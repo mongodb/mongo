@@ -74,7 +74,6 @@ public:
 
     virtual bool isInitialSyncFlagSet(OperationContext* opCtx) override;
 
-    virtual void startMasterSlave(OperationContext* opCtx);
     virtual void shutdown(OperationContext* opCtx);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
     virtual ThreadPool* getDbWorkThreadPool() const override;

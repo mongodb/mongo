@@ -5199,21 +5199,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "resync",
-          command: {resync: 1},
-          skipSharded: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {hostManager: 1, clusterManager: 1, clusterAdmin: 1, root: 1, __system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["resync"]}],
-                expectFail: true
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
           testname: "serverStatus",
           command: {serverStatus: 1},
           testcases: [

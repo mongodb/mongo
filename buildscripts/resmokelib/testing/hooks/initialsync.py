@@ -23,9 +23,7 @@ class BackgroundInitialSync(interface.Hook):
     validates it, tears it down, and restarts it.
 
     This test accepts a parameter 'n' that specifies a number of tests after which it will wait for
-    replication to finish before validating and restarting the initial sync node. It also accepts
-    a parameter 'use_resync' for whether to restart the initial sync node with resync or by
-    shutting it down and restarting it.
+    replication to finish before validating and restarting the initial sync node.
 
     This requires the ReplicaSetFixture to be started with 'start_initial_sync_node=True'. If used
     at the same time as CleanEveryN, the 'n' value passed to this hook should be equal to the 'n'
@@ -34,7 +32,7 @@ class BackgroundInitialSync(interface.Hook):
 
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
-    def __init__(self, hook_logger, fixture, use_resync=False, n=DEFAULT_N, shell_options=None):
+    def __init__(self, hook_logger, fixture, n=DEFAULT_N, shell_options=None):
         if not isinstance(fixture, replicaset.ReplicaSetFixture):
             raise ValueError("`fixture` must be an instance of ReplicaSetFixture, not {}".format(
                 fixture.__class__.__name__))
@@ -42,7 +40,6 @@ class BackgroundInitialSync(interface.Hook):
         description = "Background Initial Sync"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.use_resync = use_resync
         self.n = n
         self.tests_run = 0
         self.random_restarts = 0
@@ -102,9 +99,8 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                 # If we have not restarted initial sync since the last time we ran the data
                 # validation, restart initial sync with a 20% probability.
                 if self._hook.random_restarts < 1 and random.random() < 0.2:
-                    hook_type = "resync" if self._hook.use_resync else "initial sync"
-                    self.logger.info("randomly restarting " + hook_type +
-                                     " in the middle of " + hook_type)
+                    self.logger.info(
+                        "randomly restarting initial sync in the middle of initial sync")
                     self.__restart_init_sync(sync_node, sync_node_conn)
                     self._hook.random_restarts += 1
                 return
@@ -123,35 +119,27 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
         self.__restart_init_sync(sync_node, sync_node_conn)
 
-    # Restarts initial sync by shutting down the node, clearing its data, and restarting it,
-    # or by calling resync if use_resync is specified.
+    # Restarts initial sync by shutting down the node, clearing its data, and restarting it.
     def __restart_init_sync(self, sync_node, sync_node_conn):
-        if self._hook.use_resync:
-            self.logger.info("Calling resync on initial sync node...")
-            cmd = bson.SON([("resync", 1), ("wait", 0)])
-            sync_node_conn.admin.command(cmd)
-        else:
-            # Tear down and restart the initial sync node to start initial sync again.
-            sync_node.teardown()
+        # Tear down and restart the initial sync node to start initial sync again.
+        sync_node.teardown()
 
-            self.logger.info("Starting the initial sync node back up again...")
-            sync_node.setup()
-            sync_node.await_ready()
+        self.logger.info("Starting the initial sync node back up again...")
+        sync_node.setup()
+        sync_node.await_ready()
 
 
 class IntermediateInitialSync(interface.Hook):
     """
     This hook accepts a parameter 'n' that specifies a number of tests after which it will start up
-    a node to initial sync, wait for replication to finish, and then validate the data. It also
-    accepts a parameter 'use_resync' for whether to restart the initial sync node with resync or by
-    shutting it down and restarting it.
+    a node to initial sync, wait for replication to finish, and then validate the data.
 
     This requires the ReplicaSetFixture to be started with 'start_initial_sync_node=True'.
     """
 
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
-    def __init__(self, hook_logger, fixture, use_resync=False, n=DEFAULT_N):
+    def __init__(self, hook_logger, fixture, n=DEFAULT_N):
         if not isinstance(fixture, replicaset.ReplicaSetFixture):
             raise ValueError("`fixture` must be an instance of ReplicaSetFixture, not {}".format(
                 fixture.__class__.__name__))
@@ -159,7 +147,6 @@ class IntermediateInitialSync(interface.Hook):
         description = "Intermediate Initial Sync"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.use_resync = use_resync
         self.n = n
         self.tests_run = 0
 
@@ -195,16 +182,11 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
         sync_node = self.fixture.get_initial_sync_node()
         sync_node_conn = sync_node.mongo_client()
 
-        if self._hook.use_resync:
-            self.logger.info("Calling resync on initial sync node...")
-            cmd = bson.SON([("resync", 1)])
-            sync_node_conn.admin.command(cmd)
-        else:
-            sync_node.teardown()
+        sync_node.teardown()
 
-            self.logger.info("Starting the initial sync node back up again...")
-            sync_node.setup()
-            sync_node.await_ready()
+        self.logger.info("Starting the initial sync node back up again...")
+        sync_node.setup()
+        sync_node.await_ready()
 
         # Do initial sync round.
         self.logger.info("Waiting for initial sync node to go into SECONDARY state")

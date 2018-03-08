@@ -294,10 +294,6 @@ ExitCode _initAndListen(int listenPort) {
         LogstreamBuilder l = log(LogComponent::kControl);
         l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
           << " dbpath=" << storageGlobalParams.dbpath;
-        if (replSettings.isMaster())
-            l << " master=" << replSettings.isMaster();
-        if (replSettings.isSlave())
-            l << " slave=" << (int)replSettings.isSlave();
 
         const bool is32bit = sizeof(int*) == 4;
         l << (is32bit ? " 32" : " 64") << "-bit host=" << getHostNameCached() << endl;
@@ -398,8 +394,8 @@ ExitCode _initAndListen(int listenPort) {
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    bool canCallFCVSetIfCleanStartup = !storageGlobalParams.readOnly &&
-        !(replSettings.isSlave() || storageGlobalParams.engine == "devnull");
+    bool canCallFCVSetIfCleanStartup =
+        !storageGlobalParams.readOnly && (storageGlobalParams.engine != "devnull");
     if (canCallFCVSetIfCleanStartup && !replSettings.usingReplSets()) {
         Lock::GlobalWrite lk(startupOpCtx.get());
         FeatureCompatibilityVersion::setIfCleanStartup(startupOpCtx.get(),
@@ -560,8 +556,7 @@ ExitCode _initAndListen(int listenPort) {
             startTTLBackgroundJob();
         }
 
-        if (replSettings.usingReplSets() || (!replSettings.isMaster() && replSettings.isSlave()) ||
-            !internalValidateFeaturesAsMaster) {
+        if (replSettings.usingReplSets() || !internalValidateFeaturesAsMaster) {
             serverGlobalParams.validateFeaturesAsMaster.store(false);
         }
     }

@@ -45,9 +45,6 @@ const auto getReplicationCoordinator =
 ReplicationCoordinator::ReplicationCoordinator() {}
 ReplicationCoordinator::~ReplicationCoordinator() {}
 
-// TODO(dannenberg) remove when master slave is removed
-const char* replAllDead = 0;
-
 ReplicationCoordinator* ReplicationCoordinator::get(ServiceContext* service) {
     return getReplicationCoordinator(service).get();
 }

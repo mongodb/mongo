@@ -105,7 +105,6 @@ void ShardingMongodTestFixture::setUp() {
 
     repl::ReplSettings replSettings;
     replSettings.setReplSetString(ConnectionString::forReplicaSet(_setName, _servers).toString());
-    replSettings.setMaster(true);
     auto replCoordPtr = makeReplicationCoordinator(replSettings);
     _replCoord = replCoordPtr.get();
 
@@ -156,7 +155,10 @@ void ShardingMongodTestFixture::setUp() {
 
 std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(
     ReplSettings replSettings) {
-    return stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(), replSettings);
+    auto coordinator =
+        stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(), replSettings);
+    ASSERT_OK(coordinator->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    return coordinator;
 }
 
 std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskExecutorPool() {

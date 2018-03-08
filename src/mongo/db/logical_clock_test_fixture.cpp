@@ -61,9 +61,6 @@ void LogicalClockTestFixture::setUp() {
 
     _dbDirectClient = stdx::make_unique<DBDirectClient>(operationContext());
 
-    // Set master to false (set to true in ShardingMongodTestFixture::setUp()) so follower mode can
-    // be toggled meaningfully. Default follower mode to primary, so writes can be accepted.
-    replicationCoordinator()->setMaster(false);
     ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 }
 

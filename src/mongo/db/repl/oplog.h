@@ -183,7 +183,6 @@ std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement
 class OplogApplication {
 public:
     static constexpr StringData kInitialSyncOplogApplicationMode = "InitialSync"_sd;
-    static constexpr StringData kMasterSlaveOplogApplicationMode = "MasterSlave"_sd;
     static constexpr StringData kRecoveringOplogApplicationMode = "Recovering"_sd;
     static constexpr StringData kSecondaryOplogApplicationMode = "Secondary"_sd;
     static constexpr StringData kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
@@ -191,9 +190,6 @@ public:
     enum class Mode {
         // Used during the oplog application phase of the initial sync process.
         kInitialSync,
-
-        // Used when a slave is applying operations from a master node in master-slave.
-        kMasterSlave,
 
         // Used when we are applying oplog operations to recover the database state following an
         // unclean shutdown, or when we are recovering from the oplog after we rollback to a

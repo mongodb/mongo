@@ -28,11 +28,9 @@
 
 #pragma once
 
-#include <set>
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -56,15 +54,7 @@ public:
     /**
      * Getters
      */
-    bool isSlave() const;
-    bool isMaster() const;
-    bool isFastSyncEnabled() const;
-    bool isAutoResyncEnabled() const;
-    Seconds getSlaveDelaySecs() const;
-    int getPretouch() const;
     long long getOplogSizeBytes() const;
-    std::string getSource() const;
-    std::string getOnly() const;
     std::string getReplSetString() const;
 
     /**
@@ -82,37 +72,12 @@ public:
     /**
      * Setters
      */
-    void setSlave(bool slave);
-    void setMaster(bool master);
-    void setFastSyncEnabled(bool fastSyncEnabled);
-    void setAutoResyncEnabled(bool autoResyncEnabled);
-    void setSlaveDelaySecs(int slaveDelay);
-    void setPretouch(int pretouch);
     void setOplogSizeBytes(long long oplogSizeBytes);
-    void setSource(std::string source);
-    void setOnly(std::string only);
     void setReplSetString(std::string replSetString);
     void setPrefetchIndexMode(std::string prefetchIndexModeString);
 
 private:
-    /**
-     * true means we are master and doing replication.  If we are not writing to oplog, this won't
-     * be true.
-     */
-    bool _master = false;
-
-    // replication slave? (possibly with slave)
-    bool _slave = false;
-
-    bool _fastSyncEnabled = false;
-    bool _autoResyncEnabled = false;
-    Seconds _slaveDelaySecs = Seconds(0);
     long long _oplogSizeBytes = 0;  // --oplogSize
-
-    // for master/slave replication
-    std::string _source;  // --source
-    std::string _only;    // --only
-    int _pretouch = 0;    // --pretouch for replication application (experimental)
 
     std::string _replSetString;  // --replSet[/<seedlist>]
 

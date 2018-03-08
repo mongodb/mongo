@@ -24,9 +24,8 @@
         data: {collectionNS: coll.getFullName()}
     }));
 
-    jsTest.log("Issuing RESYNC command to " + tojson(secondary));
-    assert.commandWorked(secondary.getDB("admin").runCommand({resync: 1}));
-
+    jsTest.log("Re-syncing " + tojson(secondary));
+    secondary = replSet.restart(secondary, {startClean: true});
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
 

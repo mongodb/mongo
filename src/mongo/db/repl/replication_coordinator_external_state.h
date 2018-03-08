@@ -97,11 +97,6 @@ public:
     virtual void stopDataReplication(OperationContext* opCtx) = 0;
 
     /**
-     * Starts the Master/Slave threads and sets up logOp
-     */
-    virtual void startMasterSlave(OperationContext* opCtx) = 0;
-
-    /**
      * Performs any necessary external state specific shutdown tasks, such as cleaning up
      * the threads it started.
      */

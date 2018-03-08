@@ -82,7 +82,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     }
 #endif
 
-    moe::OptionSection ms_options("Master/slave options (old; use replica sets instead)");
     moe::OptionSection rs_options("Replica set options");
     moe::OptionSection replication_options("Replication options");
     moe::OptionSection sharding_options("Sharding options");
@@ -370,49 +369,6 @@ Status addMongodOptions(moe::OptionSection* options) {
 
 #endif
 
-    // Master Slave Options
-
-    ms_options.addOptionChaining("master", "master", moe::Switch, "master mode")
-        .incompatibleWith("replication.replSet")
-        .incompatibleWith("replication.replSetName")
-        .setSources(moe::SourceAllLegacy);
-
-    ms_options.addOptionChaining("slave", "slave", moe::Switch, "slave mode")
-        .incompatibleWith("replication.replSet")
-        .incompatibleWith("replication.replSetName")
-        .setSources(moe::SourceAllLegacy);
-
-    ms_options
-        .addOptionChaining(
-            "source", "source", moe::String, "when slave: specify master as <server:port>")
-        .incompatibleWith("replication.replSet")
-        .incompatibleWith("replication.replSetName")
-        .setSources(moe::SourceAllLegacy);
-
-    ms_options
-        .addOptionChaining(
-            "only", "only", moe::String, "when slave: specify a single database to replicate")
-        .incompatibleWith("replication.replSet")
-        .incompatibleWith("replication.replSetName")
-        .setSources(moe::SourceAllLegacy);
-
-    ms_options
-        .addOptionChaining(
-            "slavedelay",
-            "slavedelay",
-            moe::Int,
-            "specify delay (in seconds) to be used when applying master ops to slave")
-        .incompatibleWith("replication.replSet")
-        .incompatibleWith("replication.replSetName")
-        .setSources(moe::SourceAllLegacy);
-
-    ms_options
-        .addOptionChaining(
-            "autoresync", "autoresync", moe::Switch, "automatically resync if slave data is stale")
-        .incompatibleWith("replication.replSet")
-        .incompatibleWith("replication.replSetName")
-        .setSources(moe::SourceAllLegacy);
-
     // Replication Options
 
     replication_options.addOptionChaining(
@@ -468,9 +424,7 @@ Status addMongodOptions(moe::OptionSection* options) {
                            moe::Switch,
                            "declare this is a shard db of a cluster; default port 27018")
         .setSources(moe::SourceAllLegacy)
-        .incompatibleWith("configsvr")
-        .incompatibleWith("master")
-        .incompatibleWith("slave");
+        .incompatibleWith("configsvr");
 
     sharding_options
         .addOptionChaining(
@@ -530,7 +484,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     options->addSection(windows_scm_options).transitional_ignore();
 #endif
     options->addSection(replication_options).transitional_ignore();
-    options->addSection(ms_options).transitional_ignore();
     options->addSection(rs_options).transitional_ignore();
     options->addSection(sharding_options).transitional_ignore();
 #ifdef MONGO_CONFIG_SSL
@@ -539,23 +492,6 @@ Status addMongodOptions(moe::OptionSection* options) {
     options->addSection(storage_options).transitional_ignore();
 
     // The following are legacy options that are disallowed in the JSON config file
-
-    options
-        ->addOptionChaining(
-            "fastsync",
-            "fastsync",
-            moe::Switch,
-            "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
-
-    options
-        ->addOptionChaining("pretouch",
-                            "pretouch",
-                            moe::Int,
-                            "n pretouch threads for applying master/slave operations")
-        .hidden()
-        .setSources(moe::SourceAllLegacy);
 
     // This is a deprecated option that we are supporting for backwards compatibility
     // The first value for this option can be either 'dbpath' or 'run'.
@@ -651,18 +587,8 @@ Status validateMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
-        for (const auto& disallowedOption : {"replication.replSet",
-                                             "configsvr",
-                                             "upgrade",
-                                             "repair",
-                                             "profile",
-                                             "master",
-                                             "slave",
-                                             "source",
-                                             "only",
-                                             "slavedelay",
-                                             "autoresync",
-                                             "fastsync"}) {
+        for (const auto& disallowedOption :
+             {"replication.replSet", "configsvr", "upgrade", "repair", "profile"}) {
             if (params.count(disallowedOption)) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Cannot specify both queryable backup mode and "
@@ -1097,32 +1023,6 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     repl::ReplSettings replSettings;
-    if (params.count("master")) {
-        replSettings.setMaster(params["master"].as<bool>());
-    }
-    if (params.count("slave") && params["slave"].as<bool>() == true) {
-        replSettings.setSlave(true);
-    }
-    if (params.count("slavedelay")) {
-        replSettings.setSlaveDelaySecs(params["slavedelay"].as<int>());
-    }
-    if (params.count("fastsync")) {
-        if (!replSettings.isSlave()) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "--fastsync must only be used with --slave");
-        }
-        replSettings.setFastSyncEnabled(params["fastsync"].as<bool>());
-    }
-    if (params.count("autoresync")) {
-        replSettings.setAutoResyncEnabled(params["autoresync"].as<bool>());
-    }
-    if (params.count("source")) {
-        /* specifies what the source in local.sources should be */
-        replSettings.setSource(params["source"].as<std::string>().c_str());
-    }
-    if (params.count("pretouch")) {
-        replSettings.setPretouch(params["pretouch"].as<int>());
-    }
     if (params.count("replication.replSetName")) {
         replSettings.setReplSetString(params["replication.replSetName"].as<std::string>().c_str());
     }
@@ -1147,9 +1047,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         serverGlobalParams.indexBuildRetry = params["storage.indexBuildRetry"].as<bool>();
     }
 
-    if (params.count("only")) {
-        replSettings.setOnly(params["only"].as<std::string>().c_str());
-    }
     if (params.count("storage.mmapv1.nsSize")) {
         int x = params["storage.mmapv1.nsSize"].as<int>();
         if (x <= 0 || x > (0x7fffffff / 1024 / 1024)) {
@@ -1271,9 +1168,6 @@ Status storeMongodOptions(const moe::Environment& params) {
     } else {
         storageGlobalParams.repairpath = storageGlobalParams.dbpath;
     }
-
-    if (replSettings.getPretouch())
-        log() << "--pretouch " << replSettings.getPretouch();
 
     // Check if we are 32 bit and have not explicitly specified any journaling options
     if (sizeof(void*) == 4 && !params.count("storage.journal.enabled")) {

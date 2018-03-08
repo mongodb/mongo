@@ -1535,10 +1535,8 @@ env.Library(
 env.Library(
     target="serveronly_repl",
     source=[
-        "master_slave.cpp",
         'noop_writer.cpp',
         "replication_coordinator_external_state_impl.cpp",
-        "resync.cpp",
         "rs_sync.cpp",
         "sync_source_feedback.cpp",
     ],

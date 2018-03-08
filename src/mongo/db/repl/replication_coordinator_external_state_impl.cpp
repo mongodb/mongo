@@ -57,7 +57,6 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
@@ -323,10 +322,6 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     _writerPool = SyncTail::makeWriterPool();
 
     _startedThreads = true;
-}
-
-void ReplicationCoordinatorExternalStateImpl::startMasterSlave(OperationContext* opCtx) {
-    repl::startMasterSlave(opCtx);
 }
 
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {

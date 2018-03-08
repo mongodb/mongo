@@ -366,8 +366,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // to. The local DB is special because it is not replicated.  See SERVER-10927 for more
     // details.
     const bool shouldClearNonLocalTmpCollections =
-        !(checkIfReplMissingFromCommandLine(opCtx) || replSettings.usingReplSets() ||
-          replSettings.isSlave());
+        !(checkIfReplMissingFromCommandLine(opCtx) || replSettings.usingReplSets());
 
     // To check whether a featureCompatibilityVersion document exists.
     bool fcvDocumentExists = false;

@@ -917,7 +917,6 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
 }  // namespace
 
 constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
-constexpr StringData OplogApplication::kMasterSlaveOplogApplicationMode;
 constexpr StringData OplogApplication::kRecoveringOplogApplicationMode;
 constexpr StringData OplogApplication::kSecondaryOplogApplicationMode;
 constexpr StringData OplogApplication::kApplyOpsCmdOplogApplicationMode;
@@ -926,8 +925,6 @@ StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
     switch (mode) {
         case OplogApplication::Mode::kInitialSync:
             return OplogApplication::kInitialSyncOplogApplicationMode;
-        case OplogApplication::Mode::kMasterSlave:
-            return OplogApplication::kMasterSlaveOplogApplicationMode;
         case OplogApplication::Mode::kRecovering:
             return OplogApplication::kRecoveringOplogApplicationMode;
         case OplogApplication::Mode::kSecondary:
@@ -941,8 +938,6 @@ StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
 StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string& mode) {
     if (mode == OplogApplication::kInitialSyncOplogApplicationMode) {
         return OplogApplication::Mode::kInitialSync;
-    } else if (mode == OplogApplication::kMasterSlaveOplogApplicationMode) {
-        return OplogApplication::Mode::kMasterSlave;
     } else if (mode == OplogApplication::kRecoveringOplogApplicationMode) {
         return OplogApplication::Mode::kRecovering;
     } else if (mode == OplogApplication::kSecondaryOplogApplicationMode) {

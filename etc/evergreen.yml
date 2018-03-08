@@ -739,7 +739,6 @@ functions:
               case "${task_name}" in
               replica_sets_initsync_jscore_passthrough          \
               |replica_sets_initsync_static_jscore_passthrough  \
-              |replica_sets_resync_static_jscore_passthrough    \
               |replica_sets*                           \
               |sharding*                              \
               )
@@ -3032,19 +3031,6 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication_initsync --storageEngine=wiredTiger
 
-## jstestfuzz initial sync replica set ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_replication_resync
-  commands:
-  - func: "do setup"
-  - func: "run jstestfuzz"
-    vars:
-      jstestfuzz_vars: --numGeneratedFiles 75
-  - <<: *run_jstestfuzz_tests
-    vars:
-      <<: *jstestfuzz_config_vars
-      resmoke_args: --suites=jstestfuzz_replication_resync --storageEngine=wiredTiger
-
 ## jstestfuzz replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_session
@@ -3541,17 +3527,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_initsync_static_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: replica_sets_resync_static_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=replica_sets_resync_static_jscore_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -4995,7 +4970,6 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_pv0
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
@@ -5994,9 +5968,6 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
     - windows-64-vs2015-large
-  - name: replica_sets_resync_static_jscore_passthrough
-    distros:
-    - windows-64-vs2015-large
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
     - windows-64-vs2015-large
@@ -6772,9 +6743,6 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
     - rhel62-large
-  - name: replica_sets_resync_static_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
     - rhel62-large
@@ -6920,7 +6888,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
-  - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: sasl
@@ -8998,7 +8965,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
-  - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
@@ -9153,7 +9119,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
-  - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
@@ -9283,7 +9248,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
-  - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
@@ -9403,7 +9367,6 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_session
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
-  - name: jstestfuzz_replication_resync
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_causal_consistency
@@ -9431,9 +9394,6 @@ buildvariants:
     distros:
     - rhel62-large
   - name: replica_sets_jscore_passthrough
-    distros:
-    - rhel62-large
-  - name: replica_sets_resync_static_jscore_passthrough
     distros:
     - rhel62-large
   - name: rlp
@@ -9529,7 +9489,6 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_session
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
-  - name: jstestfuzz_replication_resync
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_causal_consistency
@@ -9555,9 +9514,6 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: replica_sets_jscore_passthrough
-    distros:
-    - windows-64-vs2015-large
-  - name: replica_sets_resync_static_jscore_passthrough
     distros:
     - windows-64-vs2015-large
   - name: rollback_fuzzer
@@ -9632,7 +9588,6 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_session
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
-  - name: jstestfuzz_replication_resync
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_causal_consistency
@@ -9650,7 +9605,6 @@ buildvariants:
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_jscore_passthrough
-  - name: replica_sets_resync_static_jscore_passthrough
   - name: rollback_fuzzer
   - name: serial_run
   - name: sharded_collections_jscore_passthrough

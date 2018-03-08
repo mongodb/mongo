@@ -46,7 +46,6 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
-#include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -88,15 +87,8 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
         return;
     }
 
-    // TODO(dannenberg) replAllDead is bad and should be removed when master slave is removed
-    if (replAllDead) {
-        result.append("ismaster", 0);
-        string s = string("dead: ") + replAllDead;
-        result.append("info", s);
-    } else {
-        result.appendBool("ismaster",
-                          ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
-    }
+    result.appendBool("ismaster",
+                      ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
 
     if (level) {
         BSONObjBuilder sources(result.subarrayStart("sources"));

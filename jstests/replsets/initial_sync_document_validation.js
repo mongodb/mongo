@@ -1,6 +1,5 @@
 /**
- * Tests that initial sync via resync command does not fail if it inserts documents
- * which don't validate.
+ * Tests that initial sync does not fail if it inserts documents which don't validate.
  */
 
 (function() {
@@ -19,7 +18,7 @@
     assert.writeOK(coll.insert({_id: 0, x: 1}));
     assert.commandWorked(coll.runCommand("collMod", {"validator": {a: {$exists: true}}}));
 
-    assert.commandWorked(secondary.getDB("admin").runCommand({resync: 1}));
+    secondary = replSet.restart(secondary, {startClean: true});
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
 

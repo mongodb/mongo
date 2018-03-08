@@ -41,7 +41,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/view_response_formatter.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/util/log.h"
 
@@ -68,10 +67,6 @@ public:
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* serviceContext) const override {
-        if (repl::ReplicationCoordinator::get(serviceContext)->getSettings().isSlave()) {
-            // ok on --slave setups
-            return Command::AllowedOnSecondary::kAlways;
-        }
         return Command::AllowedOnSecondary::kOptIn;
     }
 

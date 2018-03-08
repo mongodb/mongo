@@ -443,7 +443,6 @@
         replSetUpdatePosition: {skip: isUnrelated},
         replSetResizeOplog: {skip: isUnrelated},
         resetError: {skip: isUnrelated},
-        resync: {skip: isUnrelated},
         revokePrivilegesFromRole: {
             command: {
                 revokePrivilegesFromRole: "testrole",
