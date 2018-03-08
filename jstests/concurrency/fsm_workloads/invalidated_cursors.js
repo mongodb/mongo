@@ -44,6 +44,31 @@ var $config = (function() {
                 assertAlways.commandWorked(db[collName].createIndex(indexSpec));
             });
         },
+
+        /**
+         * Calls 'killFn' on a random getMore that's currently running.
+         */
+        killRandomGetMore: function killRandomGetMore(someDB, killFn) {
+            const admin = someDB.getSiblingDB("admin");
+            const getMores = admin
+                                 .aggregate([
+                                     // idleConnections true so we can also kill cursors which are
+                                     // not currently active.
+                                     {$currentOp: {idleConnections: true}},
+                                     // We only about getMores.
+                                     {$match: {"command.getMore": {$exists: true}}},
+                                     // Only find getMores running on the database for this test.
+                                     {$match: {"ns": this.uniqueDBName + ".$cmd"}}
+                                 ])
+                                 .toArray();
+
+            if (getMores.length === 0) {
+                return;
+            }
+
+            const toKill = this.chooseRandomlyFrom(getMores);
+            return killFn(toKill);
+        }
     };
 
     let states = {
@@ -81,10 +106,44 @@ var $config = (function() {
             assertAlways.commandWorked(res);
         },
 
+        /**
+         * This is just a transition state that serves as a placeholder to delegate to one of the
+         * specific kill types like 'killOp' or 'killCursors'.
+         */
+        kill: function kill(unusedDB, unusedCollName) {},
+
+        /**
+         * Choose a random cursor that's open and kill it.
+         */
         killCursor: function killCursor(unusedDB, unusedCollName) {
-            if (this.hasOwnProperty('cursor')) {
-                this.cursor.close();
+            if (isMongos(unusedDB)) {
+                // SERVER-33700: We can't list operations running locally on a mongos.
+                return;
             }
+
+            const myDB = unusedDB.getSiblingDB(this.uniqueDBName);
+
+            // Not checking the return value, since the cursor may be closed on its own
+            // before this has a chance to run.
+            this.killRandomGetMore(myDB, function(toKill) {
+                const res = myDB.runCommand(
+                    {killCursors: toKill.command.collection, cursors: [toKill.command.getMore]});
+                assertAlways.commandWorked(res);
+            });
+        },
+
+        killOp: function killOp(unusedDB, unusedCollName) {
+            if (isMongos(unusedDB)) {
+                // SERVER-33700: We can't list operations running locally on a mongos.
+                return;
+            }
+
+            const myDB = unusedDB.getSiblingDB(this.uniqueDBName);
+            // Not checking return value since the operation may end on its own before we have
+            // a chance to kill it.
+            this.killRandomGetMore(myDB, function(toKill) {
+                assertAlways.commandWorked(myDB.killOp(toKill.opid));
+            });
         },
 
         /**
@@ -104,12 +163,15 @@ var $config = (function() {
                     this.cursor.next();
                 } catch (e) {
                     // The getMore request can fail if the database, a collection, or an index was
-                    // dropped.
+                    // dropped. It can also fail if another thread kills it through killCursor or
+                    // killOp.
                     assertAlways.contains(e.code,
                                           [
                                             ErrorCodes.OperationFailed,
                                             ErrorCodes.QueryPlanKilled,
-                                            ErrorCodes.CursorNotFound
+                                            ErrorCodes.CursorNotFound,
+                                            ErrorCodes.CursorKilled,
+                                            ErrorCodes.Interrupted,
                                           ],
                                           'unexpected error code: ' + e.code + ': ' + e.message);
                 }
@@ -185,10 +247,12 @@ var $config = (function() {
             dropIndex: 0.1,
         },
 
-        query: {killCursor: 0.1, getMore: 0.9},
+        query: {kill: 0.1, getMore: 0.9},
         explain: {explain: 0.1, init: 0.9},
+        kill: {killOp: 0.5, killCursor: 0.5},
+        killOp: {init: 1},
         killCursor: {init: 1},
-        getMore: {killCursor: 0.2, getMore: 0.6, init: 0.2},
+        getMore: {kill: 0.2, getMore: 0.6, init: 0.2},
         dropDatabase: {init: 1},
         dropCollection: {init: 1},
         dropIndex: {init: 1}
