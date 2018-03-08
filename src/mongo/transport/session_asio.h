@@ -169,6 +169,45 @@ public:
 #endif
     }
 
+    template <typename Buffer>
+    bool checkForHTTPRequest(const Buffer& buffers) {
+        invariant(asio::buffer_size(buffers) >= 4);
+        const StringData bufferAsStr(asio::buffer_cast<const char*>(buffers), 4);
+        return (bufferAsStr == "GET "_sd);
+    }
+
+    // Called from read() to send an HTTP response back to a client that's trying to use HTTP
+    // over a native MongoDB port.
+    template <typename Callback>
+    void sendHTTPResponse(bool sync, Callback&& postHandshakeCb) {
+        constexpr auto userMsg =
+            "It looks like you are trying to access MongoDB over HTTP"
+            " on the native driver port.\r\n"_sd;
+
+        static const std::string httpResp = str::stream() << "HTTP/1.0 200 OK\r\n"
+                                                             "Connection: close\r\n"
+                                                             "Content-Type: text/plain\r\n"
+                                                             "Content-Length: "
+                                                          << userMsg.size() << "\r\n\r\n"
+                                                          << userMsg;
+
+        write(sync,
+              asio::buffer(httpResp.data(), httpResp.size()),
+              [ cb = std::move(postHandshakeCb), this ](const std::error_code& ec,
+                                                        size_t size) mutable {
+                  if (ec) {
+                      cb({ErrorCodes::ProtocolError,
+                          str::stream()
+                              << "Client sent an HTTP request over a native MongoDB connection, "
+                                 "but there was an error sending a response: "
+                              << ec.message()});
+                      return;
+                  }
+                  cb({ErrorCodes::ProtocolError,
+                      "Client sent an HTTP request over a native MongoDB connection"});
+              });
+    }
+
 private:
     template <typename Stream, typename MutableBufferSequence, typename CompleteHandler>
     void opportunisticRead(bool sync,
@@ -218,6 +257,10 @@ private:
         invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
         MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
         auto responseTo = headerView.getResponseToMsgId();
+
+        if (checkForHTTPRequest(buffer)) {
+            return onComplete(Status::OK(), false);
+        }
 
         // This logic was taken from the old mongo/util/net/sock.cpp.
         //

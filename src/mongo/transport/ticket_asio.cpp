@@ -93,6 +93,10 @@ void TransportLayerASIO::ASIOSourceTicket::_headerCallback(const std::error_code
     if (!session)
         return;
 
+    if (session->checkForHTTPRequest(asio::buffer(_buffer.get(), size))) {
+        return session->sendHTTPResponse(isSync(), [this](Status status) { finishFill(status); });
+    }
+
     MSGHEADER::View headerView(_buffer.get());
     auto msgLen = static_cast<size_t>(headerView.getMessageLength());
     if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
