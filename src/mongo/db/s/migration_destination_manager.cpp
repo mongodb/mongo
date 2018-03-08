@@ -272,6 +272,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
             // Ignoring this error because this is an optional parameter and we catch timeout
             // exceptions later.
         }
+        b.append("waited", true);
     }
     stdx::lock_guard<stdx::mutex> sl(_mutex);
 
@@ -280,7 +281,6 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
     if (_sessionId) {
         b.append("sessionId", _sessionId->toString());
     }
-    b.append("waited", waitForSteadyOrDone);
 
     b.append("ns", _nss.ns());
     b.append("from", _fromShardConnString.toString());

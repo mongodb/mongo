@@ -269,7 +269,7 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
 
         const BSONObj& res = responseStatus.getValue();
 
-        if (res["waited"].boolean()) {
+        if (!res["waited"].boolean()) {
             sleepmillis(1LL << std::min(iteration, 10));
         }
         iteration++;
