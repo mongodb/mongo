@@ -1198,7 +1198,7 @@ size_t sync_send(socket_type s, state_type state, const buf* bufs,
 
   // Write some data
   signed_size_type bytes = socket_ops::send(s, bufs, count, flags, ec);
-  return bytes;
+  return bytes > 0 ? bytes : 0;
 }
 
 #if defined(ASIO_HAS_IOCP)

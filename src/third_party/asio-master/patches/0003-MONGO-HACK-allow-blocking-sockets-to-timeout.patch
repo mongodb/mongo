@@ -72,7 +72,7 @@ index b3b1a0cf81..2f89889fac 100644
 -  }
 +  // Write some data
 +  signed_size_type bytes = socket_ops::send(s, bufs, count, flags, ec);
-+  return bytes;
++  return bytes > 0 ? bytes : 0;
  }
  
  #if defined(ASIO_HAS_IOCP)
