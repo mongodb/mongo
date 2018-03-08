@@ -672,7 +672,7 @@ void ReplSource::applyOperation(OperationContext* opCtx, Database* db, const BSO
             // collection cloning. As a result, it is possible that a document that we need to
             // update is not present locally. In that case we fetch the document from the
             // sync source.
-            SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc());
+            SyncTail sync(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
             sync.setHostname(hostName);
             OplogEntry oplogEntry(op);
             sync.fetchAndInsertMissingDocument(opCtx, oplogEntry);

@@ -1392,7 +1392,7 @@ public:
 class SyncTest : public SyncTail {
 public:
     bool returnEmpty;
-    SyncTest() : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc()), returnEmpty(false) {}
+    SyncTest() : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr), returnEmpty(false) {}
     virtual ~SyncTest() {}
     BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override {
         if (returnEmpty) {
@@ -1428,7 +1428,7 @@ public:
 
         // this should fail because we can't connect
         try {
-            SyncTail badSource(nullptr, SyncTail::MultiSyncApplyFunc());
+            SyncTail badSource(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
             badSource.setHostname("localhost:123");
 
             OldClientContext ctx(&_opCtx, ns());

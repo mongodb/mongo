@@ -1244,9 +1244,9 @@ public:
                       << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
-        ASSERT_EQUALS(op2.getOpTime(),
-                      unittest::assertGet(
-                          repl::SyncTail(nullptr, repl::multiSyncApply).multiApply(_opCtx, ops)));
+        auto writerPool = repl::SyncTail::makeWriterPool();
+        repl::SyncTail syncTail(nullptr, repl::multiSyncApply, writerPool.get());
+        ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(syncTail.multiApply(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
         assertMultikeyPaths(
@@ -1354,8 +1354,9 @@ public:
             return repl::multiInitialSyncApply(ops, st, &fetchCount, workerMultikeyPathInfo);
         };
 
-        auto lastTime =
-            unittest::assertGet(repl::SyncTail(nullptr, applyOpFn).multiApply(_opCtx, ops));
+        auto writerPool = repl::SyncTail::makeWriterPool();
+        repl::SyncTail syncTail(nullptr, applyOpFn, writerPool.get());
+        auto lastTime = unittest::assertGet(syncTail.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);

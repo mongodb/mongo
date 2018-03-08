@@ -274,13 +274,8 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op)
 
 }  // namespace
 
-SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
-    : SyncTail(q, func, makeWriterPool()) {}
-
-SyncTail::SyncTail(BackgroundSync* q,
-                   MultiSyncApplyFunc func,
-                   std::unique_ptr<ThreadPool> writerPool)
-    : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)) {}
+SyncTail::SyncTail(BackgroundSync* bgsync, MultiSyncApplyFunc func, ThreadPool* writerPool)
+    : _bgsync(bgsync), _applyFunc(func), _writerPool(writerPool) {}
 
 SyncTail::~SyncTail() {}
 
@@ -306,7 +301,7 @@ std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
 }
 
 bool SyncTail::peek(OperationContext* opCtx, BSONObj* op) {
-    return _networkQueue->peek(opCtx, op);
+    return _bgsync->peek(opCtx, op);
 }
 
 // static
@@ -719,7 +714,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         return Status::OK();
     };
 
-    return repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation);
+    return repl::multiApply(opCtx, _writerPool, std::move(ops), applyOperation);
 }
 
 namespace {
@@ -901,7 +896,7 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
             while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
                 // Tests should not trigger clean shutdown while that failpoint is active. If we
                 // think we need this, we need to think hard about what the behavior should be.
-                if (_networkQueue->inShutdown()) {
+                if (_bgsync->inShutdown()) {
                     severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
                     fassertFailedNoTrace(40304);
                 }
@@ -1009,12 +1004,12 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
         if (!peek_success) {
             // If we don't have anything in the queue, wait a bit for something to appear.
             if (ops->empty()) {
-                if (_networkQueue->inShutdown()) {
+                if (_bgsync->inShutdown()) {
                     ops->setMustShutdownFlag();
                 } else {
                     // Block up to 1 second. We still return true in this case because we want this
                     // op to be the first in a new batch with a new start time.
-                    _networkQueue->waitForMore();
+                    _bgsync->waitForMore();
                 }
             }
 
@@ -1065,7 +1060,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     if (entry.isCommand() && entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
         if (ops->getCount() == 1) {
             // apply commands one-at-a-time
-            _networkQueue->consume(opCtx);
+            _bgsync->consume(opCtx);
         } else {
             // This op must be processed alone, but we already had ops in the queue so we can't
             // include it in this batch. Since we didn't call consume(), we'll see this again next
@@ -1078,7 +1073,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     }
 
     // We are going to apply this Op.
-    _networkQueue->consume(opCtx);
+    _bgsync->consume(opCtx);
 
     // Go back for more ops, unless we've hit the limit.
     return ops->getCount() >= limits.ops;

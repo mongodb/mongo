@@ -79,7 +79,9 @@ void RSDataSync::_run() {
     try {
         // Once we call into SyncTail::oplogApplication we never return, so this code only runs at
         // startup.
-        SyncTail(_bgsync, multiSyncApply).oplogApplication(_replCoord);
+        auto writerPool = SyncTail::makeWriterPool();
+        SyncTail syncTail(_bgsync, multiSyncApply, writerPool.get());
+        syncTail.oplogApplication(_replCoord);
     } catch (...) {
         auto status = exceptionToStatus();
         severe() << "Exception thrown in RSDataSync: " << redact(status);

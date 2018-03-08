@@ -51,7 +51,12 @@ class ReplicationCoordinator;
 class OpTime;
 
 /**
- * "Normal" replica set syncing
+ * Used for oplog application on a replica set secondary.
+ * Primarily used to apply batches of operations fetched from a sync source during steady state
+ * replication and initial sync.
+ *
+ * When used for steady state replication, runs a thread that reads batches of operations from
+ * an oplog buffer (through the BackgroundSync interface) and applies the batch of operations.
  */
 class SyncTail {
 public:
@@ -91,8 +96,16 @@ public:
     using ApplyCommandInLockFn = stdx::function<Status(
         OperationContext*, const BSONObj&, OplogApplication::Mode oplogApplicationMode)>;
 
-    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
-    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<ThreadPool> writerPool);
+    /**
+     *
+     * Constructs a SyncTail.
+     * During steady state replication, oplogApplication() obtains batches of operations to apply
+     * from 'bgsync'. It is not required to provide 'bgsync' at construction if we do not plan on
+     * using oplogApplication(). During the oplog application phase, the batch of operations is
+     * distributed across writer threads in 'writerPool'. Each writer thread applies its own vector
+     * of operations using 'func'. The writer thread pool is not owned by us.
+     */
+    SyncTail(BackgroundSync* bgsync, MultiSyncApplyFunc func, ThreadPool* writerPool);
     virtual ~SyncTail();
 
     /**
@@ -237,13 +250,14 @@ private:
 
     std::string _hostname;
 
-    BackgroundSync* _networkQueue;
+    BackgroundSync* _bgsync;
 
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;
 
-    // persistent pool of worker threads for writing ops to the databases
-    std::unique_ptr<ThreadPool> _writerPool;
+    // Pool of worker threads for writing ops to the databases.
+    // Not owned by us.
+    ThreadPool* const _writerPool;
 };
 
 /**
