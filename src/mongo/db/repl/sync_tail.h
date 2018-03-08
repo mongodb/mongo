@@ -223,17 +223,14 @@ public:
     static AtomicInt32 replBatchLimitOperations;
 
     /**
-     * Passthrough function to test multiApply.
+     * Apply a batch of operations, using multiple threads.
+     * Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
      */
-    OpTime multiApply_forTest(OperationContext* opCtx, MultiApplier::Operations ops);
+    StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
 protected:
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
     static const int replBatchLimitSeconds = 1;
-
-    // Apply a batch of operations, using multiple threads.
-    // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
-    OpTime multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
 private:
     class OpQueueBatcher;

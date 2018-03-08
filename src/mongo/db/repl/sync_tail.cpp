@@ -702,9 +702,6 @@ SessionRecordMap getLatestSessionRecords(const MultiApplier::Operations& ops) {
 
 }  // namespace
 
-OpTime SyncTail::multiApply_forTest(OperationContext* opCtx, MultiApplier::Operations ops) {
-    return multiApply(opCtx, ops);
-}
 /**
  * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then using
  * a set of threads to apply the operations. If the batch application is successful, returns the
@@ -713,7 +710,7 @@ OpTime SyncTail::multiApply_forTest(OperationContext* opCtx, MultiApplier::Opera
  * last optime of the batch. If 'minValid' is already greater than or equal to the last optime of
  * this batch, it will not be updated.
  */
-OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
+StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     auto applyOperation = [this](MultiApplier::OperationPtrs* ops,
                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
         _applyFunc(ops, this, workerMultikeyPathInfo);
@@ -722,8 +719,7 @@ OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations op
         return Status::OK();
     };
 
-    return fassert(34437,
-                   repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation));
+    return repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation);
 }
 
 namespace {
@@ -957,7 +953,8 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
 
         // Apply the operations in this batch. 'multiApply' returns the optime of the last op that
         // was applied, which should be the last optime in the batch.
-        auto lastOpTimeAppliedInBatch = multiApply(&opCtx, ops.releaseBatch());
+        auto lastOpTimeAppliedInBatch =
+            fassertNoTrace(34437, multiApply(&opCtx, ops.releaseBatch()));
         invariant(lastOpTimeAppliedInBatch == lastOpTimeInBatch);
 
         // In order to provide resilience in the event of a crash in the middle of batch
