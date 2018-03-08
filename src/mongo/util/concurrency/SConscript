@@ -7,7 +7,6 @@ env = env.Clone()
 env.Library(
     target='thread_pool',
     source=[
-        'old_thread_pool.cpp',
         'thread_pool.cpp',
     ],
     LIBDEPS=[

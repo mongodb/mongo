@@ -43,7 +43,7 @@
 #include "mongo/platform/bits.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -126,12 +126,17 @@ class ThreadPoolTest {
 
 public:
     void run() {
-        OldThreadPool tp(nThreads);
+        ThreadPool::Options options;
+        options.maxThreads = options.minThreads = nThreads;
+        ThreadPool tp(options);
+        tp.startup();
 
         for (unsigned i = 0; i < iterations; i++) {
-            tp.schedule([=] { increment(2); });
+            ASSERT_OK(tp.schedule([=] { increment(2); }));
         }
 
+        tp.waitForIdle();
+        tp.shutdown();
         tp.join();
 
         ASSERT_EQUALS(counter.load(), iterations * 2);
