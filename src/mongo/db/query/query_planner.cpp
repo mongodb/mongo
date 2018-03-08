@@ -124,9 +124,6 @@ string optionString(size_t options) {
             case QueryPlannerParams::CANNOT_TRIM_IXISECT:
                 ss << "CANNOT_TRIM_IXISECT ";
                 break;
-            case QueryPlannerParams::SNAPSHOT_USE_ID:
-                ss << "SNAPSHOT_USE_ID ";
-                break;
             case QueryPlannerParams::NO_UNCOVERED_PROJECTIONS:
                 ss << "NO_UNCOVERED_PROJECTIONS ";
                 break;
@@ -595,40 +592,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     BSONObj hintIndex;
     if (!params.indexFiltersApplied) {
         hintIndex = query.getQueryRequest().getHint();
-    }
-
-    // If snapshot is set, default to collscanning. If the query param SNAPSHOT_USE_ID is set,
-    // snapshot is a form of a hint, so try to use _id index to make a real plan. If that fails,
-    // just scan the _id index.
-    //
-    // Don't do this if the query is a geonear or text as as text search queries must be answered
-    // using full text indices and geoNear queries must be answered using geospatial indices.
-    if (query.getQueryRequest().isSnapshot()) {
-        RARELY {
-            warning() << "The snapshot option is deprecated. See "
-                         "http://dochub.mongodb.org/core/snapshot-deprecation";
-        }
-
-        if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
-            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
-            const bool useIXScan = params.options & QueryPlannerParams::SNAPSHOT_USE_ID;
-
-            if (!useIXScan) {
-                auto soln = buildCollscanSoln(query, isTailable, params);
-                if (soln) {
-                    out.push_back(std::move(soln));
-                }
-                return {std::move(out)};
-            } else {
-                // Find the ID index in indexKeyPatterns. It's our hint.
-                for (size_t i = 0; i < params.indices.size(); ++i) {
-                    if (isIdIndex(params.indices[i].keyPattern)) {
-                        hintIndex = params.indices[i].keyPattern;
-                        break;
-                    }
-                }
-            }
-        }
     }
 
     boost::optional<size_t> hintIndexNumber;

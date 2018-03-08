@@ -279,16 +279,6 @@ TEST(ExpressionOptimizeTest, IsValidGeoNearNaturalHint) {
     ASSERT_NOT_OK(isValid("{a: {$near: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}", *qr));
 }
 
-TEST(ExpressionOptimizeTest, IsValidTextAndSnapshot) {
-    // Filter inside QueryRequest is not used.
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setSnapshot(true);
-    ASSERT_OK(qr->validate());
-
-    // Invalid: TEXT and snapshot.
-    ASSERT_NOT_OK(isValid("{$text: {$search: 's'}}", *qr));
-}
-
 TEST(ExpressionOptimizeTest, IsValidNaturalSortIndexHint) {
     const bool isExplain = false;
     auto qr = assertGet(QueryRequest::makeFromFindCommand(

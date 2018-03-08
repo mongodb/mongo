@@ -95,7 +95,7 @@
         // Create collection with options.
         assert.commandWorked(configCopy.createCollection(c.name, c.options));
         // Clone the docs.
-        config.getCollection(c.name).find().snapshot().forEach(function(d) {
+        config.getCollection(c.name).find().hint({_id: 1}).forEach(function(d) {
             assert.writeOK(configCopy.getCollection(c.name).insert(d));
         });
         // Build the indexes.

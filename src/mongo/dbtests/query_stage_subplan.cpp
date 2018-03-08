@@ -376,16 +376,6 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
         ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
     }
 
-    // Can't use subplanning with snapshot.
-    {
-        std::string findCmd =
-            "{find: 'testns',"
-            "filter: {$or: [{a:1, b:1}, {c:1, d:1}]},"
-            "snapshot: true}";
-        std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
-        ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
-    }
-
     // Can use subplanning for rooted $or.
     {
         std::string findCmd =

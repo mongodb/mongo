@@ -50,7 +50,6 @@ selector:
 
   # Expect results to return in a certain order, secondaries may apply ops out of order.
   - jstests/core/coveredIndex1.js
-  - jstests/core/find1.js
   - jstests/core/sortc.js
 
   # Assert on the ismaster field of an isMaster response. If a primary steps down after accepting

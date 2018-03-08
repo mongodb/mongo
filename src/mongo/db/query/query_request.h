@@ -316,14 +316,6 @@ public:
         _showRecordId = showRecordId;
     }
 
-    bool isSnapshot() const {
-        return _snapshot;
-    }
-
-    void setSnapshot(bool snapshot) {
-        _snapshot = snapshot;
-    }
-
     bool hasReadPref() const {
         return _hasReadPref;
     }
@@ -509,7 +501,6 @@ private:
 
     bool _returnKey = false;
     bool _showRecordId = false;
-    bool _snapshot = false;
     bool _hasReadPref = false;
 
     // Options that can be specified in the OP_QUERY 'flags' header.

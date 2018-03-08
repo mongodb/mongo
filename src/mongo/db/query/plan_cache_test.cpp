@@ -155,7 +155,6 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
                                         const char* hintStr,
                                         const char* minStr,
                                         const char* maxStr,
-                                        bool snapshot,
                                         bool explain) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -173,7 +172,6 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     qr->setHint(fromjson(hintStr));
     qr->setMin(fromjson(minStr));
     qr->setMax(fromjson(maxStr));
-    qr->setSnapshot(snapshot);
     qr->setExplain(explain);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
@@ -412,9 +410,8 @@ TEST(PlanCacheTest, ShouldNotCacheQueryExplain) {
                                                0,
                                                "{}",
                                                "{}",
-                                               "{}",   // min, max
-                                               false,  // snapshot
-                                               true    // explain
+                                               "{}",  // min, max
+                                               true   // explain
                                                ));
     const QueryRequest& qr = cq->getQueryRequest();
     ASSERT_TRUE(qr.isExplain());
@@ -534,7 +531,7 @@ protected:
                             const BSONObj& hint,
                             const BSONObj& minObj,
                             const BSONObj& maxObj) {
-        runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj, false);
+        runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
     }
 
     void runQuerySortProjSkipLimitHint(const BSONObj& query,
@@ -543,11 +540,7 @@ protected:
                                        long long skip,
                                        long long limit,
                                        const BSONObj& hint) {
-        runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj(), false);
-    }
-
-    void runQuerySnapshot(const BSONObj& query) {
-        runQueryFull(query, BSONObj(), BSONObj(), 0, 0, BSONObj(), BSONObj(), BSONObj(), true);
+        runQueryFull(query, sort, proj, skip, limit, hint, BSONObj(), BSONObj());
     }
 
     void runQueryFull(const BSONObj& query,
@@ -557,8 +550,7 @@ protected:
                       long long limit,
                       const BSONObj& hint,
                       const BSONObj& minObj,
-                      const BSONObj& maxObj,
-                      bool snapshot) {
+                      const BSONObj& maxObj) {
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
 
@@ -578,7 +570,6 @@ protected:
         qr->setHint(hint);
         qr->setMin(minObj);
         qr->setMax(maxObj);
-        qr->setSnapshot(snapshot);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx.get(),

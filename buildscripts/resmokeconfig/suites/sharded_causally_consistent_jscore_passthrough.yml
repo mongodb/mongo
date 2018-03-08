@@ -148,7 +148,6 @@ selector:
   - jstests/core/coveredIndex1.js
   - jstests/core/distinct1.js
   - jstests/core/elemMatchProjection.js
-  - jstests/core/find1.js
   - jstests/core/find4.js
   - jstests/core/find5.js
   - jstests/core/fts1.js
@@ -162,7 +161,6 @@ selector:
   - jstests/core/nan.js
   - jstests/core/null2.js
   - jstests/core/not2.js
-  - jstests/core/snapshot_queries.js
   - jstests/core/sorta.js
   - jstests/core/sortc.js
   - jstests/core/sort3.js

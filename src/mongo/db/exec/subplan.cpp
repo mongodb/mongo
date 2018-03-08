@@ -100,11 +100,6 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
-    // Snapshot is really a hint.
-    if (query.getQueryRequest().isSnapshot()) {
-        return false;
-    }
-
     // We can only subplan rooted $or queries.
     return MatchExpression::OR == expr->matchType();
 }

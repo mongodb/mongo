@@ -153,10 +153,6 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq(profileObj.command.returnKey, true, tojson(profileObj));
 
-    assert.eq(coll.find().snapshot().itcount(), 1);
-    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.command.snapshot, true, tojson(profileObj));
-
     //
     // Confirm that queries are truncated in the profiler as { $truncated: <string>, comment:
     // <string> }

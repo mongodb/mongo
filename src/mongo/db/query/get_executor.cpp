@@ -207,13 +207,6 @@ void fillOutPlannerParams(OperationContext* opCtx,
     } else {
         plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
     }
-
-    // MMAPv1 storage engine should have snapshot() perform an index scan on _id rather than a
-    // collection scan since a collection scan on the MMAP storage engine can return duplicates
-    // or miss documents.
-    if (isMMAPV1()) {
-        plannerParams->options |= QueryPlannerParams::SNAPSHOT_USE_ID;
-    }
 }
 
 namespace {

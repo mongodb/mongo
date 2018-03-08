@@ -201,7 +201,7 @@ void QueryPlannerTest::runQueryHintMinMax(const BSONObj& query,
                                           const BSONObj& hint,
                                           const BSONObj& minObj,
                                           const BSONObj& maxObj) {
-    runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj, false);
+    runQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
 }
 
 void QueryPlannerTest::runQuerySortProjSkipNToReturnHint(const BSONObj& query,
@@ -210,11 +210,7 @@ void QueryPlannerTest::runQuerySortProjSkipNToReturnHint(const BSONObj& query,
                                                          long long skip,
                                                          long long ntoreturn,
                                                          const BSONObj& hint) {
-    runQueryFull(query, sort, proj, skip, ntoreturn, hint, BSONObj(), BSONObj(), false);
-}
-
-void QueryPlannerTest::runQuerySnapshot(const BSONObj& query) {
-    runQueryFull(query, BSONObj(), BSONObj(), 0, 0, BSONObj(), BSONObj(), BSONObj(), true);
+    runQueryFull(query, sort, proj, skip, ntoreturn, hint, BSONObj(), BSONObj());
 }
 
 void QueryPlannerTest::runQueryFull(const BSONObj& query,
@@ -224,8 +220,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     long long ntoreturn,
                                     const BSONObj& hint,
                                     const BSONObj& minObj,
-                                    const BSONObj& maxObj,
-                                    bool snapshot) {
+                                    const BSONObj& maxObj) {
     // Clean up any previous state from a call to runQueryFull
     solns.clear();
     cq.reset();
@@ -248,7 +243,6 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     qr->setHint(hint);
     qr->setMin(minObj);
     qr->setMax(maxObj);
-    qr->setSnapshot(snapshot);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
@@ -290,7 +284,7 @@ void QueryPlannerTest::runInvalidQueryHintMinMax(const BSONObj& query,
                                                  const BSONObj& hint,
                                                  const BSONObj& minObj,
                                                  const BSONObj& maxObj) {
-    runInvalidQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj, false);
+    runInvalidQueryFull(query, BSONObj(), BSONObj(), 0, 0, hint, minObj, maxObj);
 }
 
 void QueryPlannerTest::runInvalidQuerySortProjSkipNToReturnHint(const BSONObj& query,
@@ -299,7 +293,7 @@ void QueryPlannerTest::runInvalidQuerySortProjSkipNToReturnHint(const BSONObj& q
                                                                 long long skip,
                                                                 long long ntoreturn,
                                                                 const BSONObj& hint) {
-    runInvalidQueryFull(query, sort, proj, skip, ntoreturn, hint, BSONObj(), BSONObj(), false);
+    runInvalidQueryFull(query, sort, proj, skip, ntoreturn, hint, BSONObj(), BSONObj());
 }
 
 void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
@@ -309,8 +303,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            long long ntoreturn,
                                            const BSONObj& hint,
                                            const BSONObj& minObj,
-                                           const BSONObj& maxObj,
-                                           bool snapshot) {
+                                           const BSONObj& maxObj) {
     solns.clear();
     cq.reset();
 
@@ -332,7 +325,6 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     qr->setHint(hint);
     qr->setMin(minObj);
     qr->setMax(maxObj);
-    qr->setSnapshot(snapshot);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),

@@ -93,7 +93,6 @@ const char kMaxField[] = "max";
 const char kMinField[] = "min";
 const char kReturnKeyField[] = "returnKey";
 const char kShowRecordIdField[] = "showRecordId";
-const char kSnapshotField[] = "snapshot";
 const char kTailableField[] = "tailable";
 const char kOplogReplayField[] = "oplogReplay";
 const char kNoCursorTimeoutField[] = "noCursorTimeout";
@@ -309,13 +308,6 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             }
 
             qr->_showRecordId = el.boolean();
-        } else if (fieldName == kSnapshotField) {
-            Status status = checkFieldType(el, Bool);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            qr->_snapshot = el.boolean();
         } else if (fieldName == kTailableField) {
             Status status = checkFieldType(el, Bool);
             if (!status.isOK()) {
@@ -501,10 +493,6 @@ void QueryRequest::asFindCommand(BSONObjBuilder* cmdBuilder) const {
         cmdBuilder->append(kShowRecordIdField, true);
     }
 
-    if (_snapshot) {
-        cmdBuilder->append(kSnapshotField, true);
-    }
-
     switch (_tailableMode) {
         case TailableMode::kTailable: {
             cmdBuilder->append(kTailableField, true);
@@ -590,15 +578,6 @@ Status QueryRequest::validate() const {
                 return Status(ErrorCodes::BadValue,
                               "must have $meta projection for all $meta sort keys");
             }
-        }
-    }
-
-    if (_snapshot) {
-        if (!_sort.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "E12001 can't use sort with snapshot");
-        }
-        if (!_hint.isEmpty()) {
-            return Status(ErrorCodes::BadValue, "E12002 can't use hint with snapshot");
         }
     }
 
@@ -887,9 +866,6 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
             if (str::equals("explain", name)) {
                 // Won't throw.
                 _explain = e.trueValue();
-            } else if (str::equals("snapshot", name)) {
-                // Won't throw.
-                _snapshot = e.trueValue();
             } else if (str::equals("min", name)) {
                 if (!e.isABSONObj()) {
                     return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
@@ -1021,10 +997,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kShowRecordIdField
                               << " not supported in aggregation."};
-    }
-    if (_snapshot) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kSnapshotField << " not supported in aggregation."};
     }
     if (isTailable()) {
         return {ErrorCodes::InvalidPipelineOperator,

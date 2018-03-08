@@ -47,11 +47,6 @@ var $config = extendWorkload($config, function($config, $super) {
             var res = db[collName].find().maxTimeMS(2000).explain();
             assertAlways.commandWorked(res);
         },
-        explainSnapshot: function explainSnapshot(db, collName) {
-            var res = db[collName].find().snapshot().explain();
-            assertAlways.commandWorked(res);
-            assertWhenOwnColl(isIxscan(db, res.queryPlanner.winningPlan));
-        }
     },
                                    $super.states);
 

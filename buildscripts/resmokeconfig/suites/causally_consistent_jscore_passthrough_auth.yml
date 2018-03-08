@@ -127,10 +127,6 @@ selector:
   - jstests/core/or4.js
   - jstests/core/recursion.js
   - jstests/core/temp_cleanup.js
-  # Tests that use $snapshot and expect documents to arrive in some implicit sort order are not
-  # causally consistent.
-  - jstests/core/snapshot_queries.js
-  - jstests/core/find1.js
   # An index drop does not necessarily cause cursors to be killed on the secondary.
   - jstests/core/ord.js
   # plan_cache tests does not work because they check the plan_cache on the primary while the 

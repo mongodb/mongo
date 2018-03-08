@@ -176,12 +176,6 @@ assert.commandWorked(explain);
 explain = t.find().comment("test .comment").explain();
 assert.commandWorked(explain);
 
-// .snapshot()
-explain = t.explain().find().snapshot().finish();
-assert.commandWorked(explain);
-explain = t.find().snapshot().explain();
-assert.commandWorked(explain);
-
 // .next()
 explain = t.explain().find().next();
 assert.commandWorked(explain);

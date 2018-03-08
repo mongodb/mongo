@@ -106,7 +106,6 @@ var DBExplainQuery = (function() {
             "readPref",
             "showDiskLoc",
             "skip",
-            "snapshot",
             "sort",
         ];
 
@@ -235,7 +234,6 @@ var DBExplainQuery = (function() {
             print("\t.readPref(mode, tagSet)");
             print("\t.showDiskLoc()");
             print("\t.skip(n)");
-            print("\t.snapshot()");
             print("\t.sort(sortSpec)");
             return __magicNoPrint;
         };

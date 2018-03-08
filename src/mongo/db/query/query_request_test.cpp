@@ -712,17 +712,6 @@ TEST(QueryRequestTest, ParseFromCommandShowRecordIdWrongType) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(QueryRequestTest, ParseFromCommandSnapshotWrongType) {
-    BSONObj cmdObj = fromjson(
-        "{find: 'testns',"
-        "filter:  {a: 1},"
-        "snapshot: 3}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
 TEST(QueryRequestTest, ParseFromCommandTailableWrongType) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
@@ -924,28 +913,6 @@ TEST(QueryRequestTest, ParseFromCommandMinMaxDifferentFieldsError) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
-TEST(QueryRequestTest, ParseFromCommandSnapshotPlusSortError) {
-    BSONObj cmdObj = fromjson(
-        "{find: 'testns',"
-        "sort: {a: 3},"
-        "snapshot: true}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
-TEST(QueryRequestTest, ParseFromCommandSnapshotPlusHintError) {
-    BSONObj cmdObj = fromjson(
-        "{find: 'testns',"
-        "snapshot: true,"
-        "hint: {a: 1}}");
-    const NamespaceString nss("test.testns");
-    bool isExplain = false;
-    auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-    ASSERT_NOT_OK(result.getStatus());
-}
-
 TEST(QueryRequestTest, ParseCommandForbidNonMetaSortOnFieldWithMetaProject) {
     BSONObj cmdObj;
 
@@ -1044,7 +1011,6 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     ASSERT_EQUALS(0, qr->getMaxTimeMS());
     ASSERT_EQUALS(false, qr->returnKey());
     ASSERT_EQUALS(false, qr->showRecordId());
-    ASSERT_EQUALS(false, qr->isSnapshot());
     ASSERT_EQUALS(false, qr->hasReadPref());
     ASSERT_EQUALS(false, qr->isTailable());
     ASSERT_EQUALS(false, qr->isSlaveOk());
@@ -1062,7 +1028,6 @@ TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
 TEST(QueryRequestTest, ParseFromCommandForbidExtraField) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
-        "snapshot: true,"
         "foo: {a: 1}}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
@@ -1073,7 +1038,6 @@ TEST(QueryRequestTest, ParseFromCommandForbidExtraField) {
 TEST(QueryRequestTest, ParseFromCommandForbidExtraOption) {
     BSONObj cmdObj = fromjson(
         "{find: 'testns',"
-        "snapshot: true,"
         "foo: true}");
     const NamespaceString nss("test.testns");
     bool isExplain = false;
@@ -1212,12 +1176,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithCommentSucceeds) {
 TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
     QueryRequest qr(testns);
     qr.setShowRecordId(true);
-    ASSERT_NOT_OK(qr.asAggregationCommand());
-}
-
-TEST(QueryRequestTest, ConvertToAggregationWithSnapshotFails) {
-    QueryRequest qr(testns);
-    qr.setSnapshot(true);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 

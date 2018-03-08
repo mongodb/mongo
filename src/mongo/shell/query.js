@@ -43,7 +43,6 @@ DBQuery.prototype.help = function() {
     print("\t.maxScan(<n>)");
     print("\t.maxTimeMS(<n>)");
     print("\t.comment(<comment>)");
-    print("\t.snapshot()");
     print("\t.tailable(<isAwaitData>)");
     print("\t.noCursorTimeout()");
     print("\t.allowPartialResults()");
@@ -213,10 +212,6 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
 
     if ("$showDiskLoc" in this._query) {
         cmd["showRecordId"] = this._query.$showDiskLoc;
-    }
-
-    if ("$snapshot" in this._query) {
-        cmd["snapshot"] = this._query.$snapshot;
     }
 
     if ("readConcern" in this._query) {
@@ -516,10 +511,6 @@ DBQuery.prototype.comment = function(comment) {
 DBQuery.prototype.explain = function(verbose) {
     var explainQuery = new DBExplainQuery(this, verbose);
     return explainQuery.finish();
-};
-
-DBQuery.prototype.snapshot = function() {
-    return this._addSpecial("$snapshot", true);
 };
 
 DBQuery.prototype.returnKey = function() {
