@@ -135,7 +135,7 @@ variables:
   ec2_monitor_files: proc.json system.json
   monitor_proc_file: proc.json
   monitor_system_file: system.json
-  remote_dir: powercycle
+  remote_dir: /log/powercycle
   secret_port: "20001"
   security_group_ids: ${powercycle_aws_security_group_id}
   security_groups: mci powercycle_testing
@@ -154,9 +154,9 @@ variables:
   params:
      updates:
      - key: backup_path_after
-       value: /data/afterrecovery
+       value: ${remote_dir}/afterrecovery
      - key: backup_path_before
-       value: /data/beforerecovery
+       value: ${remote_dir}/beforerecovery
      - key: db_path
        value: /data/db
      - key: log_path
@@ -1501,7 +1501,7 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          # Copy mount_data_drive.sh script to remote host.
+          # Copy mount_drives.sh script to remote host.
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
@@ -1510,7 +1510,7 @@ functions:
             --operation "copy_to"                            \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
-            --file buildscripts/mount_data_drive.sh
+            --file buildscripts/mount_drives.sh
 
     - command: shell.exec
       params:
@@ -1520,9 +1520,9 @@ functions:
           set -o errexit
           # Mount /data on the attached drive(s), more than 1 indicates a RAID set.
           ${set_sudo}
-          script_opts="-d '${device_names}'"
-          if [ ! -z "${raid_device_name}" ]; then
-            script_opts="$script_opts -r ${raid_device_name}"
+          script_opts="-d '${data_device_names}'"
+          if [ ! -z "${raid_data_device_name}" ]; then
+            script_opts="$script_opts -r ${raid_data_device_name}"
           fi
           if [ ! -z "${fstype}" ]; then
             script_opts="$script_opts -t ${fstype}"
@@ -1530,15 +1530,16 @@ functions:
           if [ ! -z "${fs_options}" ]; then
             script_opts="$script_opts -o '${fs_options}'"
           fi
+          # Mount /log on the attached drive.
+          if [ ! -z "${log_device_name}" ]; then
+            script_opts="$script_opts -l '${log_device_name}'"
+            log="/log"
+          fi
           group=$(id -Gn $USER | cut -f1 -d ' ') || true
           user_group="$USER:$group"
           script_opts="$script_opts -u $user_group"
           data_db=/data/db
-          set_permission="chmod 777 $data_db"
-          if [ "Windows_NT" = "$OS" ]; then
-            set_permission="setfacl -s user::rwx,group::rwx,other::rwx $data_db"
-          fi
-          cmds="$sudo bash mount_data_drive.sh $script_opts; $set_permission; ls -ld $data_db; df; mount"
+          cmds="$sudo bash mount_drives.sh $script_opts; ls -ld $data_db $log; df; mount"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
