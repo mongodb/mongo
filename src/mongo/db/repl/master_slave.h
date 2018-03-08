@@ -30,6 +30,7 @@
 
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 /* replication data overview
 
@@ -44,7 +45,6 @@
 namespace mongo {
 
 class Database;
-class OldThreadPool;
 class OperationContext;
 
 namespace repl {
@@ -79,7 +79,7 @@ private:
    not done (always use main for now).
 */
 class ReplSource {
-    std::shared_ptr<OldThreadPool> tp;
+    std::shared_ptr<ThreadPool> tp;
 
     void resync(OperationContext* opCtx, const std::string& dbName);
 

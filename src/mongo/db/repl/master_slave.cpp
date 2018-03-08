@@ -71,7 +71,6 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
@@ -741,7 +740,10 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
                 if (tp.get() == 0) {
                     int nthr = min(8, replSettings.getPretouch());
                     nthr = max(nthr, 1);
-                    tp.reset(new OldThreadPool(nthr));
+                    ThreadPool::Options options;
+                    options.maxThreads = options.minThreads = std::size_t(nthr);
+                    options.poolName = "master_slave_pretouch";
+                    tp.reset(new ThreadPool(options));
                 }
                 vector<BSONObj> v;
                 oplogReader.peek(v, replSettings.getPretouch());
@@ -752,13 +754,13 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
                     unsigned b = a + m - 1;  // v[a..b]
                     if (b >= v.size())
                         b = v.size() - 1;
-                    tp->schedule([&v, a, b] { pretouchN(v, a, b); });
+                    invariantOK(tp->schedule([&v, a, b] { pretouchN(v, a, b); }));
                     DEV cout << "pretouch task: " << a << ".." << b << endl;
                     a += m;
                 }
                 // we do one too...
                 pretouchOperation(opCtx, op);
-                tp->join();
+                tp->waitForIdle();
                 countdown = v.size();
             }
         } else {
