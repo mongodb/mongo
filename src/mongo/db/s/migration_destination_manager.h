@@ -118,6 +118,14 @@ public:
                  const WriteConcernOptions& writeConcern);
 
     /**
+     * Clones documents from a donor shard.
+     */
+    static void cloneDocumentsFromDonor(
+        OperationContext* opCtx,
+        stdx::function<void(OperationContext*, BSONObjIterator)> insertBatchFn,
+        stdx::function<BSONObj(OperationContext*)> fetchBatchFn);
+
+    /**
      * Idempotent method, which causes the current ongoing migration to abort only if it has the
      * specified session id. If the migration is already aborted, does nothing.
      */
