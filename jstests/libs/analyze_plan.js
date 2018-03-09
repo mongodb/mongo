@@ -248,3 +248,42 @@ function getChunkSkips(root) {
 
     return 0;
 }
+
+/**
+ * Given explain output at executionStats level verbosity, confirms that the root stage is COUNT and
+ * that the result of the count is equal to 'expectedCount'.
+ */
+function assertExplainCount({explainResults, expectedCount}) {
+    const execStages = explainResults.executionStats.executionStages;
+
+    // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage or
+    // SHARD_MERGE stages, with COUNT as the root stage on each shard. If explaining directly on the
+    // shard, then COUNT is the root stage.
+    if ("SINGLE_SHARD" == execStages.stage || "SHARD_MERGE" == execStages.stage) {
+        let totalCounted = 0;
+        for (let shardExplain of execStages.shards) {
+            const countStage = shardExplain.executionStages;
+            assert.eq(countStage.stage, "COUNT", "root stage on shard is not COUNT");
+            totalCounted += countStage.nCounted;
+        }
+        assert.eq(totalCounted, expectedCount, "wrong count result");
+    } else {
+        assert.eq(execStages.stage, "COUNT", "root stage is not COUNT");
+        assert.eq(execStages.nCounted, expectedCount, "wrong count result");
+    }
+}
+
+/**
+ * Verifies that a given query uses an index and is covered when used in a count command.
+ */
+function assertCoveredQueryAndCount({collection, query, project, count}) {
+    let explain = collection.find(query, project).explain();
+    assert(isIndexOnly(db, explain.queryPlanner.winningPlan),
+           "Winning plan was not covered: " + tojson(explain.queryPlanner.winningPlan));
+
+    // Same query as a count command should also be covered.
+    explain = collection.explain("executionStats").find(query).count();
+    assert(isIndexOnly(db, explain.queryPlanner.winningPlan),
+           "Winning plan for count was not covered: " + tojson(explain.queryPlanner.winningPlan));
+    assertExplainCount({explainResults: explain, expectedCount: count});
+}

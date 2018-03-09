@@ -146,6 +146,11 @@ public:
             case BSONType::bsonTimestamp:
             case BSONType::jstOID:
             case BSONType::BinData:
+            case BSONType::Object:
+            case BSONType::Code:
+            case BSONType::CodeWScope:
+            case BSONType::MinKey:
+            case BSONType::MaxKey:
                 return true;
             default:
                 return false;

@@ -223,6 +223,86 @@ TEST(IndexBoundsBuilderTest, TranslateLteNegativeInfinity) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
+TEST(IndexBoundsBuilderTest, TranslateLteObject) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$lte: {b: 1}}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[0].compare(Interval(fromjson("{'': {}, '': {b: 1}}"), true, true)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLteCode) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lte" << BSONCode("function(){ return 0; }")));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[, function(){ return 0; }]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLteCodeWScope) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lte" << BSONCodeWScope("this.b == c", BSON("c" << 1))));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(),
+                  "[CodeWScope( , {}), CodeWScope( this.b == c, { c: 1 })]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLteMinKey) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lte" << MINKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MinKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLteMaxKey) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lte" << MAXKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
 TEST(IndexBoundsBuilderTest, TranslateLtNumber) {
     IndexEntry testIndex = IndexEntry(BSONObj());
     BSONObj obj = fromjson("{a: {$lt: 1}}");
@@ -281,6 +361,85 @@ TEST(IndexBoundsBuilderTest, TranslateLtDate) {
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(
                       Interval(fromjson("{'': true, '': new Date(5000)}"), false, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLtObject) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$lt: {b: 1}}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': {}, '': {b: 1}}"), true, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLtCode) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lt" << BSONCode("function(){ return 0; }")));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[, function(){ return 0; })");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLtCodeWScope) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lt" << BSONCodeWScope("this.b == c", BSON("c" << 1))));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(),
+                  "[CodeWScope( , {}), CodeWScope( this.b == c, { c: 1 }))");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+// Nothing can be less than MinKey so the resulting index bounds would be a useless empty range.
+TEST(IndexBoundsBuilderTest, TranslateLtMinKeyDoesNotGenerateBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lt" << MINKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 0U);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateLtMaxKey) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$lt" << MAXKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
@@ -348,6 +507,100 @@ TEST(IndexBoundsBuilderTest, TranslateGtPositiveInfinity) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
+TEST(IndexBoundsBuilderTest, TranslateGtString) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$gt: 'abc'}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': 'abc', '': {}}"), false, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGtObject) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = fromjson("{a: {$gt: {b: 1}}}");
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': {b: 1}, '': []}"), false, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGtCode) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gt" << BSONCode("function(){ return 0; }")));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "(function(){ return 0; }, CodeWScope( , {}))");
+    ASSERT_FALSE(oil.intervals[0].startInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGtCodeWScope) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gt" << BSONCodeWScope("this.b == c", BSON("c" << 1))));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "(CodeWScope( this.b == c, { c: 1 }), MaxKey)");
+    ASSERT_FALSE(oil.intervals[0].startInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGtMinKey) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gt" << MINKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+// Nothing can be greater than MaxKey so the resulting index bounds would be a useless empty range.
+TEST(IndexBoundsBuilderTest, TranslateGtMaxKeyDoesNotGenerateBounds) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gt" << MAXKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 0U);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
 TEST(IndexBoundsBuilderTest, TranslateGteNumber) {
     IndexEntry testIndex = IndexEntry(BSONObj());
     BSONObj obj = fromjson("{a: {$gte: 1}}");
@@ -396,9 +649,9 @@ TEST(IndexBoundsBuilderTest, TranslateGtePositiveInfinity) {
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
-TEST(IndexBoundsBuilderTest, TranslateGtString) {
+TEST(IndexBoundsBuilderTest, TranslateGteObject) {
     IndexEntry testIndex = IndexEntry(BSONObj());
-    BSONObj obj = fromjson("{a: {$gt: 'abc'}}");
+    BSONObj obj = fromjson("{a: {$gte: {b: 1}}}");
     unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
     BSONElement elt = obj.firstElement();
     OrderedIntervalList oil;
@@ -408,7 +661,71 @@ TEST(IndexBoundsBuilderTest, TranslateGtString) {
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(
         Interval::INTERVAL_EQUALS,
-        oil.intervals[0].compare(Interval(fromjson("{'': 'abc', '': {}}"), false, false)));
+        oil.intervals[0].compare(Interval(fromjson("{'': {b: 1}, '': []}"), true, false)));
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGteCode) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gte" << BSONCode("function(){ return 0; }")));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[function(){ return 0; }, CodeWScope( , {}))");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGteCodeWScope) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gte" << BSONCodeWScope("this.b == c", BSON("c" << 1))));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[CodeWScope( this.b == c, { c: 1 }), MaxKey)");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_FALSE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGteMinKey) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gte" << MINKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MinKey, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateGteMaxKey) {
+    IndexEntry testIndex = IndexEntry(BSONObj());
+    BSONObj obj = BSON("a" << BSON("$gte" << MAXKEY));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals[0].toString(), "[MaxKey, MaxKey]");
+    ASSERT_TRUE(oil.intervals[0].startInclusive);
+    ASSERT_TRUE(oil.intervals[0].endInclusive);
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
