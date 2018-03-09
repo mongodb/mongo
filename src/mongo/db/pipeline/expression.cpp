@@ -469,10 +469,10 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
     const Value indexArg = vpOperand[1]->evaluate(root);
     long long i = indexArg.coerceToLong();
 
-    const Value array = dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
-        ?dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->computeNthFilteredValue(root, i)
+    const Value array = dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (i >= 0)
+        ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->computeNthFilteredValue(root, i)
         : vpOperand[0]->evaluate(root);
-    // const Value array = vpOperand[0]->evaluate(root);
+
 
     if (array.nullish() || indexArg.nullish()) {
         return Value(BSONNULL);
@@ -2046,12 +2046,12 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 }
 
 Value ExpressionFilter::computeNthFilteredValue(const Document& root, long long n) const {
-      // We are guaranteed at parse time that this isn't using our _varId.
+    // We are guaranteed at parse time that this isn't using our _varId.
     const Value inputVal = _input->evaluate(root);
     if (inputVal.nullish())
         return Value(BSONNULL);
 
-     uassert(50701,
+    uassert(50701,
             str::stream() << "input to $filter must be an array not "
                           << typeName(inputVal.getType()),
             inputVal.isArray());
@@ -2068,8 +2068,8 @@ Value ExpressionFilter::computeNthFilteredValue(const Document& root, long long 
 
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
-            if(output.size() == size_t(n)) {
-                return  Value(std::move(output));
+            if (output.size() == size_t(n)) {
+                return Value(std::move(output));
             }
         }
     }
@@ -3698,8 +3698,8 @@ Value ExpressionSlice::evaluate(const Document& root) const {
                           << " a 32-bit integer: " << arg2.coerceToDouble(),
             arg2.integral());
 
-    size_t start;
-    size_t end;
+    size_t start = 0;
+    size_t end = 0;
     if (n == 2) {
         start = 0;
         end = arg2.coerceToInt();
@@ -3728,7 +3728,8 @@ Value ExpressionSlice::evaluate(const Document& root) const {
     }
 
     // If array is a filter expression call computeNthFilterdValue to return an array of size "end".
-    const Value arrayVal = dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
+    const Value arrayVal =
+        dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (n == 2 && end >= 0)
         ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
               ->computeNthFilteredValue(root, static_cast<long long>(end) + 1)
         : vpOperand[0]->evaluate(root);
