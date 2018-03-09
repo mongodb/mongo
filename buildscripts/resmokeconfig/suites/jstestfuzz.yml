@@ -23,7 +23,7 @@ executor:
     mongod_options:
       noprealloc: ''
       set_parameters:
+        disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
       smallfiles: ''
       verbose: ''
-

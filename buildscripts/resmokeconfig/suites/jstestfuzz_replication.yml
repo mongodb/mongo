@@ -35,6 +35,7 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
+        disableLogicalSessionCacheRefresh: false
         enableTestCommands: 1
         numInitialSyncAttempts: 1
         writePeriodicNoops: 1
