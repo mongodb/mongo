@@ -418,26 +418,6 @@ functions:
         make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
         fi
 
-  "build cdriver" :
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${build_cdriver|}" = "true" ]; then
-        CDRIVER_VERSION=1.6.3
-        rm -rf mongo-c-driver-$CDRIVER_VERSION
-        rm -rf mongo-c-driver
-        curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
-        tar xzf mongo-c-driver-$CDRIVER_VERSION.tar.gz
-        mv mongo-c-driver-$CDRIVER_VERSION mongo-c-driver
-        cd mongo-c-driver
-        export ${compile_env|}
-        ./configure --prefix=$(pwd)/install --build x86_64-apple-darwin --with-libbson=bundled --disable-automatic-init-and-cleanup --disable-ssl --disable-sasl --disable-examples --disable-man-pages --disable-html-docs --disable-shm-counters --disable-shared --enable-static ${cdriver_configure_flags|}
-        make
-        make install
-        fi
-
   "build new tools" :
     command: shell.exec
     params:
@@ -837,19 +817,6 @@ functions:
           set -o errexit
 
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/idl/run_tests.py
-
-  "run ios sim embedded tests" :
-    command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        set -o errexit
-        if [ ${enable_ios_sim_tests|false} = "true" ]; then
-            ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
-            ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
-        fi
 
   "run powercycle test" :
     - command: shell.exec
@@ -2307,7 +2274,6 @@ tasks:
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
-    - func: "build cdriver" # noop if ${build_cdriver} is not "true"
     - *generate_compile_expansions
     # Then we load the generated version data into the agent so we can use it in task definitions.
     - *apply_compile_expansions
@@ -2349,10 +2315,6 @@ tasks:
       vars:
         resmoke_args: --suites=unittests
         run_multiple_jobs: true
-
-    # Run the iOS embedded CAPI tests in the iOS simulator
-    # noop if ${run_ios_embedded_tests} is not "true"
-    - func: "run ios sim embedded tests"
 
 ## lint ##
 - name: lint
@@ -6956,59 +6918,6 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
-
-- name: ios-102-debug
-  display_name: "iOS 10.2 DEBUG"
-  run_on:
-  - macos-1012
-  batchtime: 1440 # 1 day
-  expansions:
-    build_cdriver: true
-    cdriver_configure_flags: --host arm-apple-darwin CC="$(xcrun -f --sdk iphoneos clang)" CXX="$(xcrun -f --sdk iphoneos clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode"  CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" LDFLAGS="-miphoneos-version-min=10.2 -arch arm64"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios.vars  CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all
-    disable_unit_tests: true
-  tasks:
-  - name: compile_all
-
-- name: ios-sim-102-debug
-  display_name: "iOS Simulator 10.2 DEBUG"
-  run_on:
-  - macos-1012
-  batchtime: 1440 # 1 day
-  expansions:
-    build_cdriver: true
-    cdriver_configure_flags: --host x86_64-apple-darwin16.6.0 CC="$(xcrun -f --sdk iphonesimulator clang)" CXX="$(xcrun -f --sdk iphonesimulator clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"  CFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2" CXXFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2" LDFLAGS="-miphoneos-version-min=10.2"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_ios_sim.vars CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all
-    disable_unit_tests: true
-    enable_ios_sim_tests: true
-  tasks:
-  - name: compile_all
-
-- name: tvos-101-debug
-  display_name: "tvOS 10.1 DEBUG"
-  run_on:
-  - macos-1012
-  batchtime: 1440 # 1 day
-  expansions:
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos.vars all
-    disable_unit_tests: true
-  tasks:
-  - name: compile_all
-
-- name: tvos-sim-101-debug
-  display_name: "tvOS Simulator 10.1 DEBUG"
-  run_on:
-  - macos-1012
-  batchtime: 1440 # 1 day
-  expansions:
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos_sim.vars all
-    disable_unit_tests: true
-  tasks:
-  - name: compile_all
 
 ###########################################
 #          Redhat buildvariants           #
