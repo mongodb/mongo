@@ -134,8 +134,7 @@ private:
         AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
-        auto statusWithPlanExecutor =
-            getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor = getExecutorGroup(opCtx, coll, groupRequest);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -164,8 +163,7 @@ private:
         AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
-        auto statusWithPlanExecutor =
-            getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor = getExecutorGroup(opCtx, coll, groupRequest);
         if (!statusWithPlanExecutor.isOK()) {
             return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }

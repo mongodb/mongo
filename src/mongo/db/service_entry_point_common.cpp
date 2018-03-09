@@ -132,10 +132,12 @@ const StringMap<int> sessionCheckoutWhitelist = {{"aggregate", 1},
 const StringMap<int> readConcernSnapshotWhitelist = {{"aggregate", 1},
                                                      {"count", 1},
                                                      {"delete", 1},
+                                                     {"distinct", 1},
                                                      {"find", 1},
                                                      {"findandmodify", 1},
                                                      {"findAndModify", 1},
                                                      {"geoSearch", 1},
+                                                     {"group", 1},
                                                      {"insert", 1},
                                                      {"parallelCollectionScan", 1},
                                                      {"update", 1}};
@@ -1094,8 +1096,13 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
     DbMessage dbmsg(m);
 
     Client& c = *opCtx->getClient();
+
     if (c.isInDirectClient()) {
-        invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+        if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber() ||
+            opCtx->recoveryUnit()->getReadConcernLevel() !=
+                repl::ReadConcernLevel::kSnapshotReadConcern) {
+            invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+        }
     } else {
         LastError::get(c).startRequest();
         AuthorizationSession::get(c)->startRequest(opCtx);
@@ -1202,6 +1209,8 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         // Performance profiling is on
         if (opCtx->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";
+        } else if (c.isInDirectClient()) {
+            LOG(1) << "note: not profiling because we are in DBDirectClient";
         } else if (behaviors.lockedForWriting()) {
             // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
             // lockedForWriting() call but prior to profile collection lock acquisition.
@@ -1209,6 +1218,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         } else if (storageGlobalParams.readOnly) {
             LOG(1) << "note: not profiling because server is read-only";
         } else {
+            invariant(!opCtx->lockState()->inAWriteUnitOfWork());
             profile(opCtx, op);
         }
     }

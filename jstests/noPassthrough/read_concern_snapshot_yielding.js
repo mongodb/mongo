@@ -209,7 +209,7 @@
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.filter": {x: 1}}, {op: "query"});
 
-    // Test getMore.
+    // Test getMore on a find established cursor.
     testCommand(function() {
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
@@ -277,6 +277,73 @@
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"originatingCommand.filter": {x: 1}}, {op: "getmore"});
+
+    // Test count.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            count: "coll",
+            query: {_id: {$ne: 0}},
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert.eq(res.n, 3, tojson(res));
+    }, {"command.count": "coll"}, {"command.count": "coll"});
+
+    // Test distinct.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            distinct: "coll",
+            key: "_id",
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert(res.hasOwnProperty("values"));
+        assert.eq(res.values.length, 4, tojson(res));
+    }, {"command.distinct": "coll"}, {"command.distinct": "coll"});
+
+    // Test group.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            group: {ns: "coll", key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}},
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert(res.hasOwnProperty("count"), tojson(res));
+        assert.eq(res.count, 4);
+    }, {"command.group.ns": "coll"}, {"command.group.ns": "coll"});
+
+    // Test getMore on a parallelCollectionScan established cursor. We skip testing for
+    // parallelCollectionScan itself as it returns a cursor only and may not hit an interrupt point.
+    testCommand(function() {
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
+        let res = assert.commandWorked(db.runCommand({
+            parallelCollectionScan: "coll",
+            numCursors: 1,
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert(res.hasOwnProperty("cursors"));
+        assert.eq(res.cursors.length, 1, tojson(res));
+        assert(res.cursors[0].hasOwnProperty("cursor"), tojson(res));
+        const cursorId = res.cursors[0].cursor.id;
+
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
+        res = assert.commandWorked(db.runCommand({
+            getMore: NumberLong(cursorId),
+            collection: "coll",
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("nextBatch"), tojson(res));
+        assert.eq(res.cursor.nextBatch.length, TestData.numDocs, tojson(res));
+    }, {"originatingCommand.parallelCollectionScan": "coll"}, {op: "getmore"});
 
     // Test update.
     // TODO SERVER-33412: Perform writes under autocommit:false transaction.

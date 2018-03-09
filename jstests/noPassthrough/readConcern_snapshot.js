@@ -122,15 +122,13 @@
     assert.commandWorked(sessionDb.runCommand(
         {count: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
 
-    // readConcern 'snapshot' is not supported by distinct.
-    // TODO SERVER-33354: Add snapshot support for distinct.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // readConcern 'snapshot' is supported by distinct.
+    assert.commandWorked(sessionDb.runCommand({
         distinct: collName,
         key: "x",
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    }));
 
     // readConcern 'snapshot' is not supported by geoNear.
     // TODO SERVER-33354: Add snapshot support for geoNear.
@@ -153,13 +151,11 @@
     }));
 
     // readConcern 'snapshot' is supported by group.
-    // TODO SERVER-33354: Add snapshot support for group.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    assert.commandWorked(sessionDb.runCommand({
         group: {ns: collName, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}},
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    }));
 
     // TODO SERVER-33412 Move all write related commands out of this test file when writes
     // with snapshot read concern are only allowed in transactions.
@@ -235,12 +231,18 @@
     assert.eq(0, sessionDb.coll.find({_id: 1}).itcount());
 
     // readConcern 'snapshot' is supported by parallelCollectionScan.
-    assert.commandWorked(sessionDb.runCommand({
+    const res = assert.commandWorked(sessionDb.runCommand({
         parallelCollectionScan: collName,
         numCursors: 1,
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
+        txnNumber: NumberLong(txnNumber)
     }));
+    assert(res.hasOwnProperty("cursors"));
+    assert.eq(res.cursors.length, 1);
+    assert(res.cursors[0].hasOwnProperty("cursor"));
+    const cursorId = res.cursors[0].cursor.id;
+    assert.commandWorked(sessionDb.runCommand(
+        {getMore: cursorId, collection: collName, txnNumber: NumberLong(txnNumber++)}));
 
     // readConcern 'snapshot' is not supported by non-CRUD commands.
     assert.commandFailedWithCode(sessionDb.runCommand({

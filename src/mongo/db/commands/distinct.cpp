@@ -148,8 +148,8 @@ public:
 
         Collection* const collection = ctx->getCollection();
 
-        auto executor = uassertStatusOK(getExecutorDistinct(
-            opCtx, collection, nss.ns(), &parsedDistinct, PlanExecutor::YIELD_AUTO));
+        auto executor =
+            uassertStatusOK(getExecutorDistinct(opCtx, collection, nss.ns(), &parsedDistinct));
 
         Explain::explainStages(executor.get(), collection, verbosity, out);
         return Status::OK();
@@ -188,8 +188,7 @@ public:
 
         Collection* const collection = ctx->getCollection();
 
-        auto executor = getExecutorDistinct(
-            opCtx, collection, nss.ns(), &parsedDistinct, PlanExecutor::YIELD_AUTO);
+        auto executor = getExecutorDistinct(opCtx, collection, nss.ns(), &parsedDistinct);
         if (!executor.isOK()) {
             return CommandHelpers::appendCommandStatus(result, executor.getStatus());
         }

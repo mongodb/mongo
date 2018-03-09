@@ -1018,15 +1018,17 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
 //
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorGroup(
-    OperationContext* opCtx,
-    Collection* collection,
-    const GroupRequest& request,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    OperationContext* opCtx, Collection* collection, const GroupRequest& request) {
     if (!getGlobalScriptEngine()) {
         return Status(ErrorCodes::BadValue, "server-side JavaScript execution is disabled");
     }
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+    const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto yieldPolicy =
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
 
     if (!collection) {
         // Treat collections that do not exist as empty collections.  Note that the explain
@@ -1269,11 +1271,7 @@ BSONObj getDistinctProjection(const std::string& field) {
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
-    OperationContext* opCtx,
-    Collection* collection,
-    const CountRequest& request,
-    bool explain,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    OperationContext* opCtx, Collection* collection, const CountRequest& request, bool explain) {
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
 
     auto qr = stdx::make_unique<QueryRequest>(request.getNs());
@@ -1296,6 +1294,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
         return statusWithCQ.getStatus();
     }
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto yieldPolicy =
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
+
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain
         // reporting machinery always assumes that the root stage for a count operation is
@@ -1477,8 +1482,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     OperationContext* opCtx,
     Collection* collection,
     const std::string& ns,
-    ParsedDistinct* parsedDistinct,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    ParsedDistinct* parsedDistinct) {
+    const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto yieldPolicy =
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
+
     if (!collection) {
         // Treat collections that do not exist as empty collections.
         return PlanExecutor::make(opCtx,

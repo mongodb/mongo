@@ -152,11 +152,8 @@ public:
         // version on initial entry into count.
         auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
-        auto statusWithPlanExecutor = getExecutorCount(opCtx,
-                                                       collection,
-                                                       request.getValue(),
-                                                       true,  // explain
-                                                       PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor =
+            getExecutorCount(opCtx, collection, request.getValue(), true /*explain*/);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -207,11 +204,8 @@ public:
         // version on initial entry into count.
         auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
-        auto statusWithPlanExecutor = getExecutorCount(opCtx,
-                                                       collection,
-                                                       request.getValue(),
-                                                       false,  // !explain
-                                                       PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor =
+            getExecutorCount(opCtx, collection, request.getValue(), false /*explain*/);
         if (!statusWithPlanExecutor.isOK()) {
             return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
