@@ -747,13 +747,6 @@ public:
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
         // Make the distlocks boost::optional so that they can be released by being reset below.
-        // Remove the backwards compatible lock after 3.6 ships.
-        boost::optional<DistLockManager::ScopedDistLock> backwardsCompatibleDbDistLock(
-            uassertStatusOK(
-                catalogClient->getDistLockManager()->lock(opCtx,
-                                                          nss.db() + "-movePrimary",
-                                                          "shardCollection",
-                                                          DistLockManager::kDefaultLockTimeout)));
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock(
             uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
@@ -892,7 +885,6 @@ public:
         // Free the distlocks to allow the splits and migrations below to proceed.
         collDistLock.reset();
         dbDistLock.reset();
-        backwardsCompatibleDbDistLock.reset();
 
         // Step 7. Migrate initial chunks to distribute them across shards.
         migrateAndFurtherSplitInitialChunks(

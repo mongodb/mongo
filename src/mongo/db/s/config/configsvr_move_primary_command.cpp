@@ -148,12 +148,6 @@ public:
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
-        // Remove the backwards compatible lock after 3.6 ships.
-        auto backwardsCompatibleDbDistLock = uassertStatusOK(
-            catalogClient->getDistLockManager()->lock(opCtx,
-                                                      dbname + "-movePrimary",
-                                                      "movePrimary",
-                                                      DistLockManager::kDefaultLockTimeout));
         auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "movePrimary", DistLockManager::kDefaultLockTimeout));
 
