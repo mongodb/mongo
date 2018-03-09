@@ -56,6 +56,16 @@ __wt_timestamp_set(wt_timestamp_t *dest, const wt_timestamp_t *src)
 }
 
 /*
+ * __wt_timestamp_subone --
+ *	Subtract one from a timestamp.
+ */
+static inline void
+__wt_timestamp_subone(wt_timestamp_t *ts)
+{
+	ts->val -= 1;
+}
+
+/*
  * __wt_timestamp_iszero --
  *	Check if a timestamp is equal to the special "zero" time.
  */
@@ -144,6 +154,26 @@ __wt_timestamp_set_zero(wt_timestamp_t *ts)
 {
 	memset(ts->ts, 0x00, WT_TIMESTAMP_SIZE);
 }
+
+/*
+ * __wt_timestamp_subone --
+ *	Subtract one from a timestamp.
+ */
+static inline void
+__wt_timestamp_subone(wt_timestamp_t *ts)
+{
+	uint8_t *tsb;
+
+	/*
+	 * Complicated path for arbitrary-sized timestamps: start with the
+	 * least significant byte, subtract one, continue to more significant
+	 * bytes on underflow.
+	 */
+	for (tsb = ts->ts + WT_TIMESTAMP_SIZE - 1; tsb >= ts->ts; --tsb)
+		if (--*tsb != 0xff)
+			break;
+}
+
 #endif /* WT_TIMESTAMP_SIZE == 8 */
 
 #else /* !HAVE_TIMESTAMPS */
@@ -151,6 +181,7 @@ __wt_timestamp_set_zero(wt_timestamp_t *ts)
 #define	__wt_timestamp_set(dest, src)
 #define	__wt_timestamp_set_inf(ts)
 #define	__wt_timestamp_set_zero(ts)
+#define	__wt_timestamp_subone(ts)
 #define	__wt_txn_clear_commit_timestamp(session)
 #define	__wt_txn_clear_read_timestamp(session)
 #define	__wt_txn_timestamp_flags(session)

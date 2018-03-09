@@ -117,9 +117,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	/*
 	 * If this WT_REF was previously part of a fast-delete operation, there
 	 * may be existing page-delete information. The structure is only read
-	 * after a WT_REF_DELETED state is switched to locked: immediately after
-	 * locking (from a state other than WT_REF_DELETED), free the previous
-	 * version.
+	 * while the state is locked, free the previous version.
 	 *
 	 * Note: changes have been made, we must publish any state change from
 	 * this point on.
@@ -294,9 +292,9 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 
 	/*
 	 * The page_del structure can be freed as soon as the delete is stable:
-	 * it is only read when the ref state is WT_REF_DELETED.  It is worth
-	 * checking every time we come through because once this is freed, we
-	 * no longer need synchronization to check the ref.
+	 * it is only read when the ref state is locked. It is worth checking
+	 * every time we come through because once this is freed, we no longer
+	 * need synchronization to check the ref.
 	 */
 	if (skip && ref->page_del != NULL && (visible_all ||
 	    __wt_txn_visible_all(session, ref->page_del->txnid,

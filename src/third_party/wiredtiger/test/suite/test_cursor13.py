@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -267,7 +267,7 @@ class test_cursor13_drops(test_cursor13_base):
                 c = cursor_session.open_cursor(uri)
                 c.close()
             # The cursor cache is unaffected by the drop, and nothing
-            # in the cache should prevent the drop from occuring.
+            # in the cache should prevent the drop from occurring.
             drop_session.drop(uri)
             confirm_does_not_exist(self, uri)
 
@@ -387,11 +387,14 @@ class test_cursor13_big_base(test_cursor13_base):
         return uri_map
 
     def close_uris(self, uri_map, range_arg):
+        closed = 0
         for i in range_arg:
             cursors = uri_map[self.uriname(i)]
             while len(cursors) > 0:
                 cursors.pop().close()
                 self.closecount += 1
+                closed += 1
+        return closed
 
     def open_or_close(self, uri_map, rand, low, high):
         uri = self.uriname(rand.rand_range(low, high))
@@ -465,6 +468,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
         begin_sweep_stats = self.sweep_stats()
         #self.tty('stats before = ' + str(begin_stats))
         #self.tty('sweep stats before = ' + str(begin_sweep_stats))
+        potential_dead = 0
 
         for round_cnt in range(0, self.rounds):
             if round_cnt % 2 == 1:
@@ -472,18 +476,26 @@ class test_cursor13_sweep(test_cursor13_big_base):
                 # use them during this round, so they will be
                 # closed by sweep.
                 half = self.nuris / 2
-                self.close_uris(uri_map, xrange(0, half))
+                potential_dead += self.close_uris(uri_map, xrange(0, half))
                 bottom_range = half
                 # Let the dhandle sweep run and find the closed cursors.
                 time.sleep(3.0)
             else:
                 bottom_range = 0
 
+            # The session cursor sweep runs at most once a second and
+            # traverses a fraction of the cached cursors.  We'll run for
+            # ten seconds with pauses to make sure we see sweep activity.
+            pause_point = self.opens_per_round / 100
+            if pause_point == 0:
+                pause_point = 1
+            pause_duration = 0.1
+
             i = 0
             while self.opencount < (1 + round_cnt) * self.opens_per_round:
                 i += 1
-                if i % 100 == 0:
-                    time.sleep(0.0)   # Let other threads run
+                if i % pause_point == 0:
+                    time.sleep(pause_duration)   # over time, let sweep run
                 self.open_or_close(uri_map, rand, bottom_range, self.nuris)
 
         end_stats = self.caching_stats()
@@ -495,7 +507,19 @@ class test_cursor13_sweep(test_cursor13_big_base):
         #self.tty('sweep stats after = ' + str(end_sweep_stats))
         self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
         swept = end_sweep_stats[3] - begin_sweep_stats[3]
-        min_swept = self.deep * self.nuris
+
+        # Although this is subject to tuning parameters, we know that
+        # in an active sesssion, we'll sweep through minimum of 1% of
+        # the cached cursors per second.  We've set this test to run
+        # 5 rounds. In 2 of the 5 rounds (sandwiched between the others),
+        # some of the uris are allowed to close. So during the 'closing rounds'
+        # we'll sweep a minimum of 20% of the uri space, and in the other
+        # rounds we'll be referencing the closed uris again.
+
+        # We'll pass the test if we see at least 20% of the 'potentially
+        # dead' cursors swept.  There may be more, since the 1% per second
+        # is a minimum.
+        min_swept = 2 * potential_dead / 10
         self.assertGreaterEqual(swept, min_swept)
 
         # No strict equality test for the reopen stats. When we've swept

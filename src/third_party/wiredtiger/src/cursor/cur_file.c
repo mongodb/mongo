@@ -643,7 +643,6 @@ __curfile_create(WT_SESSION_IMPL *session,
 	cursor->internal_uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
-	cursor->checkpoint = session->dhandle->checkpoint;
 	cbt->btree = btree;
 
 	/*

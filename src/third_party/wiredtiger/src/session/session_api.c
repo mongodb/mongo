@@ -59,12 +59,22 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor, *cursor_tmp;
 	WT_CURSOR_LIST *cached_list;
 	WT_DECL_RET;
+	time_t now;
 	uint32_t position;
 	int i, t_ret, nbuckets, nexamined, nclosed;
 	bool productive;
 
 	if (!F_ISSET(session, WT_SESSION_CACHE_CURSORS))
 		return (0);
+
+	/*
+	 * Periodically sweep for dead cursors; if we've swept recently, don't
+	 * do it again.
+	 */
+	__wt_seconds(session, &now);
+	if (difftime(now, session->last_cursor_sweep) < 1)
+		return (0);
+	session->last_cursor_sweep = now;
 
 	position = session->cursor_sweep_position;
 	productive = true;
@@ -93,13 +103,12 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
 
 		/*
 		 * We continue sweeping as long as we have some good average
-		 * productivity. At a minimum, we look at two buckets.
+		 * productivity, or we are under the minimum.
 		 */
-		productive = (nclosed >= i);
+		productive = (nclosed + WT_SESSION_CURSOR_SWEEP_MIN > i);
 	}
 
 	session->cursor_sweep_position = position;
-	session->cursor_sweep_countdown = WT_SESSION_CURSOR_SWEEP_COUNTDOWN;
 	F_SET(session, WT_SESSION_CACHE_CURSORS);
 
 	WT_STAT_CONN_INCR(session, cursor_sweep);
@@ -395,8 +404,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	 * Indicated as allowed in prepared state, even though not allowed,
 	 * so that running transaction check below take precedence.
 	 */
-	SESSION_API_CALL_PREPARE_ALLOWED(
-	    session, reconfigure, config, cfg);
+	SESSION_API_CALL_PREPARE_ALLOWED(session, reconfigure, config, cfg);
 
 	/*
 	 * Note that this method only checks keys that are passed in by the
@@ -567,9 +575,10 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 
-	if (owner == NULL && F_ISSET(session, WT_SESSION_CACHE_CURSORS)) {
+	/* We do not cache any subordinate tables/files cursors. */
+	if (owner == NULL) {
 		if ((ret = __wt_cursor_cache_get(
-		    session, uri, owner, cfg, cursorp)) == 0)
+		    session, uri, cfg, cursorp)) == 0)
 			return (0);
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -596,9 +605,9 @@ __session_open_cursor(WT_SESSION *wt_session,
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
-	if (to_dup == NULL && F_ISSET(session, WT_SESSION_CACHE_CURSORS)) {
+	if (to_dup == NULL) {
 		if ((ret = __wt_cursor_cache_get(
-		    session, uri, NULL, cfg, cursorp)) == 0)
+		    session, uri, cfg, cursorp)) == 0)
 			goto done;
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -1930,8 +1939,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 * Indicated as allowed in prepared state, even though not allowed,
 	 * so that running transaction check below take precedence.
 	 */
-	SESSION_API_CALL_PREPARE_ALLOWED(
-	    session, checkpoint, config, cfg);
+	SESSION_API_CALL_PREPARE_ALLOWED(session, checkpoint, config, cfg);
 
 	WT_ERR(__wt_inmem_unsupported_op(session, NULL));
 

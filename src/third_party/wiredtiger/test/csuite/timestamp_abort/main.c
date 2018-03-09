@@ -63,6 +63,8 @@ static char home[1024];			/* Program working dir */
 #define	MAX_VAL		1024
 #define	MIN_TH		5
 #define	MIN_TIME	10
+#define	PREPARE_FREQ	5
+#define	PREPARE_YIELD	PREPARE_FREQ * 10
 #define	RECORDS_FILE	"records-%" PRIu32
 #define	STABLE_PERIOD	100
 
@@ -236,11 +238,12 @@ thread_run(void *arg)
 	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
 	WT_ITEM data;
 	WT_RAND_STATE rnd;
-	WT_SESSION *session;
+	WT_SESSION *oplog_session, *session;
 	THREAD_DATA *td;
 	uint64_t i, stable_ts;
 	char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
 	char kname[64], tscfg[64];
+	bool use_prep;
 
 	__wt_random_init(&rnd);
 	memset(cbuf, 0, sizeof(cbuf));
@@ -261,6 +264,20 @@ thread_run(void *arg)
 	 * cases where the result files end up with partial lines.
 	 */
 	__wt_stream_set_line_buffer(fp);
+
+	/*
+	 * Have half the threads use prepared transactions if timestamps
+	 * are in use.
+	 */
+	use_prep = (use_ts && td->info % 2 == 0) ? true : false;
+	/*
+	 * We may have two sessions so that the oplog session can have its own
+	 * transaction in parallel with the collection session for threads
+	 * that are going to be using prepared transactions. We need this
+	 * because prepared transactions cannot have any operations that modify
+	 * a table that is logged. But we also want to test mixed logged and
+	 * not-logged transactions.
+	 */
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 	/*
 	 * Open a cursor to each table.
@@ -269,8 +286,15 @@ thread_run(void *arg)
 	    uri_collection, NULL, NULL, &cur_coll));
 	testutil_check(session->open_cursor(session,
 	    uri_local, NULL, NULL, &cur_local));
-	testutil_check(session->open_cursor(session,
-	    uri_oplog, NULL, NULL, &cur_oplog));
+	oplog_session = NULL;
+	if (use_prep) {
+		testutil_check(td->conn->open_session(
+		    td->conn, NULL, NULL, &oplog_session));
+		testutil_check(session->open_cursor(oplog_session,
+		    uri_oplog, NULL, NULL, &cur_oplog));
+	} else
+		testutil_check(session->open_cursor(session,
+		    uri_oplog, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Write our portion of the key space until we're killed.
@@ -285,6 +309,9 @@ thread_run(void *arg)
 		    kname, sizeof(kname), "%" PRIu64, i));
 
 		testutil_check(session->begin_transaction(session, NULL));
+		if (use_prep)
+			testutil_check(oplog_session->begin_transaction(
+			    oplog_session, NULL));
 		cur_coll->set_key(cur_coll, kname);
 		cur_local->set_key(cur_local, kname);
 		cur_oplog->set_key(cur_oplog, kname);
@@ -310,10 +337,28 @@ thread_run(void *arg)
 		cur_oplog->set_value(cur_oplog, &data);
 		testutil_check(cur_oplog->insert(cur_oplog));
 		if (use_ts) {
+			/*
+			 * Run with prepare every once in a while. And also
+			 * yield after prepare sometimes too. This is only done
+			 * on the regular session.
+			 */
+			if (use_prep && i % PREPARE_FREQ == 0) {
+				testutil_check(__wt_snprintf(
+				    tscfg, sizeof(tscfg),
+				    "prepare_timestamp=%" PRIx64, stable_ts));
+				testutil_check(session->prepare_transaction(
+				    session, tscfg));
+				if (i % PREPARE_YIELD == 0)
+					__wt_yield();
+			}
 			testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
 			    "commit_timestamp=%" PRIx64, stable_ts));
 			testutil_check(
 			    session->commit_transaction(session, tscfg));
+			if (use_prep)
+				testutil_check(
+				    oplog_session->commit_transaction(
+				    oplog_session, tscfg));
 			/*
 			 * Update the thread's last-committed timestamp.
 			 * Don't let the compiler re-order this statement,
@@ -321,9 +366,14 @@ thread_run(void *arg)
 			 * might see our thread update before the commit.
 			 */
 			WT_PUBLISH(th_ts[td->info], stable_ts);
-		} else
+		} else {
 			testutil_check(
 			    session->commit_transaction(session, NULL));
+			if (use_prep)
+				testutil_check(
+				    oplog_session->commit_transaction(
+				    oplog_session, NULL));
+		}
 		/*
 		 * Insert into the local table outside the timestamp txn.
 		 */
@@ -588,6 +638,12 @@ main(int argc, char *argv[])
 		    use_ts ? "true" : "false");
 		printf("Parent: Create %" PRIu32
 		    " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
+		printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 "-t %" PRIu32 "\n",
+		    progname,
+		    compat ? " -C" : "",
+		    inmem ? " -m" : "",
+		    !use_ts ? " -z" : "",
+		    working_dir, nth, timeout);
 		/*
 		 * Fork a child to insert as many items.  We will then randomly
 		 * kill the child, run recovery and make sure all items we wrote

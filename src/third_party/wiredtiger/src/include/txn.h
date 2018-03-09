@@ -172,6 +172,7 @@ typedef enum __wt_txn_isolation {
 struct __wt_txn_op {
 	uint32_t fileid;
 	enum {
+		WT_TXN_OP_NONE,
 		WT_TXN_OP_BASIC,
 		WT_TXN_OP_INMEM,
 		WT_TXN_OP_REF_DELETE,

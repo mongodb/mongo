@@ -56,7 +56,6 @@
 	cache,								\
 	reopen,								\
 	0,				/* uri_hash */			\
-	NULL,				/* checkpoint */		\
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\

@@ -27,7 +27,6 @@
  */
 #include "test_util.h"
 
-#include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 
@@ -535,7 +534,7 @@ subtest_main(int argc, char *argv[], bool close_test)
  * aware of when a failure may be expected due to the effects of the fail_fs.
  * This macro is used only in subtest_populate(), it uses local variables.
  */
-#define	CHECK(expr) {							\
+#define	CHECK(expr, failmode) {						\
 	int _ret;							\
 	_ret = expr;							\
 	if (_ret != 0) {						\
@@ -563,35 +562,35 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 	uint32_t rndint;
 	int key, v0, v1, v2;
 	char *big, *bigref;
-	bool failed, failmode;
+	bool failed;
 
-	failmode = failed = false;
+	failed = false;
 	__wt_random_init_seed(NULL, &rnd);
-	CHECK(create_big_string(&bigref));
+	CHECK(create_big_string(&bigref), false);
 	nrecords = opts->nrecords;
 
 	CHECK(opts->conn->open_session(
-	    opts->conn, NULL, NULL, &session));
+	    opts->conn, NULL, NULL, &session), false);
 
 	CHECK(session->open_cursor(session, "table:subtest", NULL,
-	    NULL, &maincur));
+	    NULL, &maincur), false);
 
 	CHECK(session->open_cursor(session, "table:subtest2", NULL,
-	    NULL, &maincur2));
+	    NULL, &maincur2), false);
 
 	for (i = 0; i < nrecords && !failed; i++) {
 		rndint = __wt_random(&rnd);
 		generate_key(i, &key);
 		generate_value(rndint, i, bigref, &v0, &v1, &v2, &big);
-		CHECK(session->begin_transaction(session, NULL));
+		CHECK(session->begin_transaction(session, NULL), false);
 		maincur->set_key(maincur, key);
 		maincur->set_value(maincur, v0, v1, v2, big);
-		CHECK(maincur->insert(maincur));
+		CHECK(maincur->insert(maincur), false);
 
 		maincur2->set_key(maincur2, key);
 		maincur2->set_value(maincur2, rndint);
-		CHECK(maincur2->insert(maincur2));
-		CHECK(session->commit_transaction(session, NULL));
+		CHECK(maincur2->insert(maincur2), false);
+		CHECK(session->commit_transaction(session, NULL), false);
 
 		if (i == 0)
 			/*
@@ -599,7 +598,7 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 			 * distinguish a clear failure from just not running
 			 * long enough.
 			 */
-			CHECK(session->checkpoint(session, NULL));
+			CHECK(session->checkpoint(session, NULL), false);
 
 		if ((i + 1) % VERBOSE_PRINT == 0 && opts->verbose)
 			printf("  %" PRIu64 "/%" PRIu64 "\n",
@@ -607,9 +606,8 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 		/* Attempt to isolate the failures to checkpointing. */
 		if (i == (nrecords/100)) {
 			enable_failures(opts->nops, 1000000);
-			failmode = true;  /* CHECK should expect failures. */
-			CHECK(session->checkpoint(session, NULL));
-			failmode = false;
+			/* CHECK should expect failures. */
+			CHECK(session->checkpoint(session, NULL), true);
 			disable_failures();
 			if (failed && opts->verbose)
 				printf("checkpoint failed (expected).\n");
@@ -631,9 +629,9 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 	}
 
 	free(bigref);
-	CHECK(maincur->close(maincur));
-	CHECK(maincur2->close(maincur2));
-	CHECK(session->close(session, NULL));
+	CHECK(maincur->close(maincur), false);
+	CHECK(maincur2->close(maincur2), false);
+	CHECK(session->close(session, NULL), false);
 }
 
 /*

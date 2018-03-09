@@ -594,15 +594,6 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	r.files[0].c = NULL;
 	WT_ERR(metac->close(metac));
 
-#ifdef HAVE_TIMESTAMPS
-	/*
-	 * After recovering the metadata, set the recovery timestamp to the
-	 * largest one we recovered.
-	 */
-	__wt_timestamp_set(
-	    &conn->txn_global.recovery_timestamp, &r.max_timestamp);
-#endif
-
 	/*
 	 * Now, recover all the files apart from the metadata.
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
@@ -665,6 +656,24 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 ckpt:	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * After recovery, set the recovery timestamp to the largest one we
+	 * recovered. This is done at the end so that it is set whether we
+	 * ran a full recovery or not. In all cases, we've reviewed all the
+	 * files in the metadata.
+	 */
+	{
+	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
+	__wt_timestamp_set(
+	    &conn->txn_global.recovery_timestamp, &r.max_timestamp);
+	WT_TRET(__wt_timestamp_to_hex_string(session,
+	    hex_timestamp, &conn->txn_global.recovery_timestamp));
+	__wt_verbose(session, WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS,
+	    "Set global recovery timestamp: %s", hex_timestamp);
+	}
+#endif
+
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	FLD_CLR(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);

@@ -267,6 +267,7 @@ typedef struct {
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
 	uint64_t commit;			/* transaction resolution */
+	uint64_t prepare;
 	uint64_t rollback;
 	uint64_t deadlock;
 

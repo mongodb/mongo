@@ -660,7 +660,6 @@ struct __wt_cursor {
 	int __F(reopen)(WT_CURSOR *cursor, bool check_only);
 
 	uint64_t uri_hash;			/* Hash of URI */
-	const char *checkpoint;			/* Checkpoint, if any */
 
 	/*
 	 * !!!
@@ -2425,15 +2424,15 @@ struct __wt_connection {
 	 * size plus one byte for NUL termination).
 	 * @configstart{WT_CONNECTION.query_timestamp, see dist/api_data.py}
 	 * @config{get, specify which timestamp to query: \c all_committed
-	 * returns the largest timestamp such that all earlier timestamps have
-	 * committed\, \c oldest returns the most recent \c oldest_timestamp set
-	 * with WT_CONNECTION::set_timestamp\, \c pinned returns the minimum of
-	 * the \c oldest_timestamp and the read timestamps of all active
-	 * readers\, and \c stable returns the most recent \c stable_timestamp
-	 * set with WT_CONNECTION::set_timestamp.  See @ref
-	 * transaction_timestamps., a string\, chosen from the following
-	 * options: \c "all_committed"\, \c "oldest"\, \c "pinned"\, \c
-	 * "recovery"\, \c "stable"; default \c all_committed.}
+	 * returns the largest timestamp such that all timestamps up to that
+	 * value have committed\, \c oldest returns the most recent \c
+	 * oldest_timestamp set with WT_CONNECTION::set_timestamp\, \c pinned
+	 * returns the minimum of the \c oldest_timestamp and the read
+	 * timestamps of all active readers\, and \c stable returns the most
+	 * recent \c stable_timestamp set with WT_CONNECTION::set_timestamp.
+	 * See @ref transaction_timestamps., a string\, chosen from the
+	 * following options: \c "all_committed"\, \c "oldest"\, \c "pinned"\,
+	 * \c "recovery"\, \c "stable"; default \c all_committed.}
 	 * @configend
 	 * @errors
 	 * If there is no matching timestamp (e.g., if this method is called

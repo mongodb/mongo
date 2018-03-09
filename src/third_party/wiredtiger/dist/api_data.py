@@ -838,6 +838,9 @@ wiredtiger_open_common =\
     Config('session_scratch_max', '2MB', r'''
         maximum memory to cache in each session''',
         type='int', undoc=True),
+    Config('session_table_cache', 'true', r'''
+        Maintain a per-session cache of tables''',
+        type='boolean', undoc=True), # Obsolete after WT-3476
     Config('transaction_sync', '', r'''
         how to sync log records when the transaction commits''',
         type='category', subconfig=[
@@ -1362,8 +1365,8 @@ methods = {
 'WT_CONNECTION.query_timestamp' : Method([
     Config('get', 'all_committed', r'''
         specify which timestamp to query: \c all_committed returns the largest
-        timestamp such that all earlier timestamps have committed, \c oldest
-        returns the most recent \c oldest_timestamp set with
+        timestamp such that all timestamps up to that value have committed,
+        \c oldest returns the most recent \c oldest_timestamp set with
         WT_CONNECTION::set_timestamp, \c pinned returns the minimum of the
         \c oldest_timestamp and the read timestamps of all active readers, and
         \c stable returns the most recent \c stable_timestamp set with

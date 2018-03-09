@@ -552,7 +552,7 @@ wts_verify(const char *tag)
 
 	if (g.c_txn_timestamps && g.timestamp > 0) {
 		/*
-		 * Bump the oldest timestamp, otherwise recent operation will
+		 * Bump the oldest timestamp, otherwise recent operations can
 		 * prevent verify from running.
 		 */
 		testutil_check(__wt_snprintf(
