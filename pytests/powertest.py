@@ -1384,12 +1384,16 @@ def wait_for_mongod_shutdown(data_dir, timeout=120):
     return 0
 
 
-def get_mongo_client_args(host=None, port=None, options=None):
+def get_mongo_client_args(host=None,
+                          port=None,
+                          options=None,
+                          serverSelectionTimeoutMS=600000,
+                          socketTimeoutMS=600000):
     """ Returns keyword arg dict used in PyMongo client. """
-    # Set the serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes
+    # Set the default serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes.
     mongo_args = {
-        "serverSelectionTimeoutMS": 600000,
-        "socketTimeoutMS": 600000
+        "serverSelectionTimeoutMS": serverSelectionTimeoutMS,
+        "socketTimeoutMS": socketTimeoutMS
     }
     if host:
         mongo_args["host"] = host
@@ -2373,8 +2377,14 @@ Examples:
 
         # Optionally validate canary document locally.
         if validate_canary_local:
+            # Increase the Pymongo connection timeout to 1 hour.
+            one_hour_ms = 60 * 60 * 1000
             mongo = pymongo.MongoClient(
-                **get_mongo_client_args(host=mongod_host, port=secret_port))
+                **get_mongo_client_args(
+                    host=mongod_host,
+                    port=secret_port,
+                    serverSelectionTimeoutMS=one_hour_ms,
+                    socketTimeoutMS=one_hour_ms))
             ret = mongo_validate_canary(
                 mongo, options.db_name, options.collection_name, canary_doc)
             LOGGER.info("Local canary validation: %d", ret)
