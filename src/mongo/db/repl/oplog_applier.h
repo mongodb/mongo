@@ -1,0 +1,142 @@
+/**
+ *    Copyright (C) 2018 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+
+#pragma once
+
+#include <vector>
+
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/future.h"
+
+namespace mongo {
+namespace repl {
+
+/**
+ * Applies oplog entries.
+ * Reads from an OplogBuffer batches of operations that may be applied in parallel.
+ */
+class OplogApplier {
+public:
+    /**
+     * Used to configure behavior of this OplogApplier.
+     **/
+    class Options {
+    public:
+        bool failOnCrudOpsNamespaceNotFoundErrors = true;
+        bool relaxUniqueIndexConstraints = false;
+    };
+
+    // Used to report oplog application progress.
+    class Observer;
+
+    using Operations = std::vector<OplogEntry>;
+
+    /**
+     * Constructs this OplogApplier with specific options.
+     * Obtains batches of operations from the OplogBuffer to apply.
+     * Reports oplog application progress using the Observer.
+     */
+    OplogApplier(executor::TaskExecutor* executor,
+                 OplogBuffer* oplogBuffer,
+                 Observer* observer,
+                 const Options& options);
+
+    /**
+     * Starts this OplogApplier.
+     */
+    Status startup();
+
+    /**
+     * Starts the shutdown process for this OplogApplier.
+     * Use the Future object to be notified when this OplogApplier has finished shutting down.
+     * It is safe to call shutdown() multiplie times.
+     */
+    Future<void> shutdown();
+
+    /**
+     * Pushes operations read into oplog buffer.
+     */
+    void enqueue(const Operations& operations);
+
+
+private:
+    // Not owned by us.
+    executor::TaskExecutor* const _executor;
+
+    // Not owned by us.
+    OplogBuffer* const _oplogBuffer;
+
+    // Not owned by us.
+    Observer* const _observer;
+
+    // Used to configure OplogApplier behavior.
+    const Options _options;
+};
+
+/**
+ * The OplogApplier reports its progress using the Observer interface.
+ */
+class OplogApplier::Observer {
+public:
+    virtual ~Observer() = default;
+
+    /**
+     * Called when the OplogApplier is ready to start applying a batch of operations read from the
+     * OplogBuffer.
+     **/
+    virtual void onBatchBegin(const OplogApplier::Operations& operations) = 0;
+
+    /**
+     * When the OplogApplier has completed applying a batch of operations, it will call this
+     * function to report the last optime applied on success. Any errors during oplog application
+     * will also be here.
+     */
+    virtual void onBatchEnd(const StatusWith<OpTime>& lastOpTimeApplied,
+                            const OplogApplier::Operations& operations) = 0;
+
+    /**
+     * Called when documents are fetched and inserted into the collection in order to
+     * apply an update operation.
+     * Applies to initial sync only.
+     *
+     * TODO: Delegate fetching behavior to OplogApplier owner.
+     */
+    using FetchInfo = std::pair<OplogEntry, BSONObj>;
+    virtual void onMissingDocumentsFetchedAndInserted(
+        const std::vector<FetchInfo>& documentsFetchedAndInserted) = 0;
+};
+
+}  // namespace repl
+}  // namespace mongo

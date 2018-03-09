@@ -613,6 +613,7 @@ env.Library(
     target='oplog_application',
     source=[
         'applier_helpers.cpp',
+        'oplog_applier.cpp',
         'sync_tail.cpp',
     ],
     LIBDEPS=[
