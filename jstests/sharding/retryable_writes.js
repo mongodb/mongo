@@ -506,7 +506,7 @@
 
     // Tests for replica set
     var replTest = new ReplSetTest({nodes: 2});
-    replTest.startSet();
+    replTest.startSet({verbose: 5});
     replTest.initiate();
 
     var priConn = replTest.getPrimary();
@@ -519,7 +519,7 @@
     replTest.stopSet();
 
     // Tests for sharded cluster
-    var st = new ShardingTest({shards: {rs0: {nodes: 1}}});
+    var st = new ShardingTest({shards: {rs0: {nodes: 1, verbose: 5}}});
 
     runTests(st.s0, st.rs0.getPrimary());
     runFailpointTests(st.s0, st.rs0.getPrimary());
