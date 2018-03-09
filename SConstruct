@@ -275,15 +275,6 @@ add_option('gcov',
     nargs=0,
 )
 
-add_option('smokedbprefix',
-    help='prefix to dbpath et al. for smoke tests',
-)
-
-add_option('smokeauth',
-    help='run smoke tests with --auth',
-    nargs=0,
-)
-
 add_option('use-sasl-client',
     help='Support SASL authentication in the client library',
     nargs=0,

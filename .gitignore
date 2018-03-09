@@ -9,7 +9,6 @@
 /perf.data
 /perf.data.old
 /massif.out.*
-/smoke-last.json
 
 *~
 *.swp
@@ -61,7 +60,6 @@ settings.py
 log_config.py
 /tags
 TAGS
-failfile.smoke
 
 # temp dirs
 dump
