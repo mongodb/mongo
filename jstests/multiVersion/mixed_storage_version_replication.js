@@ -674,6 +674,7 @@ function doMultiThreadedWork(primary, numThreads) {
     // primary/secondary syncing.
     config.members = newConfig.members;
     config.settings.chainingAllowed = false;
+    config.protocolVersion = 0;
     config.version += 1;
     reconfig(replTest, config);
 

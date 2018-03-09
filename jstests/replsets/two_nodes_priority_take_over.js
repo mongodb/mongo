@@ -54,7 +54,8 @@ if (false) {
         // Priority takeover should happen smoothly without failed election as there is
         // no current candidate. If vote requests failed (wrongly) for some reason,
         // nodes have to start new elections, which increase the term unnecessarily.
-        assert.eq(newTerm, stableTerm + 1);
-
+        if (rst.getReplSetConfigFromNode().protocolVersion == 1) {
+            assert.eq(newTerm, stableTerm + 1);
+        }
     })();
 }

@@ -1405,29 +1405,49 @@ rs.debug.getLastOpWritten = function(server) {
 };
 
 /**
- * Compares OpTimes in the format {ts:Timestamp, t:NumberLong}.
- * Returns -1 if ot1 is 'earlier' than ot2, 1 if 'later' and 0 if equal.
+ * Compares OpTimes. Returns -1 if ot1 is 'earlier' than ot2, 1 if 'later' and 0 if equal.
+ *
+ * Note: Since Protocol Version 1 was introduced for replication, 'OpTimes'
+ * can come in two different formats. This function will throw an error when the OpTime
+ * passed do not have the same protocol version.
+ *
+ * OpTime Formats:
+ * PV0: Timestamp
+ * PV1: {ts:Timestamp, t:NumberLong}
  */
 rs.compareOpTimes = function(ot1, ot2) {
-
-    function _isValidOptime(opTime) {
-        let timestampIsValid = (opTime.hasOwnProperty("ts") && (opTime.ts !== Timestamp(0, 0)));
-        let termIsValid = (opTime.hasOwnProperty("t") && (opTime.t != -1));
-
-        return timestampIsValid && termIsValid;
+    function _isOpTimeV1(opTime) {
+        return (opTime.hasOwnProperty("ts") && opTime.hasOwnProperty("t"));
+    }
+    function _isEmptyOpTime(opTime) {
+        return (opTime.ts.getTime() == 0 && opTime.ts.getInc() == 0 && opTime.t == -1);
     }
 
-    if (!_isValidOptime(ot1) || !_isValidOptime(ot2)) {
-        throw Error("invalid optimes, received: " + tojson(ot1) + " and " + tojson(ot2));
+    // Make sure both OpTimes have a timestamp and a term.
+    var ot1 = _isOpTimeV1(ot1) ? ot1 : {ts: ot1, t: NumberLong(-1)};
+    var ot2 = _isOpTimeV1(ot2) ? ot2 : {ts: ot2, t: NumberLong(-1)};
+
+    if (_isEmptyOpTime(ot1) || _isEmptyOpTime(ot2)) {
+        throw Error("cannot do comparison with empty OpTime, received: " + tojson(ot1) + " and " +
+                    tojson(ot2));
     }
 
-    if (ot1.t > ot2.t) {
-        return 1;
-    } else if (ot1.t < ot2.t) {
-        return -1;
-    } else {
-        return timestampCmp(ot1.ts, ot2.ts);
+    if ((ot1.t == -1 && ot2.t != -1) || (ot1.t != -1 && ot2.t == -1)) {
+        throw Error("cannot compare OpTimes between different protocol versions, received: " +
+                    tojson(ot1) + " and " + tojson(ot2));
     }
+
+    if (!friendlyEqual(ot1.t, ot2.t)) {
+        if (ot1.t < ot2.t) {
+            return -1;
+        } else {
+            return 1;
+        }
+    }
+    // else equal terms, so proceed to compare timestamp component.
+
+    // Otherwise, choose the OpTime with the lower timestamp.
+    return timestampCmp(ot1.ts, ot2.ts);
 };
 
 help = shellHelper.help = function(x) {

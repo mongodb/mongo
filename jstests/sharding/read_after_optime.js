@@ -13,7 +13,10 @@
     assert(lastOp, 'invalid op returned from ReplSetTest.awaitLastOpCommitted()');
 
     var config = configReplSetTest.getReplSetConfigFromNode();
-    var term = lastOp.t;
+    var term = -1;
+    if (config.protocolVersion === 1) {
+        term = lastOp.t;
+    }
 
     var runFindCommand = function(ts) {
         return primaryConn.getDB('local').runCommand({

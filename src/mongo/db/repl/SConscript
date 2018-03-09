@@ -917,12 +917,22 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest('replication_coordinator_impl_elect_test',
+                'replication_coordinator_impl_elect_test.cpp',
+                LIBDEPS=[
+                    'repl_coordinator_test_fixture',
+                ])
+
 env.CppUnitTest('replication_coordinator_impl_elect_v1_test',
                 'replication_coordinator_impl_elect_v1_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
 env.CppUnitTest('replication_coordinator_impl_heartbeat_v1_test',
                 'replication_coordinator_impl_heartbeat_v1_test.cpp',
+                LIBDEPS=['repl_coordinator_test_fixture'])
+
+env.CppUnitTest('replication_coordinator_impl_heartbeat_test',
+                'replication_coordinator_impl_heartbeat_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
 env.CppUnitTest('replication_coordinator_impl_reconfig_test',

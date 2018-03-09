@@ -15,10 +15,12 @@ let nodes = {
     n3: {binVersion: newVersion}
 };
 
-function runDowngradeTest() {
+function runDowngradeTest(protocolVersion) {
     let rst = new ReplSetTest({name: name, nodes: nodes, waitForKeys: true});
     rst.startSet();
-    rst.initiate();
+    let replSetConfig = rst.getReplSetConfig();
+    replSetConfig.protocolVersion = protocolVersion;
+    rst.initiate(replSetConfig);
 
     let primary = rst.getPrimary();
     let coll = "test.foo";
@@ -71,4 +73,5 @@ function runDowngradeTest() {
     rst.stopSet();
 }
 
-runDowngradeTest();
+runDowngradeTest(0);
+runDowngradeTest(1);

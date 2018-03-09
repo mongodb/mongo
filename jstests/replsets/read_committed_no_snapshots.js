@@ -28,7 +28,8 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
             {"_id": 0, "host": nodes[0]},
             {"_id": 1, "host": nodes[1], priority: 0},
             {"_id": 2, "host": nodes[2], arbiterOnly: true}
-        ]
+        ],
+        "protocolVersion": 1
     };
 
     replTest.initiate(config);
