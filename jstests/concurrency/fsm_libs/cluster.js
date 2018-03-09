@@ -432,6 +432,10 @@ var Cluster = function(options) {
         return Cluster.isReplication(options);
     };
 
+    this.isStandalone = function isStandalone() {
+        return Cluster.isStandalone(options);
+    };
+
     this.shardCollection = function shardCollection() {
         assert(initialized, 'cluster must be initialized first');
         assert(this.isSharded(), 'cluster is not sharded');
