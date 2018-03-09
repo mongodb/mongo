@@ -245,6 +245,13 @@ TEST(Future, Success_thenSimple) {
                         });
 }
 
+TEST(Future, Success_thenSimpleAuto) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            ASSERT_EQ(std::move(fut).then([](auto i) { return i + 2; }).get(), 3);
+                        });
+}
+
 TEST(Future, Success_thenVoid) {
     FUTURE_SUCCESS_TEST(
         [] { return 1; },
@@ -1132,6 +1139,13 @@ TEST(Future_MoveOnly, Success_thenSimple) {
     FUTURE_SUCCESS_TEST([] { return Widget(1); },
                         [](Future<Widget>&& fut) {
                             ASSERT_EQ(std::move(fut).then([](Widget i) { return i + 2; }).get(), 3);
+                        });
+}
+
+TEST(Future_MoveOnly, Success_thenSimpleAuto) {
+    FUTURE_SUCCESS_TEST([] { return Widget(1); },
+                        [](Future<Widget>&& fut) {
+                            ASSERT_EQ(std::move(fut).then([](auto&& i) { return i + 2; }).get(), 3);
                         });
 }
 

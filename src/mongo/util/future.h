@@ -87,6 +87,21 @@ template <typename Func, typename... Args>
 struct is_invocable
     : public decltype(is_invocable_impl(std::declval<Func>(), std::declval<Args>()...)) {};
 
+
+// call(func, FakeVoid) -> func(Status::OK())
+// This simulates the implicit Status/T overloading you get by taking a StatusWith<T> that doesn't
+// work for Status/void and Status.
+// TODO replace this dispatch with constexpr if in c++17
+template <typename Func>
+inline auto callVoidOrStatus(Func&& func, std::true_type useStatus) {
+    return func(Status::OK());
+}
+
+template <typename Func>
+inline auto callVoidOrStatus(Func&& func, std::false_type useStatus) {
+    return func();
+}
+
 /**
  * call() normalizes arguments to hide the FakeVoid shenanigans from users of Futures.
  * In the future it may also expand tuples to argument lists.
@@ -101,23 +116,14 @@ inline auto call(Func&& func) {
     return func();
 }
 
-template <typename Func, typename = std::enable_if_t<is_invocable<Func>::value>>
+template <typename Func>
 inline auto call(Func&& func, FakeVoid) {
-    return func();
+    auto useStatus =
+        std::integral_constant<bool, (!is_invocable<Func>() && is_invocable<Func, Status>())>();
+    return callVoidOrStatus(func, useStatus);
 }
 
-// call(func, FakeVoid) -> func(Status::OK())
-// This simulates the implicit Status/T overloading you get by taking a StatusWith<T> that doesn't
-// work for Status/void and Status.
-template <
-    typename Func,
-    typename = std::enable_if_t<!is_invocable<Func>::value && is_invocable<Func, Status>::value>,
-    typename = void>
-inline auto call(Func&& func, FakeVoid) {
-    return func(Status::OK());
-}
-
-template <typename Func, typename = std::enable_if_t<is_invocable<Func, Status>::value>>
+template <typename Func>
 inline auto call(Func&& func, StatusWith<FakeVoid> sw) {
     return func(sw.getStatus());
 }
