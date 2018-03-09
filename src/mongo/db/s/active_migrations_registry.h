@@ -56,6 +56,9 @@ public:
     ActiveMigrationsRegistry();
     ~ActiveMigrationsRegistry();
 
+    static ActiveMigrationsRegistry& get(ServiceContext* service);
+    static ActiveMigrationsRegistry& get(OperationContext* opCtx);
+
     /**
      * If there are no migrations running on this shard, registers an active migration with the
      * specified arguments. Returns a ScopedDonateChunk, which must be signaled by the

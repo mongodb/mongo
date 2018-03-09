@@ -48,6 +48,9 @@ public:
     ActiveMovePrimariesRegistry();
     ~ActiveMovePrimariesRegistry();
 
+    static ActiveMovePrimariesRegistry& get(ServiceContext* service);
+    static ActiveMovePrimariesRegistry& get(OperationContext* opCtx);
+
     /**
      * If there are no movePrimary operations running on this shard, registers an active
      * movePrimary operation with the specified arguments. Returns a ScopedMovePrimary, which must

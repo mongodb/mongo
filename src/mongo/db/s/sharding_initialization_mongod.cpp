@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/logical_time_metadata_hook.h"
@@ -47,14 +48,29 @@
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
+
+auto makeEgressHooksList(ServiceContext* service) {
+    auto unshardedHookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    unshardedHookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    unshardedHookList->addHook(
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(service));
+
+    return unshardedHookList;
+};
+
+}  // namespace
 
 Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
                                               const ConnectionString& configCS,
@@ -106,20 +122,16 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         validator->resetKeyManager();
     }
 
+    globalConnPool.addHook(new ShardingConnectionHook(false, makeEgressHooksList(service)));
+    shardConnectionPool.addHook(new ShardingConnectionHook(true, makeEgressHooksList(service)));
+
     return initializeGlobalShardingState(
         opCtx,
         configCS,
         distLockProcessId,
         std::move(shardFactory),
         stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(opCtx)),
-        [opCtx] {
-            auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-            hookList->addHook(
-                stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
-            hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(
-                opCtx->getServiceContext()));
-            return hookList;
-        },
+        [service] { return makeEgressHooksList(service); },
         // We only need one task executor here because sharding task executors aren't used for user
         // queries in mongod.
         1);

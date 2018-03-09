@@ -34,6 +34,7 @@ namespace mongo {
 
 class ConnectionString;
 class OperationContext;
+class ServiceContext;
 class Status;
 
 /**

@@ -26,16 +26,31 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/s/active_move_primaries_registry.h"
 
-#include "mongo/util/assert_util.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
+namespace {
+
+const auto getRegistry = ServiceContext::declareDecoration<ActiveMovePrimariesRegistry>();
+
+}  // namespace
 
 ActiveMovePrimariesRegistry::ActiveMovePrimariesRegistry() = default;
 
 ActiveMovePrimariesRegistry::~ActiveMovePrimariesRegistry() {
     invariant(!_activeMovePrimaryState);
+}
+
+ActiveMovePrimariesRegistry& ActiveMovePrimariesRegistry::get(ServiceContext* service) {
+    return getRegistry(service);
+}
+
+ActiveMovePrimariesRegistry& ActiveMovePrimariesRegistry::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
 }
 
 StatusWith<ScopedMovePrimary> ActiveMovePrimariesRegistry::registerMovePrimary(

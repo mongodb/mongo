@@ -214,8 +214,6 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
                               << causedBy(_initializationStatus)};
     }
 
-    ShardedConnectionInfo::addHook(opCtx->getServiceContext());
-
     try {
         Status status = _globalInit(opCtx, configSvrConnStr, generateDistLockProcessId(opCtx));
         if (status.isOK()) {
@@ -371,33 +369,6 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
             return false;
         }
     }
-}
-
-StatusWith<ScopedDonateChunk> ShardingState::registerDonateChunk(const MoveChunkRequest& args) {
-    return _activeMigrationsRegistry.registerDonateChunk(args);
-}
-
-StatusWith<ScopedReceiveChunk> ShardingState::registerReceiveChunk(const NamespaceString& nss,
-                                                                   const ChunkRange& chunkRange,
-                                                                   const ShardId& fromShardId) {
-    return _activeMigrationsRegistry.registerReceiveChunk(nss, chunkRange, fromShardId);
-}
-
-boost::optional<NamespaceString> ShardingState::getActiveDonateChunkNss() {
-    return _activeMigrationsRegistry.getActiveDonateChunkNss();
-}
-
-BSONObj ShardingState::getActiveMigrationStatusReport(OperationContext* opCtx) {
-    return _activeMigrationsRegistry.getActiveMigrationStatusReport(opCtx);
-}
-
-StatusWith<ScopedMovePrimary> ShardingState::registerMovePrimary(
-    const ShardMovePrimary& requestArgs) {
-    return _activeMovePrimariesRegistry.registerMovePrimary(requestArgs);
-}
-
-boost::optional<NamespaceString> ShardingState::getActiveMovePrimaryNss() {
-    return _activeMovePrimariesRegistry.getActiveMovePrimaryNss();
 }
 
 void ShardingState::appendInfo(OperationContext* opCtx, BSONObjBuilder& builder) {

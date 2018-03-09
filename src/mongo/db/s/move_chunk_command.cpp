@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_timing_helper.h"
@@ -120,8 +121,8 @@ public:
         // where we might have changed a shard's host by removing/adding a shard with the same name.
         Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
-        auto scopedMigration =
-            uassertStatusOK(shardingState->registerDonateChunk(moveChunkRequest));
+        auto scopedMigration = uassertStatusOK(
+            ActiveMigrationsRegistry::get(opCtx).registerDonateChunk(moveChunkRequest));
 
         Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 

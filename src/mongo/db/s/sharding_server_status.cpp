@@ -30,6 +30,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_options.h"
@@ -77,9 +78,10 @@ public:
         result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
         // Get a migration status report if a migration is active for which this is the source
-        // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the
-        // namespace of the active migration if there is one that is active.
-        BSONObj migrationStatus = shardingState->getActiveMigrationStatusReport(opCtx);
+        // shard. The call to getActiveMigrationStatusReport will take an IS lock on the namespace
+        // of the active migration if there is one that is active.
+        BSONObj migrationStatus =
+            ActiveMigrationsRegistry::get(opCtx).getActiveMigrationStatusReport(opCtx);
         if (!migrationStatus.isEmpty()) {
             result.append("migrations", migrationStatus);
         }

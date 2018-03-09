@@ -38,9 +38,8 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
-struct CollectionOptions;
+
 struct InsertStatement;
-class NamespaceString;
 class OperationContext;
 
 namespace repl {
@@ -301,8 +300,8 @@ private:
 
 /**
  * This class is an RAII object to manage the state of the `OpObserver::Times` decoration on an
- * operation context.  Upon destruction the list of times in the decoration on the operation
- * context is cleared.  It is intended for use as a scope object in `OpObserverRegistry` to manage
+ * operation context. Upon destruction the list of times in the decoration on the operation context
+ * is cleared. It is intended for use as a scope object in `OpObserverRegistry` to manage
  * re-entrancy.
  */
 class OpObserver::ReservedTimes {
@@ -310,28 +309,8 @@ class OpObserver::ReservedTimes {
     ReservedTimes& operator=(const ReservedTimes&) = delete;
 
 public:
-    ~ReservedTimes() {
-        // Every time the `ReservedTimes` guard goes out of scope, this indicates one fewer level of
-        // recursion in the `OpObserver` registered chain.
-        if (!--_times._recursionDepth) {
-            // When the depth hits 0, the `OpObserver` is considered to have finished, and therefore
-            // the `reservedOpTimes` state needs to be reset.
-            _times.reservedOpTimes.clear();
-        }
-        invariant(_times._recursionDepth >= 0);
-    }
-
-    explicit ReservedTimes(OperationContext* const opCtx) : _times(Times::get(opCtx)) {
-        // Every time that a `ReservedTimes` scope object is instantiated, we have to track if there
-        // was a potentially recursive call.  When there was no `OpObserver` chain being executed
-        // before this instantiation, we should have an empty `reservedOpTimes` vector.
-        if (!_times._recursionDepth++) {
-            invariant(_times.reservedOpTimes.empty());
-        }
-
-        invariant(_times._recursionDepth > 0);
-        invariant(_times._recursionDepth == 1 || !opCtx->writesAreReplicated());
-    }
+    explicit ReservedTimes(OperationContext* const opCtx);
+    ~ReservedTimes();
 
     const Times& get() const {
         return _times;
@@ -340,4 +319,5 @@ public:
 private:
     Times& _times;
 };
+
 }  // namespace mongo

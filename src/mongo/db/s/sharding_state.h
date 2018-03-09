@@ -33,9 +33,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -141,66 +138,6 @@ public:
                                            const std::string& newConnectionString);
 
     /**
-     * If there are no migrations running on this shard, registers an active migration with the
-     * specified arguments and returns a ScopedDonateChunk, which must be signaled by the
-     * caller before it goes out of scope.
-     *
-     * If there is an active migration already running on this shard and it has the exact same
-     * arguments, returns a ScopedDonateChunk, which can be used to join the existing one.
-     *
-     * Otherwise returns a ConflictingOperationInProgress error.
-     */
-    StatusWith<ScopedDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
-
-    /**
-     * If there are no migrations running on this shard, registers an active receive operation with
-     * the specified session id and returns a ScopedReceiveChunk, which will unregister it
-     * when it goes out of scope.
-     *
-     * Otherwise returns a ConflictingOperationInProgress error.
-     */
-    StatusWith<ScopedReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
-                                                        const ChunkRange& chunkRange,
-                                                        const ShardId& fromShardId);
-
-    /**
-     * If a migration has been previously registered through a call to registerDonateChunk returns
-     * that namespace. Otherwise returns boost::none.
-     *
-     * This method can be called without any locks, but once the namespace is fetched it needs to be
-     * re-checked after acquiring some intent lock on that namespace.
-     */
-    boost::optional<NamespaceString> getActiveDonateChunkNss();
-
-    /**
-     * Get a migration status report from the migration registry. If no migration is active, this
-     * returns an empty BSONObj.
-     *
-     * Takes an IS lock on the namespace of the active migration, if one is active.
-     */
-    BSONObj getActiveMigrationStatusReport(OperationContext* opCtx);
-
-    /**
-     * If there are no movePrimary operations running on this shard, registers an active
-     * movePrimary operation with the specified arguments. Returns a ScopedMovePrimary, which must
-     * be signaled by the caller before it goes out of scope.
-     *
-     * If there is an active movePrimary operation already running on this shard and it has the
-     * exact same arguments, returns a ScopedMovePrimary, which can be used to join the already
-     * running movePrimary command.
-     *
-     * Otherwise returns a ConflictingOperationInProgress error.
-     */
-    StatusWith<ScopedMovePrimary> registerMovePrimary(const ShardMovePrimary& requestArgs);
-
-    /**
-     * If a movePrimary command has been previously registered through a call to
-     * registerMovePrimary,
-     * returns that namespace. Otherwise returns boost::none.
-     */
-    boost::optional<NamespaceString> getActiveMovePrimaryNss();
-
-    /**
      * For testing only. Mock the initialization method used by initializeFromConfigConnString and
      * initializeFromShardIdentity after all checks are performed.
      */
@@ -247,12 +184,6 @@ private:
      * Updates the initialization state.
      */
     void _setInitializationState(InitializationState newState);
-
-    // Tracks the active move chunk operations running on this shard
-    ActiveMigrationsRegistry _activeMigrationsRegistry;
-
-    // Tracks the active move primary operations running on this shard
-    ActiveMovePrimariesRegistry _activeMovePrimariesRegistry;
 
     // Protects state below
     stdx::mutex _mutex;
