@@ -25,9 +25,10 @@ executor:
       oplogSize: 511
       verbose: ''
       set_parameters:
+        disableLogicalSessionCacheRefresh: false
+        enableTestCommands: 1
         logComponentVerbosity:
           replication: 2
-        enableTestCommands: 1
         numInitialSyncAttempts: 1
         numInitialSyncConnectAttempts: 60
         writePeriodicNoops: 1
