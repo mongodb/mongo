@@ -71,7 +71,7 @@ const WriteConcernOptions kMajorityWriteConcern(
 // A facade presenting CommandDefinition as an audit::CommandInterface.
 class CommandAuditHook : public audit::CommandInterface {
 public:
-    explicit CommandAuditHook(Command* command) : _command(command) {}
+    explicit CommandAuditHook(const Command* command) : _command{command} {}
 
     void redactForLogging(mutablebson::Document* cmdObj) const final {
         _command->redactForLogging(cmdObj);
@@ -82,7 +82,7 @@ public:
     }
 
 private:
-    Command* _command;
+    const Command* _command;
 };
 
 }  // namespace
@@ -110,6 +110,22 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
         appendCommandStatus(body, ex.toStatus());
     }
     return BSONObj(bb.release());
+}
+
+void CommandHelpers::logAuthViolation(OperationContext* opCtx,
+                                      const Command* command,
+                                      const OpMsgRequest& request,
+                                      ErrorCodes::Error err) {
+    CommandAuditHook hook{command};
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, &hook, err);
+}
+
+void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
+                                                const OpMsgRequest& request) {
+    uassert(40472,
+            str::stream() << "The " << commandName
+                          << " command does not support document sequences.",
+            request.sequences.empty());
 }
 
 std::string CommandHelpers::parseNsFullyQualified(StringData dbname, const BSONObj& cmdObj) {
@@ -461,7 +477,7 @@ Status Command::explain(OperationContext* opCtx,
 
 Status BasicCommand::checkAuthForRequest(OperationContext* opCtx,
                                          const OpMsgRequest& request) const {
-    uassertNoDocumentSequences(request);
+    CommandHelpers::uassertNoDocumentSequences(getName(), request);
     return checkAuthForOperation(opCtx, request.getDatabase().toString(), request.body);
 }
 
@@ -535,16 +551,10 @@ void Command::generateHelpResponse(OperationContext* opCtx,
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }
 
-void BasicCommand::uassertNoDocumentSequences(const OpMsgRequest& request) const {
-    uassert(40472,
-            str::stream() << "The " << getName() << " command does not support document sequences.",
-            request.sequences.empty());
-}
-
 bool BasicCommand::enhancedRun(OperationContext* opCtx,
                                const OpMsgRequest& request,
                                BSONObjBuilder& result) {
-    uassertNoDocumentSequences(request);
+    CommandHelpers::uassertNoDocumentSequences(getName(), request);
     return run(opCtx, request.getDatabase().toString(), request.body, result);
 }
 

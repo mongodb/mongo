@@ -192,6 +192,13 @@ struct CommandHelpers {
      */
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 
+    static void logAuthViolation(OperationContext* opCtx,
+                                 const Command* command,
+                                 const OpMsgRequest& request,
+                                 ErrorCodes::Error err);
+
+    static void uassertNoDocumentSequences(StringData commandName, const OpMsgRequest& request);
+
     static constexpr StringData kHelpFieldName = "help"_sd;
 };
 
@@ -447,7 +454,9 @@ private:
      */
     virtual bool enhancedRun(OperationContext* opCtx,
                              const OpMsgRequest& request,
-                             BSONObjBuilder& result) = 0;
+                             BSONObjBuilder& result) {
+        MONGO_UNREACHABLE;
+    }
 
     // Counters for how many times this command has been executed and failed
     Counter64 _commandsExecuted;
@@ -646,8 +655,6 @@ private:
      * Calls checkAuthForOperation.
      */
     Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final;
-
-    void uassertNoDocumentSequences(const OpMsgRequest& request) const;
 };
 
 /**
