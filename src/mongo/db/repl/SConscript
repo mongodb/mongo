@@ -312,7 +312,7 @@ env.Library(
     LIBDEPS=[
     ],
     LIBDEPS_PRIVATE=[
-        'sync_tail',
+        'oplog_application',
         '$BUILD_DIR/mongo/base',
     ],
 )
@@ -610,7 +610,7 @@ env.Library(
 )
 
 env.Library(
-    target='sync_tail',
+    target='oplog_application',
     source=[
         'applier_helpers.cpp',
         'sync_tail.cpp',
@@ -652,9 +652,9 @@ env.Library(
         'sync_tail_test_fixture.cpp',
     ],
     LIBDEPS=[
+        'oplog_application',
         'replication_process',
         'replmocks',
-        'sync_tail',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
@@ -1565,6 +1565,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/client_metadata',
         'bgsync',
         'drop_pending_collection_reaper',
+        'oplog_application',
         'oplog_buffer_collection',
         'oplog_interface_remote',
         'optime',
@@ -1576,7 +1577,6 @@ env.Library(
         'replication_recovery',
         'reporter',
         'rollback_source_impl',
-        'sync_tail',
     ],
 )
 
