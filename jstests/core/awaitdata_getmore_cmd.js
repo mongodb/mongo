@@ -156,6 +156,9 @@
 
     // getMore should time out if we insert a non-matching document.
     let insertshell = startParallelShell(function() {
+        // Signal to the original shell that the parallel shell has successfully started.
+        assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
+        // Wait for the parent shell to start watching for the next document.
         assert.soon(
             function() {
                 return db.currentOp({
@@ -167,9 +170,16 @@
             function() {
                 return tojson(db.currentOp().inprog);
             });
+        // Now write a non-matching document to the collection.
         assert.writeOK(db.await_data.insert({x: 0}));
     });
 
+    // Wait until we receive confirmation that the parallel shell has started.
+    assert.soon(() => db.await_data.findOne({_id: "signal parent shell"}) !== null);
+
+    // Now issue a getMore which will match the parallel shell's currentOp filter, signalling it to
+    // write a non-matching document into the collection. Confirm that we do not receive this
+    // document and that we subsequently time out.
     now = new Date();
     cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 4000});
     assert.commandWorked(cmdRes);
