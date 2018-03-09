@@ -120,8 +120,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
 
     massertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());

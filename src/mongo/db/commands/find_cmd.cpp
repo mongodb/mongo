@@ -154,8 +154,7 @@ public:
                                          std::move(qrStatus.getValue()),
                                          expCtx,
                                          extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures &
-                                             ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -272,8 +271,7 @@ public:
                                          std::move(qr),
                                          expCtx,
                                          extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures &
-                                             ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
         if (!statusWithCQ.isOK()) {
             return CommandHelpers::appendCommandStatus(result, statusWithCQ.getStatus());
         }

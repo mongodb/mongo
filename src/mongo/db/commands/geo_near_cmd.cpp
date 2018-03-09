@@ -220,8 +220,7 @@ public:
                                          std::move(qr),
                                          expCtx,
                                          extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures &
-                                             ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;

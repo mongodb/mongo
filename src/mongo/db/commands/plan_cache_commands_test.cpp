@@ -273,24 +273,6 @@ TEST(PlanCacheCommandsTest, Canonicalize) {
     ASSERT_NOT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*projectionQuery));
 }
 
-TEST(PlanCacheCommandsTest, PlanCacheIgnoresIsolated) {
-    PlanCache planCache;
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
-
-    // Query with $isolated should generate the same key as a query without $siolated.
-    auto statusWithCQ =
-        PlanCacheCommand::canonicalize(opCtx.get(), nss.ns(), fromjson("{query: {a: 1, b: 1}}"));
-    ASSERT_OK(statusWithCQ.getStatus());
-    unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
-
-    statusWithCQ = PlanCacheCommand::canonicalize(
-        opCtx.get(), nss.ns(), fromjson("{query: {a: 1, b: 1}, $isolated: 1}"));
-    ASSERT_OK(statusWithCQ.getStatus());
-    unique_ptr<CanonicalQuery> queryWithIsolated = std::move(statusWithCQ.getValue());
-    ASSERT_EQUALS(planCache.computeKey(*query), planCache.computeKey(*queryWithIsolated));
-}
-
 /**
  * Tests for planCacheClear (single query shape)
  */
