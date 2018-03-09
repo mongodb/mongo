@@ -15,7 +15,6 @@
     assert.commandFailed(db.createCollection(collName, {validator: 7}));
     assert.commandFailed(db.createCollection(collName, {validator: "assert"}));
     assert.commandFailed(db.createCollection(collName, {validator: {$jsonSchema: {invalid: 1}}}));
-    assert.commandFailed(db.createCollection(collName, {validator: {$isolated: 1}}));
 
     // Check some disallowed match statements.
     assert.commandFailed(db.createCollection(collName, {validator: {$text: "bob"}}));
@@ -55,7 +54,6 @@
         db.runCommand({"collMod": collName, "validator": {$expr: {$eq: ["$a", "$$unbound"]}}}));
     assert.commandFailed(
         db.runCommand({"collMod": collName, "validator": {$jsonSchema: {invalid: 7}}}));
-    assert.commandFailed(db.runCommand({"collMod": collName, "validator": {$isolated: 1}}));
 
     coll.drop();
 

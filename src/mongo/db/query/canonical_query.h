@@ -92,8 +92,7 @@ public:
                                                                     MatchExpression* root);
 
     /**
-     * Returns true if "query" describes an exact-match query on _id, possibly with
-     * the $isolated/$atomic modifier.
+     * Returns true if "query" describes an exact-match query on _id.
      */
     static bool isSimpleIdQuery(const BSONObj& query);
 
@@ -171,14 +170,6 @@ public:
         return _canHaveNoopMatchNodes;
     }
 
-    /**
-     * Returns true if the query this CanonicalQuery was parsed from included a $isolated/$atomic
-     * operator.
-     */
-    bool isIsolated() const {
-        return _isIsolated;
-    }
-
 private:
     // You must go through canonicalize to create a CanonicalQuery.
     CanonicalQuery() {}
@@ -199,8 +190,6 @@ private:
     std::unique_ptr<CollatorInterface> _collator;
 
     bool _canHaveNoopMatchNodes = false;
-
-    bool _isIsolated;
 };
 
 }  // namespace mongo

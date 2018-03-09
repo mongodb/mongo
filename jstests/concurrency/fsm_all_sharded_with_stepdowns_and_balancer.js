@@ -143,8 +143,6 @@ var blacklist = [
     'remove_and_bulk_insert.js',
     'update_and_bulk_insert.js',
     'update_check_index.js',
-    'update_multifield_isolated_multiupdate.js',
-    'update_multifield_isolated_multiupdate_noindex.js',
     'update_multifield_multiupdate.js',
     'update_multifield_multiupdate_noindex.js',
     'update_ordered_bulk_inc.js',

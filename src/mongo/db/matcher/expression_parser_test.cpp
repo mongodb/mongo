@@ -65,56 +65,6 @@ TEST(MatchExpressionParserTest, Multiple1) {
     ASSERT(!result.getValue()->matchesBSON(BSON("x" << 5 << "y" << 4)));
 }
 
-TEST(AtomicMatchExpressionTest, AtomicOperatorSuccessfullyParsesWhenFeatureBitIsSet) {
-    auto query = BSON("x" << 5 << "$atomic" << 1);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto result = MatchExpressionParser::parse(
-        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kIsolated);
-    ASSERT_OK(result.getStatus());
-}
-
-TEST(AtomicMatchExpressionTest, AtomicOperatorFailsToParseIfNotTopLevel) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("x" << 5 << "y" << BSON("$atomic" << 1));
-    auto result = MatchExpressionParser::parse(
-        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kIsolated);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(ErrorCodes::BadValue, result.getStatus());
-}
-
-TEST(AtomicMatchExpressionTest, AtomicOperatorFailsToParseIfFeatureBitIsNotSet) {
-    auto query = BSON("x" << 5 << "$atomic" << 1);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_EQ(ErrorCodes::QueryFeatureNotAllowed, result.getStatus());
-}
-
-TEST(IsolatedMatchExpressionTest, IsolatedOperatorSuccessfullyParsesWhenFeatureBitIsSet) {
-    auto query = BSON("x" << 5 << "$isolated" << 1);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto result = MatchExpressionParser::parse(
-        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kIsolated);
-    ASSERT_OK(result.getStatus());
-}
-
-TEST(IsolatedMatchExpressionTest, IsolatedOperatorFailsToParseIfFeatureBitIsNotSet) {
-    // Query parsing fails if $isolated is not in the allowed feature set.
-    auto query = BSON("x" << 5 << "$isolated" << 1);
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(ErrorCodes::QueryFeatureNotAllowed, result.getStatus());
-}
-
-TEST(IsolatedMatchExpressionTest, IsolatedOperatorFailsToParseIfNotTopLevel) {
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    auto query = BSON("x" << 5 << "y" << BSON("$isolated" << 1));
-    auto result = MatchExpressionParser::parse(
-        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kIsolated);
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(ErrorCodes::BadValue, result.getStatus());
-}
-
 TEST(MatchExpressionParserTest, MinDistanceWithoutNearFailsToParse) {
     BSONObj query = fromjson("{loc: {$minDistance: 10}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
