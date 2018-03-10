@@ -21,10 +21,10 @@ class JsCustomBehavior(interface.CustomBehavior):
 
     def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
         interface.CustomBehavior.__init__(self, hook_logger, fixture, description)
-        self.hook_test_case = jstest.JSTestCase(hook_logger,
-                                                js_filename,
-                                                shell_options=shell_options,
-                                                test_kind="Hook")
+        self.hook_test_case = self.make_dynamic_test(jstest.JSTestCase,
+                                                     js_filename,
+                                                     shell_options=shell_options,
+                                                     test_kind="Hook")
         self.test_case_is_configured = False
 
     def before_suite(self, test_report):
@@ -45,9 +45,10 @@ class JsCustomBehavior(interface.CustomBehavior):
 
         # Change test_name and description to be more descriptive.
         description = "{0} after running '{1}'".format(self.description, test.short_name())
-        self.hook_test_case.test_name = test.short_name() + ":" + self.logger_name
-        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+        test_name = "{}:{}".format(test.short_name(), self.__class__.__name__)
+        self.hook_test_case.test_name = test_name
 
+        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
         try:
             self._after_test_impl(test, test_report, description)
         except pymongo.errors.OperationFailure as err:
