@@ -69,7 +69,7 @@
 
     // Propagate 'clusterTime' to shard 0. This ensures that its next write will be at time >=
     // 'clusterTime'.
-    testDB0.coll0.find().itcount();
+    testDB0.coll0.find().readPref('secondary').itcount();
 
     // Attempt a snapshot read at 'clusterTime' on shard 0. Test that it performs a noop write to
     // advance its majority commit point. The snapshot read itself may fail if the noop write

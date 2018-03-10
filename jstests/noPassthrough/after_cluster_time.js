@@ -30,15 +30,13 @@
         ErrorCodes.InvalidOptions,
         "expected afterClusterTime read with null timestamp to fail on standalone mongod");
 
-    // Standalones don't store clusterTime, so any non-zero afterClusterTime read value will be
-    // rejected for being ahead of the server's uninitialized internal clusterTime.
-    assert.commandFailedWithCode(
-        testDB.runCommand({
-            find: "after_cluster_time",
-            readConcern: {level: "majority", afterClusterTime: Timestamp(0, 1)}
-        }),
-        ErrorCodes.InvalidOptions,
-        "expected afterClusterTime read with non-zero timestamp to fail on standalone mongod");
+    // Standalones don't support any operations with clusterTime.
+    assert.commandFailedWithCode(testDB.runCommand({
+        find: "after_cluster_time",
+        readConcern: {level: "majority", afterClusterTime: Timestamp(0, 1)}
+    }),
+                                 ErrorCodes.IllegalOperation,
+                                 "expected afterClusterTime read to fail on standalone mongod");
     MongoRunner.stopMongod(standalone);
 
     var rst = new ReplSetTest({nodes: 1});
