@@ -859,6 +859,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
 }
 
 Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
+    OperationContext* opCtx,
     MultiApplier::OperationPtrs* ops,
     const HostAndPort& source,
     AtomicUInt32* fetchCount,
@@ -869,7 +870,7 @@ Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     // be accessing any SyncTail functionality that require these constructor parameters.
     SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
     syncTail.setHostname(source.toString());
-    return repl::multiInitialSyncApply(ops, &syncTail, fetchCount, workerMultikeyPathInfo);
+    return repl::multiInitialSyncApply(opCtx, ops, &syncTail, fetchCount, workerMultikeyPathInfo);
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(

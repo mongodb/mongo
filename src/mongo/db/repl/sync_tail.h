@@ -60,7 +60,8 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc = stdx::function<void(MultiApplier::OperationPtrs* ops,
+    using MultiSyncApplyFunc = stdx::function<void(OperationContext* opCtx,
+                                                   MultiApplier::OperationPtrs* ops,
                                                    SyncTail* st,
                                                    WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
@@ -278,12 +279,13 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 // They consume the passed in OperationPtrs and callers should not make any assumptions about the
 // state of the container after calling. However, these functions cannot modify the pointed-to
 // operations because the OperationPtrs container contains const pointers.
-void multiSyncApply(MultiApplier::OperationPtrs* ops,
+void multiSyncApply(OperationContext* opCtx,
+                    MultiApplier::OperationPtrs* ops,
                     SyncTail* st,
                     WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
-// Used by 3.4 initial sync.
-Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+Status multiInitialSyncApply(OperationContext* opCtx,
+                             MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
                              AtomicUInt32* fetchCount,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo);
@@ -299,16 +301,6 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* ops,
                               WorkerMultikeyPathInfo* workerMultikeyPathInfo,
                               SyncApplyFn syncApply);
-
-/**
- * Testing-only version of multiInitialSyncApply that accepts an external operation context and
- * returns an error instead of aborting.
- */
-Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
-                                     MultiApplier::OperationPtrs* ops,
-                                     SyncTail* st,
-                                     AtomicUInt32* fetchCount,
-                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 }  // namespace repl
 }  // namespace mongo

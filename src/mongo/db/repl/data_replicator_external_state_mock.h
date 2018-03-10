@@ -90,12 +90,16 @@ public:
 
     // Override to change _multiInitialSyncApply behavior.
     using MultiInitialSyncApplyFn =
-        stdx::function<Status(MultiApplier::OperationPtrs* ops,
+        stdx::function<Status(OperationContext* opCtx,
+                              MultiApplier::OperationPtrs* ops,
                               const HostAndPort& source,
                               AtomicUInt32* fetchCount,
                               WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
-    MultiInitialSyncApplyFn multiInitialSyncApplyFn = [](
-        MultiApplier::OperationPtrs*, const HostAndPort&, AtomicUInt32*, WorkerMultikeyPathInfo*) {
+    MultiInitialSyncApplyFn multiInitialSyncApplyFn = [](OperationContext*,
+                                                         MultiApplier::OperationPtrs*,
+                                                         const HostAndPort&,
+                                                         AtomicUInt32*,
+                                                         WorkerMultikeyPathInfo*) {
         return Status::OK();
     };
 
@@ -106,7 +110,8 @@ private:
                                    MultiApplier::Operations ops,
                                    MultiApplier::ApplyOperationFn applyOperation) override;
 
-    Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+    Status _multiInitialSyncApply(OperationContext* opCtx,
+                                  MultiApplier::OperationPtrs* ops,
                                   const HostAndPort& source,
                                   AtomicUInt32* fetchCount,
                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;

@@ -109,7 +109,8 @@ public:
     virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
-    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+    virtual Status multiInitialSyncApply(OperationContext* opCtx,
+                                         MultiApplier::OperationPtrs* ops,
                                          const HostAndPort& source,
                                          AtomicUInt32* fetchCount,
                                          WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;

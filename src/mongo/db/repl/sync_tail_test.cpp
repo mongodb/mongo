@@ -564,7 +564,8 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
                                           const CollectionOptions& options) {
     auto writerPool = SyncTail::makeWriterPool();
     MultiApplier::Operations operationsApplied;
-    auto applyOperationFn = [&operationsApplied](MultiApplier::OperationPtrs* operationsToApply,
+    auto applyOperationFn = [&operationsApplied](OperationContext* opCtx,
+                                                 MultiApplier::OperationPtrs* operationsToApply,
                                                  WorkerMultikeyPathInfo*) -> Status {
         for (auto&& opPtr : *operationsToApply) {
             operationsApplied.push_back(*opPtr);
@@ -613,7 +614,8 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     stdx::mutex mutex;
     std::vector<MultiApplier::Operations> operationsApplied;
     auto applyOperationFn =
-        [&mutex, &operationsApplied](MultiApplier::OperationPtrs* operationsForWriterThreadToApply,
+        [&mutex, &operationsApplied](OperationContext* opCtx,
+                                     MultiApplier::OperationPtrs* operationsForWriterThreadToApply,
                                      WorkerMultikeyPathInfo*) -> Status {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         operationsApplied.emplace_back();
@@ -781,67 +783,65 @@ TEST_F(SyncTailTest, MultiApplyUpdatesTheTransactionTable) {
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
-    _opCtx.reset();
 
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    multiSyncApply(&ops, nullptr, &pathInfo);
+    multiSyncApply(_opCtx.get(), &ops, nullptr, &pathInfo);
     // Collection should be created after SyncTail::syncApply() processes operation.
-    _opCtx = cc().makeOperationContext();
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
 
-void testWorkerMultikeyPaths(const OplogEntry& op, unsigned long numPaths) {
+void testWorkerMultikeyPaths(OperationContext* opCtx,
+                             const OplogEntry& op,
+                             unsigned long numPaths) {
     WorkerMultikeyPathInfo pathInfo;
     MultiApplier::OperationPtrs ops = {&op};
-    multiSyncApply(&ops, nullptr, &pathInfo);
+    multiSyncApply(opCtx, &ops, nullptr, &pathInfo);
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyAddsWorkerMultikeyPathInfoOnInsert) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    _opCtx.reset();
 
     {
         auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto keyPattern = BSON("a" << 1);
         auto op =
             makeCreateIndexOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, "a_1", keyPattern);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5));
         auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, nss, doc);
-        testWorkerMultikeyPaths(op, 1UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 1UL);
     }
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyAddsMultipleWorkerMultikeyPathInfo) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    _opCtx.reset();
 
     {
         auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto keyPattern = BSON("a" << 1);
         auto op =
             makeCreateIndexOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, "a_1", keyPattern);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto keyPattern = BSON("b" << 1);
         auto op =
             makeCreateIndexOplogEntry({Timestamp(Seconds(3), 0), 1LL}, nss, "b_1", keyPattern);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
@@ -851,37 +851,36 @@ TEST_F(SyncTailTest, MultiSyncApplyAddsMultipleWorkerMultikeyPathInfo) {
         auto opB = makeInsertDocumentOplogEntry({Timestamp(Seconds(5), 0), 1LL}, nss, docB);
         WorkerMultikeyPathInfo pathInfo;
         MultiApplier::OperationPtrs ops = {&opA, &opB};
-        multiSyncApply(&ops, nullptr, &pathInfo);
+        multiSyncApply(_opCtx.get(), &ops, nullptr, &pathInfo);
         ASSERT_EQ(pathInfo.size(), 2UL);
     }
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDoesNotAddWorkerMultikeyPathInfoOnCreateIndex) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    _opCtx.reset();
 
     {
         auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto doc = BSON("_id" << 1 << "a" << BSON_ARRAY(4 << 5));
         auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto keyPattern = BSON("a" << 1);
         auto op =
             makeCreateIndexOplogEntry({Timestamp(Seconds(3), 0), 1LL}, nss, "a_1", keyPattern);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 
     {
         auto doc = BSON("_id" << 2 << "a" << BSON_ARRAY(6 << 7));
         auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc);
-        testWorkerMultikeyPaths(op, 0UL);
+        testWorkerMultikeyPaths(_opCtx.get(), op, 0UL);
     }
 }
 
@@ -893,9 +892,8 @@ DEATH_TEST_F(SyncTailTest,
     NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
-    _opCtx.reset();
     MultiApplier::OperationPtrs ops = {&op};
-    multiSyncApply(&ops, nullptr, nullptr);
+    multiSyncApply(_opCtx.get(), &ops, nullptr, nullptr);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
@@ -904,10 +902,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMake
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
-    _opCtx.reset();
     MultiApplier::OperationPtrs ops = {&op};
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  multiInitialSyncApply(&ops, nullptr, nullptr, nullptr));
+                  multiInitialSyncApply(_opCtx.get(), &ops, nullptr, nullptr, nullptr));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
@@ -1279,7 +1276,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
     MultiApplier::OperationPtrs ops = {&op};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
     ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
@@ -1299,7 +1296,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
     MultiApplier::OperationPtrs ops = {&op};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
@@ -1322,7 +1319,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
     ASSERT_EQUALS(fetchCount.load(), 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
@@ -1348,7 +1345,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
     ASSERT_EQUALS(fetchCount.load(), 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
@@ -1372,7 +1369,7 @@ TEST_F(SyncTailTest,
     MultiApplier::OperationPtrs ops = {&op};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
     ASSERT_EQUALS(fetchCount.load(), 1U);
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold

@@ -251,6 +251,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
 }
 
 Status ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
+    OperationContext* opCtx,
     MultiApplier::OperationPtrs* ops,
     const HostAndPort& source,
     AtomicUInt32* fetchCount,

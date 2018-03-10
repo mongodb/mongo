@@ -141,7 +141,8 @@ private:
      *
      * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
-    virtual Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+    virtual Status _multiInitialSyncApply(OperationContext* opCtx,
+                                          MultiApplier::OperationPtrs* ops,
                                           const HostAndPort& source,
                                           AtomicUInt32* fetchCount,
                                           WorkerMultikeyPathInfo* workerMultikeyPathInfo) = 0;

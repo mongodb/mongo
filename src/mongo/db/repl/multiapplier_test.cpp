@@ -59,7 +59,7 @@ void MultiApplierTest::setUp() {
     launchExecutorThread();
 }
 
-Status applyOperation(MultiApplier::OperationPtrs*, WorkerMultikeyPathInfo*) {
+Status applyOperation(OperationContext*, MultiApplier::OperationPtrs*, WorkerMultikeyPathInfo*) {
     return Status::OK();
 };
 

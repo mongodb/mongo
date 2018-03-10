@@ -448,7 +448,10 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
                 &writer = writerVectors.at(i),
                 &status = statusVector->at(i),
                 &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
-            ] { status = func(&writer, &workerMultikeyPathInfo); }));
+            ] {
+                auto opCtx = cc().makeOperationContext();
+                status = func(opCtx.get(), &writer, &workerMultikeyPathInfo);
+            }));
         }
     }
 }
@@ -706,9 +709,10 @@ SessionRecordMap getLatestSessionRecords(const MultiApplier::Operations& ops) {
  * this batch, it will not be updated.
  */
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
-    auto applyOperation = [this](MultiApplier::OperationPtrs* ops,
+    auto applyOperation = [this](OperationContext* opCtx,
+                                 MultiApplier::OperationPtrs* ops,
                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
-        _applyFunc(ops, this, workerMultikeyPathInfo);
+        _applyFunc(opCtx, ops, this, workerMultikeyPathInfo);
         // This function is used by 3.2 initial sync and steady state data replication.
         // _applyFunc() will throw or abort on error, so we return OK here.
         return Status::OK();
@@ -1224,16 +1228,15 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
 }
 
 // This free function is used by the writer threads to apply each op
-void multiSyncApply(MultiApplier::OperationPtrs* ops,
+void multiSyncApply(OperationContext* opCtx,
+                    MultiApplier::OperationPtrs* ops,
                     SyncTail* st,
                     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    auto opCtx = cc().makeOperationContext();
     auto syncApply = [](
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
         return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
-    fassertNoTrace(16359,
-                   multiSyncApply_noAbort(opCtx.get(), ops, workerMultikeyPathInfo, syncApply));
+    fassertNoTrace(16359, multiSyncApply_noAbort(opCtx, ops, workerMultikeyPathInfo, syncApply));
 }
 
 Status multiSyncApply_noAbort(OperationContext* opCtx,
@@ -1295,19 +1298,11 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+Status multiInitialSyncApply(OperationContext* opCtx,
+                             MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
                              AtomicUInt32* fetchCount,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    auto opCtx = cc().makeOperationContext();
-    return multiInitialSyncApply_noAbort(opCtx.get(), ops, st, fetchCount, workerMultikeyPathInfo);
-}
-
-Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
-                                     MultiApplier::OperationPtrs* ops,
-                                     SyncTail* st,
-                                     AtomicUInt32* fetchCount,
-                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());

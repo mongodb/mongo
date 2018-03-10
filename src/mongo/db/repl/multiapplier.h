@@ -68,11 +68,13 @@ public:
     using CallbackFn = stdx::function<void(const Status&)>;
 
     /**
-     * Type of function to to apply a single operation. In production, this function
-     * would have the same outcome as calling SyncTail::syncApply() (oplog application mode
-     * will be embedded in the function implementation).
+     * Type of function for a writer thread during oplog application to apply a set of operations
+     * that have been assigned (hashed by SyncTail::fillWriterVectors()) to that writer thread.
+     * In production, this function would have the same outcome as calling SyncTail::syncApply()
+     * (oplog application mode will be embedded in the function implementation).
      */
-    using ApplyOperationFn = stdx::function<Status(OperationPtrs*, WorkerMultikeyPathInfo*)>;
+    using ApplyOperationFn =
+        stdx::function<Status(OperationContext*, OperationPtrs*, WorkerMultikeyPathInfo*)>;
 
     using MultiApplyFn = stdx::function<StatusWith<OpTime>(
         OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn)>;

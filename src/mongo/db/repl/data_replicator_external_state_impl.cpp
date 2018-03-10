@@ -127,12 +127,13 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
 }
 
 Status DataReplicatorExternalStateImpl::_multiInitialSyncApply(
+    OperationContext* opCtx,
     MultiApplier::OperationPtrs* ops,
     const HostAndPort& source,
     AtomicUInt32* fetchCount,
     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     return _replicationCoordinatorExternalState->multiInitialSyncApply(
-        ops, source, fetchCount, workerMultikeyPathInfo);
+        opCtx, ops, source, fetchCount, workerMultikeyPathInfo);
 }
 
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {

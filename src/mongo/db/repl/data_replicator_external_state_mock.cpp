@@ -102,12 +102,13 @@ StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
 }
 
 Status DataReplicatorExternalStateMock::_multiInitialSyncApply(
+    OperationContext* opCtx,
     MultiApplier::OperationPtrs* ops,
     const HostAndPort& source,
     AtomicUInt32* fetchCount,
     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
 
-    return multiInitialSyncApplyFn(ops, source, fetchCount, workerMultikeyPathInfo);
+    return multiInitialSyncApplyFn(opCtx, ops, source, fetchCount, workerMultikeyPathInfo);
 }
 
 }  // namespace repl

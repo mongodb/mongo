@@ -303,7 +303,8 @@ public:
      * multikey at the end of the batch.
      *
      */
-    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+    virtual Status multiInitialSyncApply(OperationContext* opCtx,
+                                         MultiApplier::OperationPtrs* ops,
                                          const HostAndPort& source,
                                          AtomicUInt32* fetchCount,
                                          WorkerMultikeyPathInfo* workerMultikeyPathInfo) = 0;

@@ -3573,16 +3573,17 @@ TEST_F(
     // missing document.
     // This forces InitialSyncer to evaluate its end timestamp for applying operations after each
     // batch.
-    getExternalState()->multiApplyFn = [](OperationContext*,
+    getExternalState()->multiApplyFn = [](OperationContext* opCtx,
                                           const MultiApplier::Operations& ops,
                                           MultiApplier::ApplyOperationFn applyOperation) {
         // 'OperationPtr*' is ignored by our overridden _multiInitialSyncApply().
-        ASSERT_OK(applyOperation(nullptr, nullptr));
+        ASSERT_OK(applyOperation(opCtx, nullptr, nullptr));
         return ops.back().getOpTime();
     };
     bool fetchCountIncremented = false;
     getExternalState()->multiInitialSyncApplyFn =
-        [&fetchCountIncremented](MultiApplier::OperationPtrs*,
+        [&fetchCountIncremented](OperationContext*,
+                                 MultiApplier::OperationPtrs*,
                                  const HostAndPort&,
                                  AtomicUInt32* fetchCount,
                                  WorkerMultikeyPathInfo*) {

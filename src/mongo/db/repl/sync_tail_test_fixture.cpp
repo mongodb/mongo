@@ -184,7 +184,7 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
     }
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    return multiInitialSyncApply_noAbort(_opCtx.get(), &opsPtrs, &syncTail, &fetchCount, &pathInfo);
+    return multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &fetchCount, &pathInfo);
 }
 
 

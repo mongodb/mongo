@@ -935,10 +935,11 @@ void InitialSyncer::_getNextApplierBatchCallback(
     if (!ops.empty()) {
         _fetchCount.store(0);
         MultiApplier::ApplyOperationFn applyOperationsForEachReplicationWorkerThreadFn =
-            [ =, source = _syncSource ](MultiApplier::OperationPtrs * x,
+            [ =, source = _syncSource ](OperationContext * opCtx,
+                                        MultiApplier::OperationPtrs * x,
                                         WorkerMultikeyPathInfo * workerMultikeyPathInfo) {
             return _dataReplicatorExternalState->_multiInitialSyncApply(
-                x, source, &_fetchCount, workerMultikeyPathInfo);
+                opCtx, x, source, &_fetchCount, workerMultikeyPathInfo);
         };
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn =
             [=](OperationContext* opCtx,
