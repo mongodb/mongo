@@ -157,12 +157,7 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     _ensureSession();
-    WiredTigerSession* session = _session.get();
-
-    // Dropping the queued idents might block session, which is not desired for fastpath workflow
-    // like FTDC thread. Disable dropping of queued idents for such sessions.
-    session->dropQueuedIdentsAtSessionEndAllowed(false);
-    return session;
+    return _session.get();
 }
 
 void WiredTigerRecoveryUnit::abandonSnapshot() {
@@ -255,13 +250,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     WT_SESSION* session = _session->getSession();
 
     if (_readAtTimestamp != Timestamp::min()) {
-        invariantWTOK(session->begin_transaction(session, NULL));
         auto status =
-            _sessionCache->snapshotManager().setTransactionReadTimestamp(_readAtTimestamp, session);
-
+            _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
         if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
-            int wtRet = session->rollback_transaction(session, NULL);
-            invariant(!wtRet);
             uasserted(ErrorCodes::SnapshotTooOld,
                       str::stream() << "Read timestamp " << _readAtTimestamp.toString()
                                     << " is older than the oldest available timestamp.");

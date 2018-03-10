@@ -757,7 +757,7 @@ int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
     if (_isEphemeral) {
         return dataSize(opCtx);
     }
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     StatusWith<int64_t> result =
         WiredTigerUtil::getStatisticsValueAs<int64_t>(session->getSession(),
                                                       "statistics:" + getURI(),
@@ -1446,7 +1446,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
         result->appendIntOrLL("sleepCount", _cappedSleep.load());
         result->appendIntOrLL("sleepMS", _cappedSleepMS.load());
     }
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSession();
     WT_SESSION* s = session->getSession();
     BSONObjBuilder bob(result->subobjStart(_engineName));
     {
