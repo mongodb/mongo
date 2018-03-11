@@ -220,6 +220,7 @@ StatusWith<BSONObj> validateIndexSpec(
     bool hasNamespaceField = false;
     bool hasVersionField = false;
     bool hasCollationField = false;
+    bool isUniqueIndex = false;
 
     auto fieldNamesValidStatus = validateIndexSpecFieldNames(indexSpec);
     if (!fieldNamesValidStatus.isOK()) {
@@ -364,6 +365,13 @@ StatusWith<BSONObj> validateIndexSpec(
             if (!statusWithMatcher.isOK()) {
                 return statusWithMatcher.getStatus();
             }
+        } else if (IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName) {
+            // Note: Here we only consider whether or not "unique" field is specified and that its
+            // value evaluates to true. "_id" index for instance is unique, but the index spec for
+            // it doesn't carry a "unique" field. "isUniqueIndex" being false for "_id" indexes is
+            // on purpose, and in future if we were to make "_id" index specs include
+            // "unique:true", then we would need to change the logic here to preserve its behavior.
+            isUniqueIndex = indexSpecElem.trueValue();
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().
@@ -372,8 +380,8 @@ StatusWith<BSONObj> validateIndexSpec(
     }
 
     if (!resolvedIndexVersion) {
-        resolvedIndexVersion =
-            IndexDescriptor::getDefaultIndexVersion(featureCompatibility.getVersion());
+        resolvedIndexVersion = IndexDescriptor::getDefaultIndexVersion(
+            featureCompatibility.getVersion(), isUniqueIndex);
     }
 
     if (!hasKeyPatternField) {

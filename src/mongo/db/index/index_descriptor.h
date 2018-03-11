@@ -133,7 +133,8 @@ public:
      * Returns the index version to use if it isn't specified in the index specification.
      */
     static IndexVersion getDefaultIndexVersion(
-        ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion);
+        ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion,
+        bool isUniqueIndex = false);
 
     //
     // Information about the key pattern.

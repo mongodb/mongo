@@ -130,11 +130,19 @@ Status IndexDescriptor::isIndexVersionAllowedForCreation(
 }
 
 IndexVersion IndexDescriptor::getDefaultIndexVersion(
-    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) {
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion,
+    bool isUniqueIndex) {
     // The gating variable would allow creation of V2 format unique index when set to true.
+    // Note: Here "isUniqueIndex" only considers whether or not "unique" field is specified
+    // and that its value evaluates to true. "_id" index for instance is unique, but the
+    // index spec for it doesn't carry a "unique" field. "isUniqueIndex" being false for
+    // "_id" indexes is on purpose, and in future if we were to make "_id" index specs
+    // include "unique:true", then we would need to change the logic here to preserve its
+    // behavior.
     const bool useV2UniqueIndexFormat = false;
-    if (useV2UniqueIndexFormat)
+    if (useV2UniqueIndexFormat && isUniqueIndex) {
         return IndexVersion::kV2Unique;
+    }
 
     return IndexVersion::kV2;
 }
