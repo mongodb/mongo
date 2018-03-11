@@ -3727,9 +3727,10 @@ Value ExpressionSlice::evaluate(const Document& root) const {
         end = arg3.coerceToInt();
     }
 
-    // If array is a filter expression call computeNthFilterdValue to return an array of size "end".
+    // If array is a filter expression call computeNthFilterdValue to return an array of size "end" and
+    // if end is less than 0 evaluate normaly
     const Value arrayVal =
-        dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (n == 2 && end >= 0)
+        dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) &&  (start >= 0 &&  end >= 0)
         ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
               ->computeNthFilteredValue(root, static_cast<long long>(end) + 1)
         : vpOperand[0]->evaluate(root);
