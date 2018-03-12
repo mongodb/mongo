@@ -530,31 +530,33 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
 TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullOperationContext) {
     auto writerPool = SyncTail::makeWriterPool();
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status = multiApply(nullptr, writerPool.get(), {op}, noopApplyOperationFn).getStatus();
+    SyncTail syncTail(nullptr, noopApplyOperationFn, writerPool.get());
+    auto status = syncTail.multiApply(nullptr, {op}).getStatus();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "invalid operation context");
 }
 
 TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullWriterPool) {
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status = multiApply(_opCtx.get(), nullptr, {op}, noopApplyOperationFn).getStatus();
+    SyncTail syncTail(nullptr, noopApplyOperationFn, nullptr);
+    auto status = syncTail.multiApply(_opCtx.get(), {op}).getStatus();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "invalid worker pool");
 }
 
 TEST_F(SyncTailTest, MultiApplyReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
     auto writerPool = SyncTail::makeWriterPool();
-    auto status = multiApply(_opCtx.get(), writerPool.get(), {}, noopApplyOperationFn).getStatus();
+    SyncTail syncTail(nullptr, noopApplyOperationFn, writerPool.get());
+    auto status = syncTail.multiApply(_opCtx.get(), {}).getStatus();
     ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation, status);
     ASSERT_STRING_CONTAINS(status.reason(), "no operations provided to multiApply");
 }
 
 TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullApplyOperation) {
     auto writerPool = SyncTail::makeWriterPool();
-    MultiApplier::ApplyOperationFn nullApplyOperationFn;
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    auto status =
-        multiApply(_opCtx.get(), writerPool.get(), {op}, nullApplyOperationFn).getStatus();
+    SyncTail syncTail(nullptr, {}, writerPool.get());
+    auto status = syncTail.multiApply(_opCtx.get(), {op}).getStatus();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
     ASSERT_STRING_CONTAINS(status.reason(), "invalid apply operation function");
 }
@@ -566,6 +568,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
     MultiApplier::Operations operationsApplied;
     auto applyOperationFn = [&operationsApplied](OperationContext* opCtx,
                                                  MultiApplier::OperationPtrs* operationsToApply,
+                                                 SyncTail* st,
                                                  WorkerMultikeyPathInfo*) -> Status {
         for (auto&& opPtr : *operationsToApply) {
             operationsApplied.push_back(*opPtr);
@@ -577,8 +580,8 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("a" << 1));
     ASSERT_FALSE(op.isForCappedCollection);
 
-    auto lastOpTime =
-        unittest::assertGet(multiApply(opCtx, writerPool.get(), {op}, applyOperationFn));
+    SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
+    auto lastOpTime = unittest::assertGet(syncTail.multiApply(opCtx, {op}));
     ASSERT_EQUALS(op.getOpTime(), lastOpTime);
 
     ASSERT_EQUALS(1U, operationsApplied.size());
@@ -616,6 +619,7 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     auto applyOperationFn =
         [&mutex, &operationsApplied](OperationContext* opCtx,
                                      MultiApplier::OperationPtrs* operationsForWriterThreadToApply,
+                                     SyncTail* st,
                                      WorkerMultikeyPathInfo*) -> Status {
         stdx::lock_guard<stdx::mutex> lock(mutex);
         operationsApplied.emplace_back();
@@ -640,8 +644,8 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
         return Status::OK();
     };
 
-    auto lastOpTime = unittest::assertGet(
-        multiApply(_opCtx.get(), writerPool.get(), {op1, op2}, applyOperationFn));
+    SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
+    auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx.get(), {op1, op2}));
     ASSERT_EQUALS(op2.getOpTime(), lastOpTime);
 
     // Each writer thread should be given exactly one operation to apply.

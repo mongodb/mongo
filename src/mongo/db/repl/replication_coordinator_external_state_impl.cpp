@@ -863,7 +863,14 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     OperationContext* opCtx,
     MultiApplier::Operations ops,
     MultiApplier::ApplyOperationFn applyOperation) {
-    return repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation);
+    auto applyOperationsForWriter = [&](OperationContext* opCtx,
+                                        MultiApplier::OperationPtrs* ops,
+                                        SyncTail* st,
+                                        WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
+        return applyOperation(opCtx, ops, workerMultikeyPathInfo);
+    };
+    SyncTail syncTail(nullptr, applyOperationsForWriter, _writerPool.get());
+    return syncTail.multiApply(opCtx, std::move(ops));
 }
 
 Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(

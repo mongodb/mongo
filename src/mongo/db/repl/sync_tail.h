@@ -238,8 +238,16 @@ public:
     static AtomicInt32 replBatchLimitOperations;
 
     /**
-     * Apply a batch of operations, using multiple threads.
-     * Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
+     * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
+     * using a set of threads to apply the operations.
+     *
+     * If the batch application is successful, returns the optime of the last op applied, which
+     * should be the last op in the batch.
+     * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary.
+     *
+     * To provide crash resilience, this function will advance the persistent value of 'minValid'
+     * to at least the last optime of the batch. If 'minValid' is already greater than or equal
+     * to the last optime of this batch, it will not be updated.
      */
     StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
 
@@ -261,20 +269,6 @@ private:
     // Not owned by us.
     ThreadPool* const _writerPool;
 };
-
-/**
- * Applies the operations described in the oplog entries contained in "ops" using the
- * "applyOperation" function.
- *
- * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary, and the OpTime
- * of the final operation applied otherwise.
- *
- * Shared between here and MultiApplier.
- */
-StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                              ThreadPool* workerPool,
-                              MultiApplier::Operations ops,
-                              MultiApplier::ApplyOperationFn applyOperation);
 
 // These free functions are used by the thread pool workers to write ops to the db.
 // They consume the passed in OperationPtrs and callers should not make any assumptions about the

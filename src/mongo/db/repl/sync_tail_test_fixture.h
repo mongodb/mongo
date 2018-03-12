@@ -57,9 +57,10 @@ protected:
     StorageInterfaceMock* _storageInterface = nullptr;
     ReplicationProcess* _replicationProcess = nullptr;
 
-    // Implements the MultiApplier::ApplyOperationFn interface and does nothing.
+    // Implements the SyncTail::MultiSyncApplyFn interface and does nothing.
     static Status noopApplyOperationFn(OperationContext*,
                                        MultiApplier::OperationPtrs*,
+                                       SyncTail* st,
                                        WorkerMultikeyPathInfo*) {
         return Status::OK();
     }

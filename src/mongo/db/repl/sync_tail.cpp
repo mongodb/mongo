@@ -440,7 +440,8 @@ void prefetchOps(const MultiApplier::Operations& ops, ThreadPool* prefetcherPool
 // Does not modify writerVectors, but passes non-const pointers to inner vectors into func.
 void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               ThreadPool* writerPool,
-              const MultiApplier::ApplyOperationFn& func,
+              const SyncTail::MultiSyncApplyFunc& func,
+              SyncTail* st,
               std::vector<Status>* statusVector,
               std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
     invariant(writerVectors.size() == statusVector->size());
@@ -448,12 +449,13 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
         if (!writerVectors[i].empty()) {
             invariantOK(writerPool->schedule([
                 &func,
+                st,
                 &writer = writerVectors.at(i),
                 &status = statusVector->at(i),
                 &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
             ] {
                 auto opCtx = cc().makeOperationContext();
-                status = func(opCtx.get(), &writer, &workerMultikeyPathInfo);
+                status = func(opCtx.get(), &writer, st, &workerMultikeyPathInfo);
             }));
         }
     }
@@ -635,24 +637,6 @@ void fillWriterVectors(OperationContext* opCtx,
 }
 
 }  // namespace
-
-/**
- * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then using
- * a set of threads to apply the operations. If the batch application is successful, returns the
- * optime of the last op applied, which should be the last op in the batch. To provide crash
- * resilience, this function will advance the persistent value of 'minValid' to at least the
- * last optime of the batch. If 'minValid' is already greater than or equal to the last optime of
- * this batch, it will not be updated.
- */
-StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
-    auto applyOperation = [this](OperationContext* opCtx,
-                                 MultiApplier::OperationPtrs* ops,
-                                 WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
-        return _applyFunc(opCtx, ops, this, workerMultikeyPathInfo);
-    };
-
-    return repl::multiApply(opCtx, _writerPool, std::move(ops), applyOperation);
-}
 
 namespace {
 void tryToGoLiveAsASecondary(OperationContext* opCtx,
@@ -1289,10 +1273,9 @@ Status multiInitialSyncApply(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                              ThreadPool* workerPool,
-                              MultiApplier::Operations ops,
-                              MultiApplier::ApplyOperationFn applyOperation) {
+StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
+    auto workerPool = _writerPool;
+
     if (!opCtx) {
         return {ErrorCodes::BadValue, "invalid operation context"};
     }
@@ -1305,7 +1288,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         return {ErrorCodes::EmptyArrayOperation, "no operations provided to multiApply"};
     }
 
-    if (!applyOperation) {
+    if (!_applyFunc) {
         return {ErrorCodes::BadValue, "invalid apply operation function"};
     }
 
@@ -1365,7 +1348,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 
         {
             std::vector<Status> statusVector(workerPool->getStats().numThreads, Status::OK());
-            applyOps(writerVectors, workerPool, applyOperation, &statusVector, &multikeyVector);
+            applyOps(writerVectors, workerPool, _applyFunc, this, &statusVector, &multikeyVector);
             workerPool->waitForIdle();
 
             // If any of the statuses is not ok, return error.
