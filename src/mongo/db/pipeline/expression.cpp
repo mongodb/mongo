@@ -3686,7 +3686,6 @@ const char* ExpressionIsArray::getOpName() const {
 Value ExpressionSlice::evaluate(const Document& root) const {
     const size_t n = vpOperand.size();
 
-
     // Could be either a start index or the length from 0.
     Value arg2 = vpOperand[1]->evaluate(root);
 
@@ -3772,7 +3771,6 @@ Value ExpressionSlice::evaluate(const Document& root) const {
 
     return Value(vector<Value>(array.begin() + start, array.begin() + end));
 }
-
 
 REGISTER_EXPRESSION(slice, ExpressionSlice::parse);
 const char* ExpressionSlice::getOpName() const {
