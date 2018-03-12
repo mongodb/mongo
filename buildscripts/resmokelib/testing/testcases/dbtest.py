@@ -54,6 +54,10 @@ class DBTestCase(interface.ProcessTestCase):
             # Directory already exists.
             pass
 
+    def _execute(self, process):
+        interface.ProcessTestCase._execute(self, process)
+        self._clear_dbpath()
+
     def _clear_dbpath(self):
         shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
