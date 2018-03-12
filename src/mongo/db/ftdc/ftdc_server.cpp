@@ -60,7 +60,7 @@ FTDCController* getGlobalFTDCController() {
     return getFTDCController(getGlobalServiceContext()).get();
 }
 
-std::atomic<bool> localEnabledFlag(FTDCConfig::kEnabledDefault); // NOLINT
+std::atomic<bool> localEnabledFlag(FTDCConfig::kEnabledDefault);  // NOLINT
 
 class ExportedFTDCEnabledParameter
     : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {
@@ -82,7 +82,7 @@ public:
 
 } exportedFTDCEnabledParameter;
 
-std::atomic<std::int32_t> localPeriodMillis(FTDCConfig::kPeriodMillisDefault); // NOLINT
+std::atomic<std::int32_t> localPeriodMillis(FTDCConfig::kPeriodMillisDefault);  // NOLINT
 
 class ExportedFTDCPeriodParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
@@ -111,9 +111,11 @@ public:
 } exportedFTDCPeriodParameter;
 
 // Scale the values down since are defaults are in bytes, but the user interface is MB
-std::atomic<std::int32_t> localMaxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024)); // NOLINT 
+std::atomic<std::int32_t> localMaxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault /
+                                                  (1024 * 1024));  // NOLINT
 
-std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024)); // NOLINT
+std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault /
+                                             (1024 * 1024));  // NOLINT
 
 class ExportedFTDCDirectorySizeParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {

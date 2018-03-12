@@ -100,8 +100,7 @@ public:
              BSONObjBuilder& result) override {
 
         result.append(
-            "data",
-            FTDCController::get(txn->getServiceContext())->getMostRecentPeriodicDocument());
+            "data", FTDCController::get(txn->getServiceContext())->getMostRecentPeriodicDocument());
 
         return true;
     }
