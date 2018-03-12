@@ -2222,7 +2222,7 @@ Value ExpressionFilter::filterTillNthValue(const Document& root, long long n) co
     if (inputVal.nullish())
         return Value(BSONNULL);
 
-    uassert(50701,
+    uassert(50745,
             str::stream() << "input to $filter must be an array not "
                           << typeName(inputVal.getType()),
             inputVal.isArray());
