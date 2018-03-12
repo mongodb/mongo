@@ -469,8 +469,10 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
     const Value indexArg = vpOperand[1]->evaluate(root);
     long long i = indexArg.coerceToLong();
 
+    // If "vpOperand[0]" is an ExpressionFilter given index is greater than 0 call
+    // filterTillNthValue
     const Value array = dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (i >= 0)
-        ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->computeNthFilteredValue(root, i)
+        ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->filterTillNthValue(root, i)
         : vpOperand[0]->evaluate(root);
 
 
@@ -2045,7 +2047,7 @@ Value ExpressionFilter::evaluate(const Document& root) const {
     return Value(std::move(output));
 }
 
-Value ExpressionFilter::computeNthFilteredValue(const Document& root, long long n) const {
+Value ExpressionFilter::filterTillNthValue(const Document& root, long long n) const {
     // We are guaranteed at parse time that this isn't using our _varId.
     const Value inputVal = _input->evaluate(root);
     if (inputVal.nullish())
@@ -3685,11 +3687,10 @@ Value ExpressionSlice::evaluate(const Document& root) const {
     const size_t n = vpOperand.size();
 
 
-
     // Could be either a start index or the length from 0.
     Value arg2 = vpOperand[1]->evaluate(root);
 
-     uassert(28725,
+    uassert(28725,
             str::stream() << "Second argument to $slice must be a numeric value,"
                           << " but is of type: " << typeName(arg2.getType()),
             arg2.numeric());
@@ -3698,8 +3699,8 @@ Value ExpressionSlice::evaluate(const Document& root) const {
                           << " a 32-bit integer: " << arg2.coerceToDouble(),
             arg2.integral());
 
-    size_t start = 0;
-    size_t end = 0;
+    int start = 0;
+    int end = 0;
     if (n == 2) {
         start = 0;
         end = arg2.coerceToInt();
@@ -3727,19 +3728,19 @@ Value ExpressionSlice::evaluate(const Document& root) const {
         end = arg3.coerceToInt();
     }
 
-    // If array is a filter expression call computeNthFilterdValue to return an array of size "end" and
-    // if end is less than 0 evaluate normaly
+    // If array is a filter expression call filtertillNth to return an array of size "end" and
+    // if end or start are less than 0 evaluate normaly.
     const Value arrayVal =
-        dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) &&  (start >= 0 &&  end >= 0)
+        dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (start >= 0 && end >= 0)
         ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
-              ->computeNthFilteredValue(root, static_cast<long long>(end) + 1)
+              ->filterTillNthValue(root, static_cast<long long>(end) + 1)
         : vpOperand[0]->evaluate(root);
 
     uassert(28724,
             str::stream() << "First argument to $slice must be an array, but is"
                           << " of type: " << typeName(arrayVal.getType()),
             arrayVal.isArray());
-   
+
     const auto& array = arrayVal.getArray();
     if (n == 2) {
         // Only count given.
@@ -3747,7 +3748,7 @@ Value ExpressionSlice::evaluate(const Document& root) const {
         start = 0;
         end = array.size();
         if (count >= 0) {
-            end = std::min(end, size_t(count));
+            end = std::min(end, count);
         } else {
             // Negative count's start from the back. If a abs(count) is greater
             // than the
@@ -3761,12 +3762,12 @@ Value ExpressionSlice::evaluate(const Document& root) const {
             // Negative values start from the back. If a abs(start) is greater
             // than the length
             // of the array, start from 0.
-            start = std::max(0, static_cast<int>(array.size()) + startInt);
+            start = std::max(0, static_cast<int>(array.size() + startInt));
         } else {
-            start = std::min(array.size(), size_t(startInt));
+            start = std::min(static_cast<int>(array.size()), startInt);
         }
 
-        end = std::min(start + end, array.size());
+        end = std::min(start + end, static_cast<int>(array.size()));
     }
 
     return Value(vector<Value>(array.begin() + start, array.begin() + end));
