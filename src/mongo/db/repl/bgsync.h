@@ -140,9 +140,6 @@ public:
     // Starts the producer if it's stopped. Otherwise, let it keep running.
     void startProducerIfStopped();
 
-    // Adds a fake oplog entry to buffer. Used for testing only.
-    void pushTestOpToBuffer(OperationContext* opCtx, const BSONObj& op);
-
 private:
     bool _inShutdown_inlock() const;
 

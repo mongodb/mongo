@@ -823,12 +823,6 @@ bool BackgroundSync::shouldStopFetching() const {
     return false;
 }
 
-void BackgroundSync::pushTestOpToBuffer(OperationContext* opCtx, const BSONObj& op) {
-    _oplogBuffer->push(opCtx, op);
-    bufferCountGauge.increment();
-    bufferSizeGauge.increment(op.objsize());
-}
-
 BackgroundSync::ProducerState BackgroundSync::getState() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _state;
