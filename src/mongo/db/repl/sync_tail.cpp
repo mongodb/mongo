@@ -645,10 +645,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
     auto applyOperation = [this](OperationContext* opCtx,
                                  MultiApplier::OperationPtrs* ops,
                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
-        _applyFunc(opCtx, ops, this, workerMultikeyPathInfo);
-        // This function is used by 3.2 initial sync and steady state data replication.
-        // _applyFunc() will throw or abort on error, so we return OK here.
-        return Status::OK();
+        return _applyFunc(opCtx, ops, this, workerMultikeyPathInfo);
     };
 
     return repl::multiApply(opCtx, _writerPool, std::move(ops), applyOperation);
@@ -1161,15 +1158,16 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
 }
 
 // This free function is used by the writer threads to apply each op
-void multiSyncApply(OperationContext* opCtx,
-                    MultiApplier::OperationPtrs* ops,
-                    SyncTail* st,
-                    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+Status multiSyncApply(OperationContext* opCtx,
+                      MultiApplier::OperationPtrs* ops,
+                      SyncTail* st,
+                      WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     auto syncApply = [](
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
         return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
     fassertNoTrace(16359, multiSyncApply_noAbort(opCtx, ops, workerMultikeyPathInfo, syncApply));
+    return Status::OK();
 }
 
 Status multiSyncApply_noAbort(OperationContext* opCtx,

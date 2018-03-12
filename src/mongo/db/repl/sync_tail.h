@@ -60,10 +60,11 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc = stdx::function<void(OperationContext* opCtx,
-                                                   MultiApplier::OperationPtrs* ops,
-                                                   SyncTail* st,
-                                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
+    using MultiSyncApplyFunc =
+        stdx::function<Status(OperationContext* opCtx,
+                              MultiApplier::OperationPtrs* ops,
+                              SyncTail* st,
+                              WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -279,10 +280,10 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 // They consume the passed in OperationPtrs and callers should not make any assumptions about the
 // state of the container after calling. However, these functions cannot modify the pointed-to
 // operations because the OperationPtrs container contains const pointers.
-void multiSyncApply(OperationContext* opCtx,
-                    MultiApplier::OperationPtrs* ops,
-                    SyncTail* st,
-                    WorkerMultikeyPathInfo* workerMultikeyPathInfo);
+Status multiSyncApply(OperationContext* opCtx,
+                      MultiApplier::OperationPtrs* ops,
+                      SyncTail* st,
+                      WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 Status multiInitialSyncApply(OperationContext* opCtx,
                              MultiApplier::OperationPtrs* ops,

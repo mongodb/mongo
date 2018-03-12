@@ -673,7 +673,7 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
 
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    multiSyncApply(_opCtx.get(), &ops, nullptr, &pathInfo);
+    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, nullptr, &pathInfo));
     // Collection should be created after SyncTail::syncApply() processes operation.
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
@@ -683,7 +683,7 @@ void testWorkerMultikeyPaths(OperationContext* opCtx,
                              unsigned long numPaths) {
     WorkerMultikeyPathInfo pathInfo;
     MultiApplier::OperationPtrs ops = {&op};
-    multiSyncApply(opCtx, &ops, nullptr, &pathInfo);
+    ASSERT_OK(multiSyncApply(opCtx, &ops, nullptr, &pathInfo));
     ASSERT_EQ(pathInfo.size(), numPaths);
 }
 
@@ -738,7 +738,7 @@ TEST_F(SyncTailTest, MultiSyncApplyAddsMultipleWorkerMultikeyPathInfo) {
         auto opB = makeInsertDocumentOplogEntry({Timestamp(Seconds(5), 0), 1LL}, nss, docB);
         WorkerMultikeyPathInfo pathInfo;
         MultiApplier::OperationPtrs ops = {&opA, &opB};
-        multiSyncApply(_opCtx.get(), &ops, nullptr, &pathInfo);
+        ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, nullptr, &pathInfo));
         ASSERT_EQ(pathInfo.size(), 2UL);
     }
 }
@@ -780,7 +780,7 @@ DEATH_TEST_F(SyncTailTest,
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
     MultiApplier::OperationPtrs ops = {&op};
-    multiSyncApply(_opCtx.get(), &ops, nullptr, nullptr);
+    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, nullptr, nullptr));
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
