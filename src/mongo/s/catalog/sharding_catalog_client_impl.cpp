@@ -392,6 +392,24 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollection
     return collections;
 }
 
+std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollectionsForDb(
+    OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) {
+    const auto dbNameStr = dbName.toString();
+
+    const std::vector<CollectionType> collectionsOnConfig =
+        uassertStatusOK(getCollections(opCtx, &dbNameStr, nullptr, readConcern));
+
+    std::vector<NamespaceString> collectionsToReturn;
+    for (const auto& coll : collectionsOnConfig) {
+        if (coll.getDropped())
+            continue;
+
+        collectionsToReturn.push_back(coll.getNs());
+    }
+
+    return collectionsToReturn;
+}
+
 StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,
                                                                  StringData key) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,

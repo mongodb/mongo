@@ -637,25 +637,6 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
     }
 }
 
-std::vector<NamespaceString> ShardingCatalogManager::getAllShardedCollectionsForDb(
-    OperationContext* opCtx, StringData dbName) {
-    const auto dbNameStr = dbName.toString();
-
-    const std::vector<CollectionType> collectionsOnConfig =
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
-            opCtx, &dbNameStr, nullptr, repl::ReadConcernLevel::kLocalReadConcern));
-
-    std::vector<NamespaceString> collectionsToReturn;
-    for (const auto& coll : collectionsOnConfig) {
-        if (coll.getDropped())
-            continue;
-
-        collectionsToReturn.push_back(coll.getNs());
-    }
-
-    return collectionsToReturn;
-}
-
 void ShardingCatalogManager::createCollection(OperationContext* opCtx,
                                               const NamespaceString& ns,
                                               const CollectionOptions& collOptions) {

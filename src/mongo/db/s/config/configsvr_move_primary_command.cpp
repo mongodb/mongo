@@ -145,7 +145,6 @@ public:
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
-        auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
@@ -207,7 +206,8 @@ public:
         log() << "Moving " << dbname << " primary from: " << fromShard->toString()
               << " to: " << toShard->toString();
 
-        const auto shardedColls = catalogManager->getAllShardedCollectionsForDb(opCtx, dbname);
+        const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
+            opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern);
 
         // Record start in changelog
         uassertStatusOK(catalogClient->logChange(

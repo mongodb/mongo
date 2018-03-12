@@ -66,6 +66,9 @@ public:
         repl::OpTime* optime,
         repl::ReadConcernLevel readConcernLevel) override;
 
+    std::vector<NamespaceString> getAllShardedCollectionsForDb(
+        OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) override;
+
     StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
                                                               const ShardId& shardName) override;
 
