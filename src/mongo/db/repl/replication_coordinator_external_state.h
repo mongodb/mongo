@@ -316,12 +316,6 @@ public:
         OperationContext* opCtx) const = 0;
 
     /**
-     * Creates an oplog buffer suitable for steady state replication.
-     */
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* opCtx) const = 0;
-
-    /**
      * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog
      * tailing query on non-cancellation errors.
      */

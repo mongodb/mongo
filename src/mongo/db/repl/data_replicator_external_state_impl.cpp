@@ -110,11 +110,6 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
     return _replicationCoordinatorExternalState->makeInitialSyncOplogBuffer(opCtx);
 }
 
-std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOplogBuffer(
-    OperationContext* opCtx) const {
-    return _replicationCoordinatorExternalState->makeSteadyStateOplogBuffer(opCtx);
-}
-
 StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {
     return _replicationCoordinator->getConfig();
 }

@@ -234,7 +234,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
     _bgSync = stdx::make_unique<BackgroundSync>(
-        replCoord, this, _replicationProcess, makeSteadyStateOplogBuffer(opCtx));
+        replCoord, this, _replicationProcess, stdx::make_unique<OplogBufferBlockingQueue>());
     _bgSync->startup(opCtx);
 
     log() << "Starting replication applier thread";
@@ -884,11 +884,6 @@ std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitia
     } else {
         return stdx::make_unique<OplogBufferBlockingQueue>();
     }
-}
-
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeSteadyStateOplogBuffer(
-    OperationContext* opCtx) const {
-    return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
 std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {

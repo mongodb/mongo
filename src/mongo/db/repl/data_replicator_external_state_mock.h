@@ -58,8 +58,6 @@ public:
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 
-    std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* opCtx) const override;
-
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
     // Task executor. Not owned by us.

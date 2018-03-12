@@ -116,8 +116,6 @@ public:
                                          WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
         OperationContext* opCtx) const override;
-    virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
-        OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
 
     // Methods from JournalListener.
