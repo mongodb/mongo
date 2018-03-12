@@ -285,18 +285,25 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
     // For each collection, time out its cursors under the collection lock (to prevent the
     // collection from going away during the erase).
     for (const auto& nsTodo : todo) {
-        // Note that we specify 'kViewsPermitted' here, even though we don't expect 'nsTodo' to be a
-        // view. Because we are not holding the mutex anymore, it is possible that the collection we
-        // are trying to access has since been destroyed and a view of the same name has been
-        // created in its place. Without 'kViewsPermitted' here, that would result in a uassert that
-        // would crash the cursor cleaner background thread.
-        AutoGetCollectionForReadCommand ctx(
-            opCtx, nsTodo, AutoGetCollection::ViewMode::kViewsPermitted);
-        if (!ctx.getDb()) {
+        // We need to be careful to not use an AutoGet* helper, since we only need the lock to
+        // protect potential access to the Collection's CursorManager, and those helpers may
+        // do things we don't want here, like check the shard version or throw an exception if this
+        // namespace has since turned into a view. Using Database::getCollection() will simply
+        // return nullptr if the collection has since turned into a view. In this case, the cursors
+        // will already have been cleaned up when the collection was dropped, so there will be none
+        // left to time out.
+        //
+        // Additionally, we need to use the UninterruptibleLockGuard to ensure the lock acquisition
+        // will not throw due to an interrupt. This method can be called from a background thread so
+        // we do not want to throw any exceptions.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        AutoGetDb dbLock(opCtx, nsTodo.db(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx->lockState(), nsTodo.ns(), MODE_IS);
+        if (!dbLock.getDb()) {
             continue;
         }
 
-        Collection* const collection = ctx.getCollection();
+        Collection* const collection = dbLock.getDb()->getCollection(opCtx, nsTodo);
         if (!collection) {
             // The 'nsTodo' collection has been dropped since we held _mutex. We can safely skip it.
             continue;
