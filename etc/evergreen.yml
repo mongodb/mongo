@@ -2471,6 +2471,8 @@ tasks:
   name: aggregation_fuzzer
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
+  - func: "do multiversion setup"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 50
@@ -2478,6 +2480,7 @@ tasks:
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
       resmoke_args: --suites=generational_fuzzer --storageEngine=mmapv1
 
 ## jstestfuzz standalone aggregation generational fuzzer WT ##
@@ -2485,6 +2488,8 @@ tasks:
   name: aggregation_fuzzer_WT
   commands:
   - func: "do setup"
+  - func: "set up virtualenv"
+  - func: "do multiversion setup"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 50
@@ -2492,6 +2497,7 @@ tasks:
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
       resmoke_args: --suites=generational_fuzzer --storageEngine=wiredTiger
 
 ## jstestfuzz standalone update generational fuzzer mmapv1 ##
@@ -5752,6 +5758,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: arm64
+    multiversion_edition: targeted
   tasks:
   - name: compile
     distros:
@@ -5843,6 +5852,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: arm64
+    multiversion_edition: targeted
   tasks:
   - name: compile
     distros:
@@ -5880,6 +5892,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: ppc64le
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5962,6 +5977,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -6363,6 +6381,8 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
+    multiversion_platform: windows
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     requires:
@@ -6565,6 +6585,8 @@ buildvariants:
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
     use_scons_cache: true
+    multiversion_platform: windows
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -6895,6 +6917,8 @@ buildvariants:
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
     num_jobs_available: 1
     build_mongoreplay: true
+    multiversion_platform: osx
+    multiversion_edition: enterprise
   tasks:
   - name: compile
   - name: compile_all
@@ -7530,6 +7554,9 @@ buildvariants:
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: rhel71
+    multiversion_architecture: ppc64le
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -7637,6 +7664,9 @@ buildvariants:
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: rhel72
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -8153,6 +8183,9 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: suse12
+    multiversion_architecture: s390x
+    multiversion_edition: targeted
   tasks:
   - name: compile
     distros:
@@ -8337,6 +8370,8 @@ buildvariants:
     push_arch: x86_64-enterprise-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    multiversion_platform: suse11
+    multiversion_edition: targeted
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: x86_64
@@ -8390,6 +8425,9 @@ buildvariants:
     push_arch: s390x-enterprise-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    multiversion_platform: suse11
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
