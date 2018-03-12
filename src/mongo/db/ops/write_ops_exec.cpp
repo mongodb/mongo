@@ -82,6 +82,7 @@ namespace {
 MONGO_FP_DECLARE(failAllInserts);
 MONGO_FP_DECLARE(failAllUpdates);
 MONGO_FP_DECLARE(failAllRemoves);
+MONGO_FP_DECLARE(hangDuringBatchInsert);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -352,7 +353,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     auto acquireCollection = [&] {
         while (true) {
-            opCtx->checkForInterrupt();
+            if (MONGO_FAIL_POINT(hangDuringBatchInsert)) {
+                log() << "batch insert - hangDuringBatchInsert fail point enabled. Blocking until "
+                         "fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringBatchInsert);
+            }
 
             if (MONGO_FAIL_POINT(failAllInserts)) {
                 uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
@@ -365,6 +370,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             collection.reset();  // unlock.
             makeCollection(opCtx, wholeOp.getNamespace());
         }
+
+        opCtx->checkForInterrupt();
 
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
         assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
@@ -575,7 +582,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     boost::optional<AutoGetCollection> collection;
     while (true) {
-        opCtx->checkForInterrupt();
         if (MONGO_FAIL_POINT(failAllUpdates)) {
             uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
         }
@@ -590,6 +596,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         collection.reset();  // unlock.
         makeCollection(opCtx, ns);
     }
+
+    opCtx->checkForInterrupt();
 
     if (collection->getDb()) {
         curOp.raiseDbProfileLevel(collection->getDb()->getProfilingLevel());
@@ -721,8 +729,6 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    opCtx->checkForInterrupt();
-
     if (MONGO_FAIL_POINT(failAllRemoves)) {
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
@@ -731,6 +737,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                  ns,
                                  MODE_IX,  // DB is always IX, even if collection is X.
                                  parsedDelete.isIsolated() ? MODE_X : MODE_IX);
+
+    opCtx->checkForInterrupt();
+
     if (collection.getDb()) {
         curOp.raiseDbProfileLevel(collection.getDb()->getProfilingLevel());
     }
