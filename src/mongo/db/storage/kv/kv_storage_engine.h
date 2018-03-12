@@ -121,7 +121,9 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
-    virtual Status recoverToStableTimestamp() override;
+    virtual StatusWith<Timestamp> recoverToStableTimestamp() override;
+
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
     bool supportsReadConcernSnapshot() const final;
 

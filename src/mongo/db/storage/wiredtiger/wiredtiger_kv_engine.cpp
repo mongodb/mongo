@@ -1123,7 +1123,7 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     return true;
 }
 
-Status WiredTigerKVEngine::recoverToStableTimestamp() {
+StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp() {
     if (!supportsRecoverToStableTimestamp()) {
         severe() << "WiredTiger is configured to not support recover to a stable timestamp";
         fassertFailed(50665);
@@ -1141,6 +1141,15 @@ Status WiredTigerKVEngine::recoverToStableTimestamp() {
     }
     return Status(ErrorCodes::UnrecoverableRollbackError,
                   "WT does not support recover to stable timestamp yet.");
+}
+
+boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {
+    if (!supportsRecoverToStableTimestamp()) {
+        severe() << "WiredTiger is configured to not support recover to a stable timestamp";
+        fassertFailed(50745);
+    }
+
+    return boost::none;
 }
 
 bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {

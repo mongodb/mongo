@@ -1014,8 +1014,17 @@ void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
     serviceCtx->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 
-Status StorageInterfaceImpl::recoverToStableTimestamp(ServiceContext* serviceCtx) {
+StatusWith<Timestamp> StorageInterfaceImpl::recoverToStableTimestamp(ServiceContext* serviceCtx) {
     return serviceCtx->getGlobalStorageEngine()->recoverToStableTimestamp();
+}
+
+bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getGlobalStorageEngine()->supportsRecoverToStableTimestamp();
+}
+
+boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(
+    ServiceContext* serviceCtx) const {
+    return serviceCtx->getGlobalStorageEngine()->getRecoveryTimestamp();
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {

@@ -271,8 +271,15 @@ public:
     /**
      * See `StorageEngine::recoverToStableTimestamp`
      */
-    virtual Status recoverToStableTimestamp() {
+    virtual StatusWith<Timestamp> recoverToStableTimestamp() {
         fassertFailed(50664);
+    }
+
+    /**
+     * See `StorageEngine::getRecoveryTimestamp`
+     */
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
+        MONGO_UNREACHABLE;
     }
 
     /**

@@ -56,15 +56,16 @@ public:
 
     /**
      * If '_recoverToTimestampStatus' is non-empty, returns it. If '_recoverToTimestampStatus' is
-     * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns an OK status.
+     * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns the new value
+     * of '_currTimestamp'.
      */
-    Status recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_recoverToTimestampStatus) {
             return _recoverToTimestampStatus.get();
         } else {
             _currTimestamp = _stableTimestamp;
-            return Status::OK();
+            return _currTimestamp;
         }
     }
 
@@ -125,9 +126,12 @@ protected:
     stdx::function<void()> _onTransitionToRollbackFn = [this]() { _transitionedToRollback = true; };
 
     bool _recoveredToStableTimestamp = false;
-    stdx::function<void()> _onRecoverToStableTimestampFn = [this]() {
-        _recoveredToStableTimestamp = true;
-    };
+    Timestamp _stableTimestamp;
+    stdx::function<void(Timestamp)> _onRecoverToStableTimestampFn =
+        [this](Timestamp stableTimestamp) {
+            _recoveredToStableTimestamp = true;
+            _stableTimestamp = stableTimestamp;
+        };
 
     bool _recoveredFromOplog = false;
     stdx::function<void()> _onRecoverFromOplogFn = [this]() { _recoveredFromOplog = true; };
@@ -175,19 +179,19 @@ class RollbackImplTest::Listener : public RollbackImpl::Listener {
 public:
     Listener(RollbackImplTest* test) : _test(test) {}
 
-    void onTransitionToRollback() noexcept {
+    void onTransitionToRollback() noexcept override {
         _test->_onTransitionToRollbackFn();
     }
 
-    void onCommonPointFound(Timestamp commonPoint) noexcept {
+    void onCommonPointFound(Timestamp commonPoint) noexcept override {
         _test->_onCommonPointFoundFn(commonPoint);
     }
 
-    void onRecoverToStableTimestamp() noexcept {
-        _test->_onRecoverToStableTimestampFn();
+    void onRecoverToStableTimestamp(Timestamp stableTimestamp) noexcept override {
+        _test->_onRecoverToStableTimestampFn(stableTimestamp);
     }
 
-    void onRecoverFromOplog() noexcept {
+    void onRecoverFromOplog() noexcept override {
         _test->_onRecoverFromOplogFn();
     }
 
@@ -321,13 +325,20 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
 
     // Check the current timestamp.
     ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
+    ASSERT_EQUALS(Timestamp(), _stableTimestamp);
 
     // Run rollback.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
+    // Set the stable timestamp ahead to see that the current timestamp and the stable timestamp
+    // we recovered to don't change.
+    auto newTimestamp = Timestamp(30, 0);
+    _storageInterface->setStableTimestamp(nullptr, newTimestamp);
+
     // Make sure "recover to timestamp" occurred by checking that the current timestamp was set back
     // to the stable timestamp.
     ASSERT_EQUALS(stableTimestamp, _storageInterface->getCurrentTimestamp());
+    ASSERT_EQUALS(stableTimestamp, _stableTimestamp);
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails) {
@@ -348,6 +359,7 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
 
     // Check the current timestamp.
     ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
+    ASSERT_EQUALS(Timestamp(), _stableTimestamp);
 
     // Run rollback.
     auto rollbackStatus = _rollback->runRollback(_opCtx.get());
@@ -355,6 +367,7 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
     // Make sure rollback failed, and didn't execute the recover to timestamp logic.
     ASSERT_EQUALS(recoverToTimestampStatus, rollbackStatus);
     ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
+    ASSERT_EQUALS(Timestamp(), _stableTimestamp);
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
@@ -400,8 +413,9 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
-    _onRecoverToStableTimestampFn = [this]() {
+    _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
         _recoveredToStableTimestamp = true;
+        _stableTimestamp = stableTimestamp;
         _rollback->shutdown();
     };
 
@@ -415,6 +429,8 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
+
+    ASSERT(_stableTimestamp.isNull());
 }
 
 TEST_F(RollbackImplTest, RollbackSucceeds) {

@@ -587,8 +587,12 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
-Status KVStorageEngine::recoverToStableTimestamp() {
+StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp() {
     return _engine->recoverToStableTimestamp();
+}
+
+boost::optional<Timestamp> KVStorageEngine::getRecoveryTimestamp() const {
+    return _engine->getRecoveryTimestamp();
 }
 
 bool KVStorageEngine::supportsReadConcernSnapshot() const {

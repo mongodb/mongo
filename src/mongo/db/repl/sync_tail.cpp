@@ -366,7 +366,10 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
                 // Delete operations on non-existent namespaces can be treated as successful for
                 // idempotency reasons.
-                if (opType == OpTypeEnum::kDelete) {
+                // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
+                // storage does not wait for drops to be checkpointed (SERVER-33161).
+                if (opType == OpTypeEnum::kDelete ||
+                    oplogApplicationMode == OplogApplication::Mode::kRecovering) {
                     return Status::OK();
                 }
                 ex.addContext(str::stream() << "Failed to apply operation: " << redact(op));

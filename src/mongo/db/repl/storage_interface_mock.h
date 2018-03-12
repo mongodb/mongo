@@ -285,8 +285,16 @@ public:
 
     Timestamp getInitialDataTimestamp() const;
 
-    Status recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
+    }
+
+    bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override {
+        return false;
+    }
+
+    boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override {
+        return boost::none;
     }
 
     Status isAdminDbValid(OperationContext* opCtx) override {

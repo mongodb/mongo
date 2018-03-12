@@ -320,8 +320,9 @@ public:
      * used should be one provided by StorageEngine::setStableTimestamp().
      *
      * The "local" database is exempt and should not roll back any state except for
-     * "local.replset.minvalid" and "local.replset.checkpointTimestamp" which must roll back to
-     * the last stable timestamp.
+     * "local.replset.minvalid" which must roll back to the last stable timestamp.
+     *
+     * If successful, returns the timestamp that the storage engine recovered to.
      *
      * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return
      * false. Returns a bad status if there is no stable timestamp to recover to.
@@ -329,8 +330,17 @@ public:
      * It is illegal to call this concurrently with `setStableTimestamp` or
      * `setInitialDataTimestamp`.
      */
-    virtual Status recoverToStableTimestamp() {
+    virtual StatusWith<Timestamp> recoverToStableTimestamp() {
         fassertFailed(40547);
+    }
+
+    /**
+     * Returns the stable timestamp that the storage engine recovered to on startup. If the
+     * recovery point was not stable, returns "none".
+     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     */
+    virtual boost::optional<Timestamp> getRecoveryTimestamp() const {
+        MONGO_UNREACHABLE;
     }
 
     /**

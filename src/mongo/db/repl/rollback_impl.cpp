@@ -149,14 +149,14 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
 
     // Recover to the stable timestamp.
-    status = _recoverToStableTimestamp(opCtx);
-    if (!status.isOK()) {
-        return status;
+    auto stableTimestampSW = _recoverToStableTimestamp(opCtx);
+    if (!stableTimestampSW.isOK()) {
+        return stableTimestampSW.getStatus();
     }
-    _listener->onRecoverToStableTimestamp();
+    _listener->onRecoverToStableTimestamp(stableTimestampSW.getValue());
 
     // Run the oplog recovery logic.
-    status = _oplogRecovery(opCtx);
+    status = _oplogRecovery(opCtx, stableTimestampSW.getValue());
     if (!status.isOK()) {
         return status;
     }
@@ -449,7 +449,7 @@ Timestamp RollbackImpl::_findTruncateTimestamp(
     return truncatePointTime.getValue().getTimestamp();
 }
 
-Status RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
+StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
@@ -465,12 +465,12 @@ Status RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
     }
 }
 
-Status RollbackImpl::_oplogRecovery(OperationContext* opCtx) {
+Status RollbackImpl::_oplogRecovery(OperationContext* opCtx, Timestamp stableTimestamp) {
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
     // Run the recovery process.
-    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx);
+    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
     return Status::OK();
 }
 
