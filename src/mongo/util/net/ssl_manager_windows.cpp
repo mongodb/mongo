@@ -280,6 +280,15 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
 
+    if (params.sslFIPSMode) {
+        BOOLEAN enabled = FALSE;
+        BCryptGetFipsAlgorithmMode(&enabled);
+        if (!enabled) {
+            severe() << "FIPS modes is not enabled on the operating system.";
+            fassertFailedNoTrace(50744);
+        }
+    }
+
     uassertStatusOK(_loadCertificates(params));
 
     uassertStatusOK(initSSLContext(&_clientCred, params, ConnectionDirection::kOutgoing));
