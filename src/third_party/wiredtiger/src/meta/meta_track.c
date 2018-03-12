@@ -114,8 +114,15 @@ __wt_meta_track_discard(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_on(WT_SESSION_IMPL *session)
 {
-	if (session->meta_track_nest++ == 0)
+	if (session->meta_track_nest++ == 0) {
+		if (!F_ISSET(&session->txn, WT_TXN_RUNNING)) {
+#ifdef WT_ENABLE_SCHEMA_TXN
+			WT_RET(__wt_txn_begin(session, NULL));
+#endif
+			F_SET(session, WT_SESSION_SCHEMA_TXN);
+		}
 		WT_RET(__meta_track_next(session, NULL));
+	}
 
 	return (0);
 }
@@ -257,16 +264,23 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	session->meta_track_next = session->meta_track_sub = NULL;
 
 	/*
-	 * If there were no operations logged, return now and avoid unnecessary
-	 * metadata checkpoints.  For example, this happens if attempting to
-	 * create a data source that already exists (or drop one that doesn't).
+	 * If there were no operations logged, skip unnecessary metadata
+	 * checkpoints.  For example, this happens if attempting to create a
+	 * data source that already exists (or drop one that doesn't).
 	 */
 	if (trk == trk_orig)
-		return (0);
+		goto err;
 
 	/* Unrolling doesn't require syncing the metadata. */
 	if (unroll)
-		goto done;
+		goto err;
+
+	if (F_ISSET(session, WT_SESSION_SCHEMA_TXN)) {
+		F_CLR(session, WT_SESSION_SCHEMA_TXN);
+#ifdef WT_ENABLE_SCHEMA_TXN
+		WT_ERR(__wt_txn_commit(session, NULL));
+#endif
+	}
 
 	/*
 	 * If we don't have the metadata cursor (e.g, we're in the process of
@@ -274,7 +288,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 	 */
 	if (!need_sync || session->meta_cursor == NULL ||
 	    F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		goto done;
+		goto err;
 
 	/* If we're logging, make sure the metadata update was flushed. */
 	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
@@ -303,7 +317,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, bool need_sync, bool unroll)
 			    ret = __wt_checkpoint_sync(session, NULL));
 	}
 
-done:	/*
+err:	/*
 	 * Undo any tracked operations on failure.
 	 * Apply any tracked operations post-commit.
 	 */
@@ -315,6 +329,20 @@ done:	/*
 	} else
 		for (; trk_orig < trk; trk_orig++)
 			WT_TRET(__meta_track_apply(session, trk_orig));
+
+	if (F_ISSET(session, WT_SESSION_SCHEMA_TXN)) {
+		F_CLR(session, WT_SESSION_SCHEMA_TXN);
+		/*
+		 * We should have committed above unless we're unrolling, there
+		 * was an error or the operation was a noop.
+		 */
+		WT_ASSERT(session, unroll || saved_ret != 0 ||
+		    session->txn.mod_count == 0);
+#ifdef WT_ENABLE_SCHEMA_TXN
+		WT_TRET(__wt_txn_rollback(session, NULL));
+#endif
+	}
+
 	if (ret != 0)
 		WT_PANIC_RET(session, ret,
 		    "failed to apply or unroll all tracked operations");

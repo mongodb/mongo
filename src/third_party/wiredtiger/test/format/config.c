@@ -149,8 +149,11 @@ config_setup(void)
 	if (DATASOURCE("kvsbdb") && access(KVS_BDB_PATH, R_OK) != 0)
 		testutil_die(errno, "kvsbdb shared library: %s", KVS_BDB_PATH);
 
-	/* Some data-sources don't support user-specified collations. */
-	if (DATASOURCE("kvsbdb"))
+	/*
+	 * Only row-store tables support collation order.
+	 * Some data-sources don't support user-specified collations.
+	 */
+	if (g.type != ROW || DATASOURCE("kvsbdb"))
 		config_single("reverse=off", 0);
 
 	/*
@@ -184,6 +187,13 @@ config_setup(void)
 	/* Check if a minimum cache size has been specified. */
 	if (g.c_cache_minimum != 0 && g.c_cache < g.c_cache_minimum)
 		g.c_cache = g.c_cache_minimum;
+
+	/*
+	 * Turn off truncate for LSM runs (some configurations with truncate
+	 * always results in a timeout).
+	 */
+	if (!config_is_perm("truncate") && DATASOURCE("lsm"))
+		config_single("truncate=off", 0);
 
 	/* Give Helium configuration a final review. */
 	if (DATASOURCE("helium"))
@@ -588,7 +598,7 @@ config_pct(void)
 
 	/* Cursor modify isn't possible for fixed-length column store. */
 	if (g.type == FIX) {
-		if (config_is_perm("modify_pct"))
+		if (config_is_perm("modify_pct") && g.c_modify_pct != 0)
 			testutil_die(EINVAL,
 			    "WT_CURSOR.modify not supported by fixed-length "
 			    "column store");
@@ -603,7 +613,7 @@ config_pct(void)
 	 */
 	if (g.c_isolation_flag == ISOLATION_READ_UNCOMMITTED) {
 		if (config_is_perm("isolation")) {
-			if (config_is_perm("modify_pct"))
+			if (config_is_perm("modify_pct") && g.c_modify_pct != 0)
 				testutil_die(EINVAL,
 				    "WT_CURSOR.modify not supported with "
 				    "read-uncommitted transactions");

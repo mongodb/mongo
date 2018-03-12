@@ -76,15 +76,17 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page = *pagep;
 	*pagep = NULL;
 
-	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+	/*
+	 * Unless we have a dead handle or we're closing the database, we
+	 * should never discard a dirty page.  We do ordinary eviction from
+	 * dead trees until sweep gets to them, so we may not in the
+	 * WT_SYNC_DISCARD loop.
+	 */
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+	    F_ISSET(S2C(session), WT_CONN_CLOSING))
 		__wt_page_modify_clear(session, page);
 
-	/*
-	 * We should never discard:
-	 * - a dirty page,
-	 * - a page queued for eviction, or
-	 * - a locked page.
-	 */
+	/* Assert we never discard a dirty page or a page queue for eviction. */
 	WT_ASSERT(session, !__wt_page_is_modified(page));
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 

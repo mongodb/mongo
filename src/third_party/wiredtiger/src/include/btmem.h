@@ -779,6 +779,8 @@ struct __wt_page_deleted {
 	volatile uint64_t txnid;		/* Transaction ID */
 	WT_DECL_TIMESTAMP(timestamp)
 
+	uint32_t previous_state;		/* Previous state */
+
 	WT_UPDATE **update_list;		/* List of updates for abort */
 };
 
@@ -987,6 +989,16 @@ struct __wt_update {
 #define	WT_UPDATE_TOMBSTONE	5	/* deleted */
 	uint8_t type;			/* type (one byte to conserve memory) */
 
+	/*
+	 * The update state is used for transaction prepare to manage
+	 * visibility and transitioning update structure state safely.
+	 */
+#define	WT_UPDATE_STATE_READY		0	/* Must be 0. Default or
+						   finalized prepare */
+#define	WT_UPDATE_STATE_LOCKED		1	/* locked */
+#define	WT_UPDATE_STATE_PREPARED	2	/* prepared */
+	uint8_t state;			/* state (one byte : conserve memory) */
+
 	/* If the update includes a complete value. */
 #define	WT_UPDATE_DATA_VALUE(upd)					\
 	((upd)->type == WT_UPDATE_STANDARD ||				\
@@ -1008,7 +1020,7 @@ struct __wt_update {
  * WT_UPDATE_SIZE is the expected structure size excluding the payload data --
  * we verify the build to ensure the compiler hasn't inserted padding.
  */
-#define	WT_UPDATE_SIZE	(21 + WT_TIMESTAMP_SIZE)
+#define	WT_UPDATE_SIZE	(22 + WT_TIMESTAMP_SIZE)
 
 /*
  * The memory size of an update: include some padding because this is such a

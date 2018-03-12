@@ -63,6 +63,8 @@ static char home[1024];			/* Program working dir */
 #define	MAX_VAL		1024
 #define	MIN_TH		5
 #define	MIN_TIME	10
+#define	PREPARE_FREQ	5
+#define	PREPARE_YIELD	PREPARE_FREQ * 10
 #define	RECORDS_FILE	"records-%" PRIu32
 #define	STABLE_PERIOD	100
 
@@ -70,7 +72,6 @@ static const char * const uri_local = "table:local";
 static const char * const uri_oplog = "table:oplog";
 static const char * const uri_collection = "table:collection";
 
-static const char * const stable_store = "table:stable";
 static const char * const ckpt_file = "checkpoint_done";
 
 static bool compat, inmem, use_ts;
@@ -118,7 +119,6 @@ usage(void)
 static WT_THREAD_RET
 thread_ts_run(void *arg)
 {
-	WT_CURSOR *cur_stable;
 	WT_SESSION *session;
 	THREAD_DATA *td;
 	uint64_t i, last_ts, oldest_ts, this_ts;
@@ -128,9 +128,6 @@ thread_ts_run(void *arg)
 	last_ts = 0;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-	testutil_check(session->open_cursor(
-	    session, stable_store, NULL, NULL, &cur_stable));
-
 	/*
 	 * Every N records we will record our stable timestamp into the stable
 	 * table. That will define our threshold where we expect to find records
@@ -170,9 +167,6 @@ thread_ts_run(void *arg)
 			testutil_check(
 			    td->conn->set_timestamp(td->conn, tscfg));
 			last_ts = oldest_ts;
-			cur_stable->set_key(cur_stable, td->info);
-			cur_stable->set_value(cur_stable, oldest_ts);
-			testutil_check(cur_stable->insert(cur_stable));
 		} else
 ts_wait:		__wt_sleep(0, 1000);
 	}
@@ -244,11 +238,12 @@ thread_run(void *arg)
 	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
 	WT_ITEM data;
 	WT_RAND_STATE rnd;
-	WT_SESSION *session;
+	WT_SESSION *oplog_session, *session;
 	THREAD_DATA *td;
 	uint64_t i, stable_ts;
 	char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
 	char kname[64], tscfg[64];
+	bool use_prep;
 
 	__wt_random_init(&rnd);
 	memset(cbuf, 0, sizeof(cbuf));
@@ -269,6 +264,20 @@ thread_run(void *arg)
 	 * cases where the result files end up with partial lines.
 	 */
 	__wt_stream_set_line_buffer(fp);
+
+	/*
+	 * Have half the threads use prepared transactions if timestamps
+	 * are in use.
+	 */
+	use_prep = (use_ts && td->info % 2 == 0) ? true : false;
+	/*
+	 * We may have two sessions so that the oplog session can have its own
+	 * transaction in parallel with the collection session for threads
+	 * that are going to be using prepared transactions. We need this
+	 * because prepared transactions cannot have any operations that modify
+	 * a table that is logged. But we also want to test mixed logged and
+	 * not-logged transactions.
+	 */
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 	/*
 	 * Open a cursor to each table.
@@ -277,8 +286,15 @@ thread_run(void *arg)
 	    uri_collection, NULL, NULL, &cur_coll));
 	testutil_check(session->open_cursor(session,
 	    uri_local, NULL, NULL, &cur_local));
-	testutil_check(session->open_cursor(session,
-	    uri_oplog, NULL, NULL, &cur_oplog));
+	oplog_session = NULL;
+	if (use_prep) {
+		testutil_check(td->conn->open_session(
+		    td->conn, NULL, NULL, &oplog_session));
+		testutil_check(session->open_cursor(oplog_session,
+		    uri_oplog, NULL, NULL, &cur_oplog));
+	} else
+		testutil_check(session->open_cursor(session,
+		    uri_oplog, NULL, NULL, &cur_oplog));
 
 	/*
 	 * Write our portion of the key space until we're killed.
@@ -293,6 +309,9 @@ thread_run(void *arg)
 		    kname, sizeof(kname), "%" PRIu64, i));
 
 		testutil_check(session->begin_transaction(session, NULL));
+		if (use_prep)
+			testutil_check(oplog_session->begin_transaction(
+			    oplog_session, NULL));
 		cur_coll->set_key(cur_coll, kname);
 		cur_local->set_key(cur_local, kname);
 		cur_oplog->set_key(cur_oplog, kname);
@@ -318,10 +337,28 @@ thread_run(void *arg)
 		cur_oplog->set_value(cur_oplog, &data);
 		testutil_check(cur_oplog->insert(cur_oplog));
 		if (use_ts) {
+			/*
+			 * Run with prepare every once in a while. And also
+			 * yield after prepare sometimes too. This is only done
+			 * on the regular session.
+			 */
+			if (use_prep && i % PREPARE_FREQ == 0) {
+				testutil_check(__wt_snprintf(
+				    tscfg, sizeof(tscfg),
+				    "prepare_timestamp=%" PRIx64, stable_ts));
+				testutil_check(session->prepare_transaction(
+				    session, tscfg));
+				if (i % PREPARE_YIELD == 0)
+					__wt_yield();
+			}
 			testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
 			    "commit_timestamp=%" PRIx64, stable_ts));
 			testutil_check(
 			    session->commit_transaction(session, tscfg));
+			if (use_prep)
+				testutil_check(
+				    oplog_session->commit_transaction(
+				    oplog_session, tscfg));
 			/*
 			 * Update the thread's last-committed timestamp.
 			 * Don't let the compiler re-order this statement,
@@ -329,9 +366,14 @@ thread_run(void *arg)
 			 * might see our thread update before the commit.
 			 */
 			WT_PUBLISH(th_ts[td->info], stable_ts);
-		} else
+		} else {
 			testutil_check(
 			    session->commit_transaction(session, NULL));
+			if (use_prep)
+				testutil_check(
+				    oplog_session->commit_transaction(
+				    oplog_session, NULL));
+		}
 		/*
 		 * Insert into the local table outside the timestamp txn.
 		 */
@@ -392,8 +434,6 @@ run_workload(uint32_t nth)
 	 * Don't log the stable timestamp table so that we know what timestamp
 	 * was stored at the checkpoint.
 	 */
-	testutil_check(session->create(session, stable_store,
-	    "key_format=Q,value_format=Q,log=(enabled=false)"));
 	testutil_check(session->close(session, NULL));
 
 	/*
@@ -507,12 +547,12 @@ main(int argc, char *argv[])
 	FILE *fp;
 	REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
 	WT_CONNECTION *conn;
-	WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_stable;
+	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	pid_t pid;
 	uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;
-	uint64_t stable_fp, stable_val, val[MAX_TH+1];
+	uint64_t stable_fp, stable_val;
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
 	const char *working_dir;
@@ -598,6 +638,12 @@ main(int argc, char *argv[])
 		    use_ts ? "true" : "false");
 		printf("Parent: Create %" PRIu32
 		    " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
+		printf("CONFIG: %s%s%s%s -h %s -T %" PRIu32 "-t %" PRIu32 "\n",
+		    progname,
+		    compat ? " -C" : "",
+		    inmem ? " -m" : "",
+		    !use_ts ? " -z" : "",
+		    working_dir, nth, timeout);
 		/*
 		 * Fork a child to insert as many items.  We will then randomly
 		 * kill the child, run recovery and make sure all items we wrote
@@ -653,7 +699,7 @@ main(int argc, char *argv[])
 	 */
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
 	    "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
-	    "cp -p WiredTigerLog.* ../%s.SAVE",
+	    "cp -p * ../%s.SAVE",
 	     home, home, home));
 	if ((status = system(buf)) < 0)
 		testutil_die(status, "system: %s", buf);
@@ -673,26 +719,17 @@ main(int argc, char *argv[])
 	    uri_local, NULL, NULL, &cur_local));
 	testutil_check(session->open_cursor(session,
 	    uri_oplog, NULL, NULL, &cur_oplog));
-	testutil_check(session->open_cursor(session,
-	    stable_store, NULL, NULL, &cur_stable));
 
 	/*
 	 * Find the biggest stable timestamp value that was saved.
 	 */
 	stable_val = 0;
-	memset(val, 0, sizeof(val));
-	while (cur_stable->next(cur_stable) == 0) {
-		testutil_check(cur_stable->get_key(cur_stable, &key));
-		testutil_check(cur_stable->get_value(cur_stable, &val[key]));
-		if (val[key] > stable_val)
-			stable_val = val[key];
-
-		if (use_ts)
-			printf("Stable: key %" PRIu64 " value %" PRIu64 "\n",
-			    key, val[key]);
-	}
-	if (use_ts)
+	if (use_ts) {
+		testutil_check(
+		    conn->query_timestamp(conn, buf, "get=recovery"));
+		sscanf(buf, "%" SCNx64, &stable_val);
 		printf("Got stable_val %" PRIu64 "\n", stable_val);
+	}
 
 	count = 0;
 	absent_coll = absent_local = absent_oplog = 0;
@@ -761,11 +798,11 @@ main(int argc, char *argv[])
 				 * larger than the saved one.
 				 */
 				if (!inmem &&
-				    stable_fp != 0 && stable_fp <= val[i]) {
+				    stable_fp != 0 && stable_fp <= stable_val) {
 					printf("%s: COLLECTION no record with "
 					    "key %" PRIu64 " record ts %" PRIu64
 					    " <= stable ts %" PRIu64 "\n",
-					    fname, key, stable_fp, val[i]);
+					    fname, key, stable_fp, stable_val);
 					absent_coll++;
 				}
 				if (c_rep[i].first_miss == INVALID_KEY)
@@ -778,6 +815,18 @@ main(int argc, char *argv[])
 				 * after absent records, a hole in our data.
 				 */
 				c_rep[i].exist_key = key;
+				fatal = true;
+			} else if (!inmem &&
+			    stable_fp != 0 && stable_fp > stable_val) {
+				/*
+				 * If we found a record, the stable timestamp
+				 * written to our file better be no larger
+				 * than the checkpoint one.
+				 */
+				printf("%s: COLLECTION record with "
+				    "key %" PRIu64 " record ts %" PRIu64
+				    " > stable ts %" PRIu64 "\n",
+				    fname, key, stable_fp, stable_val);
 				fatal = true;
 			}
 			/*

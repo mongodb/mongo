@@ -45,6 +45,11 @@ struct __wt_config_parser_impl {
 	WT_CONFIG_ITEM config_item;
 };
 
+#define	WT_CONFIG_ITEM_STATIC_INIT(n)					\
+	static const WT_CONFIG_ITEM n = {				\
+		"", 0, 0, WT_CONFIG_ITEM_NUM				\
+	}
+
 /*
  * DO NOT EDIT: automatically built by dist/api_config.py.
  * configuration section: BEGIN

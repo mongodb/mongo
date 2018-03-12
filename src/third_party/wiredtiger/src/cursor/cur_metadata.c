@@ -47,12 +47,11 @@ __schema_source_config(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, cval.len + 10, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
 	srch->set_key(srch, buf->data);
-	if ((ret = srch->search(srch)) == WT_NOTFOUND)
-		WT_ERR_MSG(session, EINVAL,
-		    "metadata information for source configuration \"%s\" "
-		    "not found",
-		    (char *)buf->data);
-	WT_ERR(ret);
+	if ((ret = srch->search(srch)) != 0)
+		WT_ERR_MSG(session, ret,
+		    "metadata information for source configuration"
+		    " \"%s\" not found",
+		    (const char *)buf->data);
 	WT_ERR(srch->get_value(srch, &v));
 	WT_ERR(__wt_strdup(session, v, result));
 
@@ -73,6 +72,8 @@ static int
 __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc,
     const char *key, const char *value, char **value_ret)
 {
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM cgconf, ckey, cval;
 	WT_CURSOR *c;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -82,6 +83,19 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc,
 	lastcfg = cfg = &_cfg[3];		/* position on value */
 	c = NULL;
 	if (key != NULL && WT_PREFIX_SKIP(key, "table:")) {
+		/*
+		 * Check if the table has declared column groups.  If it does,
+		 * don't attempt to open the automatically created column
+		 * group for simple tables.
+		 */
+		WT_RET(__wt_config_getones(
+		    session, value, "colgroups", &cgconf));
+
+		__wt_config_subinit(session, &cparser, &cgconf);
+		if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
+			goto skip;
+		WT_RET_NOTFOUND_OK(ret);
+
 		c = mdc->create_cursor;
 		WT_ERR(__wt_scr_alloc(session, 0, &buf));
 		/*
@@ -90,12 +104,14 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc,
 		 */
 		WT_ERR(__wt_buf_fmt(session, buf, "colgroup:%s", key));
 		c->set_key(c, buf->data);
-		if ((ret = c->search(c)) == 0) {
-			WT_ERR(c->get_value(c, &v));
-			WT_ERR(__wt_strdup(session, v, --cfg));
-			WT_ERR(__schema_source_config(session, c, v, --cfg));
-		} else
-			WT_ERR_NOTFOUND_OK(ret);
+		if ((ret = c->search(c)) != 0)
+			WT_ERR_MSG(session, ret,
+			    "metadata information for source configuration"
+			    " \"%s\" not found",
+			    (const char *)buf->data);
+		WT_ERR(c->get_value(c, &v));
+		WT_ERR(__wt_strdup(session, v, --cfg));
+		WT_ERR(__schema_source_config(session, c, v, --cfg));
 	} else if (key != NULL && WT_PREFIX_SKIP(key, "colgroup:")) {
 		if (strchr(key, ':') != NULL) {
 			c = mdc->create_cursor;
@@ -104,7 +120,8 @@ __schema_create_collapse(WT_SESSION_IMPL *session, WT_CURSOR_METADATA *mdc,
 			    __schema_source_config(session, c, value, --cfg));
 		}
 	}
-	firstcfg = cfg;
+
+skip:	firstcfg = cfg;
 	*--firstcfg = WT_CONFIG_BASE(session, WT_SESSION_create);
 	WT_ERR(__wt_config_collapse(session, firstcfg, value_ret));
 
@@ -263,11 +280,20 @@ __curmetadata_next(WT_CURSOR *cursor)
 		 * all schema-level operations reflected in the results.  Query
 		 * at read-uncommitted to avoid confusion caused by the current
 		 * transaction state.
+		 *
+		 * Don't exit from the scan if we find an incomplete entry:
+		 * just skip over it.
 		 */
-		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
-		    ret = file_cursor->next(mdc->file_cursor));
-		WT_ERR(ret);
-		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
+		for (;;) {
+			WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+			    ret = file_cursor->next(mdc->file_cursor));
+			WT_ERR(ret);
+			WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+			    ret = __curmetadata_setkv(mdc, file_cursor));
+			if (ret == 0)
+				break;
+			WT_ERR_NOTFOUND_OK(ret);
+		}
 	}
 
 err:	if (ret != 0) {
@@ -299,12 +325,24 @@ __curmetadata_prev(WT_CURSOR *cursor)
 		goto err;
 	}
 
-	WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
-	    ret = file_cursor->prev(file_cursor));
-	if (ret == 0)
-		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
-	else if (ret == WT_NOTFOUND)
-		WT_ERR(__curmetadata_metadata_search(session, cursor));
+	/*
+	 * Don't exit from the scan if we find an incomplete entry:
+	 * just skip over it.
+	 */
+	for (;;) {
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = file_cursor->prev(file_cursor));
+		if (ret == WT_NOTFOUND) {
+			WT_ERR(__curmetadata_metadata_search(session, cursor));
+			break;
+		}
+		WT_ERR(ret);
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = __curmetadata_setkv(mdc, file_cursor));
+		if (ret == 0)
+			break;
+		WT_ERR_NOTFOUND_OK(ret);
+	}
 
 err:	if (ret != 0) {
 		F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
@@ -327,7 +365,7 @@ __curmetadata_reset(WT_CURSOR *cursor)
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	file_cursor = mdc->file_cursor;
-	CURSOR_API_CALL(cursor, session,
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session,
 	    reset, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
 	if (F_ISSET(mdc, WT_MDC_POSITIONED) && !F_ISSET(mdc, WT_MDC_ONMETADATA))
@@ -363,7 +401,9 @@ __curmetadata_search(WT_CURSOR *cursor)
 		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
 		    ret = file_cursor->search(file_cursor));
 		WT_ERR(ret);
-		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = __curmetadata_setkv(mdc, file_cursor));
+		WT_ERR(ret);
 	}
 
 err:	if (ret != 0) {
@@ -399,7 +439,9 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
 		    ret = file_cursor->search_near(file_cursor, exact));
 		WT_ERR(ret);
-		WT_ERR(__curmetadata_setkv(mdc, file_cursor));
+		WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+		    ret = __curmetadata_setkv(mdc, file_cursor));
+		WT_ERR(ret);
 	}
 
 err:	if (ret != 0) {
@@ -511,7 +553,7 @@ __curmetadata_close(WT_CURSOR *cursor)
 
 	mdc = (WT_CURSOR_METADATA *)cursor;
 	c = mdc->file_cursor;
-	CURSOR_API_CALL(cursor, session, close, c == NULL ?
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, c == NULL ?
 	    NULL : ((WT_CURSOR_BTREE *)c)->btree);
 
 	if (c != NULL)
@@ -555,6 +597,8 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
 	    __curmetadata_remove,		/* remove */
 	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup,			/* cache */
+	    __wt_cursor_reopen_notsup,		/* reopen */
 	    __curmetadata_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_METADATA *mdc;

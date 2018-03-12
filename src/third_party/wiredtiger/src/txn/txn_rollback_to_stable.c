@@ -279,7 +279,7 @@ __txn_rollback_to_stable_btree_walk(
 		/* Review deleted page saved to the ref */
 		if (ref->page_del != NULL && __wt_timestamp_cmp(
 		    rollback_timestamp, &ref->page_del->timestamp) < 0)
-			__wt_delete_page_rollback(session, ref);
+			WT_RET(__wt_delete_page_rollback(session, ref));
 
 		if (!__wt_page_is_modified(ref->page))
 			continue;

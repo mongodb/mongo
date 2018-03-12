@@ -1044,14 +1044,21 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *s, *session;
 	uint32_t i;
+	const char *ckpt_cfg;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
+	ckpt_cfg = "use_timestamp=false";
 
 	CONNECTION_API_CALL(conn, session, close, config, cfg);
 
 	WT_TRET(__wt_config_gets(session, cfg, "leak_memory", &cval));
 	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
+	WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
+	if (cval.val != 0 && conn->txn_global.has_stable_timestamp) {
+		ckpt_cfg = "use_timestamp=true";
+		F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
+	}
 
 err:	/*
 	 * Rollback all running transactions.
@@ -1110,7 +1117,7 @@ err:	/*
 		if (s != NULL) {
 			const char *checkpoint_cfg[] = {
 			    WT_CONFIG_BASE(session, WT_SESSION_checkpoint),
-			    "use_timestamp=false",
+			    ckpt_cfg,
 			    NULL
 			};
 			wt_session = &s->iface;
@@ -2606,6 +2613,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val != 0;
+
+	WT_ERR(__wt_config_gets(session, cfg, "cache_cursors", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_CACHE_CURSORS);
 
 	WT_ERR(__wt_conn_statistics_config(session, cfg));
 	WT_ERR(__wt_lsm_manager_config(session, cfg));

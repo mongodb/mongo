@@ -465,14 +465,16 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			 * and the deletion committed, but older transactions
 			 * in the system required the previous version of the
 			 * page to remain available, a special deleted-address
-			 * type cell is written.  The only reason we'd ever see
-			 * that cell on a page we're reading is if we crashed
-			 * and recovered (otherwise a version of the page w/o
-			 * that cell would have eventually been written).  If we
-			 * crash and recover to a page with a deleted-address
-			 * cell, we want to discard the page from the backing
-			 * store (it was never discarded), and, of course, by
-			 * definition no earlier transaction will ever need it.
+			 * type cell is written. We'll see that cell on a page
+			 * if we read from a checkpoint including a deleted
+			 * cell or if we crash/recover and start off from such
+			 * a checkpoint (absent running recovery, a version of
+			 * the page without the deleted cell would eventually
+			 * have been written). If we crash and recover to a
+			 * page with a deleted-address cell, we want to discard
+			 * the page from the backing store (it was never
+			 * discarded), and, of course, by definition no earlier
+			 * transaction will ever need it.
 			 *
 			 * Re-create the state of a deleted page.
 			 */

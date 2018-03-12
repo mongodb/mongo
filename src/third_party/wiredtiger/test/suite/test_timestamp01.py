@@ -45,7 +45,7 @@ class test_timestamp01(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
                 'commit_timestamp=' + timestamp_str(1 << 5000)),
-                '/must be running/')
+                '/only permitted in a running/')
 
         # Zero is not permitted
         self.session.begin_transaction()

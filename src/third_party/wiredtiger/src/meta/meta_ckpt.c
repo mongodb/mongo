@@ -375,6 +375,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 	time_t secs;
 	int64_t maxorder;
 	const char *sep;
+	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 2];
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	maxorder = 0;
@@ -452,6 +453,21 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_catfmt(session, buf,
 		    ",checkpoint_lsn=(%" PRIu32 ",%" PRIuMAX ")",
 		    ckptlsn->l.file, (uintmax_t)ckptlsn->l.offset));
+	hex_timestamp[0] = '0';
+	hex_timestamp[1] = '\0';
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * We need to record the timestamp of the checkpoint in the metadata's
+	 * checkpoint record. Although the read_timestamp remains set for the
+	 * duration of the checkpoint, we set and unset the flag based on the
+	 * file's durability. Record the timestamp if the flag is set.
+	 */
+	if (F_ISSET(&session->txn, WT_TXN_HAS_TS_READ))
+		WT_ERR(__wt_timestamp_to_hex_string(session, hex_timestamp,
+		    &session->txn.read_timestamp));
+#endif
+	WT_ERR(__wt_buf_catfmt(session, buf,
+	    ",checkpoint_timestamp=\"%s\"", hex_timestamp));
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(session, &buf);

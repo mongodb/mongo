@@ -744,9 +744,7 @@ int
 __wt_config_gets_def(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, int def, WT_CONFIG_ITEM *value)
 {
-	static const WT_CONFIG_ITEM false_value = {
-		"", 0, 0, WT_CONFIG_ITEM_NUM
-	};
+	WT_CONFIG_ITEM_STATIC_INIT(false_value);
 
 	*value = false_value;
 	value->val = def;

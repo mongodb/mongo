@@ -603,6 +603,7 @@ curtable
 cust
 customp
 cv
+cval
 cx
 cxa
 dT
@@ -1185,6 +1186,7 @@ subgetraw
 subgets
 subinit
 sublicense
+subone
 subtest
 subtree
 sunique

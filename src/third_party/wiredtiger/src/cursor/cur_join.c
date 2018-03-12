@@ -325,7 +325,7 @@ __curjoin_close(WT_CURSOR *cursor)
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
 
-	JOINABLE_CURSOR_API_CALL(cursor, session, close, NULL);
+	JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 
 	WT_TRET(__wt_schema_release_table(session, cjoin->table));
 
@@ -539,16 +539,16 @@ __curjoin_extract_insert(WT_CURSOR *cursor)
 	WT_ITEM ikey;
 	WT_SESSION_IMPL *session;
 
-	cextract = (WT_CURJOIN_EXTRACTOR *)cursor;
 	/*
 	 * This insert method may be called multiple times during a single
 	 * extraction.  If we already have a definitive answer to the
 	 * membership question, exit early.
 	 */
+	cextract = (WT_CURJOIN_EXTRACTOR *)cursor;
 	if (cextract->ismember)
 		return (0);
 
-	session = (WT_SESSION_IMPL *)cursor->session;
+	CURSOR_API_CALL(cursor, session, insert, NULL);
 
 	WT_ITEM_SET(ikey, cursor->key);
 	/*
@@ -564,7 +564,7 @@ __curjoin_extract_insert(WT_CURSOR *cursor)
 	else if (ret == 0)
 		cextract->ismember = true;
 
-	return (ret);
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -596,6 +596,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	    __wt_cursor_notsup,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup,			/* cache */
+	    __wt_cursor_reopen_notsup,		/* reopen */
 	    __wt_cursor_notsup);		/* close */
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -1211,7 +1213,7 @@ __curjoin_reset(WT_CURSOR *cursor)
 
 	cjoin = (WT_CURSOR_JOIN *)cursor;
 
-	JOINABLE_CURSOR_API_CALL(cursor, session, reset, NULL);
+	JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
 
 	if (cjoin->iter != NULL)
 		WT_ERR(__curjoin_iter_reset(cjoin->iter));
@@ -1301,6 +1303,8 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup,			/* cache */
+	    __wt_cursor_reopen_notsup,		/* reopen */
 	    __curjoin_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_JOIN *cjoin;

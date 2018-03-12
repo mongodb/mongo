@@ -139,9 +139,9 @@ class TestSuiteConnection(object):
         self._conn = conn
         self._connlist = connlist
 
-    def close(self):
+    def close(self, config=''):
         self._connlist.remove(self._conn)
-        return self._conn.close()
+        return self._conn.close(config)
 
     # Proxy everything except what we explicitly define to the
     # wrapped connection
@@ -166,6 +166,10 @@ class WiredTigerTestCase(unittest.TestCase):
     # conn_config can be overridden to add to basic connection configuration.
     # Can be a string or a callable function or lambda expression.
     conn_config = ''
+
+    # session_config can be overridden to add to basic session configuration.
+    # Can be a string or a callable function or lambda expression.
+    session_config = ''
 
     # conn_extensions can be overridden to add a list of extensions to load.
     # Each entry is a string (directory and extension name) and optional config.
@@ -319,17 +323,20 @@ class WiredTigerTestCase(unittest.TestCase):
         conn = wiredtiger.wiredtiger_open(home, config)
         return TestSuiteConnection(conn, self._connections)
 
-    # Can be overridden
+    # Can be overridden, but first consider setting self.session_config
     def setUpSessionOpen(self, conn):
-        return conn.open_session(None)
+        config = self.session_config
+        if hasattr(config, '__call__'):
+            config = self.session_config()
+        return conn.open_session(config)
 
     # Can be overridden
-    def close_conn(self):
+    def close_conn(self, config=''):
         """
         Close the connection if already open.
         """
         if self.conn != None:
-            self.conn.close()
+            self.conn.close(config)
             self.conn = None
 
     def open_conn(self, directory="."):

@@ -104,6 +104,7 @@ struct __wt_txn_global {
 	WT_DECL_TIMESTAMP(commit_timestamp)
 	WT_DECL_TIMESTAMP(oldest_timestamp)
 	WT_DECL_TIMESTAMP(pinned_timestamp)
+	WT_DECL_TIMESTAMP(recovery_timestamp)
 	WT_DECL_TIMESTAMP(stable_timestamp)
 	bool has_commit_timestamp;
 	bool has_oldest_timestamp;
@@ -171,17 +172,17 @@ typedef enum __wt_txn_isolation {
 struct __wt_txn_op {
 	uint32_t fileid;
 	enum {
+		WT_TXN_OP_NONE,
 		WT_TXN_OP_BASIC,
-		WT_TXN_OP_BASIC_TS,
 		WT_TXN_OP_INMEM,
-		WT_TXN_OP_REF,
+		WT_TXN_OP_REF_DELETE,
 		WT_TXN_OP_TRUNCATE_COL,
 		WT_TXN_OP_TRUNCATE_ROW
 	} type;
 	union {
 		/* WT_TXN_OP_BASIC, WT_TXN_OP_INMEM */
 		WT_UPDATE *upd;
-		/* WT_TXN_OP_REF */
+		/* WT_TXN_OP_REF_DELETE */
 		WT_REF *ref;
 		/* WT_TXN_OP_TRUNCATE_COL */
 		struct {
@@ -236,6 +237,12 @@ struct __wt_txn {
 	 */
 	WT_DECL_TIMESTAMP(first_commit_timestamp)
 
+	/*
+	 * Timestamp copied into updates created by this transaction, when this
+	 * transaction is prepared.
+	 */
+	WT_DECL_TIMESTAMP(prepare_timestamp)
+
 	/* Read updates committed as of this timestamp. */
 	WT_DECL_TIMESTAMP(read_timestamp)
 
@@ -271,15 +278,16 @@ struct __wt_txn {
 #define	WT_TXN_HAS_TS_READ	0x00020u
 #define	WT_TXN_IGNORE_PREPARE	0x00040u
 #define	WT_TXN_NAMED_SNAPSHOT	0x00080u
-#define	WT_TXN_PUBLIC_TS_COMMIT	0x00100u
-#define	WT_TXN_PUBLIC_TS_READ	0x00200u
-#define	WT_TXN_READONLY		0x00400u
-#define	WT_TXN_RUNNING		0x00800u
-#define	WT_TXN_SYNC_SET		0x01000u
-#define	WT_TXN_TS_COMMIT_ALWAYS	0x02000u
-#define	WT_TXN_TS_COMMIT_KEYS	0x04000u
-#define	WT_TXN_TS_COMMIT_NEVER	0x08000u
-#define	WT_TXN_UPDATE	        0x10000u
+#define	WT_TXN_PREPARE		0x00100u
+#define	WT_TXN_PUBLIC_TS_COMMIT	0x00200u
+#define	WT_TXN_PUBLIC_TS_READ	0x00400u
+#define	WT_TXN_READONLY		0x00800u
+#define	WT_TXN_RUNNING		0x01000u
+#define	WT_TXN_SYNC_SET		0x02000u
+#define	WT_TXN_TS_COMMIT_ALWAYS	0x04000u
+#define	WT_TXN_TS_COMMIT_KEYS	0x08000u
+#define	WT_TXN_TS_COMMIT_NEVER	0x10000u
+#define	WT_TXN_UPDATE	        0x20000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

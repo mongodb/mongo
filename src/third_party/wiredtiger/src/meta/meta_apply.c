@@ -20,17 +20,26 @@ __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
     const char *cfg[])
 {
 	WT_DECL_RET;
+	int t_ret;
 	const char *uri;
 	bool skip;
 
-	while ((ret = cursor->next(cursor)) == 0) {
-		WT_RET(cursor->get_key(cursor, &uri));
-		if (strcmp(uri, WT_METAFILE_URI) == 0)
+	/*
+	 * Accumulate errors but continue through to the end of the metadata.
+	 */
+	while ((t_ret = cursor->next(cursor)) == 0) {
+		if ((t_ret = cursor->get_key(cursor, &uri)) != 0 ||
+		    strcmp(uri, WT_METAFILE_URI) == 0) {
+			WT_TRET(t_ret);
 			continue;
+		}
 
 		skip = false;
-		if (name_func != NULL)
-			WT_RET(name_func(session, uri, &skip));
+		if (name_func != NULL &&
+		    (t_ret = name_func(session, uri, &skip)) != 0) {
+			WT_TRET(t_ret);
+			continue;
+		}
 
 		if (file_func == NULL || skip || !WT_PREFIX_MATCH(uri, "file:"))
 			continue;
@@ -39,18 +48,25 @@ __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 		 * We need to pull the handle into the session handle cache
 		 * and make sure it's referenced to stop other internal code
 		 * dropping the handle (e.g in LSM when cleaning up obsolete
-		 * chunks).  Holding the metadata lock isn't enough.
+		 * chunks).  Holding the schema lock isn't enough.
+		 *
+		 * Handles that are busy are skipped without the whole
+		 * operation failing.  This deals among other cases with
+		 * checkpoint encountering handles that are locked (e.g., for
+		 * bulk loads or verify operations).
 		 */
-		if ((ret = __wt_session_get_dhandle(
-		    session, uri, NULL, NULL, 0)) != 0)
-			return (ret == EBUSY ? 0 : ret);
-		WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
-		WT_TRET(__wt_session_release_dhandle(session));
-		WT_RET(ret);
-	}
-	WT_RET_NOTFOUND_OK(ret);
+		if ((t_ret = __wt_session_get_dhandle(
+		    session, uri, NULL, NULL, 0)) != 0) {
+			WT_TRET_BUSY_OK(t_ret);
+			continue;
+		}
 
-	return (0);
+		WT_SAVE_DHANDLE(session, WT_TRET(file_func(session, cfg)));
+		WT_TRET(__wt_session_release_dhandle(session));
+	}
+	WT_TRET_NOTFOUND_OK(t_ret);
+
+	return (ret);
 }
 
 /*
@@ -67,6 +83,7 @@ __wt_meta_apply_all(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
 	WT_RET(__wt_metadata_cursor(session, &cursor));
 	WT_SAVE_DHANDLE(session, ret =
 	    __meta_btree_apply(session, cursor, file_func, name_func, cfg));

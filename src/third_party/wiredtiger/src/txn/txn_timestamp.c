@@ -82,12 +82,12 @@ __wt_verbose_timestamp(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_txn_parse_timestamp --
- *	Decodes and sets a timestamp.
+ * __wt_txn_parse_timestamp_raw --
+ *	Decodes and sets a timestamp. Don't do any checking.
  */
 int
-__wt_txn_parse_timestamp(WT_SESSION_IMPL *session,
-     const char *name, wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval)
+__wt_txn_parse_timestamp_raw(WT_SESSION_IMPL *session, const char *name,
+    wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval)
 {
 	__wt_timestamp_set_zero(timestamp);
 
@@ -172,7 +172,19 @@ __wt_txn_parse_timestamp(WT_SESSION_IMPL *session,
 	    ts.data, ts.size);
 	}
 #endif
-	if (__wt_timestamp_iszero(timestamp))
+	return (0);
+}
+
+/*
+ * __wt_txn_parse_timestamp --
+ *	Decodes and sets a timestamp checking it is non-zero.
+ */
+int
+__wt_txn_parse_timestamp(WT_SESSION_IMPL *session, const char *name,
+    wt_timestamp_t *timestamp, WT_CONFIG_ITEM *cval)
+{
+	WT_RET(__wt_txn_parse_timestamp_raw(session, name, timestamp, cval));
+	if (cval->len != 0 && __wt_timestamp_iszero(timestamp))
 		WT_RET_MSG(session, EINVAL,
 		    "Failed to parse %s timestamp '%.*s': zero not permitted",
 		    name, (int)cval->len, cval->str);
@@ -192,7 +204,7 @@ __txn_global_query_timestamp(
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	wt_timestamp_t ts;
+	wt_timestamp_t ts, tmpts;
 
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
@@ -216,15 +228,14 @@ __txn_global_query_timestamp(
 		    commit_timestampq) {
 			if (txn->clear_ts_queue)
 				continue;
-			/*
-			 * Compare on the first real running transaction.
-			 */
-			if (__wt_timestamp_cmp(
-			    &txn->first_commit_timestamp, &ts) < 0) {
-				__wt_timestamp_set(
-				    &ts, &txn->first_commit_timestamp);
-				WT_ASSERT(session, !__wt_timestamp_iszero(&ts));
-			}
+
+			__wt_timestamp_set(
+			    &tmpts, &txn->first_commit_timestamp);
+			WT_ASSERT(session, !__wt_timestamp_iszero(&tmpts));
+			__wt_timestamp_subone(&tmpts);
+
+			if (__wt_timestamp_cmp(&tmpts, &ts) < 0)
+				__wt_timestamp_set(&ts, &tmpts);
 			break;
 		}
 		__wt_readunlock(session, &txn_global->commit_timestamp_rwlock);
@@ -254,7 +265,10 @@ __txn_global_query_timestamp(
 		    __wt_timestamp_cmp(&txn->read_timestamp, &ts) < 0)
 			__wt_timestamp_set(&ts, &txn->read_timestamp);
 		__wt_readunlock(session, &txn_global->read_timestamp_rwlock);
-	} else if (WT_STRING_MATCH("stable", cval.str, cval.len)) {
+	} else if (WT_STRING_MATCH("recovery", cval.str, cval.len))
+		/* Read-only value forever. No lock needed. */
+		__wt_timestamp_set(&ts, &txn_global->recovery_timestamp);
+	else if (WT_STRING_MATCH("stable", cval.str, cval.len)) {
 		if (!txn_global->has_stable_timestamp)
 			return (WT_NOTFOUND);
 		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
@@ -617,7 +631,7 @@ __wt_timestamp_validate(WT_SESSION_IMPL *session, const char *name,
 
 /*
  * __wt_txn_set_timestamp --
- *	Set a transaction's timestamp.
+ *	Parse a request to set a timestamp in a transaction.
  */
 int
 __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
@@ -625,19 +639,14 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 
-	/*
-	 * Look for a commit timestamp.
-	 */
+	/* Look for a commit timestamp. */
 	ret = __wt_config_gets_def(session, cfg, "commit_timestamp", 0, &cval);
 	if (ret == 0 && cval.len != 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_TXN *txn = &session->txn;
 		wt_timestamp_t ts;
 
-		if (!F_ISSET(txn, WT_TXN_RUNNING))
-			WT_RET_MSG(session, EINVAL,
-			    "Transaction must be running "
-			    "to set a commit_timestamp");
+		WT_TRET(__wt_txn_context_check(session, true));
 		WT_RET(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
 		WT_RET(__wt_timestamp_validate(session,
 		    "commit", &ts, &cval, true, true, true));
@@ -649,6 +658,108 @@ __wt_txn_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 #endif
 	}
 	WT_RET_NOTFOUND_OK(ret);
+
+	/* Look for a read timestamp. */
+	WT_RET(__wt_txn_parse_read_timestamp(session, cfg));
+
+	return (0);
+}
+
+/*
+ * __wt_txn_parse_read_timestamp --
+ *	Parse a request to set a transaction's read_timestamp.
+ */
+int
+__wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval;
+	WT_TXN *txn;
+
+	txn = &session->txn;
+
+	WT_RET(__wt_config_gets_def(session, cfg, "read_timestamp", 0, &cval));
+	if (cval.len > 0) {
+#ifdef HAVE_TIMESTAMPS
+		wt_timestamp_t ts;
+		WT_TXN_GLOBAL *txn_global;
+		char hex_timestamp[2][2 * WT_TIMESTAMP_SIZE + 1];
+		bool round_to_oldest;
+
+		txn_global = &S2C(session)->txn_global;
+		WT_RET(__wt_txn_parse_timestamp(session, "read", &ts, &cval));
+
+		/* Read timestamps imply / require snapshot isolation. */
+		if (!F_ISSET(txn, WT_TXN_RUNNING))
+			txn->isolation = WT_ISO_SNAPSHOT;
+		else if (txn->isolation != WT_ISO_SNAPSHOT)
+			WT_RET_MSG(session, EINVAL, "setting a read_timestamp"
+			    " requires a transaction running at snapshot"
+			    " isolation");
+
+		/* Read timestamps can't change once set. */
+		if (F_ISSET(txn, WT_TXN_HAS_TS_READ))
+			WT_RET_MSG(session, EINVAL, "a read_timestamp"
+			    " may only be set once per transaction");
+
+		/*
+		 * Read the configuration here to reduce the span of the
+		 * critical section.
+		 */
+		WT_RET(__wt_config_gets_def(session,
+		    cfg, "round_to_oldest", 0, &cval));
+		round_to_oldest = cval.val;
+		/*
+		 * This code is not using the timestamp validate function to
+		 * avoid a race between checking and setting transaction
+		 * timestamp.
+		 */
+		WT_RET(__wt_timestamp_to_hex_string(session,
+		    hex_timestamp[0], &ts));
+		__wt_readlock(session, &txn_global->rwlock);
+		if (__wt_timestamp_cmp(
+		    &ts, &txn_global->oldest_timestamp) < 0) {
+			WT_RET(__wt_timestamp_to_hex_string(session,
+			    hex_timestamp[1], &txn_global->oldest_timestamp));
+			/*
+			 * If given read timestamp is earlier than oldest
+			 * timestamp then round the read timestamp to
+			 * oldest timestamp.
+			 */
+			if (round_to_oldest)
+				__wt_timestamp_set(&txn->read_timestamp,
+				    &txn_global->oldest_timestamp);
+			else {
+				__wt_readunlock(session, &txn_global->rwlock);
+				WT_RET_MSG(session, EINVAL, "read timestamp "
+				    "%s older than oldest timestamp %s",
+				    hex_timestamp[0], hex_timestamp[1]);
+			}
+		} else {
+			__wt_timestamp_set(&txn->read_timestamp, &ts);
+			/*
+			 * Reset to avoid a verbose message as read
+			 * timestamp is not rounded to oldest timestamp.
+			 */
+			round_to_oldest = false;
+		}
+
+		__wt_txn_set_read_timestamp(session);
+		__wt_readunlock(session, &txn_global->rwlock);
+		if (round_to_oldest) {
+			/*
+			 * This message is generated here to reduce the span of
+			 * critical section.
+			 */
+			__wt_verbose(session, WT_VERB_TIMESTAMP, "Read "
+			    "timestamp %s : Rounded to oldest timestamp %s",
+			    hex_timestamp[0], hex_timestamp[1]);
+		}
+#else
+		WT_UNUSED(txn);
+		WT_RET_MSG(session, EINVAL, "read_timestamp requires a "
+		    "version of WiredTiger built with timestamp support");
+#endif
+	}
 
 	return (0);
 }

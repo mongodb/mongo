@@ -82,7 +82,7 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	 */
 	len = WT_DATA_IN_ITEM(value) ? WT_PTRDIFF(value->data, value->mem) : 0;
 	WT_RET(__wt_buf_grow(session, value,
-	    len + WT_MAX(value->size, offset) + data_size));
+	    len + WT_MAX(value->size, offset) + data_size + (sformat ? 1 : 0)));
 
 	/*
 	 * Fast-path the expected case, where we're overwriting a set of bytes

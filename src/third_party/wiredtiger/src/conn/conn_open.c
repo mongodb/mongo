@@ -175,6 +175,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	if (!F_ISSET(conn, WT_CONN_LEAK_MEMORY))
 		if ((s = conn->sessions) != NULL)
 			for (i = 0; i < conn->session_size; ++s, ++i) {
+				__wt_free(session, s->cursor_cache);
 				__wt_free(session, s->dhhash);
 				__wt_stash_discard_all(session, s);
 				__wt_free(session, s->hazard);

@@ -71,6 +71,9 @@ This error is generated when wiredtiger_open is configured to return an error if
 @par <code>WT_CACHE_FULL</code>
 This error is only generated when wiredtiger_open is configured to run in-memory, and an insert or update operation requires more than the configured cache size to complete. The operation may be retried; if a transaction is in progress, it should be rolled back and the operation retried in a new transaction.
 
+@par <code>WT_PREPARE_CONFLICT</code>
+This error is generated when the application attempts to update an already updated record which is in prepared state. An updated record will be in prepared state, when the transaction that performed the update is in prepared state.
+
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
 

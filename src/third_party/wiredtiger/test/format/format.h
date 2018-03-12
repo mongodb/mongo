@@ -122,7 +122,9 @@ typedef struct {
 
 	WT_RAND_STATE rnd;			/* Global RNG state */
 
-	uint64_t timestamp;			/* Counter for timestamps. */
+	uint64_t timestamp;			/* Counter for timestamps */
+
+	uint64_t truncate_cnt;			/* Counter for truncation */
 
 	/*
 	 * We have a list of records that are appended, but not yet "resolved",
@@ -209,6 +211,7 @@ typedef struct {
 	uint32_t c_timer;
 	uint32_t c_txn_freq;
 	uint32_t c_txn_timestamps;
+	uint32_t c_truncate;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
 	uint32_t c_verify;
@@ -264,23 +267,28 @@ typedef struct {
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
 	uint64_t commit;			/* transaction resolution */
+	uint64_t prepare;
 	uint64_t rollback;
 	uint64_t deadlock;
 
 	uint64_t commit_timestamp;		/* last committed timestamp */
 	uint64_t read_timestamp;		/* read timestamp */
 
-	bool quit;				/* thread should quit */
+	volatile bool quit;			/* thread should quit */
 
 	uint64_t search;			/* operation counts */
 	uint64_t insert;
 	uint64_t update;
 	uint64_t remove;
+	uint64_t truncate;
 	uint64_t ops;
 
-	uint64_t keyno;				/* current key, value */
-	WT_ITEM	 *key, _key;
+	uint64_t keyno;				/* key */
+	WT_ITEM	 *key, _key;			/* key, value */
 	WT_ITEM	 *value, _value;
+
+	uint64_t last;				/* truncate range */
+	WT_ITEM	 *lastkey, _lastkey;
 
 #define	TINFO_RUNNING	1			/* Running */
 #define	TINFO_COMPLETE	2			/* Finished */
@@ -295,6 +303,7 @@ void	 bdb_np(bool, void *, size_t *, void *, size_t *, int *);
 void	 bdb_open(void);
 void	 bdb_read(uint64_t, void *, size_t *, int *);
 void	 bdb_remove(uint64_t, int *);
+void	 bdb_truncate(uint64_t, uint64_t);
 void	 bdb_update(const void *, size_t, const void *, size_t);
 #endif
 

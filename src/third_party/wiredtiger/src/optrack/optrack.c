@@ -100,20 +100,21 @@ err:		WT_TRET(__wt_close(session, &session->optrack_fh));
  * __wt_optrack_flush_buffer --
  *	Flush optrack buffer. Returns the number of bytes flushed to the file.
  */
-size_t
+void
 __wt_optrack_flush_buffer(WT_SESSION_IMPL *s)
 {
-	WT_DECL_RET;
-
 	if (s->optrack_fh == NULL)
 		if (__wt_optrack_open_file(s))
-			return (0);
+			return;
 
-	ret = s->optrack_fh->handle->fh_write(s->optrack_fh->handle,
+	/*
+	 * We're not using the standard write path deliberately, that's quite
+	 * a bit of additional code (including atomic operations), and this
+	 * work should be as light-weight as possible.
+	 */
+	if (s->optrack_fh->handle->fh_write(s->optrack_fh->handle,
 	    (WT_SESSION *)s, (wt_off_t)s->optrack_offset,
-	    s->optrackbuf_ptr * sizeof(WT_OPTRACK_RECORD), s->optrack_buf);
-	if (ret == 0)
-		return (s->optrackbuf_ptr * sizeof(WT_OPTRACK_RECORD));
-	else
-		return (0);
+	    s->optrackbuf_ptr * sizeof(WT_OPTRACK_RECORD), s->optrack_buf) == 0)
+		s->optrack_offset +=
+		    s->optrackbuf_ptr * sizeof(WT_OPTRACK_RECORD);
 }

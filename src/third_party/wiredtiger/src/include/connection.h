@@ -6,12 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * Default hash table size; we don't need a prime number of buckets
- * because we always use a good hash function.
- */
-#define	WT_HASH_ARRAY_SIZE	512
-
 /*******************************************
  * Global per-process structure.
  *******************************************/
@@ -465,27 +459,29 @@ struct __wt_connection_impl {
 	WT_FILE_SYSTEM *file_system;
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_CONN_CACHE_POOL		0x000001u
-#define	WT_CONN_CKPT_SYNC		0x000002u
-#define	WT_CONN_CLOSING			0x000004u
-#define	WT_CONN_CLOSING_NO_MORE_OPENS	0x000008u
-#define	WT_CONN_EVICTION_NO_LOOKASIDE	0x000010u
-#define	WT_CONN_EVICTION_RUN		0x000020u
-#define	WT_CONN_IN_MEMORY		0x000040u
-#define	WT_CONN_LEAK_MEMORY		0x000080u
-#define	WT_CONN_LOOKASIDE_OPEN		0x000100u
-#define	WT_CONN_LSM_MERGE		0x000200u
-#define	WT_CONN_OPTRACK			0x000400u
-#define	WT_CONN_PANIC			0x000800u
-#define	WT_CONN_READONLY		0x001000u
-#define	WT_CONN_RECOVERING		0x002000u
-#define	WT_CONN_SERVER_ASYNC		0x004000u
-#define	WT_CONN_SERVER_CHECKPOINT	0x008000u
-#define	WT_CONN_SERVER_LOG		0x010000u
-#define	WT_CONN_SERVER_LSM		0x020000u
-#define	WT_CONN_SERVER_STATISTICS	0x040000u
-#define	WT_CONN_SERVER_SWEEP		0x080000u
-#define	WT_CONN_WAS_BACKUP		0x100000u
+#define	WT_CONN_CACHE_CURSORS		0x000001u
+#define	WT_CONN_CACHE_POOL		0x000002u
+#define	WT_CONN_CKPT_SYNC		0x000004u
+#define	WT_CONN_CLOSING			0x000008u
+#define	WT_CONN_CLOSING_NO_MORE_OPENS	0x000010u
+#define	WT_CONN_CLOSING_TIMESTAMP	0x000020u
+#define	WT_CONN_EVICTION_NO_LOOKASIDE	0x000040u
+#define	WT_CONN_EVICTION_RUN		0x000080u
+#define	WT_CONN_IN_MEMORY		0x000100u
+#define	WT_CONN_LEAK_MEMORY		0x000200u
+#define	WT_CONN_LOOKASIDE_OPEN		0x000400u
+#define	WT_CONN_LSM_MERGE		0x000800u
+#define	WT_CONN_OPTRACK			0x001000u
+#define	WT_CONN_PANIC			0x002000u
+#define	WT_CONN_READONLY		0x004000u
+#define	WT_CONN_RECOVERING		0x008000u
+#define	WT_CONN_SERVER_ASYNC		0x010000u
+#define	WT_CONN_SERVER_CHECKPOINT	0x020000u
+#define	WT_CONN_SERVER_LOG		0x040000u
+#define	WT_CONN_SERVER_LSM		0x080000u
+#define	WT_CONN_SERVER_STATISTICS	0x100000u
+#define	WT_CONN_SERVER_SWEEP		0x200000u
+#define	WT_CONN_WAS_BACKUP		0x400000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

@@ -24,6 +24,7 @@ typedef struct {
 	u_int max_fileid;		/* Maximum file ID seen. */
 	WT_LSN max_lsn;			/* Maximum checkpoint LSN seen. */
 	u_int nfiles;			/* Number of files in the metadata. */
+	WT_DECL_TIMESTAMP(max_timestamp)
 
 	WT_LSN ckpt_lsn;		/* Start LSN for main recovery loop. */
 
@@ -346,6 +347,7 @@ static int
 __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DECL_TIMESTAMP(ckpt_timestamp)
 	WT_LSN lsn;
 	uint32_t fileid, lsnfile, lsnoffset;
 
@@ -361,6 +363,29 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 		    r->session, &r->file_alloc, fileid + 1, &r->files));
 		r->nfiles = fileid + 1;
 	}
+
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * If we're reading the config for the metadata from the turtle file
+	 * save the stable timestamp of the last checkpoint for later query.
+	 * This gets saved in the connection.
+	 */
+	WT_CLEAR(cval);
+	WT_RET_NOTFOUND_OK(__wt_config_getones(r->session,
+	    config, "checkpoint_timestamp", &cval));
+	if (cval.len != 0) {
+		__wt_verbose(r->session, WT_VERB_RECOVERY,
+		    "%s: Recovery timestamp %.*s",
+		    uri, (int)cval.len, cval.str);
+		WT_RET(__wt_txn_parse_timestamp_raw(r->session, "recovery",
+		    &ckpt_timestamp, &cval));
+		/*
+		 * Keep track of the largest checkpoint timestamp seen.
+		 */
+		if (__wt_timestamp_cmp(&ckpt_timestamp, &r->max_timestamp) > 0)
+			__wt_timestamp_set(&r->max_timestamp, &ckpt_timestamp);
+	}
+#endif
 
 	WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
 	WT_RET(
@@ -472,6 +497,10 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	    false, WT_SESSION_NO_LOGGING, &session));
 	r.session = session;
 	WT_MAX_LSN(&r.max_lsn);
+#ifdef HAVE_TIMESTAMPS
+	__wt_timestamp_set_zero(&conn->txn_global.recovery_timestamp);
+	__wt_timestamp_set_zero(&r.max_timestamp);
+#endif
 
 	F_SET(conn, WT_CONN_RECOVERING);
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
@@ -627,6 +656,24 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 */
 ckpt:	WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 done:	FLD_SET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE);
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * After recovery, set the recovery timestamp to the largest one we
+	 * recovered. This is done at the end so that it is set whether we
+	 * ran a full recovery or not. In all cases, we've reviewed all the
+	 * files in the metadata.
+	 */
+	{
+	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 1];
+	__wt_timestamp_set(
+	    &conn->txn_global.recovery_timestamp, &r.max_timestamp);
+	WT_TRET(__wt_timestamp_to_hex_string(session,
+	    hex_timestamp, &conn->txn_global.recovery_timestamp));
+	__wt_verbose(session, WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS,
+	    "Set global recovery timestamp: %s", hex_timestamp);
+	}
+#endif
+
 err:	WT_TRET(__recovery_free(&r));
 	__wt_free(session, config);
 	FLD_CLR(conn->log_flags, WT_CONN_LOG_RECOVER_DIRTY);

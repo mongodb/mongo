@@ -110,15 +110,14 @@ class test_prepare01(wttest.WiredTigerTestCase):
         committed = 0
         cursor = self.session.open_cursor(self.uri, None)
         self.check(cursor, 0, 0)
-        msg = "/prepare_transaction is not supported/"
+
         # Currently ignore_prepare is not realized yet, hence no effect.
         self.session.begin_transaction("ignore_prepare=false")
         for i in xrange(self.nentries):
             if i > 0 and i % (self.nentries / 37) == 0:
                 self.check(cursor, committed, i)
-                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                    lambda: self.session.prepare_transaction(), msg)
-                self.session.commit_transaction()
+                self.session.prepare_transaction("prepare_timestamp=2a")
+                self.session.commit_transaction("commit_timestamp=3a")
                 committed = i
                 self.session.begin_transaction()
 
@@ -133,9 +132,9 @@ class test_prepare01(wttest.WiredTigerTestCase):
             cursor.insert()
 
         self.check(cursor, committed, self.nentries)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.prepare_transaction(), msg)
-        self.session.commit_transaction()
+
+        self.session.prepare_transaction("prepare_timestamp=2a")
+        self.session.commit_transaction("commit_timestamp=3a")
         self.check(cursor, self.nentries, self.nentries)
 
 # Test that read-committed is the default isolation level.
@@ -154,10 +153,9 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri, None)
         self.session.begin_transaction()
         cursor['key: aaa'] = 'value: aaa'
-        msg = "/prepare_transaction is not supported/"
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.prepare_transaction(), msg)
-        self.session.commit_transaction()
+
+        self.session.prepare_transaction("prepare_timestamp=2a")
+        self.session.commit_transaction("commit_timestamp=3a")
         self.session.begin_transaction()
         cursor['key: bbb'] = 'value: bbb'
 
@@ -165,14 +163,14 @@ class test_read_committed_default(wttest.WiredTigerTestCase):
         cursor = s.open_cursor(self.uri, None)
         s.begin_transaction("isolation=read-committed")
         self.assertEqual(self.cursor_count(cursor), 1)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.prepare_transaction(), msg)
-        s.commit_transaction()
-        s.begin_transaction(None)
+
+        s.prepare_transaction("prepare_timestamp=4a")
+        s.commit_transaction("commit_timestamp=5a")
+        s.begin_transaction()
         self.assertEqual(self.cursor_count(cursor), 1)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: self.session.prepare_transaction(), msg)
-        s.commit_transaction()
+        s.prepare_transaction("prepare_timestamp=7a")
+
+        s.commit_transaction("commit_timestamp=8a")
         s.close()
 
 if __name__ == '__main__':

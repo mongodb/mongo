@@ -35,19 +35,19 @@ class test_config06(wttest.WiredTigerTestCase):
     key = 'keyABCDEFGHIJKLMNOPQRSTUVWXYZ'
     value = 'valueABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-    def session_config(self, config):
+    def bad_session_config(self, config):
         msg = '/Invalid argument/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create(self.uri, config), msg)
 
     # Edge cases for key/value formats.
-    def test_session_config(self):
-        self.session_config('key_format=A,value_format=S')
-        self.session_config('key_format=S,value_format=A')
-        self.session_config('key_format=0s,value_format=s')
-        self.session_config('key_format=s,value_format=0s')
-        self.session_config('key_format=0t,value_format=4t')
-        self.session_config('key_format=4t,value_format=0t')
+    def test_bad_session_config(self):
+        self.bad_session_config('key_format=A,value_format=S')
+        self.bad_session_config('key_format=S,value_format=A')
+        self.bad_session_config('key_format=0s,value_format=s')
+        self.bad_session_config('key_format=s,value_format=0s')
+        self.bad_session_config('key_format=0t,value_format=4t')
+        self.bad_session_config('key_format=4t,value_format=0t')
 
     # Smoke-test the string formats with length specifiers; both formats should
     # ignore trailing bytes, verify that.
