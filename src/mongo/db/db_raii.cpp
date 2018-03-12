@@ -91,13 +91,25 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         if (!minSnapshot) {
             return;
         }
-        auto mySnapshot = opCtx->recoveryUnit()->getMajorityCommittedSnapshot();
+        auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
         if (!mySnapshot) {
             return;
         }
         if (mySnapshot >= minSnapshot) {
             return;
         }
+
+        auto readConcernLevel = opCtx->recoveryUnit()->getReadConcernLevel();
+        if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            uasserted(ErrorCodes::SnapshotUnavailable,
+                      str::stream()
+                          << "Unable to read from a snapshot due to pending collection catalog "
+                             "changes; please retry the operation. Snapshot timestamp is "
+                          << mySnapshot->toString()
+                          << ". Collection minimum is "
+                          << minSnapshot->toString());
+        }
+        invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
 
         // Yield locks in order to do the blocking call below
         _autoColl = boost::none;

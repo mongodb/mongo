@@ -25,7 +25,7 @@
     }
 
     let txnNumber = NumberLong(0);
-    assert.commandWorked(sessionDB.runCommand({create: kCollName}));
+    assert.commandWorked(sessionDB.runCommand({create: kCollName, writeConcern: {w: "majority"}}));
 
     function testSnapshotAggFailsWithCode(coll, pipeline, code) {
         let cmd = {aggregate: coll, pipeline: pipeline, cursor: {}};
@@ -47,7 +47,11 @@
     testSnapshotAggFailsWithCode(kCollName, [{$collStats: {}}], kIllegalStageForSnapshotReadCode);
 
     // Test that $geoNear is disallowed with snapshot reads.
-    assert.commandWorked(sessionDB.getCollection(kCollName).createIndex({a: "2dsphere"}));
+    assert.commandWorked(sessionDB.runCommand({
+        createIndexes: kCollName,
+        indexes: [{key: {a: "2dsphere"}, name: "a_2dsphere"}],
+        writeConcern: {w: "majority"}
+    }));
     testSnapshotAggFailsWithCode(kCollName,
                                  [{
                                     $geoNear: {

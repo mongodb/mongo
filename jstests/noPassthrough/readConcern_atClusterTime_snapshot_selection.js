@@ -129,13 +129,25 @@
     }));
     assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
 
-    // A read at a time that is too old fails.
+    // A read at a timestamp that is no longer held by the storage engine fails.
+    // TODO SERVER-31767: Once mongod supports a snapshot window, performing a majority write will
+    // not be sufficient to make a previous majority commit point stale.
+    assert.commandWorked(
+        primaryDB.runCommand({insert: collName, documents: [{}], writeConcern: {w: "majority"}}));
+    assert.commandFailedWithCode(primaryDB.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: clusterTimeAfter},
+        txnNumber: NumberLong(primaryTxnNumber++)
+    }),
+                                 ErrorCodes.SnapshotTooOld);
+
+    // A read at a timestamp that is older than our collection catalog min time fails.
     assert.commandFailedWithCode(primaryDB.runCommand({
         find: collName,
         readConcern: {level: "snapshot", atClusterTime: Timestamp(1, 1)},
         txnNumber: NumberLong(primaryTxnNumber++)
     }),
-                                 ErrorCodes.SnapshotTooOld);
+                                 ErrorCodes.SnapshotUnavailable);
 
     rst.stopSet();
 }());

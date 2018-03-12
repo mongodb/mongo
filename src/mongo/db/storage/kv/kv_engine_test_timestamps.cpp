@@ -198,17 +198,18 @@ private:
 
 TEST_F(SnapshotManagerTests, ConsistentIfNotSupported) {
     if (snapshotManager)
-        return;  // This test is only for engines that DON'T support SnapshotMangers.
+        return;  // This test is only for engines that DON'T support SnapshotManagers.
 
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    ASSERT(!ru->isReadingFromMajorityCommittedSnapshot());
-    ASSERT(!ru->getMajorityCommittedSnapshot());
+    auto readConcernLevel = ru->getReadConcernLevel();
+    ASSERT(readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
+           readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
 }
 
 TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
     if (!snapshotManager)
-        return;  // This test is only for engines that DO support SnapshotMangers.
+        return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
@@ -236,7 +237,7 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
 
 TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     if (!snapshotManager)
-        return;  // This test is only for engines that DO support SnapshotMangers.
+        return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto op = makeOperation();
     op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
@@ -260,7 +261,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
 
 TEST_F(SnapshotManagerTests, BasicFunctionality) {
     if (!snapshotManager)
-        return;  // This test is only for engines that DO support SnapshotMangers.
+        return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto snap0 = fetchAndIncrementTimestamp();
     snapshotManager->setCommittedSnapshot(snap0);
@@ -315,7 +316,7 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
 
 TEST_F(SnapshotManagerTests, UpdateAndDelete) {
     if (!snapshotManager)
-        return;  // This test is only for engines that DO support SnapshotMangers.
+        return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto snapBeforeInsert = fetchAndIncrementTimestamp();
 

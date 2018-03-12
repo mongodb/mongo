@@ -223,7 +223,7 @@ SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
 }
 
 Status WiredTigerRecoveryUnit::obtainMajorityCommittedSnapshot() {
-    invariant(isReadingFromMajorityCommittedSnapshot());
+    invariant(_isReadingFromPointInTime());
     auto snapshotName = _sessionCache->snapshotManager().getMinSnapshotForNextCommittedRead();
     if (!snapshotName) {
         return {ErrorCodes::ReadConcernMajorityNotAvailableYet,
@@ -233,9 +233,16 @@ Status WiredTigerRecoveryUnit::obtainMajorityCommittedSnapshot() {
     return Status::OK();
 }
 
-boost::optional<Timestamp> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
-    if (!isReadingFromMajorityCommittedSnapshot())
-        return {};
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp() const {
+    if (!_isReadingFromPointInTime())
+        return boost::none;
+
+    if (getReadConcernLevel() == repl::ReadConcernLevel::kSnapshotReadConcern &&
+        !_readAtTimestamp.isNull()) {
+        return _readAtTimestamp;
+    }
+
+    invariant(!_majorityCommittedSnapshot.isNull());
     return _majorityCommittedSnapshot;
 }
 
@@ -249,6 +256,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     }
     WT_SESSION* session = _session->getSession();
 
+    // '_readAtTimestamp' is available outside of a check for readConcern level 'snapshot' to
+    // accommodate unit testing.
     if (_readAtTimestamp != Timestamp::min()) {
         auto status =
             _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
@@ -258,7 +267,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     << " is older than the oldest available timestamp.");
         }
         uassertStatusOK(status);
-    } else if (isReadingFromMajorityCommittedSnapshot()) {
+    } else if (_isReadingFromPointInTime()) {
         // We reset _majorityCommittedSnapshot to the actual read timestamp used when the
         // transaction was started.
         _majorityCommittedSnapshot =
@@ -319,7 +328,7 @@ void WiredTigerRecoveryUnit::clearCommitTimestamp() {
     _commitTimestamp = Timestamp();
 }
 
-Status WiredTigerRecoveryUnit::selectSnapshot(Timestamp timestamp) {
+Status WiredTigerRecoveryUnit::setPointInTimeReadTimestamp(Timestamp timestamp) {
     _readAtTimestamp = timestamp;
     return Status::OK();
 }

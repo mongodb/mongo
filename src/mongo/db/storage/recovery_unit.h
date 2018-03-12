@@ -114,13 +114,6 @@ public:
     }
 
     /**
-     * Returns true if we are reading from a majority committed snapshot.
-     */
-    virtual bool isReadingFromMajorityCommittedSnapshot() const {
-        return false;
-    }
-
-    /**
      * Set this operation's readConcern level and replication mode on the recovery unit.
      */
     void setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel readConcernLevel,
@@ -138,14 +131,15 @@ public:
 
     /**
      * Returns the Timestamp being used by this recovery unit or boost::none if not reading from
-     * a majority committed snapshot.
-     *
-     * It is possible for reads to occur from later snapshots, but they may not occur from earlier
-     * snapshots.
+     * a point in time. Any point in time returned will reflect either:
+     *  - A timestamp set via call to setPointInTimeReadTimestamp()
+     *  - A majority committed snapshot timestamp (chosen by the storage engine when read-majority
+     *    has been enabled via call to obtainMajorityCommittedSnapshot())
      */
-    virtual boost::optional<Timestamp> getMajorityCommittedSnapshot() const {
-        dassert(!isReadingFromMajorityCommittedSnapshot());
-        return {};
+    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp() const {
+        invariant(_readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
+                  _readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+        return boost::none;
     }
 
     /**
@@ -186,9 +180,9 @@ public:
     }
 
     /**
-     * Chooses which timestamp to use for read transactions.
+     * Sets which timestamp to use for read transactions.
      */
-    virtual Status selectSnapshot(Timestamp timestamp) {
+    virtual Status setPointInTimeReadTimestamp(Timestamp timestamp) {
         return Status(ErrorCodes::CommandNotSupported,
                       "point-in-time reads are not implemented for this storage engine");
     }

@@ -75,13 +75,7 @@ public:
 
     Status obtainMajorityCommittedSnapshot() override;
 
-    bool isReadingFromMajorityCommittedSnapshot() const override {
-        return _replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-            (_readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
-             _readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
-    }
-
-    boost::optional<Timestamp> getMajorityCommittedSnapshot() const override;
+    boost::optional<Timestamp> getPointInTimeReadTimestamp() const override;
 
     SnapshotId getSnapshotId() const override;
 
@@ -93,7 +87,7 @@ public:
 
     Timestamp getCommitTimestamp() override;
 
-    Status selectSnapshot(Timestamp timestamp) override;
+    Status setPointInTimeReadTimestamp(Timestamp timestamp) override;
 
     void* writingPtr(void* data, size_t len) override;
 
@@ -132,6 +126,12 @@ public:
     static void appendGlobalStats(BSONObjBuilder& b);
 
 private:
+    bool _isReadingFromPointInTime() const {
+        return _replicationMode == repl::ReplicationCoordinator::modeReplSet &&
+            (_readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+             _readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
+    }
+
     void _abort();
     void _commit();
 

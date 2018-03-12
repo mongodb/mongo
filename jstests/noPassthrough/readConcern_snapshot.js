@@ -45,7 +45,7 @@
     session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
     let txnNumber = 0;
-    assert.commandWorked(sessionDb.coll.insert({}, {w: 2}));
+    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(sessionDb.runCommand(
         {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
 
@@ -95,7 +95,11 @@
     let testDB = rst.getPrimary().getDB(dbName);
     let coll = testDB.coll;
     assert.commandWorked(coll.createIndex({geo: "2d"}));
-    assert.commandWorked(coll.createIndex({haystack: "geoHaystack", a: 1}, {bucketSize: 1}));
+    assert.commandWorked(testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}],
+        writeConcern: {w: "majority"}
+    }));
 
     session = testDB.getMongo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);

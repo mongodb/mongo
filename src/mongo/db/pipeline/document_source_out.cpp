@@ -223,9 +223,11 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
             elem.type() == String);
 
+    auto readConcernLevel = pExpCtx->opCtx->recoveryUnit()->getReadConcernLevel();
     uassert(ErrorCodes::InvalidOptions,
-            "$out can only be used with the 'local' read concern level",
-            !pExpCtx->opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
+            "$out can not be used with either a 'majority' or 'snapshot' read concern level",
+            readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
+                readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
 
     NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
     uassert(17385, "Can't $out to special collection: " + elem.str(), !outputNs.isSpecial());

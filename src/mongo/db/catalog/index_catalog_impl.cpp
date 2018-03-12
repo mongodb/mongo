@@ -1161,7 +1161,7 @@ void IndexCatalogImpl::IndexIteratorImpl::_advance() {
 
         if (!_includeUnfinishedIndexes) {
             if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
-                if (auto mySnapshot = _opCtx->recoveryUnit()->getMajorityCommittedSnapshot()) {
+                if (auto mySnapshot = _opCtx->recoveryUnit()->getPointInTimeReadTimestamp()) {
                     if (mySnapshot < minSnapshot) {
                         // This index isn't finished in my snapshot.
                         continue;
