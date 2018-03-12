@@ -202,7 +202,7 @@ void WiredTigerSizeStorer::syncCache(bool syncToDisk) {
 
     WT_SESSION* session = _session.getSession();
     invariantWTOK(session->begin_transaction(session, syncToDisk ? "sync=true" : ""));
-    ScopeGuard rollbacker = MakeGuard(session->rollback_transaction, session, "");
+    auto rollbacker = MakeGuard(session->rollback_transaction, session, "");
 
     for (Map::iterator it = myMap.begin(); it != myMap.end(); ++it) {
         string uriKey = it->first;

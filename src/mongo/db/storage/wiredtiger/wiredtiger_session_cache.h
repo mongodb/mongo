@@ -109,6 +109,14 @@ public:
         return _cursorsOut;
     }
 
+    bool isDropQueuedIdentsAtSessionEndAllowed() const {
+        return _dropQueuedIdentsAtSessionEnd;
+    }
+
+    void dropQueuedIdentsAtSessionEndAllowed(bool dropQueuedIdentsAtSessionEnd) {
+        _dropQueuedIdentsAtSessionEnd = dropQueuedIdentsAtSessionEnd;
+    }
+
     static uint64_t genTableId();
 
     /**
@@ -139,6 +147,7 @@ private:
     CursorCache _cursors;            // owned
     uint64_t _cursorGen;
     int _cursorsOut;
+    bool _dropQueuedIdentsAtSessionEnd = true;
 };
 
 /**

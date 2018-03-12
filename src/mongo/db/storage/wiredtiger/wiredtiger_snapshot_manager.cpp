@@ -38,6 +38,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
