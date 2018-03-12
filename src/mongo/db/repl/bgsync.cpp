@@ -146,8 +146,8 @@ BackgroundSync::BackgroundSync(
     ReplicationCoordinator* replicationCoordinator,
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
     ReplicationProcess* replicationProcess,
-    std::unique_ptr<OplogBuffer> oplogBuffer)
-    : _oplogBuffer(std::move(oplogBuffer)),
+    OplogBuffer* oplogBuffer)
+    : _oplogBuffer(oplogBuffer),
       _replCoord(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
       _replicationProcess(replicationProcess) {
@@ -157,8 +157,6 @@ BackgroundSync::BackgroundSync(
 }
 
 void BackgroundSync::startup(OperationContext* opCtx) {
-    _oplogBuffer->startup(opCtx);
-
     invariant(!_producerThread);
     _producerThread.reset(new stdx::thread([this] { _run(); }));
 }
@@ -189,7 +187,6 @@ void BackgroundSync::shutdown(OperationContext* opCtx) {
 
 void BackgroundSync::join(OperationContext* opCtx) {
     _producerThread->join();
-    _oplogBuffer->shutdown(opCtx);
 }
 
 bool BackgroundSync::inShutdown() const {

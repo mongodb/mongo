@@ -77,10 +77,15 @@ public:
      */
     enum class ProducerState { Starting, Running, Stopped };
 
+    /**
+     * Constructs a BackgroundSync to fetch oplog entries from a sync source.
+     * The BackgroundSync does not own any of the components referenced by the constructor
+     * arguments. All these components must outlive the BackgroundSync object.
+     */
     BackgroundSync(ReplicationCoordinator* replicationCoordinator,
                    ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    ReplicationProcess* replicationProcess,
-                   std::unique_ptr<OplogBuffer> oplogBuffer);
+                   OplogBuffer* oplogBuffer);
 
     // stop syncing (when this node becomes a primary, e.g.)
     // During stepdown, the last fetched optime is not reset in order to keep track of the lastest
@@ -203,8 +208,8 @@ private:
 
     OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* opCtx);
 
-    // Production thread
-    std::unique_ptr<OplogBuffer> _oplogBuffer;
+    // This OplogBuffer holds oplog entries fetched from the sync source.
+    OplogBuffer* const _oplogBuffer;
 
     // A pointer to the replication coordinator running the show.
     ReplicationCoordinator* _replCoord;

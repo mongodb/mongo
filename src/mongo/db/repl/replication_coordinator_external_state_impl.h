@@ -176,6 +176,11 @@ private:
     // replication.
     SyncSourceFeedback _syncSourceFeedback;
 
+    // The OplogBuffer is used to hold operations read from the sync source.
+    // BackgroundSync adds operations to the OplogBuffer while the applier thread consumes these
+    // operations in batches during oplog application.
+    std::unique_ptr<OplogBuffer> _oplogBuffer;
+
     // The BackgroundSync class is responsible for pulling ops off the network from the sync source
     // and into a BlockingQueue.
     // We can't create it on construction because it needs a fully constructed

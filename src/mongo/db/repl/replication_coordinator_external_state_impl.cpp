@@ -233,8 +233,11 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     invariant(replCoord);
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
-    _bgSync = stdx::make_unique<BackgroundSync>(
-        replCoord, this, _replicationProcess, stdx::make_unique<OplogBufferBlockingQueue>());
+    _oplogBuffer = stdx::make_unique<OplogBufferBlockingQueue>();
+    _oplogBuffer->startup(opCtx);
+
+    _bgSync =
+        stdx::make_unique<BackgroundSync>(replCoord, this, _replicationProcess, _oplogBuffer.get());
     _bgSync->startup(opCtx);
 
     log() << "Starting replication applier thread";
@@ -264,6 +267,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     _stoppingDataReplication = true;
 
     auto oldSSF = std::move(_syncSourceFeedbackThread);
+    auto oldOplogBuffer = std::move(_oplogBuffer);
     auto oldBgSync = std::move(_bgSync);
     auto oldApplier = std::move(_applierThread);
     lock->unlock();
@@ -288,6 +292,10 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
 
     if (oldBgSync) {
         oldBgSync->join(opCtx);
+    }
+
+    if (oldOplogBuffer) {
+        oldOplogBuffer->shutdown(opCtx);
     }
 
     lock->lock();
