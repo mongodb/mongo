@@ -490,8 +490,15 @@ const char* ExpressionArray::getOpName() const {
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
 Value ExpressionArrayElemAt::evaluate(const Document& root) const {
-    const Value array = vpOperand[0]->evaluate(root);
     const Value indexArg = vpOperand[1]->evaluate(root);
+    long long i = indexArg.coerceToLong();
+
+    // If "vpOperand[0]" is an ExpressionFilter given index is greater than 0 call
+    // filterTillNthValue
+    const Value array = dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (i >= 0)
+        ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->filterTillNthValue(root, i)
+        : vpOperand[0]->evaluate(root);
+
 
     if (array.nullish() || indexArg.nullish()) {
         return Value(BSONNULL);
@@ -503,16 +510,13 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
             array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                          << " but is "
-                          << typeName(indexArg.getType()),
+                          << " but is " << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
             str::stream() << getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: "
-                          << indexArg.coerceToDouble(),
+                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
             indexArg.integral());
 
-    long long i = indexArg.coerceToLong();
     if (i < 0 && static_cast<size_t>(std::abs(i)) > array.getArrayLength()) {
         // Positive indices that are too large are handled automatically by Value.
         return Value();
@@ -2212,6 +2216,38 @@ Value ExpressionFilter::evaluate(const Document& root) const {
     return Value(std::move(output));
 }
 
+Value ExpressionFilter::filterTillNthValue(const Document& root, long long n) const {
+    // We are guaranteed at parse time that this isn't using our _varId.
+    const Value inputVal = _input->evaluate(root);
+    if (inputVal.nullish())
+        return Value(BSONNULL);
+
+    uassert(50701,
+            str::stream() << "input to $filter must be an array not "
+                          << typeName(inputVal.getType()),
+            inputVal.isArray());
+
+    const vector<Value>& input = inputVal.getArray();
+
+    if (input.empty())
+        return inputVal;
+
+    vector<Value> output;
+    auto& vars = getExpressionContext()->variables;
+    for (const auto& elem : input) {
+        vars.setValue(_varId, elem);
+
+        if (_filter->evaluate(root).coerceToBool()) {
+            output.push_back(std::move(elem));
+            if (output.size() == size_t(n)) {
+                return Value(std::move(output));
+            }
+        }
+    }
+
+    return Value(std::move(output));
+}
+
 void ExpressionFilter::_doAddDependencies(DepsTracker* deps) const {
     _input->addDependencies(deps);
     _filter->addDependencies(deps);
@@ -3819,41 +3855,68 @@ const char* ExpressionIsArray::getOpName() const {
 Value ExpressionSlice::evaluate(const Document& root) const {
     const size_t n = vpOperand.size();
 
-    Value arrayVal = vpOperand[0]->evaluate(root);
     // Could be either a start index or the length from 0.
     Value arg2 = vpOperand[1]->evaluate(root);
 
-    if (arrayVal.nullish() || arg2.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(28724,
-            str::stream() << "First argument to $slice must be an array, but is"
-                          << " of type: "
-                          << typeName(arrayVal.getType()),
-            arrayVal.isArray());
     uassert(28725,
             str::stream() << "Second argument to $slice must be a numeric value,"
-                          << " but is of type: "
-                          << typeName(arg2.getType()),
+                          << " but is of type: " << typeName(arg2.getType()),
             arg2.numeric());
     uassert(28726,
             str::stream() << "Second argument to $slice can't be represented as"
-                          << " a 32-bit integer: "
-                          << arg2.coerceToDouble(),
+                          << " a 32-bit integer: " << arg2.coerceToDouble(),
             arg2.integral());
 
-    const auto& array = arrayVal.getArray();
-    size_t start;
-    size_t end;
+    int start = 0;
+    int end = 0;
+    if (n == 2) {
+        start = 0;
+        end = arg2.coerceToInt();
+    } else {
+        Value arg3 = vpOperand[2]->evaluate(root);
 
+        uassert(28727,
+                str::stream() << "Third argument to $slice must be numeric, but "
+                              << "is of type: " << typeName(arg3.getType()),
+                arg3.numeric());
+        uassert(28728,
+                str::stream() << "Third argument to $slice can't be represented"
+                              << " as a 32-bit integer: " << arg3.coerceToDouble(),
+                arg3.integral());
+        uassert(28729,
+                str::stream() << "Third argument to $slice must be positive: "
+                              << arg3.coerceToInt(),
+                arg3.coerceToInt() > 0);
+
+
+        if (arg3.nullish()) {
+            return Value(BSONNULL);
+        }
+        start = arg2.coerceToInt();
+        end = arg3.coerceToInt();
+    }
+
+    // If array is a filter expression call filtertillNth to return an array of size "end" and
+    // if end or start are less than 0 evaluate normaly.
+    const Value arrayVal =
+        dynamic_cast<ExpressionFilter*>(vpOperand[0].get()) && (start >= 0 && end >= 0)
+        ? dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
+              ->filterTillNthValue(root, static_cast<long long>(end) + 1)
+        : vpOperand[0]->evaluate(root);
+
+    uassert(28724,
+            str::stream() << "First argument to $slice must be an array, but is"
+                          << " of type: " << typeName(arrayVal.getType()),
+            arrayVal.isArray());
+
+    const auto& array = arrayVal.getArray();
     if (n == 2) {
         // Only count given.
-        int count = arg2.coerceToInt();
+        int count = end;
         start = 0;
         end = array.size();
         if (count >= 0) {
-            end = std::min(end, size_t(count));
+            end = std::min(end, count);
         } else {
             // Negative count's start from the back. If a abs(count) is greater
             // than the
@@ -3862,39 +3925,17 @@ Value ExpressionSlice::evaluate(const Document& root) const {
         }
     } else {
         // We have both a start index and a count.
-        int startInt = arg2.coerceToInt();
+        int startInt = start;
         if (startInt < 0) {
             // Negative values start from the back. If a abs(start) is greater
             // than the length
             // of the array, start from 0.
-            start = std::max(0, static_cast<int>(array.size()) + startInt);
+            start = std::max(0, static_cast<int>(array.size() + startInt));
         } else {
-            start = std::min(array.size(), size_t(startInt));
+            start = std::min(static_cast<int>(array.size()), startInt);
         }
 
-        Value countVal = vpOperand[2]->evaluate(root);
-
-        if (countVal.nullish()) {
-            return Value(BSONNULL);
-        }
-
-        uassert(28727,
-                str::stream() << "Third argument to $slice must be numeric, but "
-                              << "is of type: "
-                              << typeName(countVal.getType()),
-                countVal.numeric());
-        uassert(28728,
-                str::stream() << "Third argument to $slice can't be represented"
-                              << " as a 32-bit integer: "
-                              << countVal.coerceToDouble(),
-                countVal.integral());
-        uassert(28729,
-                str::stream() << "Third argument to $slice must be positive: "
-                              << countVal.coerceToInt(),
-                countVal.coerceToInt() > 0);
-
-        size_t count = size_t(countVal.coerceToInt());
-        end = std::min(start + count, array.size());
+        end = std::min(start + end, static_cast<int>(array.size()));
     }
 
     return Value(vector<Value>(array.begin() + start, array.begin() + end));
