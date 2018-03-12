@@ -280,7 +280,9 @@ ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> im
 }
 
 ConnectionPool::~ConnectionPool() {
-    if (_manager) {
+    // If we're currently destroying the service context the _manager is already deleted and this
+    // pointer dangles. No need for cleanup in that case.
+    if (hasGlobalServiceContext() && _manager) {
         _manager->remove(this);
     }
 }

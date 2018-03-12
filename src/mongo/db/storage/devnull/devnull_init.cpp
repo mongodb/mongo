@@ -1,5 +1,3 @@
-// devnull_init.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -66,7 +64,7 @@ public:
 };
 }  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(DevNullEngineInit, ("SetGlobalEnvironment"))
+MONGO_INITIALIZER(DevNullEngineInit)
 (InitializerContext* context) {
     getGlobalServiceContext()->registerStorageEngine("devnull", new DevNullStorageEngineFactory());
     return Status::OK();

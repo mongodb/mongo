@@ -138,10 +138,10 @@ TEST_F(MongodbCAPITest, CreateAndDestroyDBAndClient) {
     auto client = createClient();
 }
 
-// This test is to make sure that destroying the db will destroy all of its clients
-// This test will only fail under ASAN
+// This test is to make sure that destroying the db will fail if there's remaining clients left.
 TEST_F(MongodbCAPITest, DoNotDestroyClient) {
-    createClient().release();
+    auto client = createClient();
+    ASSERT(libmongodbcapi_db_destroy(getDB()) != LIBMONGODB_CAPI_SUCCESS);
 }
 
 TEST_F(MongodbCAPITest, CreateMultipleClients) {
@@ -415,7 +415,7 @@ int main(int argc, char** argv, char** envp) {
         return EXIT_FAILURE;
     }
 
-    auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+    ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 
     int fini = libmongodbcapi_fini();
     if (fini != LIBMONGODB_CAPI_SUCCESS) {
@@ -424,5 +424,4 @@ int main(int argc, char** argv, char** envp) {
     }
 
     globalTempDir.reset();
-    mongo::quickExit(result);
 }

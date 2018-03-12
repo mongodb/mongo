@@ -70,10 +70,12 @@ public:
 };
 }  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(MobileKVEngineInit, ("SetGlobalEnvironment"))
-(InitializerContext* context) {
-    getGlobalServiceContext()->registerStorageEngine("mobile", new MobileFactory());
-    return Status::OK();
-}
+GlobalInitializerRegisterer mobileKVEngineInitializer(
+    "MobileKVEngineInit",
+    [](InitializerContext* context) {
+        context->serviceContext()->registerStorageEngine("mobile", new MobileFactory());
+        return Status::OK();
+    },
+    [](DeinitializerContext* const) { return Status::OK(); });
 
 }  // namespace mongo

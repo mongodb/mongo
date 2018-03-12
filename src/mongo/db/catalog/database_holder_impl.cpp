@@ -51,16 +51,24 @@
 namespace mongo {
 namespace {
 
+DatabaseHolder* _dbHolder = nullptr;
+
 DatabaseHolder& dbHolderImpl() {
-    static DatabaseHolder _dbHolder;
-    return _dbHolder;
+    return *_dbHolder;
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeDbHolderimpl, ("InitializeDatabaseHolderFactory"))
-(InitializerContext* const) {
-    registerDbHolderImpl(dbHolderImpl);
-    return Status::OK();
-}
+GlobalInitializerRegisterer dbHolderImplInitializer("InitializeDbHolderimpl",
+                                                    {"InitializeDatabaseHolderFactory"},
+                                                    [](InitializerContext* const) {
+                                                        _dbHolder = new DatabaseHolder();
+                                                        registerDbHolderImpl(dbHolderImpl);
+                                                        return Status::OK();
+                                                    },
+                                                    [](DeinitializerContext* const) {
+                                                        delete _dbHolder;
+                                                        _dbHolder = nullptr;
+                                                        return Status::OK();
+                                                    });
 
 MONGO_INITIALIZER(InitializeDatabaseHolderFactory)(InitializerContext* const) {
     DatabaseHolder::registerFactory([] { return stdx::make_unique<DatabaseHolderImpl>(); });

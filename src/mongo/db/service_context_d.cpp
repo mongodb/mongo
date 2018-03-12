@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
@@ -53,19 +54,14 @@
 
 namespace mongo {
 namespace {
-auto makeMongoDServiceContext() {
-    auto service = stdx::make_unique<ServiceContextMongoD>();
-    service->setServiceEntryPoint(stdx::make_unique<ServiceEntryPointMongod>(service.get()));
-    service->setTickSource(stdx::make_unique<SystemTickSource>());
-    service->setFastClockSource(stdx::make_unique<SystemClockSource>());
-    service->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
+ServiceContextRegistrar serviceContextCreator([]() {
+    auto service = std::make_unique<ServiceContextMongoD>();
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service.get()));
+    service->setTickSource(std::make_unique<SystemTickSource>());
+    service->setFastClockSource(std::make_unique<SystemClockSource>());
+    service->setPreciseClockSource(std::make_unique<SystemClockSource>());
     return service;
-}
-
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(makeMongoDServiceContext());
-    return Status::OK();
-}
+});
 }  // namespace
 
 extern bool _supportsDocLocking;

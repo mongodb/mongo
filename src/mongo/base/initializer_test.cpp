@@ -160,8 +160,8 @@ TEST(InitializerTest, SuccessfulInitialization) {
                                set7,
                                set8);
     clearCounts();
-    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                              InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers(
+        InitializerContext::ArgumentVector(), InitializerContext::EnvironmentMap(), nullptr));
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(1, globalCounts[i]);
 }
@@ -181,7 +181,8 @@ TEST(InitializerTest, Step5Misimplemented) {
     clearCounts();
     ASSERT_EQUALS(ErrorCodes::UnknownError,
                   initializer.executeInitializers(InitializerContext::ArgumentVector(),
-                                                  InitializerContext::EnvironmentMap()));
+                                                  InitializerContext::EnvironmentMap(),
+                                                  nullptr));
     ASSERT_EQUALS(1, globalCounts[0]);
     ASSERT_EQUALS(1, globalCounts[1]);
     ASSERT_EQUALS(1, globalCounts[2]);

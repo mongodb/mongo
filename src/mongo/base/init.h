@@ -40,6 +40,7 @@
 
 #pragma once
 
+#include "mongo/base/deinitializer_context.h"
 #include "mongo/base/global_initializer.h"
 #include "mongo/base/global_initializer_registerer.h"
 #include "mongo/base/initializer.h"

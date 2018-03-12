@@ -39,8 +39,8 @@
 
 namespace mongo {
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(
-    LoadTimeZoneDB, ("GlobalLogManager", "SetGlobalEnvironment", "EndStartupOptionStorage"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(LoadTimeZoneDB,
+                                     ("GlobalLogManager", "EndStartupOptionStorage"))
 (InitializerContext* context) {
     auto serviceContext = getGlobalServiceContext();
     if (!serverGlobalParams.timeZoneInfoPath.empty()) {

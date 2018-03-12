@@ -95,8 +95,10 @@ libmongodbcapi_db* libmongodbcapi_db_new(int argc, const char** argv, const char
 *
 * @param
 *       A pointer to a db handle to be destroyed
+*
+* @return A libmongo error code
 */
-void libmongodbcapi_db_destroy(libmongodbcapi_db* db);
+int libmongodbcapi_db_destroy(libmongodbcapi_db* db);
 
 /**
 * Let the database do background work. Returns an int from the error enum

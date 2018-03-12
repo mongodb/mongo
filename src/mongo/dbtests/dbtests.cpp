@@ -50,6 +50,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
@@ -129,7 +130,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     ::mongo::setTestCommandsEnabled(true);
     ::mongo::setupSynchronousSignalHandlers();
     mongo::dbtests::initWireSpec();
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+
+    setGlobalServiceContext(createServiceContext());
+    mongo::runGlobalInitializersOrDie(argc, argv, envp, getGlobalServiceContext());
     serverGlobalParams.featureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
     repl::ReplSettings replSettings;

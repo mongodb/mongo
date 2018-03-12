@@ -33,6 +33,8 @@
 
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -44,7 +46,13 @@ using mongo::Status;
 int main(int argc, char** argv, char** envp) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
-    ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
+
+    ::mongo::ServiceContext* serviceContext = nullptr;
+    if (::mongo::hasServiceContextFactory()) {
+        ::mongo::setGlobalServiceContext(::mongo::createServiceContext());
+        serviceContext = ::mongo::getGlobalServiceContext();
+    }
+    ::mongo::runGlobalInitializersOrDie(argc, argv, envp, serviceContext);
 
     namespace moe = ::mongo::optionenvironment;
     moe::OptionsParser parser;

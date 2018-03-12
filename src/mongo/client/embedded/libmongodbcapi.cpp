@@ -82,7 +82,6 @@ namespace {
 bool libraryInitialized_ = false;
 libmongodbcapi_db* global_db = nullptr;
 thread_local int last_error = LIBMONGODB_CAPI_SUCCESS;
-bool run_setup = false;
 
 libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexcept try {
     last_error = LIBMONGODB_CAPI_SUCCESS;
@@ -93,40 +92,33 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
     }
     global_db = new libmongodbcapi_db;
 
-    if (!run_setup) {
-        // iterate over argv and copy them to argvStorage
-        for (int i = 0; i < argc; i++) {
-            // allocate space for the null terminator
-            auto s = mongo::stdx::make_unique<char[]>(std::strlen(argv[i]) + 1);
-            // copy the string + null terminator
-            std::strncpy(s.get(), argv[i], std::strlen(argv[i]) + 1);
-            global_db->argvPointers.push_back(s.get());
-            global_db->argvStorage.push_back(std::move(s));
-        }
-        global_db->argvPointers.push_back(nullptr);
+    // iterate over argv and copy them to argvStorage
+    for (int i = 0; i < argc; i++) {
+        // allocate space for the null terminator
+        auto s = mongo::stdx::make_unique<char[]>(std::strlen(argv[i]) + 1);
+        // copy the string + null terminator
+        std::strncpy(s.get(), argv[i], std::strlen(argv[i]) + 1);
+        global_db->argvPointers.push_back(s.get());
+        global_db->argvStorage.push_back(std::move(s));
+    }
+    global_db->argvPointers.push_back(nullptr);
 
-        // iterate over envp and copy them to envpStorage
-        while (envp != nullptr && *envp != nullptr) {
-            auto s = mongo::stdx::make_unique<char[]>(std::strlen(*envp) + 1);
-            std::strncpy(s.get(), *envp, std::strlen(*envp) + 1);
-            global_db->envpPointers.push_back(s.get());
-            global_db->envpStorage.push_back(std::move(s));
-            envp++;
-        }
-        global_db->envpPointers.push_back(nullptr);
+    // iterate over envp and copy them to envpStorage
+    while (envp != nullptr && *envp != nullptr) {
+        auto s = mongo::stdx::make_unique<char[]>(std::strlen(*envp) + 1);
+        std::strncpy(s.get(), *envp, std::strlen(*envp) + 1);
+        global_db->envpPointers.push_back(s.get());
+        global_db->envpStorage.push_back(std::move(s));
+        envp++;
+    }
+    global_db->envpPointers.push_back(nullptr);
 
+    global_db->serviceContext =
         embedded::initialize(argc, global_db->argvPointers.data(), global_db->envpPointers.data());
-
-        // wait until the global service context is not null
-        global_db->serviceContext = waitAndGetGlobalServiceContext();
-
-        // block until the global service context is initialized
-        global_db->serviceContext->waitForStartupComplete();
-
-        run_setup = true;
-    } else {
-        // wait until the global service context is not null
-        global_db->serviceContext = waitAndGetGlobalServiceContext();
+    if (!global_db->serviceContext) {
+        delete global_db;
+        global_db = nullptr;
+        throw std::runtime_error("Initialization failed");
     }
 
     // creating mock transport layer to be able to create sessions
@@ -138,12 +130,13 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
     return nullptr;
 }
 
-void db_destroy(libmongodbcapi_db* db) noexcept {
-    // todo, we can't teardown and re-initialize yet.
-    /*if (run_setup) {
-        embedded::shutdown();
-        run_setup = false;
-    }*/
+int db_destroy(libmongodbcapi_db* db) noexcept {
+    if (!db->open_clients.empty()) {
+        last_error = LIBMONGODB_CAPI_ERROR_UNKNOWN;
+        return last_error;
+    }
+
+    embedded::shutdown(global_db->serviceContext);
 
     delete db;
     invariant(!db || db == global_db);
@@ -151,6 +144,7 @@ void db_destroy(libmongodbcapi_db* db) noexcept {
         global_db = nullptr;
     }
     last_error = LIBMONGODB_CAPI_SUCCESS;
+    return last_error;
 }
 
 int db_pump(libmongodbcapi_db* db) noexcept try {
@@ -239,7 +233,7 @@ libmongodbcapi_db* libmongodbcapi_db_new(int argc, const char** argv, const char
     return mongo::db_new(argc, argv, envp);
 }
 
-void libmongodbcapi_db_destroy(libmongodbcapi_db* db) {
+int libmongodbcapi_db_destroy(libmongodbcapi_db* db) {
     return mongo::db_destroy(db);
 }
 

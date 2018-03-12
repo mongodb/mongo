@@ -61,6 +61,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
@@ -549,13 +550,14 @@ MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* c
     return Status::OK();
 }
 
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-    getGlobalServiceContext()->setTickSource(stdx::make_unique<SystemTickSource>());
-    getGlobalServiceContext()->setFastClockSource(stdx::make_unique<SystemClockSource>());
-    getGlobalServiceContext()->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
-    return Status::OK();
-}
+ServiceContextRegistrar serviceContextCreator([]() {
+    auto service = std::make_unique<ServiceContextNoop>();
+    service->setTickSource(std::make_unique<SystemTickSource>());
+    service->setFastClockSource(std::make_unique<SystemClockSource>());
+    service->setPreciseClockSource(std::make_unique<SystemClockSource>());
+    return service;
+});
+
 
 #ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
@@ -577,7 +579,8 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
 
     setupSignalHandlers();
 
-    Status status = runGlobalInitializers(argc, argv, envp);
+    setGlobalServiceContext(createServiceContext());
+    Status status = runGlobalInitializers(argc, argv, envp, getGlobalServiceContext());
     if (!status.isOK()) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         return EXIT_ABRUPT;

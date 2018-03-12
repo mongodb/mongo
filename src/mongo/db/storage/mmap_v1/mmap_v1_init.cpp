@@ -76,7 +76,7 @@ public:
 
 }  // namespace
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(MMAPV1EngineInit, ("SetGlobalEnvironment"))
+MONGO_INITIALIZER(MMAPV1EngineInit)
 (InitializerContext* context) {
     getGlobalServiceContext()->registerStorageEngine("mmapv1", new MMAPV1Factory());
     return Status::OK();

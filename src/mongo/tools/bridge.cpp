@@ -39,6 +39,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/command_request.h"
@@ -391,10 +392,9 @@ private:
 
 std::unique_ptr<mongo::BridgeListener> listener;
 
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-    return Status::OK();
-}
+ServiceContextRegistrar serviceContextCreator([]() {
+    return std::make_unique<ServiceContextNoop>();
+});
 
 }  // namespace
 
@@ -409,7 +409,8 @@ int bridgeMain(int argc, char** argv, char** envp) {
     });
 
     setupSignalHandlers();
-    runGlobalInitializersOrDie(argc, argv, envp);
+    setGlobalServiceContext(createServiceContext());
+    runGlobalInitializersOrDie(argc, argv, envp, getGlobalServiceContext());
     startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
 
     auto serviceContext = getGlobalServiceContext();

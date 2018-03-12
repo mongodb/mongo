@@ -139,6 +139,11 @@ public:
     };
 
     /**
+    * The destructor should only be called if we are tearing down but not exiting the process.
+    */
+    virtual ~StorageEngine() {}
+
+    /**
      * Called after the globalStorageEngine pointer has been set up, before any other methods
      * are called. Any initialization work that requires the ability to create OperationContexts
      * should be done here rather than in the constructor.
@@ -389,12 +394,6 @@ public:
      * implementation.
      */
     virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;
-
-protected:
-    /**
-     * The destructor will never be called. See cleanShutdown instead.
-     */
-    virtual ~StorageEngine() {}
 };
 
 }  // namespace mongo

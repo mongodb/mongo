@@ -21,6 +21,7 @@ env.Library(target="unittest",
 env.Library("unittest_main", ['unittest_main.cpp'],
             LIBDEPS=[
                 'unittest',
+                '$BUILD_DIR/mongo/db/service_context',
                  ])
 
 env.Library(target="integration_test_main",
@@ -47,6 +48,7 @@ bmEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_benchmark',
     ],
 )

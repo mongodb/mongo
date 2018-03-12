@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
@@ -51,19 +52,14 @@
 
 namespace mongo {
 namespace {
-auto makeMongoEmbeddedServiceContext() {
-    auto service = stdx::make_unique<ServiceContextMongoEmbedded>();
-    service->setServiceEntryPoint(stdx::make_unique<ServiceEntryPointEmbedded>(service.get()));
-    service->setTickSource(stdx::make_unique<SystemTickSource>());
-    service->setFastClockSource(stdx::make_unique<SystemClockSource>());
-    service->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
+ServiceContextRegistrar serviceContextCreator([]() {
+    auto service = std::make_unique<ServiceContextMongoEmbedded>();
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>(service.get()));
+    service->setTickSource(std::make_unique<SystemTickSource>());
+    service->setFastClockSource(std::make_unique<SystemClockSource>());
+    service->setPreciseClockSource(std::make_unique<SystemClockSource>());
     return service;
-}
-
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(makeMongoEmbeddedServiceContext());
-    return Status::OK();
-}
+});
 }  // namespace
 
 extern bool _supportsDocLocking;
@@ -76,7 +72,7 @@ StorageEngine* ServiceContextMongoEmbedded::getGlobalStorageEngine() {
     // We don't check that globalStorageEngine is not-NULL here intentionally.  We can encounter
     // an error before it's initialized and proceed to exitCleanly which is equipped to deal
     // with a NULL storage engine.
-    return _storageEngine;
+    return _storageEngine.get();
 }
 
 void ServiceContextMongoEmbedded::createLockFile() {
@@ -134,10 +130,10 @@ void ServiceContextMongoEmbedded::initializeGlobalStorageEngine() {
         if (storageGlobalParams.engineSetByUser) {
             // Verify that the name of the user-supplied storage engine matches the contents of
             // the metadata file.
-            const StorageEngine::Factory* factory =
-                mapFindWithDefault(_storageFactories,
-                                   storageGlobalParams.engine,
-                                   static_cast<const StorageEngine::Factory*>(nullptr));
+            const StorageEngine::Factory* factory = nullptr;
+            auto it = _storageFactories.find(storageGlobalParams.engine);
+            if (it != _storageFactories.end())
+                factory = it->second.get();
 
             if (factory) {
                 uassert(50667,
@@ -185,7 +181,7 @@ void ServiceContextMongoEmbedded::initializeGlobalStorageEngine() {
                           << " is only supported by the mmapv1 storage engine",
             repairpath.empty() || repairpath == dbpath || storageGlobalParams.engine == "mmapv1");
 
-    const StorageEngine::Factory* factory = _storageFactories[storageGlobalParams.engine];
+    const auto& factory = _storageFactories[storageGlobalParams.engine];
 
     uassert(50681,
             str::stream() << "Cannot start server with an unknown storage engine: "
@@ -221,7 +217,7 @@ void ServiceContextMongoEmbedded::initializeGlobalStorageEngine() {
         }
     });
 
-    _storageEngine = factory->create(storageGlobalParams, _lockFile.get());
+    _storageEngine.reset(factory->create(storageGlobalParams, _lockFile.get()));
     _storageEngine->finishInit();
 
     if (_lockFile) {
@@ -261,7 +257,7 @@ void ServiceContextMongoEmbedded::registerStorageEngine(const std::string& name,
     // and all factories should be added before we pick a storage engine.
     invariant(NULL == _storageEngine);
 
-    _storageFactories[name] = factory;
+    _storageFactories[name].reset(factory);
 }
 
 bool ServiceContextMongoEmbedded::isRegisteredStorageEngine(const std::string& name) {
@@ -282,7 +278,7 @@ bool StorageFactoriesIteratorMongoEmbedded::more() const {
 }
 
 const StorageEngine::Factory* StorageFactoriesIteratorMongoEmbedded::next() {
-    return _curr++->second;
+    return _curr++->second.get();
 }
 
 std::unique_ptr<OperationContext> ServiceContextMongoEmbedded::_newOpCtx(Client* client,
