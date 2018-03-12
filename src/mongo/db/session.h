@@ -69,6 +69,8 @@ public:
          */
         TxnResources(OperationContext* opCtx);
 
+        ~TxnResources();
+
         /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          */
@@ -216,6 +218,12 @@ public:
      * OperationContext.
      */
     void unstashTransactionResources(OperationContext* opCtx);
+
+    /**
+     * If there is transaction in progress with transaction number 'txnNumber' and _autocommit=true,
+     * aborts the transaction.
+     */
+    void abortIfSnapshotRead(OperationContext* opCtx, TxnNumber txnNumber);
 
     bool getAutocommit() const {
         return _autocommit;

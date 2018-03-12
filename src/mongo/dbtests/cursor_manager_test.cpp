@@ -303,7 +303,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
                                                     BSONObj()});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
-    ASSERT_OK(cursorManager->killCursor(_opCtx.get(), cursorId, shouldAudit));
+    ASSERT_OK(cursorManager->killCursor(_opCtx.get(), cursorId, shouldAudit).getStatus());
 
     // The original operation should have been interrupted since the cursor was pinned.
     ASSERT_EQ(pinningOpCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
@@ -339,7 +339,7 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
 
     auto killCursorOpCtx = killCursorClient->makeOperationContext();
     invariant(killCursorOpCtx);
-    ASSERT_OK(cursorManager->killCursor(killCursorOpCtx.get(), cursorId, shouldAudit));
+    ASSERT_OK(cursorManager->killCursor(killCursorOpCtx.get(), cursorId, shouldAudit).getStatus());
 
     // The original operation should have been interrupted since the cursor was pinned.
     ASSERT_EQ(pinningOpCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
@@ -359,11 +359,15 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
                                    repl::ReadConcernLevel::kLocalReadConcern,
                                    BSONObj()});
 
-    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t()));
+    std::vector<std::pair<LogicalSessionId, TxnNumber>> txnsToAbort;
+
+    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t(), &txnsToAbort));
+    ASSERT_EQ(0UL, txnsToAbort.size());
 
     clock->advance(getDefaultCursorTimeoutMillis());
-    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(0UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 
     cursorManager->registerCursor(_opCtx.get(),
                                   {makeFakePlanExecutor(),
@@ -371,8 +375,9 @@ TEST_F(CursorManagerTest, InactiveCursorShouldTimeout) {
                                    {},
                                    repl::ReadConcernLevel::kLocalReadConcern,
                                    BSONObj()});
-    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t::max()));
+    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), Date_t::max(), &txnsToAbort));
     ASSERT_EQ(0UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 }
 
 /**
@@ -391,7 +396,9 @@ TEST_F(CursorManagerTest, InactivePinnedCursorShouldNotTimeout) {
 
     // The pin is still in scope, so it should not time out.
     clock->advance(getDefaultCursorTimeoutMillis());
-    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    std::vector<std::pair<LogicalSessionId, TxnNumber>> txnsToAbort;
+    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
+    ASSERT_EQ(0UL, txnsToAbort.size());
 }
 
 /**
@@ -416,8 +423,10 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsShouldTimeout) {
     // Advance the clock to simulate time passing.
     clock->advance(getDefaultCursorTimeoutMillis());
 
-    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    std::vector<std::pair<LogicalSessionId, TxnNumber>> txnsToAbort;
+    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(0UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 }
 
 /**
@@ -442,7 +451,9 @@ TEST_F(CursorManagerTest, InactiveKilledCursorsThatAreStillPinnedShouldNotTimeou
     clock->advance(getDefaultCursorTimeoutMillis());
 
     // The pin is still in scope, so it should not time out.
-    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    std::vector<std::pair<LogicalSessionId, TxnNumber>> txnsToAbort;
+    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
+    ASSERT_EQ(0UL, txnsToAbort.size());
 }
 
 /**
@@ -477,16 +488,20 @@ TEST_F(CursorManagerTest, UsingACursorShouldUpdateTimeOfLastUse) {
     // Touch the cursor with id 'usedCursorId' to advance its time of last use.
     cursorManager->pinCursor(_opCtx.get(), usedCursorId).status_with_transitional_ignore();
 
+    std::vector<std::pair<LogicalSessionId, TxnNumber>> txnsToAbort;
+
     // We should be able to time out the unused cursor, but the one we used should stay alive.
     ASSERT_EQ(2UL, cursorManager->numCursors());
     clock->advance(getDefaultCursorTimeoutMillis() - Milliseconds(1));
-    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(1UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 
     // We should be able to time out the used cursor after one more millisecond.
     clock->advance(Milliseconds(1));
-    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(0UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 }
 
 /**
@@ -508,22 +523,27 @@ TEST_F(CursorManagerTest, CursorShouldNotTimeOutUntilIdleForLongEnoughAfterBeing
     // Advance the clock to simulate time passing.
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
 
+    std::vector<std::pair<LogicalSessionId, TxnNumber>> txnsToAbort;
+
     // Make sure the pinned cursor does not time out, before or after unpinning it.
     ASSERT_EQ(1UL, cursorManager->numCursors());
-    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(1UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 
     cursorPin.release();
 
     ASSERT_EQ(1UL, cursorManager->numCursors());
-    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(0UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(1UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 
     // Advance the clock to simulate more time passing, then assert that the now-inactive cursor
     // times out.
     clock->advance(getDefaultCursorTimeoutMillis() + Milliseconds(1));
-    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now()));
+    ASSERT_EQ(1UL, cursorManager->timeoutCursors(_opCtx.get(), clock->now(), &txnsToAbort));
     ASSERT_EQ(0UL, cursorManager->numCursors());
+    ASSERT_EQ(0UL, txnsToAbort.size());
 }
 
 /**
@@ -586,7 +606,7 @@ TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
 
     // Remove the cursor from the manager.
     pinned.release();
-    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId, false));
+    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId, false).getStatus());
 
     // There should be no more cursor entries by session id.
     LogicalSessionIdSet sessions;
@@ -622,7 +642,7 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
 
     // Remove one cursor from the manager.
     pinned.release();
-    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId1, false));
+    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId1, false).getStatus());
 
     // Should still be able to retrieve the session.
     lsids.clear();

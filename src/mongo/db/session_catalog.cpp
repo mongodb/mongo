@@ -149,7 +149,7 @@ ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx)
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-    auto sri = _getOrCreateSessionRuntimeInfo(opCtx, lsid, ul);
+    auto sri = _getOrCreateSessionRuntimeInfo(ul, opCtx, lsid);
 
     // Wait until the session is no longer checked out
     opCtx->waitForConditionOrInterrupt(
@@ -169,11 +169,33 @@ ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
 
     auto ss = [&] {
         stdx::unique_lock<stdx::mutex> ul(_mutex);
-        return ScopedSession(_getOrCreateSessionRuntimeInfo(opCtx, lsid, ul));
+        return ScopedSession(_getOrCreateSessionRuntimeInfo(ul, opCtx, lsid));
     }();
 
     // Perform the refresh outside of the mutex
     ss->refreshFromStorageIfNeeded(opCtx);
+
+    return ss;
+}
+
+boost::optional<ScopedSession> SessionCatalog::getSession(OperationContext* opCtx,
+                                                          const LogicalSessionId& lsid) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!OperationContextSession::get(opCtx));
+
+    boost::optional<ScopedSession> ss;
+    {
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
+        auto sri = _getSessionRuntimeInfo(ul, opCtx, lsid);
+        if (sri) {
+            ss = ScopedSession(sri);
+        }
+    }
+
+    // Perform the refresh outside of the mutex.
+    if (ss) {
+        (*ss)->refreshFromStorageIfNeeded(opCtx);
+    }
 
     return ss;
 }
@@ -216,12 +238,24 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
 }
 
 std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreateSessionRuntimeInfo(
-    OperationContext* opCtx, const LogicalSessionId& lsid, stdx::unique_lock<stdx::mutex>& ul) {
+    WithLock, OperationContext* opCtx, const LogicalSessionId& lsid) {
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     auto it = _txnTable.find(lsid);
     if (it == _txnTable.end()) {
         it = _txnTable.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
+    }
+
+    return it->second;
+}
+
+std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getSessionRuntimeInfo(
+    WithLock, OperationContext* opCtx, const LogicalSessionId& lsid) {
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    auto it = _txnTable.find(lsid);
+    if (it == _txnTable.end()) {
+        return nullptr;
     }
 
     return it->second;

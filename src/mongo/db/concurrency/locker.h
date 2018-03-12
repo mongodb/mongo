@@ -170,8 +170,8 @@ public:
     virtual void downgradeGlobalXtoSForMMAPV1() = 0;
 
     /**
-     * beginWriteUnitOfWork/endWriteUnitOfWork must only be called by WriteUnitOfWork. See
-     * comments there for the semantics of units of work.
+     * beginWriteUnitOfWork/endWriteUnitOfWork are called at the start and end of WriteUnitOfWorks.
+     * They can be used to implement two-phase locking.
      */
     virtual void beginWriteUnitOfWork() = 0;
     virtual void endWriteUnitOfWork() = 0;

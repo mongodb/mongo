@@ -36,6 +36,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/scopeguard.h"
 
@@ -71,10 +72,28 @@ private:
             }
         }
 
-        return CursorManager::withCursorManager(
-            opCtx, id, nss, [opCtx, id](CursorManager* manager) {
-                return manager->killCursor(opCtx, id, true /* shouldAudit */);
+        boost::optional<std::pair<LogicalSessionId, TxnNumber>> txnToAbort;
+
+        auto status = CursorManager::withCursorManager(
+            opCtx, id, nss, [opCtx, id, &txnToAbort](CursorManager* manager) {
+                auto status = manager->killCursor(opCtx, id, true /* shouldAudit */);
+                if (status.isOK()) {
+                    txnToAbort = status.getValue();
+                }
+                return status.getStatus();
             });
+
+        // If the cursor has a corresponding transaction, abort that transaction if it is a snapshot
+        // read. This must be done while we are not holding locks.
+        invariant(!opCtx->lockState()->isLocked());
+        if (txnToAbort) {
+            auto session = SessionCatalog::get(opCtx)->getSession(opCtx, txnToAbort->first);
+            if (session) {
+                (*session)->abortIfSnapshotRead(opCtx, txnToAbort->second);
+            }
+        }
+
+        return status;
     }
 } killCursorsCmd;
 

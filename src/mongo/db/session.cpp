@@ -32,6 +32,8 @@
 
 #include "mongo/db/session.h"
 
+#include <boost/utility/in_place_factory.hpp>
+
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -514,6 +516,13 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 }
 
+Session::TxnResources::~TxnResources() {
+    if (!_released) {
+        _recoveryUnit->abortUnitOfWork();
+        _locker->endWriteUnitOfWork();
+    }
+}
+
 void Session::TxnResources::release(OperationContext* opCtx) {
     // Perform operations that can fail the release before marking the TxnResources as released.
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -566,7 +575,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     }
 
     invariant(!_txnResourceStash);
-    _txnResourceStash = TxnResources(opCtx);
+    _txnResourceStash = boost::in_place(opCtx);
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx) {
@@ -605,6 +614,13 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
             _txnState == MultiDocumentTransactionState::kInProgress) {
             opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
         }
+    }
+}
+
+void Session::abortIfSnapshotRead(OperationContext* opCtx, TxnNumber txnNumber) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (_activeTxnNumber == txnNumber && _autocommit) {
+        _releaseStashedTransactionResources(lg, opCtx);
     }
 }
 
