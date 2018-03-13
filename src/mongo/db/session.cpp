@@ -556,6 +556,8 @@ void Session::TxnResources::release(OperationContext* opCtx) {
 }
 
 void Session::stashTransactionResources(OperationContext* opCtx) {
+    invariant(opCtx->getTxnNumber());
+
     // We must lock the Client to change the Locker on the OperationContext and the Session mutex to
     // access Session state. We must lock the Client before the Session mutex, since the Client
     // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
@@ -602,6 +604,8 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx) {
+    invariant(opCtx->getTxnNumber());
+
     // If the storage engine is mmapv1, it is not safe to lock both the Client and the Session
     // mutex. This is fine because mmapv1 does not support transactions.
     if (isMMAPV1()) {

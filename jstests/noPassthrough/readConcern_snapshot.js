@@ -161,22 +161,18 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
-    // TODO SERVER-33592 Move all write related commands out of this test file when writes
+    // TODO SERVER-33412 Move all write related commands out of this test file when writes
     // with snapshot read concern are only allowed in transactions.
     // readConcern 'snapshot' is supported by insert.
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
         documents: [{_id: "single-insert"}],
         readConcern: {level: "snapshot"},
+        writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber++)
     }));
     assert.eq({_id: "single-insert"}, sessionDb.coll.findOne({_id: "single-insert"}));
 
-    // Wait for the last write to be committed since they will update the same session entry.
-    // TODO SERVER-33592 remove the following write when writes with snapshot read concern
-    // are only allowed in transactions.
-    assert.commandWorked(
-        sessionDb.coll.insert({_id: "dummy-insert"}, {writeConcern: {w: "majority"}}));
     // readConcern 'snapshot' is supported by batch insert.
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
@@ -214,13 +210,9 @@
         delete: collName,
         deletes: [{q: {}, limit: 1}],
         readConcern: {level: "snapshot"},
+        writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber++)
     }));
-
-    // TODO SERVER-33591: Remove once snapshot writes use majority writeConcern.
-    // Perform majority write to ensure any previous writes are part of the majority commit
-    // snapshot.
-    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
 
     // readConcern 'snapshot' is supported by findAndModify.
     assert.commandWorked(sessionDb.runCommand({
@@ -228,14 +220,10 @@
         query: {_id: 1},
         update: {$set: {b: 1}},
         readConcern: {level: "snapshot"},
+        writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber++),
     }));
     assert.eq({_id: 1, a: 1, b: 1}, sessionDb.coll.findOne({_id: 1}));
-
-    // TODO SERVER-33591: Remove once snapshot writes use majority writeConcern.
-    // Perform majority write to ensure any previous writes are part of the majority commit
-    // snapshot.
-    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
 
     assert.commandWorked(sessionDb.runCommand({
         findAndModify: collName,

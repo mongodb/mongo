@@ -407,6 +407,35 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
     return operationTime;
 }
 
+void invokeInTransaction(OperationContext* opCtx,
+                         CommandInvocation* invocation,
+                         CommandReplyBuilder* replyBuilder) {
+    // Only get the session if it's at top nesting level.
+    const bool topLevelOnly = true;
+    auto session = OperationContextSession::get(opCtx, topLevelOnly);
+    if (!session) {
+        // Run the command directly if we're not in a transaction.
+        invocation->run(opCtx, replyBuilder);
+        return;
+    }
+
+    session->unstashTransactionResources(opCtx);
+
+    // TODO: SERVER-33217 Add an RAII so that any exception will abort the transaction.
+    invocation->run(opCtx, replyBuilder);
+
+    if (auto okField = replyBuilder->getBodyBuilder().asTempObj()["ok"]) {
+        // If ok is present, use its truthiness.
+        if (!okField.trueValue()) {
+            // TODO: SERVER-33217 Abort the transaction if the command fails.
+            return;
+        }
+    }
+
+    // Stash or commit the transaction when the command succeeds.
+    session->stashTransactionResources(opCtx);
+}
+
 bool runCommandImpl(OperationContext* opCtx,
                     CommandInvocation* invocation,
                     const OpMsgRequest& request,
@@ -428,7 +457,7 @@ bool runCommandImpl(OperationContext* opCtx,
 
     if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
-        invocation->run(opCtx, &crb);
+        invokeInTransaction(opCtx, invocation, &crb);
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
 
@@ -442,7 +471,7 @@ bool runCommandImpl(OperationContext* opCtx,
             behaviors.waitForWriteConcern(
                 opCtx, invocation->definition()->getName(), lastOpBeforeRun, crb.getBodyBuilder());
         });
-        invocation->run(opCtx, &crb);
+        invokeInTransaction(opCtx, invocation, &crb);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
@@ -699,13 +728,10 @@ void execCommandDatabase(OperationContext* opCtx,
 
         behaviors.waitForReadConcern(opCtx, invocation.get(), request);
 
-        sessionTxnState.unstashTransactionResources();
         retval = runCommandImpl(
             opCtx, invocation.get(), request, replyBuilder, startOperationTime, behaviors);
 
-        if (retval) {
-            sessionTxnState.stashTransactionResources();
-        } else {
+        if (!retval) {
             command->incrementCommandsFailed();
         }
     } catch (const DBException& e) {

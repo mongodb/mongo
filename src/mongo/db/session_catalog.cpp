@@ -343,37 +343,12 @@ OperationContextSession::~OperationContextSession() {
     }
 }
 
-void OperationContextSession::stashTransactionResources() {
-    if (!_opCtx->getTxnNumber()) {
-        return;
-    }
-
-    if (auto& checkedOutSession = operationSessionDecoration(_opCtx)) {
-        if (checkedOutSession->checkOutNestingLevel == 1) {
-            if (auto session = checkedOutSession->scopedSession.get()) {
-                session->stashTransactionResources(_opCtx);
-            }
-        }
-    }
-}
-
-void OperationContextSession::unstashTransactionResources() {
-    if (!_opCtx->getTxnNumber()) {
-        return;
-    }
-
-    if (auto& checkedOutSession = operationSessionDecoration(_opCtx)) {
-        if (checkedOutSession->checkOutNestingLevel == 1) {
-            if (auto session = checkedOutSession->scopedSession.get()) {
-                session->unstashTransactionResources(_opCtx);
-            }
-        }
-    }
-}
-
-Session* OperationContextSession::get(OperationContext* opCtx) {
+Session* OperationContextSession::get(OperationContext* opCtx, bool topLevelOnly) {
     auto& checkedOutSession = operationSessionDecoration(opCtx);
     if (checkedOutSession) {
+        if (topLevelOnly && checkedOutSession->checkOutNestingLevel != 1) {
+            return nullptr;
+        }
         return checkedOutSession->scopedSession.get();
     }
 
