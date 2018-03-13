@@ -201,6 +201,9 @@ class WriteCommand : public Command {
 public:
     explicit WriteCommand(StringData name) : Command(name) {}
 
+    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
+                                             const OpMsgRequest& request) override;
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
@@ -239,7 +242,68 @@ public:
     virtual void runImpl(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          BSONObjBuilder& result) = 0;
+
+    virtual Status explainImpl(OperationContext* opCtx,
+                               const OpMsgRequest& request,
+                               ExplainOptions::Verbosity verbosity,
+                               BSONObjBuilder* out) const {
+        return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
+    }
+
+private:
+    class Invocation;
 };
+
+class WriteCommand::Invocation : public CommandInvocation {
+public:
+    Invocation(OperationContext* opCtx, const OpMsgRequest& request, WriteCommand* writeCommand)
+        : CommandInvocation(writeCommand), _request{&request}, _writeCommand{writeCommand} {}
+
+private:
+    void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+        try {
+            BSONObjBuilder bob = result->getBodyBuilder();
+            bool ok = _writeCommand->enhancedRun(opCtx, *_request, bob);
+            CommandHelpers::appendCommandStatus(bob, ok);
+        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
+            CommandHelpers::logAuthViolation(
+                opCtx, _writeCommand, *_request, ErrorCodes::Unauthorized);
+            throw;
+        }
+    }
+
+    void explain(OperationContext* opCtx,
+                 ExplainOptions::Verbosity verbosity,
+                 BSONObjBuilder* result) override {
+        uassertStatusOK(_writeCommand->explainImpl(opCtx, *_request, verbosity, result));
+    }
+    NamespaceString ns() const override {
+        return NamespaceString(
+            _writeCommand->parseNs(_request->getDatabase().toString(), _request->body));
+    }
+    bool supportsWriteConcern() const override {
+        return _writeCommand->supportsWriteConcern(_request->body);
+    }
+    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
+        return _writeCommand->secondaryAllowed(context);
+    }
+    bool supportsReadConcern(repl::ReadConcernLevel level) const override {
+        return _writeCommand->supportsReadConcern(
+            _request->getDatabase().toString(), _request->body, level);
+    }
+
+    void doCheckAuthorization(OperationContext* opCtx) const override {
+        uassertStatusOK(_writeCommand->checkAuthForRequest(opCtx, *_request));
+    }
+
+    const OpMsgRequest* _request;
+    WriteCommand* _writeCommand;
+};
+
+std::unique_ptr<CommandInvocation> WriteCommand::parse(OperationContext* opCtx,
+                                                       const OpMsgRequest& request) {
+    return std::unique_ptr<CommandInvocation>(stdx::make_unique<Invocation>(opCtx, request, this));
+}
 
 class CmdInsert final : public WriteCommand {
 public:
@@ -302,10 +366,10 @@ public:
                        &result);
     }
 
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& opMsgRequest,
-                   ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const final {
+    Status explainImpl(OperationContext* opCtx,
+                       const OpMsgRequest& opMsgRequest,
+                       ExplainOptions::Verbosity verbosity,
+                       BSONObjBuilder* out) const final {
         const auto batch = UpdateOp::parse(opMsgRequest);
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",
@@ -367,10 +431,10 @@ public:
                        &result);
     }
 
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& opMsgRequest,
-                   ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const final {
+    Status explainImpl(OperationContext* opCtx,
+                       const OpMsgRequest& opMsgRequest,
+                       ExplainOptions::Verbosity verbosity,
+                       BSONObjBuilder* out) const final {
         const auto batch = DeleteOp::parse(opMsgRequest);
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",
