@@ -45,26 +45,24 @@ const Database::Decoration<DatabaseShardingState> DatabaseShardingState::get =
 
 DatabaseShardingState::DatabaseShardingState() = default;
 
-void DatabaseShardingState::enterCriticalSection(OperationContext* opCtx) {
+void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
-    invariant(!_critSecSignal);
-    _critSecSignal = std::make_shared<Notification<void>>();
+    _critSec.enterCriticalSectionCatchUpPhase();
     // TODO (SERVER-33313): call CursorManager::invalidateAll() on all collections in this database
     // with 'fromMovePrimary=true' and a predicate to only invalidate the cursor if the opCtx on its
     // PlanExecutor has a client dbVersion.
 }
 
+void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    _critSec.enterCriticalSectionCommitPhase();
+}
+
 void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx,
                                                 boost::optional<DatabaseVersion> newDbVersion) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
-    invariant(_critSecSignal);
-    _critSecSignal->set();
-    _critSecSignal.reset();
+    _critSec.exitCriticalSection();
     _dbVersion = newDbVersion;
-}
-
-std::shared_ptr<Notification<void>> DatabaseShardingState::getCriticalSectionSignal() const {
-    return _critSecSignal;
 }
 
 void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
@@ -88,7 +86,10 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
         return;
     }
 
-    if (_critSecSignal) {
+    auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
+                                                        ? ShardingMigrationCriticalSection::kWrite
+                                                        : ShardingMigrationCriticalSection::kRead);
+    if (criticalSectionSignal) {
         // TODO (SERVER-33773): Set movePrimary critical section signal on the
         // OperationShardingState (so that the operation can wait outside the DBLock for the
         // movePrimary critical section to end before returning to the client).

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/sharding_migration_critical_section.h"
 
 namespace mongo {
 
@@ -153,9 +154,16 @@ public:
     std::vector<ScopedCollectionMetadata> overlappingMetadata(ChunkRange const& range) const;
 
     /**
-     * Returns the active migration source manager, if one is available.
+     * Methods to control the collection's critical section. Must be called with the collection X
+     * lock held.
      */
-    MigrationSourceManager* getMigrationSourceManager();
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx);
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx);
+    void exitCriticalSection(OperationContext* opCtx);
+
+    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
+        return _critSec.getSignal(op);
+    }
 
     /**
      * Attaches a migration source manager to this collection's sharding state. Must be called with
@@ -163,6 +171,10 @@ public:
      * installed. Must be followed by a call to clearMigrationSourceManager.
      */
     void setMigrationSourceManager(OperationContext* opCtx, MigrationSourceManager* sourceMgr);
+
+    auto getMigrationSourceManager() const {
+        return _sourceMgr;
+    }
 
     /**
      * Removes a migration source manager from this collection's sharding state. Must be called with
@@ -254,6 +266,8 @@ private:
 
     // Contains all the metadata associated with this collection.
     std::shared_ptr<MetadataManager> _metadataManager;
+
+    ShardingMigrationCriticalSection _critSec;
 
     // If this collection is serving as a source shard for chunk migration, this value will be
     // non-null. To write this value there needs to be X-lock on the collection in order to

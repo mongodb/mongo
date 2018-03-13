@@ -320,7 +320,8 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
-        _critSecSignal = std::make_shared<Notification<void>>();
+        CollectionShardingState::get(opCtx, _args.getNss())
+            ->enterCriticalSectionCatchUpPhase(opCtx);
     }
 
     _state = kCriticalSection;
@@ -423,7 +424,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-        _readsShouldWaitOnCritSec = true;
+        CollectionShardingState::get(opCtx, _args.getNss())->enterCriticalSectionCommitPhase(opCtx);
     }
 
     Timer t;
@@ -692,9 +693,7 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
         css->clearMigrationSourceManager(opCtx);
 
         // Leave the critical section.
-        if (_critSecSignal) {
-            _critSecSignal->set();
-        }
+        CollectionShardingState::get(opCtx, _args.getNss())->exitCriticalSection(opCtx);
 
         return std::move(_cloneDriver);
     }();
@@ -729,19 +728,6 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     }
 
     _state = kDone;
-}
-
-std::shared_ptr<Notification<void>> MigrationSourceManager::getMigrationCriticalSectionSignal(
-    bool isForReadOnlyOperation) const {
-    if (!isForReadOnlyOperation) {
-        return _critSecSignal;
-    }
-
-    if (_readsShouldWaitOnCritSec) {
-        return _critSecSignal;
-    }
-
-    return nullptr;
 }
 
 BSONObj MigrationSourceManager::getMigrationStatusReport() const {

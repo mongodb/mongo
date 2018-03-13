@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/s/database_version_gen.h"
 
 namespace mongo {
@@ -49,25 +50,17 @@ public:
     ~DatabaseShardingState() = default;
 
     /**
-     * Assigns a new Notification to _critSecSignal and invalidates all yielded readers and writers
-     * on collections in Database that have a client dbVersion on their OperationContext.
-     *
-     * Invariants that _critSecSignal was null and that the caller holds the DBLock in X mode.
+     * Methods to control the databases's critical section. Must be called with the database X lock
+     * held.
      */
-    void enterCriticalSection(OperationContext* opCtx);
-
-    /**
-     * Signals and clears _critSecSignal, and sets _dbVersion to 'newDbVersion'.
-     *
-     * Invariants that _critSecSignal was not null and that the caller holds the DBLock in X mode.
-     */
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx);
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx);
     void exitCriticalSection(OperationContext* opCtx,
                              boost::optional<DatabaseVersion> newDbVersion);
 
-    /**
-     * Returns a shared_ptr to _critSecSignal if it's non-null, otherwise nullptr.
-     */
-    std::shared_ptr<Notification<void>> getCriticalSectionSignal() const;
+    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
+        return _critSec.getSignal(op);
+    }
 
     /**
      * Sets this shard server's cached dbVersion to newVersion.
@@ -88,9 +81,7 @@ private:
     // mode is acceptable for reading it. (Note: accessing this class at all requires holding the
     // DBLock in some mode, since it requires having a pointer to the Database).
 
-    // Is non-null if this shard server is in a movePrimary critical section for the database.
-    // Stored as shared_ptr rather than boost::optional so callers can wait on it outside a DBLock.
-    std::shared_ptr<Notification<void>> _critSecSignal;
+    ShardingMigrationCriticalSection _critSec;
 
     // This shard server's cached dbVersion. If boost::none, indicates this shard server does not
     // know the dbVersion.

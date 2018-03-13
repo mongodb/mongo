@@ -37,7 +37,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -221,9 +220,19 @@ std::vector<ScopedCollectionMetadata> CollectionShardingState::overlappingMetada
     return _metadataManager->overlappingMetadata(_metadataManager, range);
 }
 
+void CollectionShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    _critSec.enterCriticalSectionCatchUpPhase();
+}
 
-MigrationSourceManager* CollectionShardingState::getMigrationSourceManager() {
-    return _sourceMgr;
+void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    _critSec.enterCriticalSectionCommitPhase();
+}
+
+void CollectionShardingState::exitCriticalSection(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
+    _critSec.exitCriticalSection();
 }
 
 void CollectionShardingState::setMigrationSourceManager(OperationContext* opCtx,
@@ -401,18 +410,16 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
     auto metadata = getMetadata();
     *actualShardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
-    if (_sourceMgr) {
-        const bool isReader = !opCtx->lockState()->isWriteLocked();
+    auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
+                                                        ? ShardingMigrationCriticalSection::kWrite
+                                                        : ShardingMigrationCriticalSection::kRead);
+    if (criticalSectionSignal) {
+        *errmsg = str::stream() << "migration commit in progress for " << _nss.ns();
 
-        auto criticalSectionSignal = _sourceMgr->getMigrationCriticalSectionSignal(isReader);
-        if (criticalSectionSignal) {
-            *errmsg = str::stream() << "migration commit in progress for " << _nss.ns();
-
-            // Set migration critical section on operation sharding state: operation will wait for
-            // the migration to finish before returning failure and retrying.
-            oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
-            return false;
-        }
+        // Set migration critical section on operation sharding state: operation will wait for
+        // the migration to finish before returning failure and retrying.
+        oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
+        return false;
     }
 
     if (expectedShardVersion->isWriteCompatibleWith(*actualShardVersion)) {

@@ -15,6 +15,7 @@ env.Library(
         'database_sharding_state.cpp',
         'operation_sharding_state.cpp',
         'sharded_connection_info.cpp',
+        'sharding_migration_critical_section.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

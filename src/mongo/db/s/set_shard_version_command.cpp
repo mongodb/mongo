@@ -292,16 +292,13 @@ public:
                 // TODO: Refactor all of this
                 if (requestedVersion < collectionShardVersion &&
                     requestedVersion.epoch() == collectionShardVersion.epoch()) {
-                    if (css->getMigrationSourceManager()) {
-                        auto critSecSignal =
-                            css->getMigrationSourceManager()->getMigrationCriticalSectionSignal(
-                                false);
-                        if (critSecSignal) {
-                            collLock.reset();
-                            autoDb.reset();
-                            log() << "waiting till out of critical section";
-                            critSecSignal->waitFor(opCtx, Seconds(10));
-                        }
+                    auto critSecSignal =
+                        css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                    if (critSecSignal) {
+                        collLock.reset();
+                        autoDb.reset();
+                        log() << "waiting till out of critical section";
+                        critSecSignal->waitFor(opCtx, Seconds(10));
                     }
 
                     errmsg = str::stream() << "shard global version for collection is higher "
@@ -316,16 +313,13 @@ public:
                 if (!collectionShardVersion.isSet() && !authoritative) {
                     // Needed b/c when the last chunk is moved off a shard, the version gets reset
                     // to zero, which should require a reload.
-                    if (css->getMigrationSourceManager()) {
-                        auto critSecSignal =
-                            css->getMigrationSourceManager()->getMigrationCriticalSectionSignal(
-                                false);
-                        if (critSecSignal) {
-                            collLock.reset();
-                            autoDb.reset();
-                            log() << "waiting till out of critical section";
-                            critSecSignal->waitFor(opCtx, Seconds(10));
-                        }
+                    auto critSecSignal =
+                        css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                    if (critSecSignal) {
+                        collLock.reset();
+                        autoDb.reset();
+                        log() << "waiting till out of critical section";
+                        critSecSignal->waitFor(opCtx, Seconds(10));
                     }
 
                     // need authoritative for first look
