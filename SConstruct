@@ -360,6 +360,15 @@ add_option('use-system-intel_decimal128',
     nargs=0,
 )
 
+add_option('use-system-mongo-c',
+    choices=['on', 'off', 'auto'],
+    const='on',
+    default="auto",
+    help="use system version of the mongo-c-driver (auto will use it if it's found)",
+    nargs='?',
+    type='choice',
+)
+
 add_option('use-system-all',
     help='use all system libraries',
     nargs=0,
@@ -3209,12 +3218,16 @@ def doConfigure(myenv):
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
             break
  
-    conf.env['MONGO_HAVE_LIBMONGOC'] = conf.CheckLibWithHeader(
-            ["mongoc-1.0"],
-            ["mongoc.h"],
-            "C",
-            "mongoc_get_major_version();",
-            autoadd=False )
+    mongoc_mode = get_option('use-system-mongo-c')
+    if mongoc_mode != 'off':
+        conf.env['MONGO_HAVE_LIBMONGOC'] = conf.CheckLibWithHeader(
+                ["mongoc-1.0"],
+                ["mongoc.h"],
+                "C",
+                "mongoc_get_major_version();",
+                autoadd=False )
+        if not conf.env['MONGO_HAVE_LIBMONGOC'] and mongoc_mode == 'on':
+            myenv.ConfError("Failed to find the required C driver headers")
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
