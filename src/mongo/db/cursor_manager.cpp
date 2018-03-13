@@ -637,14 +637,19 @@ void CursorManager::unpin(OperationContext* opCtx, ClientCursor* cursor) {
     auto interruptStatus = cursor->_operationUsingCursor->checkForInterruptNoAssert();
     cursor->_operationUsingCursor = nullptr;
     cursor->_lastUseDate = now;
-    if (!interruptStatus.isOK()) {
-        // If an interrupt occurred after the batch was completed, we remove the now-unpinned cursor
-        // from the CursorManager, then dispose of and delete it.
+
+    // If someone was trying to kill this cursor with a killOp or a killCursors, they are likely
+    // interesting in proactively cleaning up that cursor's resources. In these cases, we
+    // proactively delete the cursor. In other cases we preserve the error code so that the client
+    // will see the reason the cursor was killed when asking for the next batch.
+    if (interruptStatus == ErrorCodes::Interrupted || interruptStatus == ErrorCodes::CursorKilled) {
         LOG(0) << "removing cursor " << cursor->cursorid()
                << " after completing batch: " << interruptStatus;
         partition->erase(cursor->cursorid());
         cursor->dispose(opCtx);
         delete cursor;
+    } else if (!interruptStatus.isOK()) {
+        cursor->markAsKilled(interruptStatus);
     }
 }
 
