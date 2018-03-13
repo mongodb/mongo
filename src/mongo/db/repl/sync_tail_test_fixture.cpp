@@ -33,7 +33,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -43,6 +43,46 @@
 
 namespace mongo {
 namespace repl {
+
+void SyncTailOpObserver::onInserts(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   OptionalCollectionUUID uuid,
+                                   std::vector<InsertStatement>::const_iterator begin,
+                                   std::vector<InsertStatement>::const_iterator end,
+                                   bool fromMigrate) {
+    if (!onInsertsFn) {
+        return;
+    }
+    std::vector<BSONObj> docs;
+    for (auto it = begin; it != end; ++it) {
+        const InsertStatement& insertStatement = *it;
+        docs.push_back(insertStatement.doc.getOwned());
+    }
+    onInsertsFn(opCtx, nss, docs);
+}
+
+void SyncTailOpObserver::onDelete(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  OptionalCollectionUUID uuid,
+                                  StmtId stmtId,
+                                  bool fromMigrate,
+                                  const boost::optional<BSONObj>& deletedDoc) {
+    if (!onDeleteFn) {
+        return;
+    }
+    onDeleteFn(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+}
+
+void SyncTailOpObserver::onCreateCollection(OperationContext* opCtx,
+                                            Collection* coll,
+                                            const NamespaceString& collectionName,
+                                            const CollectionOptions& options,
+                                            const BSONObj& idIndex) {
+    if (!onCreateCollectionFn) {
+        return;
+    }
+    onCreateCollectionFn(opCtx, coll, collectionName, options, idIndex);
+}
 
 void SyncTailTest::setUp() {
     ServiceContextMongoDTest::setUp();
@@ -72,7 +112,6 @@ void SyncTailTest::setUp() {
         service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
     repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
-    service->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
     _replicationProcess =
         new ReplicationProcess(_storageInterface,
@@ -81,6 +120,11 @@ void SyncTailTest::setUp() {
     ReplicationProcess::set(cc().getServiceContext(),
                             std::unique_ptr<ReplicationProcess>(_replicationProcess));
 
+    // Set up an OpObserver to track the documents SyncTail inserts.
+    auto opObserver = std::make_unique<SyncTailOpObserver>();
+    _opObserver = opObserver.get();
+    auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    opObserverRegistry->addObserver(std::move(opObserver));
 
     _opsApplied = 0;
     _applyOp = [](OperationContext* opCtx,
