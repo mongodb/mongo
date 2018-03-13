@@ -135,7 +135,7 @@ function runTest(s) {
         db.foo.mapReduce(map, reduce, {out: {replace: "big_out", nonAtomic: true}});
     });
 
-    jsTest.log();
+    jsTest.log("Adding documents");
 
     // Add docs with dup "i"
     valInc = 0;
