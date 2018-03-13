@@ -482,4 +482,20 @@ StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, Stri
     return dbStatus.getStatus().withContext(str::stream() << "Database " << dbName << " not found");
 }
 
+BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
+    BSONObjBuilder cmdAtClusterTimeBob;
+    for (auto el : cmdObj) {
+        if (el.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
+            BSONObjBuilder readConcernBob =
+                cmdAtClusterTimeBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
+            readConcernBob.appendElements(el.Obj());
+            readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
+                                  atClusterTime.asTimestamp());
+        } else {
+            cmdAtClusterTimeBob.append(el);
+        }
+    }
+    return cmdAtClusterTimeBob.obj();
+}
+
 }  // namespace mongo

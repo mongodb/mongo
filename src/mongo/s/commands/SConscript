@@ -103,11 +103,24 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_legacy_api',
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_op_conversion',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'shared_cluster_commands',
+    ]
+)
+
+env.CppUnitTest(
+    target='cluster_commands_helpers_test',
+    source=[
+        'cluster_commands_helpers_test.cpp',
+    ],
+    LIBDEPS=[
+        'shared_cluster_commands',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/unittest/unittest',
     ]
 )

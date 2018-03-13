@@ -59,6 +59,11 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
 BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
 
 /**
+ * Returns a copy of 'cmdObj' with atClusterTime appended to a readConcern.
+ */
+BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime);
+
+/**
  * Utility for dispatching unversioned commands to all shards in a cluster.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
