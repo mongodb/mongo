@@ -212,13 +212,7 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
-    repl::ReadConcernArgs readConcernArgs;
-    auto readConcernParseStatus = readConcernArgs.initialize(request.body);
-    if (!readConcernParseStatus.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, readConcernParseStatus);
-        return;
-    }
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
         // TODO SERVER-33708.
@@ -306,6 +300,13 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
     }
 
     initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
+
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    auto readConcernParseStatus = readConcernArgs.initialize(request.body);
+    if (!readConcernParseStatus.isOK()) {
+        CommandHelpers::appendCommandStatus(builder, readConcernParseStatus);
+        return;
+    }
 
     CommandReplyBuilder crb(std::move(builder));
 
