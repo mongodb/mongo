@@ -36,7 +36,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     st.rs1.getPrimary().getDB('test').foo.insert({x: 0});
 
     st.rs0.restart(0);
-    st.rs1.restart(1);
+    st.rs1.restart(0);
 
     var fooCount;
     for (var retries = 0; retries <= 2; retries++) {

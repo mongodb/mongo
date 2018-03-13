@@ -1151,7 +1151,7 @@ var ShardingTest = function(params) {
             if (otherParams.rs || otherParams["rs" + i]) {
                 var numReplicas = rsDefaults.nodes || 3;
             } else if (startShardsAsRS) {
-                var numReplicas = 2;
+                var numReplicas = 1;
             }
             delete rsDefaults.nodes;
 
