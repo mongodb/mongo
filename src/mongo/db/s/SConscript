@@ -38,6 +38,7 @@ env.Library(
         'migration_destination_manager.cpp',
         'migration_source_manager.cpp',
         'migration_util.cpp',
+        'move_primary_source_manager.cpp',
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
         'read_only_catalog_cache_loader.cpp',

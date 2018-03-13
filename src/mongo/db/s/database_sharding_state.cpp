@@ -106,4 +106,24 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
             *clientDbVersion == *_dbVersion);
 }
 
+MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager() {
+    return _sourceMgr;
+}
+
+void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
+                                                        MovePrimarySourceManager* sourceMgr) {
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    invariant(sourceMgr);
+    invariant(!_sourceMgr);
+
+    _sourceMgr = sourceMgr;
+}
+
+void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    invariant(_sourceMgr);
+
+    _sourceMgr = nullptr;
+}
+
 }  // namespace mongo
