@@ -64,6 +64,12 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
 BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime);
 
 /**
+ * Returns a copy of the given readConcern object with atClusterTime appended. The given object must
+ * not already have an atClusterTime field.
+ */
+BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atClusterTime);
+
+/**
  * Utility for dispatching unversioned commands to all shards in a cluster.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
@@ -183,9 +189,32 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName);
 
 /**
- *  Computes the cluster snapshot time for provided shards. Returns uninitialized LogicalTime if
- *  the set is empty or every shard's lastCommittedOpTime is not initialized.
+ * Computes the cluster snapshot time for provided shards. Returns uninitialized LogicalTime if
+ * the set is empty or every shard's lastCommittedOpTime is not initialized.
  */
-LogicalTime computeAtClusterTime(OperationContext* opCtx, std::set<ShardId> shardIds);
+LogicalTime computeAtClusterTimeForShards(OperationContext* opCtx,
+                                          const std::set<ShardId>& shardIds);
+
+/**
+ * Returns the shards that would be targeted for the given query according to the given routing
+ * info.
+ */
+std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
+                                            const CachedCollectionRoutingInfo& routingInfo,
+                                            const BSONObj& query,
+                                            const BSONObj& collation);
+
+/**
+ * Returns the atClusterTime to use for the given query. This will be the latest known
+ * lastCommittedOpTime for the targeted shards if the same set of shards would be targeted at that
+ * time, otherwise the latest in-memory cluster time.
+ *
+ * A null logical time is returned if the readConcern on the OperationContext is not snapshot.
+ */
+boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
+                                                  const CachedCollectionRoutingInfo& routingInfo,
+                                                  const std::set<ShardId>& shardIds,
+                                                  const BSONObj& query,
+                                                  const BSONObj& collation);
 
 }  // namespace mongo

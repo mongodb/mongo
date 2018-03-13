@@ -28,8 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/shard_id.h"
@@ -71,7 +75,7 @@ TEST_F(AtClusterTimeTest, ComputeValidValid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(operationContext(), {shardOneId, shardTwoId});
+    auto maxTime = computeAtClusterTimeForShards(operationContext(), {shardOneId, shardTwoId});
     ASSERT_EQ(maxTime, timeTwo);
 }
 
@@ -84,7 +88,7 @@ TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(operationContext(), {shardOneId, shardTwoId});
+    auto maxTime = computeAtClusterTimeForShards(operationContext(), {shardOneId, shardTwoId});
     ASSERT_EQ(maxTime, timeTwo);
 }
 
@@ -95,8 +99,79 @@ TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
     auto shardTwo = shardRegistry()->getShardNoReload(shardTwoId);
     ASSERT_EQ(LogicalTime(), shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(operationContext(), {shardOneId, shardTwoId});
+    auto maxTime = computeAtClusterTimeForShards(operationContext(), {shardOneId, shardTwoId});
     ASSERT_EQ(maxTime, LogicalTime());
+}
+
+const NamespaceString kNss = NamespaceString("test", "coll");
+
+class AtClusterTimeTargetingTest : public CatalogCacheTestFixture {
+protected:
+    void setUp() {
+        CatalogCacheTestFixture::setUp();
+        CatalogCacheTestFixture::setupNShards(2);
+
+        // Set up a logical clock with an initial time.
+        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
+        LogicalTime initialTime(Timestamp(10, 1));
+        logicalClock->setClusterTimeFromTrustedSource(initialTime);
+        LogicalClock::set(serviceContext(), std::move(logicalClock));
+    }
+};
+
+// Verifies that the latest in-memory logical time is always returned.
+//
+// TODO SERVER-33767: Once the multi-versioned routing table is integrated into global snapshot
+// reads, replace this test with one that verifies the latest known committed optime for the
+// targeted shards is returned, unless different shards would be targeted at that time, in which
+// case the latest in-memory logical time is returned.
+TEST_F(AtClusterTimeTargetingTest, AlwaysReturnsLatestInMemoryTime) {
+    auto routingInfo = loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+    auto query = BSON("find" << kNss.coll());
+    auto collation = BSONObj();
+    auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
+
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    LogicalTime time(Timestamp(5, 1));
+    shardRegistry()->getShardNoReload(ShardId("0"))->updateLastCommittedOpTime(time);
+
+    // The latest lastCommittedOpTime for a targeted shard should be ignored, with the latest
+    // in-memory logical time returned instead.
+    ASSERT_NE(time,
+              *computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+    ASSERT_EQ(LogicalClock::get(operationContext())->getClusterTime(),
+              *computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+}
+
+// Verifies that a null logical time is returned for all requests without snapshot readConcern.
+TEST_F(AtClusterTimeTargetingTest, NonSnapshotReadConcern) {
+    auto routingInfo = loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+    auto query = BSON("find" << kNss.coll());
+    auto collation = BSONObj();
+    auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
+
+    // Uninitialized read concern.
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+
+    auto& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
+
+    // Local readConcern.
+    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+
+    // Majority readConcern.
+    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+
+    // Linearizable readConcern.
+    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLinearizableReadConcern);
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+
+    // Available readConcern.
+    readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern);
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 }
 
 }  // namespace

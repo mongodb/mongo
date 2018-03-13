@@ -31,13 +31,13 @@
 #include <vector>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 class BSONObj;
-class CachedCollectionRoutingInfo;
 class ChunkManager;
 class CollatorInterface;
 class ShardKeyPattern;
@@ -79,7 +79,7 @@ protected:
      * Triggers a refresh for the given namespace and mocks network calls to simulate loading
      * metadata with two chunks: [minKey, 0) and [0, maxKey) on two shards with ids: "0" and "1".
      */
-    void loadRoutingTableWithTwoChunksAndTwoShards(NamespaceString nss);
+    CachedCollectionRoutingInfo loadRoutingTableWithTwoChunksAndTwoShards(NamespaceString nss);
 
     /**
      * Mocks network responses for loading a sharded database and collection from the config server.

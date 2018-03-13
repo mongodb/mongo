@@ -60,7 +60,6 @@ class ClusterFindCmd : public BasicCommand {
 public:
     ClusterFindCmd() : BasicCommand("find") {}
 
-
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -75,6 +74,12 @@ public:
 
     bool adminOnly() const final {
         return false;
+    }
+
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const final {
+        return true;
     }
 
     bool shouldAffectCommandCounter() const final {

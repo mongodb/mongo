@@ -33,6 +33,7 @@
 #include "mongo/s/commands/cluster_commands_helpers.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -529,7 +530,18 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
     return cmdAtClusterTimeBob.obj();
 }
 
-LogicalTime computeAtClusterTime(OperationContext* opCtx, std::set<ShardId> shardIds) {
+BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atClusterTime) {
+    invariant(readConcernObj[repl::ReadConcernArgs::kAtClusterTimeFieldName].eoo());
+
+    BSONObjBuilder readConcernBob;
+    readConcernBob.appendElements(readConcernObj);
+    readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
+                          atClusterTime.asTimestamp());
+    return readConcernBob.obj();
+}
+
+LogicalTime computeAtClusterTimeForShards(OperationContext* opCtx,
+                                          const std::set<ShardId>& shardIds) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     invariant(shardRegistry);
     LogicalTime highestTime;
@@ -541,6 +553,36 @@ LogicalTime computeAtClusterTime(OperationContext* opCtx, std::set<ShardId> shar
         }
     }
     return highestTime;
+}
+
+std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
+                                            const CachedCollectionRoutingInfo& routingInfo,
+                                            const BSONObj& query,
+                                            const BSONObj& collation) {
+    if (routingInfo.cm()) {
+        // The collection is sharded. Use the routing table to decide which shards to target
+        // based on the query and collation.
+        std::set<ShardId> shardIds;
+        routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
+        return shardIds;
+    }
+
+    // The collection is unsharded. Target only the primary shard for the database.
+    return {routingInfo.primaryId()};
+}
+
+boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
+                                                  const CachedCollectionRoutingInfo& routingInfo,
+                                                  const std::set<ShardId>& shardIds,
+                                                  const BSONObj& query,
+                                                  const BSONObj& collation) {
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
+        repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return boost::none;
+    }
+
+    // TODO SERVER-33767: Integrate multi-versioned routing table into atClusterTime selection.
+    return LogicalClock::get(opCtx)->getClusterTime();
 }
 
 }  // namespace mongo

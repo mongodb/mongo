@@ -187,16 +187,7 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
         return {shardIds.begin(), shardIds.end()};
     }
 
-    if (routingInfo.cm()) {
-        // The collection is sharded. Use the routing table to decide which shards to target
-        // based on the query and collation.
-        std::set<ShardId> shardIds;
-        routingInfo.cm()->getShardIdsForQuery(opCtx, shardQuery, collation, &shardIds);
-        return shardIds;
-    }
-
-    // The collection is unsharded. Target only the primary shard for the database.
-    return {routingInfo.primaryId()};
+    return getTargetedShardsForQuery(opCtx, routingInfo, shardQuery, collation);
 }
 
 BSONObj createCommandForTargetedShards(

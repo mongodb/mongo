@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -45,11 +46,27 @@ const NamespaceString kNss = NamespaceString("test", "coll");
 const auto kFindCmdScatterGather = BSON("find" << kNss.coll());
 const auto kFindCmdTargeted = BSON("find" << kNss.coll() << "filter" << BSON("_id" << 0));
 
+using InspectionCallback = stdx::function<void(const executor::RemoteCommandRequest& request)>;
+
+BSONObj appendSnapshotReadConcern(BSONObj cmdObj) {
+    BSONObjBuilder bob(cmdObj);
+    BSONObjBuilder readConcernBob = bob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
+    readConcernBob.append("level", "snapshot");
+    readConcernBob.doneFast();
+    return bob.obj();
+}
+
 class ClusterFindTest : public CatalogCacheTestFixture {
 protected:
     void setUp() {
         CatalogCacheTestFixture::setUp();
         CatalogCacheTestFixture::setupNShards(numShards);
+
+        // Set up a logical clock with an initial time.
+        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
+        LogicalTime initialTime(Timestamp(10, 1));
+        logicalClock->setClusterTimeFromTrustedSource(initialTime);
+        LogicalClock::set(serviceContext(), std::move(logicalClock));
     }
 
     // The index of the shard expected to receive the response is used to prevent different shards
@@ -58,6 +75,18 @@ protected:
     void expectFindReturnsSuccess(int shardIndex) {
         onCommandForPoolExecutor([shardIndex](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+
+            std::vector<BSONObj> batch = {BSON("_id" << shardIndex)};
+            CursorResponse cursorResponse(kNss, CursorId(0), batch);
+            return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    }
+
+    void expectFindInspectRequest(int shardIndex, InspectionCallback cb) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+
+            cb(request);
 
             std::vector<BSONObj> batch = {BSON("_id" << shardIndex)};
             CursorResponse cursorResponse(kNss, CursorId(0), batch);
@@ -145,6 +174,17 @@ protected:
 
         future.timed_get(kFutureTimeout);
     }
+
+    void runFindCommandInspectRequests(BSONObj cmd, InspectionCallback cb, bool isTargeted) {
+        auto future = launchAsync([&] { runFindCommand(cmd); });
+
+        size_t numMocks = isTargeted ? 1 : numShards;
+        for (size_t i = 0; i < numMocks; i++) {
+            expectFindInspectRequest(i % numShards, cb);
+        }
+
+        future.timed_get(kFutureTimeout);
+    }
 };
 
 TEST_F(ClusterFindTest, NoErrors) {
@@ -182,6 +222,27 @@ TEST_F(ClusterFindTest, MaxRetriesSnapshotErrors) {
     // Target all shards
     runFindCommandMaxErrors(kFindCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
     runFindCommandMaxErrors(kFindCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
+}
+
+TEST_F(ClusterFindTest, AttachesAtClusterTimeForSnapshotReadConcern) {
+    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(1);
+
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    auto containsAtClusterTime = [](const executor::RemoteCommandRequest& request) {
+        ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
+    };
+
+    // Target one shard.
+    runFindCommandInspectRequests(
+        appendSnapshotReadConcern(kFindCmdTargeted), containsAtClusterTime, true);
+
+    // Target all shards.
+    runFindCommandInspectRequests(
+        appendSnapshotReadConcern(kFindCmdScatterGather), containsAtClusterTime, false);
 }
 
 }  // namespace

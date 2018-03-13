@@ -180,7 +180,8 @@ void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
     }());
 }
 
-void CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(NamespaceString nss) {
+CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
+    NamespaceString nss) {
     const OID epoch = OID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
@@ -204,7 +205,7 @@ void CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(Namespac
         return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
     }());
 
-    future.timed_get(kFutureTimeout);
+    return future.timed_get(kFutureTimeout).get();
 }
 
 }  // namespace mongo

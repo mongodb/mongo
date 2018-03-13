@@ -59,5 +59,19 @@ TEST(ClusterCommands, AddAtClusterTimeNormal) {
     ASSERT_BSONOBJ_EQ(expectedCommand, newCommand);
 }
 
+// Add atClusterTime to a standalone readConcern object with level snapshot.
+TEST(ClusterCommands, AddAtClusterTimeToReadConcern) {
+    BSONObj readConcern = BSON("level"
+                               << "snapshot");
+    BSONObj expectedReadConcern = BSON("level"
+                                       << "snapshot"
+                                       << "atClusterTime"
+                                       << Timestamp(1, 0));
+
+    BSONObj newReadConcern =
+        appendAtClusterTimeToReadConcern(readConcern, LogicalTime(Timestamp(1, 0)));
+    ASSERT_BSONOBJ_EQ(expectedReadConcern, newReadConcern);
+}
+
 }  // namespace
 }  // namespace mongo
