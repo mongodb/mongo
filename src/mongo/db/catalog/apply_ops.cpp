@@ -76,7 +76,7 @@ bool _areOpsCrudOnly(const BSONObj& applyOpCmd) {
         BSONElement& fieldOp = fields[1];
 
         const char* opType = fieldOp.valuestrsafe();
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
 
         // All atomic ops have an opType of length 1.
         if (opType[0] == '\0' || opType[1] != '\0')
@@ -176,7 +176,7 @@ Status _applyOps(OperationContext* opCtx,
                         opObj.getFields(2, names, fields);
                         BSONElement& fieldO = fields[0];
                         BSONElement& fieldNs = fields[1];
-                        const StringData ns = fieldNs.valueStringData();
+                        const StringData ns = fieldNs.valuestrsafe();
                         NamespaceString requestNss{ns};
 
                         if (nss.isSystemDotIndexes()) {
