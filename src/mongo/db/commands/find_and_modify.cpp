@@ -452,6 +452,7 @@ public:
 
                     // If someone else beat us to creating the collection, do nothing
                     if (!collection) {
+                        uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
                         WriteUnitOfWork wuow(opCtx);
                         uassertStatusOK(
                             userCreateNS(opCtx, autoDb->getDb(), nsString.ns(), BSONObj()));

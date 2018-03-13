@@ -193,6 +193,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
         assertCanWrite_inlock(opCtx, ns);
         if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
+            uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
             WriteUnitOfWork wuow(opCtx);
             uassertStatusOK(userCreateNS(opCtx, db.getDb(), ns.ns(), BSONObj()));
             wuow.commit();
