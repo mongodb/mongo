@@ -92,7 +92,6 @@ env.Library(
         'logger/log_severity.cpp',
         'logger/logger.cpp',
         'logger/logstream_builder.cpp',
-        'logger/max_log_size.cpp',
         'logger/message_event_utf8_encoder.cpp',
         'logger/message_log_domain.cpp',
         'logger/ramlog.cpp',

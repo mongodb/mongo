@@ -31,21 +31,45 @@
 
 #include <iostream>
 
-#include "mongo/logger/max_log_size.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 namespace logger {
 
-static MessageEventDetailsEncoder::DateFormatter _dateFormatter = outputDateAsISOStringLocal;
+const int LogContext::kDefaultMaxLogSizeKB;
 
-void MessageEventDetailsEncoder::setDateFormatter(DateFormatter dateFormatter) {
-    _dateFormatter = dateFormatter;
+LogContext::LogContext()
+    : _dateFormatter{outputDateAsISOStringLocal}, _maxLogSizeSource{nullptr} {};
+
+LogContext& MessageEventDetailsEncoder::getGlobalLogContext() {
+    static LogContext context;
+    return context;
 }
 
-MessageEventDetailsEncoder::DateFormatter MessageEventDetailsEncoder::getDateFormatter() {
-    return _dateFormatter;
+void MessageEventDetailsEncoder::setMaxLogSizeKBSource(const AtomicWord<int>& source) {
+    invariant(getGlobalLogContext()._maxLogSizeSource == nullptr);
+    getGlobalLogContext()._maxLogSizeSource = &source;
+}
+
+int MessageEventDetailsEncoder::getMaxLogSizeKB() {
+    auto* source = getGlobalLogContext()._maxLogSizeSource;
+
+    // If not initialized, use the default
+    if (source == nullptr)
+        return LogContext::kDefaultMaxLogSizeKB;
+
+    // If initialized, use the reference
+    // TODO: This seems like a CST seq'd load we don't need. `loadRelaxed()`?
+    return source->load();
+}
+
+void MessageEventDetailsEncoder::setDateFormatter(DateFormatter dateFormatter) {
+    getGlobalLogContext()._dateFormatter = dateFormatter;
+}
+
+DateFormatter MessageEventDetailsEncoder::getDateFormatter() {
+    return getGlobalLogContext()._dateFormatter;
 }
 
 namespace {
@@ -59,9 +83,11 @@ constexpr auto kEOL = "\n"_sd;
 MessageEventDetailsEncoder::~MessageEventDetailsEncoder() {}
 std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& event,
                                                  std::ostream& os) {
-    const size_t maxLogSize = MaxLogSizeKB::get() * 1024;
+    const auto maxLogSizeKB = getMaxLogSizeKB();
 
-    _dateFormatter(os, event.getDate());
+    const size_t maxLogSize = maxLogSizeKB * 1024;
+
+    getDateFormatter()(os, event.getDate());
     os << ' ';
 
     os << event.getSeverity().toChar();
@@ -99,7 +125,7 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
 
     if (event.isTruncatable() && msg.size() > maxLogSize) {
         os << "warning: log line attempted (" << msg.size() / 1024 << "kB) over max size ("
-           << MaxLogSizeKB::get() << "kB), printing beginning and end ... ";
+           << maxLogSizeKB << "kB), printing beginning and end ... ";
         os << msg.substr(0, maxLogSize / 3);
         os << " .......... ";
         os << msg.substr(msg.size() - (maxLogSize / 3));

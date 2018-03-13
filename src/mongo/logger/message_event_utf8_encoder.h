@@ -36,13 +36,26 @@
 namespace mongo {
 namespace logger {
 
+typedef void (*DateFormatter)(std::ostream&, Date_t);
+
+/**
+ * This is the logging context for the MessageEventDetailsEncoder below.  It actively controls how
+ * the output is encoded. As of now, there can be only one.
+ */
+struct LogContext {
+    static constexpr int kDefaultMaxLogSizeKB = 10;
+
+    LogContext();
+
+    DateFormatter _dateFormatter;
+    const AtomicWord<int>* _maxLogSizeSource;
+};
+
 /**
  * Encoder that writes log messages of the style that MongoDB writes to console and files.
  */
 class MessageEventDetailsEncoder : public Encoder<MessageEventEphemeral> {
 public:
-    typedef void (*DateFormatter)(std::ostream&, Date_t);
-
     /**
      * Sets the date formatter function for all instances of MessageEventDetailsEncoder.
      *
@@ -58,8 +71,30 @@ public:
      */
     static DateFormatter getDateFormatter();
 
+    /**
+     * Sets a static wrapper to track an atomic variable reference
+     *
+     * Only safe to call once during single-threaded execution, as in during start-up
+     * initialization.
+     */
+    static void setMaxLogSizeKBSource(const AtomicWord<int>& source);
+
+    /**
+     * Loads a max log size from the reference set above. If no reference has been set, it returns
+     * the default. Note that this has to be an atomic operation, cache values when possible.
+     *
+     * Always safe to call.
+     */
+    static int getMaxLogSizeKB();
+
     virtual ~MessageEventDetailsEncoder();
     virtual std::ostream& encode(const MessageEventEphemeral& event, std::ostream& os);
+
+private:
+    /**
+     * Grab the singleton LogContext
+     */
+    static LogContext& getGlobalLogContext();
 };
 
 /**

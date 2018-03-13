@@ -212,6 +212,7 @@ void forkServerOrDie() {
         quickExit(EXIT_FAILURE);
 }
 
+MONGO_EXPORT_SERVER_PARAMETER(maxLogSizeKB, int, logger::LogContext::kDefaultMaxLogSizeKB);
 MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                           ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
                           ("default"))
@@ -223,6 +224,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
     using logger::MessageLogDomain;
     using logger::RotatableFileAppender;
     using logger::StatusWithRotatableFileWriter;
+
+    // Hook up this global into our logging encoder
+    MessageEventDetailsEncoder::setMaxLogSizeKBSource(maxLogSizeKB);
 
     if (serverGlobalParams.logWithSyslog) {
 #ifdef _WIN32
