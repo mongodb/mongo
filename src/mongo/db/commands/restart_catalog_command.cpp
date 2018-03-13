@@ -34,6 +34,8 @@
 #include <vector>
 
 #include "mongo/db/catalog/catalog_control.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/util/log.h"
@@ -85,6 +87,22 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         Lock::GlobalLock global(opCtx, MODE_X, Date_t::max());
+
+        // This command will fail without modifying the catalog if there are any databases that are
+        // marked drop-pending. (Otherwise, the Database object will be reconstructed when
+        // re-opening the catalog, but with the drop pending flag cleared.)
+        std::vector<std::string> allDbs;
+        getGlobalServiceContext()->getGlobalStorageEngine()->listDatabases(&allDbs);
+        for (auto&& dbName : allDbs) {
+            const auto db = dbHolder().get(opCtx, dbName);
+            if (db->isDropPending(opCtx)) {
+                return CommandHelpers::appendCommandStatus(
+                    result,
+                    {ErrorCodes::DatabaseDropPending,
+                     str::stream() << "cannot restart the catalog because database " << dbName
+                                   << " is pending removal"});
+            }
+        }
 
         log() << "Closing database catalog";
         catalog::closeCatalog(opCtx);
