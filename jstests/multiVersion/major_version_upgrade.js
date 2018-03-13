@@ -31,7 +31,6 @@
     // TODO SERVER-26792: In the future, we should have a common place from which both the
     // multiversion setup procedure and this test get information about supported major releases.
     const versions = [
-        {binVersion: '3.0', testCollection: 'three_zero'},
         {binVersion: '3.2', testCollection: 'three_two'},
         {binVersion: '3.4', featureCompatibilityVersion: '3.4', testCollection: 'three_four'},
         {binVersion: '3.6', featureCompatibilityVersion: '3.6', testCollection: 'three_six'},

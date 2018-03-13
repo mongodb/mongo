@@ -38,18 +38,6 @@
         ErrorCodes.IllegalOperation);
     MongoRunner.stopMongod(conn);
 
-    // readConcern 'snapshot' is not allowed with protocol version 0.
-    rst = new ReplSetTest({nodes: 1, protocolVersion: 0});
-    rst.startSet();
-    rst.initiate();
-    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(0)}),
-        ErrorCodes.IncompatibleElectionProtocol);
-    rst.stopSet();
-
     // readConcern 'snapshot' is allowed on a replica set primary.
     rst = new ReplSetTest({nodes: 2});
     rst.startSet();

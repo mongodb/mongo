@@ -1409,6 +1409,71 @@ TEST_F(ReplCoordTest, NodeReturnsBadValueWhenUpdateTermIsRunAgainstANonReplNode)
     ASSERT_EQUALS(ErrorCodes::BadValue, getReplCoord()->updateTerm(opCtx.get(), 0).code());
 }
 
+TEST_F(ReplCoordTest, ElectionIdTracksTermInPV1) {
+    init("mySet/test1:1234,test2:1234,test3:1234");
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test3:1234"))
+                            << "protocolVersion"
+                            << 1),
+                       HostAndPort("test1", 1234));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 1), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 1), 0));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    // No election has taken place yet.
+    {
+        auto term = getTopoCoord().getTerm();
+        auto electionId = getTopoCoord().getElectionId();
+
+        ASSERT_EQUALS(0, term);
+        ASSERT_FALSE(electionId.isSet());
+    }
+
+    simulateSuccessfulV1Election();
+
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    // Check that the electionId is set properly after the election.
+    {
+        auto term = getTopoCoord().getTerm();
+        auto electionId = getTopoCoord().getElectionId();
+
+        ASSERT_EQUALS(1, term);
+        ASSERT_EQUALS(OID::fromTerm(term), electionId);
+    }
+
+    const auto opCtx = makeOperationContext();
+    auto status = getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000));
+
+    ASSERT_OK(status);
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    simulateSuccessfulV1ElectionWithoutExitingDrainMode(
+        getReplCoord()->getElectionTimeout_forTest());
+
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+
+    // Check that the electionId is again properly set after the new election.
+    {
+        auto term = getTopoCoord().getTerm();
+        auto electionId = getTopoCoord().getElectionId();
+
+        ASSERT_EQUALS(2, term);
+        ASSERT_EQUALS(OID::fromTerm(term), electionId);
+    }
+}
+
 TEST_F(ReplCoordTest, NodeChangesTermAndStepsDownWhenAndOnlyWhenUpdateTermSuppliesAHigherTerm) {
     init("mySet/test1:1234,test2:1234,test3:1234");
 
@@ -4408,32 +4473,6 @@ TEST_F(ReplCoordTest,
 
     ASSERT_LESS_THAN_OR_EQUALS(until + replCoord->getConfig().getElectionTimeoutPeriod(),
                                replCoord->getElectionTimeout_forTest());
-}
-
-TEST_F(ReplCoordTest, DoNotScheduleElectionWhenCancelAndRescheduleElectionTimeoutIsRunInPV0) {
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "protocolVersion"
-                            << 0
-                            << "version"
-                            << 2
-                            << "members"
-                            << BSON_ARRAY(BSON("host"
-                                               << "node1:12345"
-                                               << "_id"
-                                               << 0)
-                                          << BSON("host"
-                                                  << "node2:12345"
-                                                  << "_id"
-                                                  << 1))),
-                       HostAndPort("node1", 12345));
-    ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
-
-    getReplCoord()->cancelAndRescheduleElectionTimeout();
-
-    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
-    ASSERT_EQUALS(Date_t(), electionTimeoutWhen);
 }
 
 TEST_F(ReplCoordTest, DoNotScheduleElectionWhenCancelAndRescheduleElectionTimeoutIsRunInRollback) {

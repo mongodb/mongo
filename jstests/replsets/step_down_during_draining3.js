@@ -13,7 +13,6 @@
     conf.settings = conf.settings || {};
     conf.settings.chainingAllowed = false;
     conf.settings.catchUpTimeoutMillis = 0;
-    conf.protocolVersion = 1;
     replSet.initiate(conf);
 
     var primary = replSet.getPrimary();

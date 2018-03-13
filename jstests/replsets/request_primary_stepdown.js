@@ -11,9 +11,7 @@
     var replSet = new ReplSetTest(
         {name: name, nodes: [{rsConfig: {priority: 3}}, {}, {rsConfig: {arbiterOnly: true}}]});
     replSet.startSet();
-    var conf = replSet.getReplSetConfig();
-    conf.protocolVersion = 0;
-    replSet.initiate(conf);
+    replSet.initiate();
 
     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
     replSet.awaitSecondaryNodes();

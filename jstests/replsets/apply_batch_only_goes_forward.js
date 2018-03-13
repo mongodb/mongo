@@ -59,10 +59,6 @@ TestData.skipCheckDBHashes = true;
                                 return member.self;
                             })[0]
                             .optime;
-    // Fix OpTime formatting for pv0.
-    if (primaryOpTime.ts === undefined) {
-        primaryOpTime = {ts: primaryOpTime, t: -1};
-    }
 
     jsTest.log("future TS: " + tojson(farFutureTS) + ", date:" + tsToDate(farFutureTS));
     // We do an update in case there is a minvalid document on the primary already.

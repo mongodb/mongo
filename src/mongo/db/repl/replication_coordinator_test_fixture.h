@@ -74,7 +74,6 @@ public:
      * Constructs a ReplSetConfig from the given BSON, or raises a test failure exception.
      */
     static ReplSetConfig assertMakeRSConfig(const BSONObj& configBSON);
-    static ReplSetConfig assertMakeRSConfigV0(const BSONObj& configBson);
 
     /**
      * Adds { protocolVersion: 0 or 1 } to the config.
@@ -225,7 +224,6 @@ protected:
      *
      * Behavior is unspecified if node does not have a clean config, is not in SECONDARY, etc.
      */
-    void simulateSuccessfulElection();
     void simulateSuccessfulV1Election();
 
     /**

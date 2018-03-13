@@ -1685,32 +1685,7 @@ TEST(ReplSetConfig, GetCatchUpTakeoverDelayDefault) {
 }
 
 TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJournalDefault) {
-    // PV0, should default to false.
     ReplSetConfig config;
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345")))));
-    ASSERT_OK(config.validate());
-    ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
-    ASSERT_FALSE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
-
-    // Should be able to set it true in PV0.
-    ASSERT_OK(config.initialize(BSON("_id"
-                                     << "rs0"
-                                     << "version"
-                                     << 1
-                                     << "members"
-                                     << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                              << "localhost:12345"))
-                                     << "writeConcernMajorityJournalDefault"
-                                     << true)));
-    ASSERT_OK(config.validate());
-    ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
-    ASSERT_TRUE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
 
     // PV1, should default to true.
     ASSERT_OK(config.initialize(BSON("_id"
