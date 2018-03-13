@@ -230,6 +230,10 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             return latestDropPendingOpTime;
         }();
 
+        log() << "dropDatabase " << dbName << " waiting for " << awaitOpTime
+              << " to be replicated at " << kDropDatabaseWriteConcern.toBSON() << ". Dropping "
+              << numCollectionsToDrop << " collections, with last collection drop at "
+              << latestDropPendingOpTime;
         auto result = replCoord->awaitReplication(opCtx, awaitOpTime, kDropDatabaseWriteConcern);
         const auto& status = result.status;
         if (!status.isOK()) {
