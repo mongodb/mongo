@@ -60,13 +60,7 @@ thread_local int64_t ServiceExecutorSynchronous::_localThreadIdleCounter = 0;
 ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext* ctx) {}
 
 Status ServiceExecutorSynchronous::start() {
-    _numHardwareCores = [] {
-        ProcessInfo p;
-        if (auto availCores = p.getNumAvailableCores()) {
-            return static_cast<size_t>(*availCores);
-        }
-        return static_cast<size_t>(p.getNumCores());
-    }();
+    _numHardwareCores = static_cast<size_t>(ProcessInfo::getNumAvailableCores());
 
     _stillRunning.store(true);
 

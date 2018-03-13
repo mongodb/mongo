@@ -48,7 +48,7 @@ namespace {
 
 static bool blockSupported = false;
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(RecordBlockSupported, ("SystemInfo"))(InitializerContext* cx) {
+MONGO_INITIALIZER(RecordBlockSupported)(InitializerContext* cx) {
     blockSupported = ProcessInfo::blockCheckSupported();
     return Status::OK();
 }

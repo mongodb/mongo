@@ -69,12 +69,7 @@ void BM_ClockNow(benchmark::State& state) {
 }
 
 BENCHMARK(BM_ClockNow)
-    ->ThreadRange(1,
-                  [] {
-                      ProcessInfo::initializeSystemInfo();
-                      ProcessInfo pi;
-                      return static_cast<int>(pi.getNumAvailableCores().value_or(pi.getNumCores()));
-                  }())
+    ->ThreadRange(1, ProcessInfo::getNumAvailableCores())
     ->ArgName("poll period")
     ->Arg(0)
     ->Arg(1)

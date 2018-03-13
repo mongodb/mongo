@@ -58,69 +58,71 @@ public:
     /**
      * Get the type of os (e.g. Windows, Linux, Mac OS)
      */
-    const std::string& getOsType() const {
+    static const std::string& getOsType() {
         return sysInfo().osType;
     }
 
     /**
      * Get the os Name (e.g. Ubuntu, Gentoo, Windows Server 2008)
      */
-    const std::string& getOsName() const {
+    static const std::string& getOsName() {
         return sysInfo().osName;
     }
 
     /**
      * Get the os version (e.g. 10.04, 11.3.0, 6.1 (build 7600))
      */
-    const std::string& getOsVersion() const {
+    static const std::string& getOsVersion() {
         return sysInfo().osVersion;
     }
 
     /**
      * Get the cpu address size (e.g. 32, 36, 64)
      */
-    unsigned getAddrSize() const {
+    static unsigned getAddrSize() {
         return sysInfo().addrSize;
     }
 
     /**
      * Get the total amount of system memory in MB
      */
-    unsigned long long getMemSizeMB() const {
+    static unsigned long long getMemSizeMB() {
         return sysInfo().memSize / (1024 * 1024);
     }
 
     /**
-     * Get the number of available CPUs. Depending on the OS, the number can be the
-     * number of available CPUs to the current process or scheduler.
-     */
-    boost::optional<unsigned long> getNumAvailableCores();
-
-    /**
      * Get the number of CPUs
      */
-    unsigned getNumCores() const {
+    static unsigned getNumCores() {
         return sysInfo().numCores;
+    }
+
+    /**
+     * Get the number of cores available. Make a best effort to get the cores for this process.
+     * If that information is not available, get the total number of CPUs.
+     */
+    static unsigned long getNumAvailableCores() {
+        return ProcessInfo::getNumCoresForProcess().value_or(ProcessInfo::getNumCores());
     }
 
     /**
      * Get the system page size in bytes.
      */
     static unsigned long long getPageSize() {
-        return systemInfo->pageSize;
+        return sysInfo().pageSize;
     }
 
     /**
      * Get the CPU architecture (e.g. x86, x86_64)
      */
-    const std::string& getArch() const {
+    static const std::string& getArch() {
         return sysInfo().cpuArch;
     }
 
     /**
      * Determine if NUMA is enabled (interleaved) for this process
      */
-    bool hasNumaEnabled() const {
+    static bool hasNumaEnabled() {
         return sysInfo().hasNuma;
     }
 
@@ -128,14 +130,14 @@ public:
      * Determine if file zeroing is necessary for newly allocated data files.
      */
     static bool isDataFileZeroingNeeded() {
-        return systemInfo->fileZeroNeeded;
+        return sysInfo().fileZeroNeeded;
     }
 
     /**
      * Determine if we need to workaround slow msync performance on Illumos/Solaris
      */
     static bool preferMsyncOverFSync() {
-        return systemInfo->preferMsyncOverFSync;
+        return sysInfo().preferMsyncOverFSync;
     }
 
     /**
@@ -236,18 +238,20 @@ private:
     };
 
     ProcessId _pid;
-    static stdx::mutex _sysInfoLock;
 
     static bool checkNumaEnabled();
 
-    static ProcessInfo::SystemInfo* systemInfo;
-
-    inline const SystemInfo& sysInfo() const {
-        return *systemInfo;
+    inline static const SystemInfo& sysInfo() {
+        static ProcessInfo::SystemInfo systemInfo;
+        return systemInfo;
     }
 
-public:
-    static void initializeSystemInfo();
+private:
+    /**
+     * Get the number of available CPUs. Depending on the OS, the number can be the
+     * number of available CPUs to the current process or scheduler.
+     */
+    static boost::optional<unsigned long> getNumCoresForProcess();
 };
 
 bool writePidFile(const std::string& path);

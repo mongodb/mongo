@@ -424,7 +424,7 @@ bool ProcessInfo::supported() {
 }
 
 // get the number of CPUs available to the current process
-boost::optional<unsigned long> ProcessInfo::getNumAvailableCores() {
+boost::optional<unsigned long> ProcessInfo::getNumCoresForProcess() {
     cpu_set_t set;
 
     if (sched_getaffinity(0, sizeof(cpu_set_t), &set) == 0) {

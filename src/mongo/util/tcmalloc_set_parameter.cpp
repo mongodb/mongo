@@ -129,7 +129,7 @@ TcmallocNumericPropertyServerParameter tcmallocAggressiveMemoryDecommit(
     "tcmallocAggressiveMemoryDecommit", "tcmalloc.aggressive_memory_decommit");
 
 MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults,
-                          ("SystemInfo"),
+                          MONGO_NO_PREREQUISITES,
                           ("BeginStartupOptionHandling"))
 (InitializerContext*) {
     // Before processing the command line options, if the user has not specified a value in via
