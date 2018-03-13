@@ -35,8 +35,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -46,7 +49,6 @@ class OperationContext;
 struct MultikeyPathInfo;
 
 namespace repl {
-class BackgroundSync;
 class ReplicationCoordinator;
 class OpTime;
 
@@ -102,12 +104,12 @@ public:
      *
      * Constructs a SyncTail.
      * During steady state replication, oplogApplication() obtains batches of operations to apply
-     * from 'bgsync'. It is not required to provide 'bgsync' at construction if we do not plan on
-     * using oplogApplication(). During the oplog application phase, the batch of operations is
+     * from 'observer'. It is not required to provide 'observer' at construction if we do not plan
+     * on using oplogApplication(). During the oplog application phase, the batch of operations is
      * distributed across writer threads in 'writerPool'. Each writer thread applies its own vector
      * of operations using 'func'. The writer thread pool is not owned by us.
      */
-    SyncTail(BackgroundSync* bgsync, MultiSyncApplyFunc func, ThreadPool* writerPool);
+    SyncTail(OplogApplier::Observer* observer, MultiSyncApplyFunc func, ThreadPool* writerPool);
     virtual ~SyncTail();
 
     /**
@@ -132,8 +134,23 @@ public:
                             const BSONObj& o,
                             OplogApplication::Mode oplogApplicationMode);
 
-    void oplogApplication(ReplicationCoordinator* replCoord);
-    bool peek(OperationContext* opCtx, BSONObj* obj);
+    /**
+     * Runs oplog application in a loop until shutdown() is called.
+     * Retrieves operations from the OplogBuffer in batches that will be applied in parallel using
+     * multiApply().
+     */
+    void oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator* replCoord);
+
+    /**
+     * Shuts down oplogApplication() processing.
+     */
+    void shutdown();
+
+    /**
+     * Returns true if we are shutting down.
+     */
+    bool inShutdown() const;
+
 
     class OpQueue {
     public:
@@ -218,7 +235,10 @@ public:
      * If ops is empty on entry and nothing can be added yet, will wait up to a second before
      * returning true.
      */
-    bool tryPopAndWaitForMore(OperationContext* opCtx, OpQueue* ops, const BatchLimits& limits);
+    bool tryPopAndWaitForMore(OperationContext* opCtx,
+                              OplogBuffer* oplogBuffer,
+                              OpQueue* ops,
+                              const BatchLimits& limits);
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
@@ -256,11 +276,17 @@ protected:
     static const int replBatchLimitSeconds = 1;
 
 private:
+    /**
+     * Pops the operation at the front of the OplogBuffer.
+     * Updates stats on BackgroundSync.
+     */
+    void _consume(OperationContext* opCtx, OplogBuffer* oplogBuffer);
+
     class OpQueueBatcher;
 
     std::string _hostname;
 
-    BackgroundSync* _bgsync;
+    OplogApplier::Observer* const _observer;
 
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;
@@ -268,6 +294,12 @@ private:
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
     ThreadPool* const _writerPool;
+
+    // Protects member data of SyncTail.
+    mutable stdx::mutex _mutex;
+
+    // Set to true if shutdown() has been called.
+    bool _inShutdown = false;
 };
 
 // These free functions are used by the thread pool workers to write ops to the db.

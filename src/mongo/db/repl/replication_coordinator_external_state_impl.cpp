@@ -241,7 +241,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     log() << "Starting replication applier thread";
     invariant(!_applierThread);
-    _applierThread.reset(new RSDataSync{_bgSync.get(), replCoord});
+    _applierThread.reset(new RSDataSync{_bgSync.get(), _oplogBuffer.get(), replCoord});
     _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
@@ -286,11 +286,25 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
 
     if (oldApplier) {
         log() << "Stopping replication applier thread";
-        oldApplier->join();
+        oldApplier->shutdown();
+    }
+
+    // Clear the buffer. This unblocks the OplogFetcher if it is blocked with a full queue, but
+    // ensures that it won't add anything. It will also unblock the OplogApplier pipeline if it is
+    // waiting for an operation to be past the slaveDelay point.
+    if (oldOplogBuffer) {
+        oldOplogBuffer->clear(opCtx);
+        if (oldBgSync) {
+            oldBgSync->onBufferCleared();
+        }
     }
 
     if (oldBgSync) {
         oldBgSync->join(opCtx);
+    }
+
+    if (oldApplier) {
+        oldApplier->join();
     }
 
     if (oldOplogBuffer) {

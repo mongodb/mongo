@@ -274,8 +274,10 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op)
 
 }  // namespace
 
-SyncTail::SyncTail(BackgroundSync* bgsync, MultiSyncApplyFunc func, ThreadPool* writerPool)
-    : _bgsync(bgsync), _applyFunc(func), _writerPool(writerPool) {}
+SyncTail::SyncTail(OplogApplier::Observer* observer,
+                   MultiSyncApplyFunc func,
+                   ThreadPool* writerPool)
+    : _observer(observer), _applyFunc(func), _writerPool(writerPool) {}
 
 SyncTail::~SyncTail() {}
 
@@ -298,10 +300,6 @@ std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
     auto pool = stdx::make_unique<ThreadPool>(options);
     pool->startup();
     return pool;
-}
-
-bool SyncTail::peek(OperationContext* opCtx, BSONObj* op) {
-    return _bgsync->peek(opCtx, op);
 }
 
 // static
@@ -691,7 +689,8 @@ class SyncTail::OpQueueBatcher {
     MONGO_DISALLOW_COPYING(OpQueueBatcher);
 
 public:
-    OpQueueBatcher(SyncTail* syncTail) : _syncTail(syncTail), _thread([this] { run(); }) {}
+    OpQueueBatcher(SyncTail* syncTail, OplogBuffer* oplogBuffer)
+        : _syncTail(syncTail), _oplogBuffer(oplogBuffer), _thread([this] { run(); }) {}
     ~OpQueueBatcher() {
         invariant(_isDead);
         _thread.join();
@@ -758,7 +757,8 @@ private:
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
             {
                 auto opCtx = cc().makeOperationContext();
-                while (!_syncTail->tryPopAndWaitForMore(opCtx.get(), &ops, batchLimits)) {
+                while (!_syncTail->tryPopAndWaitForMore(
+                    opCtx.get(), _oplogBuffer, &ops, batchLimits)) {
                 }
             }
 
@@ -779,6 +779,7 @@ private:
     }
 
     SyncTail* const _syncTail;
+    OplogBuffer* const _oplogBuffer;
 
     stdx::mutex _mutex;  // Guards _ops.
     stdx::condition_variable _cv;
@@ -791,8 +792,8 @@ private:
     stdx::thread _thread;  // Must be last so all other members are initialized before starting.
 };
 
-void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
-    OpQueueBatcher batcher(this);
+void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator* replCoord) {
+    OpQueueBatcher batcher(this, oplogBuffer);
 
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
         getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
@@ -817,7 +818,7 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
             while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
                 // Tests should not trigger clean shutdown while that failpoint is active. If we
                 // think we need this, we need to think hard about what the behavior should be.
-                if (_bgsync->inShutdown()) {
+                if (inShutdown()) {
                     severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
                     fassertFailedNoTrace(40304);
                 }
@@ -916,21 +917,22 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
 // queue.  We don't block forever so that we can periodically check for things like shutdown or
 // reconfigs.
 bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
+                                    OplogBuffer* oplogBuffer,
                                     SyncTail::OpQueue* ops,
                                     const BatchLimits& limits) {
     {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
-        bool peek_success = peek(opCtx, &op);
+        bool peek_success = oplogBuffer->peek(opCtx, &op);
         if (!peek_success) {
             // If we don't have anything in the queue, wait a bit for something to appear.
             if (ops->empty()) {
-                if (_bgsync->inShutdown()) {
+                if (inShutdown()) {
                     ops->setMustShutdownFlag();
                 } else {
                     // Block up to 1 second. We still return true in this case because we want this
                     // op to be the first in a new batch with a new start time.
-                    _bgsync->waitForMore();
+                    oplogBuffer->waitForData(Seconds(1));
                 }
             }
 
@@ -981,7 +983,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     if (entry.isCommand() && entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
         if (ops->getCount() == 1) {
             // apply commands one-at-a-time
-            _bgsync->consume(opCtx);
+            _consume(opCtx, oplogBuffer);
         } else {
             // This op must be processed alone, but we already had ops in the queue so we can't
             // include it in this batch. Since we didn't call consume(), we'll see this again next
@@ -994,10 +996,34 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     }
 
     // We are going to apply this Op.
-    _bgsync->consume(opCtx);
+    _consume(opCtx, oplogBuffer);
 
     // Go back for more ops, unless we've hit the limit.
     return ops->getCount() >= limits.ops;
+}
+
+void SyncTail::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
+    // This is just to get the op off the queue; it's been peeked at and queued for application
+    // already.
+    BSONObj op;
+    if (oplogBuffer->tryPop(opCtx, &op)) {
+        _observer->onOperationConsumed(op);
+    } else {
+        invariant(inShutdown());
+        // This means that shutdown() was called between the consumer's calls to peek() and
+        // consume(). shutdown() cleared the buffer so there is nothing for us to consume here.
+        // Since our postcondition is already met, it is safe to return successfully.
+    }
+}
+
+void SyncTail::shutdown() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _inShutdown = true;
+}
+
+bool SyncTail::inShutdown() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _inShutdown;
 }
 
 void SyncTail::setHostname(const std::string& hostname) {

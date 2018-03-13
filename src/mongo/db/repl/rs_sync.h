@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 namespace repl {
-class BackgroundSync;
 class ReplicationCoordinator;
 
 /**
@@ -41,9 +43,12 @@ class ReplicationCoordinator;
  */
 class RSDataSync {
 public:
-    RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord);
+    RSDataSync(OplogApplier::Observer* observer,
+               OplogBuffer* oplogBuffer,
+               ReplicationCoordinator* replCoord);
     ~RSDataSync();
     void startup();
+    void shutdown();
     void join();
 
 private:
@@ -51,8 +56,10 @@ private:
     void _run();
 
     stdx::thread _runThread;
-    BackgroundSync* _bgsync;
+    OplogBuffer* _oplogBuffer;
     ReplicationCoordinator* _replCoord;
+    std::unique_ptr<ThreadPool> _writerPool;
+    SyncTail _syncTail;
 };
 
 }  // namespace repl

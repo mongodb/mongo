@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
@@ -59,7 +60,7 @@ class ReplicationCoordinatorExternalState;
 class ReplicationProcess;
 class StorageInterface;
 
-class BackgroundSync {
+class BackgroundSync : public OplogApplier::Observer {
     MONGO_DISALLOW_COPYING(BackgroundSync);
 
 public:
@@ -119,18 +120,15 @@ public:
 
     HostAndPort getSyncTarget() const;
 
-    // Interface implementation
+    /**
+     * This is called while shutting down to reset the counters for the OplogBuffer.
+     */
+    void onBufferCleared();
 
-    bool peek(OperationContext* opCtx, BSONObj* op);
-    void consume(OperationContext* opCtx);
     void clearSyncTarget();
-    void waitForMore();
 
     // For monitoring
     BSONObj getCounters();
-
-    // Clears any fetched and buffered oplog entries.
-    void clearBuffer(OperationContext* opCtx);
 
     /**
      * Returns true if any of the following is true:
@@ -144,6 +142,12 @@ public:
     ProducerState getState() const;
     // Starts the producer if it's stopped. Otherwise, let it keep running.
     void startProducerIfStopped();
+
+    // OplogApplier::Observer functions
+    void onBatchBegin(const OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
+    void onOperationConsumed(const BSONObj& op) final;
 
 private:
     bool _inShutdown_inlock() const;

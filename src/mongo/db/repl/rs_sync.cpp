@@ -44,8 +44,13 @@
 namespace mongo {
 namespace repl {
 
-RSDataSync::RSDataSync(BackgroundSync* bgsync, ReplicationCoordinator* replCoord)
-    : _bgsync(bgsync), _replCoord(replCoord) {}
+RSDataSync::RSDataSync(OplogApplier::Observer* observer,
+                       OplogBuffer* oplogBuffer,
+                       ReplicationCoordinator* replCoord)
+    : _oplogBuffer(oplogBuffer),
+      _replCoord(replCoord),
+      _writerPool(SyncTail::makeWriterPool()),
+      _syncTail(observer, multiSyncApply, _writerPool.get()) {}
 
 RSDataSync::~RSDataSync() {
     DESTRUCTOR_GUARD(join(););
@@ -56,9 +61,13 @@ void RSDataSync::startup() {
     _runThread = stdx::thread(&RSDataSync::_run, this);
 }
 
+void RSDataSync::shutdown() {
+    _syncTail.shutdown();
+}
+
 void RSDataSync::join() {
     if (_runThread.joinable()) {
-        invariant(_bgsync->inShutdown());
+        invariant(_syncTail.inShutdown());
         _runThread.join();
     }
 }
@@ -79,9 +88,7 @@ void RSDataSync::_run() {
     try {
         // Once we call into SyncTail::oplogApplication we never return, so this code only runs at
         // startup.
-        auto writerPool = SyncTail::makeWriterPool();
-        SyncTail syncTail(_bgsync, multiSyncApply, writerPool.get());
-        syncTail.oplogApplication(_replCoord);
+        _syncTail.oplogApplication(_oplogBuffer, _replCoord);
     } catch (...) {
         auto status = exceptionToStatus();
         severe() << "Exception thrown in RSDataSync: " << redact(status);

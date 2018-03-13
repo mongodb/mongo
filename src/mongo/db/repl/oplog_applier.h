@@ -136,6 +136,12 @@ public:
     using FetchInfo = std::pair<OplogEntry, BSONObj>;
     virtual void onMissingDocumentsFetchedAndInserted(
         const std::vector<FetchInfo>& documentsFetchedAndInserted) = 0;
+
+    /**
+     * Used primarily by BackgroundSync to update server statistics during steady state replication.
+     * TODO: remove this function. See SERVER-33864.
+     */
+    virtual void onOperationConsumed(const BSONObj& op) = 0;
 };
 
 }  // namespace repl

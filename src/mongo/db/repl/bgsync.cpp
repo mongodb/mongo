@@ -164,10 +164,6 @@ void BackgroundSync::startup(OperationContext* opCtx) {
 void BackgroundSync::shutdown(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    // Clear the buffer. This unblocks the OplogFetcher if it is blocked with a full queue, but
-    // ensures that it won't add anything. It will also unblock the OpApplier pipeline if it is
-    // waiting for an operation to be past the slaveDelay point.
-    clearBuffer(opCtx);
     _state = ProducerState::Stopped;
 
     if (_syncSourceResolver) {
@@ -216,7 +212,8 @@ void BackgroundSync::_run() {
             fassertFailed(28546);
         }
     }
-    stop(true);
+    // No need to reset optimes here because we are shutting down.
+    stop(false);
 }
 
 void BackgroundSync::_runProducer() {
@@ -562,28 +559,9 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     return Status::OK();
 }
 
-bool BackgroundSync::peek(OperationContext* opCtx, BSONObj* op) {
-    return _oplogBuffer->peek(opCtx, op);
-}
-
-void BackgroundSync::waitForMore() {
-    // Block for one second before timing out.
-    _oplogBuffer->waitForData(Seconds(1));
-}
-
-void BackgroundSync::consume(OperationContext* opCtx) {
-    // this is just to get the op off the queue, it's been peeked at
-    // and queued for application already
-    BSONObj op;
-    if (_oplogBuffer->tryPop(opCtx, &op)) {
-        bufferCountGauge.decrement(1);
-        bufferSizeGauge.decrement(getSize(op));
-    } else {
-        invariant(inShutdown());
-        // This means that shutdown() was called between the consumer's calls to peek() and
-        // consume(). shutdown() cleared the buffer so there is nothing for us to consume here.
-        // Since our postcondition is already met, it is safe to return successfully.
-    }
+void BackgroundSync::onOperationConsumed(const BSONObj& op) {
+    bufferCountGauge.decrement(1);
+    bufferSizeGauge.decrement(getSize(op));
 }
 
 void BackgroundSync::_runRollback(OperationContext* opCtx,
@@ -763,8 +741,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;
 }
 
-void BackgroundSync::clearBuffer(OperationContext* opCtx) {
-    _oplogBuffer->clear(opCtx);
+void BackgroundSync::onBufferCleared() {
     const auto count = bufferCountGauge.get();
     bufferCountGauge.decrement(count);
     const auto size = bufferSizeGauge.get();
