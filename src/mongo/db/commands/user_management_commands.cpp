@@ -492,6 +492,7 @@ Status insertPrivilegeDocument(OperationContext* opCtx, const BSONObj& userObj) 
  * Updates the given user object with the given update modifier.
  */
 Status updatePrivilegeDocument(OperationContext* opCtx,
+                               const UserName& user,
                                const BSONObj& queryObj,
                                const BSONObj& updateObj) {
     // Minimum fields required for an update.
@@ -502,6 +503,10 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
         opCtx, AuthorizationManager::usersCollectionNamespace, queryObj, updateObj, false);
     if (status.code() == ErrorCodes::UnknownError) {
         return {ErrorCodes::UserModificationFailed, status.reason()};
+    }
+    if (status.code() == ErrorCodes::NoMatchingDocument) {
+        return {ErrorCodes::UserNotFound,
+                str::stream() << "User " << user.getFullName() << " not found"};
     }
     return status;
 }
@@ -514,15 +519,12 @@ Status updatePrivilegeDocument(OperationContext* opCtx,
                                const UserName& user,
                                const BSONObj& updateObj) {
     const auto status = updatePrivilegeDocument(opCtx,
+                                                user,
                                                 BSON(AuthorizationManager::USER_NAME_FIELD_NAME
                                                      << user.getUser()
                                                      << AuthorizationManager::USER_DB_FIELD_NAME
                                                      << user.getDB()),
                                                 updateObj);
-    if (status.code() == ErrorCodes::NoMatchingDocument) {
-        return {ErrorCodes::UserNotFound,
-                str::stream() << "User " << user.getFullName() << " not found"};
-    }
     return status;
 }
 
@@ -1014,7 +1016,8 @@ public:
                              args.hasRoles ? &args.roles : NULL,
                              args.authenticationRestrictions);
 
-        status = updatePrivilegeDocument(opCtx, queryBuilder.done(), updateDocumentBuilder.done());
+        status = updatePrivilegeDocument(
+            opCtx, args.userName, queryBuilder.done(), updateDocumentBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserByName(args.userName);
         return CommandHelpers::appendCommandStatus(result, status);
