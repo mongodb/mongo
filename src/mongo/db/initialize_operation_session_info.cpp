@@ -86,6 +86,11 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);
 
+        if (serverGlobalParams.featureCompatibility.getVersion() !=
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            uassertStatusOK(SessionsCommandFCV34Status("Retryable writes"));
+        }
+
         opCtx->setTxnNumber(*osi.getTxnNumber());
     }
 }
