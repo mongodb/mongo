@@ -241,7 +241,7 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
             testDB.runReadCommand({distinct: 'user', key: 'x'});
             failureMsg = "Unexpected success running distinct!";
         } catch (e) {
-            jsTest.log(e);
+            jsTest.log(e.toString());
         }
 
         if (failureMsg)
