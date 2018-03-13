@@ -173,6 +173,16 @@ void createCollection(OperationContext* opCtx,
 }
 
 /**
+ * Create test collection with UUID.
+ */
+auto createCollectionWithUuid(OperationContext* opCtx, const NamespaceString& nss) {
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    createCollection(opCtx, nss, options);
+    return options.uuid.get();
+}
+
+/**
  * Create test database.
  */
 void createDatabase(OperationContext* opCtx, StringData dbName) {
