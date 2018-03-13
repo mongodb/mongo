@@ -65,5 +65,10 @@ TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
     ASSERT_TRUE(skip->getNext().isEOF());
 }
 
+TEST(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizing) {
+    auto source = DocumentSourceMock::create({"{a: 1, b: 2}", "{a: 3, b: 4}"});
+    auto skip = DocumentSourceSkip::create(getExpCtx(), 2);
+}
+
 }  // namespace
 }  // namespace mongo
