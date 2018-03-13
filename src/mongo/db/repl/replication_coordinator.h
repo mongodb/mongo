@@ -65,7 +65,6 @@ class ReplSetMetadata;
 namespace repl {
 
 class BackgroundSync;
-class HandshakeArgs;
 class IsMasterResponse;
 class OplogReader;
 class OpTime;
@@ -124,17 +123,16 @@ public:
      */
     virtual const ReplSettings& getSettings() const = 0;
 
-    enum Mode { modeNone = 0, modeReplSet, modeMasterSlave };
+    enum Mode { modeNone = 0, modeReplSet };
 
     /**
-     * Returns a value indicating whether this node was configured at start-up to run
-     * standalone, as part of a master-slave pair, or as a member of a replica set.
+     * Returns a value indicating whether this node was configured at start-up to run standalone or
+     * as a member of a replica set.
      */
     virtual Mode getReplicationMode() const = 0;
 
     /**
-     * Returns true if this node is configured to be a member of a replica set or master/slave
-     * setup.
+     * Returns true if this node is configured to be a member of a replica set.
      */
     virtual bool isReplEnabled() const = 0;
 
@@ -209,9 +207,8 @@ public:
     virtual bool isMasterForReportingPurposes() = 0;
 
     /**
-     * Returns true if it is valid for this node to accept writes on the given database.
-     * Currently this is true only if this node is Primary, master in master/slave,
-     * a standalone, or is writing to the local database.
+     * Returns true if it is valid for this node to accept writes on the given database.  Currently
+     * this is true only if this node is Primary, a standalone, or is writing to the local database.
      *
      * If a node was started with the replSet argument, but has not yet received a config, it
      * will not be able to receive writes to a database other than local (it will not be
@@ -280,12 +277,6 @@ public:
      */
     virtual bool shouldRelaxIndexConstraints(OperationContext* opCtx,
                                              const NamespaceString& ns) = 0;
-
-    /**
-     * Updates our internal tracking of the last OpTime applied for the given slave
-     * identified by "rid".  Only valid to call in master/slave mode
-     */
-    virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime applied to this node.
@@ -386,12 +377,6 @@ public:
      * TODO(spencer): Use term instead.
      */
     virtual OID getElectionId() = 0;
-
-    /**
-     * Returns the RID for this node.  The RID is used to identify this node to our sync source
-     * when sending updates about our replication progress.
-     */
-    virtual OID getMyRID() const = 0;
 
     /**
      * Returns the id for this node as specified in the current replica set configuration.
@@ -525,7 +510,7 @@ public:
 
     /**
      * Handles an incoming isMaster command for a replica set node.  Should not be
-     * called on a master-slave or standalone node.
+     * called on a standalone node.
      */
     virtual void fillIsMasterForReplSet(IsMasterResponse* result) = 0;
 
@@ -679,16 +664,6 @@ public:
      */
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion) = 0;
-
-    /**
-     * Handles an incoming Handshake command. Associates the node's 'remoteID' with its
-     * 'handshake' object. This association is used to update internal representation of
-     * replication progress and to forward the node's replication progress upstream when this
-     * node is being chained through in master/slave replication.
-     *
-     * Returns ErrorCodes::IllegalOperation if we're not running with master/slave replication.
-     */
-    virtual Status processHandshake(OperationContext* opCtx, const HandshakeArgs& handshake) = 0;
 
     /**
      * Returns a bool indicating whether or not this node builds indexes.

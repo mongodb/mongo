@@ -236,11 +236,10 @@ struct ServerGlobalParams {
 
     } featureCompatibility;
 
-    // Feature validation differs depending on the role of a mongod in a replica set or
-    // master/slave configuration. Masters/primaries can accept user-initiated writes and
-    // validate based on the feature compatibility version. A secondary/slave (which is not also
-    // a master) always validates in the upgraded mode so that it can sync new features, even
-    // when in the downgraded feature compatibility mode.
+    // Feature validation differs depending on the role of a mongod in a replica set. Replica set
+    // primaries can accept user-initiated writes and validate based on the feature compatibility
+    // version. A secondary always validates in the upgraded mode so that it can sync new features,
+    // even when in the downgraded feature compatibility mode.
     AtomicWord<bool> validateFeaturesAsMaster{true};
 
     std::vector<std::string> disabledSecureAllocatorDomains;

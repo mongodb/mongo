@@ -131,10 +131,6 @@ public:
         return _memberId;
     }
 
-    OID getRid() const {
-        return _rid;
-    }
-
     bool isSelf() const {
         return _isSelf;
     }
@@ -229,10 +225,6 @@ public:
         _memberId = memberId;
     }
 
-    void setRid(OID rid) {
-        _rid = rid;
-    }
-
 private:
     // -1 = not checked yet, 0 = member is down/unreachable, 1 = member is up
     int _health;
@@ -275,11 +267,8 @@ private:
     // Is this the data for this member?
     bool _isSelf;
 
-    // This member's RID, used only in master/slave replication.
-    OID _rid;
-
     // This member's member ID.  memberId and hostAndPort duplicate information in the
-    // configuration for replica sets, but are required to be here for master/slave replication.
+    // set's ReplSetConfig.
     int _memberId = -1;
 
     // Client address of this member.

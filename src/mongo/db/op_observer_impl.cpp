@@ -93,14 +93,6 @@ repl::OpTime logOperation(OperationContext* opCtx,
 }
 
 /**
- * Returns whether we're a master using master-slave replication.
- */
-bool isMasterSlave(OperationContext* opCtx) {
-    return repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
-        repl::ReplicationCoordinator::modeMasterSlave;
-}
-
-/**
  * Updates the session state with the last write timestamp and transaction for that session.
  *
  * In the case of writes with transaction/statement id, this method will be recursively entered a
@@ -316,7 +308,7 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    bool fromMigrate) {
     const NamespaceString systemIndexes{nss.getSystemIndexesCollection()};
 
-    if (uuid && !isMasterSlave(opCtx)) {
+    if (uuid) {
         BSONObjBuilder builder;
         builder.append("createIndexes", nss.coll());
 
@@ -765,7 +757,7 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
     builder.append("renameCollection", fromCollection.ns());
     builder.append("to", toCollection.ns());
     builder.append("stayTemp", stayTemp);
-    if (dropTargetUUID && !isMasterSlave(opCtx)) {
+    if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
     } else {
         builder.append("dropTarget", dropTarget);

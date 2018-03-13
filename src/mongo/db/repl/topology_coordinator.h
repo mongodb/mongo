@@ -472,9 +472,7 @@ public:
      * "durablyWritten" indicates whether the operation has to be durably applied.
      * "skipSelf" means to exclude this node whether or not the op has been applied.
      */
-    std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op,
-                                               bool durablyWritten,
-                                               bool skipSelf);
+    std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op, bool durablyWritten);
 
     /**
      * Marks a member as down from our perspective and returns a bool which indicates if we can no
@@ -543,26 +541,6 @@ public:
     StatusWith<bool> setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
                                    Date_t now,
                                    long long* configVersion);
-    /*
-     * Sets the last optimes for a slave node.
-     *
-     * Used only in master/slave replication.
-     */
-
-    void setLastOptimeForSlave(const OID& rid, const OpTime& opTime, Date_t now);
-
-    /*
-     * Set the RID for this node.
-     *
-     * Used only in master/slave replication.
-     */
-    void setMyRid(const OID& rid);
-
-    /**
-     * Process a handshake command, adding the slave to the member list if it isn't already there.
-     * Used only in master/slave mode
-     */
-    Status processHandshake(const OID& rid, const HostAndPort& hostAndPort);
 
     /**
      * If getRole() == Role::candidate and this node has not voted too recently, updates the
@@ -875,13 +853,6 @@ private:
      * nullptr if memberId is not found in the configuration.
      */
     MemberData* _findMemberDataByMemberId(const int memberId);
-
-    /*
-     * Returns information we have on the state of the node identified by rid.  Returns
-     * nullptr if rid is not found in the heartbeat data.  This method is used only for
-     * master/slave replication.
-     */
-    MemberData* _findMemberDataByRid(const OID rid);
 
     // Returns NULL if there is no primary, or the MemberConfig* for the current primary
     const MemberConfig* _currentPrimaryMember() const;

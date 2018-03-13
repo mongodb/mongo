@@ -87,14 +87,6 @@ StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteC
 
         repl::ReplicationCoordinator* replCoordinator = repl::ReplicationCoordinator::get(opCtx);
 
-        if (replCoordinator->getReplicationMode() ==
-                repl::ReplicationCoordinator::modeMasterSlave &&
-            writeConcern.shouldWaitForOtherNodes()) {
-            warning() << "moveChunk cannot check if secondary throttle setting "
-                      << writeConcern.toBSON()
-                      << " can be enforced in a master slave configuration";
-        }
-
         Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
         if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
             return status;

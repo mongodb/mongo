@@ -41,7 +41,7 @@ class OperationContext;
 
 /**
  * Startup parameter to ignore featureCompatibilityVersion checks. This parameter cannot be set if
- * the node is started with --replSet, --master, or --slave. This should never be set by end users.
+ * the node is started with --replSet. This should never be set by end users.
  */
 extern bool internalValidateFeaturesAsMaster;
 

@@ -175,10 +175,6 @@ bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(OperationContext* o
     return !canAcceptWritesFor(opCtx, ns);
 }
 
-Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const Timestamp& ts) {
-    return Status::OK();
-}
-
 void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
     // TODO
 }
@@ -355,11 +351,6 @@ Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& a
 Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                                 long long* configVersion) {
     // TODO
-    return Status::OK();
-}
-
-Status ReplicationCoordinatorMock::processHandshake(OperationContext* opCtx,
-                                                    const HandshakeArgs& handshake) {
     return Status::OK();
 }
 

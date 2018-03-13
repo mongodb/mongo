@@ -635,65 +635,6 @@ public:
     }
 };
 
-class OplogReplaySlaveReadTill : public ClientBase {
-public:
-    ~OplogReplaySlaveReadTill() {
-        _client.dropCollection("unittests.querytests.OplogReplaySlaveReadTill");
-    }
-    void run() {
-        const char* ns = "unittests.querytests.OplogReplaySlaveReadTill";
-
-        // Create a capped collection of size 10.
-        _client.dropCollection(ns);
-        _client.createCollection(ns, 10, true);
-
-        // The destructor for DBClientCursor runs killCursors. This must not be done while holding
-        // locks.
-        unique_ptr<DBClientCursor> c;
-
-        {
-            Lock::DBLock lk(&_opCtx, "unittests", MODE_X);
-            OldClientContext ctx(&_opCtx, ns);
-
-            BSONObj info;
-            _client.runCommand("unittests",
-                               BSON("create"
-                                    << "querytests.OplogReplaySlaveReadTill"
-                                    << "capped"
-                                    << true
-                                    << "size"
-                                    << 8192),
-                               info);
-
-            Date_t one = Date_t::fromMillisSinceEpoch(
-                LogicalClock::get(&_opCtx)->reserveTicks(1).asTimestamp().asLL());
-            Date_t two = Date_t::fromMillisSinceEpoch(
-                LogicalClock::get(&_opCtx)->reserveTicks(1).asTimestamp().asLL());
-            Date_t three = Date_t::fromMillisSinceEpoch(
-                LogicalClock::get(&_opCtx)->reserveTicks(1).asTimestamp().asLL());
-            insert(ns, BSON("ts" << Timestamp(one)));
-            insert(ns, BSON("ts" << Timestamp(two)));
-            insert(ns, BSON("ts" << Timestamp(three)));
-            c = _client.query(ns,
-                              QUERY("ts" << GTE << Timestamp(two)).hint(BSON("$natural" << 1)),
-                              0,
-                              0,
-                              0,
-                              QueryOption_OplogReplay | QueryOption_CursorTailable |
-                                  DBClientCursor::QueryOptionLocal_forceOpQuery);
-            ASSERT(c->more());
-            ASSERT_EQUALS(Timestamp(two), c->next()["ts"].timestamp());
-            long long cursorId = c->getCursorId();
-
-            auto pinnedCursor = unittest::assertGet(ctx.db()
-                                                        ->getCollection(&_opCtx, ns)
-                                                        ->getCursorManager()
-                                                        ->pinCursor(&_opCtx, cursorId));
-            ASSERT_EQUALS(three.toULL(), pinnedCursor.getCursor()->getSlaveReadTill().asULL());
-        }
-    }
-};
-
 class OplogReplayExplain : public ClientBase {
 public:
     ~OplogReplayExplain() {
@@ -1737,7 +1678,6 @@ public:
         add<TailCappedOnly>();
         add<TailableQueryOnId>();
         add<OplogReplayMode>();
-        add<OplogReplaySlaveReadTill>();
         add<OplogReplayExplain>();
         add<ArrayId>();
         add<UnderscoreNs>();

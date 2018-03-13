@@ -212,23 +212,6 @@ public:
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
     }
 
-    //
-    // Replication-related methods.
-    //
-
-    // Used to report replication position only in master-slave, so we keep them as TimeStamp rather
-    // than OpTime.
-    void updateSlaveLocation(OperationContext* opCtx);
-
-    void slaveReadTill(const Timestamp& t) {
-        _slaveReadTill = t;
-    }
-
-    /** Just for testing. */
-    Timestamp getSlaveReadTill() const {
-        return _slaveReadTill;
-    }
-
     /**
      * Returns the server-wide the count of living cursors. Such a cursor is called an "open
      * cursor".
@@ -324,9 +307,6 @@ private:
 
     // See the QueryOptions enum in dbclientinterface.h.
     const int _queryOptions = 0;
-
-    // The replication position only used in master-slave.
-    Timestamp _slaveReadTill;
 
     // Unused maxTime budget for this cursor.
     Microseconds _leftoverMaxTimeMicros = Microseconds::max();

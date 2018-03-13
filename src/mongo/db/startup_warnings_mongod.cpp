@@ -396,18 +396,6 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         warned = true;
     }
 
-    // Check if in master-slave mode
-    auto replCoord = repl::ReplicationCoordinator::get(svcCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeMasterSlave) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This node was started in master-slave replication mode."
-              << startupWarningsLog;
-        log() << "**          Master-slave replication is deprecated and subject to be removed "
-              << startupWarningsLog;
-        log() << "**          in a future version." << startupWarningsLog;
-        warned = true;
-    }
-
     if (warned) {
         log() << startupWarningsLog;
     }

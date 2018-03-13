@@ -73,21 +73,13 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         setOplogReadTimestamp(Timestamp(kMinimumTimestamp));
     }
 
-    auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    bool isMasterSlave = false;
-    if (replCoord) {
-        isMasterSlave =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeMasterSlave;
-    }
-
     // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
     // see _shuttingDown as true and quit prematurely.
     stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
                                        this,
                                        WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
-                                       oplogRecordStore,
-                                       isMasterSlave);
+                                       oplogRecordStore);
 
     _isRunning = true;
     _shuttingDown = false;
@@ -162,9 +154,8 @@ void WiredTigerOplogManager::triggerJournalFlush() {
     }
 }
 
-void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
-                                                     WiredTigerRecordStore* oplogRecordStore,
-                                                     bool isMasterSlave) noexcept {
+void WiredTigerOplogManager::_oplogJournalThreadLoop(
+    WiredTigerSessionCache* sessionCache, WiredTigerRecordStore* oplogRecordStore) noexcept {
     Client::initThread("WTOplogJournalThread");
 
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with
@@ -237,12 +228,6 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
 
         // Wake up any await_data cursors and tell them more data might be visible now.
         oplogRecordStore->notifyCappedWaitersIfNeeded();
-
-        // For master/slave masters, set oldest timestamp here so that we clean up old timestamp
-        // data.  SERVER-31802
-        if (isMasterSlave) {
-            sessionCache->getKVEngine()->setStableTimestamp(Timestamp(newTimestamp));
-        }
     }
 }
 

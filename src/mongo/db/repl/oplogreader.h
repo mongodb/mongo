@@ -109,17 +109,6 @@ public:
     BSONObj nextSafe() {
         return cursor->nextSafe();
     }
-
-    // master/slave only
-    void peek(std::vector<BSONObj>& v, int n) {
-        if (cursor.get())
-            cursor->peek(v, n);
-    }
-
-    // master/slave only
-    void putBack(BSONObj op) {
-        cursor->putBack(op);
-    }
 };
 
 }  // namespace repl

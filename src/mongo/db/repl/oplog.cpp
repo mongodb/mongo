@@ -111,8 +111,6 @@ using std::vector;
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace repl {
-std::string masterSlaveOplogName = "local.oplog.$main";
-
 namespace {
 /**
  * The `_localOplogCollection` pointer is always valid (or null) because an
@@ -163,13 +161,9 @@ void _getNextOpTimes(OperationContext* opCtx,
 
     fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts));
 
-    // Set hash if we're in replset mode, otherwise it remains 0 in master/slave.
-    const bool needHash = (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet);
     for (std::size_t i = 0; i < count; i++) {
         slotsOut[i].opTime = {Timestamp(ts.asULL() + i), term};
-        if (needHash) {
-            slotsOut[i].hash = hashGenerator.nextInt64();
-        }
+        slotsOut[i].hash = hashGenerator.nextInt64();
     }
 }
 
@@ -218,14 +212,9 @@ void setOplogCollectionName(ServiceContext* service) {
         case ReplicationCoordinator::modeReplSet:
             _oplogCollectionName = NamespaceString::kRsOplogNamespace.ns();
             break;
-        case ReplicationCoordinator::modeMasterSlave:
-            _oplogCollectionName = masterSlaveOplogName;
-            break;
         case ReplicationCoordinator::modeNone:
             // leave empty.
             break;
-        default:
-            MONGO_UNREACHABLE;
     }
 }
 
@@ -332,9 +321,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.append("v", OplogEntry::kOplogVersion);
     b.append("op", opstr);
     b.append("ns", nss.ns());
-    if (uuid &&
-        ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
-            ReplicationCoordinator::modeMasterSlave)
+    if (uuid)
         uuid->appendToBuilder(&b, "ui");
 
     if (fromMigrate)
@@ -361,7 +348,6 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     "u" update
     "d" delete
     "c" db cmd
-    "db" declares presence of a database (ns is set to the db name + '.') (master/slave only)
     "n" no op
 */
 
@@ -370,8 +356,7 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
  * writers - an array with size nDocs of DocWriter objects.
  * timestamps - an array with size nDocs of respective Timestamp objects for each DocWriter.
  * oplogCollection - collection to be written to.
- * replicationMode - ReplSet or MasterSlave.
- * finalOpTime - the OpTime of the last DocWriter object.
+  * finalOpTime - the OpTime of the last DocWriter object.
  */
 void _logOpsInner(OperationContext* opCtx,
                   const NamespaceString& nss,
@@ -1139,10 +1124,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // We do not assign timestamps on standalones.
                     return false;
                 }
-                case ReplicationCoordinator::modeMasterSlave: {
-                    // Master-slave does not support timestamps so we do not assign a timestamp.
-                    return false;
-                }
             }
         }
         return true;
@@ -1549,10 +1530,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     // We do not assign timestamps on standalones.
                     return false;
                 }
-                case ReplicationCoordinator::modeMasterSlave: {
-                    // Master-slave does not support timestamps so we do not assign a timestamp.
-                    return false;
-                }
             }
             MONGO_UNREACHABLE;
         }
@@ -1605,11 +1582,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 break;
             }
             default:
-                if (_oplogCollectionName == masterSlaveOplogName) {
-                    error() << "Failed command " << redact(o) << " on " << nss.db()
-                            << " with status " << status << " during oplog application";
-                } else if (curOpToApply.acceptableErrors.find(status.code()) ==
-                           curOpToApply.acceptableErrors.end()) {
+                if (!curOpToApply.acceptableErrors.count(status.code())) {
                     error() << "Failed command " << redact(o) << " on " << nss.db()
                             << " with status " << status << " during oplog application";
                     return status;

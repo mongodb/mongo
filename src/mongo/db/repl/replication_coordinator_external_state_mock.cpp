@@ -96,10 +96,6 @@ ThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const
 
 void ReplicationCoordinatorExternalStateMock::forwardSlaveProgress() {}
 
-OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
-    return OID::gen();
-}
-
 bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
                                                      ServiceContext* const service) {
     return sequenceContains(_selfHosts, host);

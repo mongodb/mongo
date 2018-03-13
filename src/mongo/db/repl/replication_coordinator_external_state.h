@@ -85,8 +85,6 @@ public:
 
     /**
      * Starts steady state sync for replica set member.
-     *
-     * NOTE: Use either this or the Master/Slave version, but not both.
      */
     virtual void startSteadyStateReplication(OperationContext* opCtx,
                                              ReplicationCoordinator* replCoord) = 0;
@@ -158,14 +156,6 @@ public:
      * command upstream.
      */
     virtual void forwardSlaveProgress() = 0;
-
-    /**
-     * Queries the singleton document in local.me.  If it exists and our hostname has not
-     * changed since we wrote, returns the RID stored in the object.  If the document does not
-     * exist or our hostname doesn't match what was recorded in local.me, generates a new OID
-     * to use as our RID, stores it in local.me, and returns it.
-     */
-    virtual OID ensureMe(OperationContext*) = 0;
 
     /**
      * Returns true if "host" is one of the network identities of this node.

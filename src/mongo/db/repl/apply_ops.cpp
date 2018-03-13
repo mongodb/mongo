@@ -443,8 +443,7 @@ Status applyOps(OperationContext* opCtx,
         writeConflictRetry(opCtx, "applyOps", dbName, [&] {
             BSONObjBuilder intermediateResult;
             std::unique_ptr<BSONArrayBuilder> opsBuilder;
-            if (opCtx->writesAreReplicated() &&
-                repl::ReplicationCoordinator::modeMasterSlave != replCoord->getReplicationMode()) {
+            if (opCtx->writesAreReplicated()) {
                 opsBuilder = stdx::make_unique<BSONArrayBuilder>();
             }
             WriteUnitOfWork wunit(opCtx);

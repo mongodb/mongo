@@ -198,14 +198,10 @@ public:
         // TODO(siyuan) Output term of OpTime
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
-        const std::string& oplogNS =
-            replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet
-            ? NamespaceString::kRsOplogNamespace.ns()
-            : masterSlaveOplogName;
         BSONObj o;
         uassert(17347,
                 "Problem reading earliest entry from oplog",
-                Helpers::getSingleton(opCtx, oplogNS.c_str(), o));
+                Helpers::getSingleton(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), o));
         result.append("earliestOptime", o["ts"].timestamp());
         return result.obj();
     }
@@ -220,8 +216,7 @@ public:
         return AllowedOnSecondary::kAlways;
     }
     std::string help() const override {
-        return "Check if this server is primary for a replica pair/set; also if it is --master or "
-               "--slave in simple master/slave setups.\n"
+        return "Check if this server is primary for a replica set\n"
                "{ isMaster : 1 }";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

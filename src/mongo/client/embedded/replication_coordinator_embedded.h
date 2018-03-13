@@ -102,8 +102,6 @@ public:
 
     Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions&) const override;
 
-    Status setLastOptimeForSlave(const OID&, const Timestamp&) override;
-
     void setMyLastAppliedOpTime(const repl::OpTime&) override;
     void setMyLastDurableOpTime(const repl::OpTime&) override;
 
@@ -124,8 +122,6 @@ public:
     Status waitUntilOpTimeForRead(OperationContext*, const repl::ReadConcernArgs&) override;
 
     OID getElectionId() override;
-
-    OID getMyRID() const override;
 
     int getMyId() const override;
 
@@ -179,8 +175,6 @@ public:
     Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* response) override;
 
     Status processReplSetUpdatePosition(const repl::UpdatePositionArgs&, long long*) override;
-
-    Status processHandshake(OperationContext*, const repl::HandshakeArgs&) override;
 
     bool buildsIndexes() override;
 

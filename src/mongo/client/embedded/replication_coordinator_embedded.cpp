@@ -178,10 +178,6 @@ void ReplicationCoordinatorEmbedded::signalUpstreamUpdater() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::setLastOptimeForSlave(const OID&, const Timestamp&) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
 void ReplicationCoordinatorEmbedded::setMyHeartbeatMessage(const std::string&) {
     UASSERT_NOT_IMPLEMENTED;
 }
@@ -238,10 +234,6 @@ Status ReplicationCoordinatorEmbedded::stepDown(OperationContext*,
 }
 
 OID ReplicationCoordinatorEmbedded::getElectionId() {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
-OID ReplicationCoordinatorEmbedded::getMyRID() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
@@ -333,10 +325,6 @@ Status ReplicationCoordinatorEmbedded::processReplSetElect(const ReplSetElectArg
 
 Status ReplicationCoordinatorEmbedded::processReplSetUpdatePosition(const UpdatePositionArgs&,
                                                                     long long*) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
-Status ReplicationCoordinatorEmbedded::processHandshake(OperationContext*, const HandshakeArgs&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

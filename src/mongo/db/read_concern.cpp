@@ -212,7 +212,7 @@ Status waitForReadConcern(OperationContext* opCtx,
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-            // For master/slave and standalone nodes, Linearizable Read is not supported.
+            // For standalone nodes, Linearizable Read is not supported.
             return {ErrorCodes::NotAReplicaSet,
                     "node needs to be a replica set member to use read concern"};
         }

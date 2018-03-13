@@ -135,8 +135,8 @@ void MemberData::setLastDurableOpTime(OpTime opTime, Date_t now) {
         log() << "Durable progress (" << opTime << ") is ahead of the applied progress ("
               << _lastAppliedOpTime << ". This is likely due to a "
                                        "rollback."
-              << " memberid: " << _memberId << " rid: " << _rid << " host "
-              << _hostAndPort.toString() << " previous durable progress: " << _lastDurableOpTime;
+              << " memberid: " << _memberId << _hostAndPort.toString()
+              << " previous durable progress: " << _lastDurableOpTime;
     } else {
         _lastDurableOpTime = opTime;
     }

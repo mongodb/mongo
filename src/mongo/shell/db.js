@@ -1046,11 +1046,6 @@ var DB;
            use local
            db.getReplicationInfo();
       </pre>
-      It is assumed that this database is a replication master -- the information returned is
-      about the operation log stored at local.oplog.$main on the replication master.  (It also
-      works on a machine in a replica pair: for replica pairs, both machines are "masters" from
-      an internal database perspective.
-      <p>
       * @return Object timeSpan: time span of the oplog from start to end  if slave is more out
       *                          of date than that, it can't recover without a complete resync
     */
@@ -1062,10 +1057,8 @@ var DB;
         var localCollections = localdb.getCollectionNames();
         if (localCollections.indexOf('oplog.rs') >= 0) {
             oplog = 'oplog.rs';
-        } else if (localCollections.indexOf('oplog.$main') >= 0) {
-            oplog = 'oplog.$main';
         } else {
-            result.errmsg = "neither master/slave nor replica set replication detected";
+            result.errmsg = "replication not detected";
             return result;
         }
 
@@ -1209,12 +1202,6 @@ var DB;
             for (i in status.members) {
                 r(status.members[i]);
             }
-        } else if (L.sources.count() != 0) {
-            startOptimeDate = new Date();
-            L.sources.find().forEach(g);
-        } else {
-            print("local.sources is empty; is this db a --slave?");
-            return;
         }
     };
 

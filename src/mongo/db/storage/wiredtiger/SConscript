@@ -75,8 +75,6 @@ if wiredtiger:
             'storage_wiredtiger_customization_hooks',
             ],
         LIBDEPS_PRIVATE= [
-            # SERVER-31802 : remove this.
-            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ],
         )

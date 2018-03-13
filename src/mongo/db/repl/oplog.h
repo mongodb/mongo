@@ -95,10 +95,6 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
  */
 void createOplog(OperationContext* opCtx);
 
-extern std::string masterSlaveOplogName;
-
-extern int OPLOG_VERSION;
-
 /**
  * Log insert(s) to the local oplog.
  * Returns the OpTime of every insert.

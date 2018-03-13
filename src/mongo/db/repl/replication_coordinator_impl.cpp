@@ -48,7 +48,6 @@
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
-#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -736,22 +735,14 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     invariant(_settings.usingReplSets());
 
     {
-        OID rid = _externalState->ensureMe(opCtx);
-
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         fassert(18822, !_inShutdown);
         _setConfigState_inlock(kConfigStartingUp);
-        _myRID = rid;
-        _topCoord->setMyRid(rid);
-    }
-
-    _replExecutor->startup();
-
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _topCoord->setStorageEngineSupportsReadCommitted(
             _externalState->isReadCommittedSupportedByStorageEngine(opCtx));
     }
+
+    _replExecutor->startup();
 
     bool doneLoadingConfig = _startLoadLocalConfig(opCtx);
     if (doneLoadingConfig) {
@@ -1013,16 +1004,6 @@ Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
 
 void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
     _externalState->forwardSlaveProgress();
-}
-
-Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const Timestamp& ts) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-
-    // term == -1 for master-slave
-    OpTime opTime(ts, OpTime::kUninitializedTerm);
-    _topCoord->setLastOptimeForSlave(rid, opTime, _replExecutor->now());
-    _updateLastCommittedOpTime_inlock();
-    return Status::OK();
 }
 
 void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
@@ -1462,11 +1443,6 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         return Status::OK();
     }
 
-    if (replMode == modeMasterSlave && writeConcern.wMode == WriteConcernOptions::kMajority) {
-        // with master/slave, majority is equivalent to w=1
-        return Status::OK();
-    }
-
     if (opTime.isNull()) {
         // If waiting for the empty optime, always say it's been replicated.
         return Status::OK();
@@ -1838,9 +1814,6 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
     if (canAcceptWritesFor_UNSAFE(opCtx, ns)) {
         return Status::OK();
     }
-    if (getReplicationMode() == modeMasterSlave) {
-        return Status::OK();
-    }
     if (slaveOk) {
         if (isPrimaryOrSecondary) {
             return Status::OK();
@@ -1863,15 +1836,6 @@ bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(OperationContext* o
 OID ReplicationCoordinatorImpl::getElectionId() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _electionId;
-}
-
-OID ReplicationCoordinatorImpl::getMyRID() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _getMyRID_inlock();
-}
-
-OID ReplicationCoordinatorImpl::_getMyRID_inlock() const {
-    return _myRID;
 }
 
 int ReplicationCoordinatorImpl::getMyId() const {
@@ -2834,14 +2798,6 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
     return status;
 }
 
-Status ReplicationCoordinatorImpl::processHandshake(OperationContext* opCtx,
-                                                    const HandshakeArgs& handshake) {
-    LOG(2) << "Received handshake " << handshake.toBSON();
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _topCoord->processHandshake(handshake.getRid(),
-                                       _externalState->getClientHostAndPort(opCtx));
-}
-
 bool ReplicationCoordinatorImpl::buildsIndexes() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_selfIndex == -1) {
@@ -2854,9 +2810,7 @@ bool ReplicationCoordinatorImpl::buildsIndexes() {
 std::vector<HostAndPort> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op,
                                                                        bool durablyWritten) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    /* skip self in master-slave mode because our own HostAndPort is unknown */
-    const bool skipSelf = getReplicationMode() == modeMasterSlave;
-    return _topCoord->getHostsWrittenTo(op, durablyWritten, skipSelf);
+    return _topCoord->getHostsWrittenTo(op, durablyWritten);
 }
 
 std::vector<HostAndPort> ReplicationCoordinatorImpl::getOtherNodesInReplSet() const {
@@ -2888,15 +2842,6 @@ Status ReplicationCoordinatorImpl::_checkIfWriteConcernCanBeSatisfied_inlock(
     if (getReplicationMode() == modeNone) {
         return Status(ErrorCodes::NoReplicationEnabled,
                       "No replication enabled when checking if write concern can be satisfied");
-    }
-
-    if (getReplicationMode() == modeMasterSlave) {
-        if (!writeConcern.wMode.empty()) {
-            return Status(ErrorCodes::UnknownReplWriteConcern,
-                          "Cannot use named write concern modes in master-slave");
-        }
-        // No way to know how many slaves there are, so assume any numeric mode is possible.
-        return Status::OK();
     }
 
     invariant(getReplicationMode() == modeReplSet);

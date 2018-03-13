@@ -490,34 +490,6 @@ void ReplicationCoordinatorExternalStateImpl::forwardSlaveProgress() {
     _syncSourceFeedback.forwardSlaveProgress();
 }
 
-OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* opCtx) {
-    std::string myname = getHostName();
-    OID myRID;
-    {
-        Lock::DBLock lock(opCtx, meDatabaseName, MODE_X);
-
-        BSONObj me;
-        // local.me is an identifier for a server for getLastError w:2+
-        // TODO: handle WriteConflictExceptions below
-        if (!Helpers::getSingleton(opCtx, meCollectionName, me) || !me.hasField("host") ||
-            me["host"].String() != myname) {
-            myRID = OID::gen();
-
-            // clean out local.me
-            Helpers::emptyCollection(opCtx, NamespaceString(meCollectionName));
-
-            // repopulate
-            BSONObjBuilder b;
-            b.append("_id", myRID);
-            b.append("host", myname);
-            Helpers::putSingleton(opCtx, meCollectionName, b.done());
-        } else {
-            myRID = me["_id"].OID();
-        }
-    }
-    return myRID;
-}
-
 StatusWith<BSONObj> ReplicationCoordinatorExternalStateImpl::loadLocalConfigDocument(
     OperationContext* opCtx) {
     try {

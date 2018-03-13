@@ -990,7 +990,6 @@ env.Library('read_concern_args',
 
 env.Library('replica_set_messages',
             [
-                'handshake_args.cpp',
                 'is_master_response.cpp',
                 'member_config.cpp',
                 'repl_set_config.cpp',

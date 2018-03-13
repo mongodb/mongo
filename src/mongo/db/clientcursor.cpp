@@ -129,23 +129,6 @@ void ClientCursor::dispose(OperationContext* opCtx) {
     _disposed = true;
 }
 
-void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
-    if (_slaveReadTill.isNull())
-        return;
-
-    verify(_nss.isOplog());
-
-    Client* c = opCtx->getClient();
-    verify(c);
-    OID rid = repl::ReplClientInfo::forClient(c).getRemoteID();
-    if (!rid.isSet())
-        return;
-
-    repl::ReplicationCoordinator::get(opCtx)
-        ->setLastOptimeForSlave(rid, _slaveReadTill)
-        .transitional_ignore();
-}
-
 //
 // Pin methods
 //
