@@ -3100,9 +3100,10 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
         if (!testingSnapshotBehaviorInIsolation) {
             // Update committed snapshot and wake up any threads waiting on read concern or
             // write concern.
-            _updateCommittedSnapshot_inlock(stableOpTime.get());
-            // Update the stable timestamp for the storage engine.
-            _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
+            if (_updateCommittedSnapshot_inlock(stableOpTime.get())) {
+                // Update the stable timestamp for the storage engine.
+                _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
+            }
         }
         _cleanupStableOpTimeCandidates(&_stableOpTimeCandidates, stableOpTime.get());
     }
@@ -3381,17 +3382,17 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
 
 MONGO_FP_DECLARE(disableSnapshotting);
 
-void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
+bool ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     const OpTime& newCommittedSnapshot) {
     if (testingSnapshotBehaviorInIsolation) {
-        return;
+        return false;
     }
 
     // If we are in ROLLBACK state, do not set any new _currentCommittedSnapshot, as it will be
     // cleared at the end of rollback anyway.
     if (_memberState.rollback()) {
         log() << "Not updating committed snapshot because we are in rollback";
-        return;
+        return false;
     }
     invariant(!newCommittedSnapshot.isNull());
 
@@ -3406,7 +3407,7 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
         invariant(newCommittedSnapshot >= _currentCommittedSnapshot);
     }
     if (MONGO_FAIL_POINT(disableSnapshotting))
-        return;
+        return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
     _currentCommittedSnapshotCond.notify_all();
 
@@ -3414,6 +3415,7 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
 
     // Wake up any threads waiting for read concern or write concern.
     _wakeReadyWaiters_inlock();
+    return true;
 }
 
 void ReplicationCoordinatorImpl::dropAllSnapshots() {
