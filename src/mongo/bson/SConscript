@@ -28,6 +28,7 @@ env.CppUnitTest(
     target='bson_obj_test',
     source=[
         'bson_obj_test.cpp',
+        'simple_bsonobj_comparator_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

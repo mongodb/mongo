@@ -358,7 +358,7 @@ std::vector<BSONObj> collectionIndexInfo(OperationContext* opCtx, Collection* co
 
     auto comp = stdx::make_unique<SimpleBSONObjComparator>();
 
-    std::sort(result.begin(), result.end(), SimpleBSONObjComparator::LessThan(comp.get()));
+    std::sort(result.begin(), result.end(), SimpleBSONObjComparator::LessThan());
 
     return result;
 }
