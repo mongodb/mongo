@@ -131,6 +131,7 @@ env.Library(
         'shard_id.cpp',
         'versioning.cpp',
         env.Idlc('catalog/type_chunk_base.idl')[0],
+        env.Idlc('request_types/clone_catalog_data.idl')[0],
         env.Idlc('request_types/create_collection.idl')[0],
         env.Idlc('request_types/create_database.idl')[0],
         env.Idlc('request_types/flush_routing_table_cache_updates.idl')[0],

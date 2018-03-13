@@ -61,6 +61,7 @@
     const isUnrelated = "is unrelated";
 
     let viewsCommandTests = {
+        _cloneCatalogData: {skip: isAnInternalCommand},
         _configsvrAddShard: {skip: isAnInternalCommand},
         _configsvrAddShardToZone: {skip: isAnInternalCommand},
         _configsvrBalancerStart: {skip: isAnInternalCommand},
