@@ -92,22 +92,4 @@ private:
 bool writePidFile(const string& path) {
     return pidFileWiper.write(path);
 }
-
-ProcessInfo::SystemInfo* ProcessInfo::systemInfo = NULL;
-
-void ProcessInfo::initializeSystemInfo() {
-    if (systemInfo == NULL) {
-        systemInfo = new SystemInfo();
-    }
-}
-
-/**
- * We need this get the system page size for the secure allocator, which the enterprise modules need
- * for storage for command line parameters.
- */
-MONGO_INITIALIZER_GENERAL(SystemInfo, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
-(InitializerContext* context) {
-    ProcessInfo::initializeSystemInfo();
-    return Status::OK();
-}
-}
+}  // namespace mongo

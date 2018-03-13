@@ -105,8 +105,7 @@ struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
     int reservedThreads() const final {
         int value = adaptiveServiceExecutorReservedThreads.load();
         if (value == -1) {
-            ProcessInfo pi;
-            value = pi.getNumAvailableCores().value_or(pi.getNumCores()) / 2;
+            value = ProcessInfo::getNumAvailableCores() / 2;
             value = std::max(value, 2);
             adaptiveServiceExecutorReservedThreads.store(value);
             log() << "No thread count configured for executor. Using number of cores / 2: "

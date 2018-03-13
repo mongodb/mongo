@@ -51,7 +51,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -326,7 +325,6 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
         cout << "parsed options:\n" << options.toString() << endl;
-        ProcessInfo::initializeSystemInfo();
 
         go();
     } catch (DBException& e) {

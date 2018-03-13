@@ -55,18 +55,13 @@ TEST(ProcessInfo, NonZeroPageSize) {
 TEST(ProcessInfo, GetNumAvailableCores) {
 #if defined(__APPLE__) || defined(__linux__) || (defined(__sun) && defined(__SVR4)) || \
     defined(_WIN32)
-    ProcessInfo processInfo;
-    ProcessInfo::initializeSystemInfo();
-    optional<unsigned long> numAvailCores = processInfo.getNumAvailableCores();
-    ASSERT_TRUE(numAvailCores.is_initialized());
-    ASSERT_GREATER_THAN(*numAvailCores, 0u);
-    ASSERT_LESS_THAN_OR_EQUALS(*numAvailCores, processInfo.getNumCores());
+    unsigned long numAvailCores = ProcessInfo::getNumAvailableCores();
+    ASSERT_GREATER_THAN(numAvailCores, 0u);
+    ASSERT_LESS_THAN_OR_EQUALS(numAvailCores, ProcessInfo::getNumCores());
 #endif
 }
 
 TEST(ProcessInfo, GetNumCoresReturnsNonZeroNumberOfProcessors) {
-    ProcessInfo processInfo;
-    ProcessInfo::initializeSystemInfo();
-    ASSERT_GREATER_THAN(processInfo.getNumCores(), 0u);
+    ASSERT_GREATER_THAN(ProcessInfo::getNumCores(), 0u);
 }
 }
