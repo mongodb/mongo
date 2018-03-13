@@ -282,6 +282,27 @@ void ShardingTestFixture::onCommandForPoolExecutor(NetworkTestEnv::OnCommandFunc
     _networkTestEnvForPool->onCommand(func);
 }
 
+void ShardingTestFixture::addRemoteShards(
+    const std::vector<std::tuple<ShardId, HostAndPort>>& shardInfos) {
+    std::vector<ShardType> shards;
+
+    for (auto shard : shardInfos) {
+        ShardType shardType;
+        shardType.setName(std::get<0>(shard).toString());
+        shardType.setHost(std::get<1>(shard).toString());
+        shards.push_back(shardType);
+
+        std::unique_ptr<RemoteCommandTargeterMock> targeter(
+            stdx::make_unique<RemoteCommandTargeterMock>());
+        targeter->setConnectionStringReturnValue(ConnectionString(std::get<1>(shard)));
+        targeter->setFindHostReturnValue(std::get<1>(shard));
+
+        targeterFactory()->addTargeterToReturn(ConnectionString(std::get<1>(shard)),
+                                               std::move(targeter));
+    }
+    setupShards(shards);
+}
+
 void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {
     auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
 

@@ -167,4 +167,10 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
  */
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName);
 
+/**
+ *  Computes the cluster snapshot time for provided shards. Returns uninitialized LogicalTime if
+ *  the set is empty or every shard's lastCommittedOpTime is not initialized.
+ */
+LogicalTime computeAtClusterTime(OperationContext* opCtx, std::set<ShardId> shardIds);
+
 }  // namespace mongo

@@ -498,4 +498,18 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
     return cmdAtClusterTimeBob.obj();
 }
 
+LogicalTime computeAtClusterTime(OperationContext* opCtx, std::set<ShardId> shardIds) {
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    invariant(shardRegistry);
+    LogicalTime highestTime;
+    for (const auto& shardId : shardIds) {
+        auto lastCommittedOpTime =
+            shardRegistry->getShardNoReload(shardId)->getLastCommittedOpTime();
+        if (lastCommittedOpTime > highestTime) {
+            highestTime = lastCommittedOpTime;
+        }
+    }
+    return highestTime;
+}
+
 }  // namespace mongo

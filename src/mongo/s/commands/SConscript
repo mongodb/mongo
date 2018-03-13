@@ -112,12 +112,27 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='cluster_commands_helpers_test',
+    target='append_at_cluster_time_test',
     source=[
-        'cluster_commands_helpers_test.cpp',
+        'append_at_cluster_time_test.cpp',
     ],
     LIBDEPS=[
         'shared_cluster_commands',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ]
+)
+
+env.CppUnitTest(
+    target='compute_at_cluster_time_test',
+    source=[
+        'compute_at_cluster_time_test.cpp',
+    ],
+    LIBDEPS=[
+        'shared_cluster_commands',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/logical_time',
