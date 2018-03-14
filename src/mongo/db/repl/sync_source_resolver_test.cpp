@@ -307,6 +307,7 @@ BSONObj _makeOplogEntry(Timestamp ts, long long term) {
                       BSONObj(),                        // o
                       boost::none,                      // o2
                       {},                               // sessionInfo
+                      boost::none,                      // upsert
                       boost::none,                      // wall clock time
                       boost::none,                      // statement id
                       boost::none,  // optime of previous write within same transaction
