@@ -164,6 +164,32 @@ public:
         return _currTimestamp;
     }
 
+    /**
+     * This function always expects to receive the UUID of the collection.
+     */
+    Status setCollectionCount(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              long long newCount) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_setCollectionCountStatus && _setCollectionCountStatusUUID &&
+            nsOrUUID.uuid() == _setCollectionCountStatusUUID) {
+            return *_setCollectionCountStatus;
+        }
+        _newCounts[nsOrUUID.uuid().get()] = newCount;
+        return Status::OK();
+    }
+
+    void setSetCollectionCountStatus(UUID uuid, Status status) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _setCollectionCountStatus = status;
+        _setCollectionCountStatusUUID = uuid;
+    }
+
+    long long getFinalCollectionCount(const UUID& uuid) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _newCounts[uuid];
+    }
+
 private:
     mutable stdx::mutex _mutex;
 
@@ -178,6 +204,11 @@ private:
     // A Status value which, if set, will be returned by the 'recoverToStableTimestamp' function, in
     // order to simulate the error case for that function. Defaults to boost::none.
     boost::optional<Status> _recoverToTimestampStatus = boost::none;
+
+    stdx::unordered_map<UUID, long long, UUID::Hash> _newCounts;
+
+    boost::optional<Status> _setCollectionCountStatus = boost::none;
+    boost::optional<UUID> _setCollectionCountStatusUUID = boost::none;
 };
 
 /**

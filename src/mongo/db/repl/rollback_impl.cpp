@@ -161,6 +161,16 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     _rollbackStats.commonPoint = commonPoint;
     _listener->onCommonPointFound(commonPoint.getTimestamp());
 
+    // Ask the record store for the pre-rollback counts of any collections whose counts will change
+    // and create a map with the adjusted counts for post-rollback. While finding the common
+    // point, we keep track of how much each collection's count will change during the rollback.
+    // Note: these numbers are relative to the common point, not the stable timestamp, and thus
+    // must be set after recovering from the oplog.
+    status = _findRecordStoreCounts(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+
     // Increment the Rollback ID of this node. The Rollback ID is a natural number that it is
     // incremented by 1 every time a rollback occurs. Note that the Rollback ID must be incremented
     // before modifying any local data.
@@ -198,6 +208,13 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // we are guaranteed to have at least one oplog entry after the common point.
     Timestamp truncatePoint = _findTruncateTimestamp(opCtx, commonPointSW.getValue());
 
+    // We cannot have an interrupt point between setting the oplog truncation point and fixing the
+    // record store counts or else a clean shutdown could produce incorrect counts. We explicitly
+    // check for shutdown here to safely maximize interruptibility.
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+    }
+
     // Persist the truncate point to the 'oplogTruncateAfterPoint' document. We save this value so
     // that the replication recovery logic knows where to truncate the oplog. We save this value
     // durably to match the behavior during startup recovery. This must occur after we successfully
@@ -217,12 +234,14 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // being consistent.
     _resetDropPendingState(opCtx);
 
-    // Run the oplog recovery logic.
-    status = _oplogRecovery(opCtx, stableTimestampSW.getValue());
-    if (!status.isOK()) {
-        return status;
-    }
+    // Run the recovery process.
+    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx,
+                                                                    stableTimestampSW.getValue());
     _listener->onRecoverFromOplog();
+
+    // Sets the correct post-rollback counts on any collections whose counts changed during the
+    // rollback.
+    _correctRecordStoreCounts(opCtx);
 
     // At this point, the last applied and durable optimes on this node still point to ops on
     // the divergent branch of history. We therefore update the last optimes to the top of the
@@ -381,6 +400,78 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
     return namespaces;
 }
 
+void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
+    // This function explicitly does not check for shutdown since a clean shutdown post oplog
+    // truncation is not allowed to occur until the record store counts are corrected.
+    const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+    for (const auto& uiCount : _newCounts) {
+        auto uuid = uiCount.first;
+        const auto nss = uuidCatalog.lookupNSSByUUID(uuid);
+        invariant(!nss.isEmpty(),
+                  str::stream() << "The collection with UUID " << uuid
+                                << " is unexpectedly missing in the UUIDCatalog");
+        auto status = _storageInterface->setCollectionCount(
+            opCtx, {nss.db().toString(), uuid}, uiCount.second);
+        if (!status.isOK()) {
+            // We ignore errors here because crashing or leaving rollback would only leave
+            // collection counts more inaccurate.
+            warning() << "Failed to set count of " << nss.ns() << " (" << uuid.toString() << ") to "
+                      << uiCount.second << ". Received: " << status;
+        }
+    }
+}
+
+Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+    }
+    const auto& uuidCatalog = UUIDCatalog::get(opCtx);
+
+    log() << "finding record store counts";
+    for (const auto& uiCount : _countDiffs) {
+        auto uuid = uiCount.first;
+        auto countDiff = uiCount.second;
+        if (countDiff == 0) {
+            continue;
+        }
+
+        const auto nss = uuidCatalog.lookupNSSByUUID(uuid);
+        invariant(!nss.isEmpty(),
+                  str::stream() << "The collection with UUID " << uuid
+                                << " is unexpectedly missing in the UUIDCatalog");
+        auto countSW = _storageInterface->getCollectionCount(opCtx, {nss.db().toString(), uuid});
+        if (!countSW.isOK()) {
+            return countSW.getStatus();
+        }
+        auto oldCount = countSW.getValue();
+        if (oldCount > static_cast<uint64_t>(std::numeric_limits<long long>::max())) {
+            warning() << "Count for " << nss.ns() << " (" << uuid.toString() << ") was " << oldCount
+                      << " which is larger than the maximum int64_t value. Not attempting to fix "
+                         "count during rollback.";
+            continue;
+        }
+
+        long long oldCountSigned = static_cast<long long>(oldCount);
+        auto newCount = oldCountSigned + countDiff;
+
+        if (newCount < 0) {
+            warning() << "Attempted to set count for " << nss.ns() << " (" << uuid.toString()
+                      << ") to " << newCount
+                      << " but set it to 0 instead. This is likely due to the count previously "
+                         "becoming inconsistent from an unclean shutdown or a rollback that could "
+                         "not fix the count correctly. Old count: "
+                      << oldCount << ". Count change: " << countDiff;
+            newCount = 0;
+        }
+        LOG(2) << "Record count of " << nss.ns() << " (" << uuid.toString()
+               << ") before rollback is " << oldCount << ". Setting it to " << newCount
+               << ", due to change of " << countDiff;
+        _newCounts[uuid] = newCount;
+    }
+
+    return Status::OK();
+}
+
 /**
  * Process a single oplog entry that is getting rolled back and update the necessary rollback info
  * structures.
@@ -464,6 +555,17 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
             _observerInfo.configServerConfigVersionRolledBack = true;
             warning() << "Config version document rollback detected. oplog op: "
                       << redact(oplogEntry.toBSON());
+        }
+
+        // Rolling back an insert must decrement the count by 1.
+        _countDiffs[oplogEntry.getUuid().get()] -= 1;
+    } else if (opType == OpTypeEnum::kDelete) {
+        // Rolling back a delete must increment the count by 1.
+        _countDiffs[oplogEntry.getUuid().get()] += 1;
+    } else if (opType == OpTypeEnum::kCommand) {
+        if (oplogEntry.getCommandType() == OplogEntry::CommandType::kCreate) {
+            // If we roll back a create, then we do not need to change the size of that uuid.
+            _countDiffs.erase(oplogEntry.getUuid().get());
         }
     }
 
@@ -664,15 +766,6 @@ StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* 
             return exceptionToStatus();
         }
     }
-}
-
-Status RollbackImpl::_oplogRecovery(OperationContext* opCtx, Timestamp stableTimestamp) {
-    if (_isInShutdown()) {
-        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
-    }
-    // Run the recovery process.
-    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
-    return Status::OK();
 }
 
 Status RollbackImpl::_triggerOpObserver(OperationContext* opCtx) {

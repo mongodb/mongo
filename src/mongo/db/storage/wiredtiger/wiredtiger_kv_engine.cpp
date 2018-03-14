@@ -1176,6 +1176,9 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                           << stableTS.toString());
     }
 
+    LOG_FOR_ROLLBACK(2) << "WiredTiger::RecoverToStableTimestamp syncing size storer to disk.";
+    syncSizeInfo(true);
+
     LOG_FOR_ROLLBACK(2)
         << "WiredTiger::RecoverToStableTimestamp shutting down journal and checkpoint threads.";
     // Shutdown WiredTigerKVEngine owned accesses into the storage engine.

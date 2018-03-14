@@ -116,16 +116,24 @@ struct RollbackStats {
  *   1. Transition to ROLLBACK.
  *   2. Await background index completion.
  *   3. Find the common point between the local and remote oplogs.
- *       a. Keep track of what is rolled back to provide a summary to the user.
- *       b. Write rolled back documents to 'Rollback Files'.
- *   4. Increment the Rollback ID (RBID).
- *   5. Tell the storage engine to recover to the last stable timestamp.
- *   6. Write the oplog entry after the common point as the 'OplogTruncateAfterPoint'.
- *   7. Call recovery code.
+ *       a. Keep track of what is rolled back to provide a summary to the user and to write
+ *          rollback files.
+ *       b. Maintain a map of how the counts of each collection change during the rollback relative
+ *          to the common point.
+ *   4. Retrieve the sizes of each collection whose size will change and calculate the
+ *      post-rollback size.
+ *   5. Increment the Rollback ID (RBID).
+ *   6. Write rolled back documents to 'Rollback Files'.
+ *   7. Tell the storage engine to recover to the last stable timestamp.
+ *   8. Write the oplog entry after the common point as the 'OplogTruncateAfterPoint'.
+ *   9. Clear drop pending state.
+ *   10. Call recovery code.
  *       a. Truncate the oplog at the common point.
  *       b. Apply all oplog entries to the end of oplog.
- *   8. Trigger the on-rollback op observer.
- *   9. Transition to SECONDARY.
+ *   11. Correct the counts of any collections whose counts changed.
+ *   12. Reset last optimes from the oplog.
+ *   13. Trigger the on-rollback op observer.
+ *   14. Transition to SECONDARY.
  *
  * If the node crashes while in rollback and the storage engine has not recovered to the last
  * stable timestamp yet, then rollback will simply restart against the new sync source upon restart.
@@ -337,17 +345,22 @@ private:
     StatusWith<Timestamp> _recoverToStableTimestamp(OperationContext* opCtx);
 
     /**
-     * Runs the oplog recovery logic. This involves applying oplog operations between the stable
-     * timestamp and the common point.
-     */
-    Status _oplogRecovery(OperationContext* opCtx, Timestamp stableTimestamp);
-
-    /**
      * Process a single oplog entry that is getting rolled back and update the necessary rollback
      * info structures. This function assumes that oplog entries are processed in descending
      * timestamp order (that is, starting from the newest oplog entry, going backwards).
      */
     Status _processRollbackOp(const OplogEntry& oplogEntry);
+
+    /**
+     * Iterates through the _countDiff map and retrieves the count of the record store pointed to
+     * by each UUID. It then saves the post-rollback counts to the _newCounts map.
+     */
+    Status _findRecordStoreCounts(OperationContext* opCtx);
+
+    /**
+     * Sets the record store counts to be the values stored in _newCounts.
+     */
+    void _correctRecordStoreCounts(OperationContext* opCtx);
 
     /**
      * Called after we have successfully recovered to the stable timestamp and recovered from the
@@ -423,6 +436,16 @@ private:
 
     // Holds information about this rollback event.
     RollbackStats _rollbackStats;  // (N)
+
+    // Maintains a count of the difference between the count of the record store pointed to by the
+    // UUID before recover to a stable timestamp is called and the count after we recover from the
+    // oplog. This only must keep track of inserts and deletes. Rolling back drops is just a rename
+    // and rolling back creates means that the UUID does not exist post rollback.
+    stdx::unordered_map<UUID, long long, UUID::Hash> _countDiffs;  // (N)
+
+    // Maintains the count of the record store pointed to by the UUID after we recover from the
+    // oplog.
+    stdx::unordered_map<UUID, long long, UUID::Hash> _newCounts;  // (N)
 };
 
 }  // namespace repl

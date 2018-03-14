@@ -323,8 +323,16 @@ public:
     /**
      * Returns the number of documents in the collection.
      */
-    virtual StatusWith<CollectionCount> getCollectionCount(OperationContext* opCtx,
-                                                           const NamespaceString& nss) = 0;
+    virtual StatusWith<CollectionCount> getCollectionCount(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) = 0;
+
+    /**
+     * Sets the number of documents in the collection. This function does NOT also update the
+     * data size of the collection.
+     */
+    virtual Status setCollectionCount(OperationContext* opCtx,
+                                      const NamespaceStringOrUUID& nsOrUUID,
+                                      long long newCount) = 0;
 
     /**
      * Returns the UUID of the collection specified by nss, if such a UUID exists.

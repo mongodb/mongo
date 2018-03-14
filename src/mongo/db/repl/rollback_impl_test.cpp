@@ -53,7 +53,9 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-NamespaceString nss("local.oplog.rs");
+NamespaceString kOplogNSS("local.oplog.rs");
+NamespaceString nss("test.coll");
+std::string kGenericUUIDStr = "b4c66a44-c1ca-4d86-8d25-12e82fa2de5b";
 
 BSONObj makeInsertOplogEntry(long long time, BSONObj obj, StringData ns, UUID uuid) {
     return BSON("ts" << Timestamp(time, time) << "h" << time << "t" << time << "op"
@@ -193,16 +195,32 @@ protected:
     }
 
     /**
+     * Creates an oplog entry that represents the insertion of 'doc' into the namespace 'nss' with
+     * UUID 'uuid', and inserts the document into the storage interface.
+     *
+     * Unless 'time' is explicitly given, this insert is timestamped with an arbitrary time that
+     * monotonically increases with each successive call to this function.
+     */
+    OplogInterfaceMock::Operation _insertDocAndReturnOplogEntry(
+        BSONObj doc, UUID uuid, NamespaceString nss, boost::optional<long> time = boost::none) {
+        const auto optime = time.value_or(_counter++);
+        ASSERT_OK(_storageInterface->insertDocument(
+            _opCtx.get(), nss, {doc, Timestamp(optime, optime)}, optime));
+        return std::make_pair(makeInsertOplogEntry(optime, doc, nss.ns(), uuid), RecordId(optime));
+    }
+
+    /**
      * Creates an oplog entry that represents updating an object matched by 'query' to be 'newDoc'
      * in the namespace 'nss, with UUID 'uuid'. It also inserts 'newDoc' into the storage interface.
-     * This update is timestamped with an arbitrary time that monotonically increases with each
-     * successive call.
+     * This update is timestamped with the provided 'optime' or an arbitrary time that
+     * monotonically increases with each successive call, if none is provided.
      */
     void _updateDocAndGenerateOplogEntry(BSONObj query,
                                          BSONObj newDoc,
                                          UUID uuid,
-                                         NamespaceString nss) {
-        const auto time = _counter++;
+                                         NamespaceString nss,
+                                         boost::optional<long> optime = boost::none) {
+        const auto time = optime.value_or(_counter++);
         ASSERT_OK(_insertOplogEntry(makeUpdateOplogEntry(time, query, newDoc, nss.ns(), uuid)));
         ASSERT_OK(_storageInterface->insertDocument(
             _opCtx.get(), nss, {newDoc, Timestamp(time, time)}, time));
@@ -211,11 +229,14 @@ protected:
     /**
      * Creates an oplog entry that represents deleting an object with _id 'id' in the namespace
      * 'nss' with UUID 'uuid'. This function also removes that document from the storage interface.
-     * This update is timestamped with an arbitrary time that monotonically increases with each
-     * successive call.
+     * This delete is timestamped with the provided 'optime' or an arbitrary time that
+     * monotonically increases with each successive call, if none is provided.
      */
-    void _deleteDocAndGenerateOplogEntry(BSONElement id, UUID uuid, NamespaceString nss) {
-        const auto time = _counter++;
+    void _deleteDocAndGenerateOplogEntry(BSONElement id,
+                                         UUID uuid,
+                                         NamespaceString nss,
+                                         boost::optional<long> optime = boost::none) {
+        const auto time = optime.value_or(_counter++);
         ASSERT_OK(_insertOplogEntry(makeDeleteOplogEntry(time, id.wrap(), nss.ns(), uuid)));
         ASSERT_OK(_storageInterface->deleteById(_opCtx.get(), nss, id));
     }
@@ -248,12 +269,14 @@ protected:
 
     bool _triggeredOpObserver = false;
     stdx::function<void(const OpObserver::RollbackObserverInfo& rbInfo)> _onRollbackOpObserverFn =
-        [this](const OpObserver::RollbackObserverInfo& rbInfo) {};
+        [this](const OpObserver::RollbackObserverInfo& rbInfo) { _triggeredOpObserver = true; };
 
     stdx::function<void(UUID, NamespaceString)> _onRollbackFileWrittenForNamespaceFn =
         [this](UUID, NamespaceString) {};
 
     std::unique_ptr<Listener> _listener;
+
+    UUID kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
 
 private:
     long _counter = 100;
@@ -325,14 +348,13 @@ private:
  * Helper functions to make simple oplog entries with timestamps, terms, and hashes.
  */
 BSONObj makeOp(OpTime time, long long hash) {
-    const auto kGenericUUID =
-        unittest::assertGet(UUID::parse("b4c66a44-c1ca-4d86-8d25-12e82fa2de5b"));
+    auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
     return BSON("ts" << time.getTimestamp() << "h" << hash << "t" << time.getTerm() << "op"
-                     << "i"
+                     << "n"
                      << "o"
                      << BSONObj()
                      << "ns"
-                     << "test.coll"
+                     << nss.ns()
                      << "ui"
                      << kGenericUUID);
 }
@@ -370,7 +392,10 @@ void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
     OplogInterfaceLocal oplog(opCtx, NamespaceString::kRsOplogNamespace.ns());
     auto iter = oplog.makeIterator();
     for (auto reverseIt = expectedOplog.rbegin(); reverseIt != expectedOplog.rend(); reverseIt++) {
-        ASSERT_BSONOBJ_EQ(*reverseIt, unittest::assertGet(iter->next()).first);
+        auto expectedTime = unittest::assertGet(OpTime::parseFromOplogEntry(*reverseIt));
+        auto realTime = unittest::assertGet(
+            OpTime::parseFromOplogEntry(unittest::assertGet(iter->next()).first));
+        ASSERT_EQ(expectedTime, realTime);
     }
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
@@ -423,7 +448,6 @@ TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncate
 
     auto nextTime = 3;
     ASSERT_OK(_insertOplogEntry(makeOp(nextTime)));
-    const auto nss = NamespaceString("test.coll");
     auto coll = _initializeCollection(_opCtx.get(), UUID::gen(), nss);
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -631,20 +655,31 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringRTT) {
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
     ASSERT(_stableTimestamp.isNull());
 
-    // This shutdown occurs between setting the oplog truncate after point and truncating the oplog.
-    // This must be safe since it is no different than an untimely crash.
     _assertDocsInOplog(_opCtx.get(), {1, 2});
     truncateAfterPoint =
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
-    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+    ASSERT_EQUALS(_truncatePoint, Timestamp());
 }
 
-TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringSetTruncatePoint) {
+TEST_F(RollbackImplTest,
+       RollbackRecoversFromOplogAndFixesCountsWhenShutdownDuringSetTruncatePoint) {
+    auto uuid = kGenericUUID;
+    const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _insertDocAndGenerateOplogEntry(BSON("_id" << 1), uuid, nss, 2);
+
+    // Insert another document so the collection count is 2.
+    const Timestamp time = Timestamp(2, 2);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss.db().toString(), uuid}, {BSON("_id" << 2), time}, time.asULL()));
+    ASSERT_EQ(2ULL,
+              unittest::assertGet(_storageInterface->getCollectionCount(
+                  _opCtx.get(), {nss.db().toString(), uuid})));
 
     _assertDocsInOplog(_opCtx.get(), {1, 2});
     auto truncateAfterPoint =
@@ -662,21 +697,20 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringSetTrunc
     // Run rollback.
     auto status = _rollback->runRollback(_opCtx.get());
 
-    // Make sure shutdown occurred before oplog recovery.
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
     ASSERT(_recoveredToStableTimestamp);
-    ASSERT_FALSE(_recoveredFromOplog);
+    ASSERT(_recoveredFromOplog);
+    ASSERT_FALSE(_triggeredOpObserver);
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 
-    // This shutdown occurs between setting the oplog truncate after point and truncating the oplog.
-    // This must be safe since it is no different than an untimely crash.
-    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    _assertDocsInOplog(_opCtx.get(), {1});
     truncateAfterPoint =
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
     ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid), 1);
 }
 
 TEST_F(RollbackImplTest, RollbackSucceedsAndTruncatesOplog) {
@@ -1117,6 +1151,163 @@ DEATH_TEST_F(RollbackImplTest,
     unittest::log() << "mongod did not crash when expected; status: " << status;
 }
 
+DEATH_TEST_F(RollbackImplTest,
+             InvariantFailureIfNamespaceIsMissingWhenGettingCollectionSizes,
+             "unexpectedly missing in the UUIDCatalog") {
+    const auto commonOp = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_insertOplogEntry(commonOp.first));
+    ASSERT_OK(_insertOplogEntry(makeDeleteOplogEntry(2, BSON("_id" << 1), nss.ns(), kGenericUUID)));
+
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    auto status = _rollback->runRollback(_opCtx.get());
+    unittest::log() << "mongod did not crash when expected; status: " << status;
+}
+
+TEST_F(RollbackImplTest, RollbackSetsMultipleCollectionCounts) {
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    const auto commonOp = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_insertOplogEntry(commonOp.first));
+
+    auto uuid1 = UUID::gen();
+    auto nss1 = NamespaceString("test.coll1");
+    const auto obj1 = BSON("_id" << 1);
+    const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
+    _insertDocAndGenerateOplogEntry(obj1, uuid1, nss1, 2);
+
+    const Timestamp time1 = Timestamp(2, 2);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss1.db().toString(), uuid1}, {BSON("_id" << 2), time1}, time1.asULL()));
+    ASSERT_EQ(2ULL,
+              unittest::assertGet(_storageInterface->getCollectionCount(
+                  _opCtx.get(), {nss1.db().toString(), uuid1})));
+    ASSERT_OK(
+        _storageInterface->setCollectionCount(_opCtx.get(), {nss1.db().toString(), uuid1}, 2));
+
+    auto uuid2 = UUID::gen();
+    auto nss2 = NamespaceString("test.coll2");
+    const auto obj2 = BSON("_id" << 1);
+    const auto coll2 = _initializeCollection(_opCtx.get(), uuid2, nss2);
+    const Timestamp time2 = Timestamp(3, 3);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss2.db().toString(), uuid2}, {obj2, time2}, time2.asULL()));
+    _deleteDocAndGenerateOplogEntry(obj2["_id"], uuid2, nss2, 3);
+
+    const Timestamp time3 = Timestamp(4, 4);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss2.db().toString(), uuid2}, {BSON("_id" << 2), time3}, time3.asULL()));
+    ASSERT_EQ(1ULL,
+              unittest::assertGet(_storageInterface->getCollectionCount(
+                  _opCtx.get(), {nss2.db().toString(), uuid2})));
+    ASSERT_OK(
+        _storageInterface->setCollectionCount(_opCtx.get(), {nss2.db().toString(), uuid2}, 1));
+
+    _assertDocsInOplog(_opCtx.get(), {1, 2, 3});
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid1), 1);
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid2), 2);
+}
+
+TEST_F(RollbackImplTest, CountChangesCancelOut) {
+    auto uuid = kGenericUUID;
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    const auto commonOp = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_insertOplogEntry(commonOp.first));
+
+    const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+    const auto obj = BSON("_id" << 2);
+    const Timestamp time = Timestamp(2, 2);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss.db().toString(), uuid}, {obj, time}, time.asULL()));
+
+    _insertDocAndGenerateOplogEntry(BSON("_id" << 1), uuid, nss, 2);
+    _deleteDocAndGenerateOplogEntry(obj["_id"], uuid, nss, 3);
+    _insertDocAndGenerateOplogEntry(BSON("_id" << 3), uuid, nss, 4);
+
+    // Test that we do nothing on drop oplog entries.
+    ASSERT_OK(_insertOplogEntry(makeCommandOp(Timestamp(5, 5),
+                                              UUID::gen(),
+                                              nss.getCommandNS().toString(),
+                                              BSON("drop" << nss.coll()),
+                                              5)
+                                    .first));
+
+    ASSERT_EQ(2ULL,
+              unittest::assertGet(_storageInterface->getCollectionCount(
+                  _opCtx.get(), {nss.db().toString(), uuid})));
+    ASSERT_OK(_storageInterface->setCollectionCount(nullptr, {"", uuid}, 2));
+
+    _assertDocsInOplog(_opCtx.get(), {1, 2, 3, 4, 5});
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid), 1);
+}
+
+TEST_F(RollbackImplTest, RollbackIgnoresSetCollectionCountError) {
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    const auto commonOp = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_insertOplogEntry(commonOp.first));
+
+    auto uuid1 = UUID::gen();
+    auto nss1 = NamespaceString("test.coll1");
+    const auto obj1 = BSON("_id" << 1);
+    const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
+    _insertDocAndGenerateOplogEntry(obj1, uuid1, nss1, 2);
+
+    const Timestamp time1 = Timestamp(2, 2);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss1.db().toString(), uuid1}, {BSON("_id" << 2), time1}, time1.asULL()));
+    ASSERT_EQ(2ULL,
+              unittest::assertGet(_storageInterface->getCollectionCount(
+                  _opCtx.get(), {nss1.db().toString(), uuid1})));
+    ASSERT_OK(_storageInterface->setCollectionCount(nullptr, {"", uuid1}, 2));
+
+    auto uuid2 = UUID::gen();
+    auto nss2 = NamespaceString("test.coll2");
+    const auto obj2 = BSON("_id" << 1);
+    const auto coll2 = _initializeCollection(_opCtx.get(), uuid2, nss2);
+    _insertDocAndGenerateOplogEntry(obj2, uuid2, nss2, 3);
+
+    const Timestamp time2 = Timestamp(3, 3);
+    ASSERT_OK(_storageInterface->insertDocument(
+        _opCtx.get(), {nss2.db().toString(), uuid2}, {BSON("_id" << 2), time2}, time2.asULL()));
+    ASSERT_EQ(2ULL,
+              unittest::assertGet(_storageInterface->getCollectionCount(
+                  _opCtx.get(), {nss2.db().toString(), uuid2})));
+    ASSERT_OK(_storageInterface->setCollectionCount(nullptr, {"", uuid2}, 2));
+
+    _assertDocsInOplog(_opCtx.get(), {1, 2, 3});
+
+    _storageInterface->setSetCollectionCountStatus(
+        uuid1, Status(ErrorCodes::CommandFailed, "set collection count failed"));
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid1), 2);
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(uuid2), 1);
+}
+
+TEST_F(RollbackImplTest, ResetToZeroIfCountGoesNegative) {
+    const auto commonOp = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonOp});
+    ASSERT_OK(_insertOplogEntry(commonOp.first));
+    ASSERT_OK(_insertOplogEntry(makeInsertOplogEntry(2, BSON("_id" << 1), nss.ns(), kGenericUUID)));
+
+    const auto coll = _initializeCollection(_opCtx.get(), kGenericUUID, nss);
+
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    ASSERT_EQ(_storageInterface->getFinalCollectionCount(kGenericUUID), 0);
+}
+
 /**
  * Fixture to help test that rollback records the correct information in its RollbackObserverInfo
  * struct.
@@ -1145,13 +1336,18 @@ public:
     }
 
     BSONObj makeSessionOp(UUID collId, NamespaceString nss, UUID sessionId, TxnNumber txnNum) {
+        auto doc = BSON("_id" << 1);
+        const Timestamp time = Timestamp(2, 1);
+        ASSERT_OK(_storageInterface->insertDocument(
+            _opCtx.get(), {nss.db().toString(), collId}, {doc, time}, time.asULL()));
+
         BSONObjBuilder bob;
-        bob.append("ts", Timestamp(2, 1));
+        bob.append("ts", time);
         bob.append("h", 1LL);
         bob.append("op", "i");
         collId.appendToBuilder(&bob, "ui");
         bob.append("ns", nss.ns());
-        bob.append("o", BSON("_id" << 1));
+        bob.append("o", doc);
         bob.append("lsid",
                    BSON("id" << sessionId << "uid"
                              << BSONBinData(std::string(32, 'x').data(), 32, BinDataGeneral)));
@@ -1415,8 +1611,8 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceOfSingleOplogEntry)
     const auto nss = NamespaceString("test", "coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    const auto insertOp = makeCRUDOp(
-        OpTypeEnum::kInsert, Timestamp(2, 2), uuid, nss.ns(), BSON("_id" << 1), boost::none, 2);
+    const auto insertOp = _insertDocAndReturnOplogEntry(BSON("_id" << 1), uuid, nss, 2);
+
     ASSERT_OK(rollbackOps({insertOp}));
     std::set<NamespaceString> expectedNamespaces = {nss};
     ASSERT(expectedNamespaces == _rbInfo.rollbackNamespaces);
@@ -1424,8 +1620,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceOfSingleOplogEntry)
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesOfOplogEntries) {
     const auto makeInsertOp = [&](UUID uuid, NamespaceString nss, Timestamp ts, int recordId) {
-        return makeCRUDOp(
-            OpTypeEnum::kInsert, ts, uuid, nss.ns(), BSON("_id" << 1), boost::none, recordId);
+        return _insertDocAndReturnOplogEntry(BSON("_id" << 1), uuid, nss, recordId);
     };
 
     const auto nss1 = NamespaceString("test", "coll1");
@@ -1467,7 +1662,6 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromOplogEntry) {
-    NamespaceString nss("test.coll");
     const auto collId = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), collId, nss);
     auto sessionId = UUID::gen();
@@ -1485,14 +1679,13 @@ TEST_F(RollbackImplObserverInfoTest,
     const auto nss = NamespaceString("test", "coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    auto insertOp = makeCRUDOp(
-        OpTypeEnum::kInsert, Timestamp(2, 2), uuid, nss.ns(), BSON("_id" << 1), boost::none, 2);
+
+    const auto insertOp = _insertDocAndReturnOplogEntry(BSON("_id" << 1), uuid, nss, 2);
     ASSERT_OK(rollbackOps({insertOp}));
     ASSERT(_rbInfo.rollbackSessionIds.empty());
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromApplyOpsSubOp) {
-    NamespaceString nss("test.coll");
     const auto collId = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), collId, nss);
     auto sessionId = UUID::gen();
@@ -1515,14 +1708,9 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsShardIdentityRollback) {
     const auto uuid = UUID::gen();
     const auto nss = NamespaceString::kServerConfigurationNamespace;
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
-    auto insertShardIdOp = makeCRUDOp(OpTypeEnum::kInsert,
-                                      Timestamp(2, 2),
-                                      uuid,
-                                      nss.ns(),
-                                      BSON("_id" << ShardIdentityType::IdName),
-                                      boost::none,
-                                      2);
 
+    const auto insertShardIdOp =
+        _insertDocAndReturnOplogEntry(BSON("_id" << ShardIdentityType::IdName), uuid, nss, 2);
     ASSERT_OK(rollbackOps({insertShardIdOp}));
     ASSERT(_rbInfo.shardIdentityRolledBack);
 }
@@ -1602,16 +1790,14 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsInsertOpsInUUIDToIdMap) {
     const auto coll1 = _initializeCollection(_opCtx.get(), uuid1, nss1);
     const auto obj1 = BSON("_id"
                            << "kyle");
-    const auto insertOp1 =
-        makeCRUDOp(OpTypeEnum::kInsert, Timestamp(2, 2), uuid1, nss.ns(), obj1, boost::none, 2);
+    const auto insertOp1 = _insertDocAndReturnOplogEntry(obj1, uuid1, nss1, 2);
 
     const auto nss2 = NamespaceString("db.persons");
     const auto uuid2 = UUID::gen();
     const auto coll2 = _initializeCollection(_opCtx.get(), uuid2, nss2);
     const auto obj2 = BSON("_id"
                            << "jungsoo");
-    const auto insertOp2 =
-        makeCRUDOp(OpTypeEnum::kInsert, Timestamp(3, 3), uuid2, nss2.ns(), obj2, boost::none, 3);
+    const auto insertOp2 = _insertDocAndReturnOplogEntry(obj2, uuid2, nss2, 3);
 
     ASSERT_OK(rollbackOps({insertOp2, insertOp1}));
     ASSERT_EQ(_rbInfo.rollbackDeletedIdsMap.size(), 2UL);
@@ -1656,13 +1842,12 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleInsertOpsForSameName
     const auto nss = NamespaceString("db.coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+
     const auto obj1 = BSON("_id" << 1);
-    const auto insertOp1 =
-        makeCRUDOp(OpTypeEnum::kInsert, Timestamp(2, 2), uuid, nss.ns(), obj1, boost::none, 2);
+    const auto insertOp1 = _insertDocAndReturnOplogEntry(obj1, uuid, nss, 2);
 
     const auto obj2 = BSON("_id" << 2);
-    const auto insertOp2 =
-        makeCRUDOp(OpTypeEnum::kInsert, Timestamp(3, 3), uuid, nss.ns(), obj2, boost::none, 3);
+    const auto insertOp2 = _insertDocAndReturnOplogEntry(obj2, uuid, nss, 3);
 
     ASSERT_OK(rollbackOps({insertOp2, insertOp1}));
     ASSERT_EQ(_rbInfo.rollbackDeletedIdsMap.size(), 1UL);

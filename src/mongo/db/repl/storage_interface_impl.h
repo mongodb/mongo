@@ -147,7 +147,11 @@ public:
         OperationContext* opCtx, const NamespaceString& nss) override;
 
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
-        OperationContext* opCtx, const NamespaceString& nss) override;
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) override;
+
+    Status setCollectionCount(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              long long newCount) override;
 
     StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
                                                          const NamespaceString& nss) override;

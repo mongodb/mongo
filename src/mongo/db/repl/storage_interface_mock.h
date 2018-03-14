@@ -268,8 +268,14 @@ public:
     }
 
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
-        OperationContext* opCtx, const NamespaceString& nss) override {
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) override {
         return 0;
+    }
+
+    Status setCollectionCount(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              long long newCount) override {
+        return Status{ErrorCodes::IllegalOperation, "setCollectionCount not implemented."};
     }
 
     StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,

@@ -986,17 +986,37 @@ StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollection
 }
 
 StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectionCount(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
+    AutoGetCollectionForRead autoColl(opCtx, nsOrUUID);
 
     auto collectionResult =
-        getCollection(autoColl, nss, "Unable to get number of documents in collection.");
+        getCollection(autoColl, nsOrUUID, "Unable to get number of documents in collection.");
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
     auto collection = collectionResult.getValue();
 
     return collection->numRecords(opCtx);
+}
+
+Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
+                                                const NamespaceStringOrUUID& nsOrUUID,
+                                                long long newCount) {
+    AutoGetCollection autoColl(opCtx, nsOrUUID, LockMode::MODE_X);
+
+    auto collectionResult =
+        getCollection(autoColl, nsOrUUID, "Unable to set number of documents in collection.");
+    if (!collectionResult.isOK()) {
+        return collectionResult.getStatus();
+    }
+    auto collection = collectionResult.getValue();
+
+    auto rs = collection->getRecordStore();
+    // We cannot fix the data size correctly, so we just get the current cached value and keep it
+    // the same.
+    long long dataSize = rs->dataSize(opCtx);
+    rs->updateStatsAfterRepair(opCtx, newCount, dataSize);
+    return Status::OK();
 }
 
 StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
