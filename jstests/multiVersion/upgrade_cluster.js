@@ -46,7 +46,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 shardOptions: {binVersion: "last-stable"},
 
                 rsOptions: {binVersion: "last-stable"},
-                rs: isRSCluster
+                rs: isRSCluster,
+                shardAsReplicaSet: false
             }
         });
         st.configRS.awaitReplication();
