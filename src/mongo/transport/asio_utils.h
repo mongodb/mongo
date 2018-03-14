@@ -129,7 +129,7 @@ StatusWith<EventsMask> pollASIOSocket(Socket& socket, EventsMask mask, Milliseco
     int revents = (FD_ISSET(fd, &readfds) ? POLLIN : 0) | (FD_ISSET(fd, &writefds) ? POLLOUT : 0) |
         (FD_ISSET(fd, &errfds) ? POLLERR : 0);
 #else
-    pollfd pollItem;
+    pollfd pollItem = {};
     pollItem.fd = socket.native_handle();
     pollItem.events = mask;
 
