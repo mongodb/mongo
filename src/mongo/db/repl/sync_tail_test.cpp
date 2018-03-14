@@ -810,69 +810,90 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMake
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    auto syncApply =
-        [](OperationContext* opCtx, const BSONObj&, OplogApplication::Mode oplogApplicationMode) {
+    bool onInsertsCalled = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            onInsertsCalled = true;
             ASSERT_FALSE(opCtx->writesAreReplicated());
             ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
             ASSERT_TRUE(documentValidationDisabled(opCtx));
-            ASSERT_EQUALS(OplogApplication::Mode::kSecondary, oplogApplicationMode);
             return Status::OK();
         };
-    auto op = makeUpdateDocumentOplogEntry(
-        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    MultiApplier::OperationPtrs ops = {&op};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    createCollectionWithUuid(_opCtx.get(), nss);
+    auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0));
+    ASSERT_OK(runOpSteadyState(op));
+    ASSERT(onInsertsCalled);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToApplyOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    // This makes a delete operation on a non-existent collection.
     auto op = makeOplogEntry(nss);
-    auto syncApply = [](OperationContext*, const BSONObj&, OplogApplication::Mode) -> Status {
-        return {ErrorCodes::OperationFailed, ""};
-    };
-    MultiApplier::OperationPtrs ops = {&op};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, runOpSteadyState(op));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    auto op = makeOplogEntry(nss);
-    auto syncApply = [](OperationContext*, const BSONObj&, OplogApplication::Mode) -> Status {
-        uasserted(ErrorCodes::OperationFailed, "");
-        MONGO_UNREACHABLE;
-    };
-    MultiApplier::OperationPtrs ops = {&op};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    bool onInsertsCalled = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString&, const std::vector<BSONObj>&) {
+            onInsertsCalled = true;
+            uasserted(ErrorCodes::OperationFailed, "");
+            MONGO_UNREACHABLE;
+        };
+    createCollectionWithUuid(_opCtx.get(), nss);
+    auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0));
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, runOpSteadyState(op));
+    ASSERT(onInsertsCalled);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplying) {
-    auto op1 = makeOplogEntry("test.t1");
-    auto op2 = makeOplogEntry("test.t1");
-    auto op3 = makeOplogEntry("test.t2");
-    auto op4 = makeOplogEntry("test.t3");
-    MultiApplier::Operations operationsApplied;
-    auto syncApply =
-        [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
-            operationsApplied.push_back(OplogEntry(op));
-            return Status::OK();
+    NamespaceString nss1("test.t1");
+    NamespaceString nss2("test.t2");
+    NamespaceString nss3("test.t3");
+
+    const Seconds s(1);
+    unsigned int i = 1;
+    auto op1 = makeInsertDocumentOplogEntry({Timestamp(s, i++), 1LL}, nss1, BSON("_id" << 1));
+    auto op2 = makeInsertDocumentOplogEntry({Timestamp(s, i++), 1LL}, nss1, BSON("_id" << 2));
+    auto op3 = makeInsertDocumentOplogEntry({Timestamp(s, i++), 1LL}, nss2, BSON("_id" << 3));
+    auto op4 = makeInsertDocumentOplogEntry({Timestamp(s, i++), 1LL}, nss3, BSON("_id" << 4));
+
+    std::vector<NamespaceString> nssInserted;
+    std::vector<BSONObj> docsInserted;
+    bool onInsertsCalled = false;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            onInsertsCalled = true;
+            for (const auto& doc : docs) {
+                nssInserted.push_back(nss);
+                docsInserted.push_back(doc);
+            }
         };
-    MultiApplier::OperationPtrs ops = {&op4, &op1, &op3, &op2};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
-    ASSERT_EQUALS(4U, operationsApplied.size());
-    ASSERT_EQUALS(op1, operationsApplied[0]);
-    ASSERT_EQUALS(op2, operationsApplied[1]);
-    ASSERT_EQUALS(op3, operationsApplied[2]);
-    ASSERT_EQUALS(op4, operationsApplied[3]);
+
+    createCollectionWithUuid(_opCtx.get(), nss1);
+    createCollectionWithUuid(_opCtx.get(), nss2);
+    createCollectionWithUuid(_opCtx.get(), nss3);
+
+    ASSERT_OK(runOpsSteadyState({op4, op1, op3, op2}));
+
+    ASSERT_EQUALS(4U, nssInserted.size());
+    ASSERT_EQUALS(nss1, nssInserted[0]);
+    ASSERT_EQUALS(nss1, nssInserted[1]);
+    ASSERT_EQUALS(nss2, nssInserted[2]);
+    ASSERT_EQUALS(nss3, nssInserted[3]);
+
+    ASSERT_EQUALS(4U, docsInserted.size());
+    ASSERT_BSONOBJ_EQ(op1.getObject(), docsInserted[0]);
+    ASSERT_BSONOBJ_EQ(op2.getObject(), docsInserted[1]);
+    ASSERT_BSONOBJ_EQ(op3.getObject(), docsInserted[2]);
+    ASSERT_BSONOBJ_EQ(op4.getObject(), docsInserted[3]);
+
+    ASSERT(onInsertsCalled);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplying) {
-    int seconds = 0;
+    int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
         return makeInsertDocumentOplogEntry(
             {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
@@ -885,43 +906,35 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
     auto insertOp1b = makeOp(nss1);
     auto insertOp2a = makeOp(nss2);
     auto insertOp2b = makeOp(nss2);
-    std::vector<BSONObj> operationsApplied;
-    auto syncApply =
-        [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
-            operationsApplied.push_back(op.copy());
-            return Status::OK();
+
+    // Each element in 'docsInserted' is a grouped insert operation.
+    std::vector<std::vector<BSONObj>> docsInserted;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            docsInserted.push_back(docs);
         };
 
-    MultiApplier::OperationPtrs ops = {
-        &createOp1, &createOp2, &insertOp1a, &insertOp2a, &insertOp1b, &insertOp2b};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    MultiApplier::Operations ops = {
+        createOp1, createOp2, insertOp1a, insertOp2a, insertOp1b, insertOp2b};
+    ASSERT_OK(runOpsSteadyState(ops));
 
-    ASSERT_EQUALS(4U, operationsApplied.size());
-    ASSERT_EQUALS(createOp1, unittest::assertGet(OplogEntry::parse(operationsApplied[0])));
-    ASSERT_EQUALS(createOp2, unittest::assertGet(OplogEntry::parse(operationsApplied[1])));
+    ASSERT_EQUALS(2U, docsInserted.size());
 
     // Check grouped insert operations in namespace "nss1".
-    ASSERT_EQUALS(insertOp1a.getOpTime(), parseFromOplogEntryArray(operationsApplied[2], 0));
-    ASSERT_EQUALS(insertOp1a.getNamespace().ns(), operationsApplied[2]["ns"].valuestrsafe());
-    ASSERT_EQUALS(BSONType::Array, operationsApplied[2]["o"].type());
-    auto group1 = operationsApplied[2]["o"].Array();
+    const auto& group1 = docsInserted[0];
     ASSERT_EQUALS(2U, group1.size());
-    ASSERT_BSONOBJ_EQ(insertOp1a.getObject(), group1[0].Obj());
-    ASSERT_BSONOBJ_EQ(insertOp1b.getObject(), group1[1].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp1a.getObject(), group1[0]);
+    ASSERT_BSONOBJ_EQ(insertOp1b.getObject(), group1[1]);
 
     // Check grouped insert operations in namespace "nss2".
-    ASSERT_EQUALS(insertOp2a.getOpTime(), parseFromOplogEntryArray(operationsApplied[3], 0));
-    ASSERT_EQUALS(insertOp2a.getNamespace().ns(), operationsApplied[3]["ns"].valuestrsafe());
-    ASSERT_EQUALS(BSONType::Array, operationsApplied[3]["o"].type());
-    auto group2 = operationsApplied[3]["o"].Array();
+    const auto& group2 = docsInserted[1];
     ASSERT_EQUALS(2U, group2.size());
-    ASSERT_BSONOBJ_EQ(insertOp2a.getObject(), group2[0].Obj());
-    ASSERT_BSONOBJ_EQ(insertOp2b.getObject(), group2[1].Obj());
+    ASSERT_BSONOBJ_EQ(insertOp2a.getObject(), group2[0]);
+    ASSERT_BSONOBJ_EQ(insertOp2b.getObject(), group2[1]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchCountWhenGroupingInsertOperation) {
-    int seconds = 0;
+    int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
         return makeInsertDocumentOplogEntry(
             {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
@@ -939,38 +952,32 @@ TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchCountWhenGroupingInsertOperation) 
     MultiApplier::Operations operationsToApply;
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
-    std::vector<BSONObj> operationsApplied;
-    auto syncApply =
-        [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
-            operationsApplied.push_back(op.copy());
-            return Status::OK();
+
+    // Each element in 'docsInserted' is a grouped insert operation.
+    std::vector<std::vector<BSONObj>> docsInserted;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            docsInserted.push_back(docs);
         };
 
-    MultiApplier::OperationPtrs ops;
-    for (auto&& op : operationsToApply) {
-        ops.push_back(&op);
-    }
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    ASSERT_OK(runOpsSteadyState(operationsToApply));
 
     // multiSyncApply should combine operations as follows:
     // {create}, {grouped_insert}, {insert_(limit+1)}
-    ASSERT_EQUALS(3U, operationsApplied.size());
-    ASSERT_EQUALS(createOp, unittest::assertGet(OplogEntry::parse(operationsApplied[0])));
+    // Ignore {create} since we are only tracking inserts.
+    ASSERT_EQUALS(2U, docsInserted.size());
 
-    const auto& groupedInsertOp = operationsApplied[1];
-    ASSERT_EQUALS(insertOps.front().getOpTime(), parseFromOplogEntryArray(groupedInsertOp, 0));
-    ASSERT_EQUALS(insertOps.front().getNamespace().ns(), groupedInsertOp["ns"].valuestrsafe());
-    ASSERT_EQUALS(BSONType::Array, groupedInsertOp["o"].type());
-    auto groupedInsertDocuments = groupedInsertOp["o"].Array();
+    const auto& groupedInsertDocuments = docsInserted[0];
     ASSERT_EQUALS(limit, groupedInsertDocuments.size());
     for (std::size_t i = 0; i < limit; ++i) {
         const auto& insertOp = insertOps[i];
-        ASSERT_BSONOBJ_EQ(insertOp.getObject(), groupedInsertDocuments[i].Obj());
+        ASSERT_BSONOBJ_EQ(insertOp.getObject(), groupedInsertDocuments[i]);
     }
 
     // (limit + 1)-th insert operations should not be included in group of first (limit) inserts.
-    ASSERT_EQUALS(insertOps.back(), unittest::assertGet(OplogEntry::parse(operationsApplied[2])));
+    const auto& singleInsertDocumentGroup = docsInserted[1];
+    ASSERT_EQUALS(1U, singleInsertDocumentGroup.size());
+    ASSERT_BSONOBJ_EQ(insertOps.back().getObject(), singleInsertDocumentGroup[0]);
 }
 
 // Create an 'insert' oplog operation of an approximate size in bytes. The '_id' of the oplog entry
@@ -982,8 +989,7 @@ OplogEntry makeSizedInsertOp(const NamespaceString& nss, int size, int id) {
 };
 
 TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchSizeWhenGroupingInsertOperations) {
-
-    int seconds = 0;
+    int seconds = 1;
     NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
@@ -1003,40 +1009,36 @@ TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchSizeWhenGroupingInsertOperations) 
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
 
-    MultiApplier::OperationPtrs ops;
-    for (auto&& op : operationsToApply) {
-        ops.push_back(&op);
-    }
-
-    std::vector<BSONObj> operationsApplied;
-    auto syncApply =
-        [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
-            operationsApplied.push_back(op.copy());
-            return Status::OK();
+    // Each element in 'docsInserted' is a grouped insert operation.
+    std::vector<std::vector<BSONObj>> docsInserted;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            docsInserted.push_back(docs);
         };
 
     // Apply the ops.
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    ASSERT_OK(runOpsSteadyState(operationsToApply));
 
     // Applied ops should be as follows:
     // [ {create}, INSERT_GROUP{insert 1, insert 2, insert 3}, {insert 4} ]
-    ASSERT_EQ(3U, operationsApplied.size());
-    auto groupedInsertOp = operationsApplied[1];
-    ASSERT_EQUALS(BSONType::Array, groupedInsertOp["o"].type());
+    // Ignore {create} since we are only tracking inserts.
+    ASSERT_EQUALS(2U, docsInserted.size());
+
     // Make sure the insert group was created correctly.
+    const auto& groupedInsertOpArray = docsInserted[0];
+    ASSERT_EQUALS(std::size_t(opsPerBatch), groupedInsertOpArray.size());
     for (int i = 0; i < opsPerBatch; ++i) {
-        auto groupedInsertOpArray = groupedInsertOp["o"].Array();
-        ASSERT_BSONOBJ_EQ(insertOps[i].getObject(), groupedInsertOpArray[i].Obj());
+        ASSERT_BSONOBJ_EQ(insertOps[i].getObject(), groupedInsertOpArray[i]);
     }
 
     // Check that the last op was applied individually.
-    ASSERT_EQUALS(insertOps[3], unittest::assertGet(OplogEntry::parse(operationsApplied[2])));
+    const auto& singleInsertDocumentGroup = docsInserted[1];
+    ASSERT_EQUALS(1U, singleInsertDocumentGroup.size());
+    ASSERT_BSONOBJ_EQ(insertOps[3].getObject(), singleInsertDocumentGroup[0]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyAppliesOpIndividuallyWhenOpIndividuallyExceedsBatchSize) {
-
-    int seconds = 0;
+    int seconds = 1;
     NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
     auto createOp = makeCreateCollectionOplogEntry({Timestamp(Seconds(seconds++), 0), 1LL}, nss);
 
@@ -1047,33 +1049,30 @@ TEST_F(SyncTailTest, MultiSyncApplyAppliesOpIndividuallyWhenOpIndividuallyExceed
 
     MultiApplier::Operations operationsToApply = {createOp, insertOpLarge, insertOpSmall};
 
-    MultiApplier::OperationPtrs ops;
-    for (auto&& op : operationsToApply) {
-        ops.push_back(&op);
-    }
-
-    std::vector<BSONObj> operationsApplied;
-    auto syncApply =
-        [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
-            operationsApplied.push_back(op.copy());
-            return Status::OK();
+    // Each element in 'docsInserted' is a grouped insert operation.
+    std::vector<std::vector<BSONObj>> docsInserted;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            docsInserted.push_back(docs);
         };
 
     // Apply the ops.
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    ASSERT_OK(runOpsSteadyState(operationsToApply));
 
     // Applied ops should be as follows:
     // [ {create}, {large insert} {small insert} ]
-    ASSERT_EQ(operationsToApply.size(), operationsApplied.size());
-    ASSERT_EQUALS(createOp, unittest::assertGet(OplogEntry::parse(operationsApplied[0])));
-    ASSERT_EQUALS(insertOpLarge, unittest::assertGet(OplogEntry::parse(operationsApplied[1])));
-    ASSERT_EQUALS(insertOpSmall, unittest::assertGet(OplogEntry::parse(operationsApplied[2])));
+    // Ignore {create} since we are only tracking inserts.
+    ASSERT_EQUALS(2U, docsInserted.size());
+
+    ASSERT_EQUALS(1U, docsInserted[0].size());
+    ASSERT_BSONOBJ_EQ(insertOpLarge.getObject(), docsInserted[0][0]);
+
+    ASSERT_EQUALS(1U, docsInserted[1].size());
+    ASSERT_BSONOBJ_EQ(insertOpSmall.getObject(), docsInserted[1][0]);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyAppliesInsertOpsIndividuallyWhenUnableToCreateGroupByNamespace) {
-
-    int seconds = 0;
+    int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
         return makeInsertDocumentOplogEntry(
             {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
@@ -1087,33 +1086,32 @@ TEST_F(SyncTailTest, MultiSyncApplyAppliesInsertOpsIndividuallyWhenUnableToCreat
                                                   makeOp(NamespaceString(testNs + "_2")),
                                                   makeOp(NamespaceString(testNs + "_3"))};
 
-    std::vector<BSONObj> operationsApplied;
-    auto syncApply =
-        [&operationsApplied](OperationContext*, const BSONObj& op, OplogApplication::Mode) {
-            operationsApplied.push_back(op.copy());
-            return Status::OK();
-        };
-
-    MultiApplier::OperationPtrs ops;
-    for (auto&& op : operationsToApply) {
-        ops.push_back(&op);
+    for (const auto& oplogEntry : operationsToApply) {
+        createCollectionWithUuid(_opCtx.get(), oplogEntry.getNamespace());
     }
 
+    // Each element in 'docsInserted' is a grouped insert operation.
+    std::vector<std::vector<BSONObj>> docsInserted;
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            docsInserted.push_back(docs);
+        };
+
     // Apply the ops.
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    ASSERT_OK(runOpsSteadyState(operationsToApply));
 
     // Applied ops should be as follows i.e. no insert grouping:
     // [{insert 1}, {insert 2}, {insert 3}]
-    ASSERT_EQ(operationsToApply.size(), operationsApplied.size());
+    ASSERT_EQ(operationsToApply.size(), docsInserted.size());
     for (std::size_t i = 0; i < operationsToApply.size(); i++) {
-        ASSERT_EQUALS(operationsToApply[i],
-                      unittest::assertGet(OplogEntry::parse(operationsApplied[i])));
+        const auto& group = docsInserted[i];
+        ASSERT_EQUALS(1U, group.size()) << i;
+        ASSERT_BSONOBJ_EQ(operationsToApply[i].getObject(), group[0]);
     }
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGroupedInsertFails) {
-    int seconds = 0;
+    int seconds = 1;
     auto makeOp = [&seconds](const NamespaceString& nss) {
         return makeInsertDocumentOplogEntry(
             {Timestamp(Seconds(seconds), 0), 1LL}, nss, BSON("_id" << seconds++));
@@ -1132,35 +1130,32 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
     operationsToApply.push_back(createOp);
     std::copy(insertOps.begin(), insertOps.end(), std::back_inserter(operationsToApply));
 
+    // Each element in 'docsInserted' is a grouped insert operation.
+    std::vector<std::vector<BSONObj>> docsInserted;
     std::size_t numFailedGroupedInserts = 0;
-    MultiApplier::Operations operationsApplied;
-    auto syncApply = [&numFailedGroupedInserts, &operationsApplied](
-        OperationContext*, const BSONObj& op, OplogApplication::Mode) -> Status {
-        // Reject grouped insert operations.
-        if (op["o"].type() == BSONType::Array) {
-            numFailedGroupedInserts++;
-            return {ErrorCodes::OperationFailed, "grouped inserts not supported"};
-        }
-        operationsApplied.push_back(OplogEntry(op));
-        return Status::OK();
-    };
+    _opObserver->onInsertsFn =
+        [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            // Reject grouped insert operations.
+            if (docs.size() > 1U) {
+                numFailedGroupedInserts++;
+                uasserted(ErrorCodes::OperationFailed, "grouped inserts not supported");
+            }
+            docsInserted.push_back(docs);
+        };
 
-    MultiApplier::OperationPtrs ops;
-    for (auto&& op : operationsToApply) {
-        ops.push_back(&op);
-    }
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
+    ASSERT_OK(runOpsSteadyState(operationsToApply));
 
     // On failing to apply the grouped insert operation, multiSyncApply should apply the operations
     // as given in "operationsToApply":
     // {create}, {insert_1}, {insert_2}, .. {insert_(limit)}, {insert_(limit+1)}
-    ASSERT_EQUALS(limit + 2, operationsApplied.size());
-    ASSERT_EQUALS(createOp, operationsApplied[0]);
+    // Ignore {create} since we are only tracking inserts.
+    ASSERT_EQUALS(limit + 1, docsInserted.size());
 
     for (std::size_t i = 0; i < limit + 1; ++i) {
         const auto& insertOp = insertOps[i];
-        ASSERT_EQUALS(insertOp, operationsApplied[i + 1]);
+        const auto& group = docsInserted[i];
+        ASSERT_EQUALS(1U, group.size()) << i;
+        ASSERT_BSONOBJ_EQ(insertOp.getObject(), group[0]);
     }
 
     // Ensure that multiSyncApply does not attempt to group remaining operations in first failed
