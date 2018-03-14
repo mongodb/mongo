@@ -646,7 +646,8 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
             // occurs, we abort the current transaction. Note that it would indicate a user bug to
             // have a newer transaction on one shard while an older transaction is still active on
             // another shard.
-            _releaseStashedTransactionResources(lg);
+            _abortTransaction(lg);
+            _txnState = MultiDocumentTransactionState::kNone;
             uasserted(ErrorCodes::TransactionAborted,
                       str::stream() << "Transaction aborted. Active txnNumber is now "
                                     << _activeTxnNumber);
@@ -670,7 +671,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
                 snapshotPreallocated = true;
 
                 if (_txnState != MultiDocumentTransactionState::kInProgress) {
-                    invariant(_txnState == MultiDocumentTransactionState::kNone);
                     _txnState = MultiDocumentTransactionState::kInSnapshotRead;
                 }
             }
@@ -687,21 +687,35 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
 void Session::abortIfSnapshotRead(TxnNumber txnNumber) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (_activeTxnNumber == txnNumber && _autocommit) {
-        _releaseStashedTransactionResources(lg);
-        _txnState = MultiDocumentTransactionState::kAborted;
+        _abortTransaction(lg);
     }
 }
 
-void Session::abortTransaction() {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _releaseStashedTransactionResources(lg);
-    _txnState = MultiDocumentTransactionState::kAborted;
+void Session::abortArbitraryTransaction() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _abortTransaction(lock);
 }
 
-void Session::_releaseStashedTransactionResources(WithLock wl) {
+void Session::abortActiveTransaction(OperationContext* opCtx) {
+    stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    _abortTransaction(lock);
+
+    // Abort the WUOW. We should be able to abort empty transactions that don't have WUOW.
+    if (opCtx->getWriteUnitOfWork()) {
+        opCtx->setWriteUnitOfWork(nullptr);
+    }
+}
+
+void Session::_abortTransaction(WithLock wl) {
+    // TODO SERVER-33432 Disallow aborting committed transaction after we implement implicit abort.
+    if (_txnState == MultiDocumentTransactionState::kCommitted) {
+        return;
+    }
     _txnResourceStash = boost::none;
     _transactionOperations.clear();
-    _txnState = MultiDocumentTransactionState::kNone;
+    _txnState = MultiDocumentTransactionState::kAborted;
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
@@ -730,13 +744,6 @@ void Session::addTransactionOperation(OperationContext* opCtx,
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     if (_transactionOperations.empty()) {
         auto txnNumberCompleting = _activeTxnNumber;
-        opCtx->recoveryUnit()->onRollback([this, txnNumberCompleting] {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            invariant(_activeTxnNumber == txnNumberCompleting);
-            invariant(_txnState != MultiDocumentTransactionState::kCommitted);
-            _transactionOperations.clear();
-            _txnState = MultiDocumentTransactionState::kAborted;
-        });
         opCtx->recoveryUnit()->onCommit([this, txnNumberCompleting] {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             invariant(_activeTxnNumber == txnNumberCompleting);

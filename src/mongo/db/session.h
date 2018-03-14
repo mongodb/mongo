@@ -229,9 +229,16 @@ public:
     void abortIfSnapshotRead(TxnNumber txnNumber);
 
     /**
-     * Aborts the transaction, releasing stashed transaction resources.
+     * Aborts the transaction outside the transaction, releasing transaction resources.
      */
-    void abortTransaction();
+    void abortArbitraryTransaction();
+
+    /*
+     * Aborts the transaction inside the transaction, releasing transaction resources.
+     * We're inside the transaction when we have the Session checked out and 'opCtx' owns the
+     * transaction resources.
+     */
+    void abortActiveTransaction(OperationContext* opCtx);
 
     bool getAutocommit() const {
         return _autocommit;
@@ -310,7 +317,8 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
-    void _releaseStashedTransactionResources(WithLock);
+    // Releases stashed transaction resources to abort the transaction.
+    void _abortTransaction(WithLock);
 
     const LogicalSessionId _sessionId;
 

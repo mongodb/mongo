@@ -193,6 +193,7 @@ var authCommandsLib = {
           testname: "abortTxn",
           command: {abortTransaction: 1},
           skipSharded: true,
+          skipUnlessReplicaSet: true,
           testcases: [
               {
                 runOnDb: firstDbName,

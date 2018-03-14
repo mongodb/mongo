@@ -133,14 +133,6 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        // Clean the global WUOW to allow clients to wait for write concern.
-        // TODO SERVER-33591 Remove this after pushing down the stashing logic.
-        ON_BLOCK_EXIT([opCtx] {
-            if (opCtx->getWriteUnitOfWork()) {
-                opCtx->setWriteUnitOfWork(nullptr);
-            }
-        });
-
         uassert(ErrorCodes::CommandNotSupported,
                 "This storage engine does not support transactions.",
                 !opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1());

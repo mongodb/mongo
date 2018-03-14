@@ -54,7 +54,7 @@ void killSessionsLocalKillTransactions(OperationContext* opCtx,
                                        const SessionKiller::Matcher& matcher) {
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcher, [](OperationContext* opCtx, Session* session) {
-            session->abortTransaction();
+            session->abortArbitraryTransaction();
         });
 }
 

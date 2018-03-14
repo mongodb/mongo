@@ -103,7 +103,8 @@ using logger::LogComponent;
 // session for commands that can take a lock and then run another whitelisted command in
 // DBDirectClient. Otherwise, the nested command would try to check out a session under a lock,
 // which is not allowed.
-const StringMap<int> sessionCheckoutWhitelist = {{"aggregate", 1},
+const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
+                                                 {"aggregate", 1},
                                                  {"applyOps", 1},
                                                  {"commitTransaction", 1},
                                                  {"count", 1},
@@ -406,20 +407,20 @@ void invokeInTransaction(OperationContext* opCtx,
     }
 
     session->unstashTransactionResources(opCtx);
+    ScopeGuard guard = MakeGuard([session, opCtx]() { session->abortActiveTransaction(opCtx); });
 
-    // TODO: SERVER-33217 Add an RAII so that any exception will abort the transaction.
     invocation->run(opCtx, replyBuilder);
 
     if (auto okField = replyBuilder->getBodyBuilder().asTempObj()["ok"]) {
         // If ok is present, use its truthiness.
         if (!okField.trueValue()) {
-            // TODO: SERVER-33217 Abort the transaction if the command fails.
             return;
         }
     }
 
     // Stash or commit the transaction when the command succeeds.
     session->stashTransactionResources(opCtx);
+    guard.Dismiss();
 }
 
 bool runCommandImpl(OperationContext* opCtx,

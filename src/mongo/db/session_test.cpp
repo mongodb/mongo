@@ -628,20 +628,19 @@ TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
 }
 
-TEST_F(SessionTest, RollbackClearsStoredStatements) {
+TEST_F(SessionTest, AbortClearsStoredStatements) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 24;
     session.beginOrContinueTxn(opCtx(), txnNum, false);
-    {
-        WriteUnitOfWork wuow(opCtx());
-        auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
-        session.addTransactionOperation(opCtx(), operation);
-        ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
-        // Since the WriteUnitOfWork was not committed, it will implicitly roll back.
-    }
+
+    WriteUnitOfWork wuow(opCtx());
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    session.addTransactionOperation(opCtx(), operation);
+    ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
+    session.abortActiveTransaction(opCtx());
     ASSERT_TRUE(session.transactionOperationsForTest().empty());
 }
 

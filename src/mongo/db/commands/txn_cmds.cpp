@@ -75,7 +75,7 @@ public:
         // TODO SERVER-33501 Change this when commitTransaction is retryable.
         uassert(ErrorCodes::CommandFailed,
                 "Transaction isn't in progress",
-                opCtx->getWriteUnitOfWork() && session->inMultiDocumentTransaction());
+                session->inMultiDocumentTransaction());
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
@@ -131,7 +131,7 @@ public:
         // Running commit after prepare is not allowed yet.
         // Prepared units of work cannot be released by the session, so we immediately abort here.
         opCtx->getWriteUnitOfWork()->prepare();
-        opCtx->setWriteUnitOfWork(nullptr);
+        session->abortActiveTransaction(opCtx);
         return true;
     }
 };
@@ -169,6 +169,16 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        auto session = OperationContextSession::get(opCtx);
+        uassert(
+            ErrorCodes::CommandFailed, "abortTransaction must be run within a session", session);
+
+        // TODO SERVER-33501 Change this when abortTransaction is retryable.
+        uassert(ErrorCodes::CommandFailed,
+                "Transaction isn't in progress",
+                session->inMultiDocumentTransaction());
+
+        session->abortActiveTransaction(opCtx);
         return true;
     }
 
