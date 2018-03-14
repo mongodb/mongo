@@ -105,7 +105,7 @@ public:
             std::error_code ec;
             getSocket().cancel();
             getSocket().shutdown(GenericSocket::shutdown_both, ec);
-            if (ec) {
+            if ((ec) && (ec != asio::error::not_connected)) {
                 error() << "Error shutting down socket: " << ec.message();
             }
         }
