@@ -66,14 +66,15 @@ var FixtureHelpers = (function() {
     }
 
     /**
-     * Runs the command given by 'cmdObj' on the database given by 'dbName' on each replica set in
+     * Runs the command given by 'cmdObj' on the database given by 'db' on each replica set in
      * the fixture (besides the config servers). Asserts that each command works, and returns an
      * array with the responses from each shard, or with a single element if the fixture was a
      * replica set. Asserts if the fixture is a standalone or if the shards are standalones.
      */
-    function runCommandOnEachPrimary({dbName, cmdObj}) {
-        return _getAllReplicas().map((replSet) => assert.commandWorked(
-                                         replSet.getPrimary().getDB(dbName).runCommand(cmdObj)));
+    function runCommandOnEachPrimary({db, cmdObj}) {
+        return _getAllReplicas(db).map(
+            (replSet) =>
+                assert.commandWorked(replSet.getPrimary().getDB(db.getName()).runCommand(cmdObj)));
     }
 
     /**

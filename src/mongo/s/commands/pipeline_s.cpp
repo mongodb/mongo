@@ -30,6 +30,7 @@
 
 #include "mongo/s/commands/pipeline_s.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -182,6 +183,16 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
             batch.size() <= 1u);
 
     return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
+}
+
+BSONObj PipelineS::MongoSInterface::_reportCurrentOpForClient(
+    OperationContext* opCtx, Client* client, CurrentOpTruncateMode truncateOps) const {
+    BSONObjBuilder builder;
+
+    CurOp::reportCurrentOpForClient(
+        opCtx, client, (truncateOps == CurrentOpTruncateMode::kTruncateOps), &builder);
+
+    return builder.obj();
 }
 
 std::vector<GenericCursor> PipelineS::MongoSInterface::getCursors(

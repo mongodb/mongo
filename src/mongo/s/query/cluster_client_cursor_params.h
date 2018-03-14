@@ -88,6 +88,9 @@ struct ClusterClientCursorParams {
     // Namespace against which the cursors exist.
     NamespaceString nsString;
 
+    // The original command object which generated this cursor. Must either be empty or owned.
+    BSONObj originatingCommandObj;
+
     // Per-remote node data.
     std::vector<RemoteCursor> remotes;
 

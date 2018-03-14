@@ -190,6 +190,11 @@ public:
         void returnCursor(CursorState cursorState);
 
         /**
+         * Returns the command object which originally created this cursor.
+         */
+        BSONObj getOriginatingCommand() const;
+
+        /**
          * Returns the cursor id for the underlying cursor, or zero if no cursor is owned.
          */
         CursorId getCursorId() const;

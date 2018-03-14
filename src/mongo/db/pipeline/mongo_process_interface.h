@@ -62,6 +62,7 @@ public:
     enum class CurrentOpConnectionsMode { kIncludeIdle, kExcludeIdle };
     enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
     enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
+    enum class CurrentOpLocalOpsMode { kLocalMongosOps, kRemoteShardOps };
 
     struct MakePipelineOptions {
         MakePipelineOptions(){};

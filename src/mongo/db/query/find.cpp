@@ -542,7 +542,8 @@ std::string runQuery(OperationContext* opCtx,
     invariant(!nss.isCommand());
 
     // Set CurOp information.
-    beginQueryOp(opCtx, nss, q.query, q.ntoreturn, q.ntoskip);
+    const auto upconvertedQuery = upconvertQueryEntry(q.query, nss, q.ntoreturn, q.ntoskip);
+    beginQueryOp(opCtx, nss, upconvertedQuery, q.ntoreturn, q.ntoskip);
 
     // Parse the qm into a CanonicalQuery.
     const boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -703,7 +704,7 @@ std::string runQuery(OperationContext* opCtx,
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
              opCtx->recoveryUnit()->getReadConcernLevel(),
-             upconvertQueryEntry(q.query, qr.nss(), q.ntoreturn, q.ntoskip)});
+             upconvertedQuery});
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults

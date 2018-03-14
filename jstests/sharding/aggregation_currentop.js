@@ -3,6 +3,7 @@
  * - It must be the first stage in the pipeline.
  * - It can only be run on admin, and the "aggregate" field must be 1.
  * - Only active connections are shown unless {idleConnections: true} is specified.
+ * - Specifying {localOps: true} shows the local ops on mongoS rather than shard ops.
  * - A user without the inprog privilege can see their own ops, but no-one else's.
  * - A user with the inprog privilege can see all ops.
  * - Non-local readConcerns are rejected.
@@ -17,6 +18,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+
     // Replica set nodes started with --shardsvr do not enable key generation until they are added
     // to a sharded cluster and reject commands with gossiped clusterTime from users without the
     // advanceClusterTime privilege. This causes ShardingTest setup to fail because the shell
@@ -28,32 +31,28 @@
 
     const key = "jstests/libs/key1";
 
+    // Parameters used to establish the sharded cluster.
+    const stParams = {
+        name: jsTestName(),
+        keyFile: key,
+        shards: 3,
+        rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}}
+    };
+
     // Create a new sharded cluster for testing. We set the internalQueryExecYieldIterations
     // parameter so that plan execution yields on every iteration. For some tests, we will
     // temporarily set yields to hang the mongod so we can capture particular operations in the
     // currentOp output.
-    const st = new ShardingTest({
-        name: jsTestName(),
-        keyFile: key,
-        shards: 3,
-        rs: {
-            nodes: [
-                {rsConfig: {priority: 1}},
-                {rsConfig: {priority: 0}},
-                {rsConfig: {arbiterOnly: true}}
-            ],
-            setParameter: {internalQueryExecYieldIterations: 1}
-        }
-    });
+    const st = new ShardingTest(stParams);
 
     // Assign various elements of the cluster. We will use shard rs0 to test replica-set level
     // $currentOp behaviour.
     let shardConn = st.rs0.getPrimary();
-    const mongosConn = st.s;
-    const shardRS = st.rs0;
+    let mongosConn = st.s;
+    let shardRS = st.rs0;
 
-    const clusterTestDB = mongosConn.getDB(jsTestName());
-    const clusterAdminDB = mongosConn.getDB("admin");
+    let clusterTestDB = mongosConn.getDB(jsTestName());
+    let clusterAdminDB = mongosConn.getDB("admin");
     shardConn.waitForClusterTime(60);
     let shardAdminDB = shardConn.getDB("admin");
 
@@ -91,21 +90,39 @@
 
     st.ensurePrimaryShard(clusterTestDB.getName(), shardRS.name);
 
-    // Restarts a replica set with additional parameters, and optionally re-authenticates.
-    function restartReplSet(replSet, newOpts, user, pwd) {
+    // Restarts a replset with a different set of parameters. Explicitly set the keyFile to null,
+    // since if ReplSetTest#stopSet sees a keyFile property, it attempts to auth before dbhash
+    // checks.
+    function restartReplSet(replSet, newOpts) {
         const numNodes = replSet.nodeList().length;
-
         for (let n = 0; n < numNodes; n++) {
             replSet.restart(n, newOpts);
         }
-
-        shardConn = replSet.getPrimary();
-        replSet.awaitSecondaryNodes();
-
+        replSet.keyFile = newOpts.keyFile;
+        return replSet.getPrimary();
+    }
+    // Restarts a cluster with a different set of parameters.
+    function restartCluster(st, newOpts) {
+        restartReplSet(st.configRS, newOpts);
+        for (let i = 0; i < stParams.shards; i++) {
+            restartReplSet(st[`rs${i}`], newOpts);
+        }
+        st.restartMongos(0, Object.assign(newOpts, {restart: true}));
+        st.keyFile = newOpts.keyFile;
+        // Re-link the cluster components.
+        shardConn = st.rs0.getPrimary();
+        mongosConn = st.s;
+        shardRS = st.rs0;
+        clusterTestDB = mongosConn.getDB(jsTestName());
+        clusterAdminDB = mongosConn.getDB("admin");
         shardAdminDB = shardConn.getDB("admin");
+    }
 
-        if (user && pwd) {
-            shardAdminDB.auth(user, pwd);
+    function runCommandOnAllPrimaries({dbName, cmdObj, username, password}) {
+        for (let i = 0; i < stParams.shards; i++) {
+            const rsAdminDB = st[`rs${i}`].getPrimary().getDB("admin");
+            rsAdminDB.auth(username, password);
+            assert.commandWorked(rsAdminDB.getSiblingDB(dbName).runCommand(cmdObj));
         }
     }
 
@@ -115,8 +132,12 @@
         TestData.aggCurOpUser = username;
         TestData.aggCurOpPwd = password;
 
-        assert.commandWorked(conn.getDB("admin").runCommand(
-            {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+        runCommandOnAllPrimaries({
+            dbName: "admin",
+            username: username,
+            password: password,
+            cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}
+        });
 
         testfunc = function() {
             db.getSiblingDB("admin").auth(TestData.aggCurOpUser, TestData.aggCurOpPwd);
@@ -127,8 +148,8 @@
         return startParallelShell(testfunc, conn.port);
     }
 
-    function assertCurrentOpHasSingleMatchingEntry({conn, currentOpAggFilter, curOpOpts}) {
-        curOpOpts = (curOpOpts || {allUsers: true});
+    function assertCurrentOpHasSingleMatchingEntry({conn, currentOpAggFilter, curOpSpec}) {
+        curOpSpec = (curOpSpec || {allUsers: true});
 
         const connAdminDB = conn.getDB("admin");
 
@@ -137,7 +158,7 @@
         assert.soon(
             function() {
                 curOpResult =
-                    connAdminDB.aggregate([{$currentOp: curOpOpts}, {$match: currentOpAggFilter}])
+                    connAdminDB.aggregate([{$currentOp: curOpSpec}, {$match: currentOpAggFilter}])
                         .toArray();
 
                 return curOpResult.length === 1;
@@ -150,9 +171,13 @@
         return curOpResult[0];
     }
 
-    function waitForParallelShell(conn, awaitShell) {
-        assert.commandWorked(conn.getDB("admin").runCommand(
-            {configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+    function waitForParallelShell({conn, username, password, awaitShell}) {
+        runCommandOnAllPrimaries({
+            dbName: "admin",
+            username: username,
+            password: password,
+            cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "off"}
+        });
 
         awaitShell();
     }
@@ -163,10 +188,11 @@
 
     // Generic function for running getMore on a $currentOp aggregation cursor and returning the
     // command response.
-    function getMoreTest({conn, showAllUsers, getMoreBatchSize}) {
+    function getMoreTest({conn, curOpSpec, getMoreBatchSize}) {
         // Ensure that there are some other connections present so that the result set is larger
         // than 1 $currentOp entry.
         const otherConns = [new Mongo(conn.host), new Mongo(conn.host)];
+        curOpSpec = Object.assign({idleConnections: true}, (curOpSpec || {}));
 
         // Log the other connections in as user_no_inprog so that they will show up for user_inprog
         // with {allUsers: true} and user_no_inprog with {allUsers: false}.
@@ -176,11 +202,8 @@
 
         const connAdminDB = conn.getDB("admin");
 
-        const aggCmdRes = assert.commandWorked(connAdminDB.runCommand({
-            aggregate: 1,
-            pipeline: [{$currentOp: {allUsers: showAllUsers, idleConnections: true}}],
-            cursor: {batchSize: 0}
-        }));
+        const aggCmdRes = assert.commandWorked(connAdminDB.runCommand(
+            {aggregate: 1, pipeline: [{$currentOp: curOpSpec}], cursor: {batchSize: 0}}));
         assert.neq(aggCmdRes.cursor.id, 0);
 
         return connAdminDB.runCommand({
@@ -190,12 +213,22 @@
         });
     }
 
+    //
+    // Common tests.
+    //
+
     // Runs a suite of tests for behaviour common to both the replica set and cluster levels.
-    function runCommonTests(conn) {
+    function runCommonTests(conn, curOpSpec) {
         const testDB = conn.getDB(jsTestName());
         const adminDB = conn.getDB("admin");
+        curOpSpec = (curOpSpec || {});
 
-        const isMongos = (conn == mongosConn);
+        function addToSpec(spec) {
+            return Object.assign({}, curOpSpec, spec);
+        }
+
+        const isLocalMongosCurOp = (conn == mongosConn && curOpSpec.localOps);
+        const isRemoteShardCurOp = (conn == mongosConn && !curOpSpec.localOps);
 
         // Test that an unauthenticated connection cannot run $currentOp even with {allUsers:
         // false}.
@@ -203,7 +236,7 @@
 
         assert.commandFailedWithCode(
             adminDB.runCommand(
-                {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}),
+                {aggregate: 1, pipeline: [{$currentOp: addToSpec({allUsers: false})}], cursor: {}}),
             ErrorCodes.Unauthorized);
 
         // Test that an unauthenticated connection cannot run the currentOp command even with
@@ -220,7 +253,7 @@
         // privilege.
         assert.commandFailedWithCode(
             adminDB.runCommand(
-                {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}}),
+                {aggregate: 1, pipeline: [{$currentOp: addToSpec({allUsers: true})}], cursor: {}}),
             ErrorCodes.Unauthorized);
 
         // Test that the currentOp command fails with {ownOps: false} for a user without the
@@ -243,17 +276,18 @@
         // 1} namespace check.
         assert.commandFailedWithCode(
             adminDB.runCommand(
-                {aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: {}}], cursor: {}}),
+                {aggregate: 1, pipeline: [{$currentOp: {}}, {$currentOp: curOpSpec}], cursor: {}}),
             40602);
 
         // Test that $currentOp fails when run on admin without {aggregate: 1}.
         assert.commandFailedWithCode(
-            adminDB.runCommand({aggregate: "collname", pipeline: [{$currentOp: {}}], cursor: {}}),
+            adminDB.runCommand(
+                {aggregate: "collname", pipeline: [{$currentOp: curOpSpec}], cursor: {}}),
             ErrorCodes.InvalidNamespace);
 
         // Test that $currentOp fails when run as {aggregate: 1} on a database other than admin.
         assert.commandFailedWithCode(
-            testDB.runCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}}),
+            testDB.runCommand({aggregate: 1, pipeline: [{$currentOp: curOpSpec}], cursor: {}}),
             ErrorCodes.InvalidNamespace);
 
         // Test that the currentOp command fails when run directly on a database other than admin.
@@ -267,8 +301,8 @@
         const ones = [1, 1.0, NumberInt(1), NumberLong(1), NumberDecimal(1)];
 
         for (let one of ones) {
-            assert.commandWorked(
-                adminDB.runCommand({aggregate: one, pipeline: [{$currentOp: {}}], cursor: {}}));
+            assert.commandWorked(adminDB.runCommand(
+                {aggregate: one, pipeline: [{$currentOp: curOpSpec}], cursor: {}}));
 
             assert.commandWorked(adminDB.runCommand({currentOp: one, $ownOps: true}));
         }
@@ -276,7 +310,7 @@
         // Test that $currentOp with {allUsers: true} succeeds for a user with the "inprog"
         // privilege.
         assert.commandWorked(adminDB.runCommand(
-            {aggregate: 1, pipeline: [{$currentOp: {allUsers: true}}], cursor: {}}));
+            {aggregate: 1, pipeline: [{$currentOp: addToSpec({allUsers: true})}], cursor: {}}));
 
         // Test that the currentOp command with {$ownOps: false} succeeds for a user with the
         // "inprog" privilege.
@@ -285,26 +319,33 @@
         // Test that $currentOp succeeds if local readConcern is specified.
         assert.commandWorked(adminDB.runCommand({
             aggregate: 1,
-            pipeline: [{$currentOp: {}}],
+            pipeline: [{$currentOp: curOpSpec}],
             readConcern: {level: "local"},
             cursor: {}
         }));
 
-        // Test that $currentOp fails if a non-local readConcern is specified.
-        assert.commandFailedWithCode(adminDB.runCommand({
+        // Test that $currentOp fails if a non-local readConcern is specified for any data-bearing
+        // target. When run on a mongoS with {localOps:true}, read concern is not applicable and is
+        // therefore ignored.
+        const linearizableAggCmd = {
             aggregate: 1,
-            pipeline: [{$currentOp: {}}],
+            pipeline: [{$currentOp: curOpSpec}],
             readConcern: {level: "linearizable"},
             cursor: {}
-        }),
-                                     ErrorCodes.InvalidOptions);
+        };
+        if (isLocalMongosCurOp) {
+            assert.commandWorked(adminDB.runCommand(linearizableAggCmd));
+        } else {
+            assert.commandFailedWithCode(adminDB.runCommand(linearizableAggCmd),
+                                         ErrorCodes.InvalidOptions);
+        }
 
         // Test that {idleConnections: false} returns only active connections.
         const idleConn = new Mongo(conn.host);
 
         assert.eq(adminDB
                       .aggregate([
-                          {$currentOp: {allUsers: true, idleConnections: false}},
+                          {$currentOp: addToSpec({allUsers: true, idleConnections: false})},
                           {$match: {active: false}}
                       ])
                       .itcount(),
@@ -316,7 +357,7 @@
         // Test that {idleConnections: true} returns inactive connections.
         assert.gte(adminDB
                        .aggregate([
-                           {$currentOp: {allUsers: true, idleConnections: true}},
+                           {$currentOp: addToSpec({allUsers: true, idleConnections: true})},
                            {$match: {active: false}}
                        ])
                        .itcount(),
@@ -326,13 +367,13 @@
         assert.gte(adminDB.currentOp({$ownOps: false, $all: true, active: false}).inprog.length, 1);
 
         // Test that collation rules apply to matches on $currentOp output.
-        const matchField = (isMongos ? "originatingCommand.comment" : "command.comment");
-        const numExpectedMatches = (isMongos ? 3 : 1);
+        const matchField = (isRemoteShardCurOp ? "originatingCommand.comment" : "command.comment");
+        const numExpectedMatches = (isRemoteShardCurOp ? stParams.shards : 1);
 
         assert.eq(
             adminDB
                 .aggregate(
-                    [{$currentOp: {}}, {$match: {[matchField]: "AGG_currént_op_COLLATION"}}],
+                    [{$currentOp: curOpSpec}, {$match: {[matchField]: "AGG_currént_op_COLLATION"}}],
                     {
                       collation: {locale: "en_US", strength: 1},  // Case and diacritic insensitive.
                       comment: "agg_current_op_collation"
@@ -344,7 +385,7 @@
         assert.eq(adminDB
                       .aggregate(
                           [
-                            {$currentOp: {}},
+                            {$currentOp: curOpSpec},
                             {
                               $facet: {
                                   testFacet: [
@@ -362,33 +403,35 @@
                   numExpectedMatches);
 
         // Test that $currentOp is explainable.
-        const explainPlan = assert.commandWorked(adminDB.runCommand({
-            aggregate: 1,
-            pipeline:
-                [{$currentOp: {idleConnections: true, allUsers: false}}, {$match: {desc: "test"}}],
-            explain: true
-        }));
+        // TODO SERVER-33718: enable this test for {localOps:true} on mongoS.
+        if (!isLocalMongosCurOp) {
+            const explainPlan = assert.commandWorked(adminDB.runCommand({
+                aggregate: 1,
+                pipeline: [
+                    {$currentOp: addToSpec({idleConnections: true, allUsers: false})},
+                    {$match: {desc: "test"}}
+                ],
+                explain: true
+            }));
 
-        const expectedStages = [
-            {$currentOp: {idleConnections: true, allUsers: false, truncateOps: false}},
-            {$match: {desc: {$eq: "test"}}}
-        ];
+            let expectedStages =
+                [{$currentOp: {idleConnections: true}}, {$match: {desc: {$eq: "test"}}}];
 
-        if (isMongos) {
-            assert.eq(explainPlan.splitPipeline.shardsPart, expectedStages);
-
-            for (let i = 0; i < 3; i++) {
-                let shardName = st["rs" + i].name;
-                assert.eq(explainPlan.shards[shardName].stages, expectedStages);
+            if (isRemoteShardCurOp) {
+                assert.docEq(explainPlan.splitPipeline.shardsPart, expectedStages);
+                for (let i = 0; i < stParams.shards; i++) {
+                    let shardName = st["rs" + i].name;
+                    assert.docEq(explainPlan.shards[shardName].stages, expectedStages);
+                }
+            } else {
+                assert.docEq(explainPlan.stages, expectedStages);
             }
-        } else {
-            assert.eq(explainPlan.stages, expectedStages);
         }
 
         // Test that a user with the inprog privilege can run getMore on a $currentOp aggregation
         // cursor which they created with {allUsers: true}.
         let getMoreCmdRes = assert.commandWorked(
-            getMoreTest({conn: conn, showAllUsers: true, getMoreBatchSize: 1}));
+            getMoreTest({conn: conn, curOpSpec: {allUsers: true}, getMoreBatchSize: 1}));
 
         // Test that a user without the inprog privilege cannot run getMore on a $currentOp
         // aggregation cursor created by a user with {allUsers: true}.
@@ -404,14 +447,16 @@
                                      ErrorCodes.Unauthorized);
     }
 
+    // Run the common tests on a shard, through mongoS, and on mongoS with 'localOps' enabled.
     runCommonTests(shardConn);
     runCommonTests(mongosConn);
+    runCommonTests(mongosConn, {localOps: true});
 
     //
     // mongoS specific tests.
     //
 
-    // Test that a user without the inprog privilege cannot run cluster $currentOp via mongoS even
+    // Test that a user without the inprog privilege cannot run non-local $currentOp via mongoS even
     // if allUsers is false.
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_no_inprog", "pwd"));
@@ -421,13 +466,13 @@
             {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}),
         ErrorCodes.Unauthorized);
 
-    // Test that a user without the inprog privilege cannot run the currentOp command via mongoS
-    // even if $ownOps is true.
+    // Test that a user without the inprog privilege cannot run non-local currentOp command via
+    // mongoS even if $ownOps is true.
     assert.commandFailedWithCode(clusterAdminDB.currentOp({$ownOps: true}),
                                  ErrorCodes.Unauthorized);
 
-    // Test that a $currentOp pipeline returns results from all shards, and includes both the shard
-    // and host names.
+    // Test that a non-local $currentOp pipeline via mongoS returns results from all shards, and
+    // includes both the shard and host names.
     assert(clusterAdminDB.logout());
     assert(clusterAdminDB.auth("user_inprog", "pwd"));
 
@@ -444,130 +489,173 @@
                 {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
               ]);
 
-    //
-    // ReplSet specific tests.
-    //
-
-    // Test that a user with the inprog privilege can see another user's operations with {allUsers:
-    // true} when run on a mongoD.
-    assert(shardAdminDB.logout());
-    assert(shardAdminDB.auth("user_inprog", "pwd"));
-
-    let awaitShell = runInParallelShell({
-        testfunc: function() {
-            assert.eq(db.getSiblingDB(jsTestName())
-                          .test.find({})
-                          .comment("agg_current_op_allusers_test")
-                          .itcount(),
-                      5);
-        },
-        conn: shardConn,
-        username: "admin",
-        password: "pwd"
-    });
-
-    assertCurrentOpHasSingleMatchingEntry(
-        {conn: shardConn, currentOpAggFilter: {"command.comment": "agg_current_op_allusers_test"}});
-
-    // Test that the currentOp command can see another user's operations with {$ownOps: false}.
-    assert.eq(
-        shardAdminDB.currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"})
-            .inprog.length,
-        1);
-
-    // Allow the op to complete.
-    waitForParallelShell(shardConn, awaitShell);
-
-    // Test that $currentOp succeeds with {allUsers: false} for a user without the "inprog"
-    // privilege when run on a mongoD.
-    assert(shardAdminDB.logout());
-    assert(shardAdminDB.auth("user_no_inprog", "pwd"));
-
-    assert.commandWorked(shardAdminDB.runCommand(
-        {aggregate: 1, pipeline: [{$currentOp: {allUsers: false}}], cursor: {}}));
-
-    // Test that the currentOp command succeeds with {$ownOps: true} for a user without the "inprog"
-    // privilege when run on a mongoD.
-    assert.commandWorked(shardAdminDB.currentOp({$ownOps: true}));
-
-    // Test that a user without the inprog privilege cannot see another user's operations.
-    // Temporarily log in as 'user_inprog' to validate that the op is present in $currentOp output.
-    assert(shardAdminDB.logout());
-    assert(shardAdminDB.auth("user_inprog", "pwd"));
-
-    awaitShell = runInParallelShell({
-        testfunc: function() {
-            assert.eq(db.getSiblingDB(jsTestName())
-                          .test.find({})
-                          .comment("agg_current_op_allusers_test")
-                          .itcount(),
-                      5);
-        },
-        conn: shardConn,
-        username: "admin",
-        password: "pwd"
-    });
-
-    assertCurrentOpHasSingleMatchingEntry({
-        currentOpAggFilter: {"command.comment": "agg_current_op_allusers_test"},
-        curOpOpts: {allUsers: true},
-        conn: shardConn
-    });
-
-    // Log back in as 'user_no_inprog' and validate that the user cannot see the op.
-    assert(shardAdminDB.logout());
-    assert(shardAdminDB.auth("user_no_inprog", "pwd"));
-
-    assert.eq(shardAdminDB
-                  .aggregate([
-                      {$currentOp: {allUsers: false}},
-                      {$match: {"command.comment": "agg_current_op_allusers_test"}}
-                  ])
+    // Test that a $currentOp pipeline with {localOps:true} returns operations from the mongoS
+    // itself rather than the shards.
+    assert.eq(clusterAdminDB
+                  .aggregate(
+                      [
+                        {$currentOp: {localOps: true}},
+                        {
+                          $match: {
+                              $expr: {$eq: ["$host", "$clientMetadata.mongos.host"]},
+                              "command.comment": "mongos_currentop_localOps"
+                          }
+                        }
+                      ],
+                      {comment: "mongos_currentop_localOps"})
                   .itcount(),
-              0);
+              1);
 
-    // Test that a user without the inprog privilege cannot see another user's operations via the
-    // currentOp command.
-    assert.eq(
-        shardAdminDB.currentOp({$ownOps: true, "command.comment": "agg_current_op_allusers_test"})
-            .inprog.length,
-        0);
+    //
+    // localOps tests.
+    //
 
-    waitForParallelShell(shardConn, awaitShell);
+    // Runs a suite of tests for behaviour common to both replica sets and mongoS with
+    // {localOps:true}.
+    function runLocalOpsTests(conn) {
+        // The 'localOps' parameter is not supported by the currentOp command, so we limit its
+        // testing to the replica set in certain cases.
+        const connAdminDB = conn.getDB("admin");
+        const isMongos = FixtureHelpers.isMongos(connAdminDB);
 
-    // Test that a user without the inprog privilege can run getMore on a $currentOp cursor which
-    // they created with {allUsers: false}.
-    assert.commandWorked(getMoreTest({conn: shardConn, showAllUsers: false}));
+        // Test that a user with the inprog privilege can see another user's ops with
+        // {allUsers:true}.
+        assert(connAdminDB.logout());
+        assert(connAdminDB.auth("user_inprog", "pwd"));
 
-    // Test that the allUsers parameter is ignored when authentication is disabled.
-    restartReplSet(shardRS, {shardsvr: null, keyFile: null});
-    // Explicitly set the keyFile to null. If ReplSetTest#stopSet sees a keyFile property, it
-    // attempts to auth before dbhash checks.
-    shardRS.keyFile = null;
+        let awaitShell = runInParallelShell({
+            testfunc: function() {
+                assert.eq(db.getSiblingDB(jsTestName())
+                              .test.find({})
+                              .comment("agg_current_op_allusers_test")
+                              .itcount(),
+                          5);
+            },
+            conn: conn,
+            username: "admin",
+            password: "pwd"
+        });
 
-    // Ensure that there is at least one other connection present.
-    const otherConn = new Mongo(shardConn.host);
+        assertCurrentOpHasSingleMatchingEntry({
+            conn: conn,
+            currentOpAggFilter: {"command.comment": "agg_current_op_allusers_test"},
+            curOpSpec: {allUsers: true, localOps: true}
+        });
 
-    // Verify that $currentOp displays all operations when auth is disabled regardless of the
-    // allUsers parameter, by confirming that we can see non-client system operations when
-    // {allUsers: false} is specified.
-    assert.gte(shardAdminDB
-                   .aggregate([
-                       {$currentOp: {allUsers: false, idleConnections: true}},
-                       {$match: {connectionId: {$exists: false}}}
-                   ])
-                   .itcount(),
-               1);
+        // Test that the currentOp command can see another user's operations with {$ownOps: false}.
+        assert.eq(
+            connAdminDB
+                .currentOp({$ownOps: false, "command.comment": "agg_current_op_allusers_test"})
+                .inprog.length,
+            1);
 
-    // Verify that the currentOp command displays all operations when auth is disabled regardless of
-    // the $ownOps parameter, by confirming that we can see non-client system operations when
-    // {$ownOps: true} is specified.
-    assert.gte(shardAdminDB.currentOp({$ownOps: true, $all: true, connectionId: {$exists: false}})
-                   .inprog.length,
-               1);
+        // Test that $currentOp succeeds with {allUsers: false} for a user without the "inprog"
+        // privilege.
+        assert(connAdminDB.logout());
+        assert(connAdminDB.auth("user_no_inprog", "pwd"));
 
-    // Test that a user can run getMore on a $currentOp cursor when authentication is disabled.
-    assert.commandWorked(getMoreTest({conn: shardConn, showAllUsers: true}));
+        assert.commandWorked(connAdminDB.runCommand({
+            aggregate: 1,
+            pipeline: [{$currentOp: {allUsers: false, localOps: true}}],
+            cursor: {}
+        }));
+
+        // Test that the currentOp command succeeds with {$ownOps: true} for a user without the
+        // "inprog" privilege. Because currentOp does not support the 'localOps' parameter, we only
+        // perform this test in the replica set case.
+        if (!isMongos) {
+            assert.commandWorked(connAdminDB.currentOp({$ownOps: true}));
+        }
+
+        // Test that a user without the inprog privilege cannot see another user's operations.
+        assert.eq(connAdminDB
+                      .aggregate([
+                          {$currentOp: {allUsers: false, localOps: true}},
+                          {$match: {"command.comment": "agg_current_op_allusers_test"}}
+                      ])
+                      .itcount(),
+                  0);
+
+        // Test that a user without the inprog privilege cannot see another user's operations via
+        // the currentOp command. Limit this test to the replica set case due to the absence of a
+        // 'localOps' parameter for the currentOp command.
+        if (!isMongos) {
+            assert.eq(
+                connAdminDB
+                    .currentOp({$ownOps: true, "command.comment": "agg_current_op_allusers_test"})
+                    .inprog.length,
+                0);
+        }
+
+        // Release the failpoint and wait for the parallel shell to complete.
+        waitForParallelShell(
+            {conn: conn, username: "admin", password: "pwd", awaitShell: awaitShell});
+
+        // Test that a user without the inprog privilege can run getMore on a $currentOp cursor
+        // which they created with {allUsers: false}.
+        assert.commandWorked(
+            getMoreTest({conn: conn, curOpSpec: {allUsers: false, localOps: true}}));
+    }
+
+    // Run the localOps tests for both replset and mongoS.
+    runLocalOpsTests(mongosConn);
+    runLocalOpsTests(shardConn);
+
+    //
+    // No-auth tests.
+    //
+
+    // Restart the cluster with auth disabled.
+    restartCluster(st, {keyFile: null});
+
+    // Run a set of tests of behaviour common to replset and mongoS when auth is disabled.
+    function runNoAuthTests(conn, curOpSpec) {
+        // Test that the allUsers parameter is ignored when authentication is disabled.
+        // Ensure that there is at least one other connection present.
+        const connAdminDB = conn.getDB("admin");
+        const otherConn = new Mongo(conn.host);
+        curOpSpec = Object.assign({localOps: false}, (curOpSpec || {}));
+
+        // Verify that $currentOp displays all operations when auth is disabled regardless of the
+        // allUsers parameter, by confirming that we can see non-client system operations when
+        // {allUsers: false} is specified.
+        assert.gte(
+            connAdminDB
+                .aggregate([
+                    {
+                      $currentOp:
+                          {allUsers: false, idleConnections: true, localOps: curOpSpec.localOps}
+                    },
+                    {$match: {connectionId: {$exists: false}}}
+                ])
+                .itcount(),
+            1);
+
+        // Verify that the currentOp command displays all operations when auth is disabled
+        // regardless of
+        // the $ownOps parameter, by confirming that we can see non-client system operations when
+        // {$ownOps: true} is specified.
+        assert.gte(
+            connAdminDB.currentOp({$ownOps: true, $all: true, connectionId: {$exists: false}})
+                .inprog.length,
+            1);
+
+        // Test that a user can run getMore on a $currentOp cursor when authentication is disabled.
+        assert.commandWorked(
+            getMoreTest({conn: conn, curOpSpec: {allUsers: true, localOps: curOpSpec.localOps}}));
+    }
+
+    runNoAuthTests(shardConn);
+    runNoAuthTests(mongosConn);
+    runNoAuthTests(mongosConn, {localOps: true});
+
+    //
+    // Replset specific tests.
+    //
+
+    // Take the replica set out of the cluster.
+    shardConn = restartReplSet(st.rs0, {shardsvr: null});
+    shardAdminDB = shardConn.getDB("admin");
 
     // Test that the host field is present and the shard field is absent when run on mongoD.
     assert.eq(shardAdminDB
@@ -615,7 +703,7 @@
         1);
 
     // Test that $currentOp can run while the mongoD is write-locked.
-    awaitShell = startParallelShell(function() {
+    let awaitShell = startParallelShell(function() {
         assert.commandFailedWithCode(db.adminCommand({sleep: 1, lock: "w", secs: 300}),
                                      ErrorCodes.Interrupted);
     }, shardConn.port);
@@ -626,5 +714,8 @@
     assert.commandWorked(shardAdminDB.killOp(op.opid));
 
     awaitShell();
+
+    // Add the shard back into the replset so that it can be validated by st.stop().
+    shardConn = restartReplSet(st.rs0, {shardsvr: ""});
     st.stop();
 })();

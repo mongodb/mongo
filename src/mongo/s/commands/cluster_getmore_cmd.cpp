@@ -50,6 +50,9 @@ class ClusterGetMoreCmd final : public BasicCommand {
 public:
     ClusterGetMoreCmd() : BasicCommand("getMore") {}
 
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const final {
+        return GetMoreRequest::parseNs(dbname, cmdObj).ns();
+    }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

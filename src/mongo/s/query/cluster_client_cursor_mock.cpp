@@ -64,6 +64,10 @@ StatusWith<ClusterQueryResult> ClusterClientCursorMock::next(
     return out.getValue();
 }
 
+BSONObj ClusterClientCursorMock::getOriginatingCommand() const {
+    return _originatingCommand;
+}
+
 long long ClusterClientCursorMock::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }

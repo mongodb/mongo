@@ -41,6 +41,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/logical_clock.h"
@@ -275,7 +276,10 @@ void execCommandClient(OperationContext* opCtx,
     }
 }
 
-void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
+void runCommand(OperationContext* opCtx,
+                const OpMsgRequest& request,
+                const NetworkOp opType,
+                BSONObjBuilder&& builder) {
     // Handle command option maxTimeMS first thing while processing the command so that the
     // subsequent code has the deadline available
     uassert(ErrorCodes::InvalidOptions,
@@ -298,6 +302,15 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         globalCommandRegistry()->incrementUnknownCommands();
         return;
     }
+
+    // Set the logical optype, command object and namespace as soon as we identify the command. If
+    // the command does not define a fully-qualified namespace, set CurOp to the generic command
+    // namespace db.$cmd.
+    auto ns = command->parseNs(request.getDatabase().toString(), request.body);
+    auto nss = (request.getDatabase() == ns ? NamespaceString(ns, "$cmd") : NamespaceString(ns));
+
+    // Fill out all currentOp details.
+    CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, opType);
 
     initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
 
@@ -367,6 +380,12 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     globalOpCounters.gotQuery();
 
     const QueryMessage q(*dbm);
+
+    const auto upconvertedQuery = upconvertQueryEntry(q.query, nss, q.ntoreturn, q.ntoskip);
+
+    // Set the upconverted query as the CurOp command object.
+    CurOp::get(opCtx)->setGenericOpRequestDetails(
+        opCtx, nss, nullptr, upconvertedQuery, dbm->msg().operation());
 
     Client* const client = opCtx->getClient();
     AuthorizationSession* const authSession = AuthorizationSession::get(client);
@@ -475,7 +494,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
 
         try {  // Execute.
             LOG(3) << "Command begin db: " << db << " msg id: " << m.header().getId();
-            runCommand(opCtx, request, reply->getInPlaceReplyBuilder(0));
+            runCommand(opCtx, request, m.operation(), reply->getInPlaceReplyBuilder(0));
             LOG(3) << "Command end db: " << db << " msg id: " << m.header().getId();
         } catch (const DBException& ex) {
             LOG(1) << "Exception thrown while processing command on " << db
@@ -548,6 +567,10 @@ DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss
     }
 
     GetMoreRequest getMoreRequest(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
+
+    // Set the upconverted getMore as the CurOp command object.
+    CurOp::get(opCtx)->setGenericOpRequestDetails(
+        opCtx, nss, nullptr, getMoreRequest.toBSON(), dbm->msg().operation());
 
     auto cursorResponse = ClusterFind::runGetMore(opCtx, getMoreRequest);
     if (cursorResponse == ErrorCodes::CursorNotFound) {
@@ -644,6 +667,7 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
                            MONGO_UNREACHABLE;
                    }
                }(),
+               dbm->msg().operation(),
                BSONObjBuilder{bb});  // built object is ignored
 }
 

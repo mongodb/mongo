@@ -103,6 +103,8 @@ public:
 
     bool isTailableAndAwaitData() const final;
 
+    BSONObj getOriginatingCommand() const final;
+
     long long getNumReturnedSoFar() const final;
 
     void queueResult(const ClusterQueryResult& result) final;

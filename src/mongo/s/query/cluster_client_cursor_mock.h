@@ -67,6 +67,8 @@ public:
 
     bool isTailableAndAwaitData() const final;
 
+    BSONObj getOriginatingCommand() const final;
+
     long long getNumReturnedSoFar() const final;
 
     void queueResult(const ClusterQueryResult& result) final;
@@ -95,6 +97,9 @@ private:
     bool _exhausted = false;
     std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;
     stdx::function<void(void)> _killCallback;
+
+    // Originating command object.
+    BSONObj _originatingCommand;
 
     // Number of returned documents.
     long long _numReturnedSoFar = 0;

@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/fetch.h"
@@ -732,83 +733,6 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     return Status::OK();
 }
 
-std::vector<BSONObj> PipelineD::MongoDInterface::getCurrentOps(
-    OperationContext* opCtx,
-    CurrentOpConnectionsMode connMode,
-    CurrentOpUserMode userMode,
-    CurrentOpTruncateMode truncateMode) const {
-    AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
-
-    const std::string hostName = getHostNameCachedAndPort();
-
-    std::vector<BSONObj> ops;
-
-    for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
-         Client* client = cursor.next();) {
-        invariant(client);
-
-        stdx::lock_guard<Client> lk(*client);
-
-        // If auth is disabled, ignore the allUsers parameter.
-        if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
-            userMode == CurrentOpUserMode::kExcludeOthers &&
-            !ctxAuth->isCoauthorizedWithClient(client)) {
-            continue;
-        }
-
-        const OperationContext* clientOpCtx = client->getOperationContext();
-
-        if (!clientOpCtx && connMode == CurrentOpConnectionsMode::kExcludeIdle) {
-            continue;
-        }
-
-        BSONObjBuilder infoBuilder;
-
-        infoBuilder.append("host", hostName);
-
-        client->reportState(infoBuilder);
-        const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-
-        if (clientMetadata) {
-            auto appName = clientMetadata.get().getApplicationName();
-            if (!appName.empty()) {
-                infoBuilder.append("appName", appName);
-            }
-
-            auto clientMetadataDocument = clientMetadata.get().getDocument();
-            infoBuilder.append("clientMetadata", clientMetadataDocument);
-        }
-
-        // Fill out the rest of the BSONObj with opCtx specific details.
-        infoBuilder.appendBool("active", static_cast<bool>(clientOpCtx));
-        infoBuilder.append("currentOpTime",
-                           opCtx->getServiceContext()->getPreciseClockSource()->now().toString());
-
-        if (clientOpCtx) {
-            infoBuilder.append("opid", clientOpCtx->getOpID());
-            if (clientOpCtx->isKillPending()) {
-                infoBuilder.append("killPending", true);
-            }
-
-            if (clientOpCtx->getLogicalSessionId()) {
-                BSONObjBuilder bob(infoBuilder.subobjStart("lsid"));
-                clientOpCtx->getLogicalSessionId()->serialize(&bob);
-            }
-
-            CurOp::get(clientOpCtx)
-                ->reportState(&infoBuilder, (truncateMode == CurrentOpTruncateMode::kTruncateOps));
-
-            Locker::LockerInfo lockerInfo;
-            clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
-            fillLockerInfo(lockerInfo, infoBuilder);
-        }
-
-        ops.emplace_back(infoBuilder.obj());
-    }
-
-    return ops;
-}
-
 std::string PipelineD::MongoDInterface::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
         return ShardingState::get(opCtx)->getShardName();
@@ -888,6 +812,23 @@ boost::optional<Document> PipelineD::MongoDInterface::lookupSingleDocument(
                                 << "]");
     }
     return lookedUpDocument;
+}
+
+BSONObj PipelineD::MongoDInterface::_reportCurrentOpForClient(
+    OperationContext* opCtx, Client* client, CurrentOpTruncateMode truncateOps) const {
+    BSONObjBuilder builder;
+
+    CurOp::reportCurrentOpForClient(
+        opCtx, client, (truncateOps == CurrentOpTruncateMode::kTruncateOps), &builder);
+
+    // Append lock stats before returning.
+    if (auto clientOpCtx = client->getOperationContext()) {
+        Locker::LockerInfo lockerInfo;
+        clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
+        fillLockerInfo(lockerInfo, builder);
+    }
+
+    return builder.obj();
 }
 
 std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(

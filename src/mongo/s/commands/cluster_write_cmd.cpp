@@ -147,6 +147,19 @@ public:
         return true;
     }
 
+    LogicalOp getLogicalOp() const {
+        switch (_writeType) {
+            case BatchedCommandRequest::BatchType::BatchType_Insert:
+                return LogicalOp::opInsert;
+            case BatchedCommandRequest::BatchType::BatchType_Delete:
+                return LogicalOp::opDelete;
+            case BatchedCommandRequest::BatchType::BatchType_Update:
+                return LogicalOp::opUpdate;
+        }
+
+        MONGO_UNREACHABLE;
+    }
+
     Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
         Status status = auth::checkAuthForWriteCommand(
             AuthorizationSession::get(opCtx->getClient()), _writeType, request);

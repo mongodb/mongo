@@ -105,6 +105,11 @@ public:
     virtual bool isTailableAndAwaitData() const = 0;
 
     /**
+     * Returns the original command object which created this cursor.
+     */
+    virtual BSONObj getOriginatingCommand() const = 0;
+
+    /**
      * Returns the number of result documents returned so far by this cursor via the next() method.
      */
     virtual long long getNumReturnedSoFar() const = 0;

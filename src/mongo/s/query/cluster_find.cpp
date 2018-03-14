@@ -41,6 +41,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
@@ -191,6 +192,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Construct the query and parameters.
 
     ClusterClientCursorParams params(query.nss(), readPref);
+    params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.limit = query.getQueryRequest().getLimit();
     params.batchSize = query.getQueryRequest().getEffectiveBatchSize();
     params.skip = query.getQueryRequest().getSkip();
@@ -401,6 +403,14 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         return pinnedCursor.getStatus();
     }
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
+
+    // Set the originatingCommand object and the cursorID in CurOp.
+    {
+        CurOp::get(opCtx)->debug().cursorid = request.cursorid;
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setOriginatingCommand_inlock(
+            pinnedCursor.getValue().getOriginatingCommand());
+    }
 
     // If the fail point is enabled, busy wait until it is disabled.
     while (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {

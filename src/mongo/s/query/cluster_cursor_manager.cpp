@@ -142,6 +142,11 @@ void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
     *this = PinnedCursor();
 }
 
+BSONObj ClusterCursorManager::PinnedCursor::getOriginatingCommand() const {
+    invariant(_cursor);
+    return _cursor->getOriginatingCommand();
+}
+
 CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {
     return _cursorId;
 }

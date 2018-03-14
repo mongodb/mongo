@@ -693,7 +693,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         // TODO: don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
-        Command* cmd = parentCurOp.getCommand();
+        const Command* cmd = parentCurOp.getCommand();
         CurOp curOp(opCtx);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -833,7 +833,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         // TODO: don't create nested CurOp for legacy writes.
         // Add Command pointer to the nested CurOp.
         auto& parentCurOp = *CurOp::get(opCtx);
-        Command* cmd = parentCurOp.getCommand();
+        const Command* cmd = parentCurOp.getCommand();
         CurOp curOp(opCtx);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());

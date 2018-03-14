@@ -142,6 +142,10 @@ bool ClusterClientCursorImpl::isTailableAndAwaitData() const {
     return _params.tailableMode == TailableMode::kTailableAndAwaitData;
 }
 
+BSONObj ClusterClientCursorImpl::getOriginatingCommand() const {
+    return _params.originatingCommandObj;
+}
+
 long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }

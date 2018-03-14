@@ -1168,6 +1168,15 @@ var authCommandsLib = {
           skipSharded: true
         },
         {
+          testname: "aggregate_currentOp_allUsers_false_localOps_true",
+          command: {
+              aggregate: 1,
+              pipeline: [{$currentOp: {allUsers: false, localOps: true}}],
+              cursor: {}
+          },
+          testcases: [{runOnDb: adminDbName, roles: roles_all}]
+        },
+        {
           testname: "aggregate_listLocalCursors",
           command: {aggregate: 1, pipeline: [{$listLocalCursors: {}}], cursor: {}},
           testcases: [{
@@ -2791,17 +2800,22 @@ var authCommandsLib = {
           }]
         },
         {
-          testname: "currentOp",
-          command: {currentOp: 1, $all: true},
+          testname: "currentOp_$ownOps_false",
+          command: {currentOp: 1, $all: true, $ownOps: false},
           testcases: [
               {
                 runOnDb: adminDbName,
                 roles: roles_monitoring,
                 privileges: [{resource: {cluster: true}, actions: ["inprog"]}]
               },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
+              {runOnDb: firstDbName, roles: {}}
           ]
+        },
+        {
+          testname: "currentOp_$ownOps_true",
+          command: {currentOp: 1, $all: true, $ownOps: true},
+          testcases: [{runOnDb: adminDbName, roles: roles_all}],
+          skipSharded: true
         },
         {
           testname: "lockInfo",
