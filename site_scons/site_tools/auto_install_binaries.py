@@ -8,6 +8,7 @@ def generate(env):
     env.Tool('install')
 
     suffix_map = {
+        env.subst('$PROGSUFFIX') : 'bin',
         '.dylib' : 'lib',
         '.so' : 'lib',
     }

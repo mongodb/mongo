@@ -133,6 +133,7 @@ capiTest = env.Program(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
+    INSTALL_ALIAS='mobile-test',
 )
 
 env.RegisterUnitTest(capiTest[0])
@@ -157,7 +158,7 @@ embeddedTransport = env.Library(
         'mongoc-1.0',
         'bson-1.0',
     ],
-    INSTALL_ALIAS='mobile-dev'
+    INSTALL_ALIAS='mobile-dev',
 )
 
 env.Alias('embedded_capi', embeddedTransport)
@@ -176,6 +177,7 @@ embeddedTransportTest = env.Program(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
+    INSTALL_ALIAS='mobile-test',
 )
 
 env.Alias('embedded_capi', embeddedTransportTest)
