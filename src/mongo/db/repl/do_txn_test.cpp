@@ -127,6 +127,7 @@ void DoTxnTest::setUp() {
     _opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     _opCtx->setTxnNumber(0);  // TxnNumber can always be 0 because we have a new session.
     _ocs.emplace(_opCtx.get(), true /* checkOutSession */, false /* autocommit */);
+    _ocs->unstashTransactionResources();
 }
 
 void DoTxnTest::tearDown() {

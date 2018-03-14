@@ -281,7 +281,8 @@ Status doTxn(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidOptions, "doTxn can only be run with a transaction ID.", txnNumber);
     auto* session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions, "doTxn must be run within a session", session);
-    invariant(!session->getAutocommit());
+    invariant(session->inMultiDocumentTransaction());
+    invariant(opCtx->getWriteUnitOfWork());
     uassert(
         ErrorCodes::InvalidOptions, "doTxn supports only CRUD opts.", _areOpsCrudOnly(doTxnCmd));
     auto hasPrecondition = _hasPrecondition(doTxnCmd);
@@ -301,31 +302,23 @@ Status doTxn(OperationContext* opCtx,
     int numApplied = 0;
 
     try {
-        writeConflictRetry(opCtx, "doTxn", dbName, [&] {
-            BSONObjBuilder intermediateResult;
-            // The write unit of work guarantees snapshot isolation for precondition check and the
-            // write.
-            WriteUnitOfWork wunit(opCtx);
+        BSONObjBuilder intermediateResult;
 
-            // Check precondition in the same write unit of work so that they share the same
-            // snapshot.
-            if (hasPrecondition) {
-                uassertStatusOK(_checkPrecondition(opCtx, doTxnCmd, result));
-            }
+        // The transaction takes place in a global unit of work, so the precondition check
+        // and the writes will share the same snapshot.
+        if (hasPrecondition) {
+            uassertStatusOK(_checkPrecondition(opCtx, doTxnCmd, result));
+        }
 
-            numApplied = 0;
-            uassertStatusOK(_doTxn(opCtx, dbName, doTxnCmd, &intermediateResult, &numApplied));
-            auto opObserver = getGlobalServiceContext()->getOpObserver();
-            invariant(opObserver);
-            opObserver->onTransactionCommit(opCtx);
-            wunit.commit();
-            result->appendElements(intermediateResult.obj());
-        });
+        numApplied = 0;
+        uassertStatusOK(_doTxn(opCtx, dbName, doTxnCmd, &intermediateResult, &numApplied));
+        auto opObserver = getGlobalServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onTransactionCommit(opCtx);
+        result->appendElements(intermediateResult.obj());
 
         // Commit the global WUOW if the command succeeds.
-        if (opCtx->getWriteUnitOfWork()) {
-            opCtx->getWriteUnitOfWork()->commit();
-        }
+        opCtx->getWriteUnitOfWork()->commit();
     } catch (const DBException& ex) {
         BSONArrayBuilder ab;
         ++numApplied;

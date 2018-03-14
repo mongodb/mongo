@@ -246,13 +246,10 @@ LockMode getLockModeForQuery(OperationContext* opCtx) {
     invariant(opCtx);
 
     // Use IX locks for autocommit:false multi-statement transactions; otherwise, use IS locks.
-    if (opCtx->getWriteUnitOfWork()) {
-        invariant(OperationContextSession::get(opCtx));
-        if (!OperationContextSession::get(opCtx)->getAutocommit()) {
-            return MODE_IX;
-        }
+    auto session = OperationContextSession::get(opCtx);
+    if (session && session->inMultiDocumentTransaction()) {
+        return MODE_IX;
     }
-
     return MODE_IS;
 }
 

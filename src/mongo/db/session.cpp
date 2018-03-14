@@ -32,8 +32,6 @@
 
 #include "mongo/db/session.h"
 
-#include <boost/utility/in_place_factory.hpp>
-
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -517,9 +515,13 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
 }
 
 Session::TxnResources::~TxnResources() {
-    if (!_released) {
-        _recoveryUnit->abortUnitOfWork();
+    if (!_released && _recoveryUnit) {
+        // This should only be reached when aborting a transaction that isn't active, i.e.
+        // when starting a new transaction before completing an old one.  So we should
+        // be at WUOW nesting level 1 (only the top level WriteUnitOfWork).
         _locker->endWriteUnitOfWork();
+        invariant(!_locker->inAWriteUnitOfWork());
+        _recoveryUnit->abortUnitOfWork();
     }
 }
 
@@ -556,11 +558,10 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
     // away, and then lock the Session owned by that client. We rely on the fact that we are not
     // using the  DefaultLockerImpl to avoid deadlock.
+
     invariant(!isMMAPV1());
     stdx::lock_guard<Client> lk(*opCtx->getClient());
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    invariant(opCtx->hasStashedCursor() || !_autocommit);
+    stdx::unique_lock<stdx::mutex> lg(_mutex);
 
     if (*opCtx->getTxnNumber() != _activeTxnNumber) {
         // The session is checked out, so _activeTxnNumber cannot advance due to a user operation.
@@ -574,8 +575,27 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
                                 << _activeTxnNumber);
     }
 
+    if (_txnState != MultiDocumentTransactionState::kInProgress &&
+        _txnState != MultiDocumentTransactionState::kInSnapshotRead) {
+        // Not in a multi-document transaction or snapshot read: nothing to do.
+        return;
+    }
+
+    if (_txnState == MultiDocumentTransactionState::kInSnapshotRead && !opCtx->hasStashedCursor()) {
+        // The snapshot read is complete.
+        invariant(opCtx->getWriteUnitOfWork());
+        // We cannot hold the session lock during the commit, or a deadlock results.
+        _txnState = MultiDocumentTransactionState::kCommitting;
+        lg.unlock();
+        opCtx->getWriteUnitOfWork()->commit();
+        opCtx->setWriteUnitOfWork(nullptr);
+        lg.lock();
+        _txnState = MultiDocumentTransactionState::kCommitted;
+        return;
+    }
+
     invariant(!_txnResourceStash);
-    _txnResourceStash = boost::in_place(opCtx);
+    _txnResourceStash = TxnResources(opCtx);
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx) {
@@ -606,6 +626,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
     }
 
     if (_txnResourceStash) {
+        invariant(_txnState != MultiDocumentTransactionState::kNone);
         _txnResourceStash->release(opCtx);
         _txnResourceStash = boost::none;
     } else {
@@ -613,6 +634,10 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
             _txnState == MultiDocumentTransactionState::kInProgress) {
             opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+            if (_txnState != MultiDocumentTransactionState::kInProgress) {
+                invariant(_txnState == MultiDocumentTransactionState::kNone);
+                _txnState = MultiDocumentTransactionState::kInSnapshotRead;
+            }
         }
     }
 }
@@ -652,6 +677,7 @@ void Session::_setActiveTxn(WithLock, TxnNumber txnNumber) {
     _activeTxnNumber = txnNumber;
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
+    _txnResourceStash = boost::none;
 }
 
 void Session::addTransactionOperation(OperationContext* opCtx,

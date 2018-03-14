@@ -344,6 +344,10 @@ OperationContextSession::~OperationContextSession() {
 }
 
 void OperationContextSession::stashTransactionResources() {
+    if (!_opCtx->getTxnNumber()) {
+        return;
+    }
+
     if (auto& checkedOutSession = operationSessionDecoration(_opCtx)) {
         if (checkedOutSession->checkOutNestingLevel == 1) {
             if (auto session = checkedOutSession->scopedSession.get()) {

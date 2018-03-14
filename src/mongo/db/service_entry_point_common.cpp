@@ -704,22 +704,7 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx, invocation.get(), request, replyBuilder, startOperationTime, behaviors);
 
         if (retval) {
-            if (opCtx->getWriteUnitOfWork()) {
-                // Snapshot readConcern is enabled and it must be used within a session.
-                auto session = sessionTxnState.get(opCtx);
-                invariant(session != nullptr,
-                          str::stream()
-                              << "Snapshot transaction must be run within a session. Command: "
-                              << ServiceEntryPointCommon::getRedactedCopyForLogging(command,
-                                                                                    request.body));
-                if (opCtx->hasStashedCursor() || session->inMultiDocumentTransaction()) {
-                    sessionTxnState.stashTransactionResources();
-                } else {
-                    // If we are in an autocommit=true transaction and have no stashed cursor,
-                    // commit the transaction.
-                    opCtx->getWriteUnitOfWork()->commit();
-                }
-            }
+            sessionTxnState.stashTransactionResources();
         } else {
             command->incrementCommandsFailed();
         }

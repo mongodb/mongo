@@ -71,6 +71,11 @@ public:
 
         ~TxnResources();
 
+        // Rule of 5: because we have a class-defined destructor, we need to explictly specify
+        // the move operator and move assignment operator.
+        TxnResources(TxnResources&&) = default;
+        TxnResources& operator=(TxnResources&&) = default;
+
         /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          */
@@ -242,6 +247,15 @@ public:
     };
 
     /**
+     * Returns whether we are in a read-only or multi-document transaction.
+     */
+    bool inSnapshotReadOrMultiDocumentTransaction() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState == MultiDocumentTransactionState::kInProgress ||
+            _txnState == MultiDocumentTransactionState::kInSnapshotRead;
+    }
+
+    /**
      * Adds a stored operation to the list of stored operations for the current multi-document
      * (non-autocommit) transaction.  It is illegal to add operations when no multi-document
      * transaction is in progress.
@@ -325,11 +339,11 @@ private:
     // Holds transaction resources between network operations.
     boost::optional<TxnResources> _txnResourceStash;
 
-    // Indicates the state of the current multi-document transaction, if any.
-    // If the transaction is in any state but kInProgress, no more operations can
-    // be collected.
+    // Indicates the state of the current multi-document transaction or snapshot read, if any.  If
+    // the transaction is in any state but kInProgress, no more operations can be collected.
     enum class MultiDocumentTransactionState {
         kNone,
+        kInSnapshotRead,
         kInProgress,
         kCommitting,
         kCommitted,

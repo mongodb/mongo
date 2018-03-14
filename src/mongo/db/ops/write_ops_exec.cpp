@@ -129,7 +129,9 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         }
 
         // Do not profile individual statements in a write command if we are in a transaction.
-        if (curOp->shouldDBProfile(shouldSample) && !opCtx->getWriteUnitOfWork()) {
+        auto session = OperationContextSession::get(opCtx);
+        if (curOp->shouldDBProfile(shouldSample) &&
+            !(session && session->inSnapshotReadOrMultiDocumentTransaction())) {
             profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
         }
     } catch (const DBException& ex) {
@@ -217,7 +219,8 @@ bool handleError(OperationContext* opCtx,
         throw;  // These have always failed the whole batch.
     }
 
-    if (opCtx->getWriteUnitOfWork()) {
+    auto session = OperationContextSession::get(opCtx);
+    if (session && session->inSnapshotReadOrMultiDocumentTransaction()) {
         // If we are in a transaction, we must fail the whole batch.
         throw;
     }
@@ -452,9 +455,11 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
-    // Insert performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
-    // transaction.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() || opCtx->getWriteUnitOfWork());
+    // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run under
+    // snapshot read concern or in a transaction.
+    auto session = OperationContextSession::get(opCtx);
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+              (session && session->inSnapshotReadOrMultiDocumentTransaction()));
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
         // This is the only part of finishCurOp we need to do for inserts because they reuse the
@@ -512,6 +517,7 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
             const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
             if (opCtx->getTxnNumber()) {
                 auto session = OperationContextSession::get(opCtx);
+                invariant(session);
                 if (session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
                                                                      stmtId)) {
                     containsRetry = true;
@@ -653,9 +659,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 }
 
 WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& wholeOp) {
-    // Update performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
-    // transaction.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() || opCtx->getWriteUnitOfWork());
+    // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run under
+    // snapshot read concern or in a transaction.
+    auto session = OperationContextSession::get(opCtx);
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+              (session && session->inSnapshotReadOrMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
@@ -794,7 +802,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& wholeOp) {
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork() || opCtx->getWriteUnitOfWork());
+    auto session = OperationContextSession::get(opCtx);
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
+              (session && session->inSnapshotReadOrMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(
