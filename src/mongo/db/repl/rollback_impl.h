@@ -64,19 +64,19 @@ class ReplicationProcess;
  * machinery. This class runs synchronously on the caller's thread.
  *
  * Order of actions:
- *   1. Transition to ROLLBACK
- *   2. Find the common point between the local and remote oplogs.
- *       a. Keep track of what is rolled back to provide a summary to the user
- *       b. Write rolled back documents to 'Rollback Files'
- *   3. Increment the Rollback ID (RBID)
- *   4. Write the common point as the 'OplogTruncateAfterPoint'
- *   5. Tell the storage engine to recover to the last stable timestamp
- *   6. Call recovery code
- *       a. Truncate the oplog at the common point
+ *   1. Transition to ROLLBACK.
+ *   2. Await background index completion.
+ *   3. Find the common point between the local and remote oplogs.
+ *       a. Keep track of what is rolled back to provide a summary to the user.
+ *       b. Write rolled back documents to 'Rollback Files'.
+ *   4. Increment the Rollback ID (RBID).
+ *   5. Tell the storage engine to recover to the last stable timestamp.
+ *   6. Write the oplog entry after the common point as the 'OplogTruncateAfterPoint'.
+ *   7. Call recovery code.
+ *       a. Truncate the oplog at the common point.
  *       b. Apply all oplog entries to the end of oplog.
- *   7. Check the shard identity document for roll back
- *   8. Clear the in-memory transaction table
- *   9. Transition to SECONDARY
+ *   8. Trigger the on-rollback op observer.
+ *   9. Transition to SECONDARY.
  *
  * If the node crashes while in rollback and the storage engine has not recovered to the last
  * stable timestamp yet, then rollback will simply restart against the new sync source upon restart.
@@ -116,6 +116,11 @@ public:
          * Function called after we recover to the stable timestamp.
          */
         virtual void onRecoverToStableTimestamp(Timestamp stableTimestamp) noexcept {}
+
+        /**
+         * Function called after we set the oplog truncate after point.
+         */
+        virtual void onSetOplogTruncateAfterPoint(Timestamp truncatePoint) noexcept {}
 
         /**
          * Function called after we recover from the oplog.

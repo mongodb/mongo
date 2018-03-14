@@ -47,59 +47,6 @@ using namespace mongo::repl;
 
 NamespaceString nss("local.oplog.rs");
 
-class StorageInterfaceRollback : public StorageInterfaceImpl {
-public:
-    void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _stableTimestamp = snapshotName;
-    }
-
-    /**
-     * If '_recoverToTimestampStatus' is non-empty, returns it. If '_recoverToTimestampStatus' is
-     * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns the new value
-     * of '_currTimestamp'.
-     */
-    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (_recoverToTimestampStatus) {
-            return _recoverToTimestampStatus.get();
-        } else {
-            _currTimestamp = _stableTimestamp;
-            return _currTimestamp;
-        }
-    }
-
-    void setRecoverToTimestampStatus(Status status) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _recoverToTimestampStatus = status;
-    }
-
-    void setCurrentTimestamp(Timestamp ts) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _currTimestamp = ts;
-    }
-
-    Timestamp getCurrentTimestamp() {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        return _currTimestamp;
-    }
-
-private:
-    mutable stdx::mutex _mutex;
-
-    Timestamp _stableTimestamp;
-
-    // Used to mock the behavior of 'recoverToStableTimestamp'. Upon calling
-    // 'recoverToStableTimestamp', the 'currTimestamp' should be set to the current
-    // '_stableTimestamp' value. Can be viewed as mock version of replication's 'lastApplied'
-    // optime.
-    Timestamp _currTimestamp;
-
-    // A Status value which, if set, will be returned by the 'recoverToStableTimestamp' function, in
-    // order to simulate the error case for that function. Defaults to boost::none.
-    boost::optional<Status> _recoverToTimestampStatus = boost::none;
-};
-
 /**
  * Unit test for rollback implementation introduced in 3.6.
  */
@@ -117,7 +64,6 @@ private:
     friend class RollbackImplTest::Listener;
 
 protected:
-    std::unique_ptr<StorageInterfaceRollback> _storageInterface;
     std::unique_ptr<OplogInterfaceLocal> _localOplog;
     std::unique_ptr<OplogInterfaceMock> _remoteOplog;
     std::unique_ptr<RollbackImpl> _rollback;
@@ -140,6 +86,10 @@ protected:
     stdx::function<void(Timestamp commonPoint)> _onCommonPointFoundFn =
         [this](Timestamp commonPoint) { _commonPointFound = commonPoint; };
 
+    Timestamp _truncatePoint;
+    stdx::function<void(Timestamp truncatePoint)> _onSetOplogTruncateAfterPointFn =
+        [this](Timestamp truncatePoint) { _truncatePoint = truncatePoint; };
+
     bool _triggeredOpObserver = false;
     stdx::function<void(const OpObserver::RollbackObserverInfo& rbInfo)> _onRollbackOpObserverFn =
         [this](const OpObserver::RollbackObserverInfo& rbInfo) {};
@@ -150,16 +100,13 @@ protected:
 void RollbackImplTest::setUp() {
     RollbackTest::setUp();
 
-    // Set up test-specific storage interface.
-    _storageInterface = stdx::make_unique<StorageInterfaceRollback>();
-
     _localOplog = stdx::make_unique<OplogInterfaceLocal>(_opCtx.get(),
                                                          NamespaceString::kRsOplogNamespace.ns());
     _remoteOplog = stdx::make_unique<OplogInterfaceMock>();
     _listener = stdx::make_unique<Listener>(this);
     _rollback = stdx::make_unique<RollbackImpl>(_localOplog.get(),
                                                 _remoteOplog.get(),
-                                                _storageInterface.get(),
+                                                _storageInterface,
                                                 _replicationProcess.get(),
                                                 _coordinator,
                                                 _listener.get());
@@ -191,11 +138,15 @@ public:
         _test->_onRecoverToStableTimestampFn(stableTimestamp);
     }
 
+    void onSetOplogTruncateAfterPoint(Timestamp truncatePoint) noexcept override {
+        _test->_onSetOplogTruncateAfterPointFn(truncatePoint);
+    }
+
     void onRecoverFromOplog() noexcept override {
         _test->_onRecoverFromOplogFn();
     }
 
-    void onRollbackOpObserver(const OpObserver::RollbackObserverInfo& rbInfo) noexcept {
+    void onRollbackOpObserver(const OpObserver::RollbackObserverInfo& rbInfo) noexcept override {
         _test->_onRollbackOpObserverFn(rbInfo);
     }
 
@@ -207,6 +158,8 @@ private:
  * Helper functions to make simple oplog entries with timestamps, terms, and hashes.
  */
 BSONObj makeOp(OpTime time, long long hash) {
+    const auto kGenericUUID =
+        unittest::assertGet(UUID::parse("b4c66a44-c1ca-4d86-8d25-12e82fa2de5b"));
     return BSON("ts" << time.getTimestamp() << "h" << hash << "t" << time.getTerm() << "op"
                      << "i"
                      << "o"
@@ -214,7 +167,7 @@ BSONObj makeOp(OpTime time, long long hash) {
                      << "ns"
                      << "test.coll"
                      << "ui"
-                     << UUID::gen());
+                     << kGenericUUID);
 }
 
 BSONObj makeOp(int count) {
@@ -236,6 +189,23 @@ OplogInterfaceMock::Operation makeOpAndRecordId(OpTime time, long long hash) {
 
 OplogInterfaceMock::Operation makeOpAndRecordId(int count) {
     return makeOpAndRecordId(makeOp(count));
+}
+
+/**
+ * Asserts that the documents in the oplog have the given timestamps.
+ */
+void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
+    std::vector<BSONObj> expectedOplog(timestamps.size());
+    std::transform(timestamps.begin(), timestamps.end(), expectedOplog.begin(), [](int ts) {
+        return makeOp(ts);
+    });
+
+    OplogInterfaceLocal oplog(opCtx, NamespaceString::kRsOplogNamespace.ns());
+    auto iter = oplog.makeIterator();
+    for (auto reverseIt = expectedOplog.rbegin(); reverseIt != expectedOplog.rend(); reverseIt++) {
+        ASSERT_BSONOBJ_EQ(*reverseIt, unittest::assertGet(iter->next()).first);
+    }
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(RollbackImplTest, TestFixtureSetUpInitializesStorageEngine) {
@@ -282,16 +252,13 @@ TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncate
     auto commonPoint = makeOpAndRecordId(2);
     _remoteOplog->setOperations({commonPoint});
     ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(2, 2));
 
     auto nextTime = 3;
     ASSERT_OK(_insertOplogEntry(makeOp(nextTime)));
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
-
-    // Check that the common point was saved.
-    auto truncateAfterPoint =
-        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(nextTime, nextTime), truncateAfterPoint);
+    ASSERT_EQUALS(_truncatePoint, Timestamp(3, 3));
 }
 
 TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
@@ -299,6 +266,7 @@ TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     // Get the initial rollback id.
     int initRollbackId = _replicationProcess->getRollbackID();
@@ -317,8 +285,8 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
-    auto stableTimestamp = Timestamp(10, 0);
-    auto currTimestamp = Timestamp(20, 0);
+    auto stableTimestamp = Timestamp(1, 1);
+    auto currTimestamp = Timestamp(2, 2);
 
     _storageInterface->setStableTimestamp(nullptr, stableTimestamp);
     _storageInterface->setCurrentTimestamp(currTimestamp);
@@ -332,7 +300,7 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
 
     // Set the stable timestamp ahead to see that the current timestamp and the stable timestamp
     // we recovered to don't change.
-    auto newTimestamp = Timestamp(30, 0);
+    auto newTimestamp = Timestamp(3, 3);
     _storageInterface->setStableTimestamp(nullptr, newTimestamp);
 
     // Make sure "recover to timestamp" occurred by checking that the current timestamp was set back
@@ -347,10 +315,15 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
-    auto stableTimestamp = Timestamp(10, 0);
-    auto currTimestamp = Timestamp(20, 0);
+    auto stableTimestamp = Timestamp(1, 1);
+    auto currTimestamp = Timestamp(2, 2);
     _storageInterface->setStableTimestamp(nullptr, stableTimestamp);
     _storageInterface->setCurrentTimestamp(currTimestamp);
+
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
 
     // Make it so that the 'recoverToStableTimestamp' method will fail.
     auto recoverToTimestampStatus =
@@ -371,6 +344,13 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
+
+    // Don't set the truncate after point if we fail early.
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+    ASSERT_EQUALS(_truncatePoint, Timestamp());
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
@@ -383,6 +363,11 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
     auto rollbackIdNss = NamespaceString(_storageInterface->kDefaultRollbackIdNamespace);
     ASSERT_OK(_storageInterface->dropCollection(_opCtx.get(), rollbackIdNss));
 
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+
     // Run rollback.
     auto status = _rollback->runRollback(_opCtx.get());
 
@@ -392,6 +377,13 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
+
+    // Don't set the truncate after point if we fail early.
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+    ASSERT_EQUALS(_truncatePoint, Timestamp());
 }
 
 TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
@@ -399,6 +391,7 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     // Run rollback.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -407,11 +400,16 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
     ASSERT(_recoveredFromOplog);
 }
 
-TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
+TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringRTT) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
+
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
 
     _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
         _recoveredToStableTimestamp = true;
@@ -429,18 +427,77 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
-
     ASSERT(_stableTimestamp.isNull());
+
+    // This shutdown occurs between setting the oplog truncate after point and truncating the oplog.
+    // This must be safe since it is no different than an untimely crash.
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
+    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
 }
 
-TEST_F(RollbackImplTest, RollbackSucceeds) {
+TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringSetTruncatePoint) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+    _onSetOplogTruncateAfterPointFn = [this](Timestamp truncatePoint) {
+        _truncatePoint = truncatePoint;
+        _rollback->shutdown();
+    };
+
+    _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
+        _recoveredToStableTimestamp = true;
+    };
+
+    // Run rollback.
+    auto status = _rollback->runRollback(_opCtx.get());
+
+    // Make sure shutdown occurred before oplog recovery.
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
+    ASSERT(_recoveredToStableTimestamp);
+    ASSERT_FALSE(_recoveredFromOplog);
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
+
+    // This shutdown occurs between setting the oplog truncate after point and truncating the oplog.
+    // This must be safe since it is no different than an untimely crash.
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+    truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
+    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
+}
+
+TEST_F(RollbackImplTest, RollbackSucceedsAndTruncatesOplog) {
+    auto op = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({op});
+    ASSERT_OK(_insertOplogEntry(op.first));
+    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    auto truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+    _assertDocsInOplog(_opCtx.get(), {1, 2});
+
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
     ASSERT_EQUALS(Timestamp(1, 1), _commonPointFound);
+
+    // Clear truncate after point after truncation.
+    truncateAfterPoint =
+        _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
+    ASSERT_EQUALS(Timestamp(), truncateAfterPoint);
+    _assertDocsInOplog(_opCtx.get(), {1});
+    ASSERT_EQUALS(_truncatePoint, Timestamp(2, 2));
 }
 
 DEATH_TEST_F(RollbackImplTest,
@@ -453,6 +510,7 @@ DEATH_TEST_F(RollbackImplTest,
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     auto status = _rollback->runRollback(_opCtx.get());
     unittest::log() << "Mongod did not crash. Status: " << status;
@@ -488,6 +546,7 @@ TEST_F(RollbackImplTest, RollbackSkipsTriggerOpObserverWhenShutDownEarly) {
     _remoteOplog->setOperations({op});
     ASSERT_OK(_insertOplogEntry(op.first));
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
 
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
     ASSERT(_recoveredFromOplog);
@@ -506,6 +565,8 @@ public:
      * process.
      */
     Status rollbackOps(const OplogInterfaceMock::Operations& ops) {
+        _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
         auto commonOp = makeOpAndRecordId(1);
         _remoteOplog->setOperations({commonOp});
         ASSERT_OK(_insertOplogEntry(commonOp.first));

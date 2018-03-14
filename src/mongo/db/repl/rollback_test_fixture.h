@@ -112,13 +112,72 @@ protected:
     class ReplicationCoordinatorRollbackMock;
     ReplicationCoordinatorRollbackMock* _coordinator = nullptr;
 
-    StorageInterfaceImpl _storageInterface;
+    class StorageInterfaceRollback;
+    StorageInterfaceRollback* _storageInterface = nullptr;
+    ReplicationRecovery* _recovery;
 
     // ReplicationProcess used to access consistency markers.
     std::unique_ptr<ReplicationProcess> _replicationProcess;
 
     // DropPendingCollectionReaper used to clean up and roll back dropped collections.
     DropPendingCollectionReaper* _dropPendingCollectionReaper = nullptr;
+};
+
+class RollbackTest::StorageInterfaceRollback : public StorageInterfaceImpl {
+public:
+    void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _stableTimestamp = snapshotName;
+    }
+
+    /**
+     * If '_recoverToTimestampStatus' is non-empty, returns it. If '_recoverToTimestampStatus' is
+     * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns the new value
+     * of '_currTimestamp'.
+     */
+    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (_recoverToTimestampStatus) {
+            return _recoverToTimestampStatus.get();
+        } else {
+            _currTimestamp = _stableTimestamp;
+            return _currTimestamp;
+        }
+    }
+
+    bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override {
+        return true;
+    }
+
+    void setRecoverToTimestampStatus(Status status) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _recoverToTimestampStatus = status;
+    }
+
+    void setCurrentTimestamp(Timestamp ts) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        _currTimestamp = ts;
+    }
+
+    Timestamp getCurrentTimestamp() {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        return _currTimestamp;
+    }
+
+private:
+    mutable stdx::mutex _mutex;
+
+    Timestamp _stableTimestamp;
+
+    // Used to mock the behavior of 'recoverToStableTimestamp'. Upon calling
+    // 'recoverToStableTimestamp', the 'currTimestamp' should be set to the current
+    // '_stableTimestamp' value. Can be viewed as mock version of replication's 'lastApplied'
+    // optime.
+    Timestamp _currTimestamp;
+
+    // A Status value which, if set, will be returned by the 'recoverToStableTimestamp' function, in
+    // order to simulate the error case for that function. Defaults to boost::none.
+    boost::optional<Status> _recoverToTimestampStatus = boost::none;
 };
 
 /**

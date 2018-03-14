@@ -41,7 +41,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/replication_recovery_mock.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/logger/log_component.h"
@@ -69,14 +69,17 @@ ReplSettings createReplSettings() {
 
 void RollbackTest::setUp() {
     _serviceContextMongoDTest.setUp();
+    _storageInterface = new StorageInterfaceRollback();
     auto serviceContext = _serviceContextMongoDTest.getServiceContext();
+    auto consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
+    auto recovery =
+        stdx::make_unique<ReplicationRecoveryImpl>(_storageInterface, consistencyMarkers.get());
     _replicationProcess = stdx::make_unique<ReplicationProcess>(
-        &_storageInterface,
-        stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-        stdx::make_unique<ReplicationRecoveryMock>());
-    _dropPendingCollectionReaper = new DropPendingCollectionReaper(&_storageInterface);
+        _storageInterface, std::move(consistencyMarkers), std::move(recovery));
+    _dropPendingCollectionReaper = new DropPendingCollectionReaper(_storageInterface);
     DropPendingCollectionReaper::set(
         serviceContext, std::unique_ptr<DropPendingCollectionReaper>(_dropPendingCollectionReaper));
+    StorageInterface::set(serviceContext, std::unique_ptr<StorageInterface>(_storageInterface));
     _coordinator = new ReplicationCoordinatorRollbackMock(serviceContext);
     ReplicationCoordinator::set(serviceContext,
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
@@ -199,7 +202,7 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
 Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {
     TimestampedBSONObj obj;
     obj.obj = doc;
-    return _storageInterface.insertDocument(
+    return _storageInterface->insertDocument(
         _opCtx.get(), NamespaceString::kRsOplogNamespace, obj, 0);
 }
 
