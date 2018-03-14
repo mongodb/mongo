@@ -199,13 +199,18 @@ __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 	 * created records written by reconciliation are deleted and so can be
 	 * never seen by a read.
 	 */
-	if (cbt->ins == NULL ||
-	    cbt->recno > WT_INSERT_RECNO(cbt->ins) ||
-	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
+	if (cbt->ins == NULL || cbt->recno > WT_INSERT_RECNO(cbt->ins)) {
 		cbt->v = 0;
 		cbt->iface.value.data = &cbt->v;
-	} else
-		cbt->iface.value.data = upd->data;
+	} else {
+		upd = NULL;
+		WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
+		if (upd == NULL) {
+			cbt->v = 0;
+			cbt->iface.value.data = &cbt->v;
+		} else
+			cbt->iface.value.data = upd->data;
+	}
 	cbt->iface.value.size = 1;
 	return (0);
 }
@@ -247,7 +252,9 @@ new_page:
 	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
 	if (cbt->ins != NULL && cbt->recno != WT_INSERT_RECNO(cbt->ins))
 		cbt->ins = NULL;
-	upd = cbt->ins == NULL ? NULL : __wt_txn_read(session, cbt->ins->upd);
+	upd = NULL;
+	if (cbt->ins != NULL)
+		WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
 	if (upd == NULL) {
 		cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
 		cbt->iface.value.data = &cbt->v;
@@ -280,7 +287,8 @@ new_page:	if (cbt->ins == NULL)
 			return (WT_NOTFOUND);
 
 		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
-		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL)
+		WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
+		if (upd == NULL)
 			continue;
 		if (upd->type == WT_UPDATE_TOMBSTONE) {
 			if (upd->txnid != WT_TXN_NONE &&
@@ -340,8 +348,9 @@ new_page:	if (cbt->recno < cbt->ref->ref_recno)
 		/* Check any insert list for a matching record. */
 		cbt->ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
 		cbt->ins = __col_insert_search_match(cbt->ins_head, cbt->recno);
-		upd = cbt->ins == NULL ?
-		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		upd = NULL;
+		if (cbt->ins != NULL)
+			WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
 		if (upd != NULL) {
 			if (upd->type == WT_UPDATE_TOMBSTONE) {
 				if (upd->txnid != WT_TXN_NONE &&
@@ -468,7 +477,8 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 			WT_RET(__cursor_skip_prev(cbt));
 
 new_insert:	if ((ins = cbt->ins) != NULL) {
-			if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
+			WT_RET(__wt_txn_read(session, ins->upd, &upd));
+			if (upd == NULL)
 				continue;
 			if (upd->type == WT_UPDATE_TOMBSTONE) {
 				if (upd->txnid != WT_TXN_NONE &&
@@ -503,7 +513,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
 		rip = &page->pg_row[cbt->slot];
-		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
+		WT_RET(__wt_txn_read(session, WT_ROW_UPDATE(page, rip), &upd));
 		if (upd != NULL && upd->type == WT_UPDATE_TOMBSTONE) {
 			if (upd->txnid != WT_TXN_NONE &&
 			    __wt_txn_upd_visible_all(session, upd))
@@ -526,8 +536,9 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
+	WT_UPDATE *upd;
 	uint32_t flags;
-	bool newpage;
+	bool newpage, valid;
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
@@ -536,6 +547,26 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 	WT_STAT_DATA_INCR(session, cursor_prev);
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+	/*
+	 * In case of retrying a prev operation due to a prepare conflict,
+	 * cursor would have been already positioned at an update structure
+	 * which resulted in conflict. So, now when retrying we should examine
+	 * the same update again instead of starting from the next one in the
+	 * update chain.
+	 */
+	F_CLR(cbt, WT_CBT_RETRY_NEXT);
+	if (F_ISSET(cbt, WT_CBT_RETRY_PREV)) {
+		WT_RET(__wt_cursor_valid(cbt, &upd, &valid));
+		F_CLR(cbt, WT_CBT_RETRY_PREV);
+		if (valid) {
+			/*
+			 * If the update, which returned prepared conflict is
+			 * visible, return the value.
+			 */
+			return (__cursor_kv_return(session, cbt, upd));
+		}
+	}
 
 	WT_RET(__cursor_func_init(cbt, false));
 
@@ -622,10 +653,20 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
 	if (ret == 0)
 		WT_ERR(__wt_cursor_key_order_check(session, cbt, false));
 #endif
-	if (ret == 0)
+err:	switch (ret) {
+	case 0:
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-
-err:	if (ret != 0)
+		break;
+	case WT_PREPARE_CONFLICT:
+		/*
+		 * If prepare conflict occurs, cursor should not be reset,
+		 * as current cursor position will be reused in case of a
+		 * retry from user.
+		 */
+		F_SET(cbt, WT_CBT_RETRY_PREV);
+		break;
+	default:
 		WT_TRET(__cursor_reset(cbt));
+	}
 	return (ret);
 }

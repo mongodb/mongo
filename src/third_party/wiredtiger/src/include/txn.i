@@ -9,6 +9,11 @@
 static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
+typedef enum {
+	WT_VISIBLE_FALSE=0,     /* Not a visible update */
+	WT_VISIBLE_PREPARE=1,   /* Prepared update */
+	WT_VISIBLE_TRUE=2       /* A visible update */
+} WT_VISIBLE_TYPE;
 #ifdef HAVE_TIMESTAMPS
 /*
  * __wt_txn_timestamp_flags --
@@ -539,33 +544,74 @@ __wt_txn_visible(
 }
 
 /*
+ * __wt_txn_upd_visible_type --
+ *      Visible type of given update for the current transaction.
+ */
+static inline WT_VISIBLE_TYPE
+__wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+{
+	uint8_t upd_state;
+	bool upd_visible;
+
+	for (;;__wt_yield()) {
+		/* Commit is in progress, yield and try again. */
+		if ((upd_state = upd->state) == WT_UPDATE_STATE_LOCKED)
+			continue;
+
+		upd_visible = __wt_txn_visible(
+		    session, upd->txnid, WT_TIMESTAMP_NULL(&upd->timestamp));
+
+		/*
+		 * The visibility check is only valid if the update does not
+		 * change state.  If the state does change, recheck visibility.
+		 */
+		if (upd->state == upd_state)
+			break;
+	}
+
+	if (!upd_visible)
+		return (WT_VISIBLE_FALSE);
+
+	if (upd_state == WT_UPDATE_STATE_PREPARED)
+		return (F_ISSET(&session->txn, WT_TXN_IGNORE_PREPARE) ?
+		    WT_VISIBLE_FALSE : WT_VISIBLE_PREPARE);
+
+	return (WT_VISIBLE_TRUE);
+}
+
+/*
  * __wt_txn_upd_visible --
  *	Can the current transaction see the given update.
  */
 static inline bool
 __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	return (__wt_txn_visible(session,
-	    upd->txnid, WT_TIMESTAMP_NULL(&upd->timestamp)));
+	return (__wt_txn_upd_visible_type(session, upd) == WT_VISIBLE_TRUE);
 }
 
 /*
  * __wt_txn_read --
  *	Get the first visible update in a list (or NULL if none are visible).
  */
-static inline WT_UPDATE *
-__wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
+static inline int
+__wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_UPDATE **updp)
 {
 	static WT_UPDATE tombstone = {
 		.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE
 	};
+	WT_VISIBLE_TYPE upd_visible;
 	bool skipped_birthmark;
 
+	*updp = NULL;
 	for (skipped_birthmark = false; upd != NULL; upd = upd->next) {
 		/* Skip reserved place-holders, they're never visible. */
-		if (upd->type != WT_UPDATE_RESERVE &&
-		    __wt_txn_upd_visible(session, upd))
-			break;
+		if (upd->type != WT_UPDATE_RESERVE) {
+			upd_visible = __wt_txn_upd_visible_type(session, upd);
+			if (upd_visible == WT_VISIBLE_TRUE)
+				break;
+			if (upd_visible == WT_VISIBLE_PREPARE)
+				return (WT_PREPARE_CONFLICT);
+		}
 		/* An invisible birthmark is equivalent to a tombstone. */
 		if (upd->type == WT_UPDATE_BIRTHMARK)
 			skipped_birthmark = true;
@@ -574,7 +620,8 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	if (upd == NULL && skipped_birthmark)
 		upd = &tombstone;
 
-	return (upd == NULL || upd->type == WT_UPDATE_BIRTHMARK ? NULL : upd);
+	*updp = (upd == NULL || upd->type == WT_UPDATE_BIRTHMARK ? NULL : upd);
+	return (0);
 }
 
 /*
@@ -786,21 +833,32 @@ static inline int
 __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
 	WT_TXN *txn;
+	bool ignore_prepare_set;
 
 	txn = &session->txn;
-	if (txn->isolation == WT_ISO_SNAPSHOT)
-		while (upd != NULL && !__wt_txn_upd_visible(session, upd)) {
-			if (upd->txnid != WT_TXN_ABORTED) {
-				WT_STAT_CONN_INCR(
-				    session, txn_update_conflict);
-				WT_STAT_DATA_INCR(
-				    session, txn_update_conflict);
-				return (__wt_txn_rollback_required(session,
-				    "conflict between concurrent operations"));
-			}
-			upd = upd->next;
-		}
+	if (txn->isolation != WT_ISO_SNAPSHOT)
+		return (0);
 
+	/*
+	 * Clear the ignore prepare setting of txn, as it is not supposed, to
+	 * affect the visibility for update operations.
+	 */
+	ignore_prepare_set = F_ISSET(txn, WT_TXN_IGNORE_PREPARE);
+	F_CLR(txn, WT_TXN_IGNORE_PREPARE);
+	for (;upd != NULL && !__wt_txn_upd_visible(session, upd);
+	    upd = upd->next) {
+		if (upd->txnid != WT_TXN_ABORTED) {
+			if (ignore_prepare_set)
+				F_SET(txn, WT_TXN_IGNORE_PREPARE);
+			WT_STAT_CONN_INCR(session, txn_update_conflict);
+			WT_STAT_DATA_INCR(session, txn_update_conflict);
+			return (__wt_txn_rollback_required(session,
+				    "conflict between concurrent operations"));
+		}
+	}
+
+	if (ignore_prepare_set)
+		F_SET(txn, WT_TXN_IGNORE_PREPARE);
 	return (0);
 }
 

@@ -217,20 +217,23 @@ struct __wt_cursor_btree {
 #endif
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_CBT_ACTIVE		0x01u	/* Active in the tree */
-#define	WT_CBT_ITERATE_APPEND	0x02u	/* Col-store: iterating append list */
-#define	WT_CBT_ITERATE_NEXT	0x04u	/* Next iteration configuration */
-#define	WT_CBT_ITERATE_PREV	0x08u	/* Prev iteration configuration */
-#define	WT_CBT_NO_TXN   	0x10u	/* Non-txn cursor (e.g. a checkpoint) */
-#define	WT_CBT_SEARCH_SMALLEST	0x20u	/* Row-store: small-key insert list */
-#define	WT_CBT_VAR_ONPAGE_MATCH	0x40u	/* Var-store: on-page recno match */
+#define	WT_CBT_ACTIVE		0x001u	/* Active in the tree */
+#define	WT_CBT_ITERATE_APPEND	0x002u	/* Col-store: iterating append list */
+#define	WT_CBT_ITERATE_NEXT	0x004u	/* Next iteration configuration */
+#define	WT_CBT_ITERATE_PREV	0x008u	/* Prev iteration configuration */
+#define	WT_CBT_NO_TXN   	0x010u	/* Non-txn cursor (e.g. a checkpoint) */
+#define	WT_CBT_RETRY_NEXT	0x020u	/* Next, resulted in prepare conflict */
+#define	WT_CBT_RETRY_PREV	0x040u	/* Prev, resulted in prepare conflict */
+#define	WT_CBT_SEARCH_SMALLEST	0x080u	/* Row-store: small-key insert list */
+#define	WT_CBT_VAR_ONPAGE_MATCH	0x100u	/* Var-store: on-page recno match */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 #define	WT_CBT_POSITION_MASK		/* Flags associated with position */ \
 	(WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV | \
-	WT_CBT_SEARCH_SMALLEST | WT_CBT_VAR_ONPAGE_MATCH)
+	WT_CBT_RETRY_NEXT | WT_CBT_RETRY_PREV | WT_CBT_SEARCH_SMALLEST |     \
+	WT_CBT_VAR_ONPAGE_MATCH)
 
-	uint8_t flags;
+	uint32_t flags;
 };
 
 struct __wt_cursor_bulk {

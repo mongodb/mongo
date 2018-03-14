@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_timestamp10.py
-#   Timestamps: Saving and querying the checkpoint recovery timestamp
+#   Timestamps: Saving and querying the last checkpoint and recovery timestamps
 #
 
 import fnmatch, os, shutil
@@ -101,6 +101,8 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
                 ',stable_timestamp=' + timestamp_str(ts))
             # This forces a different checkpoint timestamp for each table.
             self.session.checkpoint()
+            q = self.conn.query_timestamp('get=last_checkpoint')
+            self.assertTimestampsEqual(q, timestamp_str(ts))
 
         # Copy to a new database and then recover.
         self.copy_dir(".", "RESTART")

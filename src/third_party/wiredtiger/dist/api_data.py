@@ -1371,7 +1371,8 @@ methods = {
         \c oldest_timestamp and the read timestamps of all active readers, and
         \c stable returns the most recent \c stable_timestamp set with
         WT_CONNECTION::set_timestamp.  See @ref transaction_timestamps''',
-        choices=['all_committed','oldest','pinned','recovery','stable']),
+        choices=['all_committed','last_checkpoint',
+            'oldest','pinned','recovery','stable']),
 ]),
 
 'WT_CONNECTION.set_timestamp' : Method([

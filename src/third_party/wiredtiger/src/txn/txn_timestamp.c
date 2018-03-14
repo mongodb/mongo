@@ -239,7 +239,10 @@ __txn_global_query_timestamp(
 			break;
 		}
 		__wt_readunlock(session, &txn_global->commit_timestamp_rwlock);
-	} else if (WT_STRING_MATCH("oldest", cval.str, cval.len)) {
+	} else if (WT_STRING_MATCH("last_checkpoint", cval.str, cval.len))
+		/* Read-only value forever. No lock needed. */
+		__wt_timestamp_set(&ts, &txn_global->last_ckpt_timestamp);
+	else if (WT_STRING_MATCH("oldest", cval.str, cval.len)) {
 		if (!txn_global->has_oldest_timestamp)
 			return (WT_NOTFOUND);
 		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,

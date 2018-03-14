@@ -1052,6 +1052,9 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: read timestamp queue inserts to head",
 	"transaction: read timestamp queue inserts total",
 	"transaction: read timestamp queue length",
+	"transaction: rollback to stable calls",
+	"transaction: rollback to stable updates aborted",
+	"transaction: rollback to stable updates removed from lookaside",
 	"transaction: set timestamp calls",
 	"transaction: set timestamp commit calls",
 	"transaction: set timestamp commit updates",
@@ -1438,6 +1441,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->txn_read_queue_head = 0;
 	stats->txn_read_queue_inserts = 0;
 	stats->txn_read_queue_len = 0;
+	stats->txn_rollback_to_stable = 0;
+	stats->txn_rollback_upd_aborted = 0;
+	stats->txn_rollback_las_removed = 0;
 	stats->txn_set_ts = 0;
 	stats->txn_set_ts_commit = 0;
 	stats->txn_set_ts_commit_upd = 0;
@@ -1956,6 +1962,12 @@ __wt_stat_connection_aggregate(
 	to->txn_read_queue_inserts +=
 	    WT_STAT_READ(from, txn_read_queue_inserts);
 	to->txn_read_queue_len += WT_STAT_READ(from, txn_read_queue_len);
+	to->txn_rollback_to_stable +=
+	    WT_STAT_READ(from, txn_rollback_to_stable);
+	to->txn_rollback_upd_aborted +=
+	    WT_STAT_READ(from, txn_rollback_upd_aborted);
+	to->txn_rollback_las_removed +=
+	    WT_STAT_READ(from, txn_rollback_las_removed);
 	to->txn_set_ts += WT_STAT_READ(from, txn_set_ts);
 	to->txn_set_ts_commit += WT_STAT_READ(from, txn_set_ts_commit);
 	to->txn_set_ts_commit_upd +=

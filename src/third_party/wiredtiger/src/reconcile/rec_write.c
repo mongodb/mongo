@@ -1341,12 +1341,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * started.  The global commit point can move forward during
 		 * reconciliation so we use a cached copy to avoid races when a
 		 * concurrent transaction commits or rolls back while we are
-		 * examining its updates.
+		 * examining its updates. As prepared transaction id's are
+		 * globally visible, need to check the update state as well.
 		 */
 		if (F_ISSET(r, WT_REC_EVICT) &&
+		    (upd->state != WT_UPDATE_STATE_READY ||
 		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    WT_TXNID_LE(r->last_running, txnid) :
-		    !__txn_visible_id(session, txnid))) {
+		    !__txn_visible_id(session, txnid)))) {
 			uncommitted = r->update_uncommitted = true;
 			continue;
 		}
