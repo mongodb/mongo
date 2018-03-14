@@ -317,16 +317,5 @@ Status multiInitialSyncApply(OperationContext* opCtx,
                              AtomicUInt32* fetchCount,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
-/**
- * Testing-only version of multiSyncApply that returns an error instead of aborting.
- * Accepts an external operation context and a function with the same argument list as
- * SyncTail::syncApply.
- */
-using SyncApplyFn = stdx::function<Status(
-    OperationContext* opCtx, const BSONObj& o, OplogApplication::Mode oplogApplicationMode)>;
-Status multiSyncApply_noAbort(OperationContext* opCtx,
-                              MultiApplier::OperationPtrs* ops,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo);
-
 }  // namespace repl
 }  // namespace mongo

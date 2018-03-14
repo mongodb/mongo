@@ -216,7 +216,7 @@ Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
         opsPtrs.push_back(&op);
     }
     WorkerMultikeyPathInfo pathInfo;
-    return multiSyncApply_noAbort(_opCtx.get(), &opsPtrs, &pathInfo);
+    return multiSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
 }
 
 Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {

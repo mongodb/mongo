@@ -1175,12 +1175,6 @@ Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    return multiSyncApply_noAbort(opCtx, ops, workerMultikeyPathInfo);
-}
-
-Status multiSyncApply_noAbort(OperationContext* opCtx,
-                              MultiApplier::OperationPtrs* ops,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
