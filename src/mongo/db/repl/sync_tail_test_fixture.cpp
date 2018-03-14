@@ -206,8 +206,15 @@ Status failedApplyCommand(OperationContext* opCtx,
 }
 
 Status SyncTailTest::runOpSteadyState(const OplogEntry& op) {
+    return runOpsSteadyState({op});
+}
+
+Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
     SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-    MultiApplier::OperationPtrs opsPtrs{&op};
+    MultiApplier::OperationPtrs opsPtrs;
+    for (auto& op : ops) {
+        opsPtrs.push_back(&op);
+    }
     auto syncApply = [](
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
         return SyncTail::syncApply(opCtx, op, oplogApplicationMode);

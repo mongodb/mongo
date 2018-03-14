@@ -131,6 +131,7 @@ protected:
     void tearDown() override;
 
     Status runOpSteadyState(const OplogEntry& op);
+    Status runOpsSteadyState(std::vector<OplogEntry> ops);
     Status runOpInitialSync(const OplogEntry& entry);
     Status runOpsInitialSync(std::vector<OplogEntry> ops);
 };
