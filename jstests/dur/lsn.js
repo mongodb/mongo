@@ -84,9 +84,7 @@ conn = MongoRunner.runMongod({
     syncdelay: 2,
     journal: "",
     smallfiles: "",
-    journalOptions: 8 /*DurParanoid*/,
-    master: "",
-    oplogSize: 64
+    journalOptions: 8 /*DurParanoid*/
 });
 work();
 
@@ -122,9 +120,7 @@ conn = MongoRunner.runMongod({
     dbpath: path2,
     journal: "",
     smallfiles: "",
-    journalOptions: 24,
-    master: "",
-    oplogSize: 64
+    journalOptions: 24
 });
 verify();
 

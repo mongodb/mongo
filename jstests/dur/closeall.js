@@ -13,12 +13,7 @@ function f(variant, quickCommits, paranoid) {
 
     // use replication to exercise that code too with a close, and also to test local.sources with a
     // close
-    var conn = MongoRunner.runMongod(
-        {journal: "", journalOptions: options + "", master: "", oplogSize: 64});
-    var connSlave = MongoRunner.runMongod(
-        {journal: "", journalOptions: options + "", slave: "", source: "localhost:" + conn.port});
-
-    var slave = connSlave.getDB(ourdb);
+    var conn = MongoRunner.runMongod({journal: "", journalOptions: options + ""});
 
     // we'll use two connections to make a little parallelism
     var db1 = conn.getDB(ourdb);
@@ -81,11 +76,7 @@ function f(variant, quickCommits, paranoid) {
 
     writeOps();
 
-    print("closeall.js end test loop.  slave.foo.count:");
-    print(slave.foo.count());
-
     print("closeall.js shutting down servers");
-    MongoRunner.stopMongod(connSlave);
     MongoRunner.stopMongod(conn);
 }
 
