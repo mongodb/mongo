@@ -325,7 +325,7 @@ TEST_F(ShardMetadataUtilTest, DropChunksAndDeleteCollectionsEntry) {
     ASSERT_OK(dropChunksAndDeleteCollectionsEntry(operationContext(), kNss));
     checkCollectionIsEmpty(kChunkMetadataNss);
     // Collections collection should be empty because it only had one entry.
-    checkCollectionIsEmpty(ShardCollectionType::ConfigNS);
+    checkCollectionIsEmpty(NamespaceString::kShardConfigCollectionsNamespace);
 }
 
 }  // namespace

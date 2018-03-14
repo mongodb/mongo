@@ -70,9 +70,6 @@ class StatusWith;
  */
 class ShardCollectionType {
 public:
-    // Name of the collections collection on the shard server.
-    static const NamespaceString ConfigNS;
-
     static const BSONField<std::string> ns;  // "_id"
     static const BSONField<UUID> uuid;
     static const BSONField<OID> epoch;

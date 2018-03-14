@@ -36,12 +36,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
-
-const char kServerConfiguration[] = "admin.system.version";
 
 constexpr auto listCollectionsCursorCol = "$cmd.listCollections"_sd;
 constexpr auto listIndexesCursorNSPrefix = "$cmd.listIndexes."_sd;
@@ -54,13 +49,17 @@ constexpr StringData NamespaceString::kAdminDb;
 constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kConfigDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
-constexpr StringData NamespaceString::kShardConfigCollectionsCollectionName;
-constexpr StringData NamespaceString::kShardConfigDatabasesCollectionName;
-constexpr StringData NamespaceString::kSystemKeysCollectionName;
 
-const NamespaceString NamespaceString::kServerConfigurationNamespace(kServerConfiguration);
+const NamespaceString NamespaceString::kServerConfigurationNamespace(NamespaceString::kAdminDb,
+                                                                     "system.version");
 const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
     NamespaceString::kConfigDb, "transactions");
+const NamespaceString NamespaceString::kShardConfigCollectionsNamespace(NamespaceString::kConfigDb,
+                                                                        "cache.collections");
+const NamespaceString NamespaceString::kShardConfigDatabasesNamespace(NamespaceString::kConfigDb,
+                                                                      "cache.databases");
+const NamespaceString NamespaceString::kSystemKeysNamespace(NamespaceString::kAdminDb,
+                                                            "system.keys");
 const NamespaceString NamespaceString::kRsOplogNamespace(NamespaceString::kLocalDb, "oplog.rs");
 
 bool NamespaceString::isListCollectionsCursorNS() const {
@@ -80,9 +79,9 @@ bool NamespaceString::isLegalClientSystemNS() const {
     if (db() == "admin") {
         if (ns() == "admin.system.roles")
             return true;
-        if (ns() == kServerConfiguration)
+        if (ns() == kServerConfigurationNamespace.ns())
             return true;
-        if (ns() == kSystemKeysCollectionName)
+        if (ns() == kSystemKeysNamespace.ns())
             return true;
         if (ns() == "admin.system.new_users")
             return true;
@@ -92,6 +91,7 @@ bool NamespaceString::isLegalClientSystemNS() const {
         if (ns() == "config.system.sessions")
             return true;
     }
+
     if (ns() == "local.system.replset")
         return true;
 

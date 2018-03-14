@@ -32,8 +32,6 @@
 
 #include "mongo/s/catalog_cache.h"
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"

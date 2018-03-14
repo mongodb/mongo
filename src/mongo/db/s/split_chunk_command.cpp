@@ -41,6 +41,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -64,7 +65,7 @@ public:
                "splitKeys : [ {a:150} , ... ]}";
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -95,19 +96,11 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        //
-        // Check whether parameters passed to splitChunk are sound
-        //
         const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
-        if (!nss.isValid()) {
-            errmsg = str::stream() << "invalid namespace '" << nss.toString()
-                                   << "' specified for command";
-            return false;
-        }
 
+        // Check whether parameters passed to splitChunk are sound
         BSONObj keyPatternObj;
         {
             BSONElement keyPatternElem;

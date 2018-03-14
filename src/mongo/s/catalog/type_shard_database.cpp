@@ -39,11 +39,6 @@
 
 namespace mongo {
 
-using std::string;
-
-const NamespaceString ShardDatabaseType::ConfigNS(
-    NamespaceString::kShardConfigDatabasesCollectionName);
-
 const BSONField<std::string> ShardDatabaseType::name("_id");
 const BSONField<DatabaseVersion> ShardDatabaseType::version("version");
 const BSONField<std::string> ShardDatabaseType::primary("primary");

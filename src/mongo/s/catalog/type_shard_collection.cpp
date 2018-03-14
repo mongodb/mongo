@@ -39,9 +39,6 @@
 
 namespace mongo {
 
-const NamespaceString ShardCollectionType::ConfigNS(
-    NamespaceString::kShardConfigCollectionsCollectionName);
-
 const BSONField<std::string> ShardCollectionType::ns("_id");
 const BSONField<UUID> ShardCollectionType::uuid("uuid");
 const BSONField<OID> ShardCollectionType::epoch("epoch");

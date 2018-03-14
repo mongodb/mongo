@@ -230,7 +230,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     auto const css = CollectionShardingState::get(opCtx, args.nss);
     const auto metadata = css->getMetadata(opCtx);
 
-    if (args.nss.ns() == NamespaceString::kShardConfigCollectionsCollectionName) {
+    if (args.nss == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
             return;
@@ -283,7 +283,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
-    if (args.nss.ns() == NamespaceString::kShardConfigDatabasesCollectionName) {
+    if (args.nss == NamespaceString::kShardConfigDatabasesNamespace) {
         // Notification of routing table changes are only needed on secondaries
         if (isStandaloneOrPrimary(opCtx)) {
             return;
@@ -337,10 +337,10 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const boost::optional<BSONObj>& deletedDoc) {
     auto& deleteState = getDeleteState(opCtx);
 
-    if (nss.ns() == NamespaceString::kShardConfigCollectionsCollectionName) {
+    if (nss == NamespaceString::kShardConfigCollectionsNamespace) {
         onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, deleteState.documentKey);
     }
-    if (nss.ns() == NamespaceString::kShardConfigDatabasesCollectionName) {
+    if (nss == NamespaceString::kShardConfigDatabasesNamespace) {
         if (isStandaloneOrPrimary(opCtx)) {
             return;
         }

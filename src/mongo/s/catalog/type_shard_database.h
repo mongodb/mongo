@@ -62,9 +62,6 @@ class StatusWith;
  */
 class ShardDatabaseType {
 public:
-    // Name of the database collection on the shard server.
-    static const NamespaceString ConfigNS;
-
     static const BSONField<std::string> name;  // "_id"
     static const BSONField<DatabaseVersion> version;
     static const BSONField<std::string> primary;

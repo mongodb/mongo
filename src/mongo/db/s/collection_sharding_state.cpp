@@ -39,7 +39,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -108,15 +107,16 @@ class CollectionShardingStateMap {
 public:
     CollectionShardingStateMap() = default;
 
-    CollectionShardingState& getOrCreate(OperationContext* opCtx, const std::string& ns) {
+    static const ServiceContext::Decoration<CollectionShardingStateMap> get;
+
+    CollectionShardingState& getOrCreate(const std::string& ns) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         auto it = _collections.find(ns);
         if (it == _collections.end()) {
-            auto inserted =
-                _collections.emplace(ns,
-                                     std::make_unique<CollectionShardingState>(
-                                         opCtx->getServiceContext(), NamespaceString(ns)));
+            auto inserted = _collections.emplace(
+                ns,
+                std::make_unique<CollectionShardingState>(get.owner(this), NamespaceString(ns)));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -151,7 +151,7 @@ private:
     CollectionsMap _collections;
 };
 
-const auto getCollectionShardingStateMap =
+const ServiceContext::Decoration<CollectionShardingStateMap> CollectionShardingStateMap::get =
     ServiceContext::declareDecoration<CollectionShardingStateMap>();
 
 }  // namespace
@@ -171,12 +171,12 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     // Collection lock must be held to have a reference to the collection's sharding state
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS));
 
-    auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
-    return &collectionsMap.getOrCreate(opCtx, ns);
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    return &collectionsMap.getOrCreate(ns);
 }
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
-    auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     collectionsMap.report(opCtx, builder);
 }
 
@@ -313,7 +313,6 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
                                                    std::string* errmsg,
                                                    ChunkVersion* expectedShardVersion,
                                                    ChunkVersion* actualShardVersion) {
-    auto* const client = opCtx->getClient();
     auto& oss = OperationShardingState::get(opCtx);
 
     // If there is a version attached to the OperationContext, use it as the received version.
@@ -321,7 +320,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
     if (oss.hasShardVersion()) {
         *expectedShardVersion = oss.getShardVersion(_nss);
     } else {
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
+        auto const info = ShardedConnectionInfo::get(opCtx->getClient(), false);
         if (!info) {
             // There is no shard version information on either 'opCtx' or 'client'. This means that
             // the operation represented by 'opCtx' is unversioned, and the shard version is always
