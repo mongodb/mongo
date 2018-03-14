@@ -54,13 +54,24 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    WiredTigerRecordStore* oplogRecordStore) {
     invariant(!_isRunning);
     // Prime the oplog read timestamp.
-    auto sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    setOplogReadTimestamp(Timestamp(_fetchAllCommittedValue(sessionCache->conn())));
-
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
         oplogRecordStore->getCursor(opCtx, false /* false = reverse cursor */);
     auto lastRecord = reverseOplogCursor->next();
-    _oplogMaxAtStartup = lastRecord ? lastRecord->id : RecordId();
+    if (lastRecord) {
+        _oplogMaxAtStartup = lastRecord->id;
+
+        // Although the oplog may have holes, using the top of the oplog should be safe. In the
+        // event of a secondary crashing, replication recovery will truncate the oplog, resetting
+        // visibility to the truncate point. In the event of a primary crashing, it will perform
+        // rollback before servicing oplog reads.
+        auto oplogVisibility = Timestamp(_oplogMaxAtStartup.repr());
+        setOplogReadTimestamp(oplogVisibility);
+        LOG(1) << "Setting oplog visibility at startup. Val: " << oplogVisibility;
+    } else {
+        _oplogMaxAtStartup = RecordId();
+        // Avoid setting oplog visibility to 0. That means "everything is visible".
+        setOplogReadTimestamp(Timestamp(kMinimumTimestamp));
+    }
 
     auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     bool isMasterSlave = false;
@@ -74,7 +85,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
                                        this,
-                                       sessionCache,
+                                       WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
                                        oplogRecordStore,
                                        isMasterSlave);
 
