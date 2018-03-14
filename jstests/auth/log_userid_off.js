@@ -2,6 +2,7 @@
  * Tests that logged users will not show up in the log.
  *
  * @param mongo {Mongo} connection object.
+ * @tags: [requires_sharding]
  */
 var doTest = function(mongo, callSetParam) {
     var TEST_USER = 'foo';

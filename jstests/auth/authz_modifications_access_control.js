@@ -1,5 +1,6 @@
 /**
  * This tests that the proper access control is enforced around modifications to user and role data.
+ * @tags: [requires_sharding]
  */
 
 function runTest(conn) {

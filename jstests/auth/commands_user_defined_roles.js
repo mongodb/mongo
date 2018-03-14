@@ -5,6 +5,8 @@ Exhaustive test for authorization of commands with user-defined roles.
 The test logic implemented here operates on the test cases defined
 in jstests/auth/commands.js.
 
+@tags: [requires_sharding]
+
 */
 
 // constants

@@ -1,4 +1,5 @@
 // Test that doing slaveOk reads from secondaries hits all the secondaries evenly
+// @tags: [requires_sharding]
 
 function testReadLoadBalancing(numReplicas) {
     var s =

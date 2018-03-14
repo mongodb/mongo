@@ -1,6 +1,7 @@
 /*
  * Verify that retryable writes aren't allowed on mmapv1, because it doesn't have document-level
  * locking.
+ * @tags: [requires_sharding]
  */
 (function() {
     "use strict";

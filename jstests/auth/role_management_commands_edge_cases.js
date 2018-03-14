@@ -1,6 +1,7 @@
 /**
  * This tests that all the different commands for role manipulation all properly handle invalid
  * and atypical inputs.
+ * @tags: [requires_sharding]
  */
 
 function runTest(conn) {

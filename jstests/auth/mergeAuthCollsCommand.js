@@ -1,5 +1,6 @@
 /**
  * Tests the behavior of the _mergeAuthzCollections command.
+ * @tags: [requires_sharding]
  */
 
 function assertUsersAndRolesHaveRole(admin, role) {

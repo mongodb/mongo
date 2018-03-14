@@ -1,5 +1,6 @@
 /**
  * This tests that CLAC (collection level access control) handles system collections properly.
+ * @tags: [requires_sharding]
  */
 
 // Verify that system collections are treated correctly

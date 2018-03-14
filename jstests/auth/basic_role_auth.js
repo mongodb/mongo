@@ -10,6 +10,7 @@
  * 2nd level field name: user names.
  * 3rd level is an object that has the format:
  *     { pwd: <password>, roles: [<list of roles>] }
+ * @tags: [requires_sharding]
  */
 var AUTH_INFO = {
     admin: {

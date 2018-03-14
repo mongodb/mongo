@@ -1,6 +1,8 @@
 // Test that a user is not allowed to getMore a cursor they did not create, and that such a failed
 // getMore will leave the cursor unaffected, so that a subsequent getMore by the original author
 // will work.
+// @tags: [requires_sharding]
+
 (function() {
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     const st = new ShardingTest(

@@ -1,6 +1,7 @@
 /**
  * Tests authorization special cases with views. These are special exceptions that prohibit certain
  * operations on views even if the user has an explicit privilege on that view.
+ * @tags: [requires_sharding]
  */
 (function() {
     "use strict";

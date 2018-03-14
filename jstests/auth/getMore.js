@@ -1,4 +1,5 @@
 // Tests that a user can only run a getMore on a cursor that they created.
+// @tags: [requires_sharding]
 (function() {
     "use strict";
 

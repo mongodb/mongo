@@ -4,6 +4,7 @@
  * Theory of operation: Create a long running operation from a user which does not have the killOp
  * or inProg privileges. Using the same user, run currentOp to get the opId, and then run killOp
  * against it.
+ * @tags: [requires_sharding]
  */
 
 (function() {

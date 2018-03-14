@@ -1,4 +1,5 @@
 // Tests that a client may discover a user's supported SASL mechanisms via isMaster.
+// @tags: [requires_sharding]
 (function() {
     "use strict";
 

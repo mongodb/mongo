@@ -1,5 +1,6 @@
 /**
  * Test that verifies client metadata is logged into log file on new connections.
+ * @tags: [requires_sharding]
  */
 (function() {
     'use strict';

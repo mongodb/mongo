@@ -1,4 +1,5 @@
 // Tests that a client will auto-discover a user's supported SASL mechanisms during auth().
+// @tags: [requires_sharding]
 (function() {
     "use strict";
 

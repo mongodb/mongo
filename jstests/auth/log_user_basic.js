@@ -1,5 +1,6 @@
 /**
  * This file tests that "user:<username>@<db>" shows up in the logs.
+ * @tags: [requires_sharding]
  */
 
 // TODO(schwerin) Re-enable this test after resolving corresponding TODO in mongo/util/log.cpp.

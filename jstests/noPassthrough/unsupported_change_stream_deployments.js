@@ -1,4 +1,6 @@
 // Tests that the $changeStream stage returns an error when run against a standalone mongod.
+// @tags: [requires_sharding]
+
 (function() {
     "use strict";
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.

@@ -1,3 +1,7 @@
+/**
+ * @tags: [requires_sharding]
+ */
+
 (function() {
     'use strict';
 

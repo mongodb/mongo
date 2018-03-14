@@ -1,4 +1,5 @@
 // Test the killCursors command.
+// @tags: [requires_sharding]
 (function() {
     'use strict';
 

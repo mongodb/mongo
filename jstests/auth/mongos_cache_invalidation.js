@@ -1,6 +1,7 @@
 /**
  * This tests that updates to user and role definitions made on one mongos propagate properly
  * to other mongoses.
+ * @tags: [requires_sharding]
  */
 
 var authzErrorCode = 13;

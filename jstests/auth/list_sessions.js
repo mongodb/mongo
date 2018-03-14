@@ -1,4 +1,7 @@
-// Auth tests for the $listSessions aggregation pipeline.
+/**
+ * Auth tests for the $listSessions aggregation pipeline.
+ * @tags: [requires_sharding]
+ */
 
 (function() {
     'use strict';

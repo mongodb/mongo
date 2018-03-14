@@ -1,5 +1,5 @@
 // Test parsing of readConcern level 'snapshot'.
-// @tags: [requires_replication]
+// @tags: [requires_replication,requires_sharding]
 (function() {
     "use strict";
 

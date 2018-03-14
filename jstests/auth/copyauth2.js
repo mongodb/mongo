@@ -1,4 +1,5 @@
 // Basic test that copydb works with auth enabled when copying within the same cluster
+// @tags: [requires_sharding]
 
 function runTest(a, b) {
     a.createUser({user: "chevy", pwd: "chase", roles: ["read", {role: 'readWrite', db: b._name}]});

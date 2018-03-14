@@ -2,6 +2,7 @@
  * This tests the access control for the pseudo-commands inprog, curop, and killop.  Once
  * SERVER-5466 is resolved this test should be removed and its functionality merged into
  * commands_builtin_roles.js and commands_user_defined_roles.js.
+ * @tags: [requires_sharding]
  */
 
 function runTest(conn) {

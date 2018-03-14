@@ -1,5 +1,6 @@
 // Test that 'atClusterTime' triggers a noop write to advance the majority commit point if
 // necessary.
+// @tags: [requires_sharding]
 (function() {
     "use strict";
 
