@@ -49,14 +49,14 @@
         cursorCmd.readConcern = {level: "snapshot"};
         cursorCmd.txnNumber = NumberLong(txnNumber);
 
-        // Establish a snapshot cursor, fetching the first 5 documents.
+        // Establish a snapshot batchSize:0 cursor.
         let res = assert.commandWorked(sessionDb.runCommand(cursorCmd));
 
-        assert(res.hasOwnProperty("cursor"));
-        assert(res.cursor.hasOwnProperty("firstBatch"));
-        assert.eq(5, res.cursor.firstBatch.length);
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("firstBatch"), tojson(res));
+        assert.eq(0, res.cursor.firstBatch.length, tojson(res));
 
-        assert(res.cursor.hasOwnProperty("id"));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
         const cursorId = res.cursor.id;
         assert.neq(cursorId, 0);
 
@@ -64,35 +64,37 @@
         // performed outside of the session.
         assert.writeOK(primaryDB.coll.insert({_id: 10}, {writeConcern: {w: "majority"}}));
 
-        // Fetch the 6th document. This confirms that the transaction stash is preserved across
-        // multiple getMore invocations.
+        // Fetch the first 5 documents.
         res = assert.commandWorked(sessionDb.runCommand({
             getMore: cursorId,
             collection: collName,
-            batchSize: 1,
+            batchSize: 5,
             txnNumber: NumberLong(txnNumber)
         }));
-        assert(res.hasOwnProperty("cursor"));
-        assert(res.cursor.hasOwnProperty("id"));
-        assert.neq(0, res.cursor.id);
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        assert.neq(0, res.cursor.id, tojson(res));
+        assert(res.cursor.hasOwnProperty("nextBatch"), tojson(res));
+        assert.eq(5, res.cursor.nextBatch.length, tojson(res));
 
-        // Exhaust the cursor, retrieving the remainder of the result set.
+        // Exhaust the cursor, retrieving the remainder of the result set. Performing a second
+        // getMore tests snapshot isolation across multiple getMore invocations.
         res = assert.commandWorked(sessionDb.runCommand({
             getMore: cursorId,
             collection: collName,
-            batchSize: 10,
+            batchSize: 20,
             txnNumber: NumberLong(txnNumber++)
         }));
 
         // The cursor has been exhausted.
-        assert(res.hasOwnProperty("cursor"));
-        assert(res.cursor.hasOwnProperty("id"));
-        assert.eq(0, res.cursor.id);
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        assert.eq(0, res.cursor.id, tojson(res));
 
-        // Only the remaining 4 of the initial 10 documents are returned. The 11th document is not
+        // Only the remaining 5 of the initial 10 documents are returned. The 11th document is not
         // part of the result set.
-        assert(res.cursor.hasOwnProperty("nextBatch"));
-        assert.eq(4, res.cursor.nextBatch.length);
+        assert(res.cursor.hasOwnProperty("nextBatch"), tojson(res));
+        assert.eq(5, res.cursor.nextBatch.length, tojson(res));
 
         if (readFromSecondary) {
             rst.awaitLastOpCommitted();
@@ -108,13 +110,13 @@
         }));
 
         // The cursor has been exhausted.
-        assert(res.hasOwnProperty("cursor"));
-        assert(res.cursor.hasOwnProperty("id"));
-        assert.eq(0, res.cursor.id);
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        assert.eq(0, res.cursor.id, tojson(res));
 
         // All 11 documents are returned.
-        assert(res.cursor.hasOwnProperty("firstBatch"));
-        assert.eq(11, res.cursor.firstBatch.length);
+        assert(res.cursor.hasOwnProperty("firstBatch"), tojson(res));
+        assert.eq(11, res.cursor.firstBatch.length, tojson(res));
 
         // Reject snapshot reads without txnNumber.
         assert.commandFailed(sessionDb.runCommand(
@@ -133,14 +135,14 @@
     }
 
     // Test snapshot reads using find.
-    let findCmd = {find: collName, sort: {_id: 1}, batchSize: 5};
+    let findCmd = {find: collName, sort: {_id: 1}, batchSize: 0};
     runTest({useCausalConsistency: false, readFromSecondary: false, establishCursorCmd: findCmd});
     runTest({useCausalConsistency: true, readFromSecondary: false, establishCursorCmd: findCmd});
     runTest({useCausalConsistency: false, readFromSecondary: true, establishCursorCmd: findCmd});
     runTest({useCausalConsistency: true, readFromSecondary: true, establishCursorCmd: findCmd});
 
     // Test snapshot reads using aggregate.
-    let aggCmd = {aggregate: collName, pipeline: [{$sort: {_id: 1}}], cursor: {batchSize: 5}};
+    let aggCmd = {aggregate: collName, pipeline: [{$sort: {_id: 1}}], cursor: {batchSize: 0}};
     runTest({useCausalConsistency: false, readFromSecondary: false, establishCursorCmd: aggCmd});
     runTest({useCausalConsistency: true, readFromSecondary: false, establishCursorCmd: aggCmd});
     runTest({useCausalConsistency: false, readFromSecondary: true, establishCursorCmd: aggCmd});

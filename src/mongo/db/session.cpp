@@ -271,6 +271,9 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
 //      will be allowed to commit.
 MONGO_FP_DECLARE(onPrimaryTransactionalWrite);
 
+// Failpoint which will pause an operation just after allocating a point-in-time storage engine
+// transaction.
+MONGO_FP_DECLARE(hangAfterPreallocateSnapshot);
 }  // namespace
 
 const BSONObj Session::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));
@@ -605,40 +608,58 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
         return;
     }
 
-    // We must lock the Client to change the Locker on the OperationContext and the Session mutex to
-    // access Session state. We must lock the Client before the Session mutex, since the Client
-    // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
-    // away, and then lock the Session owned by that client.
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (opCtx->getTxnNumber() < _activeTxnNumber) {
-        // The session is checked out, so _activeTxnNumber cannot advance due to a user operation.
-        // However, when a chunk is migrated, session and transaction information is copied from the
-        // donor shard to the recipient. This occurs outside of the check-out mechanism and can lead
-        // to a higher _activeTxnNumber during the lifetime of a checkout. If that occurs, we abort
-        // the current transaction. Note that it would indicate a user bug to have a newer
-        // transaction on one shard while an older transaction is still active on another shard.
-        _releaseStashedTransactionResources(lg);
-        uasserted(ErrorCodes::TransactionAborted,
-                  str::stream() << "Transaction aborted. Active txnNumber is now "
-                                << _activeTxnNumber);
-        return;
-    }
+    bool snapshotPreallocated = false;
+    {
+        // We must lock the Client to change the Locker on the OperationContext and the Session
+        // mutex to access Session state. We must lock the Client before the Session mutex, since
+        // the Client effectively owns the Session. That is, a user might lock the Client to ensure
+        // it doesn't go away, and then lock the Session owned by that client.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        if (opCtx->getTxnNumber() < _activeTxnNumber) {
+            // The session is checked out, so _activeTxnNumber cannot advance due to a user
+            // operation.
+            // However, when a chunk is migrated, session and transaction information is copied from
+            // the donor shard to the recipient. This occurs outside of the check-out mechanism and
+            // can lead to a higher _activeTxnNumber during the lifetime of a checkout. If that
+            // occurs, we abort the current transaction. Note that it would indicate a user bug to
+            // have a newer transaction on one shard while an older transaction is still active on
+            // another shard.
+            _releaseStashedTransactionResources(lg);
+            uasserted(ErrorCodes::TransactionAborted,
+                      str::stream() << "Transaction aborted. Active txnNumber is now "
+                                    << _activeTxnNumber);
+            return;
+        }
 
-    if (_txnResourceStash) {
-        invariant(_txnState != MultiDocumentTransactionState::kNone);
-        _txnResourceStash->release(opCtx);
-        _txnResourceStash = boost::none;
-    } else {
-        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
-            _txnState == MultiDocumentTransactionState::kInProgress) {
-            opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
-            if (_txnState != MultiDocumentTransactionState::kInProgress) {
-                invariant(_txnState == MultiDocumentTransactionState::kNone);
-                _txnState = MultiDocumentTransactionState::kInSnapshotRead;
+        if (_txnResourceStash) {
+            invariant(_txnState != MultiDocumentTransactionState::kNone);
+            _txnResourceStash->release(opCtx);
+            _txnResourceStash = boost::none;
+        } else {
+            auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
+                _txnState == MultiDocumentTransactionState::kInProgress) {
+                opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+
+                // Storage engine transactions may be started in a lazy manner. By explicitly
+                // starting here we ensure that a point-in-time snapshot is established during the
+                // first operation of a transaction.
+                opCtx->recoveryUnit()->preallocateSnapshot();
+                snapshotPreallocated = true;
+
+                if (_txnState != MultiDocumentTransactionState::kInProgress) {
+                    invariant(_txnState == MultiDocumentTransactionState::kNone);
+                    _txnState = MultiDocumentTransactionState::kInSnapshotRead;
+                }
             }
         }
+    }
+
+    if (snapshotPreallocated) {
+        // The Client lock must not be held when executing this failpoint as it will block currentOp
+        // execution.
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangAfterPreallocateSnapshot);
     }
 }
 

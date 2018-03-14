@@ -250,6 +250,34 @@
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.pipeline": [{$match: {x: 1}}]}, {"command.pipeline": [{$match: {x: 1}}]});
 
+    // Test getMore with an initial find batchSize of 0. Interrupt behavior of a getMore is not
+    // expected to change with a change of batchSize in the originating command.
+    testCommand(function() {
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
+        const initialFindBatchSize = 0;
+        const cursorId = assert
+                             .commandWorked(db.runCommand({
+                                 find: "coll",
+                                 filter: {x: 1},
+                                 batchSize: initialFindBatchSize,
+                                 readConcern: {level: "snapshot"},
+                                 lsid: TestData.sessionId,
+                                 txnNumber: NumberLong(TestData.txnNumber)
+                             }))
+                             .cursor.id;
+        assert.commandWorked(db.adminCommand(
+            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
+        const res = assert.commandWorked(db.runCommand({
+            getMore: NumberLong(cursorId),
+            collection: "coll",
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert.eq(
+            res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
+    }, {"originatingCommand.filter": {x: 1}}, {op: "getmore"});
+
     // Test update.
     // TODO SERVER-33412: Perform writes under autocommit:false transaction.
     // TODO SERVER-33548: We cannot provide a 'profilerFilter' because profiling is turned off for
