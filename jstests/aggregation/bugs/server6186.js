@@ -10,11 +10,6 @@ function substr(string, pos, n) {
 }
 
 function expectedSubstr(string, pos, n) {
-    if (pos < 0) {
-        // A negative value is interpreted as a large unsigned int, and is expected to be out of
-        // bounds.
-        return "";
-    }
     if (n < 0) {
         // A negative value is interpreted as a large unsigned int, expected to exceed the length
         // of the string.  Passing the string length is functionally equivalent.
@@ -28,7 +23,7 @@ function assertSubstr(string, pos, n) {
 }
 
 function checkVariousSubstrings(string) {
-    for (pos = -2; pos < 5; ++pos) {
+    for (pos = 0; pos < 5; ++pos) {
         for (n = -2; n < 7; ++n) {
             assertSubstr(string, pos, n);
         }

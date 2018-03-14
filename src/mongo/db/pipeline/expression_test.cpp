@@ -3948,6 +3948,32 @@ class DropEndingNull : public ExpectedResultBase {
     }
 };
 
+/** When length is negative, the remainder of the string should be returned. */
+class NegativeLength : public ExpectedResultBase {
+    string str() {
+        return string("abcdefghij");
+    }
+    int offset() {
+        return 2;
+    }
+    int length() {
+        return -1;
+    }
+    string expectedResult() {
+        return "cdefghij";
+    }
+};
+
+TEST(ExpressionSubstrTest, ThrowsWithNegativeStart) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+
+    const auto str = "abcdef"_sd;
+    const auto expr =
+        Expression::parseExpression(expCtx, BSON("$substrCP" << BSON_ARRAY(str << -5 << 1)), vps);
+    ASSERT_THROWS({ expr->evaluate(Document()); }, AssertionException);
+}
+
 }  // namespace Substr
 
 namespace SubstrCP {
@@ -5479,6 +5505,7 @@ public:
         add<SubstrBytes::EndAtNull>();
         add<SubstrBytes::DropBeginningNull>();
         add<SubstrBytes::DropEndingNull>();
+        add<SubstrBytes::NegativeLength>();
 
         add<ToLower::NullBegin>();
         add<ToLower::NullMiddle>();
