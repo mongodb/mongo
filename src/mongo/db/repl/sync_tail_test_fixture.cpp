@@ -215,12 +215,8 @@ Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
     for (auto& op : ops) {
         opsPtrs.push_back(&op);
     }
-    auto syncApply = [](
-        OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
-        return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
-    };
     WorkerMultikeyPathInfo pathInfo;
-    return multiSyncApply_noAbort(_opCtx.get(), &opsPtrs, &pathInfo, syncApply);
+    return multiSyncApply_noAbort(_opCtx.get(), &opsPtrs, &pathInfo);
 }
 
 Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {

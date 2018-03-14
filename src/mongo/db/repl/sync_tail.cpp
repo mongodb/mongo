@@ -1175,18 +1175,12 @@ Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    auto syncApply = [](
-        OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
-        return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
-    };
-    fassertNoTrace(16359, multiSyncApply_noAbort(opCtx, ops, workerMultikeyPathInfo, syncApply));
-    return Status::OK();
+    return multiSyncApply_noAbort(opCtx, ops, workerMultikeyPathInfo);
 }
 
 Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* ops,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo,
-                              SyncApplyFn syncApply) {
+                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
@@ -1197,6 +1191,11 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     // TODO: This function can be called when we're in recovering as well as secondary. Set this
     // mode correctly.
     const OplogApplication::Mode oplogApplicationMode = OplogApplication::Mode::kSecondary;
+
+    auto syncApply = [](
+        OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
+        return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
+    };
 
     ApplierHelpers::InsertGroup insertGroup(ops, syncApply, opCtx, oplogApplicationMode);
 
@@ -1217,7 +1216,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
 
             // If we didn't create a group, try to apply the op individually.
             try {
-                const Status status = syncApply(opCtx, entry.raw, oplogApplicationMode);
+                const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
 
                 if (!status.isOK()) {
                     severe() << "Error applying operation (" << redact(entry.toBSON())

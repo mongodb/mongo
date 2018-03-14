@@ -172,6 +172,7 @@ void createCollection(OperationContext* opCtx,
     });
 }
 
+
 /**
  * Create test collection with UUID.
  */
@@ -785,16 +786,14 @@ TEST_F(SyncTailTest, MultiSyncApplyDoesNotAddWorkerMultikeyPathInfoOnCreateIndex
     }
 }
 
-DEATH_TEST_F(SyncTailTest,
-             MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID,
-             "Attempted to create a new collection") {
+TEST_F(SyncTailTest, MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
     NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, nullptr, nullptr));
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, multiSyncApply(_opCtx.get(), &ops, nullptr, nullptr));
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {

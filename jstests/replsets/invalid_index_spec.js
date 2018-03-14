@@ -32,7 +32,7 @@
     assert.commandWorked(primaryDB.runCommand(
         {createIndexes: "test", indexes: [{v: 2, name: "x_1", key: {x: 1}, invalidOption2: 1}]}));
 
-    const msg1 = "Fatal assertion 16359";
+    const msg1 = "Fatal assertion 34437";
     const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
 
     const assertFn = function() {
