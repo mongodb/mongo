@@ -1192,12 +1192,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
     // mode correctly.
     const OplogApplication::Mode oplogApplicationMode = OplogApplication::Mode::kSecondary;
 
-    auto syncApply = [](
-        OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
-        return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
-    };
-
-    ApplierHelpers::InsertGroup insertGroup(ops, syncApply, opCtx, oplogApplicationMode);
+    ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
 
     {  // Ensure that the MultikeyPathTracker stops tracking paths.
         ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });

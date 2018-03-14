@@ -66,7 +66,7 @@ public:
     using ConstIterator = OperationPtrs::const_iterator;
     using Mode = OplogApplication::Mode;
 
-    InsertGroup(OperationPtrs* ops, const SyncApplyFn& applyFn, OperationContext* opCtx, Mode mode);
+    InsertGroup(OperationPtrs* ops, OperationContext* opCtx, Mode mode);
 
     /**
      * Attempts to group insert operations starting at 'iter'.
@@ -82,9 +82,6 @@ private:
 
     // Used for constructing search bounds when grouping inserts.
     ConstIterator _end;
-
-    // Used to apply the grouped insert oplog entry.
-    const SyncApplyFn _applyFn;
 
     // Passed to _syncApply when applying grouped inserts.
     OperationContext* _opCtx;

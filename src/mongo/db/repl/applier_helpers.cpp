@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -68,14 +69,9 @@ void ApplierHelpers::stableSortByNamespace(MultiApplier::OperationPtrs* oplogEnt
 using InsertGroup = ApplierHelpers::InsertGroup;
 
 InsertGroup::InsertGroup(ApplierHelpers::OperationPtrs* ops,
-                         const SyncApplyFn& applyFn,
                          OperationContext* opCtx,
                          InsertGroup::Mode mode)
-    : _doNotGroupBeforePoint(ops->cbegin()),
-      _end(ops->cend()),
-      _applyFn(applyFn),
-      _opCtx(opCtx),
-      _mode(mode) {}
+    : _doNotGroupBeforePoint(ops->cbegin()), _end(ops->cend()), _opCtx(opCtx), _mode(mode) {}
 
 StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIterator it) {
     const auto& entry = **it;
@@ -190,7 +186,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(ConstIt
     auto groupedInsertObj = groupedInsertBuilder.done();
     try {
         // Apply the group of inserts.
-        uassertStatusOK(_applyFn(_opCtx, groupedInsertObj, _mode));
+        uassertStatusOK(SyncTail::syncApply(_opCtx, groupedInsertObj, _mode));
         // It succeeded, advance the oplogEntriesIterator to the end of the
         // group of inserts.
         return endOfGroupableOpsIterator - 1;
