@@ -84,7 +84,7 @@ public:
 };
 
 MONGO_INITIALIZER(RegisterReapLogicalSessionCacheNowCommand)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new ReapLogicalSessionCacheNowCommand();
     }

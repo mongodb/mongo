@@ -130,7 +130,7 @@ public:
 };
 
 MONGO_INITIALIZER(RegisterSnapshotManagementCommands)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new CmdMakeSnapshot();
         new CmdSetCommittedSnapshot();

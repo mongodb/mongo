@@ -151,7 +151,7 @@ public:
     }
 };
 MONGO_INITIALIZER(RegisterJournalLatencyTestCmd)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new JournalLatencyTestCmd();
     }

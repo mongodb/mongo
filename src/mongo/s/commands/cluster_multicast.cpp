@@ -147,7 +147,7 @@ public:
 };
 
 MONGO_INITIALIZER(RegisterMulticast)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         new MulticastCmd();
     }
     return Status::OK();

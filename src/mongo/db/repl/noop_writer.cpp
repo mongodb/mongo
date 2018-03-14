@@ -164,7 +164,7 @@ void NoopWriter::_writeNoop(OperationContext* opCtx) {
                << " != last primary OpTime: " << lastAppliedOpTime;
     } else {
         if (writePeriodicNoops.load()) {
-            const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
+            const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
             LOG(logLevel)
                 << "Writing noop to oplog as there has been no writes to this replica set in over "
                 << _writeInterval;

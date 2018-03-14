@@ -89,7 +89,7 @@ public:
 };
 
 MONGO_INITIALIZER(RegisterClusterRestartCatalogCommand)(InitializerContext* ctx) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new ClusterRestartCatalogCmd();
     }

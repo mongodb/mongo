@@ -60,9 +60,6 @@ using logger::LogComponent;
 
 namespace {
 
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
-    ServerParameterSet::getGlobal(), "enableTestCommands", &Command::testCommandsEnabled);
-
 const char kWriteConcernField[] = "writeConcern";
 const WriteConcernOptions kMajorityWriteConcern(
     WriteConcernOptions::kMajority,

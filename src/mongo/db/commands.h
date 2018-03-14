@@ -39,6 +39,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -378,33 +379,6 @@ public:
     static Status checkAuthorization(Command* c,
                                      OperationContext* opCtx,
                                      const OpMsgRequest& request);
-
-    /**
-     * If true, then testing commands are available. Defaults to false.
-     *
-     * Testing commands should conditionally register themselves by consulting this flag:
-     *
-     *     MONGO_INITIALIZER(RegisterMyTestCommand)(InitializerContext* context) {
-     *         if (Command::testCommandsEnabled) {
-     *             // Leaked intentionally: a Command registers itself when constructed.
-     *             new MyTestCommand();
-     *         }
-     *         return Status::OK();
-     *     }
-     *
-     * To make testing commands available by default, change the value to true before running any
-     * mongo initializers:
-     *
-     *     int myMain(int argc, char** argv, char** envp) {
-     *         Command::testCommandsEnabled = true;
-     *         ...
-     *         runGlobalInitializersOrDie(argc, argv, envp);
-     *         ...
-     *     }
-     *
-     * Note: variable is defined in test_commands_enabled.cpp as a dependency hack.
-     */
-    static bool testCommandsEnabled;
 
 private:
     class InvocationShim;

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015 MongoDB Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,28 +26,34 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/test_commands_enabled.h"
-
-#include "mongo/db/server_parameters.h"
+#pragma once
 
 namespace mongo {
-namespace {
 
-bool enabled = false;
-
-ExportedServerParameter<bool, ServerParameterType::kStartupOnly> testCommandsParameter(
-    ServerParameterSet::getGlobal(), "enableTestCommands", &enabled);
-
-}  // namespace
-
-bool getTestCommandsEnabled() {
-    return enabled;
-}
-
-void setTestCommandsEnabled(bool b) {
-    enabled = b;
-}
+/**
+ * If true, then testing commands are available. Defaults to false.
+ *
+ * Testing commands should conditionally register themselves by consulting this flag:
+ *
+ *     MONGO_INITIALIZER(RegisterMyTestCommand)(InitializerContext* context) {
+ *         if (getTestCommandsEnabled()) {
+ *             // Leaked intentionally: a Command registers itself when constructed.
+ *             new MyTestCommand();
+ *         }
+ *         return Status::OK();
+ *     }
+ *
+ * To make testing commands available by default, change the value to true before running any
+ * mongo initializers:
+ *
+ *     int myMain(int argc, char** argv, char** envp) {
+ *         setTestCommandsEnabled(true);
+ *         ...
+ *         runGlobalInitializersOrDie(argc, argv, envp);
+ *         ...
+ *     }
+ */
+bool getTestCommandsEnabled();
+void setTestCommandsEnabled(bool b);
 
 }  // namespace mongo

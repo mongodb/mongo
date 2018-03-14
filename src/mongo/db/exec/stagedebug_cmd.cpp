@@ -518,7 +518,7 @@ public:
 };
 
 MONGO_INITIALIZER(RegisterStageDebugCmd)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new StageDebugCmd();
     }

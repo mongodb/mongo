@@ -325,7 +325,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     auto& mechanism = session->getMechanism();
     // Authenticating the __system@local user to the admin database on mongos is required
     // by the auth passthrough test suite.
-    if (mechanism.getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
+    if (mechanism.getAuthenticationDatabase() != db && !getTestCommandsEnabled()) {
         return CommandHelpers::appendCommandStatus(
             result,
             Status(ErrorCodes::ProtocolError,

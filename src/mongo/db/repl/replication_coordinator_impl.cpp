@@ -1540,7 +1540,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         }
 
         if (status.getValue() == stdx::cv_status::timeout) {
-            if (Command::testCommandsEnabled) {
+            if (getTestCommandsEnabled()) {
                 // log state of replica set on timeout to help with diagnosis.
                 BSONObjBuilder progress;
                 _topCoord->fillMemberData(&progress);

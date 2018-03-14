@@ -548,7 +548,7 @@ public:
 };
 
 MONGO_INITIALIZER(RegisterDbCheckCmd)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         new DbCheckCmd();
     }
     return Status::OK();

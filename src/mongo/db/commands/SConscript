@@ -9,6 +9,9 @@ env.Library(
     target="test_commands_enabled",
     source=[
         "test_commands_enabled.cpp",
+    ],
+    LIBDEPS=[
+        "server_status_core",
     ]
 )
 

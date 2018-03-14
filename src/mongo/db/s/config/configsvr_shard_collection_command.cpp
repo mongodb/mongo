@@ -786,8 +786,7 @@ public:
             // (unless we are in test mode)
             uassert(ErrorCodes::IllegalOperation,
                     "only special collections in the config db may be sharded",
-                    nss.ns() == SessionsCollection::kSessionsFullNS ||
-                        Command::testCommandsEnabled);
+                    nss.ns() == SessionsCollection::kSessionsFullNS || getTestCommandsEnabled());
 
             auto configShard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbType.getPrimary()));

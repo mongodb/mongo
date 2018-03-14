@@ -458,7 +458,7 @@ void BackgroundSync::_produce() {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 
-    const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
+    const auto logLevel = getTestCommandsEnabled() ? 0 : 1;
     LOG(logLevel) << "scheduling fetcher to read remote oplog on " << _syncSourceHost
                   << " starting at " << oplogFetcher->getFindQuery_forTest()["filter"];
     auto scheduleStatus = oplogFetcher->startup();

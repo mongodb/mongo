@@ -125,7 +125,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
 
 
 int dbtestsMain(int argc, char** argv, char** envp) {
-    Command::testCommandsEnabled = true;
+    ::mongo::setTestCommandsEnabled(true);
     ::mongo::setupSynchronousSignalHandlers();
     mongo::dbtests::initWireSpec();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);

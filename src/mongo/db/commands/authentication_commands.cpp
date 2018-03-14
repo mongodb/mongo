@@ -159,7 +159,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
         user = UserName(cmdObj.getStringField("user"), dbname);
     }
 
-    if (Command::testCommandsEnabled && user.getDB() == "admin" &&
+    if (getTestCommandsEnabled() && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
         // support the auth passthrough test framework on mongos (since you can't use the local
@@ -278,7 +278,7 @@ public:
              BSONObjBuilder& result) {
         AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
         authSession->logoutDatabase(dbname);
-        if (Command::testCommandsEnabled && dbname == "admin") {
+        if (getTestCommandsEnabled() && dbname == "admin") {
             // Allows logging out as the internal user against the admin database, however
             // this actually logs out of the local database as well. This is to
             // support the auth passthrough test framework on mongos (since you can't use the

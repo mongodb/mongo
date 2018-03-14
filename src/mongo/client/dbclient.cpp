@@ -777,7 +777,7 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
         BSONObjBuilder bob;
         bob.append("isMaster", 1);
 
-        if (Command::testCommandsEnabled) {
+        if (getTestCommandsEnabled()) {
             // Only include the host:port of this process in the isMaster command request if test
             // commands are enabled. mongobridge uses this field to identify the process opening a
             // connection to it.

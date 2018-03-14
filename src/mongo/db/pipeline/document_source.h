@@ -104,7 +104,7 @@ class Document;
 
 #define REGISTER_TEST_DOCUMENT_SOURCE(key, liteParser, fullParser) \
     REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                        \
-        key, liteParser, fullParser, Command::testCommandsEnabled)
+        key, liteParser, fullParser, ::mongo::getTestCommandsEnabled())
 
 /**
  * Registers a multi-stage alias (such as $sortByCount) to have the single name 'key'. When a stage

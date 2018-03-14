@@ -101,7 +101,7 @@ public:
     }
 };
 MONGO_INITIALIZER(RegisterHashEltCmd)(InitializerContext* context) {
-    if (Command::testCommandsEnabled) {
+    if (getTestCommandsEnabled()) {
         // Leaked intentionally: a Command registers itself when constructed.
         new CmdHashElt();
     }
