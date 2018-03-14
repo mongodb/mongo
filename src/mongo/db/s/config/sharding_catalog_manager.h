@@ -171,20 +171,15 @@ public:
     /**
      * Updates metadata in the config.chunks collection so the chunks with given boundaries are seen
      * merged into a single larger chunk.
-     * If 'validAfter' is not set, this means the commit request came from an older server version,
-     * which is not history-aware.
      */
     Status commitChunkMerge(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const OID& requestEpoch,
                             const std::vector<BSONObj>& chunkBoundaries,
-                            const std::string& shardName,
-                            const boost::optional<Timestamp>& validAfter);
+                            const std::string& shardName);
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
-     * If 'validAfter' is not set, this means the commit request came from an older server version,
-     * which is not history-aware.
      */
     StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
                                              const NamespaceString& nss,
@@ -192,8 +187,7 @@ public:
                                              const boost::optional<ChunkType>& controlChunk,
                                              const OID& collectionEpoch,
                                              const ShardId& fromShard,
-                                             const ShardId& toShard,
-                                             const boost::optional<Timestamp>& validAfter);
+                                             const ShardId& toShard);
 
     //
     // Database Operations

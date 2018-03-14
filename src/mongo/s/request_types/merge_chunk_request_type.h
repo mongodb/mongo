@@ -46,8 +46,7 @@ public:
     MergeChunkRequest(NamespaceString nss,
                       std::string shardName,
                       OID epoch,
-                      std::vector<BSONObj> chunkBoundaries,
-                      boost::optional<Timestamp> validAfter);
+                      std::vector<BSONObj> chunkBoundaries);
 
     /**
      * Parses the provided BSON content as the internal _configsvrCommitChunkMerge command, and if
@@ -95,10 +94,6 @@ public:
         return _shardName;
     }
 
-    const boost::optional<Timestamp>& getValidAfter() const {
-        return _validAfter;
-    }
-
 private:
     NamespaceString _nss;
     OID _epoch;
@@ -107,8 +102,6 @@ private:
     std::vector<BSONObj> _chunkBoundaries;
 
     std::string _shardName;
-
-    boost::optional<Timestamp> _validAfter;
 };
 
 }  // namespace mongo

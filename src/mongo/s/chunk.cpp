@@ -61,7 +61,6 @@ Chunk::Chunk(const ChunkType& from)
     : _range(from.getMin(), from.getMax()),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
-      _history(from.getHistory()),
       _jumbo(from.getJumbo()),
       _dataWritten(mkDataWritten()) {
     invariantOK(from.validate());

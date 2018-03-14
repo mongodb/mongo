@@ -64,9 +64,7 @@ TEST(MergeChunkRequest, ConfigCommandtoBSON) {
              << "chunkBoundaries"
              << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 5) << BSON("a" << 10))
              << "shard"
-             << "shard0000"
-             << "validAfter"
-             << Timestamp{100});
+             << "shard0000");
     BSONObj writeConcernObj = BSON("writeConcern" << BSON("w"
                                                           << "majority"));
 

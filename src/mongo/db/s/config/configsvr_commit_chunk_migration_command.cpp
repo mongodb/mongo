@@ -134,8 +134,7 @@ public:
             commitRequest.getControlChunk(),
             commitRequest.getCollectionEpoch(),
             commitRequest.getFromShard(),
-            commitRequest.getToShard(),
-            commitRequest.getValidAfter());
+            commitRequest.getToShard());
         if (!response.isOK()) {
             return CommandHelpers::appendCommandStatus(result, response.getStatus());
         }

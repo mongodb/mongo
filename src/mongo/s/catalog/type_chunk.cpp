@@ -54,7 +54,6 @@ const BSONField<std::string> ChunkType::shard("shard");
 const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::lastmod("lastmod");
 const BSONField<OID> ChunkType::epoch("lastmodEpoch");
-const BSONField<BSONObj> ChunkType::history("history");
 
 namespace {
 
@@ -158,23 +157,6 @@ ChunkRange ChunkRange::unionWith(ChunkRange const& other) const {
                       le(_maxKey, other._maxKey) ? other._maxKey : _maxKey);
 }
 
-StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& source) {
-    std::vector<ChunkHistory> values;
-
-    for (const auto& arrayElement : source) {
-        if (arrayElement.type() == Object) {
-            IDLParserErrorContext tempContext("chunk history array");
-            values.emplace_back(ChunkHistoryBase::parse(tempContext, arrayElement.Obj()));
-        } else {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "array element does not have the object type: "
-                                  << arrayElement.type()};
-        }
-    }
-
-    return values;
-}
-
 // ChunkType
 
 ChunkType::ChunkType() = default;
@@ -235,22 +217,6 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
         chunk._version = std::move(versionStatus.getValue());
     }
 
-    {
-        BSONElement historyObj;
-        Status status = bsonExtractTypedField(source, history.name(), Array, &historyObj);
-        if (status.isOK()) {
-            auto history = std::move(ChunkHistory::fromBSON(BSONArray(historyObj.Obj())));
-            if (!history.isOK())
-                return history.getStatus();
-
-            chunk._history = std::move(history.getValue());
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // History is missing, so it will be presumed empty
-        } else {
-            return status;
-        }
-    }
-
     return chunk;
 }
 
@@ -270,7 +236,7 @@ BSONObj ChunkType::toConfigBSON() const {
         _version->appendForChunk(&builder);
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
-    addHistoryToBSON(builder);
+
     return builder.obj();
 }
 
@@ -317,22 +283,6 @@ StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source, const OID&
         chunk._version = std::move(statusWithChunkVersion.getValue());
     }
 
-    {
-        BSONElement historyObj;
-        Status status = bsonExtractTypedField(source, history.name(), Array, &historyObj);
-        if (status.isOK()) {
-            auto history = std::move(ChunkHistory::fromBSON(BSONArray(historyObj.Obj())));
-            if (!history.isOK())
-                return history.getStatus();
-
-            chunk._history = std::move(history.getValue());
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // History is missing, so it will be presumed empty
-        } else {
-            return status;
-        }
-    }
-
     return chunk;
 }
 
@@ -346,7 +296,6 @@ BSONObj ChunkType::toShardBSON() const {
     builder.append(max.name(), getMax());
     builder.append(shard.name(), getShard().toString());
     builder.appendTimestamp(lastmod.name(), _version->toLong());
-    addHistoryToBSON(builder);
     return builder.obj();
 }
 
@@ -383,16 +332,6 @@ void ChunkType::setShard(const ShardId& shard) {
 
 void ChunkType::setJumbo(bool jumbo) {
     _jumbo = jumbo;
-}
-
-void ChunkType::addHistoryToBSON(BSONObjBuilder& builder) const {
-    if (_history.size()) {
-        BSONArrayBuilder arrayBuilder(builder.subarrayStart(history.name()));
-        for (const auto& item : _history) {
-            BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());
-            item.serialize(&subObjBuilder);
-        }
-    }
 }
 
 std::string ChunkType::genID(const NamespaceString& nss, const BSONObj& o) {

@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
@@ -409,15 +408,13 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         migratedChunkType.setMin(_args.getMinKey());
         migratedChunkType.setMax(_args.getMaxKey());
 
-        CommitChunkMigrationRequest::appendAsCommand(
-            &builder,
-            getNss(),
-            _args.getFromShardId(),
-            _args.getToShardId(),
-            migratedChunkType,
-            controlChunkType,
-            metadata->getCollVersion(),
-            LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
+        CommitChunkMigrationRequest::appendAsCommand(&builder,
+                                                     getNss(),
+                                                     _args.getFromShardId(),
+                                                     _args.getToShardId(),
+                                                     migratedChunkType,
+                                                     controlChunkType,
+                                                     metadata->getCollVersion());
 
         builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
     }
