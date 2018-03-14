@@ -111,11 +111,11 @@ public:
 } exportedFTDCPeriodParameter;
 
 // Scale the values down since are defaults are in bytes, but the user interface is MB
-std::atomic<std::int32_t> localMaxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault /
-                                                  (1024 * 1024));  // NOLINT
+std::atomic<std::int32_t> localMaxDirectorySizeMB(  // NOLINT
+    FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024));
 
-std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault /
-                                             (1024 * 1024));  // NOLINT
+std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault /  // NOLINT
+                                             (1024 * 1024));
 
 class ExportedFTDCDirectorySizeParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
