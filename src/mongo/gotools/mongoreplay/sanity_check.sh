@@ -50,7 +50,8 @@ fi
 mongo --port=$PORT mongoplay_test --eval "db.setProfilingLevel(2);" 
 mongo --port=$PORT mongoplay_test --eval "db.createCollection('sanity_check', {});" 
 
-mongoreplay play --host mongodb://localhost:$PORT -p $OUTFILE
+export MONGOREPLAY_HOST="mongodb://localhost:$PORT"
+mongoreplay play -p $OUTFILE
 mongo --port=$PORT mongoplay_test --eval "var profile_results = db.system.profile.find({'ns':'mongoplay_test.sanity_check'});
 assert.gt(profile_results.size(), 0);" 
 

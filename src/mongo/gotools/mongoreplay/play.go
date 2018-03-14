@@ -20,7 +20,7 @@ type PlayCommand struct {
 	StatOptions
 	PlaybackFile string  `description:"path to the playback file to play from" short:"p" long:"playback-file" required:"yes"`
 	Speed        float64 `description:"multiplier for playback speed (1.0 = real-time, .5 = half-speed, 3.0 = triple-speed, etc.)" long:"speed" default:"1.0"`
-	URL          string  `short:"h" long:"host" description:"Location of the host to play back against" default:"mongodb://localhost:27017"`
+	URL          string  `short:"h" long:"host" env:"MONGOREPLAY_HOST" description:"Location of the host to play back against" default:"mongodb://localhost:27017"`
 	Repeat       int     `long:"repeat" description:"Number of times to play the playback file" default:"1"`
 	QueueTime    int     `long:"queueTime" description:"don't queue ops much further in the future than this number of seconds" default:"15"`
 	NoPreprocess bool    `long:"no-preprocess" description:"don't preprocess the input file to premap data such as mongo cursorIDs"`
