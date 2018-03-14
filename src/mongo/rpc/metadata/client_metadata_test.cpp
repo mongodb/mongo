@@ -313,6 +313,8 @@ TEST(ClientMetadatTest, TestMongoSAppend) {
     ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
 
     swParseStatus.getValue().get().setMongoSMetadata("h", "i", "j");
+    ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+
     auto doc = swParseStatus.getValue().get().getDocument();
 
     constexpr auto kMongos = "mongos"_sd;

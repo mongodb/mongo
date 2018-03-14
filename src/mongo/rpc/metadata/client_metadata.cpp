@@ -306,9 +306,26 @@ void ClientMetadata::setMongoSMetadata(StringData hostAndPort,
         sub.append(kVersion, version);
     }
 
-    _document = builder.obj();
-}
+    auto document = builder.obj();
 
+    if (!_appName.empty()) {
+        // The _appName field points into the existing _document, which we are about to replace.
+        // We must redirect _appName to point into the new doc *before* replacing the old doc. We
+        // expect the 'application' metadata of the new document to be identical to the old.
+        auto appMetaData = document[kApplication];
+        invariant(appMetaData.isABSONObj());
+
+        auto appNameEl = appMetaData[kName];
+        invariant(appNameEl.type() == BSONType::String);
+
+        auto appName = appNameEl.valueStringData();
+        invariant(appName == _appName);
+
+        _appName = appName;
+    }
+
+    _document = std::move(document);
+}
 
 void ClientMetadata::serialize(StringData driverName,
                                StringData driverVersion,
