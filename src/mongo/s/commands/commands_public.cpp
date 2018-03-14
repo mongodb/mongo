@@ -57,46 +57,29 @@ namespace {
 
 bool cursorCommandPassthrough(OperationContext* opCtx,
                               StringData dbName,
-                              const ShardId& shardId,
+                              const CachedDatabaseInfo& dbInfo,
                               const BSONObj& cmdObj,
                               const NamespaceString& nss,
                               BSONObjBuilder* out) {
-    const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
-    if (!shardStatus.isOK()) {
-        return CommandHelpers::appendCommandStatus(*out, shardStatus.getStatus());
-    }
-    const auto shard = shardStatus.getValue();
-    ScopedDbConnection conn(shard->getConnString());
-    auto cursor = conn->query(str::stream() << dbName << ".$cmd",
-                              CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                              /* nToReturn=*/-1);
-    if (!cursor || !cursor->more()) {
-        return CommandHelpers::appendCommandStatus(
-            *out, {ErrorCodes::OperationFailed, "failed to read command response from shard"});
-    }
-    BSONObj response = cursor->nextSafe().getOwned();
-    conn.done();
-    Status status = getStatusFromCommandResult(response);
-    if (ErrorCodes::StaleConfig == status) {
-        uassertStatusOK(status.withContext("command failed because of stale config"));
-    }
-    if (!status.isOK()) {
-        return CommandHelpers::appendCommandStatus(*out, status);
-    }
+    auto response = executeCommandAgainstDatabasePrimary(
+        opCtx,
+        dbName,
+        dbInfo,
+        CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+        ReadPreferenceSetting::get(opCtx),
+        Shard::RetryPolicy::kIdempotent);
+    const auto cmdResponse = uassertStatusOK(std::move(response.swResponse));
 
-    StatusWith<BSONObj> transformedResponse =
+    auto transformedResponse = uassertStatusOK(
         storePossibleCursor(opCtx,
-                            shardId,
-                            HostAndPort(cursor->originalHost()),
-                            response,
+                            dbInfo.primaryId(),
+                            *response.shardHostAndPort,
+                            cmdResponse.data,
                             nss,
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                            Grid::get(opCtx)->getCursorManager());
-    if (!transformedResponse.isOK()) {
-        return CommandHelpers::appendCommandStatus(*out, transformedResponse.getStatus());
-    }
-    CommandHelpers::filterCommandReplyForPassthrough(transformedResponse.getValue(), out);
+                            Grid::get(opCtx)->getCursorManager()));
 
+    CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, out);
     return true;
 }
 
@@ -515,16 +498,15 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        auto nss = NamespaceString::makeListCollectionsNSS(dbName);
+        const auto nss(NamespaceString::makeListCollectionsNSS(dbName));
 
         auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!dbInfoStatus.isOK()) {
             return appendEmptyResultSet(result, dbInfoStatus.getStatus(), nss.ns());
         }
 
-        const auto& dbInfo = dbInfoStatus.getValue();
-
-        return cursorCommandPassthrough(opCtx, dbName, dbInfo.primaryId(), cmdObj, nss, &result);
+        return cursorCommandPassthrough(
+            opCtx, dbName, dbInfoStatus.getValue(), cmdObj, nss, &result);
     }
 
 } cmdListCollections;
@@ -576,14 +558,15 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
-
         const auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
-        const auto commandNss = NamespaceString::makeListIndexesNSS(nss.db(), nss.coll());
-
-        return cursorCommandPassthrough(
-            opCtx, nss.db(), routingInfo.primaryId(), cmdObj, commandNss, &result);
+        return cursorCommandPassthrough(opCtx,
+                                        nss.db(),
+                                        routingInfo.db(),
+                                        cmdObj,
+                                        NamespaceString::makeListIndexesNSS(nss.db(), nss.coll()),
+                                        &result);
     }
 
 } cmdListIndexes;

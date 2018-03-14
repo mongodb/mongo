@@ -70,28 +70,46 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
 
 namespace {
 
-BSONObj appendDbVersion(BSONObj cmdObj, DatabaseVersion version) {
+BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo) {
+    // Attach the databaseVersion if we have one cached for the database
+    //
+    // TODO: After 4.0 is released, require the routingInfo to have a databaseVersion for all
+    // databases besides "config" and "admin" (whose primary shard cannot be changed).
+    // (In v4.0, if the cluster is in fcv=3.6, we may not have a databaseVersion cached for any
+    // database).
+    if (!dbInfo.databaseVersion())
+        return cmdObj;
+
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
-    cmdWithVersionBob.append("databaseVersion", version.toBSON());
+    cmdWithVersionBob.append("databaseVersion", dbInfo.databaseVersion()->toBSON());
     return cmdWithVersionBob.obj();
 }
 
 const auto kAllowImplicitCollectionCreation = "allowImplicitCollectionCreation"_sd;
 
-std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForAllShards(
-    OperationContext* opCtx, const BSONObj& cmdObj) {
+/**
+ * Constructs a requests vector targeting each of the specified shard ids. Each request contains the
+ * same cmdObj combined with the default sharding parameters.
+ */
+std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForShards(
+    std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
     auto cmdToSend = cmdObj;
     if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
         cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
     }
 
     std::vector<AsyncRequestsSender::Request> requests;
+    for (auto&& shardId : shardIds)
+        requests.emplace_back(std::move(shardId), cmdToSend);
+
+    return requests;
+}
+
+std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForAllShards(
+    OperationContext* opCtx, const BSONObj& cmdObj) {
     std::vector<ShardId> shardIds;
     Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
-    for (auto&& shardId : shardIds) {
-        requests.emplace_back(std::move(shardId), cmdToSend);
-    }
-    return requests;
+    return buildUnversionedRequestsForShards(std::move(shardIds), cmdObj);
 }
 
 std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(
@@ -100,39 +118,34 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const BSONObj& cmdObj,
     const BSONObj& query,
     const BSONObj& collation) {
+    if (!routingInfo.cm()) {
+        // The collection is unsharded. Target only the primary shard for the database.
+
+        // Attach shardVersion "UNSHARDED", unless targeting the config server.
+        const auto cmdObjWithShardVersion = (routingInfo.db().primaryId() != "config")
+            ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
+            : cmdObj;
+
+        return buildUnversionedRequestsForShards(
+            {routingInfo.db().primaryId()},
+            appendDbVersionIfPresent(cmdObjWithShardVersion, routingInfo.db()));
+    }
+
     auto cmdToSend = cmdObj;
     if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
         cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
     }
 
     std::vector<AsyncRequestsSender::Request> requests;
-    if (routingInfo.cm()) {
-        // The collection is sharded. Target all shards that own chunks that match the query.
-        std::set<ShardId> shardIds;
-        routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
-        for (const ShardId& shardId : shardIds) {
-            requests.emplace_back(
-                shardId, appendShardVersion(cmdToSend, routingInfo.cm()->getVersion(shardId)));
-        }
-    } else {
-        // The collection is unsharded. Target only the primary shard for the database.
 
-        // Attach shardVersion "UNSHARDED", unless targeting the config server.
-        const auto cmdObjWithShardVersion = (routingInfo.db().primaryId() != "config")
-            ? appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED())
-            : cmdObj;
-
-        // Attach the databaseVersion if we have one cached for the database.
-        // TODO: After 4.0 is released, require the routingInfo to have a databaseVersion for all
-        // databases besides "config" and "admin" (whose primary shard cannot be changed).
-        // (In v4.0, if the cluster is in fcv=3.6, we may not have a databaseVersion cached for any
-        // database).
-        const auto cmdObjWithShardVersionAndDbVersion = routingInfo.db().databaseVersion()
-            ? appendDbVersion(cmdObjWithShardVersion, *routingInfo.db().databaseVersion())
-            : cmdObjWithShardVersion;
-
-        requests.emplace_back(routingInfo.db().primaryId(), cmdObjWithShardVersionAndDbVersion);
+    // The collection is sharded. Target all shards that own chunks that match the query.
+    std::set<ShardId> shardIds;
+    routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
+    for (const ShardId& shardId : shardIds) {
+        requests.emplace_back(shardId,
+                              appendShardVersion(cmdToSend, routingInfo.cm()->getVersion(shardId)));
     }
+
     return requests;
 }
 
@@ -270,6 +283,23 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     }
 
     return gatherResponses(opCtx, nss.db(), readPref, retryPolicy, requests);
+}
+
+AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
+    OperationContext* opCtx,
+    StringData dbName,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy) {
+    auto responses =
+        gatherResponses(opCtx,
+                        dbName,
+                        readPref,
+                        retryPolicy,
+                        buildUnversionedRequestsForShards(
+                            {dbInfo.primaryId()}, appendDbVersionIfPresent(cmdObj, dbInfo)));
+    return std::move(responses.front());
 }
 
 bool appendRawResponses(OperationContext* opCtx,

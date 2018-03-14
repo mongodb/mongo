@@ -264,9 +264,7 @@
         listCommands: {skip: "executes locally on mongos (not sent to any remote node)"},
         listDatabases: {skip: "does not forward command to primary shard"},
         listIndexes: {
-            sendsDbVersion: false,
-            // It's a known bug that listIndexes uses ShardConnection without connection versioning
-            // (SERVER-33434).
+            sendsDbVersion: true,
             sendsShardVersion: false,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.

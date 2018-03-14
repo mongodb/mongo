@@ -120,6 +120,20 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     Shard::RetryPolicy retryPolicy);
 
 /**
+ * Utility for dispatching commands against the primary of a database and attach the appropriate
+ * database version.
+ *
+ * Does not retry on StaleDbVersion.
+ */
+AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
+    OperationContext* opCtx,
+    StringData dbName,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
  * Attaches each shard's response or error status by the shard's connection string in a top-level
  * field called 'raw' in 'output'.
  *
