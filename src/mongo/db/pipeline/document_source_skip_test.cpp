@@ -65,9 +65,25 @@ TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
     ASSERT_TRUE(skip->getNext().isEOF());
 }
 
-TEST(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizing) {
-    auto source = DocumentSourceMock::create({"{a: 1, b: 2}", "{a: 3, b: 4}"});
-    auto skip = DocumentSourceSkip::create(getExpCtx(), 2);
+TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizing) {
+    auto skipShort = DocumentSourceSkip::create(getExpCtx(), 1);
+    auto skipLong = DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
+    Pipeline::SourceContainer overFlowContainer;
+    overFlowContainer.push_back(skipShort);
+    overFlowContainer.push_back(skipLong);
+    skipShort->doOptimizeAt(overFlowContainer.begin(), &overFlowContainer);
+    ASSERT_EQUALS(overFlowContainer.size(), 2U);
+    ASSERT_EQUALS(skipShort->getSkip(), 1U);
+    ASSERT_EQUALS(skipLong->getSkip(), std::numeric_limits<long long>::max());
+
+    auto skipFirst = DocumentSourceSkip::create(getExpCtx(), 1);
+    auto skipSecond = DocumentSourceSkip::create(getExpCtx(), 1);
+    Pipeline::SourceContainer containerOptimized;
+    containerOptimized.push_back(skipFirst);
+    containerOptimized.push_back(skipSecond);
+    skipFirst->doOptimizeAt(containerOptimized.begin(), &containerOptimized);
+    ASSERT_EQUALS(containerOptimized.size(), 1U);
+    ASSERT_EQUALS(skipFirst->getSkip(), 2);
 }
 
 }  // namespace

@@ -26,8 +26,6 @@
 *    it in the license file.
 */
 
-#include <iostream>
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_skip.h"
@@ -86,9 +84,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     invariant(*itr == this);
 
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-        std::cout<< std::numeric_limits<long long>::max() << "  nTo: " << _nToSkip << " next: " << nextSkip->getSkip() << "\n\n\n"; 
     if (nextSkip) {
-        if (std::numeric_limits<long long>::max() - _nToSkip - nextSkip->getSkip() > 0) {
+        if (std::numeric_limits<long long>::max() - _nToSkip - nextSkip->getSkip() >= 0) {
             _nToSkip += nextSkip->getSkip();
             container->erase(std::next(itr));
             return itr;
