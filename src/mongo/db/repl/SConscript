@@ -656,6 +656,7 @@ env.Library(
         'oplog_application',
         'replication_process',
         'replmocks',
+        'storage_interface_impl',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',

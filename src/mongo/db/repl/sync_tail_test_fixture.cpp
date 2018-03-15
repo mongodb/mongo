@@ -39,7 +39,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
-#include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 
 namespace mongo {
 namespace repl {
@@ -93,28 +94,16 @@ void SyncTailTest::setUp() {
     ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
-    auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
-    _storageInterface = storageInterface.get();
-    storageInterface->insertDocumentsFn =
-        [](OperationContext*, const NamespaceString&, const std::vector<InsertStatement>&) {
-            return Status::OK();
-        };
+    StorageInterface::set(service, stdx::make_unique<StorageInterfaceImpl>());
+    auto storageInterface = StorageInterface::get(service);
 
-    // Storage interface mock should get the real uuid.
-    storageInterface->getCollectionUUIDFn = [](
-        OperationContext* opCtx, const NamespaceString& nss) -> StatusWith<OptionalCollectionUUID> {
-        AutoGetCollectionForRead autoColl(opCtx, nss);
-        return autoColl.getCollection()->uuid();
-    };
-
-    StorageInterface::set(service, std::move(storageInterface));
     DropPendingCollectionReaper::set(
-        service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
+        service, stdx::make_unique<DropPendingCollectionReaper>(storageInterface));
     repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 
     _replicationProcess =
-        new ReplicationProcess(_storageInterface,
+        new ReplicationProcess(storageInterface,
                                stdx::make_unique<ReplicationConsistencyMarkersMock>(),
                                stdx::make_unique<ReplicationRecoveryMock>());
     ReplicationProcess::set(cc().getServiceContext(),

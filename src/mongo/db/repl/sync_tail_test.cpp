@@ -55,12 +55,9 @@
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -643,18 +640,6 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss1, BSON("x" << 1));
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss2, BSON("x" << 2));
 
-    NamespaceString nssForInsert;
-    std::vector<InsertStatement> operationsWrittenToOplog;
-    _storageInterface->insertDocumentsFn = [&mutex, &nssForInsert, &operationsWrittenToOplog](
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const std::vector<InsertStatement>& docs) {
-        stdx::lock_guard<stdx::mutex> lock(mutex);
-        nssForInsert = nss;
-        operationsWrittenToOplog = docs;
-        return Status::OK();
-    };
-
     SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
     auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx.get(), {op1, op2}));
     ASSERT_EQUALS(op2.getOpTime(), lastOpTime);
@@ -675,11 +660,23 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     }
 
     // Check ops in oplog.
+    // Obtain the last 2 entries in the oplog using a reverse collection scan.
     stdx::lock_guard<stdx::mutex> lock(mutex);
+    auto storage = StorageInterface::get(_opCtx.get());
+    auto operationsWrittenToOplog =
+        unittest::assertGet(storage->findDocuments(_opCtx.get(),
+                                                   NamespaceString::kRsOplogNamespace,
+                                                   {},
+                                                   StorageInterface::ScanDirection::kBackward,
+                                                   {},
+                                                   BoundInclusion::kIncludeStartKeyOnly,
+                                                   2U));
     ASSERT_EQUALS(2U, operationsWrittenToOplog.size());
-    ASSERT_EQUALS(NamespaceString::kRsOplogNamespace, nssForInsert);
-    ASSERT_EQUALS(op1, unittest::assertGet(OplogEntry::parse(operationsWrittenToOplog[0].doc)));
-    ASSERT_EQUALS(op2, unittest::assertGet(OplogEntry::parse(operationsWrittenToOplog[1].doc)));
+
+    auto lastEntry = unittest::assertGet(OplogEntry::parse(operationsWrittenToOplog[0]));
+    auto secondToLastEntry = unittest::assertGet(OplogEntry::parse(operationsWrittenToOplog[1]));
+    ASSERT_EQUALS(op1, secondToLastEntry);
+    ASSERT_EQUALS(op2, lastEntry);
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {

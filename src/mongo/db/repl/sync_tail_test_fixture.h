@@ -42,7 +42,6 @@ class OperationContext;
 namespace repl {
 
 class ReplicationProcess;
-class StorageInterfaceMock;
 
 /**
  * OpObserver for SyncTail test fixture.
@@ -110,7 +109,6 @@ protected:
     SyncTail::ApplyOperationInLockFn _applyOp;
     SyncTail::ApplyCommandInLockFn _applyCmd;
     SyncTail::IncrementOpsAppliedStatsFn _incOps;
-    StorageInterfaceMock* _storageInterface = nullptr;
     ReplicationProcess* _replicationProcess = nullptr;
     SyncTailOpObserver* _opObserver = nullptr;
 
