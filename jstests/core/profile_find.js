@@ -171,4 +171,11 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq((typeof profileObj.command.$truncated), "string", tojson(profileObj));
     assert.eq(profileObj.command.comment, "profile_find", tojson(profileObj));
+
+    //
+    // Confirm {query: "foo"} appears correctly in the profiler (SERVER-33154)
+    //
+    coll.find({query: "foo"}).itcount();
+    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+    assert.eq(profileObj.command.filter, {query: "foo"}, tojson(profileObj));
 })();
