@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
+
 namespace mongo {
 
 class NamespaceString;
@@ -38,6 +40,7 @@ class OperationContext;
  * by sending the command to the config server to create an entry for this collection in
  * the sharding catalog.
  */
-void onCannotImplicitlyCreateCollection(OperationContext* opCtx, const NamespaceString& ns);
+Status onCannotImplicitlyCreateCollection(OperationContext* opCtx,
+                                          const NamespaceString& ns) noexcept;
 
 }  // namespace mongo

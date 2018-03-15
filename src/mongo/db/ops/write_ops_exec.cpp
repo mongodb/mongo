@@ -233,7 +233,10 @@ bool handleError(OperationContext* opCtx,
         out->results.emplace_back(ex.toStatus());
 
         if (ShardingState::get(opCtx)->enabled()) {
-            onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss());
+            // Ignore status since we already put the cannot implicitly create error as the
+            // result of the write.
+            onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
+                .ignore();
         }
 
         return false;

@@ -723,7 +723,8 @@ void execCommandDatabase(OperationContext* opCtx,
         } else if (auto cannotImplicitCreateCollInfo =
                        e.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
             if (ShardingState::get(opCtx)->enabled()) {
-                onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss());
+                onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
+                    .ignore();
             }
         }
 

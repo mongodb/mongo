@@ -67,13 +67,16 @@ public:
      * by sending the command to the config server to create an entry for this collection in
      * the sharding catalog.
      */
-    void onCannotImplicitlyCreateCollection(OperationContext* opCtx) {
+    Status onCannotImplicitlyCreateCollection(OperationContext* opCtx) noexcept {
         invariant(!opCtx->lockState()->isLocked());
 
         {
             stdx::unique_lock<stdx::mutex> lg(_mutex);
             while (_isInProgress) {
-                opCtx->waitForConditionOrInterrupt(_cvIsInProgress, lg);
+                auto status = opCtx->waitForConditionOrInterruptNoAssert(_cvIsInProgress, lg);
+                if (!status.isOK()) {
+                    return status;
+                }
             }
 
             _isInProgress = true;
@@ -85,24 +88,32 @@ public:
             _cvIsInProgress.notify_one();
         });
 
-        {
+        try {
             AutoGetCollection autoColl(opCtx, _ns, MODE_IS);
             if (autoColl.getCollection() != nullptr) {
                 // Collection already created, no more work needs to be done.
-                return;
+                return Status::OK();
             }
+        } catch (const DBException& ex) {
+            return ex.toStatus();
         }
 
         ConfigsvrCreateCollection configCreateCmd;
         configCreateCmd.setNs(_ns);
 
-        uassertStatusOK(
+        auto statusWith =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 "admin",
                 CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON()),
-                Shard::RetryPolicy::kIdempotent));
+                Shard::RetryPolicy::kIdempotent);
+
+        if (!statusWith.isOK()) {
+            return statusWith.getStatus();
+        }
+
+        return Shard::CommandResponse::getEffectiveStatus(statusWith.getValue());
     }
 
 private:
@@ -141,10 +152,23 @@ const auto createCollectionSerializerMap =
 
 }  // unnamed namespace
 
-void onCannotImplicitlyCreateCollection(OperationContext* opCtx, const NamespaceString& ns) {
+Status onCannotImplicitlyCreateCollection(OperationContext* opCtx,
+                                          const NamespaceString& ns) noexcept {
     auto& handlerMap = createCollectionSerializerMap(opCtx->getServiceContext());
-    handlerMap.getForNs(ns)->onCannotImplicitlyCreateCollection(opCtx);
-    handlerMap.cleanupNs(ns);
+    auto status = handlerMap.getForNs(ns)->onCannotImplicitlyCreateCollection(opCtx);
+
+    if (status.isOK()) {
+        handlerMap.cleanupNs(ns);
+    } else {
+        // We only cleanup on success because that is our last chance for us to do so. This avoids
+        // the scenario with multiple handlers for the same ns to exist at the same time if we
+        // cleanup regardless of success or failure. On the other hand, cleaning it up only on
+        // success can cause the handler to never get cleaned up when the collection was
+        // successfully created, but this shard got an error response from the config
+        // server.
+    }
+
+    return status;
 }
 
 }  // namespace mongo
