@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
@@ -56,6 +57,7 @@
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
@@ -299,6 +301,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
     // Retrieve enough data from the ClusterClientCursor for the first batch of results.
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &waitInFindBeforeMakingBatch, opCtx, "waitInFindBeforeMakingBatch");
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;

@@ -215,6 +215,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/command_can_run_here',
+        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/exec/stagedebug_cmd',
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/index_d',
@@ -232,7 +233,7 @@ env.Library(
         'core',
         'current_op_common',
         'fsync_locked',
-        'killcursors_common',
+        'kill_common',
         'list_collections_filter',
         'profile_common',
         'test_commands_enabled',
@@ -281,6 +282,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
         '$BUILD_DIR/mongo/s/sharding_legacy_api',
+        'kill_common',
         'mongod_fcv',
         'mongod_fsync',
         'standalone',
@@ -290,9 +292,10 @@ env.Library(
 )
 
 env.Library(
-    target='killcursors_common',
+    target='kill_common',
     source=[
         'killcursors_common.cpp',
+        'kill_op_cmd_base.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',

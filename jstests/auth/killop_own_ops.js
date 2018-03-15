@@ -1,5 +1,5 @@
 /**
- * Test that a user may currentOp, and then killOp their own operations.
+ * Test that a user may $currentOp, and then killOp their own operations.
  *
  * Theory of operation: Create a long running operation from a user which does not have the killOp
  * or inProg privileges. Using the same user, run currentOp to get the opId, and then run killOp
@@ -13,6 +13,7 @@
     function runTest(m) {
         var db = m.getDB("foo");
         var admin = m.getDB("admin");
+        const kFailPointName = "waitInFindBeforeMakingBatch";
 
         admin.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
         admin.auth('admin', 'password');
@@ -29,27 +30,26 @@
         var t = db.jstests_killop;
         t.save({x: 1});
 
-        assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
-
         admin.logout();
+
+        // Only used for nice error messages.
+        function getAllLocalOps() {
+            admin.aggregate([{$currentOp: {allUsers: true, localOps: true}}]).toArray();
+        }
 
         /**
          * This function filters for the operations that we're looking for, based on their state and
          * the contents of their query object.
          */
         function ops(ownOps = true) {
-            var p = db.currentOp({$ownOps: ownOps}).inprog;
+            const ops =
+                admin.aggregate([{$currentOp: {allUsers: !ownOps, localOps: true}}]).toArray();
+
             var ids = [];
-            for (var i in p) {
-                var o = p[i];
-                // We *can't* check for ns, b/c it's not guaranteed to be there unless the query is
-                // active, which it may not be in our polling cycle - particularly b/c we sleep
-                // every
-                // second in both the query and the assert
-                if ((o.active || o.waitingForLock) && o.command && o.command &&
-                    o.command.find === "jstests_killop" && o.command.comment === "kill_own_ops") {
-                    print("OP: " + tojson(o));
+            for (let o of ops) {
+                if ((o.active || o.waitingForLock) && o.command &&
+                    o.command.find === "jstests_killop" && o.command.comment === "kill_own_ops" &&
+                    o.msg === kFailPointName) {
                     ids.push(o.opid);
                 }
             }
@@ -62,10 +62,9 @@
         jsTestLog("Starting long-running operation");
         db.auth('reader', 'reader');
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+            db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
         var s1 = startParallelShell(queryAsReader, m.port);
-
-        jsTestLog("Finding ops in currentOp() output");
+        jsTestLog("Finding ops in $currentOp output");
         var o = [];
         assert.soon(
             function() {
@@ -73,10 +72,9 @@
                 return o.length == 1;
             },
             () => {
-                return tojson(db.currentOp().inprog);
+                return tojson(getAllLocalOps());
             },
             60000);
-
         jsTestLog("Checking that another user cannot see or kill the op");
         db.logout();
         db.auth('otherReader', 'otherReader');
@@ -86,13 +84,11 @@
         db.auth('reader', 'reader');
         assert.eq(1, ops().length);
         db.logout();
-
         jsTestLog("Checking that originating user can kill operation");
         var start = new Date();
         db.auth('reader', 'reader');
         assert.commandWorked(db.killOp(o[0]));
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
 
         jsTestLog("Waiting for ops to terminate");
         var exitCode = s1({checkExitSuccess: false});
@@ -107,9 +103,9 @@
 
         jsTestLog("Starting a second long-running operation");
         assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}));
+            db.adminCommand({configureFailPoint: kFailPointName, mode: "alwaysOn"}));
         var s2 = startParallelShell(queryAsReader, m.port);
-        jsTestLog("Finding ops in currentOp() output");
+        jsTestLog("Finding ops in $currentOp output");
         var o2 = [];
         assert.soon(
             function() {
@@ -117,7 +113,7 @@
                 return o2.length == 1;
             },
             () => {
-                return tojson(db.currentOp().inprog);
+                return tojson(getAllLocalOps());
             },
             60000);
 
@@ -134,8 +130,7 @@
         jsTestLog("Checking that an administrative user can kill others' operations");
         var start = new Date();
         assert.commandWorked(db.killOp(o2[0]));
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "setYieldAllLocksHang", mode: "off"}));
+        assert.commandWorked(db.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
         jsTestLog("Waiting for ops to terminate");
         var exitCode = s2({checkExitSuccess: false});
         assert.neq(
@@ -150,9 +145,9 @@
     runTest(conn);
     MongoRunner.stopMongod(conn);
 
-    // TODO: This feature is currently not supported on sharded clusters.
-    /*var st =
-        new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1', useHostname: false});
+    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+    var st = new ShardingTest(
+        {shards: 1, keyFile: 'jstests/libs/key1', other: {shardAsReplicaSet: false}});
     runTest(st.s);
-    st.stop();*/
+    st.stop();
 })();

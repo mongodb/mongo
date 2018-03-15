@@ -40,6 +40,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -66,48 +67,6 @@ namespace mongo {
 namespace {
 
 MONGO_FP_DECLARE(rsStopGetMoreCmd);
-
-// Helper function which sets the 'msg' field of the opCtx's CurOp to the specified string, and
-// returns the original value of the field.
-std::string updateCurOpMsg(OperationContext* opCtx, const std::string& newMsg) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
-    auto oldMsg = CurOp::get(opCtx)->getMessage();
-    CurOp::get(opCtx)->setMessage_inlock(newMsg.c_str());
-    return oldMsg;
-}
-
-// This helper function works much like MONGO_FAIL_POINT_PAUSE_WHILE_SET, but it additionally
-// releases and re-acquires the collection readLock at regular intervals, in order to avoid
-// deadlocks caused by the pinned-cursor failpoints in this file (see SERVER-21997). Finally, it
-// also sets the 'msg' field of the opCtx's CurOp to the given string while the failpoint is active.
-void waitWhileFailPointEnabled(FailPoint* failPoint,
-                               OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const std::string& curOpMsg,
-                               boost::optional<AutoGetCollectionForRead>* readLock) {
-    invariant(failPoint);
-    auto origCurOpMsg = updateCurOpMsg(opCtx, curOpMsg);
-
-    MONGO_FAIL_POINT_BLOCK((*failPoint), options) {
-        const BSONObj& data = options.getData();
-        const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
-        while (MONGO_FAIL_POINT((*failPoint))) {
-            sleepFor(Milliseconds(10));
-            if (readLock && *readLock) {
-                readLock->reset();
-                readLock->emplace(opCtx, nss);
-            }
-
-            // Check for interrupt so that an operation can be killed while waiting for the
-            // failpoint to be disabled, if the failpoint is configured to be interruptible.
-            if (shouldCheckForInterrupt) {
-                opCtx->checkForInterrupt();
-            }
-        }
-    }
-
-    updateCurOpMsg(opCtx, origCurOpMsg);
-}
 
 /**
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
@@ -331,15 +290,23 @@ public:
 
         ClientCursor* cursor = ccPin.getValue().getCursor();
 
+        // Only used by the failpoints.
+        const auto dropAndReaquireReadLock = [&readLock, opCtx, &request]() {
+            readLock.reset();
+            readLock.emplace(opCtx, request.nss);
+        };
+
         // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
-        // field of this operation's CurOp to signal that we've hit this point and then spin until
-        // the failpoint is released.
+        // field of this operation's CurOp to signal that we've hit this point and then repeatedly
+        // release and re-acquire the collection readLock at regular intervals until the failpoint
+        // is released. This is done in order to avoid deadlocks caused by the pinned-cursor
+        // failpoints in this file (see SERVER-21997).
         if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
-            waitWhileFailPointEnabled(&waitAfterPinningCursorBeforeGetMoreBatch,
-                                      opCtx,
-                                      request.nss,
-                                      "waitAfterPinningCursorBeforeGetMoreBatch",
-                                      &readLock);
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &waitAfterPinningCursorBeforeGetMoreBatch,
+                opCtx,
+                "waitAfterPinningCursorBeforeGetMoreBatch",
+                dropAndReaquireReadLock);
         }
 
         // A user can only call getMore on their own cursor. If there were multiple users
@@ -468,11 +435,11 @@ public:
         // operation's CurOp to signal that we've hit this point and then spin until the failpoint
         // is released.
         if (MONGO_FAIL_POINT(waitWithPinnedCursorDuringGetMoreBatch)) {
-            waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
-                                      opCtx,
-                                      request.nss,
-                                      "waitWithPinnedCursorDuringGetMoreBatch",
-                                      &readLock);
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &waitWithPinnedCursorDuringGetMoreBatch,
+                opCtx,
+                "waitWithPinnedCursorDuringGetMoreBatch",
+                dropAndReaquireReadLock);
         }
 
         Status batchStatus = generateBatch(opCtx, cursor, request, &nextBatch, &state, &numResults);
@@ -525,11 +492,11 @@ public:
         // failpoint is active, set the 'msg' field of this operation's CurOp to signal that we've
         // hit this point and then spin until the failpoint is released.
         if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
-            waitWhileFailPointEnabled(&waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
-                                      opCtx,
-                                      request.nss,
-                                      "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
-                                      &readLock);
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
+                opCtx,
+                "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch",
+                dropAndReaquireReadLock);
         }
 
         return true;

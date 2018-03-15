@@ -13,6 +13,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/query/query_common',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         "cluster_client_cursor",

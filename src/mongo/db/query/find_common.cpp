@@ -31,10 +31,13 @@
 #include "mongo/db/query/find_common.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(waitInFindBeforeMakingBatch);
 
 MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
 
@@ -85,5 +88,4 @@ BSONObj FindCommon::transformSortSpec(const BSONObj& sortSpec) {
 
     return comparatorBob.obj();
 }
-
 }  // namespace mongo

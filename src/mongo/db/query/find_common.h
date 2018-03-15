@@ -54,6 +54,9 @@ extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 class BSONObj;
 class QueryRequest;
 
+// Failpoint for making find hang.
+MONGO_FP_FORWARD_DECLARE(waitInFindBeforeMakingBatch);
+
 // Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
 // tests.
 MONGO_FP_FORWARD_DECLARE(disableAwaitDataForGetMoreCmd);
