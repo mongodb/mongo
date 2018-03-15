@@ -1085,13 +1085,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     _opTimeWaiterList.signalAndRemoveIf_inlock(
         [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
 
-
-    // Note that master-slave mode has no automatic fail over, and so rollbacks never occur.
-    // Additionally, the commit point for a master-slave set will never advance, since it doesn't
-    // use any consensus protocol. Since the set of stable optime candidates can only get cleaned up
-    // when the commit point advances, we should refrain from updating stable optime candidates in
-    // master-slave mode, to avoid the candidates list from growing unbounded.
-    if (opTime.isNull() || getReplicationMode() != Mode::modeReplSet) {
+    if (opTime.isNull()) {
         return;
     }
 
