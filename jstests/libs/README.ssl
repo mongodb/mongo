@@ -1,0 +1,25 @@
+The other ceriticates in this directory come from x509gen.
+How to generate a certificate with a custom extension:
+
+1. Generate a normal certificate signing request without an extension
+2. Make a copy of the system openssl.cnf and append this text to the file
+    On Redhat/Fedora, openssl.cnf is in /etc/pki/tls
+
+See jstests\libs\mongodbauthorizationgrant.cnf for how to generate the text with the
+'openssl asn1parse' command.
+
+[MongoDBAuthorizationGrant]
+1.3.6.1.4.1.34601.2.1.1 = DER:312B300F0C066261636B75700C0561646D696E30180C0F72656164416E7944617461626173650C0561646D696E
+
+3. Sign the certificate and add the custom extension
+4. Make a new pem with the certificate and key
+
+Example Commands
+----------------
+openssl req -config openssl.cnf -newkey rsa:2048 -nodes -keyout roles.key -out roles.csr
+
+openssl x509 -req -sha256 -in roles.csr  -out roles.pem -extfile openssl.cnf -extensions MongoDBAuthorizationGrant -CA jstests/libs/ca.pem -CAcreateserial
+
+openssl rsa -in roles.key -out roles2.key
+
+cat roles.pem roles2.key > roles_final.pem
