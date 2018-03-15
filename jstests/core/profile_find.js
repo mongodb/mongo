@@ -173,7 +173,9 @@
     assert.eq(profileObj.command.comment, "profile_find", tojson(profileObj));
 
     //
-    // Confirm {query: "foo"} appears correctly in the profiler (SERVER-33154)
+    // Confirm that a query whose filter contains a field named 'query' appears as expected in the
+    // profiler. This test ensures that upconverting a legacy query correctly identifies this as a
+    // user field rather than a wrapped filter spec.
     //
     coll.find({query: "foo"}).itcount();
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);

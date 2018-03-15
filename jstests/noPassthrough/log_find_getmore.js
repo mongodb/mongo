@@ -13,20 +13,20 @@
         if (typeof(parts) == 'string') {
             return assertLogLineContains(conn, [parts]);
         }
-
-        const logLines = checkLog.getGlobalLog(conn);
-        for (var line of logLines) {
-            var foundParts = 0;
-            for (var part of parts) {
-                if (line.indexOf(part) == -1) {
-                    foundParts += 1;
+        assert.soon(function() {
+            const logLines = checkLog.getGlobalLog(conn);
+            let foundAll = false;
+            for (let l = 0; l < logLines.length && !foundAll; l++) {
+                for (let p = 0; p < parts.length; p++) {
+                    if (logLines[l].indexOf(parts[p]) == -1) {
+                        break;
+                    }
+                    foundAll = (p == parts.length - 1);
                 }
             }
-            if (foundParts == parts.length) {
-                return;
-            }
-        }
-        doassert("failed to find log line containing all of " + tojson(parts));
+            return foundAll;
+        }, "failed to find log line containing all of " + tojson(parts));
+        print("FOUND: " + tojsononeline(parts));
     }
 
     const conn = MongoRunner.runMongod();
@@ -121,8 +121,19 @@
     cursorid = getLatestProfilerEntry(testDB).cursorid;
 
     logLine =
-        'query log_getmore.test appName: "MongoDB Shell" query: { find: "test", filter: { a: { ' +
-        '$gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
+        'query log_getmore.test appName: "MongoDB Shell" command: { find: "test", filter: { a: ' +
+        '{ $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
+
+    assertLogLineContains(conn, logLine);
+
+    // TEST: Verify that a query whose filter contains a field named 'query' appears as expected in
+    // the logs. This test ensures that upconverting a legacy query correctly identifies this as a
+    // user field rather than a wrapped filter spec.
+    coll.find({query: "foo"}).itcount();
+
+    logLine =
+        'query log_getmore.test appName: "MongoDB Shell" command: { find: "test", filter: { query:' +
+        ' "foo" } }';
 
     assertLogLineContains(conn, logLine);
 
@@ -132,7 +143,7 @@
 
     assert.eq(cursor.itcount(), 8);  // Iterate the cursor established above to trigger getMore.
 
-    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
+    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" command: { getMore: ' +
         cursorIdToString(cursorid) +
         ', collection: "test", batchSize: 5 } originatingCommand: { find: "test", filter: { a: {' +
         ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
@@ -148,7 +159,7 @@
     assert.eq(cursor.itcount(), 10);
 
     logLine = [
-        'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
+        'getmore log_getmore.test appName: "MongoDB Shell" command: { getMore: ' +
             cursorIdToString(cursorid) + ', collection: "test", batchSize: 0',
         'originatingCommand: { aggregate: "test", pipeline:' +
             ' [ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
