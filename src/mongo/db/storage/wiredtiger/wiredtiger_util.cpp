@@ -103,9 +103,14 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
     invariant(opCtx);
-    WiredTigerCursor curwrap("metadata:create", WiredTigerSession::kMetadataTableId, false, opCtx);
-    WT_CURSOR* cursor = curwrap.get();
+
+    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WT_CURSOR* cursor =
+        session->getCursor("metadata:create", WiredTigerSession::kMetadataTableId, false);
     invariant(cursor);
+    auto releaser =
+        MakeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
+
     std::string strUri = uri.toString();
     cursor->set_key(cursor, strUri.c_str());
     int ret = cursor->search(cursor);

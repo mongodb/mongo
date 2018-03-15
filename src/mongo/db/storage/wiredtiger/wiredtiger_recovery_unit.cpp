@@ -41,6 +41,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -167,7 +168,12 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     _ensureSession();
-    return _session.get();
+    WiredTigerSession* session = _session.get();
+
+    // Handling queued drops can be slow, which is not desired for internal operations like FTDC
+    // sampling. Disable handling of queued drops for such sessions.
+    session->dropQueuedIdentsAtSessionEndAllowed(false);
+    return session;
 }
 
 void WiredTigerRecoveryUnit::abandonSnapshot() {
@@ -255,8 +261,12 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     WT_SESSION* session = _session->getSession();
 
     if (_readAtTimestamp != Timestamp::min()) {
-        uassertStatusOK(_sessionCache->snapshotManager().beginTransactionAtTimestamp(
+        invariantWTOK(session->begin_transaction(session, NULL));
+        auto rollbacker =
+            MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
+        uassertStatusOK(_sessionCache->snapshotManager().setTransactionReadTimestamp(
             _readAtTimestamp, session));
+        rollbacker.Dismiss();
     } else if (_readFromMajorityCommittedSnapshot) {
         _majorityCommittedSnapshot =
             _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
