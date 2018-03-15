@@ -889,7 +889,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *      auth: {
      *        user {string}: admin user name
      *        pwd {string}: admin password
-     *      }
+     *      },
+     *      skipValidation: <bool>,
+     *      allowedExitCode: <int>
      *    }
      *
      * Note: The auth option is required in a authenticated mongod running in Windows since
@@ -928,7 +930,13 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             // Invoke callback to validate collections and indexes before shutting down mongod.
             // We skip calling the callback function when the expected return code of
             // the mongod process is non-zero since it's likely the process has already exited.
-            if (allowedExitCode === MongoRunner.EXIT_CLEAN) {
+
+            var skipValidation = false;
+            if (opts.skipValidation) {
+                skipValidation = true;
+            }
+
+            if (allowedExitCode === MongoRunner.EXIT_CLEAN && !skipValidation) {
                 MongoRunner.validateCollectionsCallback(port);
             }
 

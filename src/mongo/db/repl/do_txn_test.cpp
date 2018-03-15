@@ -105,8 +105,7 @@ void DoTxnTest::setUp() {
     ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
 
     // Set up session catalog
-    SessionCatalog::reset_forTest(service);
-    SessionCatalog::create(service);
+    SessionCatalog::get(service)->reset_forTest();
     SessionCatalog::get(service)->onStepUp(_opCtx.get());
 
     // Need the OpObserverImpl in the registry in order for doTxn to work.

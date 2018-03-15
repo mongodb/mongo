@@ -85,8 +85,6 @@ void RollbackTest::setUp() {
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
     setOplogCollectionName(serviceContext);
 
-    SessionCatalog::create(serviceContext);
-
     _opCtx = cc().makeOperationContext();
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
@@ -101,7 +99,7 @@ void RollbackTest::tearDown() {
     _coordinator = nullptr;
     _opCtx.reset();
 
-    SessionCatalog::reset_forTest(_serviceContextMongoDTest.getServiceContext());
+    SessionCatalog::get(_serviceContextMongoDTest.getServiceContext())->reset_forTest();
 
     // We cannot unset the global replication coordinator because ServiceContextMongoD::tearDown()
     // calls dropAllDatabasesExceptLocal() which requires the replication coordinator to clear all

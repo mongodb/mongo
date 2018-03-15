@@ -129,13 +129,12 @@ public:
                 ->setFindHostReturnValue(kDonorConnStr.getServers()[0]);
         }
 
-        SessionCatalog::create(getServiceContext());
         SessionCatalog::get(getServiceContext())->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
     }
 
     void tearDown() override {
-        SessionCatalog::reset_forTest(getServiceContext());
+        SessionCatalog::get(getServiceContext())->reset_forTest();
         ShardServerTestFixture::tearDown();
     }
 

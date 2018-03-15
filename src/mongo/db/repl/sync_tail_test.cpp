@@ -1539,7 +1539,6 @@ public:
     void setUp() override {
         SyncTailTest::setUp();
 
-        SessionCatalog::create(_opCtx->getServiceContext());
         SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
 
         DBDirectClient client(_opCtx.get());
@@ -1547,7 +1546,7 @@ public:
         ASSERT(client.runCommand(kNs.db().toString(), BSON("create" << kNs.coll()), result));
     }
     void tearDown() override {
-        SessionCatalog::reset_forTest(_opCtx->getServiceContext());
+        SessionCatalog::get(_opCtx->getServiceContext())->reset_forTest();
         SyncTailTest::tearDown();
     }
 

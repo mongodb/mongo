@@ -48,6 +48,7 @@ void killSessionsLocalKillCursors(OperationContext* opCtx, const SessionKiller::
     auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
     uassertStatusOK(res.first);
 }
+}  // namespace
 
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
                                        const SessionKiller::Matcher& matcher) {
@@ -56,7 +57,6 @@ void killSessionsLocalKillTransactions(OperationContext* opCtx,
             session->abortTransaction();
         });
 }
-}  // namespace
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,

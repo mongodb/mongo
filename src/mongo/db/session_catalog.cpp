@@ -58,15 +58,12 @@ struct CheckedOutSession {
     int checkOutNestingLevel = 0;
 };
 
-const auto sessionTransactionTableDecoration =
-    ServiceContext::declareDecoration<boost::optional<SessionCatalog>>();
+const auto sessionTransactionTableDecoration = ServiceContext::declareDecoration<SessionCatalog>();
 
 const auto operationSessionDecoration =
     OperationContext::declareDecoration<boost::optional<CheckedOutSession>>();
 
 }  // namespace
-
-SessionCatalog::SessionCatalog(ServiceContext* serviceContext) : _serviceContext(serviceContext) {}
 
 SessionCatalog::~SessionCatalog() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
@@ -76,16 +73,9 @@ SessionCatalog::~SessionCatalog() {
     }
 }
 
-void SessionCatalog::create(ServiceContext* service) {
-    auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
-    invariant(!sessionTransactionTable);
-
-    sessionTransactionTable.emplace(service);
-}
-
-void SessionCatalog::reset_forTest(ServiceContext* service) {
-    auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
-    sessionTransactionTable.reset();
+void SessionCatalog::reset_forTest() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _txnTable.clear();
 }
 
 SessionCatalog* SessionCatalog::get(OperationContext* opCtx) {
@@ -94,9 +84,7 @@ SessionCatalog* SessionCatalog::get(OperationContext* opCtx) {
 
 SessionCatalog* SessionCatalog::get(ServiceContext* service) {
     auto& sessionTransactionTable = sessionTransactionTableDecoration(service);
-    invariant(sessionTransactionTable);
-
-    return sessionTransactionTable.get_ptr();
+    return &sessionTransactionTable;
 }
 
 boost::optional<UUID> SessionCatalog::getTransactionTableUUID(OperationContext* opCtx) {

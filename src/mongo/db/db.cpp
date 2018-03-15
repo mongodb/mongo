@@ -491,8 +491,6 @@ ExitCode _initAndListen(int listenPort) {
               << startupWarningsLog;
     }
 
-    SessionCatalog::create(serviceContext);
-
     // This function may take the global lock.
     auto shardingInitialized =
         uassertStatusOK(ShardingState::get(startupOpCtx.get())
@@ -864,6 +862,11 @@ void shutdownTask() {
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);
 
         ShardingState::get(serviceContext)->shutDown(opCtx);
+
+        // Destroy all stashed transaction resources, in order to release locks.
+        SessionKiller::Matcher matcherAllSessions(
+            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+        killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
     }
 
     serviceContext->setKillAllOperations();

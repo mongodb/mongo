@@ -53,24 +53,11 @@ class SessionCatalog {
     friend class ScopedCheckedOutSession;
 
 public:
-    explicit SessionCatalog(ServiceContext* serviceContext);
+    SessionCatalog() = default;
     ~SessionCatalog();
 
     /**
-     * Instantiates a transaction table on the specified service context. Must be called only once
-     * and is not thread-safe.
-     */
-    static void create(ServiceContext* service);
-
-    /**
-     * Resets the transaction table on the specified service context to an uninitialized state.
-     * Meant only for testing.
-     */
-    static void reset_forTest(ServiceContext* service);
-
-    /**
      * Retrieves the session transaction table associated with the service or operation context.
-     * Must only be called after 'create' has been called.
      */
     static SessionCatalog* get(OperationContext* opCtx);
     static SessionCatalog* get(ServiceContext* service);
@@ -80,6 +67,12 @@ public:
      * exist or has no UUID. Acquires a lock on the collection. Required for rollback via refetch.
      */
     static boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
+
+    /**
+     * Resets the transaction table to an uninitialized state.
+     * Meant only for testing.
+     */
+    void reset_forTest();
 
     /**
      * Invoked when the node enters the primary state. Ensures that the transactions collection is
@@ -188,8 +181,6 @@ private:
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
     void _releaseSession(const LogicalSessionId& lsid);
-
-    ServiceContext* const _serviceContext;
 
     stdx::mutex _mutex;
     SessionRuntimeInfoMap _txnTable;

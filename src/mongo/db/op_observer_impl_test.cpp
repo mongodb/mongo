@@ -255,9 +255,8 @@ public:
     void setUp() override {
         OpObserverTest::setUp();
         auto opCtx = cc().makeOperationContext();
-        SessionCatalog::reset_forTest(getServiceContext());
-        SessionCatalog::create(getServiceContext());
         auto sessionCatalog = SessionCatalog::get(getServiceContext());
+        sessionCatalog->reset_forTest();
         sessionCatalog->onStepUp(opCtx.get());
     }
 

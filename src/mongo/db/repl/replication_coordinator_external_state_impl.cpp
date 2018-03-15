@@ -49,6 +49,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
@@ -641,6 +642,11 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
 void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* opCtx) {
     ServiceContext* environment = opCtx->getServiceContext();
     environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToReplStateChange);
+
+    // Destroy all stashed transaction resources, in order to release locks.
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
 }
 
 void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {

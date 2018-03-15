@@ -39,4 +39,10 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,
                                         SessionKiller::UniformRandomBitGenerator* urbg);
 
+/**
+ * Kills all transactions on mongod for sessions matching 'matcher'.
+ */
+void killSessionsLocalKillTransactions(OperationContext* opCtx,
+                                       const SessionKiller::Matcher& matcher);
+
 }  // namespace mongo
