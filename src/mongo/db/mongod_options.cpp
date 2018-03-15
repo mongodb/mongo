@@ -406,6 +406,12 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "enables majority readConcern")
         .setDefault(moe::Value(true));
 
+    replication_options.addOptionChaining(
+        "master", "master", moe::Switch, "Master/slave replication no longer supported");
+
+    replication_options.addOptionChaining(
+        "slave", "slave", moe::Switch, "Master/slave replication no longer supported");
+
     // Sharding Options
 
     sharding_options
@@ -557,6 +563,11 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
         setPlainConsoleLogger();
         sysRuntimeInfo();
+        return false;
+    }
+
+    if (params.count("master") || params.count("slave")) {
+        severe() << "Master/slave replication is no longer supported";
         return false;
     }
 
