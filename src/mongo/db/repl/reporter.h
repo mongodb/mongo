@@ -77,7 +77,8 @@ public:
     Reporter(executor::TaskExecutor* executor,
              PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
              const HostAndPort& target,
-             Milliseconds keepAliveInterval);
+             Milliseconds keepAliveInterval,
+             Milliseconds updatePositionTimeout);
 
     virtual ~Reporter();
 
@@ -134,6 +135,7 @@ public:
      * Returns scheduled time of keep alive timeout handler.
      */
     Date_t getKeepAliveTimeoutWhen_forTest() const;
+    Status getStatus_forTest() const;
 
 private:
     /**
@@ -147,9 +149,9 @@ private:
     StatusWith<BSONObj> _prepareCommand();
 
     /**
-     * Schedules remote command to be run by the executor.
+     * Schedules remote command to be run by the executor with the given network timeout.
      */
-    void _sendCommand_inlock(BSONObj commandRequest);
+    void _sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeout);
 
     /**
      * Callback for processing response from remote command.
@@ -179,6 +181,9 @@ private:
     // Reporter will send updates every "_keepAliveInterval" ms until the reporter is canceled or
     // encounters an error.
     const Milliseconds _keepAliveInterval;
+
+    // The network timeout used when sending an updatePosition command to our sync source.
+    const Milliseconds _updatePositionTimeout;
 
     // Protects member data of this Reporter declared below.
     mutable stdx::mutex _mutex;

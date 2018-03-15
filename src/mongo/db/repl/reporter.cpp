@@ -94,11 +94,13 @@ bool _isTargetConfigNewerThanRequest(
 Reporter::Reporter(executor::TaskExecutor* executor,
                    PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
                    const HostAndPort& target,
-                   Milliseconds keepAliveInterval)
+                   Milliseconds keepAliveInterval,
+                   Milliseconds updatePositionTimeout)
     : _executor(executor),
       _prepareReplSetUpdatePositionCommandFn(prepareReplSetUpdatePositionCommandFn),
       _target(target),
-      _keepAliveInterval(keepAliveInterval) {
+      _keepAliveInterval(keepAliveInterval),
+      _updatePositionTimeout(updatePositionTimeout) {
     uassert(ErrorCodes::BadValue, "null task executor", executor);
     uassert(ErrorCodes::BadValue,
             "null function to create replSetUpdatePosition command object",
@@ -107,6 +109,9 @@ Reporter::Reporter(executor::TaskExecutor* executor,
     uassert(ErrorCodes::BadValue,
             "keep alive interval must be positive",
             keepAliveInterval > Milliseconds(0));
+    uassert(ErrorCodes::BadValue,
+            "update position timeout must be positive",
+            updatePositionTimeout > Milliseconds(0));
 }
 
 Reporter::~Reporter() {
@@ -224,13 +229,15 @@ StatusWith<BSONObj> Reporter::_prepareCommand() {
     return prepareResult.getValue();
 }
 
-void Reporter::_sendCommand_inlock(BSONObj commandRequest) {
+void Reporter::_sendCommand_inlock(BSONObj commandRequest, Milliseconds netTimeout) {
     LOG(2) << "Reporter sending slave oplog progress to upstream updater " << _target << ": "
            << commandRequest;
 
     auto scheduleResult = _executor->scheduleRemoteCommand(
-        executor::RemoteCommandRequest(_target, "admin", commandRequest, nullptr),
-        stdx::bind(&Reporter::_processResponseCallback, this, stdx::placeholders::_1));
+        executor::RemoteCommandRequest(_target, "admin", commandRequest, nullptr, netTimeout),
+        [this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
+            _processResponseCallback(rcbd);
+        });
 
     _status = scheduleResult.getStatus();
     if (!_status.isOK()) {
@@ -324,7 +331,7 @@ void Reporter::_processResponseCallback(
         return;
     }
 
-    _sendCommand_inlock(prepareResult.getValue());
+    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout);
     if (!_status.isOK()) {
         _onShutdown_inlock();
         return;
@@ -366,7 +373,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
         return;
     }
 
-    _sendCommand_inlock(prepareResult.getValue());
+    _sendCommand_inlock(prepareResult.getValue(), _updatePositionTimeout);
     if (!_status.isOK()) {
         _onShutdown_inlock();
         return;
@@ -402,6 +409,10 @@ bool Reporter::isWaitingToSendReport() const {
 Date_t Reporter::getKeepAliveTimeoutWhen_forTest() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _keepAliveTimeoutWhen;
+}
+
+Status Reporter::getStatus_forTest() const {
+    return _status;
 }
 
 }  // namespace repl
