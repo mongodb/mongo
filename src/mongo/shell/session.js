@@ -332,8 +332,12 @@ var {
                 cmdName = Object.keys(cmdObj)[0];
             }
 
+            // TODO SERVER-33921: Revisit how the mongo shell decides whether it should retry a
+            // command or not.
+            const sessionOptions = driverSession.getOptions();
             let numRetries =
-                (cmdObj.hasOwnProperty("txnNumber") && !jsTest.options().skipRetryOnNetworkError)
+                (sessionOptions.shouldRetryWrites() && cmdObj.hasOwnProperty("txnNumber") &&
+                 !jsTest.options().skipRetryOnNetworkError)
                 ? 1
                 : 0;
 
