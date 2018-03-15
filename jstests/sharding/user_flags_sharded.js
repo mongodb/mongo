@@ -48,7 +48,7 @@
         s.adminCommand({enablesharding: dbname});
         s.adminCommand({shardcollection: ns, key: {_id: 1}});
         s.adminCommand(
-            {moveChunk: ns, find: {_id: 1}, to: "s.shard0.shardName", _waitForDelete: true});
+            {moveChunk: ns, find: {_id: 1}, to: s.shard0.shardName, _waitForDelete: true});
 
         print("*************** Collection Stats On Other Shard ************");
         var shard2 = s._connections[0].getDB(dbname);
