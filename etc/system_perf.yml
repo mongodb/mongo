@@ -707,13 +707,15 @@ modules:
 #######################################
 buildvariants:
 
+# We are explicitly tracking the rhel70 variant compile options from evergreen.yml.  If we can get
+# proper artifacts directly from that project, we should do that and remove these tasks.
 - name: compile-rhel70
   display_name: Compile on rhel70
   batchtime: 1440 # 24 hours
   modules:
     - wtdevelop
   expansions:
-    compile_flags: --ssl -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     platform: linux
     project: &project dsi
