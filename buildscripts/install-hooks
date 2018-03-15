@@ -71,6 +71,13 @@ if [ ! -d "$hooks_dir" ]; then
     exit 0
 fi
 
+# Only run if the remote URL matches the MongoDB repo.
+url=$2
+if [ "$this_script" == "pre-push" ] && ! [[ $url =~ (mongodb|10gen)/ ]]; then
+    echo "Skipping pre-push hook for non-MongoDB remote URL: $url"
+    exit 0
+fi
+
 num_hooks_run=0
 all_hooks="$(/bin/ls -1 $hooks_dir 2>/dev/null)"
 
