@@ -54,12 +54,7 @@ public:
     // WT-specific methods
     //
 
-    /**
-     * Sets the read timestamp on a transaction.
-     *
-     * Reads will be reflect the state of data as of the specified timestamp.
-     */
-    Status setTransactionReadTimestamp(Timestamp pointInTime, WT_SESSION* session) const;
+    Status beginTransactionAtTimestamp(Timestamp pointInTime, WT_SESSION* session) const;
 
     /**
      * Starts a transaction and returns the SnapshotName used.
