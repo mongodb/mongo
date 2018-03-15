@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"

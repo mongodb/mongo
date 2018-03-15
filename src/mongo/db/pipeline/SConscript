@@ -338,6 +338,9 @@ pipelineeEnv.Library(
         'expression_context',
         'granularity_rounder',
         'parsed_aggregation_projection',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ]
 )
 

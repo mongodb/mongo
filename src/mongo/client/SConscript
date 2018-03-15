@@ -175,7 +175,6 @@ clientDriverEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authcommon',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/db/write_concern_options',
@@ -192,6 +191,9 @@ clientDriverEnv.Library(
         'authentication',
         'connection_string',
         'read_preference',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],
 )
 

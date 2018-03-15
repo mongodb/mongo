@@ -48,6 +48,7 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/killcursors_request.h"

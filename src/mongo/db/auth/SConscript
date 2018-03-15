@@ -136,20 +136,27 @@ env.Library(
     ],
 )
 
-env.Library('authservercommon',
-            [
-                'authz_session_external_state_server_common.cpp',
-                'sasl_commands.cpp',
-                'security_key.cpp',
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/db/commands/core',
-                'authcommon',
-                'authcore',
-                'authorization_manager_global',
-                'saslauth',
-                'security_file',
-            ])
+env.Library(
+    target='authservercommon',
+    source=[
+        'authz_session_external_state_server_common.cpp',
+        'sasl_commands.cpp',
+        'security_key.cpp',
+    ],
+    LIBDEPS=[
+        'authcommon',
+        'authcore',
+        'authorization_manager_global',
+        'saslauth',
+        'security_file',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/sasl_client',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+    ]
+)
 
 env.Library('security_file',
             ['security_file.cpp'],
@@ -167,20 +174,21 @@ env.Library('sasl_options',
             ],
 )
 
-env.Library('saslauth',
-            [
-                'sasl_mechanism_registry.cpp',
-                'sasl_plain_server_conversation.cpp',
-                'sasl_scram_server_conversation.cpp',
-            ],
-             LIBDEPS=[
-                'authcore',
-                'sasl_options',
-                '$BUILD_DIR/mongo/base/secure_allocator',
-                '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-                '$BUILD_DIR/mongo/util/icu',
-                '$BUILD_DIR/mongo/util/net/network',
-             ],
+env.Library(
+    target='saslauth',
+    source=[
+        'sasl_mechanism_registry.cpp',
+        'sasl_plain_server_conversation.cpp',
+        'sasl_scram_server_conversation.cpp',
+    ],
+    LIBDEPS=[
+        'authcore',
+        'sasl_options',
+        '$BUILD_DIR/mongo/base/secure_allocator',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/util/icu',
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
 )
 
 env.CppUnitTest(target='sasl_mechanism_registry_test',

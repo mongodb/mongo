@@ -109,8 +109,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
-        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -181,14 +179,18 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/s/sharding_legacy_api',
         'balancer',
         'type_shard_identity',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/commands/servers',
     ],
 )
 
@@ -230,12 +232,14 @@ env.Library(
         'split_vector_command.cpp',
         'unset_sharding_command.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         'balancer',
         'sharding_runtime_d',

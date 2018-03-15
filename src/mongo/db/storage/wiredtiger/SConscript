@@ -96,9 +96,9 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
             '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
             '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
-            '$BUILD_DIR/mongo/db/commands/server_status',
         ],
         LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         ],
     )

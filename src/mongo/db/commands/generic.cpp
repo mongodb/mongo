@@ -42,6 +42,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"

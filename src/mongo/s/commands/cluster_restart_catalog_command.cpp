@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 
 namespace mongo {

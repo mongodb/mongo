@@ -12,9 +12,6 @@ env.Library(
         'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/killcursors_common',
-        '$BUILD_DIR/mongo/db/commands/current_op_common',
         '$BUILD_DIR/mongo/s/async_requests_sender',
     ]
 )
@@ -93,10 +90,15 @@ env.Library(
         'strategy.cpp',
         env.Idlc('cluster_multicast.idl')[0],
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/commands/current_op_common',
+        '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version_parser',
         '$BUILD_DIR/mongo/db/commands/killcursors_common',
         '$BUILD_DIR/mongo/db/commands/profile_common',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/commands/write_commands_common',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',
