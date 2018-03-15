@@ -304,8 +304,7 @@ setJsTestOption = function(name, value) {
 };
 
 jsTestLog = function(msg) {
-    const msgs = ["----", ...msg.split("\n"), "----"].map(s => `[jsTest] ${s}`);
-    print(`\n\n${msgs.join("\n")}\n\n`);
+    print("\n\n----\n" + msg + "\n----\n\n");
 };
 
 jsTest = {};
