@@ -35,6 +35,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -103,6 +104,41 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     return Status::OK();
 }
 
+Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(_state == kCloneCompleted);
+    auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+
+    // Mark the shard as running a critical operation that requires recovery on crash.
+    uassertStatusOK(ShardingStateRecovery::startMetadataOp(opCtx));
+
+    {
+        // The critical section must be entered with the database X lock in order to ensure there
+        // are no writes which could have entered and passed the database version check just before
+        // we entered the critical section, but will potentially complete after we left it.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+
+        // IMPORTANT: After this line, the critical section is in place and needs to be signaled
+        DatabaseShardingState::get(autoDb.getDb()).enterCriticalSectionCatchUpPhase(opCtx);
+    }
+
+    _state = kCriticalSection;
+
+    // TODO SERVER-32608
+    // Write to the 'refreshing' flag in 'config.cache.databases' to indicate we are waiting on an
+    // update to a new primary shard and new database version.
+
+    log() << "movePrimary successfully entered critical section";
+
+    // TODO: Remove this call when the next function is added. This only exists currently to
+    // guarantee the critical section exits.
+    _cleanup(opCtx);
+
+    scopedGuard.Dismiss();
+    return Status::OK();
+}
+
 void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
     if (_state == kDone) {
         return;
@@ -129,10 +165,25 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
     invariant(_state != kDone);
 
     {
-        // Unregister from the database's sharding state
+        // Unregister from the database's sharding state.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
         DatabaseShardingState::get(autoDb.getDb()).clearMovePrimarySourceManager(opCtx);
+
+        // Leave the critical section.
+        // TODO: Change the second argument of exitCriticalSection to the new database version.
+        DatabaseShardingState::get(autoDb.getDb()).exitCriticalSection(opCtx, boost::none);
+    }
+
+    if (_state == kCriticalSection || _state == kCloneCompleted) {
+
+        // TODO SERVER-32608
+        // Wait for writes to 'config.cache.databases' to flush before removing the 'minOpTime
+        // 'recovery' document.
+
+        // Clear the 'minOpTime recovery' document so that the next time a node from this shard
+        // becomes a primary, it won't have to recover the config server optime.
+        ShardingStateRecovery::endMetadataOp(opCtx);
     }
 
     _state = kDone;

@@ -50,6 +50,8 @@ class Status;
  *  - Acquire a distributed lock on the database whose primary is about to be moved.
  *  - Instantiate a MovePrimarySourceManager on the stack.
  *  - Call clone to start and finish cloning of the unsharded collections.
+ *  - Call enterCriticalSection to cause the shard to enter in 'read only' mode while the config
+ *      server is notified of the new primary.
  *  - Call updatePrimary to indicate the new primary in the config server metadata.
  *  - Call clearStaleCollections to drop now-unused collections (and potentially databases) on the
  *      old primary.
@@ -91,6 +93,16 @@ public:
      * Resulting state: kCloning on success, kDone on failure
      */
     Status clone(OperationContext* opCtx);
+
+    /**
+     * Once this call returns successfully, no writes will be happening on this shard until the
+     * movePrimary is committed. Therefore, commitMovePrimaryMetadata must be called as soon as
+     * possible afterwards.
+     *
+     * Expected state: kCloneCompleted
+     * Resulting state: kCriticalSection on success, kDone on failure
+     */
+    Status enterCriticalSection(OperationContext* opCtx);
 
     /**
      * May be called at any time. Unregisters the movePrimary source manager from the database and
