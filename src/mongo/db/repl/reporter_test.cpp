@@ -153,7 +153,8 @@ void ReporterTest::setUp() {
         stdx::make_unique<Reporter>(_executorProxy.get(),
                                     [this]() { return prepareReplSetUpdatePositionCommandFn(); },
                                     HostAndPort("h1"),
-                                    Milliseconds(1000));
+                                    Milliseconds(1000),
+                                    Milliseconds(5000));
     launchExecutorThread();
 
     if (triggerAtSetUp()) {
@@ -231,21 +232,25 @@ TEST_F(ReporterTestNoTriggerAtSetUp, InvalidConstruction) {
     ASSERT_THROWS(Reporter(&getExecutor(),
                            Reporter::PrepareReplSetUpdatePositionCommandFn(),
                            HostAndPort("h1"),
-                           Milliseconds(1000)),
+                           Milliseconds(1000),
+                           Milliseconds(5000)),
                   AssertionException);
 
     // null TaskExecutor
-    ASSERT_THROWS_WHAT(
-        Reporter(
-            nullptr, prepareReplSetUpdatePositionCommandFn, HostAndPort("h1"), Milliseconds(1000)),
-        AssertionException,
-        "null task executor");
+    ASSERT_THROWS_WHAT(Reporter(nullptr,
+                                prepareReplSetUpdatePositionCommandFn,
+                                HostAndPort("h1"),
+                                Milliseconds(1000),
+                                Milliseconds(5000)),
+                       AssertionException,
+                       "null task executor");
 
     // null PrepareReplSetUpdatePositionCommandFn
     ASSERT_THROWS_WHAT(Reporter(&getExecutor(),
                                 Reporter::PrepareReplSetUpdatePositionCommandFn(),
                                 HostAndPort("h1"),
-                                Milliseconds(1000)),
+                                Milliseconds(1000),
+                                Milliseconds(5000)),
                        AssertionException,
                        "null function to create replSetUpdatePosition command object");
 
@@ -253,23 +258,28 @@ TEST_F(ReporterTestNoTriggerAtSetUp, InvalidConstruction) {
     ASSERT_THROWS_WHAT(Reporter(&getExecutor(),
                                 prepareReplSetUpdatePositionCommandFn,
                                 HostAndPort(),
-                                Milliseconds(1000)),
+                                Milliseconds(1000),
+                                Milliseconds(5000)),
                        AssertionException,
                        "target name cannot be empty");
 
     // zero keep alive interval.
-    ASSERT_THROWS_WHAT(
-        Reporter(
-            &getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort("h1"), Seconds(-1)),
-        AssertionException,
-        "keep alive interval must be positive");
+    ASSERT_THROWS_WHAT(Reporter(&getExecutor(),
+                                prepareReplSetUpdatePositionCommandFn,
+                                HostAndPort("h1"),
+                                Seconds(-1),
+                                Milliseconds(5000)),
+                       AssertionException,
+                       "keep alive interval must be positive");
 
     // negative keep alive interval.
-    ASSERT_THROWS_WHAT(
-        Reporter(
-            &getExecutor(), prepareReplSetUpdatePositionCommandFn, HostAndPort("h1"), Seconds(-1)),
-        AssertionException,
-        "keep alive interval must be positive");
+    ASSERT_THROWS_WHAT(Reporter(&getExecutor(),
+                                prepareReplSetUpdatePositionCommandFn,
+                                HostAndPort("h1"),
+                                Seconds(-1),
+                                Milliseconds(5000)),
+                       AssertionException,
+                       "keep alive interval must be positive");
 }
 
 TEST_F(ReporterTestNoTriggerAtSetUp, GetTarget) {
@@ -295,6 +305,43 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
     getExecutor().shutdown();
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, reporter->trigger());
     assertReporterDone();
+}
+
+TEST_F(ReporterTestNoTriggerAtSetUp, IsNotActiveAfterUpdatePositionTimeoutExpires) {
+
+    auto prepareReplSetUpdatePositionCommandFn = [updater = posUpdater.get()] {
+        return updater->prepareReplSetUpdatePositionCommand();
+    };
+
+    // Create a new test Reporter so we can configure the update position timeout.
+    Milliseconds updatePositionTimeout = Milliseconds(5000);
+    Reporter testReporter(&getExecutor(),
+                          prepareReplSetUpdatePositionCommandFn,
+                          HostAndPort("h1"),
+                          Milliseconds(1000),
+                          updatePositionTimeout);
+
+    ASSERT_OK(testReporter.trigger());
+    ASSERT_TRUE(testReporter.isActive());
+
+    auto net = getNet();
+    net->enterNetwork();
+
+    // Schedule a response to the updatePosition command at a time that exceeds the timeout. Then
+    // make sure the reporter shut down due to a remote command timeout.
+    auto updatePosRequest = net->getNextReadyRequest();
+    RemoteCommandResponse response(BSON("ok" << 1), BSONObj(), Milliseconds(0));
+    executor::TaskExecutor::ResponseStatus responseStatus(response);
+    net->scheduleResponse(
+        updatePosRequest, net->now() + updatePositionTimeout + Milliseconds(1), responseStatus);
+    net->runUntil(net->now() + updatePositionTimeout + Milliseconds(1));
+    net->runReadyNetworkOperations();
+    net->exitNetwork();
+
+    // Reporter should have shut down.
+    ASSERT_FALSE(testReporter.isWaitingToSendReport());
+    ASSERT_FALSE(testReporter.isActive());
+    ASSERT_EQUALS(testReporter.getStatus_forTest().code(), ErrorCodes::NetworkTimeout);
 }
 
 // If an error is returned, it should be recorded in the Reporter and not run again.
