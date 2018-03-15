@@ -55,8 +55,9 @@ public:
     //
 
     /**
-     * Sets the read timstamp on a transaction. This would enable read using the
-     * specified timestamp.
+     * Sets the read timestamp on a transaction.
+     *
+     * Reads will be reflect the state of data as of the specified timestamp.
      */
     Status setTransactionReadTimestamp(Timestamp pointInTime, WT_SESSION* session) const;
 
