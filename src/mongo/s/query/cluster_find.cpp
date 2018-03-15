@@ -328,6 +328,39 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUsers));
 }
 
+/**
+ * Populates or re-populates some state of the OperationContext from what's stored on the cursor
+ * and/or what's specified on the request.
+ */
+Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
+                                            const GetMoreRequest& request,
+                                            ClusterCursorManager::PinnedCursor* cursor) {
+    if (auto readPref = cursor->getReadPreference()) {
+        ReadPreferenceSetting::get(opCtx) = *readPref;
+    }
+
+    if (cursor->isTailableAndAwaitData()) {
+        // A maxTimeMS specified on a tailable, awaitData cursor is special. Instead of imposing a
+        // deadline on the operation, it is used to communicate how long the server should wait for
+        // new results. Here we clear any deadline set during command processing and track the
+        // deadline instead via the 'waitForInsertsDeadline' decoration. This deadline defaults to
+        // 1 second if the user didn't specify a maxTimeMS.
+        opCtx->clearDeadline();
+        auto timeout = request.awaitDataTimeout.value_or(Milliseconds{1000});
+        awaitDataState(opCtx).waitForInsertsDeadline =
+            opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
+
+        invariant(cursor->setAwaitDataTimeout(timeout).isOK());
+    } else if (request.awaitDataTimeout) {
+        return {ErrorCodes::BadValue,
+                "maxTimeMS can only be used with getMore for tailable, awaitData cursors"};
+    } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
+        // Be sure to do this only for non-tailable cursors.
+        opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
+    }
+    return Status::OK();
+}
+
 }  // namespace
 
 const size_t ClusterFind::kMaxStaleConfigRetries = 10;
@@ -416,24 +449,10 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     while (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
     }
 
-    if (auto readPref = pinnedCursor.getValue().getReadPreference()) {
-        ReadPreferenceSetting::get(opCtx) = *readPref;
-    }
-    if (pinnedCursor.getValue().isTailableAndAwaitData()) {
-        // A maxTimeMS specified on a tailable, awaitData cursor is special. Instead of imposing a
-        // deadline on the operation, it is used to communicate how long the server should wait for
-        // new results. Here we clear any deadline set during command processing and track the
-        // deadline instead via the 'waitForInsertsDeadline' decoration. This deadline defaults to
-        // 1 second if the user didn't specify a maxTimeMS.
-        opCtx->clearDeadline();
-        auto timeout = request.awaitDataTimeout.value_or(Milliseconds{1000});
-        awaitDataState(opCtx).waitForInsertsDeadline =
-            opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
-
-        invariant(pinnedCursor.getValue().setAwaitDataTimeout(timeout).isOK());
-    } else if (request.awaitDataTimeout) {
-        return {ErrorCodes::BadValue,
-                "maxTimeMS can only be used with getMore for tailable, awaitData cursors"};
+    auto opCtxSetupStatus =
+        setUpOperationContextStateForGetMore(opCtx, request, &pinnedCursor.getValue());
+    if (!opCtxSetupStatus.isOK()) {
+        return opCtxSetupStatus;
     }
 
     std::vector<BSONObj> batch;
@@ -488,6 +507,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         batch.push_back(std::move(*next.getValue().getResult()));
     }
 
+    pinnedCursor.getValue().setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.
     pinnedCursor.getValue().returnCursor(cursorState);

@@ -230,6 +230,16 @@ public:
          */
         Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
+        Microseconds getLeftoverMaxTimeMicros() const {
+            invariant(_cursor);
+            return _cursor->getLeftoverMaxTimeMicros();
+        }
+
+        void setLeftoverMaxTimeMicros(Microseconds leftoverMaxTimeMicros) {
+            invariant(_cursor);
+            _cursor->setLeftoverMaxTimeMicros(leftoverMaxTimeMicros);
+        }
+
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
         // constructor declared below, which is private to prevent clients from calling it directly.
@@ -284,6 +294,9 @@ public:
      * operating on a sharded namespace (this will be used for reporting purposes).
      * 'cursorLifetime' should reflect whether or not this cursor should be immune from the idle
      * cursor destruction procedure.
+     *
+     * If the OperationContext has a deadline set (from a maxTimeMS), stashes the remaining time
+     * limit on 'cursor' for use in subsequent getMores.
      *
      * On an error return, kills 'cursor'.
      *

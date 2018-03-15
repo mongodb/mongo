@@ -420,9 +420,18 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));
 
+    const QueryRequest& queryRequest = canonicalQuery->getQueryRequest();
+    // Handle query option $maxTimeMS (not used with commands).
+    if (queryRequest.getMaxTimeMS() > 0) {
+        uassert(50749,
+                "Illegal attempt to set operation deadline within DBDirectClient",
+                !opCtx->getClient()->isInDirectClient());
+        opCtx->setDeadlineAfterNowBy(Milliseconds{queryRequest.getMaxTimeMS()});
+    }
+    opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
+
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.
-    const QueryRequest& queryRequest = canonicalQuery->getQueryRequest();
     if (queryRequest.isExplain()) {
         const BSONObj findCommand = queryRequest.asFindCommand();
 

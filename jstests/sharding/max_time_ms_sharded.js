@@ -81,15 +81,24 @@
     // Test that mongos correctly times out max time sharded getmore operations.  Uses
     // maxTimeNeverTimeOut to ensure mongod doesn't enforce a time limit.
     //
-    // TODO: This is unimplemented.  A test for this functionality should be written as
-    // part of the work for SERVER-19410.
-    //
 
     configureMaxTimeNeverTimeOut("alwaysOn");
 
-    // Positive test.  TODO: see above.
+    // Positive test. ~10s operation, 2s limit. The operation takes ~10s because each shard
+    // processes 25 batches of ~400ms each, and the shards are processing getMores in parallel.
+    cursor = coll.find({
+        $where: function() {
+            sleep(200);
+            return true;
+        }
+    });
+    cursor.batchSize(2);
+    cursor.maxTimeMS(2 * 1000);
+    assert.doesNotThrow(
+        () => cursor.next(), [], "did not expect mongos to time out first batch of query");
+    assert.throws(() => cursor.itcount(), [], "expected mongos to abort getmore due to time limit");
 
-    // Negative test.  ~10s operation, with a high (1-day) limit.
+    // Negative test. ~5s operation, with a high (1-day) limit.
     cursor = coll.find({
         $where: function() {
             sleep(100);
@@ -196,6 +205,41 @@
     assert.commandWorked(
         coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
         "expected aggregate to not hit time limit in mongod");
+
+    // Test that the maxTimeMS is still enforced on the shards even if we do not spend much time in
+    // mongos blocking.
+
+    // Manually run a find here so we can be sure cursor establishment happens with batch size 0.
+    res = assert.commandWorked(coll.runCommand({
+        find: coll.getName(),
+        filter: {
+            $where: function() {
+                if (this._id < 0) {
+                    // Slow down the query only on one of the shards. Each shard has 50 documents so
+                    // we expect this shard to take ~5 seconds to return a batch.
+                    sleep(200);
+                }
+                return true;
+            }
+        },
+        maxTimeMS: 2000,
+        batchSize: 0
+    }));
+    // Use a batch size of 50 to allow returning results from the fast shard as soon as they're
+    // ready, as opposed to waiting to return one 16MB batch at a time.
+    const kBatchSize = 50;
+    cursor = new DBCommandCursor(coll.getDB(), res, kBatchSize);
+    // The fast shard should return relatively quickly.
+    for (let i = 0; i < 50; ++i) {
+        let next = assert.doesNotThrow(
+            () => cursor.next(), [], "did not expect mongos to time out first batch of query");
+        assert.gte(next._id, 0);
+    }
+    // Sleep on the client-side so mongos's time budget is not being used.
+    sleep(3 * 1000);
+    // Even though mongos has not been blocking this whole time, the shard has been busy computing
+    // the next batch and should have timed out.
+    assert.throws(() => cursor.next(), [], "expected mongos to abort getMore due to time limit");
 
     // The moveChunk tests are disabled due to SERVER-30179
     //
