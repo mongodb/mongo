@@ -66,12 +66,12 @@ public:
         const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
     Status insertDocument(OperationContext* opCtx,
-                          const NamespaceString& nss,
+                          const NamespaceStringOrUUID& nsOrUUID,
                           const TimestampedBSONObj& doc,
                           long long term) override;
 
     Status insertDocuments(OperationContext* opCtx,
-                           const NamespaceString& nss,
+                           const NamespaceStringOrUUID& nsOrUUID,
                            const std::vector<InsertStatement>& docs) override;
 
     Status dropReplicatedDatabases(OperationContext* opCtx) override;
@@ -127,15 +127,15 @@ public:
                            const TimestampedBSONObj& update) override;
 
     StatusWith<BSONObj> findById(OperationContext* opCtx,
-                                 const NamespaceString& nss,
+                                 const NamespaceStringOrUUID& nsOrUUID,
                                  const BSONElement& idKey) override;
 
     StatusWith<BSONObj> deleteById(OperationContext* opCtx,
-                                   const NamespaceString& nss,
+                                   const NamespaceStringOrUUID& nsOrUUID,
                                    const BSONElement& idKey) override;
 
     Status upsertById(OperationContext* opCtx,
-                      const NamespaceString& nss,
+                      const NamespaceStringOrUUID& nsOrUUID,
                       const BSONElement& idKey,
                       const BSONObj& update) override;
 

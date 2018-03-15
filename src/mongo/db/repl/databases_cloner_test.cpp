@@ -146,14 +146,14 @@ protected:
             return Status::OK();
         };
         _storageInterface.insertDocumentFn = [this](OperationContext* opCtx,
-                                                    const NamespaceString& nss,
+                                                    const NamespaceStringOrUUID& nsOrUUID,
                                                     const TimestampedBSONObj& doc,
                                                     long long term) {
             ++_storageInterfaceWorkDone.documentsInsertedCount;
             return Status::OK();
         };
         _storageInterface.insertDocumentsFn = [this](OperationContext* opCtx,
-                                                     const NamespaceString& nss,
+                                                     const NamespaceStringOrUUID& nsOrUUID,
                                                      const std::vector<InsertStatement>& ops) {
             _storageInterfaceWorkDone.insertedOplogEntries = true;
             ++_storageInterfaceWorkDone.oplogEntriesInserted;

@@ -125,7 +125,7 @@ public:
      * an error is returned.
      */
     virtual Status insertDocument(OperationContext* opCtx,
-                                  const NamespaceString& nss,
+                                  const NamespaceStringOrUUID& nsOrUUID,
                                   const TimestampedBSONObj& doc,
                                   long long term) = 0;
 
@@ -135,7 +135,7 @@ public:
      * It is an error to call this function with an empty set of documents.
      */
     virtual Status insertDocuments(OperationContext* opCtx,
-                                   const NamespaceString& nss,
+                                   const NamespaceStringOrUUID& nsOrUUID,
                                    const std::vector<InsertStatement>& docs) = 0;
 
     /**
@@ -277,7 +277,7 @@ public:
      * Not supported on collections with a default collation.
      */
     virtual StatusWith<BSONObj> findById(OperationContext* opCtx,
-                                         const NamespaceString& nss,
+                                         const NamespaceStringOrUUID& nsOrUUID,
                                          const BSONElement& idKey) = 0;
 
     /**
@@ -287,7 +287,7 @@ public:
      * Not supported on collections with a default collation.
      */
     virtual StatusWith<BSONObj> deleteById(OperationContext* opCtx,
-                                           const NamespaceString& nss,
+                                           const NamespaceStringOrUUID& nsOrUUID,
                                            const BSONElement& idKey) = 0;
 
     /**
@@ -299,7 +299,7 @@ public:
      * applied.
      */
     virtual Status upsertById(OperationContext* opCtx,
-                              const NamespaceString& nss,
+                              const NamespaceStringOrUUID& nsOrUUID,
                               const BSONElement& idKey,
                               const BSONObj& update) = 0;
 

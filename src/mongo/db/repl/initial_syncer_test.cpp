@@ -261,7 +261,7 @@ protected:
             return Status::OK();
         };
         _storageInterface->insertDocumentFn = [this](OperationContext* opCtx,
-                                                     const NamespaceString& nss,
+                                                     const NamespaceStringOrUUID& nsOrUUID,
                                                      const TimestampedBSONObj& doc,
                                                      long long term) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
@@ -269,7 +269,7 @@ protected:
             return Status::OK();
         };
         _storageInterface->insertDocumentsFn = [this](OperationContext* opCtx,
-                                                      const NamespaceString& nss,
+                                                      const NamespaceStringOrUUID& nsOrUUID,
                                                       const std::vector<InsertStatement>& ops) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.insertedOplogEntries = true;
@@ -2396,11 +2396,12 @@ TEST_F(
     TimestampedBSONObj insertDocumentDoc;
     long long insertDocumentTerm;
     _storageInterface->insertDocumentFn =
-        [&insertDocumentDoc, &insertDocumentNss, &insertDocumentTerm](OperationContext*,
-                                                                      const NamespaceString& nss,
-                                                                      const TimestampedBSONObj& doc,
-                                                                      long long term) {
-            insertDocumentNss = nss;
+        [&insertDocumentDoc, &insertDocumentNss, &insertDocumentTerm](
+            OperationContext*,
+            const NamespaceStringOrUUID& nsOrUUID,
+            const TimestampedBSONObj& doc,
+            long long term) {
+            insertDocumentNss = *nsOrUUID.nss();
             insertDocumentDoc = doc;
             insertDocumentTerm = term;
             return Status(ErrorCodes::OperationFailed, "failed to insert oplog entry");
@@ -2462,19 +2463,18 @@ TEST_F(
     NamespaceString insertDocumentNss;
     TimestampedBSONObj insertDocumentDoc;
     long long insertDocumentTerm;
-    _storageInterface->insertDocumentFn = [initialSyncer,
-                                           &insertDocumentDoc,
-                                           &insertDocumentNss,
-                                           &insertDocumentTerm](OperationContext*,
-                                                                const NamespaceString& nss,
-                                                                const TimestampedBSONObj& doc,
-                                                                long long term) {
-        insertDocumentNss = nss;
-        insertDocumentDoc = doc;
-        insertDocumentTerm = term;
-        initialSyncer->shutdown().transitional_ignore();
-        return Status::OK();
-    };
+    _storageInterface->insertDocumentFn =
+        [initialSyncer, &insertDocumentDoc, &insertDocumentNss, &insertDocumentTerm](
+            OperationContext*,
+            const NamespaceStringOrUUID& nsOrUUID,
+            const TimestampedBSONObj& doc,
+            long long term) {
+            insertDocumentNss = *nsOrUUID.nss();
+            insertDocumentDoc = doc;
+            insertDocumentTerm = term;
+            initialSyncer->shutdown().transitional_ignore();
+            return Status::OK();
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
