@@ -20,6 +20,19 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="cluster_find_test",
+    source=[
+        "cluster_find_test.cpp",
+    ],
+    LIBDEPS=[
+        'cluster_query',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+    ],
+)
+
 env.Library(
     target="cluster_client_cursor",
     source=[

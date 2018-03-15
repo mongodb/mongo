@@ -340,10 +340,19 @@ env.CppUnitTest(
     target='sharding_routing_table_test',
     source=[
         'catalog_cache_refresh_test.cpp',
-        'catalog_cache_test_fixture.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
         'shard_key_pattern_test.cpp',
+    ],
+    LIBDEPS=[
+        'catalog_cache_test_fixture',
+    ]
+)
+
+env.Library(
+    target='catalog_cache_test_fixture',
+    source=[
+        'catalog_cache_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

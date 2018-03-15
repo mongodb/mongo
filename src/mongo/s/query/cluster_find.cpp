@@ -363,7 +363,7 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
 
 }  // namespace
 
-const size_t ClusterFind::kMaxStaleConfigRetries = 10;
+const size_t ClusterFind::kMaxRetries = 10;
 
 CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const CanonicalQuery& query,
@@ -384,7 +384,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
-    for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
+    for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
         auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, query.nss());
         if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
@@ -397,26 +397,37 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         try {
             return runQueryWithoutRetrying(
                 opCtx, query, readPref, routingInfo.cm().get(), routingInfo.primary(), results);
-        } catch (const DBException& ex) {
-            if (!ErrorCodes::isStaleShardingError(ex.code()) &&
-                ex.code() != ErrorCodes::ShardNotFound) {
-                // Errors other than trying to reach a non existent shard or receiving a stale
-                // metadata message from MongoD are fatal to the operation. Network errors and
-                // replication retries happen at the level of the AsyncResultsMerger.
+        } catch (DBException& ex) {
+            if (retries >= kMaxRetries) {
+                // Check if there are no retries remaining, so the last received error can be
+                // propagated to the caller.
+                ex.addContext(str::stream() << "Failed to run query after " << kMaxRetries
+                                            << " retries");
+                throw;
+            } else if (!ErrorCodes::isStaleShardingError(ex.code()) &&
+                       !ErrorCodes::isSnapshotError(ex.code()) &&
+                       ex.code() != ErrorCodes::ShardNotFound) {
+                // Errors other than stale metadata, snapshot unavailable, or from trying to reach a
+                // non existent shard are fatal to the operation. Network errors and replication
+                // retries happen at the level of the AsyncResultsMerger.
+                ex.addContext("Encountered non-retryable error during query");
                 throw;
             }
 
             LOG(1) << "Received error status for query " << redact(query.toStringShort())
-                   << " on attempt " << retries << " of " << kMaxStaleConfigRetries << ": "
-                   << redact(ex);
+                   << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
 
-            catalogCache->onStaleConfigError(std::move(routingInfo));
+            // Note: there is no need to refresh metadata on snapshot errors since the request
+            // failed because atClusterTime was too low, not because the wrong shards were targeted,
+            // and subsequent attempts will choose a later atClusterTime.
+            if (ErrorCodes::isStaleShardingError(ex.code()) ||
+                ex.code() == ErrorCodes::ShardNotFound) {
+                catalogCache->onStaleConfigError(std::move(routingInfo));
+            }
         }
     }
 
-    uasserted(ErrorCodes::StaleShardVersion,
-              str::stream() << "Retried " << kMaxStaleConfigRetries
-                            << " times without successfully establishing shard version.");
+    MONGO_UNREACHABLE
 }
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
