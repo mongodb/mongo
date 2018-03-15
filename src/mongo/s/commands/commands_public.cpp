@@ -30,9 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -43,7 +40,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
@@ -81,6 +77,40 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
 
     CommandHelpers::filterCommandReplyForPassthrough(transformedResponse, out);
     return true;
+}
+
+bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
+                                            StringData dbName,
+                                            const NamespaceString& nss,
+                                            const CachedCollectionRoutingInfo& routingInfo,
+                                            const BSONObj& cmdObj,
+                                            Shard::RetryPolicy retryPolicy,
+                                            BSONObjBuilder* out) {
+    const StringData cmdName(cmdObj.firstElementFieldName());
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
+            !routingInfo.cm());
+
+    auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                                dbName,
+                                                                nss,
+                                                                routingInfo,
+                                                                cmdObj,
+                                                                ReadPreferenceSetting::get(opCtx),
+                                                                retryPolicy,
+                                                                {},
+                                                                {});
+    invariant(responses.size() == 1);
+
+    const auto cmdResponse = uassertStatusOK(std::move(responses.front().swResponse));
+    const auto status = getStatusFromCommandResult(cmdResponse.data);
+
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
+            !status.isA<ErrorCategory::StaleShardingError>());
+
+    out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data));
+    return status.isOK();
 }
 
 class PublicGridCommand : public BasicCommand {
@@ -174,14 +204,12 @@ protected:
     }
 };
 
-class RenameCollectionCmd : public PublicGridCommand {
+class RenameCollectionCmd : public BasicCommand {
 public:
-    RenameCollectionCmd() : PublicGridCommand("renameCollection") {}
+    RenameCollectionCmd() : BasicCommand("renameCollection") {}
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool adminOnly() const override {
@@ -192,42 +220,53 @@ public:
         return true;
     }
 
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
+        return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const auto fullNsFromElt = cmdObj.firstElement();
+        const NamespaceString fromNss(parseNs(dbName, cmdObj));
+        const NamespaceString toNss([&cmdObj] {
+            const auto fullnsToElt = cmdObj["to"];
+            uassert(ErrorCodes::InvalidNamespace,
+                    "'to' must be of type String",
+                    fullnsToElt.type() == BSONType::String);
+            return fullnsToElt.valueStringData();
+        }());
         uassert(ErrorCodes::InvalidNamespace,
-                "'renameCollection' must be of type String",
-                fullNsFromElt.type() == BSONType::String);
-        const NamespaceString fullnsFrom(fullNsFromElt.valueStringData());
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid source namespace: " << fullnsFrom.ns(),
-                fullnsFrom.isValid());
-
-        const auto fullnsToElt = cmdObj["to"];
-        uassert(ErrorCodes::InvalidNamespace,
-                "'to' must be of type String",
-                fullnsToElt.type() == BSONType::String);
-        const NamespaceString fullnsTo(fullnsToElt.valueStringData());
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid target namespace: " << fullnsTo.ns(),
-                fullnsTo.isValid());
+                str::stream() << "Invalid target namespace: " << toNss.ns(),
+                toNss.isValid());
 
         const auto fromRoutingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, fullnsFrom));
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, fromNss));
         uassert(13138, "You can't rename a sharded collection", !fromRoutingInfo.cm());
 
         const auto toRoutingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, fullnsTo));
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, toNss));
         uassert(13139, "You can't rename to a sharded collection", !toRoutingInfo.cm());
 
         uassert(13137,
                 "Source and destination collections must be on same shard",
                 fromRoutingInfo.primaryId() == toRoutingInfo.primaryId());
 
-        return passthrough(
-            opCtx, NamespaceString::kAdminDb, fromRoutingInfo.primaryId(), cmdObj, result);
+        return nonShardedCollectionCommandPassthrough(
+            opCtx,
+            NamespaceString::kAdminDb,
+            fromNss,
+            fromRoutingInfo,
+            appendAllowImplicitCreate(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                                      true),
+            Shard::RetryPolicy::kNoRetry,
+            &result);
     }
 
 } renameCollectionCmd;
@@ -341,6 +380,7 @@ public:
         return NotAllowedOnShardedCollectionCmd::run(
             opCtx, dbName, appendAllowImplicitCreate(cmdObj, true), result);
     }
+
 } convertToCappedCmd;
 
 class GroupCmd : public NotAllowedOnShardedCollectionCmd {

@@ -146,6 +146,7 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                           nss.db(),
                                                            nss,
                                                            routingInfo,
                                                            countCmdObj,
@@ -258,6 +259,7 @@ public:
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                           nss.db(),
                                                            nss,
                                                            routingInfo,
                                                            explainCmd,

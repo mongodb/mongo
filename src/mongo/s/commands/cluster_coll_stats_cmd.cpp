@@ -84,6 +84,7 @@ public:
 
         auto shardResults = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
+            nss.db(),
             nss,
             routingInfo,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),

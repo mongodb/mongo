@@ -249,6 +249,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
 
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
+    StringData dbName,
     const NamespaceString& nss,
     const CachedCollectionRoutingInfo& routingInfo,
     const BSONObj& cmdObj,
@@ -259,7 +260,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const auto requests =
         buildVersionedRequestsForTargetedShards(opCtx, routingInfo, cmdObj, query, collation);
 
-    return gatherResponses(opCtx, nss.db(), readPref, retryPolicy, requests);
+    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(

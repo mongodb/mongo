@@ -92,6 +92,7 @@ public:
                                                              const BSONObj& routingQuery) {
             auto shardResults =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                           nss.db(),
                                                            nss,
                                                            routingInfo,
                                                            cmdObj,

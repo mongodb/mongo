@@ -455,6 +455,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                     // shards, and should participate in the shard version protocol.
                     shardResults = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
+                        executionNss.db(),
                         executionNss,
                         executionNsRoutingInfo,
                         targetedCommand,

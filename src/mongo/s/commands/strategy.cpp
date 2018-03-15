@@ -695,6 +695,7 @@ void Strategy::explainFind(OperationContext* opCtx,
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
     auto shardResponses =
         scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                   qr.nss().db(),
                                                    qr.nss(),
                                                    routingInfo,
                                                    explainCmd,
