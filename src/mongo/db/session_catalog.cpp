@@ -47,21 +47,10 @@
 namespace mongo {
 namespace {
 
-struct CheckedOutSession {
-    CheckedOutSession(ScopedCheckedOutSession&& session) : scopedSession(std::move(session)) {}
-
-    ScopedCheckedOutSession scopedSession;
-
-    // This number gets incremented every time a request tries to check out this session, including
-    // the cases when it was already checked out. Level of 0 means that it's available or is
-    // completely released.
-    int checkOutNestingLevel = 0;
-};
-
 const auto sessionTransactionTableDecoration = ServiceContext::declareDecoration<SessionCatalog>();
 
 const auto operationSessionDecoration =
-    OperationContext::declareDecoration<boost::optional<CheckedOutSession>>();
+    OperationContext::declareDecoration<boost::optional<ScopedCheckedOutSession>>();
 
 }  // namespace
 
@@ -290,11 +279,6 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
     }
 
     if (!checkOutSession) {
-        // The session may have already been checked out by this operation, so bump the nesting
-        // level if necessary to avoid resetting the session when this command completes.
-        if (auto& checkedOutSession = operationSessionDecoration(opCtx)) {
-            checkedOutSession->checkOutNestingLevel++;
-        }
         return;
     }
 
@@ -302,42 +286,38 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
     if (!checkedOutSession) {
         auto sessionTransactionTable = SessionCatalog::get(opCtx);
         checkedOutSession.emplace(sessionTransactionTable->checkOutSession(opCtx));
-    }
-
-    const auto session = checkedOutSession->scopedSession.get();
-    invariant(opCtx->getLogicalSessionId() == session->getSessionId());
-
-    checkedOutSession->checkOutNestingLevel++;
-
-    if (checkedOutSession->checkOutNestingLevel > 1) {
+    } else {
+        // The only reason to be trying to check out a session when you already have a session
+        // checked out is if you're in DBDirectClient.
+        invariant(opCtx->getClient()->isInDirectClient());
         return;
     }
 
-    checkedOutSession->scopedSession->refreshFromStorageIfNeeded(opCtx);
+    const auto session = checkedOutSession->get();
+    invariant(opCtx->getLogicalSessionId() == session->getSessionId());
+
+    checkedOutSession->get()->refreshFromStorageIfNeeded(opCtx);
 
     if (opCtx->getTxnNumber()) {
-        checkedOutSession->scopedSession->beginOrContinueTxn(
-            opCtx, *opCtx->getTxnNumber(), autocommit);
+        checkedOutSession->get()->beginOrContinueTxn(opCtx, *opCtx->getTxnNumber(), autocommit);
     }
 }
 
 OperationContextSession::~OperationContextSession() {
-    auto& checkedOutSession = operationSessionDecoration(_opCtx);
-    if (checkedOutSession) {
-        invariant(checkedOutSession->checkOutNestingLevel > 0);
-        if (--checkedOutSession->checkOutNestingLevel == 0) {
-            checkedOutSession.reset();
-        }
+    // Only release the checked out session at the end of the top-level request from the client,
+    // not at the end of a nested DBDirectClient call.
+    if (_opCtx->getClient()->isInDirectClient()) {
+        return;
     }
+
+    auto& checkedOutSession = operationSessionDecoration(_opCtx);
+    checkedOutSession.reset();
 }
 
-Session* OperationContextSession::get(OperationContext* opCtx, bool topLevelOnly) {
+Session* OperationContextSession::get(OperationContext* opCtx) {
     auto& checkedOutSession = operationSessionDecoration(opCtx);
     if (checkedOutSession) {
-        if (topLevelOnly && checkedOutSession->checkOutNestingLevel != 1) {
-            return nullptr;
-        }
-        return checkedOutSession->scopedSession.get();
+        return checkedOutSession->get();
     }
 
     return nullptr;

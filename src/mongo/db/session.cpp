@@ -281,6 +281,10 @@ const BSONObj Session::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));
 Session::Session(LogicalSessionId sessionId) : _sessionId(std::move(sessionId)) {}
 
 void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
     invariant(!opCtx->lockState()->isLocked());
     invariant(repl::ReadConcernArgs::get(opCtx).getLevel() ==
               repl::ReadConcernLevel::kLocalReadConcern);
@@ -315,6 +319,10 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
 void Session::beginOrContinueTxn(OperationContext* opCtx,
                                  TxnNumber txnNumber,
                                  boost::optional<bool> autocommit) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
     invariant(!opCtx->lockState()->isLocked());
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
@@ -322,6 +330,7 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
 }
 
 void Session::beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber) {
+    invariant(!opCtx->getClient()->isInDirectClient());
     invariant(!opCtx->lockState()->isLocked());
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
@@ -556,6 +565,10 @@ void Session::TxnResources::release(OperationContext* opCtx) {
 }
 
 void Session::stashTransactionResources(OperationContext* opCtx) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
     invariant(opCtx->getTxnNumber());
 
     // We must lock the Client to change the Locker on the OperationContext and the Session mutex to
@@ -604,6 +617,10 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx) {
+    if (opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
     invariant(opCtx->getTxnNumber());
 
     // If the storage engine is mmapv1, it is not safe to lock both the Client and the Session

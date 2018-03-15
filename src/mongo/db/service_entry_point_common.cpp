@@ -412,9 +412,7 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
 void invokeInTransaction(OperationContext* opCtx,
                          CommandInvocation* invocation,
                          CommandReplyBuilder* replyBuilder) {
-    // Only get the session if it's at top nesting level.
-    const bool topLevelOnly = true;
-    auto session = OperationContextSession::get(opCtx, topLevelOnly);
+    auto session = OperationContextSession::get(opCtx);
     if (!session) {
         // Run the command directly if we're not in a transaction.
         invocation->run(opCtx, replyBuilder);

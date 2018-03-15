@@ -263,9 +263,6 @@ private:
  * Scoped object, which checks out the session specified in the passed operation context and stores
  * it for later access by the command. The session is installed at construction time and is removed
  * at destruction.
- *
- * Nested OperationContextSessions only check out the session once at the top level, but the checked
- * out session is accessible via get() in inner scopes. This could happen due to DBDirectClient.
  */
 class OperationContextSession {
     MONGO_DISALLOW_COPYING(OperationContextSession);
@@ -278,10 +275,9 @@ public:
     ~OperationContextSession();
 
     /**
-     * Returns the session checked out in the constructor. If "topLevelOnly" is true, it returns
-     * the session when it's at the top nesting level, and nullptr otherwise.
+     * Returns the session checked out in the constructor.
      */
-    static Session* get(OperationContext* opCtx, bool topLevelOnly = false);
+    static Session* get(OperationContext* opCtx);
 
 private:
     OperationContext* const _opCtx;
