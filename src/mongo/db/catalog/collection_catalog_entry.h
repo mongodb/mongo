@@ -153,9 +153,9 @@ public:
 
     /**
      * Compare the UUID argument to the UUID obtained from the metadata. Return true if they
-     * are equal, false otherwise.
+     * are equal, false otherwise. uuid can become a CollectionUUID once MMAPv1 is removed.
      */
-    virtual bool isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid) = 0;
+    virtual bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) = 0;
 
     /**
      * Updates size of a capped Collection.

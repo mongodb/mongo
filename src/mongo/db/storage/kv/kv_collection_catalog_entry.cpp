@@ -248,9 +248,10 @@ void KVCollectionCatalogEntry::addUUID(OperationContext* opCtx,
     }
 }
 
-bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid) {
+bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
+                                                     OptionalCollectionUUID uuid) {
     MetaData md = _getMetaData(opCtx);
-    return md.options.uuid && md.options.uuid.get() == uuid;
+    return md.options.uuid && md.options.uuid == uuid;
 }
 
 void KVCollectionCatalogEntry::updateFlags(OperationContext* opCtx, int newValue) {

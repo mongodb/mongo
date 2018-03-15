@@ -87,7 +87,7 @@ public:
 
     void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;
 
-    bool isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid) final;
+    bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) final;
 
     RecordStore* getRecordStore() {
         return _recordStore.get();

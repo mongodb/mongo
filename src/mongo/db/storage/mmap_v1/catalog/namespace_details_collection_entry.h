@@ -104,7 +104,7 @@ public:
 
     void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;
 
-    bool isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid);
+    bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid);
 
     void updateValidator(OperationContext* opCtx,
                          const BSONObj& validator,

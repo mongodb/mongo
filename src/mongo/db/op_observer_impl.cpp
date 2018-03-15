@@ -641,7 +641,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     // Make sure the UUID values in the Collection metadata, the Collection object, and the UUID
-    // catalog are all present and equal.
+    // catalog are all present and equal, unless the collection is system.indexes or
+    // system.namespaces (see SERVER-29926, SERVER-30095).
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     Database* db = dbHolder().get(opCtx, nss.db());
     // Some unit tests call the op observer on an unregistered Database.
@@ -649,9 +650,11 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         return;
     }
     Collection* coll = db->getCollection(opCtx, nss.ns());
-    invariant(coll->uuid() == uuid && coll->uuid());
+
+    invariant(coll->uuid() || nss.coll() == "system.indexes" || nss.coll() == "system.namespaces");
+    invariant(coll->uuid() == uuid);
     CollectionCatalogEntry* entry = coll->getCatalogEntry();
-    invariant(entry->isEqualToMetadataUUID(opCtx, uuid.get()));
+    invariant(entry->isEqualToMetadataUUID(opCtx, uuid));
 }
 
 void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
