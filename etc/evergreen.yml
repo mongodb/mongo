@@ -5034,7 +5034,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     # Running WiredTiger with --nojournal in a replica set is no longer supported,
     # so this variant does not include replica set tests.
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_mmapv1
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_mmapv1,requires_sharding
     scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
