@@ -208,6 +208,8 @@ public:
         return SnapshotId();
     }
 
+    virtual void setOrderedCommit(bool orderedCommit) {}
+
     // -----------------------
 
     void notifyInsert(HeapRecordStoreBtree* rs, const RecordId& loc);

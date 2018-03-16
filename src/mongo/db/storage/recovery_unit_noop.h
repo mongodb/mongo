@@ -80,6 +80,8 @@ public:
         return SnapshotId();
     }
 
+    virtual void setOrderedCommit(bool orderedCommit) {}
+
 private:
     std::vector<std::unique_ptr<Change>> _changes;
 };

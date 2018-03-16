@@ -93,6 +93,10 @@ public:
 
     void setRollbackWritesDisabled() override {}
 
+    virtual void setOrderedCommit(bool orderedCommit) override {
+        _orderedCommit = orderedCommit;
+    }
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();
@@ -148,6 +152,9 @@ private:
     bool _inUnitOfWork;
     bool _active;
     bool _isTimestamped = false;
+    // Commits are assumed ordered.  Unordered commits are assumed to always need to reserve a
+    // new optime, and thus always call oplogDiskLocRegister() on the record store.
+    bool _orderedCommit = true;
     Timestamp _commitTimestamp;
     uint64_t _mySnapshotId;
     Timestamp _majorityCommittedSnapshot;

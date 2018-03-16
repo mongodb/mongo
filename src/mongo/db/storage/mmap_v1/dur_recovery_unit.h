@@ -65,6 +65,8 @@ public:
         return SnapshotId();
     }
 
+    virtual void setOrderedCommit(bool orderedCommit) {}
+
 private:
     /**
      * Marks writes for journaling, if enabled, and then commits all other Changes in order.

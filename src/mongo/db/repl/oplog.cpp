@@ -158,8 +158,8 @@ void _getNextOpTimes(OperationContext* opCtx,
     auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
     lastSetTimestamp = ts;
     newTimestampNotifier.notify_all();
-
-    fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts));
+    const bool orderedCommit = false;
+    fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
 
     for (std::size_t i = 0; i < count; i++) {
         slotsOut[i].opTime = {Timestamp(ts.asULL() + i), term};

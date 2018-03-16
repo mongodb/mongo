@@ -900,7 +900,12 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
                                 << lastAppliedOpTimeAtEndOfBatch.toString()
                                 << " in the middle of batch application");
 
-        // 4. Finalize this batch. We are at a consistent optime if our current optime is >= the
+        // 4. Update oplog visibility by notifying the storage engine of the new oplog entries.
+        const bool orderedCommit = true;
+        StorageInterface::get(&opCtx)->oplogDiskLocRegister(
+            &opCtx, lastOpTimeInBatch.getTimestamp(), orderedCommit);
+
+        // 5. Finalize this batch. We are at a consistent optime if our current optime is >= the
         // current 'minValid' optime.
         auto consistency = (lastOpTimeInBatch >= minValid)
             ? ReplicationCoordinator::DataConsistency::Consistent

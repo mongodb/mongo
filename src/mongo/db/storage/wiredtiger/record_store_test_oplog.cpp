@@ -41,7 +41,7 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
                                 const Timestamp& opTime) {
     BSONObj obj = BSON("ts" << opTime);
     WriteUnitOfWork wuow(opCtx.get());
-    Status status = rs->oplogDiskLocRegister(opCtx.get(), opTime);
+    Status status = rs->oplogDiskLocRegister(opCtx.get(), opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     StatusWith<RecordId> res =
@@ -55,7 +55,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
                                 const std::unique_ptr<RecordStore>& rs,
                                 int inc) {
     Timestamp opTime = Timestamp(5, inc);
-    Status status = rs->oplogDiskLocRegister(opCtx, opTime);
+    Status status = rs->oplogDiskLocRegister(opCtx, opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime, false);

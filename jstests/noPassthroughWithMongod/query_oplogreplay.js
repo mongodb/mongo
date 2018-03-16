@@ -199,9 +199,11 @@
         assert(!cursor.hasNext());
     }
 
+    jsTestLog("Non-oplog.");
     // Test that oplog replay on a non-oplog collection succeeds.
     test(db.jstests_query_oplogreplay);
 
+    jsTestLog("Oplog.");
     // Test that oplog replay on the actual oplog succeeds.
     test(db.getSiblingDB("local").oplog.jstests_query_oplogreplay);
 

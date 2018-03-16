@@ -1096,5 +1096,13 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
     oplog.getCollection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 
+void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
+                                                const Timestamp& ts,
+                                                bool orderedCommit) {
+    AutoGetCollection oplog(opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
+    fassert(
+        28557,
+        oplog.getCollection()->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+}
 }  // namespace repl
 }  // namespace mongo

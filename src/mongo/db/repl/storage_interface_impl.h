@@ -168,6 +168,9 @@ public:
     Status isAdminDbValid(OperationContext* opCtx) override;
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) override;
+    void oplogDiskLocRegister(OperationContext* opCtx,
+                              const Timestamp& ts,
+                              bool orderedCommit) override;
 
 private:
     const NamespaceString _rollbackIdNss;

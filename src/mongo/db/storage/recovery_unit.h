@@ -305,6 +305,8 @@ public:
      */
     virtual void setRollbackWritesDisabled() = 0;
 
+    virtual void setOrderedCommit(bool orderedCommit) = 0;
+
 protected:
     RecoveryUnit() {}
     repl::ReplicationCoordinator::Mode _replicationMode = repl::ReplicationCoordinator::modeNone;

@@ -222,8 +222,11 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(
         sessionCache->waitUntilDurable(/*forceCheckpoint=*/false, false);
 
         lk.lock();
-        // Publish the new timestamp value.
-        _setOplogReadTimestamp(lk, newTimestamp);
+        // Publish the new timestamp value.  Avoid going backward.
+        auto oldTimestamp = getOplogReadTimestamp();
+        if (newTimestamp > oldTimestamp) {
+            _setOplogReadTimestamp(lk, newTimestamp);
+        }
         lk.unlock();
 
         // Wake up any await_data cursors and tell them more data might be visible now.

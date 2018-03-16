@@ -371,6 +371,16 @@ public:
      * batch.
      */
     virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) = 0;
+
+    /**
+     * Registers a timestamp with the storage engine so that it can enforce oplog visiblity rules.
+     * orderedCommit - specifies whether the timestamp provided is ordered w.r.t. commits; that is,
+     * all commits with older timestamps have already occurred, and any commits with newer
+     * timestamps have not yet occurred.
+     */
+    virtual void oplogDiskLocRegister(OperationContext* opCtx,
+                                      const Timestamp& ts,
+                                      bool orderedCommit) = 0;
 };
 
 }  // namespace repl

@@ -87,6 +87,8 @@ public:
         return checked_cast<MobileRecoveryUnit*>(opCtx->recoveryUnit());
     }
 
+    void setOrderedCommit(bool orderedCommit) override {}
+
 private:
     void _abort();
     void _commit();

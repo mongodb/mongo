@@ -207,7 +207,12 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     }
 
     if (_isTimestamped) {
-        _oplogManager->triggerJournalFlush();
+        if (!_orderedCommit) {
+            // We only need to update oplog visibility where commits can be out-of-order with
+            // respect to their assigned optime and such commits might otherwise be visible.
+            // This should happen only on primary nodes.
+            _oplogManager->triggerJournalFlush();
+        }
         _isTimestamped = false;
     }
     invariantWTOK(wtRet);
@@ -215,6 +220,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _active = false;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
     _isOplogReader = false;
+    _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {

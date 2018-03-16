@@ -901,6 +901,9 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
             onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
             return;
         }
+        const bool orderedCommit = true;
+        _storage->oplogDiskLocRegister(
+            opCtx.get(), optimeWithHash.opTime.getTimestamp(), orderedCommit);
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);

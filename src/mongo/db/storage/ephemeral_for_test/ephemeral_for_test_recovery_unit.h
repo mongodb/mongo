@@ -74,6 +74,8 @@ public:
         return SnapshotId();
     }
 
+    virtual void setOrderedCommit(bool orderedCommit) {}
+
 private:
     typedef std::shared_ptr<Change> ChangePtr;
     typedef std::vector<ChangePtr> Changes;
