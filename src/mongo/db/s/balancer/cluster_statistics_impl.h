@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 
 namespace mongo {
@@ -39,10 +40,14 @@ namespace mongo {
  */
 class ClusterStatisticsImpl final : public ClusterStatistics {
 public:
-    ClusterStatisticsImpl();
+    ClusterStatisticsImpl(BalancerRandomSource& random);
     ~ClusterStatisticsImpl();
 
     StatusWith<std::vector<ShardStatistics>> getStats(OperationContext* opCtx) override;
+
+private:
+    // Source of randomness when metadata needs to be randomized.
+    BalancerRandomSource& _random;
 };
 
 }  // namespace mongo
