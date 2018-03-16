@@ -66,6 +66,7 @@ TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
 }
 
 TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizing) {
+    // $skip should not optimize if overflow
     auto skipShort = DocumentSourceSkip::create(getExpCtx(), 1);
     auto skipLong = DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
     Pipeline::SourceContainer overFlowContainer;
@@ -76,6 +77,7 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     ASSERT_EQUALS(skipShort->getSkip(), 1U);
     ASSERT_EQUALS(skipLong->getSkip(), std::numeric_limits<long long>::max());
 
+    // $skip should optimize if no overflow
     auto skipFirst = DocumentSourceSkip::create(getExpCtx(), 1);
     auto skipSecond = DocumentSourceSkip::create(getExpCtx(), 1);
     Pipeline::SourceContainer containerOptimized;
