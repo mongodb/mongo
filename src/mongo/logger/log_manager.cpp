@@ -37,8 +37,8 @@ namespace logger {
 
 LogManager::LogManager() {
     // Should really fassert that the following status .isOK(), but it never fails.
-    _globalDomain.attachAppender(MessageLogDomain::AppenderAutoPtr(
-        new ConsoleAppender<MessageEventEphemeral>(new MessageEventDetailsEncoder)));
+    _globalDomain.attachAppender(std::make_unique<ConsoleAppender<MessageEventEphemeral>>(
+        std::make_unique<MessageEventDetailsEncoder>()));
 }
 
 LogManager::~LogManager() {

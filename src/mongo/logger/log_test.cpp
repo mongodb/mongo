@@ -87,7 +87,8 @@ private:
 
 /** Simple tests for detaching appenders. */
 TEST_F(LogTestUnadornedEncoder, DetachAppender) {
-    MessageLogDomain::AppenderAutoPtr countAppender(new CountAppender);
+    std::unique_ptr<MessageLogDomain::EventAppender> countAppender =
+        std::make_unique<CountAppender>();
     MessageLogDomain domain;
 
     // Appending to the domain before attaching the appender does not affect the appender.

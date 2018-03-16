@@ -771,9 +771,8 @@ int _main(int argc, char* argv[], char** envp) {
 
     logger::globalLogManager()
         ->getNamedDomain("javascriptOutput")
-        ->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
-            new logger::ConsoleAppender<logger::MessageEventEphemeral>(
-                new logger::MessageEventUnadornedEncoder)));
+        ->attachAppender(std::make_unique<logger::ConsoleAppender<logger::MessageEventEphemeral>>(
+            std::make_unique<logger::MessageEventUnadornedEncoder>()));
 
     std::string& cmdlineURI = shellGlobalParams.url;
     MongoURI parsedURI;

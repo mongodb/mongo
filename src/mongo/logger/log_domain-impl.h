@@ -31,7 +31,7 @@
 #include <cstdlib>
 
 #include "mongo/base/status.h"
-#include "mongo/logger/message_log_domain.h"
+#include "mongo/logger/log_domain.h"
 
 /*
  * Implementation of LogDomain<E>.  Include this in cpp files to instantiate new LogDomain types.
@@ -45,17 +45,13 @@ template <typename E>
 LogDomain<E>::LogDomain() : _abortOnFailure(false) {}
 
 template <typename E>
-LogDomain<E>::~LogDomain() {
-    clearAppenders();
-}
+LogDomain<E>::~LogDomain() {}
 
 template <typename E>
 Status LogDomain<E>::append(const E& event) {
-    for (typename AppenderVector::const_iterator iter = _appenders.begin();
-         iter != _appenders.end();
-         ++iter) {
-        if (*iter) {
-            Status status = (*iter)->append(event);
+    for (auto& appender : _appenders) {
+        if (appender) {
+            Status status = appender->append(event);
             if (!status.isOK()) {
                 if (_abortOnFailure) {
                     ::abort();
@@ -68,37 +64,30 @@ Status LogDomain<E>::append(const E& event) {
 }
 
 template <typename E>
-typename LogDomain<E>::AppenderHandle LogDomain<E>::attachAppender(
-    typename LogDomain<E>::AppenderAutoPtr appender) {
-    typename AppenderVector::iterator iter =
-        std::find(_appenders.begin(), _appenders.end(), static_cast<EventAppender*>(NULL));
+auto LogDomain<E>::attachAppender(std::unique_ptr<EventAppender> appender) -> AppenderHandle {
+    const auto isValidPred = [](auto& appender) -> bool { return !appender; };
+    auto iter = std::find_if(_appenders.begin(), _appenders.end(), isValidPred);
 
     if (iter == _appenders.end()) {
-        _appenders.push_back(appender.release());
+        _appenders.emplace_back(std::move(appender));
         return AppenderHandle(_appenders.size() - 1);
-    } else {
-        *iter = appender.release();
-        return AppenderHandle(iter - _appenders.begin());
     }
+
+    iter->swap(appender);
+    return AppenderHandle(iter - _appenders.begin());
 }
 
 template <typename E>
-typename LogDomain<E>::AppenderAutoPtr LogDomain<E>::detachAppender(
-    typename LogDomain<E>::AppenderHandle handle) {
-    EventAppender*& appender = _appenders.at(handle._index);
-    AppenderAutoPtr result(appender);
-    appender = NULL;
-    return result;
+auto LogDomain<E>::detachAppender(AppenderHandle handle) -> std::unique_ptr<EventAppender> {
+    // So technically this could just return a moved unique_ptr reference
+    // Still, eliding is a thing so swap is a nice certainty.
+    std::unique_ptr<EventAppender> appender{nullptr};
+    appender.swap(_appenders.at(handle._index));
+    return appender;
 }
 
 template <typename E>
 void LogDomain<E>::clearAppenders() {
-    for (typename AppenderVector::const_iterator iter = _appenders.begin();
-         iter != _appenders.end();
-         ++iter) {
-        delete *iter;
-    }
-
     _appenders.clear();
 }
 

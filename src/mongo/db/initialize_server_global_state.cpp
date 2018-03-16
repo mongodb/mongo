@@ -240,12 +240,12 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         openlog(strdup(sb.str().c_str()), LOG_PID | LOG_CONS, serverGlobalParams.syslogFacility);
         LogManager* manager = logger::globalLogManager();
         manager->getGlobalDomain()->clearAppenders();
-        manager->getGlobalDomain()->attachAppender(MessageLogDomain::AppenderAutoPtr(
-            new SyslogAppender<MessageEventEphemeral>(new logger::MessageEventWithContextEncoder)));
+        manager->getGlobalDomain()->attachAppender(
+            std::make_unique<SyslogAppender<MessageEventEphemeral>>(
+                std::make_unique<logger::MessageEventWithContextEncoder>()));
         manager->getNamedDomain("javascriptOutput")
-            ->attachAppender(
-                MessageLogDomain::AppenderAutoPtr(new SyslogAppender<MessageEventEphemeral>(
-                    new logger::MessageEventWithContextEncoder)));
+            ->attachAppender(std::make_unique<SyslogAppender<MessageEventEphemeral>>(
+                std::make_unique<logger::MessageEventWithContextEncoder>()));
 #endif  // defined(_WIN32)
     } else if (!serverGlobalParams.logpath.empty()) {
         fassert(16448, !serverGlobalParams.logWithSyslog);
@@ -301,12 +301,11 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
         LogManager* manager = logger::globalLogManager();
         manager->getGlobalDomain()->clearAppenders();
         manager->getGlobalDomain()->attachAppender(
-            MessageLogDomain::AppenderAutoPtr(new RotatableFileAppender<MessageEventEphemeral>(
-                new MessageEventDetailsEncoder, writer.getValue())));
+            std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
+                std::make_unique<MessageEventDetailsEncoder>(), writer.getValue()));
         manager->getNamedDomain("javascriptOutput")
-            ->attachAppender(
-                MessageLogDomain::AppenderAutoPtr(new RotatableFileAppender<MessageEventEphemeral>(
-                    new MessageEventDetailsEncoder, writer.getValue())));
+            ->attachAppender(std::make_unique<RotatableFileAppender<MessageEventEphemeral>>(
+                std::make_unique<MessageEventDetailsEncoder>(), writer.getValue()));
 
         if (serverGlobalParams.logAppend && exists) {
             log() << "***** SERVER RESTARTED *****";
@@ -317,13 +316,12 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
     } else {
         logger::globalLogManager()
             ->getNamedDomain("javascriptOutput")
-            ->attachAppender(MessageLogDomain::AppenderAutoPtr(
-                new logger::ConsoleAppender<MessageEventEphemeral>(
-                    new MessageEventDetailsEncoder)));
+            ->attachAppender(std::make_unique<logger::ConsoleAppender<MessageEventEphemeral>>(
+                std::make_unique<MessageEventDetailsEncoder>()));
     }
 
     logger::globalLogDomain()->attachAppender(
-        logger::MessageLogDomain::AppenderAutoPtr(new RamLogAppender(RamLog::get("global"))));
+        std::make_unique<RamLogAppender>(RamLog::get("global")));
 
     return Status::OK();
 }

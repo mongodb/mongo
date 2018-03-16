@@ -161,8 +161,7 @@ public:
     LogRecordingScope()
         : _logged(false),
           _threadName(mongo::getThreadName().toString()),
-          _handle(mongo::logger::globalLogDomain()->attachAppender(
-              mongo::logger::MessageLogDomain::AppenderAutoPtr(new Tee(this)))) {}
+          _handle(mongo::logger::globalLogDomain()->attachAppender(std::make_unique<Tee>(this))) {}
     ~LogRecordingScope() {
         mongo::logger::globalLogDomain()->detachAppender(_handle);
     }
