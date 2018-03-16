@@ -98,10 +98,26 @@ Status addMongosOptions(moe::OptionSection* options) {
     sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests")
         .setSources(moe::SourceAllLegacy);
 
+    /** Javascript Options
+     *  As a general rule, js enable/disable options are ignored for mongos.
+     *  However, we define and hide these options so that if someone
+     *  were to use these args in a set of options meant for both
+     *  mongos and mongod runs, the mongos won't fail on an unknown argument.
+     *
+     *  These options have no affect on how the mongos runs.
+     *  Setting either or both to *any* value will provoke a warning message
+     *  and nothing more.
+     */
     sharding_options
         .addOptionChaining("noscripting", "noscripting", moe::Switch, "disable scripting engine")
+        .hidden()
         .setSources(moe::SourceAllLegacy);
 
+    general_options
+        .addOptionChaining(
+            "security.javascriptEnabled", "", moe::Bool, "Enable javascript execution")
+        .hidden()
+        .setSources(moe::SourceYAMLConfig);
 
     options->addSection(general_options).transitional_ignore();
 
@@ -185,8 +201,9 @@ Status storeMongosOptions(const moe::Environment& params) {
             params["replication.localPingThresholdMs"].as<int>();
     }
 
-    if (params.count("noscripting")) {
-        // This option currently has no effect for mongos
+    if (params.count("noscripting") || params.count("security.javascriptEnabled")) {
+        warning() << "The Javascript enabled/disabled options are not supported for mongos. "
+                     "(\"noscripting\" and/or \"security.javascriptEnabled\" are set.)";
     }
 
     if (!params.count("sharding.configDB")) {
