@@ -60,8 +60,6 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/producer_consumer_queue.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -370,51 +368,6 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
     return Status::OK();
 }
 
-void MigrationDestinationManager::cloneDocumentsFromDonor(
-    OperationContext* opCtx,
-    stdx::function<void(OperationContext*, BSONObjIterator)> insertBatchFn,
-    stdx::function<BSONObj(OperationContext*)> fetchBatchFn) {
-
-    ProducerConsumerQueue<BSONObj> batches(1);
-    stdx::thread inserterThread{[&] {
-        Client::initThreadIfNotAlready("chunkInserter");
-        auto inserterOpCtx = Client::getCurrent()->makeOperationContext();
-        auto consumerGuard = MakeGuard([&] { batches.closeConsumerEnd(); });
-        try {
-            while (true) {
-                auto nextBatch = batches.pop(inserterOpCtx.get());
-                auto arr = nextBatch["objects"].Obj();
-                if (arr.isEmpty()) {
-                    return;
-                }
-                insertBatchFn(inserterOpCtx.get(), BSONObjIterator(arr));
-            }
-        } catch (...) {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            opCtx->getServiceContext()->killOperation(opCtx, exceptionToStatus().code());
-            log() << "Batch insertion failed " << causedBy(redact(exceptionToStatus()));
-        }
-    }};
-    auto inserterThreadJoinGuard = MakeGuard([&] {
-        batches.closeProducerEnd();
-        inserterThread.join();
-    });
-
-    while (true) {
-        opCtx->checkForInterrupt();
-
-        auto res = fetchBatchFn(opCtx);
-        batches.push(res.getOwned(), opCtx);
-        auto arr = res["objects"].Obj();
-        if (arr.isEmpty()) {
-            inserterThreadJoinGuard.Dismiss();
-            inserterThread.join();
-            opCtx->checkForInterrupt();
-            break;
-        }
-    }
-}
-
 Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
 
@@ -509,8 +462,10 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
     try {
         _migrateDriver(
             opCtx.get(), min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern);
+    } catch (std::exception& e) {
+        setStateFail(str::stream() << "migrate failed: " << redact(e.what()));
     } catch (...) {
-        setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
+        setStateFail("migrate failed with unknown exception: UNKNOWN ERROR");
     }
 
     if (getState() != DONE && !MONGO_FAIL_POINT(failMigrationLeaveOrphans)) {
@@ -761,19 +716,32 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
         _chunkMarkedPending = true;  // no lock needed, only the migrate thread looks.
 
-        auto insertBatchFn = [&](OperationContext* opCtx, BSONObjIterator docs) {
-            while (docs.more()) {
+        while (true) {
+            BSONObj res;
+            if (!conn->runCommand("admin",
+                                  migrateCloneRequest,
+                                  res)) {  // gets array of objects to copy, in disk order
+                setStateFail(str::stream() << "_migrateClone failed: " << redact(res.toString()));
+                conn.done();
+                return;
+            }
+
+            BSONObj arr = res["objects"].Obj();
+            int thisTime = 0;
+
+            BSONObjIterator i(arr);
+            while (i.more()) {
                 opCtx->checkForInterrupt();
 
                 if (getState() == ABORT) {
-                    auto message = "Migration aborted while copying documents";
-                    log() << message;
-                    uasserted(50746, message);
+                    log() << "Migration aborted while copying documents";
+                    return;
                 }
 
-                BSONObj docToClone = docs.next().Obj();
+                BSONObj docToClone = i.next().Obj();
                 {
                     OldClientWriteContext cx(opCtx, _nss.ns());
+
                     BSONObj localDoc;
                     if (willOverrideLocalId(opCtx,
                                             _nss,
@@ -792,13 +760,17 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                         // Exception will abort migration cleanly
                         uasserted(16976, errMsg);
                     }
+
                     Helpers::upsert(opCtx, _nss.ns(), docToClone, true);
                 }
+                thisTime++;
+
                 {
                     stdx::lock_guard<stdx::mutex> statsLock(_mutex);
                     _numCloned++;
                     _clonedBytes += docToClone.objsize();
                 }
+
                 if (writeConcern.shouldWaitForOtherNodes()) {
                     repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
@@ -813,22 +785,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                     }
                 }
             }
-        };
 
-        auto fetchBatchFn = [&](OperationContext* opCtx) {
-            BSONObj res;
-            if (!conn->runCommand("admin",
-                                  migrateCloneRequest,
-                                  res)) {  // gets array of objects to copy, in disk order
-                conn.done();
-                const std::string errMsg = str::stream() << "_migrateClone failed: "
-                                                         << redact(res.toString());
-                uasserted(50747, errMsg);
-            }
-            return res;
-        };
-
-        cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
+            if (thisTime == 0)
+                break;
+        }
 
         timing.done(3);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep3);
