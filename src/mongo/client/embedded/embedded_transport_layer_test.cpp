@@ -186,7 +186,21 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::serverGlobalParams.noUnixSocket = true;
     ::mongo::unittest::setupTestLogger();
+
+    int init = libmongodbcapi_init(nullptr);
+    if (init != LIBMONGODB_CAPI_SUCCESS) {
+        std::cerr << "libmongodbcapi_init() failed with " << init << std::endl;
+        return EXIT_FAILURE;
+    }
+
     auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+
+    int fini = libmongodbcapi_fini();
+    if (fini != LIBMONGODB_CAPI_SUCCESS) {
+        std::cerr << "libmongodbcapi_fini() failed with " << fini << std::endl;
+        return EXIT_FAILURE;
+    }
+
     globalTempDir.reset();
     mongo::quickExit(result);
 }

@@ -39,8 +39,42 @@ typedef struct libmongodbcapi_client libmongodbcapi_client;
 
 typedef enum {
     LIBMONGODB_CAPI_ERROR_UNKNOWN = -1,
-    LIBMONGODB_CAPI_ERROR_SUCCESS
+    LIBMONGODB_CAPI_SUCCESS = 0,
+
+    LIBMONGODB_CAPI_ERROR_LIBRARY_ALREADY_INITIALIZED,
+    LIBMONGODB_CAPI_ERROR_LIBRARY_NOT_INITIALIZED,
+    LIBMONGODB_CAPI_ERROR_DB_OPEN,
 } libmongodbcapi_error;
+
+
+/**
+* Initializes the mongodbcapi library, required before any other call. Cannot be called again
+* without libmongodbcapi_fini() being called first.
+*
+* @param config null-terminated YAML formatted MongoDB configuration. See documentation for valid
+* options.
+*
+* @note This function is not thread safe.
+*
+* @return Returns LIBMONGODB_CAPI_SUCCESS on success.
+* @return Returns LIBMONGODB_CAPI_ERROR_LIBRARY_ALREADY_INITIALIZED if libmongodbcapi_init() has
+* already been called without an intervening call to libmongodbcapi_fini().
+*/
+int libmongodbcapi_init(const char* yaml_config);
+
+/**
+* Tears down the state of the library, all databases must be closed before calling this.
+*
+* @note This function is not thread safe.
+*
+* @return Returns LIBMONGODB_CAPI_SUCCESS on success.
+* @return Returns LIBMONGODB_CAPI_ERROR_LIBRARY_NOT_INITIALIZED if libmongodbcapi_init() has not
+* been called previously.
+* @return Returns LIBMONGODB_CAPI_ERROR_DB_OPEN if there are open databases that haven't been closed
+* with libmongodbcapi_db_destroy().
+* @return Returns LIBMONGODB_CAPI_ERROR_UNKNOWN for any other unspecified errors.
+*/
+int libmongodbcapi_fini();
 
 /**
 * Starts the database and returns a handle with the service context.
@@ -70,7 +104,8 @@ void libmongodbcapi_db_destroy(libmongodbcapi_db* db);
 * @param
 *      The database that has work that needs to be done
 *
-* @return A libmongo error code
+* @return Returns LIBMONGODB_CAPI_SUCCESS on success, or an error code from libmongodbcapi_error on
+* failure.
 */
 int libmongodbcapi_db_pump(libmongodbcapi_db* db);
 
@@ -111,7 +146,8 @@ void libmongodbcapi_db_client_destroy(libmongodbcapi_client* client);
 *      A pointer to a location where this function will write the size (number of bytes)
 *      of the output
 *
-* @return A success or error code
+* @return Returns LIBMONGODB_CAPI_SUCCESS on success, or an error code from libmongodbcapi_error on
+* failure.
 */
 int libmongodbcapi_db_client_wire_protocol_rpc(libmongodbcapi_client* client,
                                                const void* input,

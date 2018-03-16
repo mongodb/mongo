@@ -138,7 +138,7 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
                                                            input_len,
                                                            &(stream->libmongo_output),
                                                            &(stream->libmongo_output_size));
-            if (retVal != LIBMONGODB_CAPI_ERROR_SUCCESS) {
+            if (retVal != LIBMONGODB_CAPI_SUCCESS) {
                 return -1;
             }
 
