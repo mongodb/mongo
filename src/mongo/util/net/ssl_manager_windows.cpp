@@ -347,6 +347,9 @@ private:
     std::array<PCCERT_CONTEXT, 1> _clientCertificates;
     std::array<PCCERT_CONTEXT, 1> _serverCertificates;
 
+    UniqueCertificate _sslCertificate;
+    UniqueCertificate _sslClusterCertificate;
+
     UniqueCertStore _certStore;
 
     std::array<HCERTSTORE, 1> _additionalCertStores;
@@ -1014,6 +1017,126 @@ StatusWith<UniqueCertStore> readCertChains(StringData caFile, StringData crlFile
     return std::move(certStore);
 }
 
+bool hasCertificateSelector(SSLParams::CertificateSelector selector) {
+    return !selector.subject.empty() || !selector.thumbprint.empty();
+}
+
+StatusWith<UniqueCertificate> loadCertificateSelectorFromStore(
+    SSLParams::CertificateSelector selector, DWORD storeType, StringData storeName) {
+
+    HCERTSTORE store = CertOpenStore(CERT_STORE_PROV_SYSTEM,
+                                     0,
+                                     NULL,
+                                     storeType | CERT_STORE_DEFER_CLOSE_UNTIL_LAST_FREE_FLAG |
+                                         CERT_STORE_READONLY_FLAG,
+                                     L"My");
+    if (store == NULL) {
+        DWORD gle = GetLastError();
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "CertOpenStore failed to open store 'My' from '" << storeName
+                                    << "': "
+                                    << errnoWithDescription(gle));
+    }
+
+    UniqueCertStore storeHolder(store);
+
+    if (!selector.subject.empty()) {
+        std::wstring wstr = toNativeString(selector.subject.c_str());
+
+        PCCERT_CONTEXT cert = CertFindCertificateInStore(storeHolder,
+                                                         X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                                         0,
+                                                         CERT_FIND_SUBJECT_STR,
+                                                         wstr.c_str(),
+                                                         NULL);
+        if (cert == NULL) {
+            DWORD gle = GetLastError();
+            return Status(
+                ErrorCodes::InvalidSSLConfiguration,
+                str::stream()
+                    << "CertFindCertificateInStore failed to find cert with subject name '"
+                    << selector.subject.c_str()
+                    << "' in 'My' store in '"
+                    << storeName
+                    << "': "
+                    << errnoWithDescription(gle));
+        }
+
+        return UniqueCertificate(cert);
+    } else {
+        CRYPT_HASH_BLOB hashBlob = {static_cast<DWORD>(selector.thumbprint.size()),
+                                    selector.thumbprint.data()};
+
+        PCCERT_CONTEXT cert = CertFindCertificateInStore(storeHolder,
+                                                         X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+                                                         0,
+                                                         CERT_FIND_HASH,
+                                                         &hashBlob,
+                                                         NULL);
+        if (cert == NULL) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream()
+                              << "CertFindCertificateInStore failed to find cert with thumbprint '"
+                              << toHex(selector.thumbprint.data(), selector.thumbprint.size())
+                              << "' in 'My' store in '"
+                              << storeName
+                              << "': "
+                              << errnoWithDescription(gle));
+        }
+
+        return UniqueCertificate(cert);
+    }
+}
+
+StatusWith<UniqueCertificate> loadCertificateSelectorFromAllStores(
+    SSLParams::CertificateSelector selector) {
+    auto swSelectMachine = loadCertificateSelectorFromStore(
+        selector, CERT_SYSTEM_STORE_LOCAL_MACHINE, "Local Machine");
+    if (!swSelectMachine.isOK()) {
+        auto swSelectUser = loadCertificateSelectorFromStore(
+            selector, CERT_SYSTEM_STORE_CURRENT_USER, "Current User");
+        if (swSelectUser.isOK()) {
+            return swSelectUser;
+        }
+    }
+
+    return swSelectMachine;
+}
+
+StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(SSLParams::CertificateSelector selector) {
+    auto swCert = loadCertificateSelectorFromAllStores(selector);
+    if (!swCert.isOK()) {
+        return swCert;
+    }
+
+    // Try to grab the private key from the certificate to verify the certificate has a private key
+    // attached to it.
+    DWORD dwKeySpec;
+    BOOL freeProvider;
+    HCRYPTPROV hCryptProv;
+    BOOL ret = CryptAcquireCertificatePrivateKey(
+        swCert.getValue().get(), 0, NULL, &hCryptProv, &dwKeySpec, &freeProvider);
+    if (!ret) {
+        DWORD gle = GetLastError();
+        if (gle == CRYPT_E_NO_KEY_PROPERTY) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream()
+                              << "Could not find private key attached to the selected certificate");
+        } else {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertGetCertificateContextProperty failed  "
+                                        << errnoWithDescription(gle));
+        }
+    }
+
+    if (freeProvider) {
+        UniqueCryptProvider prov(hCryptProv);
+    }
+
+    return std::move(swCert.getValue());
+}
+
 Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     _clientCertificates[0] = nullptr;
     _serverCertificates[0] = nullptr;
@@ -1048,7 +1171,6 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     if (!params.sslCAFile.empty()) {
-        // TODO: enable hasCA when the users use certificate seletors
         // SChannel always has a CA even when the user does not specify one
         // The openssl implementations uses this to decide if it wants to do certificate validation
         // on the server side.
@@ -1060,6 +1182,40 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         }
 
         _certStore = std::move(swChain.getValue());
+    }
+
+    if (hasCertificateSelector(params.sslCertificateSelector)) {
+        auto swCert = loadAndValidateCertificateSelector(params.sslCertificateSelector);
+        if (!swCert.isOK()) {
+            return swCert.getStatus();
+        }
+        _sslCertificate = std::move(swCert.getValue());
+    }
+
+    if (hasCertificateSelector(params.sslClusterCertificateSelector)) {
+        auto swCert = loadAndValidateCertificateSelector(params.sslClusterCertificateSelector);
+        if (!swCert.isOK()) {
+            return swCert.getStatus();
+        }
+        _sslClusterCertificate = std::move(swCert.getValue());
+    }
+
+    if (_sslCertificate || _sslClusterCertificate) {
+        if (!params.sslCAFile.empty()) {
+            warning() << "Mixing certs from the system certificate store and PEM files. This may "
+                         "produced unexpected results.";
+        }
+
+        _sslConfiguration.hasCA = true;
+    }
+
+    if (_sslCertificate) {
+        _clientCertificates[0] = _sslCertificate.get();
+        _serverCertificates[0] = _sslCertificate.get();
+    }
+
+    if (_sslClusterCertificate) {
+        _clientCertificates[0] = _sslClusterCertificate.get();
     }
 
     return Status::OK();
