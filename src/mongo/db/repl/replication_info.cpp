@@ -357,7 +357,9 @@ public:
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
-        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
+
+        if (localLogicalSessionTimeoutMinutes != localLogicalSessionTimeoutMinutesDisabledValue)
+            result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
         if (MONGO_FAIL_POINT(impersonateFullyUpgradedFutureVersion)) {
             result.append("minWireVersion", WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING);

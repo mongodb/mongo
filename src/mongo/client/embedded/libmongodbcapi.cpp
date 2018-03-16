@@ -36,6 +36,7 @@
 #include "mongo/client/embedded/embedded.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmain.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_map.h"
@@ -216,6 +217,9 @@ extern "C" {
 int libmongodbcapi_init(const char* yaml_config) {
     if (mongo::libraryInitialized_)
         return LIBMONGODB_CAPI_ERROR_LIBRARY_ALREADY_INITIALIZED;
+
+    mongo::localLogicalSessionTimeoutMinutes =
+        mongo::localLogicalSessionTimeoutMinutesDisabledValue;
 
     mongo::libraryInitialized_ = true;
     return LIBMONGODB_CAPI_SUCCESS;

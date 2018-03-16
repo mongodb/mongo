@@ -166,6 +166,9 @@ TEST_F(MongodbCAPITest, IsMaster) {
     auto outputOpMsg = mongo::OpMsg::parseOwned(outputMessage);
     ASSERT(outputOpMsg.body.valid(mongo::BSONVersion::kLatest));
     ASSERT(outputOpMsg.body.getBoolField("ismaster"));
+
+    // logicalSessionTimeoutMinutes should not be in isMaster response for embedded
+    ASSERT(!outputOpMsg.body.hasField("logicalSessionTimeoutMinutes"));
 }
 
 
