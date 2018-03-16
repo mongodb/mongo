@@ -27,6 +27,10 @@ func (ci *CollectionInfo) IsView() bool {
 	return ci.Type == "view"
 }
 
+func (ci *CollectionInfo) IsSystemCollection() bool {
+	return strings.HasPrefix(ci.Name, "system.")
+}
+
 func (ci *CollectionInfo) GetUUID() string {
 	if ci.Info == nil {
 		return ""

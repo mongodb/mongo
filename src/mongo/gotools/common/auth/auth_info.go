@@ -9,9 +9,10 @@ package auth
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/mongodb/mongo-tools/common/db"
 	"gopkg.in/mgo.v2/bson"
-	"strings"
 )
 
 // GetAuthVersion gets the authentication schema version of the connected server
@@ -34,7 +35,7 @@ func GetAuthVersion(commander db.CommandRunner) (int, error) {
 		// had no concept of an "auth schema version", so asking for the
 		// authSchemaVersion value will return a "no option found" or "no such cmd"
 		if errMessage == "no option found to get" ||
-			strings.HasPrefix(errMessage, "no such cmd") {
+			strings.Contains(errMessage, "no such cmd") {
 			return 1, nil
 		}
 		// otherwise it's a connection error, so bubble it up

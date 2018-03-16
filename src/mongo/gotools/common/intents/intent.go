@@ -114,8 +114,12 @@ func (it *Intent) IsSystemIndexes() bool {
 	return it.C == "system.indexes"
 }
 
+func (it *Intent) IsSystemProfile() bool {
+	return it.C == "system.profile"
+}
+
 func (intent *Intent) IsSpecialCollection() bool {
-	return intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion()
+	return intent.IsSystemIndexes() || intent.IsUsers() || intent.IsRoles() || intent.IsAuthVersion() || intent.IsSystemProfile() || intent.IsOplog()
 }
 
 func (it *Intent) IsView() bool {

@@ -239,11 +239,11 @@ func IsConnectionError(err error) bool {
 	lowerCaseError := strings.ToLower(err.Error())
 	if lowerCaseError == ErrNoReachableServers ||
 		err == io.EOF ||
-		strings.HasPrefix(lowerCaseError, ErrReplTimeoutPrefix) ||
-		strings.HasPrefix(lowerCaseError, ErrCouldNotContactPrimaryPrefix) ||
-		strings.HasPrefix(lowerCaseError, ErrWriteResultsUnavailable) ||
-		strings.HasPrefix(lowerCaseError, ErrCouldNotFindPrimaryPrefix) ||
-		strings.HasPrefix(lowerCaseError, ErrUnableToTargetPrefix) ||
+		strings.Contains(lowerCaseError, ErrReplTimeoutPrefix) ||
+		strings.Contains(lowerCaseError, ErrCouldNotContactPrimaryPrefix) ||
+		strings.Contains(lowerCaseError, ErrWriteResultsUnavailable) ||
+		strings.Contains(lowerCaseError, ErrCouldNotFindPrimaryPrefix) ||
+		strings.Contains(lowerCaseError, ErrUnableToTargetPrefix) ||
 		lowerCaseError == ErrNotMaster ||
 		strings.HasSuffix(lowerCaseError, ErrConnectionRefusedSuffix) {
 		return true

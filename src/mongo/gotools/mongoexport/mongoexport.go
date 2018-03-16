@@ -265,7 +265,7 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	flags := 0
 	// don't snapshot if we've been asked not to,
 	// or if we cannot because  we are querying, sorting, or if the collection is a view
-	if !exp.InputOpts.ForceTableScan && len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.Sort == "" && !collInfo.IsView() {
+	if !exp.InputOpts.ForceTableScan && len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.Sort == "" && !collInfo.IsView() && !collInfo.IsSystemCollection() {
 		flags = flags | db.Snapshot
 	}
 
