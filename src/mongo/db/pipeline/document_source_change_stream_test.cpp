@@ -72,34 +72,6 @@ static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
 static const NamespaceString nss("unittests.change_stream");
 
-/**
- * Creates an OplogEntry with given parameters and preset defaults for this test suite.
- */
-repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
-                                NamespaceString nss,
-                                boost::optional<UUID> uuid,
-                                boost::optional<bool> fromMigrate,
-                                BSONObj object,
-                                boost::optional<BSONObj> object2) {
-    long long hash = 1LL;
-    return repl::OplogEntry(optime,                           // optime
-                            hash,                             // hash
-                            opType,                           // opType
-                            nss,                              // namespace
-                            uuid,                             // uuid
-                            fromMigrate,                      // fromMigrate
-                            repl::OplogEntry::kOplogVersion,  // version
-                            object,                           // o
-                            object2,                          // o2
-                            {},                               // sessionInfo
-                            boost::none,                      // upsert
-                            boost::none,                      // wall clock time
-                            boost::none,                      // statement id
-                            boost::none,   // optime of previous write within same transaction
-                            boost::none,   // pre-image optime
-                            boost::none);  // post-image optime
-}
-
 class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
@@ -123,7 +95,10 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
 
 class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
 public:
-    ChangeStreamStageTest() : ChangeStreamStageTestNoSetup() {
+    ChangeStreamStageTest() : ChangeStreamStageTest(nss){};
+
+    explicit ChangeStreamStageTest(NamespaceString nsString)
+        : ChangeStreamStageTestNoSetup(nsString) {
         repl::ReplicationCoordinator::set(getExpCtx()->opCtx->getServiceContext(),
                                           stdx::make_unique<repl::ReplicationCoordinatorMock>(
                                               getExpCtx()->opCtx->getServiceContext()));
@@ -188,9 +163,9 @@ public:
                              const boost::optional<bool> fromMigrate = boost::none) {
         return makeOplogEntry(OpTypeEnum::kCommand,  // op type
                               nss.getCommandNS(),    // namespace
+                              oField,                // o
                               uuid,                  // uuid
                               fromMigrate,           // fromMigrate
-                              oField,                // o
                               boost::none);          // o2
     }
 
@@ -212,6 +187,34 @@ public:
     static const UUID& testUuid() {
         static const UUID* uuid_gen = new UUID(UUID::gen());
         return *uuid_gen;
+    }
+
+    /**
+     * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+     */
+    static repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
+                                           NamespaceString nss,
+                                           BSONObj object,
+                                           boost::optional<UUID> uuid = testUuid(),
+                                           boost::optional<bool> fromMigrate = boost::none,
+                                           boost::optional<BSONObj> object2 = boost::none) {
+        long long hash = 1LL;
+        return repl::OplogEntry(optime,                           // optime
+                                hash,                             // hash
+                                opType,                           // opType
+                                nss,                              // namespace
+                                uuid,                             // uuid
+                                fromMigrate,                      // fromMigrate
+                                repl::OplogEntry::kOplogVersion,  // version
+                                object,                           // o
+                                object2,                          // o2
+                                {},                               // sessionInfo
+                                boost::none,                      // upsert
+                                boost::none,                      // wall clock time
+                                boost::none,                      // statement id
+                                boost::none,   // optime of previous write within same transaction
+                                boost::none,   // pre-image optime
+                                boost::none);  // post-image optime
     }
 };
 
@@ -293,9 +296,9 @@ TEST_F(ChangeStreamStageTest, StagesGeneratedCorrectly) {
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
                                  nss,                           // namespace
+                                 BSON("_id" << 1 << "x" << 2),  // o
                                  testUuid(),                    // uuid
                                  boost::none,                   // fromMigrate
-                                 BSON("_id" << 1 << "x" << 2),  // o
                                  boost::none);                  // o2
 
     Document expectedInsert{
@@ -309,9 +312,9 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
     bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
     auto insert2 = makeOplogEntry(insert.getOpType(),     // op type
                                   insert.getNamespace(),  // namespace
+                                  insert.getObject(),     // o
                                   insert.getUuid(),       // uuid
                                   fromMigrate,            // fromMigrate
-                                  insert.getObject(),     // o
                                   insert.getObject2());   // o2
     checkTransformation(insert2, expectedInsert, {{"x"}, {"_id"}});
 }
@@ -319,9 +322,9 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyXAndId) {
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
                                  nss,                           // namespace
+                                 BSON("x" << 2 << "_id" << 1),  // o
                                  testUuid(),                    // uuid
                                  boost::none,                   // fromMigrate
-                                 BSON("x" << 2 << "_id" << 1),  // o
                                  boost::none);                  // o2
 
     Document expectedInsert{
@@ -337,9 +340,9 @@ TEST_F(ChangeStreamStageTest, TransformInsertDocKeyIdAndX) {
 TEST_F(ChangeStreamStageTest, TransformInsertDocKeyJustId) {
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
                                  nss,                           // namespace
+                                 BSON("_id" << 1 << "x" << 2),  // o
                                  testUuid(),                    // uuid
                                  boost::none,                   // fromMigrate
-                                 BSON("_id" << 1 << "x" << 2),  // o
                                  boost::none);                  // o2
 
     Document expectedInsert{
@@ -356,9 +359,9 @@ TEST_F(ChangeStreamStageTest, TransformInsertFromMigrate) {
     bool fromMigrate = true;
     auto insert = makeOplogEntry(OpTypeEnum::kInsert,           // op type
                                  nss,                           // namespace
+                                 BSON("_id" << 1 << "x" << 1),  // o
                                  boost::none,                   // uuid
                                  fromMigrate,                   // fromMigrate
-                                 BSON("_id" << 1 << "x" << 1),  // o
                                  boost::none);                  // o2
 
     checkTransformation(insert, boost::none);
@@ -369,9 +372,9 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFields) {
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
+                                      o,                    // o
                                       testUuid(),           // uuid
                                       boost::none,          // fromMigrate
-                                      o,                    // o
                                       o2);                  // o2
 
     // Update fields
@@ -394,9 +397,9 @@ TEST_F(ChangeStreamStageTest, TransformUpdateFieldsLegacyNoId) {
     BSONObj o2 = BSON("x" << 1 << "y" << 1);
     auto updateField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
+                                      o,                    // o
                                       testUuid(),           // uuid
                                       boost::none,          // fromMigrate
-                                      o,                    // o
                                       o2);                  // o2
 
     // Update fields
@@ -417,9 +420,9 @@ TEST_F(ChangeStreamStageTest, TransformRemoveFields) {
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto removeField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                       nss,                  // namespace
+                                      o,                    // o
                                       testUuid(),           // uuid
                                       boost::none,          // fromMigrate
-                                      o,                    // o
                                       o2);                  // o2
 
     // Remove fields
@@ -439,9 +442,9 @@ TEST_F(ChangeStreamStageTest, TransformReplace) {
     BSONObj o2 = BSON("_id" << 1 << "x" << 2);
     auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
                                   nss,                  // namespace
+                                  o,                    // o
                                   testUuid(),           // uuid
                                   boost::none,          // fromMigrate
-                                  o,                    // o
                                   o2);                  // o2
 
     // Replace
@@ -459,9 +462,9 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
     BSONObj o = BSON("_id" << 1 << "x" << 2);
     auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
                                       nss,                  // namespace
+                                      o,                    // o
                                       testUuid(),           // uuid
                                       boost::none,          // fromMigrate
-                                      o,                    // o
                                       boost::none);         // o2
 
     // Delete
@@ -476,9 +479,9 @@ TEST_F(ChangeStreamStageTest, TransformDelete) {
     bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
     auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),     // op type
                                        deleteEntry.getNamespace(),  // namespace
+                                       deleteEntry.getObject(),     // o
                                        deleteEntry.getUuid(),       // uuid
                                        fromMigrate,                 // fromMigrate
-                                       deleteEntry.getObject(),     // o
                                        deleteEntry.getObject2());   // o2
 
     checkTransformation(deleteEntry2, expectedDelete);
@@ -488,9 +491,9 @@ TEST_F(ChangeStreamStageTest, TransformDeleteFromMigrate) {
     bool fromMigrate = true;
     auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
                                       nss,                  // namespace
+                                      BSON("_id" << 1),     // o
                                       boost::none,          // uuid
                                       fromMigrate,          // fromMigrate
-                                      BSON("_id" << 1),     // o
                                       boost::none);         // o2
 
     checkTransformation(deleteEntry, boost::none);
@@ -544,12 +547,12 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateFromMigrate) {
 TEST_F(ChangeStreamStageTest, TransformInvalidateRenameDropTarget) {
     NamespaceString otherColl("test.bar");
     auto rename =
-        makeOplogEntry(OpTypeEnum::kCommand,      // op type
-                       otherColl.getCommandNS(),  // namespace
-                       testUuid(),                // uuid
-                       boost::none,               // fromMigrate
+        makeOplogEntry(OpTypeEnum::kCommand,                                            // op type
+                       otherColl.getCommandNS(),                                        // namespace
                        BSON("renameCollection" << otherColl.ns() << "to" << nss.ns()),  // o
-                       boost::none);                                                    // o2
+                       testUuid(),                                                      // uuid
+                       boost::none,   // fromMigrate
+                       boost::none);  // o2
 
     Document expectedInvalidate{
         {DSChangeStream::kIdField, makeResumeToken(ts, testUuid())},
@@ -562,9 +565,9 @@ TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
     auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
     auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
                                            nss,
+                                           BSONObj(),
                                            testUuid(),
                                            boost::none,  // fromMigrate
-                                           BSONObj(),
                                            o2Field.toBson());
 
     Document expectedNewShardDetected{
@@ -585,11 +588,8 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
 TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     auto noOp = makeOplogEntry(OpTypeEnum::kNoop,  // op type
                                {},                 // namespace
-                               boost::none,        // uuid
-                               boost::none,        // fromMigrate
                                BSON("msg"
-                                    << "new primary"),  // o
-                               boost::none);            // o2
+                                    << "new primary"));  // o
 
     checkTransformation(noOp, boost::none);
 }
@@ -600,9 +600,9 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndex) {
     bool fromMigrate = false;  // At the moment this makes no difference.
     auto createIndex = makeOplogEntry(OpTypeEnum::kInsert,  // op type
                                       indexNs,              // namespace
+                                      indexSpec.toBson(),   // o
                                       boost::none,          // uuid
                                       fromMigrate,          // fromMigrate
-                                      indexSpec.toBson(),   // o
                                       boost::none);         // o2
 
     checkTransformation(createIndex, boost::none);
@@ -614,9 +614,9 @@ TEST_F(ChangeStreamStageTest, MatchFiltersCreateIndexFromMigrate) {
     bool fromMigrate = true;
     auto createIndex = makeOplogEntry(OpTypeEnum::kInsert,  // op type
                                       indexNs,              // namespace
+                                      indexSpec.toBson(),   // o
                                       boost::none,          // uuid
                                       fromMigrate,          // fromMigrate
-                                      indexSpec.toBson(),   // o
                                       boost::none);         // o2
 
     checkTransformation(createIndex, boost::none);
@@ -683,6 +683,257 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
 
     // Throw an exception on the call of getNext().
     ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+}
+
+//
+// Test class for change stream of a single database.
+//
+class ChangeStreamStageDBTest : public ChangeStreamStageTest {
+public:
+    ChangeStreamStageDBTest()
+        : ChangeStreamStageTest(NamespaceString::makeCollectionlessAggregateNSS(nss.db())) {}
+};
+
+TEST_F(ChangeStreamStageDBTest, TransformInsert) {
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1 << "x" << 2));
+
+    Document expectedInsert{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("x" << 2 << "_id" << 1))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
+    };
+    checkTransformation(insert, expectedInsert, {{"x"}, {"_id"}});
+}
+
+TEST_F(ChangeStreamStageDBTest, InsertOnOtherCollections) {
+    NamespaceString otherNss("unittests.other_collection.");
+    auto insertOtherColl =
+        makeOplogEntry(OpTypeEnum::kInsert, otherNss, BSON("_id" << 1 << "x" << 2));
+
+    // Insert on another collection in the same database.
+    Document expectedInsert{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("x" << 2 << "_id" << 1))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}}},
+        {DSChangeStream::kNamespaceField, D{{"db", otherNss.db()}, {"coll", otherNss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"x", 2}, {"_id", 1}}},  // Note _id <-> x reversal.
+    };
+    checkTransformation(insertOtherColl, expectedInsert, {{"x"}, {"_id"}});
+}
+
+TEST_F(ChangeStreamStageDBTest, MatchFiltersChangesOnOtherDatabases) {
+    std::set<NamespaceString> unmatchedNamespaces = {
+        // Namespace starts with the db name, but is longer.
+        NamespaceString("unittests2.coll"),
+        // Namespace contains the db name, but not at the front.
+        NamespaceString("test.unittests"),
+        // Namespace contains the db name + dot.
+        NamespaceString("test.unittests.coll"),
+        // Namespace contains the db name + dot but is followed by $.
+        NamespaceString("unittests.$cmd"),
+    };
+
+    // Insert into another database.
+    for (auto& ns : unmatchedNamespaces) {
+        auto insert = makeOplogEntry(OpTypeEnum::kInsert, ns, BSON("_id" << 1));
+        checkTransformation(insert, boost::none);
+    }
+}
+
+TEST_F(ChangeStreamStageDBTest, MatchFiltersAllSystemDotCollections) {
+    auto nss = NamespaceString("unittests.system.coll");
+    auto insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
+    nss = NamespaceString("unittests.system.users");
+    insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
+    nss = NamespaceString("unittests.system.roles");
+    insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
+    nss = NamespaceString("unittests.system.keys");
+    insert = makeOplogEntry(OpTypeEnum::kInsert, nss, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformsEntriesForLegalClientCollectionsWithSystem) {
+    std::set<NamespaceString> allowedNamespaces = {
+        NamespaceString("unittests.coll.system"),
+        NamespaceString("unittests.coll.system.views"),
+        NamespaceString("unittests.systemx"),
+    };
+
+    for (auto& ns : allowedNamespaces) {
+        auto insert = makeOplogEntry(OpTypeEnum::kInsert, ns, BSON("_id" << 1));
+        Document expectedInsert{
+            {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << 1))},
+            {DSChangeStream::kOperationTypeField, DSChangeStream::kInsertOpType},
+            {DSChangeStream::kFullDocumentField, D{{"_id", 1}}},
+            {DSChangeStream::kNamespaceField, D{{"db", ns.db()}, {"coll", ns.coll()}}},
+            {DSChangeStream::kDocumentKeyField, D{{"_id", 1}}},
+        };
+        checkTransformation(insert, expectedInsert, {{"_id"}});
+    }
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformUpdateFields) {
+    BSONObj o = BSON("$set" << BSON("y" << 1));
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto updateField = makeOplogEntry(OpTypeEnum::kUpdate, nss, o, testUuid(), boost::none, o2);
+
+    Document expectedUpdateField{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o2)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+        {"updateDescription", D{{"updatedFields", D{{"y", 1}}}, {"removedFields", vector<V>()}}},
+    };
+    checkTransformation(updateField, expectedUpdateField);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformRemoveFields) {
+    BSONObj o = BSON("$unset" << BSON("y" << 1));
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto removeField = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      boost::none,          // fromMigrate
+                                      o2);                  // o2
+
+    // Remove fields
+    Document expectedRemoveField{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o2)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kUpdateOpType},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{{"_id", 1}, {"x", 2}}}},
+        {
+            "updateDescription", D{{"updatedFields", D{}}, {"removedFields", vector<V>{V("y"_sd)}}},
+        }};
+    checkTransformation(removeField, expectedRemoveField);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformReplace) {
+    BSONObj o = BSON("_id" << 1 << "x" << 2 << "y" << 1);
+    BSONObj o2 = BSON("_id" << 1 << "x" << 2);
+    auto replace = makeOplogEntry(OpTypeEnum::kUpdate,  // op type
+                                  nss,                  // namespace
+                                  o,                    // o
+                                  testUuid(),           // uuid
+                                  boost::none,          // fromMigrate
+                                  o2);                  // o2
+
+    // Replace
+    Document expectedReplace{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o2)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kReplaceOpType},
+        {DSChangeStream::kFullDocumentField, D{{"_id", 1}, {"x", 2}, {"y", 1}}},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(replace, expectedReplace);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformDelete) {
+    BSONObj o = BSON("_id" << 1 << "x" << 2);
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      o,                    // o
+                                      testUuid(),           // uuid
+                                      boost::none,          // fromMigrate
+                                      boost::none);         // o2
+
+    // Delete
+    Document expectedDelete{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), o)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kDeleteOpType},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kDocumentKeyField, D{{"_id", 1}, {"x", 2}}},
+    };
+    checkTransformation(deleteEntry, expectedDelete);
+
+    bool fromMigrate = false;  // also check actual "fromMigrate: false" not filtered
+    auto deleteEntry2 = makeOplogEntry(deleteEntry.getOpType(),     // op type
+                                       deleteEntry.getNamespace(),  // namespace
+                                       deleteEntry.getObject(),     // o
+                                       deleteEntry.getUuid(),       // uuid
+                                       fromMigrate,                 // fromMigrate
+                                       deleteEntry.getObject2());   // o2
+
+    checkTransformation(deleteEntry2, expectedDelete);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformDeleteFromMigrate) {
+    bool fromMigrate = true;
+    auto deleteEntry = makeOplogEntry(OpTypeEnum::kDelete,  // op type
+                                      nss,                  // namespace
+                                      BSON("_id" << 1),     // o
+                                      boost::none,          // uuid
+                                      fromMigrate,          // fromMigrate
+                                      boost::none);         // o2
+
+    checkTransformation(deleteEntry, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, TransformInvalidate) {
+    NamespaceString otherColl("test.bar");
+
+    OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
+    bool dropDBFromMigrate = false;  // verify this doesn't get it filtered
+    OplogEntry dropDB = createCommand(BSON("dropDatabase" << 1), boost::none, dropDBFromMigrate);
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns() << "to" << otherColl.ns()), testUuid());
+
+    // Invalidate entry doesn't have a document id.
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+    };
+    for (auto& entry : {dropColl, rename}) {
+        checkTransformation(entry, expectedInvalidate);
+    }
+
+    // Drop database invalidate entry doesn't have a UUID.
+    Document expectedInvalidateDropDatabase{
+        {DSChangeStream::kIdField, makeResumeToken(ts)},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+    };
+    checkTransformation(dropDB, expectedInvalidateDropDatabase);
+}
+
+TEST_F(ChangeStreamStageDBTest, SystemCollectionsDropOrRenameShouldInvalidate) {
+    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString renamedSystemColl(nss.db() + ".system.users_new");
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+    };
+
+    OplogEntry dropColl = createCommand(BSON("drop" << systemColl.coll()), testUuid());
+    checkTransformation(dropColl, expectedInvalidate);
+
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
+    checkTransformation(rename, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageDBTest, MatchFiltersNoOp) {
+    OplogEntry noOp = makeOplogEntry(OpTypeEnum::kNoop,
+                                     NamespaceString(),
+                                     BSON("msg"
+                                          << "new primary"));
+    checkTransformation(noOp, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, MatchFiltersCreateIndex) {
+    auto indexSpec = D{{"v", 2}, {"key", D{{"a", 1}}}, {"name", "a_1"_sd}, {"ns", nss.ns()}};
+    NamespaceString indexNs(nss.getSystemIndexesCollection());
+    OplogEntry createIndex = makeOplogEntry(OpTypeEnum::kInsert, indexNs, indexSpec.toBson());
+    checkTransformation(createIndex, boost::none);
 }
 
 }  // namespace

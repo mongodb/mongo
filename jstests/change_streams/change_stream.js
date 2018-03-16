@@ -1,29 +1,64 @@
 // Basic $changeStream tests.
+// Mark as assumes_read_preference_unchanged since reading from the non-replicated "system.profile"
+// collection results in a failure in the secondary reads suite.
+// @tags: [assumes_read_preference_unchanged]
 (function() {
     "use strict";
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load("jstests/libs/change_stream_util.js");
-    load('jstests/libs/uuid_util.js');
+    load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 
-    jsTestLog("Testing $changeStream on non-existent database");
-    const dbDoesNotExist = db.getSiblingDB("database-does-not-exist");
-    assert.commandWorked(dbDoesNotExist.dropDatabase());
-    assert.commandFailedWithCode(
-        dbDoesNotExist.runCommand(
-            {aggregate: dbDoesNotExist.getName(), pipeline: [{$changeStream: {}}], cursor: {}}),
-        ErrorCodes.NamespaceNotFound);
+    function assertValidChangeStreamNss(dbName, collName = "test") {
+        // Verify the DB/collection exists.
+        const testDb = db.getSiblingDB(dbName);
+        const res =
+            testDb.runCommand({aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}});
+        assert.commandWorked(res);
+        assert.commandWorked(testDb.runCommand({killCursors: "coll", cursors: [res.cursor.id]}));
+    }
+
+    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+
+    // Test that a change stream cannot be opened on the "admin", "config", or "local" databases.
+    // TODO SERVER-34040 Should prevent change streams on these databases.
+    assertValidChangeStreamNss("admin");
+    assertValidChangeStreamNss("config");
+    // Not allowed to access 'local' database through mongos.
+    if (!isMongos) {
+        assertValidChangeStreamNss("local");
+    }
+
+    // Test that a change stream cannot be opened on 'system.' collections.
+    // TODO SERVER-34040 Should prevent change streams on these collections.
+    assertValidChangeStreamNss("test", "system.users");
+    assertValidChangeStreamNss("test", "system.profile");
+    assertValidChangeStreamNss("test", "system.version");
+
+    // Test that a change stream can be opened on namespaces with 'system' in the name, but not
+    // considered an internal 'system dot' namespace.
+    assertValidChangeStreamNss("test", "systemindexes");
+    assertValidChangeStreamNss("test", "system_users");
+
+    // Similar test but for DB names that are not considered internal.
+    assert.writeOK(db.getSiblingDB("admincustomDB")["test"].insert({}));
+    assertValidChangeStreamNss("admincustomDB");
+
+    assert.writeOK(db.getSiblingDB("local_")["test"].insert({}));
+    assertValidChangeStreamNss("local_");
+
+    assert.writeOK(db.getSiblingDB("_config_")["test"].insert({}));
+    assertValidChangeStreamNss("_config_");
+
+    assertDropAndRecreateCollection(db, "t1");
 
     let cst = new ChangeStreamTest(db);
+    let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
 
     jsTestLog("Testing single insert");
-    assertDropAndRecreateCollection(db, "t1");
-    let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     // Test that if there are no changes, we return an empty batch.
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
-    const t1Uuid = getUUIDFromListCollections(db, db.t1.getName());
     let expected = {
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 1},
@@ -107,7 +142,6 @@
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     let t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
-    const t2Uuid = getUUIDFromListCollections(db, db.t2.getName());
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: []});
     expected = {
         documentKey: {_id: 100},
@@ -144,7 +178,6 @@
     cst.assertNextChangesEqual({cursor: dne1cursor, expectedChanges: []});
     cst.assertNextChangesEqual({cursor: dne2cursor, expectedChanges: []});
 
-    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
     if (!isMongos) {
         jsTestLog("Ensuring attempt to read with legacy operations fails.");
         db.getMongo().forceReadMode('legacy');

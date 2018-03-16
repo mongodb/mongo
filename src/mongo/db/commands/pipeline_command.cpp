@@ -64,7 +64,13 @@ public:
     bool supportsReadConcern(const std::string& dbName,
                              const BSONObj& cmdObj,
                              repl::ReadConcernLevel level) const override {
+        // Aggregations that are run directly against a collection allow any read concern.
+        // Otherwise, if the aggregate is collectionless then the read concern must be 'local' (e.g.
+        // $currentOp). The exception to this is a $changeStream on a whole database, which is
+        // considered collectionless but must be read concern 'majority'. Further read concern
+        // validation is done one the pipeline is parsed.
         return level == repl::ReadConcernLevel::kLocalReadConcern ||
+            level == repl::ReadConcernLevel::kMajorityReadConcern ||
             !AggregationRequest::parseNs(dbName, cmdObj).isCollectionlessAggregateNS();
     }
 

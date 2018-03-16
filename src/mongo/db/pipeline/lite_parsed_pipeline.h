@@ -118,6 +118,24 @@ public:
         });
     }
 
+    /**
+     * Verifies that this pipeline is allowed to run with the specified read concern. This ensures
+     * that each stage is compatible, and throws a UserException if not.
+     */
+    void assertSupportsReadConcern(OperationContext* opCtx,
+                                   boost::optional<ExplainOptions::Verbosity> explain) const {
+        auto readConcern = repl::ReadConcernArgs::get(opCtx);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Explain for the aggregate command "
+                                 "does not support non-local "
+                                 "readConcern levels",
+                !explain || readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
+
+        for (auto&& spec : _stageSpecs) {
+            spec->assertSupportsReadConcern(readConcern);
+        }
+    }
+
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
 };

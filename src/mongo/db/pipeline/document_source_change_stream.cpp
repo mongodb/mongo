@@ -33,6 +33,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_path_support.h"
@@ -101,13 +102,17 @@ const char* DocumentSourceOplogMatch::getSourceName() const {
 
 DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints(
     Pipeline::SplitState pipeState) const {
-    return {StreamType::kStreaming,
-            PositionRequirement::kFirst,
-            HostTypeRequirement::kAnyShard,
-            DiskUseRequirement::kNoDiskUse,
-            FacetRequirement::kNotAllowed,
-            TransactionRequirement::kNotAllowed,
-            ChangeStreamRequirement::kChangeStreamStage};
+
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kFirst,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage);
+    constraints.isIndependentOfAnyCollection =
+        pExpCtx->ns.isCollectionlessAggregateNS() ? true : false;
+    return constraints;
 }
 
 /**
@@ -234,33 +239,45 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
 BSONObj DocumentSourceChangeStream::buildMatchFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp startFrom, bool isResume) {
     auto nss = expCtx->ns;
-    auto target = nss.ns();
+    auto onEntireDB = nss.isCollectionlessAggregateNS();
+    const auto regexAllCollections = R"(\.(?!(\$|system\.)))";
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
     BSONArrayBuilder invalidatingCommands;
     invalidatingCommands.append(BSON("o.dropDatabase" << 1));
-    invalidatingCommands.append(BSON("o.drop" << nss.coll()));
-    invalidatingCommands.append(BSON("o.renameCollection" << target));
-    if (expCtx->collation.isEmpty()) {
-        // If the user did not specify a collation, they should be using the collection's default
-        // collation. So a "create" command which has any collation present would invalidate the
-        // change stream, since that must mean the stream was created before the collection existed
-        // and used the simple collation, which is no longer the default.
-        invalidatingCommands.append(
-            BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
+
+    // For change streams on an entire database, all collections drops and renames are considered
+    // invalidate entries.
+    if (onEntireDB) {
+        invalidatingCommands.append(BSON("o.drop" << BSON("$exists" << true)));
+        invalidatingCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
+    } else {
+        invalidatingCommands.append(BSON("o.drop" << nss.coll()));
+        invalidatingCommands.append(BSON("o.renameCollection" << nss.ns()));
+        if (expCtx->collation.isEmpty()) {
+            // If the user did not specify a collation, they should be using the collection's
+            // default collation. So a "create" command which has any collation present would
+            // invalidate the change stream, since that must mean the stream was created before the
+            // collection existed and used the simple collation, which is no longer the default.
+            invalidatingCommands.append(
+                BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
+        }
     }
+
     // 1.1) Commands that are on target db and one of the above.
     auto commandsOnTargetDb =
         BSON("$and" << BSON_ARRAY(BSON("ns" << nss.getCommandNS().ns())
                                   << BSON("$or" << invalidatingCommands.arr())));
+
     // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
-    auto renameDropTarget = BSON("o.to" << target);
+    auto renameDropTarget = BSON("o.to" << nss.ns());
+
     // All supported commands that are either (1.1) or (1.2).
     BSONObj commandMatch = BSON("op"
                                 << "c"
                                 << OR(commandsOnTargetDb, renameDropTarget));
 
-    // 2.1) Normal CRUD ops on the target collection.
+    // 2.1) Normal CRUD ops.
     auto normalOpTypeMatch = BSON("op" << NE << "n");
 
     // 2.2) A chunk gets migrated to a new shard that doesn't have any chunks.
@@ -268,8 +285,17 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
                                    << "n"
                                    << "o2.type"
                                    << "migrateChunkToNewShard");
+
     // 2) Supported operations on the target namespace.
-    auto opMatch = BSON("ns" << target << OR(normalOpTypeMatch, chunkMigratedMatch));
+    BSONObj opMatch;
+    if (onEntireDB) {
+        // Match all namespaces that start with db name, followed by ".", then not followed by
+        // '$' or 'system.'
+        opMatch = BSON("ns" << BSONRegEx("^" + nss.db() + regexAllCollections)
+                            << OR(normalOpTypeMatch, chunkMigratedMatch));
+    } else {
+        opMatch = BSON("ns" << nss.ns() << OR(normalOpTypeMatch, chunkMigratedMatch));
+    }
 
     // Match oplog entries after "start" and are either supported (1) commands or (2) operations,
     // excepting those tagged "fromMigrate".
@@ -283,6 +309,16 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
+
+    // Change stream on an entire database is a new 4.0 feature.
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << "$changeStream on an entire database is not allowed in the current "
+                             "feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            !expCtx->ns.isCollectionlessAggregateNS() ||
+                serverGlobalParams.featureCompatibility.getVersion() >=
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
 
     boost::optional<Timestamp> startFrom;
     if (!expCtx->inMongos) {
@@ -338,6 +374,13 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                           << fullDocOption
                           << "\"",
             fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
+
+    // TODO: SERVER-33820 should add support for 'updateLookup' with a change stream on a whole
+    // database.
+    uassert(50761,
+            "'updateLookup' not supported with a change stream on an entire database.",
+            fullDocOption != "updateLookup"_sd || !expCtx->ns.isCollectionlessAggregateNS());
+
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
     list<intrusive_ptr<DocumentSource>> stages;

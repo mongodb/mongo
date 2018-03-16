@@ -64,14 +64,22 @@ public:
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-            // TODO SERVER-29138: we need to communicate that this stage will need to look up
-            // documents from different collections.
             return stdx::unordered_set<NamespaceString>();
         }
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
             return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
+        }
+
+        void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
+            // Only "majority" is allowed for change streams.
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Read concern " << readConcern.toString()
+                                  << " is not supported for change streams. "
+                                     "Only read concern level \"majority\" is supported.",
+                    !readConcern.hasLevel() ||
+                        readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
         }
 
     private:

@@ -288,25 +288,6 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status waitForMajorityReadConcern(OperationContext* opCtx) {
-    const repl::ReadConcernArgs& originalRC = repl::ReadConcernArgs::get(opCtx);
-    if (!originalRC.hasLevel()) {
-        // If the read concern level is not specified, upgrade it to "majority".
-        const repl::ReadConcernArgs readConcern(repl::ReadConcernLevel::kMajorityReadConcern);
-        auto rcStatus = waitForReadConcern(opCtx, readConcern, true);
-        if (!rcStatus.isOK()) {
-            return rcStatus;
-        }
-    } else if (originalRC.getLevel() != repl::ReadConcernLevel::kMajorityReadConcern) {
-        // Otherwise, only "majority" is allowed for change streams.
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << "Read concern " << originalRC.toString()
-                              << " is not supported for change streams. "
-                                 "Only read concern level \"majority\" is supported."};
-    }
-    return Status::OK();
-}
-
 /**
  * Resolves the collator to either the user-specified collation or, if none was specified, to the
  * collection-default collation.
@@ -333,14 +314,6 @@ Status runAggregate(OperationContext* opCtx,
     // For operations on views, this will be the underlying namespace.
     NamespaceString nss = request.getNamespaceString();
 
-    if (request.getExplain() &&
-        repl::ReadConcernArgs::get(opCtx).getLevel() != repl::ReadConcernLevel::kLocalReadConcern) {
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << "Explain for the aggregate command "
-                                 "does not support non-local "
-                                 "readConcern levels"};
-    }
-
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
     boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
@@ -351,29 +324,47 @@ Status runAggregate(OperationContext* opCtx,
     auto curOp = CurOp::get(opCtx);
     {
         const LiteParsedPipeline liteParsedPipeline(request);
+
+        // Check whether the parsed pipeline supports the given read concern.
+        liteParsedPipeline.assertSupportsReadConcern(opCtx, request.getExplain());
+
         if (liteParsedPipeline.hasChangeStream()) {
             nss = NamespaceString::kRsOplogNamespace;
 
-            // Require $changeNotification to run with readConcern:majority.
-            uassertStatusOK(waitForMajorityReadConcern(opCtx));
+            // If the read concern is not specified, upgrade to 'majority' and wait to make sure we
+            // have a snapshot available.
+            if (!repl::ReadConcernArgs::get(opCtx).hasLevel()) {
+                const repl::ReadConcernArgs readConcern(
+                    repl::ReadConcernLevel::kMajorityReadConcern);
+                uassertStatusOK(waitForReadConcern(opCtx, readConcern, true));
+            }
 
-            // Resolve the collator to either the user-specified collation or the default collation
-            // of the collection on which $changeStream was invoked, so that we do not end up
-            // resolving the collation on the oplog.
-            invariant(!collatorToUse);
-            // Change streams can only be run against collections; AutoGetCollectionForReadCommand
-            // will raise an error if the given namespace is a view. A change stream may be opened
-            // on a namespace before the associated collection is created, but only if the database
-            // already exists. If the $changeStream was sent from mongoS then the database exists at
-            // the cluster level even if not yet present on this shard, so we allow the
-            // $changeStream to run.
-            AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "cannot open $changeStream for non-existent database: "
-                                  << origNss.db(),
-                    origNssCtx.getDb() || request.isFromMongos());
-            Collection* origColl = origNssCtx.getCollection();
-            collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
+            if (origNss.isCollectionlessAggregateNS()) {
+                // If the change stream is opened against all collections in a database which does
+                // not exist yet, go ahead and create it. Use MODE_IX since the AutoGetOrCreateDb
+                // helper will automatically reacquire as MODE_X if the database does not exist.
+                AutoGetOrCreateDb dbLock(opCtx, origNss.db(), MODE_IX);
+                invariant(dbLock.getDb());
+            } else {
+                // Change streams can only be run against collections;
+                // AutoGetCollectionForReadCommand will raise an error if the given namespace is a
+                // view. A change stream may be opened on a namespace before the associated
+                // collection is created, but only if the database already exists. If the
+                // $changeStream was sent from mongoS then the database exists at the cluster level
+                // even if not yet present on this shard, so we allow the $changeStream to run.
+                AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
+
+                // Resolve the collator to either the user-specified collation or the default
+                // collation of the collection on which $changeStream was invoked, so that we do not
+                // end up resolving the collation on the oplog.
+                invariant(!collatorToUse);
+                if (!origNssCtx.getDb() && !request.isFromMongos()) {
+                    AutoGetOrCreateDb dbLock(opCtx, origNss.db(), MODE_X);
+                    invariant(dbLock.getDb());
+                }
+                Collection* origColl = origNssCtx.getCollection();
+                collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
+            }
         }
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();

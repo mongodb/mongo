@@ -30,8 +30,10 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
             pipeline.push(self.oplogProjection);
         }
 
-        // The 'collection' argument may be either a collection name or DBCollection object.
-        assert(collection instanceof DBCollection || typeof collection === "string");
+        // The 'collection' argument may be a collection name, DBCollection object, or '1' which
+        // indicates all collections in _db.
+        assert(collection instanceof DBCollection || typeof collection === "string" ||
+               collection === 1);
         const collName = (collection instanceof DBCollection ? collection.getName() : collection);
 
         let res = assert.commandWorked(_db.runCommand(
@@ -178,10 +180,19 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      */
     self.cleanUp = function() {
         for (let testCursor of _allCursors) {
-            assert.commandWorked(_db.getSiblingDB(testCursor.db).runCommand({
-                killCursors: testCursor.coll,
-                cursors: [testCursor.cursorId]
-            }));
+            if (typeof testCursor.coll === "string") {
+                assert.commandWorked(_db.getSiblingDB(testCursor.db).runCommand({
+                    killCursors: testCursor.coll,
+                    cursors: [testCursor.cursorId]
+                }));
+            } else if (testCursor.coll == 1) {
+                // Collection '1' indicates that the change stream was opened against an entire
+                // database and is considered 'collectionless'.
+                assert.commandWorked(_db.getSiblingDB(testCursor.db).runCommand({
+                    killCursors: "$cmd.aggregate",
+                    cursors: [testCursor.cursorId]
+                }));
+            }
         }
 
     };

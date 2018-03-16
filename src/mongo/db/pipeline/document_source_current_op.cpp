@@ -52,6 +52,8 @@ REGISTER_DOCUMENT_SOURCE(currentOp,
                          DocumentSourceCurrentOp::LiteParsed::parse,
                          DocumentSourceCurrentOp::createFromBson);
 
+constexpr StringData DocumentSourceCurrentOp::kStageName;
+
 std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::LiteParsed::parse(
     const AggregationRequest& request, const BSONElement& spec) {
     // Need to check the value of allUsers; if true then inprog privilege is required.
@@ -99,7 +101,7 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
 
 
 const char* DocumentSourceCurrentOp::getSourceName() const {
-    return "$currentOp";
+    return kStageName.rawData();
 }
 
 DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {

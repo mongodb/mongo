@@ -39,6 +39,8 @@ public:
     using LocalOpsMode = MongoProcessInterface::CurrentOpLocalOpsMode;
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
 
+    static constexpr StringData kStageName = "$currentOp"_sd;
+
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
@@ -75,6 +77,14 @@ public:
 
         bool isInitialSource() const final {
             return true;
+        }
+
+        void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Aggregation stage " << kStageName
+                                  << " requires read concern local but found "
+                                  << readConcern.toString(),
+                    readConcern.getLevel() == repl::ReadConcernLevel::kLocalReadConcern);
         }
 
     private:
