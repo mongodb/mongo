@@ -57,6 +57,26 @@ var resetCollection = function() {
     f.drop();
 };
 
+// Inserts numDocs into the given collection using a bulk operation. Each document's x value is its
+// index within the batch, starting from 1, and the y value is the given filler.
+let bulkInsertDocs = function(coll, numDocs, filler) {
+    const bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 1; i <= numDocs; i++) {
+        bulk.insert({x: i, y: filler});
+    }
+    assert.writeOK(bulk.execute());
+};
+
+// Inserts numDocs into the given collection using a bulk operation. Each document's x value is set
+// to the given xVal and the y value is the given filler.
+let bulkInsertDocsFixedX = function(coll, numDocs, filler, xVal) {
+    const bulk = coll.initializeUnorderedBulkOp();
+    for (let i = 1; i <= numDocs; i++) {
+        bulk.insert({x: xVal, y: filler});
+    }
+    assert.writeOK(bulk.execute());
+};
+
 // -------------------------
 //  TESTS START HERE
 // -------------------------
@@ -105,10 +125,8 @@ var case4 = function() {
     assert.gt(docSize, 500, "4a");
 
     // Fill collection and get split vector for 1MB maxChunkSize
-    numDocs = 4500;
-    for (i = 1; i < numDocs; i++) {
-        f.save({x: i, y: filler});
-    }
+    let numDocs = 4500;
+    bulkInsertDocs(f, numDocs - 1, filler);  // 1 document was already inserted.
     res = db.runCommand(
         {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
@@ -133,10 +151,7 @@ f.ensureIndex({x: 1});
 
 var case5 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
-    numDocs = 4500;
-    for (i = 1; i < numDocs; i++) {
-        f.save({x: i, y: filler});
-    }
+    bulkInsertDocs(f, 4499, filler);
     res = db.runCommand({
         splitVector: "test.jstests_splitvector",
         keyPattern: {x: 1},
@@ -160,10 +175,7 @@ f.ensureIndex({x: 1});
 
 var case6 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
-    numDocs = 2000;
-    for (i = 1; i < numDocs; i++) {
-        f.save({x: i, y: filler});
-    }
+    bulkInsertDocs(f, 1999, filler);
     res = db.runCommand({
         splitVector: "test.jstests_splitvector",
         keyPattern: {x: 1},
@@ -188,14 +200,8 @@ f.ensureIndex({x: 1});
 
 var case7 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
-    numDocs = 2100;
-    for (i = 1; i < numDocs; i++) {
-        f.save({x: 1, y: filler});
-    }
-
-    for (i = 1; i < 10; i++) {
-        f.save({x: 2, y: filler});
-    }
+    bulkInsertDocsFixedX(f, 2099, filler, 1);
+    bulkInsertDocsFixedX(f, 9, filler, 2);
     res = db.runCommand(
         {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
@@ -215,19 +221,9 @@ resetCollection();
 f.ensureIndex({x: 1});
 
 var case8 = function() {
-    for (i = 1; i < 10; i++) {
-        f.save({x: 1, y: filler});
-    }
-
-    numDocs = 2100;
-    for (i = 1; i < numDocs; i++) {
-        f.save({x: 2, y: filler});
-    }
-
-    for (i = 1; i < 10; i++) {
-        f.save({x: 3, y: filler});
-    }
-
+    bulkInsertDocsFixedX(f, 9, filler, 1);
+    bulkInsertDocsFixedX(f, 2099, filler, 2);
+    bulkInsertDocsFixedX(f, 9, filler, 3);
     res = db.runCommand(
         {splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1});
 
