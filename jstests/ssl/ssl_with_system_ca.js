@@ -11,8 +11,13 @@
     const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 
     if (HOST_TYPE == "windows") {
+        // OpenSSL backed imports Root CA and intermediate CA
         runProgram(
             "certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
+
+        // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
+        // Current User.
+        runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
     }
 
     var testWithCerts = function(serverPem) {

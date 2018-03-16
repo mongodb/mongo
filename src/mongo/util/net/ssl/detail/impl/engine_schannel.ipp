@@ -44,15 +44,16 @@ namespace detail {
 
 engine::engine(SCHANNEL_CRED* context)
     : _pCred(context),
-      _hcxt{0, 0},
-      _hcred{0, 0},
       _inBuffer(kDefaultBufferSize),
       _outBuffer(kDefaultBufferSize),
       _extraBuffer(kDefaultBufferSize),
       _handshakeManager(
           &_hcxt, &_hcred, _serverName, &_inBuffer, &_outBuffer, &_extraBuffer, _pCred),
       _readManager(&_hcxt, &_hcred, &_inBuffer, &_extraBuffer),
-      _writeManager(&_hcxt, &_outBuffer) {}
+      _writeManager(&_hcxt, &_outBuffer) {
+    SecInvalidateHandle(&_hcxt);
+    SecInvalidateHandle(&_hcred);
+}
 
 engine::~engine() {
     DeleteSecurityContext(&_hcxt);

@@ -1,3 +1,4 @@
+// Validate the shardsrvr does not crash when enabling SSL with encrypted PEM for a cluster
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 

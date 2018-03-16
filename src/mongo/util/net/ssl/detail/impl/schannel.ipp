@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "asio/detail/assert.hpp"
+#include "mongo/util/assert_util.h"
 
 namespace asio {
 namespace ssl {
@@ -66,7 +67,7 @@ ssl_want SSLHandshakeManager::nextHandshake(asio::error_code& ec, HandshakeState
                 return ssl_want::want_nothing;
             }
 
-            want = doServerHandshake(true, ec, pHandshakeState);
+            want = doServerHandshake(ec, pHandshakeState);
             if (ec) {
                 return want;
             }
@@ -92,7 +93,7 @@ ssl_want SSLHandshakeManager::nextHandshake(asio::error_code& ec, HandshakeState
         ssl_want want;
 
         if (_mode == HandshakeMode::Server) {
-            want = doServerHandshake(false, ec, pHandshakeState);
+            want = doServerHandshake(ec, pHandshakeState);
         } else {
             want = doClientHandshake(ec);
         }
@@ -254,8 +255,7 @@ ssl_want SSLHandshakeManager::startShutdown(asio::error_code& ec) {
     return ssl_want::want_nothing;
 }
 
-ssl_want SSLHandshakeManager::doServerHandshake(bool newConversation,
-                                                asio::error_code& ec,
+ssl_want SSLHandshakeManager::doServerHandshake(asio::error_code& ec,
                                                 HandshakeState* pHandshakeState) {
     TimeStamp lifetime;
 
@@ -294,7 +294,7 @@ ssl_want SSLHandshakeManager::doServerHandshake(bool newConversation,
     ULONG retAttribs = 0;
 
     SECURITY_STATUS ss = AcceptSecurityContext(_phcred,
-                                               newConversation ? NULL : _phctxt,
+                                               SecIsValidHandle(_phctxt) ? _phctxt : NULL,
                                                &inputBufferDesc,
                                                attribs,
                                                0,
@@ -320,7 +320,10 @@ ssl_want SSLHandshakeManager::doServerHandshake(bool newConversation,
 
         return ssl_want::want_nothing;
     }
-    invariant(attribs == retAttribs);
+
+    // ASC_RET_EXTENDED_ERROR is not support on Windows 7/Windows 2008 R2.
+    // ASC_RET_MUTUAL_AUTH is not set since we do our own certificate validation later.
+    invariant(attribs == (retAttribs | ASC_RET_EXTENDED_ERROR | ASC_RET_MUTUAL_AUTH));
 
     if (inputBuffers[1].BufferType == SECBUFFER_EXTRA) {
         _pExtraEncryptedBuffer->reset();
@@ -456,7 +459,8 @@ ssl_want SSLHandshakeManager::doClientHandshake(asio::error_code& ec) {
 
         return ssl_want::want_nothing;
     }
-    invariant(sspiFlags == retAttribs);
+    // ASC_RET_EXTENDED_ERROR is not support on Windows 7/Windows 2008 R2
+    invariant(sspiFlags == (retAttribs | ASC_RET_EXTENDED_ERROR));
 
     if (_pInBuffer->size()) {
         // Locate (optional) extra buffer

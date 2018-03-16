@@ -319,7 +319,7 @@ private:
 
     DWORD getServerFlags() {
         return ASC_REQ_SEQUENCE_DETECT | ASC_REQ_REPLAY_DETECT | ASC_REQ_CONFIDENTIALITY |
-            ASC_REQ_EXTENDED_ERROR | ASC_REQ_STREAM;
+            ASC_REQ_EXTENDED_ERROR | ASC_REQ_STREAM | ASC_REQ_MUTUAL_AUTH;
     }
 
     DWORD getClientFlags() {
@@ -347,9 +347,7 @@ private:
 
     ssl_want startShutdown(asio::error_code& ec);
 
-    ssl_want doServerHandshake(bool newConversation,
-                               asio::error_code& ec,
-                               HandshakeState* pHandshakeState);
+    ssl_want doServerHandshake(asio::error_code& ec, HandshakeState* pHandshakeState);
 
     ssl_want doClientHandshake(asio::error_code& ec);
 
