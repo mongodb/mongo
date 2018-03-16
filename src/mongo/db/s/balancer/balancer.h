@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
+#include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/db/s/balancer/migration_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -237,11 +238,15 @@ private:
     // Number of moved chunks in last round
     int _balancedLastTime;
 
-    // Source for cluster statistics
+    // Source of randomness when metadata needs to be randomized.
+    BalancerRandomSource _random;
+
+    // Source for cluster statistics. Depends on the source of randomness above so it should be
+    // created after it and destroyed before it.
     std::unique_ptr<ClusterStatistics> _clusterStats;
 
-    // Balancer policy. Depends on the cluster statistics instance above so it should be created
-    // after it and destroyed before it.
+    // Balancer policy. Depends on the cluster statistics instance and source of randomness above so
+    // it should be created after them and destroyed before them.
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
 
     // Migration manager used to schedule and manage migrations

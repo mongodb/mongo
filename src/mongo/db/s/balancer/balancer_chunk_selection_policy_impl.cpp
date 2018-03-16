@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -172,8 +173,9 @@ private:
 
 }  // namespace
 
-BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats)
-    : _clusterStats(clusterStats) {}
+BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats,
+                                                                   BalancerRandomSource& random)
+    : _clusterStats(clusterStats), _random(random) {}
 
 BalancerChunkSelectionPolicyImpl::~BalancerChunkSelectionPolicyImpl() = default;
 
@@ -186,19 +188,20 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
     const auto shardStats = std::move(shardStatsStatus.getValue());
 
-    const auto swCollections =
-        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
+    auto swCollections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
     if (!swCollections.isOK()) {
         return swCollections.getStatus();
     }
 
-    const auto& collections = swCollections.getValue();
+    auto& collections = swCollections.getValue();
 
     if (collections.empty()) {
         return SplitInfoVector{};
     }
 
     SplitInfoVector splitCandidates;
+
+    std::shuffle(collections.begin(), collections.end(), _random);
 
     for (const auto& coll : collections) {
         if (coll.getDropped()) {
@@ -239,13 +242,12 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
 
-    const auto swCollections =
-        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
+    auto swCollections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
     if (!swCollections.isOK()) {
         return swCollections.getStatus();
     }
 
-    const auto& collections = swCollections.getValue();
+    auto& collections = swCollections.getValue();
 
     if (collections.empty()) {
         return MigrateInfoVector{};
@@ -253,6 +255,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
     MigrateInfoVector candidateChunks;
     std::set<ShardId> usedShards;
+
+    std::shuffle(collections.begin(), collections.end(), _random);
 
     for (const auto& coll : collections) {
         if (coll.getDropped()) {
