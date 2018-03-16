@@ -376,9 +376,9 @@ CommandInvocation::~CommandInvocation() = default;
 //////////////////////////////////////////////////////////////
 // Command
 
-class Command::InvocationShim final : public CommandInvocation {
+class BasicCommand::Invocation final : public CommandInvocation {
 public:
-    InvocationShim(OperationContext*, const OpMsgRequest& request, Command* command)
+    Invocation(OperationContext*, const OpMsgRequest& request, BasicCommand* command)
         : CommandInvocation(command),
           _command(command),
           _request(&request),
@@ -388,7 +388,7 @@ private:
     void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
         try {
             BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = _command->enhancedRun(opCtx, *_request, bob);
+            bool ok = _command->run(opCtx, _dbName, _request->body, bob);
             CommandHelpers::appendCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
             CommandAuditHook hook(_command);
@@ -432,16 +432,17 @@ private:
         return _request->body;
     }
 
-    Command* const _command;
+    BasicCommand* const _command;
     const OpMsgRequest* const _request;
     const std::string _dbName;
 };
 
 Command::~Command() = default;
 
-std::unique_ptr<CommandInvocation> Command::parse(OperationContext* opCtx,
-                                                  const OpMsgRequest& request) {
-    return stdx::make_unique<InvocationShim>(opCtx, request, this);
+std::unique_ptr<CommandInvocation> BasicCommand::parse(OperationContext* opCtx,
+                                                       const OpMsgRequest& request) {
+    CommandHelpers::uassertNoDocumentSequences(getName(), request);
+    return stdx::make_unique<Invocation>(opCtx, request, this);
 }
 
 std::string Command::parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
@@ -468,10 +469,10 @@ Command::Command(StringData name, StringData oldName)
     globalCommandRegistry()->registerCommand(this, name, oldName);
 }
 
-Status Command::explain(OperationContext* opCtx,
-                        const OpMsgRequest& request,
-                        ExplainOptions::Verbosity verbosity,
-                        BSONObjBuilder* out) const {
+Status BasicCommand::explain(OperationContext* opCtx,
+                             const OpMsgRequest& request,
+                             ExplainOptions::Verbosity verbosity,
+                             BSONObjBuilder* out) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 
@@ -549,13 +550,6 @@ void Command::generateHelpResponse(OperationContext* opCtx,
                        str::stream() << "help for: " << command.getName() << " " << command.help());
     replyBuilder->setCommandReply(helpBuilder.obj());
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-}
-
-bool BasicCommand::enhancedRun(OperationContext* opCtx,
-                               const OpMsgRequest& request,
-                               BSONObjBuilder& result) {
-    CommandHelpers::uassertNoDocumentSequences(getName(), request);
-    return run(opCtx, request.getDatabase().toString(), request.body, result);
 }
 
 bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,

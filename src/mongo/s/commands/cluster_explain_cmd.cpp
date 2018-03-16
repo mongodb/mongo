@@ -56,10 +56,6 @@ public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) override;
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
      */
@@ -149,7 +145,7 @@ private:
     }
 
     bool supportsWriteConcern() const override {
-        return command()->supportsWriteConcern(_outerRequest->body);
+        return false;
     }
 
     Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {

@@ -212,36 +212,13 @@ public:
         return false;
     }
 
-    bool supportsReadConcern(const std::string& dbName,
-                             const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
-        return level == repl::ReadConcernLevel::kLocalReadConcern ||
-            level == repl::ReadConcernLevel::kSnapshotReadConcern;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const {
-        return true;
-    }
-
     ReadWriteType getReadWriteType() const {
         return ReadWriteType::kWrite;
     }
 
-    bool enhancedRun(OperationContext* opCtx,
-                     const OpMsgRequest& request,
-                     BSONObjBuilder& result) final {
-        try {
-            runImpl(opCtx, request, result);
-            return true;
-        } catch (const DBException& ex) {
-            LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
-            throw;
-        }
-    }
-
     virtual void runImpl(OperationContext* opCtx,
                          const OpMsgRequest& request,
-                         BSONObjBuilder& result) = 0;
+                         BSONObjBuilder& result) const = 0;
 
     virtual Status explainImpl(OperationContext* opCtx,
                                const OpMsgRequest& request,
@@ -256,53 +233,65 @@ private:
 
 class WriteCommand::Invocation : public CommandInvocation {
 public:
-    Invocation(OperationContext* opCtx, const OpMsgRequest& request, WriteCommand* writeCommand)
-        : CommandInvocation(writeCommand), _request{&request}, _writeCommand{writeCommand} {}
+    Invocation(const WriteCommand* writeCommand, const OpMsgRequest& request, NamespaceString ns)
+        : CommandInvocation(writeCommand), _request{&request}, _ns{std::move(ns)} {}
 
 private:
-    void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+    void run(OperationContext* opCtx, CommandReplyBuilder* result) final {
         try {
-            BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = _writeCommand->enhancedRun(opCtx, *_request, bob);
-            CommandHelpers::appendCommandStatus(bob, ok);
+            try {
+                BSONObjBuilder bob = result->getBodyBuilder();
+                command()->runImpl(opCtx, *_request, bob);
+                CommandHelpers::extractOrAppendOk(bob);
+            } catch (const DBException& ex) {
+                LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
+                throw;
+            }
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::logAuthViolation(
-                opCtx, _writeCommand, *_request, ErrorCodes::Unauthorized);
+            CommandHelpers::logAuthViolation(opCtx, command(), *_request, ErrorCodes::Unauthorized);
             throw;
         }
     }
 
     void explain(OperationContext* opCtx,
                  ExplainOptions::Verbosity verbosity,
-                 BSONObjBuilder* result) override {
-        uassertStatusOK(_writeCommand->explainImpl(opCtx, *_request, verbosity, result));
-    }
-    NamespaceString ns() const override {
-        return NamespaceString(
-            _writeCommand->parseNs(_request->getDatabase().toString(), _request->body));
-    }
-    bool supportsWriteConcern() const override {
-        return _writeCommand->supportsWriteConcern(_request->body);
-    }
-    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-        return _writeCommand->secondaryAllowed(context);
-    }
-    bool supportsReadConcern(repl::ReadConcernLevel level) const override {
-        return _writeCommand->supportsReadConcern(
-            _request->getDatabase().toString(), _request->body, level);
+                 BSONObjBuilder* result) final {
+        uassertStatusOK(command()->explainImpl(opCtx, *_request, verbosity, result));
     }
 
-    void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(_writeCommand->checkAuthForRequest(opCtx, *_request));
+    NamespaceString ns() const final {
+        return _ns;
+    }
+
+    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const final {
+        return command()->secondaryAllowed(context);
+    }
+
+    bool supportsReadConcern(repl::ReadConcernLevel level) const final {
+        return level == repl::ReadConcernLevel::kLocalReadConcern ||
+            level == repl::ReadConcernLevel::kSnapshotReadConcern;
+    }
+
+    bool supportsWriteConcern() const final {
+        return true;
+    }
+
+    void doCheckAuthorization(OperationContext* opCtx) const final {
+        uassertStatusOK(command()->checkAuthForRequest(opCtx, *_request));
+    }
+
+    const WriteCommand* command() const {
+        return static_cast<const WriteCommand*>(definition());
     }
 
     const OpMsgRequest* _request;
-    WriteCommand* _writeCommand;
+    NamespaceString _ns;
 };
 
 std::unique_ptr<CommandInvocation> WriteCommand::parse(OperationContext* opCtx,
                                                        const OpMsgRequest& request) {
-    return std::unique_ptr<CommandInvocation>(stdx::make_unique<Invocation>(opCtx, request, this));
+    return stdx::make_unique<Invocation>(
+        this, request, NamespaceString(parseNs(request.getDatabase().toString(), request.body)));
 }
 
 class CmdInsert final : public WriteCommand {
@@ -324,7 +313,7 @@ public:
 
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
-                 BSONObjBuilder& result) final {
+                 BSONObjBuilder& result) const final {
         const auto batch = InsertOp::parse(request);
         auto reply = performInserts(opCtx, batch);
         serializeReply(opCtx,
@@ -355,7 +344,7 @@ public:
 
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
-                 BSONObjBuilder& result) final {
+                 BSONObjBuilder& result) const final {
         const auto batch = UpdateOp::parse(request);
         auto reply = performUpdates(opCtx, batch);
         serializeReply(opCtx,
@@ -420,7 +409,7 @@ public:
 
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
-                 BSONObjBuilder& result) final {
+                 BSONObjBuilder& result) const final {
         const auto batch = DeleteOp::parse(request);
         auto reply = performDeletes(opCtx, batch);
         serializeReply(opCtx,

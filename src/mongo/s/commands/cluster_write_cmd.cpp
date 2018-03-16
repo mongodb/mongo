@@ -139,14 +139,10 @@ public:
     virtual ~ClusterWriteCmd() {}
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& request) override;
+                                             const OpMsgRequest& request) final;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
-        return true;
     }
 
     LogicalOp getLogicalOp() const {
@@ -205,7 +201,7 @@ public:
     bool runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
                  BatchedCommandRequest& batchedRequest,
-                 BSONObjBuilder& result) {
+                 BSONObjBuilder& result) const {
         auto db = batchedRequest.getNS().db();
         if (db != NamespaceString::kAdminDb && db != NamespaceString::kConfigDb) {
             batchedRequest.setAllowImplicitCreate(false);
@@ -347,25 +343,25 @@ private:
     const BatchedCommandRequest::BatchType _writeType;
 };
 
-class ClusterWriteCmd::Invocation : public CommandInvocation {
+class ClusterWriteCmd::Invocation final : public CommandInvocation {
 public:
-    Invocation(OperationContext* opCtx,
+    Invocation(const ClusterWriteCmd* clusterWriteCmd,
                const OpMsgRequest& request,
-               BatchedCommandRequest batchedRequest,
-               ClusterWriteCmd* command)
-        : CommandInvocation(command),
+               NamespaceString ns,
+               BatchedCommandRequest batchedRequest)
+        : CommandInvocation(clusterWriteCmd),
           _request{&request},
-          _command{command},
+          _ns{std::move(ns)},
           _batchedRequest{std::move(batchedRequest)} {}
 
 private:
     void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
         try {
             BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = _command->runImpl(opCtx, *_request, _batchedRequest, bob);
+            bool ok = command()->runImpl(opCtx, *_request, _batchedRequest, bob);
             CommandHelpers::appendCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::logAuthViolation(opCtx, _command, *_request, ErrorCodes::Unauthorized);
+            CommandHelpers::logAuthViolation(opCtx, command(), *_request, ErrorCodes::Unauthorized);
             throw;
         }
     }
@@ -374,36 +370,41 @@ private:
                  ExplainOptions::Verbosity verbosity,
                  BSONObjBuilder* result) override {
         uassertStatusOK(
-            _command->explainImpl(opCtx, *_request, verbosity, _batchedRequest, result));
+            command()->explainImpl(opCtx, *_request, verbosity, _batchedRequest, result));
     }
 
     NamespaceString ns() const override {
-        return NamespaceString(
-            _command->parseNs(_request->getDatabase().toString(), _request->body));
+        return _ns;
     }
 
     bool supportsWriteConcern() const override {
-        return _command->supportsWriteConcern(_request->body);
+        return true;
     }
 
     Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-        return _command->secondaryAllowed(context);
+        return command()->secondaryAllowed(context);
     }
 
     void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(_command->checkAuthForRequest(opCtx, *_request));
+        uassertStatusOK(command()->checkAuthForRequest(opCtx, *_request));
+    }
+
+    const ClusterWriteCmd* command() const {
+        return static_cast<const ClusterWriteCmd*>(definition());
     }
 
     const OpMsgRequest* _request;
-    ClusterWriteCmd* _command;
+    NamespaceString _ns;
     BatchedCommandRequest _batchedRequest;
 };
 
 std::unique_ptr<CommandInvocation> ClusterWriteCmd::parse(OperationContext* opCtx,
                                                           const OpMsgRequest& request) {
-    auto batchedRequest = parseRequest(_writeType, request);
-    return std::unique_ptr<CommandInvocation>(
-        stdx::make_unique<Invocation>(opCtx, request, std::move(batchedRequest), this));
+    return stdx::make_unique<Invocation>(
+        this,
+        request,
+        NamespaceString(parseNs(request.getDatabase().toString(), request.body)),
+        parseRequest(_writeType, request));
 }
 
 class ClusterCmdInsert : public ClusterWriteCmd {

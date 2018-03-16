@@ -225,7 +225,7 @@ public:
     virtual ~Command();
 
     virtual std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                                     const OpMsgRequest& request);
+                                                     const OpMsgRequest& request) = 0;
 
     /**
      * Returns the command's name. This value never changes for the lifetime of the command.
@@ -388,76 +388,6 @@ public:
                                      const OpMsgRequest& request);
 
 private:
-    class InvocationShim;
-
-    /**
-     * Commands which can be explained override this method. Any operation which has a query
-     * part and executes as a tree of execution stages can be explained. A command should
-     * implement explain by:
-     *
-     *   1) Calling its custom parse function in order to parse the command. The output of
-     *   this function should be a CanonicalQuery (representing the query part of the
-     *   operation), and a PlanExecutor which wraps the tree of execution stages.
-     *
-     *   2) Calling Explain::explainStages(...) on the PlanExecutor. This is the function
-     *   which knows how to convert an execution stage tree into explain output.
-     */
-    virtual Status explain(OperationContext* opCtx,
-                           const OpMsgRequest& request,
-                           ExplainOptions::Verbosity verbosity,
-                           BSONObjBuilder* out) const;
-
-    /**
-     * supportsWriteConcern returns true if this command should be parsed for a writeConcern
-     * field and wait for that write concern to be satisfied after the command runs.
-     *
-     * @param cmd is a BSONObj representation of the command that is used to determine if the
-     *            the command supports a write concern. Ex. aggregate only supports write concern
-     *            when $out is provided.
-     */
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const = 0;
-
-    /**
-     * Returns true if this Command supports the given readConcern level. Takes the command object
-     * and the name of the database on which it was invoked as arguments, so that readConcern can be
-     * conditionally rejected based on the command's parameters and/or namespace.
-     *
-     * If a readConcern level argument is sent to a command that returns false the command processor
-     * will reject the command, returning an appropriate error message.
-     *
-     * Note that this is never called on mongos. Sharded commands are responsible for forwarding
-     * the option to the shards as needed. We rely on the shards to fail the commands in the
-     * cases where it isn't supported.
-     */
-    virtual bool supportsReadConcern(const std::string& dbName,
-                                     const BSONObj& cmdObj,
-                                     repl::ReadConcernLevel level) const {
-        return level == repl::ReadConcernLevel::kLocalReadConcern;
-    }
-
-    /**
-     * Returns true if command allows afterClusterTime in its readConcern. The command may not allow
-     * it if it is specifically intended not to take any LockManager locks. Waiting for
-     * afterClusterTime takes the MODE_IS lock.
-     */
-    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {
-        return true;
-    }
-
-    /**
-     * Runs the command.
-     *
-     * The default implementation verifies that request has no document sections then forwards to
-     * BasicCommand::run().
-     *
-     * For now commands should only implement if they need access to OP_MSG-specific functionality.
-     */
-    virtual bool enhancedRun(OperationContext* opCtx,
-                             const OpMsgRequest& request,
-                             BSONObjBuilder& result) {
-        MONGO_UNREACHABLE;
-    }
-
     // Counters for how many times this command has been executed and failed
     Counter64 _commandsExecuted;
     Counter64 _commandsFailed;
@@ -526,8 +456,6 @@ public:
      */
     virtual bool supportsWriteConcern() const = 0;
 
-    virtual Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const = 0;
-
     /**
      * Returns true if this Command supports the given readConcern level. Takes the command object
      * and the name of the database on which it was invoked as arguments, so that readConcern can be
@@ -552,6 +480,8 @@ public:
     virtual bool allowsAfterClusterTime() const {
         return true;
     }
+
+    virtual Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const = 0;
 
     /**
      * The command definition that this invocation runs.
@@ -587,6 +517,9 @@ private:
  * sequences.
  */
 class BasicCommand : public Command {
+private:
+    class Invocation;
+
 public:
     using Command::Command;
 
@@ -606,6 +539,23 @@ public:
                      BSONObjBuilder& result) = 0;
 
     /**
+     * Commands which can be explained override this method. Any operation which has a query
+     * part and executes as a tree of execution stages can be explained. A command should
+     * implement explain by:
+     *
+     *   1) Calling its custom parse function in order to parse the command. The output of
+     *   this function should be a CanonicalQuery (representing the query part of the
+     *   operation), and a PlanExecutor which wraps the tree of execution stages.
+     *
+     *   2) Calling Explain::explainStages(...) on the PlanExecutor. This is the function
+     *   which knows how to convert an execution stage tree into explain output.
+     */
+    virtual Status explain(OperationContext* opCtx,
+                           const OpMsgRequest& request,
+                           ExplainOptions::Verbosity verbosity,
+                           BSONObjBuilder* out) const;
+
+    /**
      * Checks if the client associated with the given OperationContext is authorized to run this
      * command. Default implementation defers to checkAuthForCommand.
      */
@@ -613,7 +563,42 @@ public:
                                          const std::string& dbname,
                                          const BSONObj& cmdObj) const;
 
+    /**
+     * supportsWriteConcern returns true if this command should be parsed for a writeConcern
+     * field and wait for that write concern to be satisfied after the command runs.
+     *
+     * @param cmd is a BSONObj representation of the command that is used to determine if the
+     *            the command supports a write concern. Ex. aggregate only supports write concern
+     *            when $out is provided.
+     */
+    virtual bool supportsWriteConcern(const BSONObj& cmdObj) const = 0;
+
+    /**
+     * Returns true if this Command supports the given readConcern level. Takes the command object
+     * and the name of the database on which it was invoked as arguments, so that readConcern can be
+     * conditionally rejected based on the command's parameters and/or namespace.
+     *
+     * If a readConcern level argument is sent to a command that returns false the command processor
+     * will reject the command, returning an appropriate error message.
+     *
+     * Note that this is never called on mongos. Sharded commands are responsible for forwarding
+     * the option to the shards as needed. We rely on the shards to fail the commands in the
+     * cases where it isn't supported.
+     */
+    virtual bool supportsReadConcern(const std::string& dbName,
+                                     const BSONObj& cmdObj,
+                                     repl::ReadConcernLevel level) const {
+        return level == repl::ReadConcernLevel::kLocalReadConcern;
+    }
+
+    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {
+        return true;
+    }
+
 private:
+    std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
+                                             const OpMsgRequest& request) final;
+
     //
     // Deprecated virtual methods.
     //
@@ -643,13 +628,6 @@ private:
     //
     // Methods provided for subclasses if they implement above interface.
     //
-
-    /**
-     * Calls run().
-     */
-    bool enhancedRun(OperationContext* opCtx,
-                     const OpMsgRequest& request,
-                     BSONObjBuilder& result) final;
 
     /**
      * Calls checkAuthForOperation.
