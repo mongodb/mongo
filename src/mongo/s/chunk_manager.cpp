@@ -83,8 +83,8 @@ ChunkManager::ChunkManager(NamespaceString nss,
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
       _chunkMap(std::move(chunkMap)),
-      _chunkMapViews(
-          _constructChunkMapViews(collectionVersion.epoch(), _chunkMap, _shardKeyOrdering)),
+      _shardVersions(
+          _constructShardVersionMap(collectionVersion.epoch(), _chunkMap, _shardKeyOrdering)),
       _collectionVersion(collectionVersion) {}
 
 std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
@@ -117,11 +117,13 @@ bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& sha
     if (shardKey.isEmpty())
         return false;
 
-    const auto it = _rangeMapUpperBound(shardKey);
-    if (it == _chunkMapViews.chunkRangeMap.end())
+    const auto it = _chunkMap.upper_bound(_extractKeyString(shardKey));
+    if (it == _chunkMap.end())
         return false;
 
-    return it->shardId == shardId;
+    invariant(it->second->containsKey(shardKey));
+
+    return it->second->getShardId() == shardId;
 }
 
 void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
@@ -176,7 +178,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
         getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds);
 
         // once we know we need to visit all shards no need to keep looping
-        if (shardIds->size() == _chunkMapViews.shardVersions.size()) {
+        if (shardIds->size() == _shardVersions.size()) {
             break;
         }
     }
@@ -185,31 +187,39 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
     // For now, we satisfy that assumption by adding a shard with no matches rather than returning
     // an empty set of shards.
     if (shardIds->empty()) {
-        shardIds->insert(_chunkMapViews.chunkRangeMap.begin()->shardId);
+        shardIds->insert(_chunkMap.begin()->second->getShardId());
     }
 }
 
 void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds) const {
-    const auto bounds = _overlappingRanges(min, max, true);
-    for (auto it = bounds.first; it != bounds.second; ++it) {
-        shardIds->insert(it->shardId);
+    const auto itMin = _chunkMap.upper_bound(_extractKeyString(min));
+    const auto itMax = [this, &max]() {
+        auto it = _chunkMap.upper_bound(_extractKeyString(max));
+        return it == _chunkMap.end() ? it : ++it;
+    }();
+
+    for (auto it = itMin; it != itMax; ++it) {
+        shardIds->insert(it->second->getShardId());
 
         // No need to iterate through the rest of the ranges, because we already know we need to use
         // all shards.
-        if (shardIds->size() == _chunkMapViews.shardVersions.size()) {
+        if (shardIds->size() == _shardVersions.size()) {
             break;
         }
     }
 }
 
 bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const {
-    const auto bounds = _overlappingRanges(range.getMin(), range.getMax(), false);
-    const auto it = std::find_if(bounds.first, bounds.second, [&shardId](const auto& scr) {
-        return scr.shardId == shardId;
-    });
-    return it != bounds.second;
+    const auto itMin = _chunkMap.upper_bound(_extractKeyString(range.getMin()));
+    const auto itMax = [this, &range]() {
+        auto it = _chunkMap.lower_bound(_extractKeyString(range.getMax()));
+        return it == _chunkMap.end() ? it : ++it;
+    }();
+    const auto it = std::find_if(
+        itMin, itMax, [&shardId](const auto& scr) { return scr.second->getShardId() == shardId; });
+    return it != itMax;
 }
 
 ChunkManager::ConstRangeOfChunks ChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
@@ -228,8 +238,8 @@ ChunkManager::ConstRangeOfChunks ChunkManager::getNextChunkOnShard(const BSONObj
 }
 
 void ChunkManager::getAllShardIds(std::set<ShardId>* all) const {
-    std::transform(_chunkMapViews.shardVersions.begin(),
-                   _chunkMapViews.shardVersions.end(),
+    std::transform(_shardVersions.begin(),
+                   _shardVersions.end(),
                    std::inserter(*all, all->begin()),
                    [](const ShardVersionMap::value_type& pair) { return pair.first; });
 }
@@ -356,8 +366,8 @@ bool ChunkManager::compatibleWith(const ChunkManager& other, const ShardId& shar
 }
 
 ChunkVersion ChunkManager::getVersion(const ShardId& shardName) const {
-    auto it = _chunkMapViews.shardVersions.find(shardName);
-    if (it == _chunkMapViews.shardVersions.end()) {
+    auto it = _shardVersions.find(shardName);
+    if (it == _shardVersions.end()) {
         // Shards without explicitly tracked shard versions (meaning they have no chunks) always
         // have a version of (0, 0, epoch)
         return ChunkVersion(0, 0, _collectionVersion.epoch());
@@ -375,25 +385,22 @@ std::string ChunkManager::toString() const {
         sb << "\t" << chunk->toString() << '\n';
     }
 
-    sb << "Ranges:\n";
-    for (const auto& entry : _chunkMapViews.chunkRangeMap) {
-        sb << "\t" << entry.range.toString() << " @ " << entry.shardId << '\n';
-    }
-
     sb << "Shard versions:\n";
-    for (const auto& entry : _chunkMapViews.shardVersions) {
+    for (const auto& entry : _shardVersions) {
         sb << "\t" << entry.first << ": " << entry.second.toString() << '\n';
     }
 
     return sb.str();
 }
 
-ChunkManager::ChunkMapViews ChunkManager::_constructChunkMapViews(const OID& epoch,
-                                                                  const ChunkMap& chunkMap,
-                                                                  Ordering shardKeyOrdering) {
-    ChunkRangeMap chunkRangeMap;
+ShardVersionMap ChunkManager::_constructShardVersionMap(const OID& epoch,
+                                                        const ChunkMap& chunkMap,
+                                                        Ordering shardKeyOrdering) {
     ShardVersionMap shardVersions;
     ChunkMap::const_iterator current = chunkMap.cbegin();
+
+    boost::optional<BSONObj> firstMin = boost::none;
+    boost::optional<BSONObj> lastMax = boost::none;
 
     while (current != chunkMap.cend()) {
         const auto& firstChunkInRange = current->second;
@@ -428,30 +435,28 @@ ChunkManager::ChunkMapViews ChunkManager::_constructChunkMapViews(const OID& epo
         const BSONObj rangeMin = firstChunkInRange->getMin();
         const BSONObj rangeMax = rangeLast->second->getMax();
 
-        if (!chunkRangeMap.empty()) {
-            uassert(
-                ErrorCodes::ConflictingOperationInProgress,
-                str::stream()
-                    << "Metadata contains chunks with the same or out-of-order max value; "
-                       "expected "
-                    << chunkRangeMap.back().max()
-                    << " < "
-                    << rangeMax,
-                SimpleBSONObjComparator::kInstance.evaluate(chunkRangeMap.back().max() < rangeMax));
+        if (lastMax) {
+            uassert(ErrorCodes::ConflictingOperationInProgress,
+                    str::stream()
+                        << "Metadata contains chunks with the same or out-of-order max value; "
+                           "expected "
+                        << lastMax.get()
+                        << " < "
+                        << rangeMax,
+                    SimpleBSONObjComparator::kInstance.evaluate(lastMax.get() < rangeMax));
             // Make sure there are no gaps in the ranges
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Gap or an overlap between ranges "
                                   << ChunkRange(rangeMin, rangeMax).toString()
                                   << " and "
-                                  << chunkRangeMap.back().range.toString(),
-                    SimpleBSONObjComparator::kInstance.evaluate(chunkRangeMap.back().max() ==
-                                                                rangeMin));
+                                  << lastMax.get(),
+                    SimpleBSONObjComparator::kInstance.evaluate(lastMax.get() == rangeMin));
         }
 
-        chunkRangeMap.emplace_back(
-            ShardAndChunkRange{{rangeMin, rangeMax},
-                               firstChunkInRange->getShardId(),
-                               extractKeyStringInternal(rangeMax, shardKeyOrdering)});
+        if (!firstMin)
+            firstMin = rangeMin;
+
+        lastMax = rangeMax;
 
         // If a shard has chunks it must have a shard version, otherwise we have an invalid chunk
         // somewhere, which should have been caught at chunk load time
@@ -459,77 +464,19 @@ ChunkManager::ChunkMapViews ChunkManager::_constructChunkMapViews(const OID& epo
     }
 
     if (!chunkMap.empty()) {
-        invariant(!chunkRangeMap.empty());
         invariant(!shardVersions.empty());
+        invariant(firstMin.is_initialized());
+        invariant(lastMax.is_initialized());
 
-        checkAllElementsAreOfType(MinKey, chunkRangeMap.front().min());
-        checkAllElementsAreOfType(MaxKey, chunkRangeMap.back().max());
-
-        DEV for (size_t i = 0; i < chunkRangeMap.size() - 1; ++i) {
-            const auto& c1 = chunkRangeMap[i];
-            const auto& c2 = chunkRangeMap[i + 1];
-
-            invariant(SimpleBSONObjComparator::kInstance.evaluate(c1.max() == c2.min()),
-                      str::stream() << "Found gap between " << c1.range.toString() << " and "
-                                    << c2.range.toString());
-        }
+        checkAllElementsAreOfType(MinKey, firstMin.get());
+        checkAllElementsAreOfType(MaxKey, lastMax.get());
     }
 
-    return {std::move(chunkRangeMap), std::move(shardVersions)};
+    return shardVersions;
 }
 
 std::string ChunkManager::_extractKeyString(const BSONObj& shardKeyValue) const {
     return extractKeyStringInternal(shardKeyValue, _shardKeyOrdering);
-}
-
-ChunkManager::ChunkRangeMap::const_iterator ChunkManager::_rangeMapUpperBound(
-    const BSONObj& key) const {
-
-    // This class is necessary, because the last argument to std::upper_bound is a functor which
-    // implements the BinaryPredicate concept. A binary predicate pred must be able to evaluate both
-    // pred(*iter1, *iter2) and pred(*iter1, value). The type of "value" in this case is
-    // std::string, while the type of *Iter is ShardAndChunkRange.
-    struct Key {
-        static const std::string& extract(const std::string& k) {
-            return k;
-        }
-        static void extract(std::string&& k) = delete;
-        static const std::string& extract(const ShardAndChunkRange& scr) {
-            return scr.ksMax;
-        }
-        static const std::string& extract(ShardAndChunkRange&&) = delete;
-    };
-
-    return std::upper_bound(_chunkMapViews.chunkRangeMap.cbegin(),
-                            _chunkMapViews.chunkRangeMap.cend(),
-                            _extractKeyString(key),
-                            [](const auto& lhs, const auto& rhs) -> bool {
-                                return Key::extract(lhs) < Key::extract(rhs);
-                            });
-}
-
-std::pair<ChunkManager::ChunkRangeMap::const_iterator, ChunkManager::ChunkRangeMap::const_iterator>
-ChunkManager::_overlappingRanges(const mongo::BSONObj& min,
-                                 const mongo::BSONObj& max,
-                                 bool isMaxInclusive) const {
-    dassert(SimpleBSONObjComparator::kInstance.evaluate(min <= max));
-    const auto begin = _rangeMapUpperBound(min);
-    auto end = _rangeMapUpperBound(max);
-
-    // The chunk range map must always cover the entire key space
-    invariant(begin != _chunkMapViews.chunkRangeMap.cend());
-
-    // Bump the end chunk, because the second iterator in the returned pair is exclusive. There is
-    // one caveat - if the exclusive max boundary of the range looked up is the same as the
-    // inclusive min of the end chunk returned, it is still possible that the min is not in the end
-    // chunk, in which case bumping the end will result in one extra chunk claimed to cover the
-    // range.
-    if (end != _chunkMapViews.chunkRangeMap.cend() &&
-        (isMaxInclusive || SimpleBSONObjComparator::kInstance.evaluate(max > end->min()))) {
-        ++end;
-    }
-
-    return {begin, end};
 }
 
 std::shared_ptr<ChunkManager> ChunkManager::makeNew(
