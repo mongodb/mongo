@@ -1357,7 +1357,7 @@ var ReplSetTest = function(opts) {
         assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
                              'failed to lock the primary');
         try {
-            this.awaitReplication(60 * 1000 * 5);
+            this.awaitReplication();
             checkerFunction.apply(this, checkerFunctionArgs);
         } catch (e) {
             activeException = true;
