@@ -12,13 +12,14 @@
     var db = s.getDB("test");
 
     var N = 10000;
+    var shards = [s.shard0.shardName, s.shard1.shardName, s.shard2.shardName];
 
     for (var i = 0; i < N; i += (N / 10)) {
         s.adminCommand({split: "test.foo", middle: {_id: i}});
         s.s.getDB('admin').runCommand({
             moveChunk: "test.foo",
             find: {_id: i},
-            to: "shard000" + Math.floor(Math.random() * numShards)
+            to: shards[Math.floor(Math.random() * numShards)]
         });
     }
 
