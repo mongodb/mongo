@@ -427,14 +427,14 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                     if (!swVersion.isOK()) {
                         severe() << swVersion.getStatus();
                         // Note this error path captures all cases of an FCV document existing,
-                        // but with any value other than "3.4" or "3.6". This includes unexpected
+                        // but with any value other than "3.6" or "4.0". This includes unexpected
                         // cases with no path forward such as the FCV value not being a string.
                         return {ErrorCodes::MustDowngrade,
                                 str::stream()
                                     << "UPGRADE PROBLEM: Unable to parse the "
                                        "featureCompatibilityVersion document. The data files need "
-                                       "to be fully upgraded to version 3.4 before attempting an "
-                                       "upgrade to 3.6. If you are upgrading to 3.6, see "
+                                       "to be fully upgraded to version 3.6 before attempting an "
+                                       "upgrade to 4.0. If you are upgrading to 4.0, see "
                                     << feature_compatibility_version_documentation::kUpgradeLink
                                     << "."};
                     }
