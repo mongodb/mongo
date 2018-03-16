@@ -32,6 +32,8 @@
 
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 
+#include <algorithm>
+
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
@@ -96,7 +98,7 @@ StatusWith<string> retrieveShardMongoDVersion(OperationContext* txn, ShardId sha
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
 
-ClusterStatisticsImpl::ClusterStatisticsImpl() = default;
+ClusterStatisticsImpl::ClusterStatisticsImpl(BalancerRandomSource& random) : _random(random) {}
 
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
@@ -112,7 +114,9 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
         return shardsStatus.getStatus();
     }
 
-    const vector<ShardType> shards(std::move(shardsStatus.getValue().value));
+    auto& shards = shardsStatus.getValue().value;
+
+    std::shuffle(shards.begin(), shards.end(), _random);
 
     vector<ShardStatistics> stats;
 

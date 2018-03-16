@@ -153,9 +153,10 @@ void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& cluste
 
 Balancer::Balancer(ServiceContext* serviceContext)
     : _balancedLastTime(0),
-      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>()),
+      _random(std::random_device{}()),
+      _clusterStats(stdx::make_unique<ClusterStatisticsImpl>(_random)),
       _chunkSelectionPolicy(
-          stdx::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())),
+          stdx::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
       _migrationManager(serviceContext) {}
 
 Balancer::~Balancer() {
