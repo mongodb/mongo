@@ -81,6 +81,19 @@ struct CERTFree {
 using UniqueCertificate = std::unique_ptr<const CERT_CONTEXT, CERTFree>;
 
 /**
+* Free a CRL Handle
+*/
+struct CryptCRLFree {
+    void operator()(const CRL_CONTEXT* p) noexcept {
+        if (p) {
+            ::CertFreeCRLContext(p);
+        }
+    }
+};
+
+using UniqueCRL = std::unique_ptr<const CRL_CONTEXT, CryptCRLFree>;
+
+/**
 * A simple generic class to manage Windows handle like things. Behaves similiar to std::unique_ptr.
 *
 * Only supports move.
@@ -151,6 +164,22 @@ struct CryptKeyFree {
 };
 
 using UniqueCryptKey = AutoHandle<HCRYPTKEY, CryptKeyFree>;
+
+/**
+ * Free a CERTSTORE Handle
+*/
+struct CertStoreFree {
+    void operator()(HCERTSTORE const p) noexcept {
+        if (p) {
+            // For leak detection, add CERT_CLOSE_STORE_CHECK_FLAG
+            // Currently, we open very few cert stores and let the certs live beyond the cert store
+            // so the leak detection flag is not useful.
+            ::CertCloseStore(p, 0);
+        }
+    }
+};
+
+using UniqueCertStore = AutoHandle<HCERTSTORE, CertStoreFree>;
 
 /**
  * The lifetime of a private key of a certificate loaded from a PEM is bound to the CryptContext's
@@ -234,6 +263,8 @@ private:
     UniqueCertificateWithPrivateKey _clusterPEMCertificate;
     std::array<PCCERT_CONTEXT, 1> _clientCertificates;
     std::array<PCCERT_CONTEXT, 1> _serverCertificates;
+
+    UniqueCertStore _certStore;
 };
 
 // Global variable indicating if this is a server or a client instance
@@ -406,14 +437,21 @@ StatusWith<std::string> readFile(StringData fileName) {
 }
 
 // Find a specific kind of PEM blob marked by BEGIN and END in a string
-StatusWith<StringData> findPEMBlob(StringData blob, StringData type, size_t position = 0) {
+StatusWith<StringData> findPEMBlob(StringData blob,
+                                   StringData type,
+                                   size_t position = 0,
+                                   bool allowEmpty = false) {
     std::string header = str::stream() << "-----BEGIN " << type << "-----";
     std::string trailer = str::stream() << "-----END " << type << "-----";
 
     size_t headerPosition = blob.find(header, position);
     if (headerPosition == std::string::npos) {
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Failed to find PEM blob header: " << header);
+        if (allowEmpty) {
+            return StringData();
+        } else {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "Failed to find PEM blob header: " << header);
+        }
     }
 
     size_t trailerPosition = blob.find(trailer, headerPosition);
@@ -680,6 +718,145 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
         UniqueCertificateWithPrivateKey(std::move(certHolder), std::move(cryptProvider)));
 }
 
+Status readCAPEMFile(HCERTSTORE certStore, StringData fileName) {
+
+    auto swBuf = readFile(fileName);
+    if (!swBuf.isOK()) {
+        return swBuf.getStatus();
+    }
+
+    std::string buf = std::move(swBuf.getValue());
+
+    // Search the buffer for the various strings that make up a PEM file
+    size_t pos = 0;
+
+    while (pos < buf.size()) {
+        auto swBlob = findPEMBlob(buf, "CERTIFICATE"_sd, pos, pos != 0);
+
+        // We expect to find at least one certificate
+        if (!swBlob.isOK()) {
+            return swBlob.getStatus();
+        }
+
+        auto blobBuf = swBlob.getValue();
+
+        if (blobBuf.empty()) {
+            return Status::OK();
+        }
+
+        pos = (blobBuf.rawData() + blobBuf.size()) - buf.data();
+
+        auto swCert = decodePEMBlob(blobBuf);
+        if (!swCert.isOK()) {
+            return swCert.getStatus();
+        }
+
+        auto certBuf = swCert.getValue();
+
+        PCCERT_CONTEXT cert =
+            CertCreateCertificateContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
+        if (cert == NULL) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertCreateCertificateContext failed to decode cert: "
+                                        << errnoWithDescription(gle));
+        }
+        UniqueCertificate certHolder(cert);
+
+        BOOL ret = CertAddCertificateContextToStore(certStore, cert, CERT_STORE_ADD_NEW, NULL);
+
+        if (!ret) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertAddCertificateContextToStore Failed  "
+                                        << errnoWithDescription(gle));
+        }
+    }
+
+    return Status::OK();
+}
+
+Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
+
+    auto swBuf = readFile(fileName);
+    if (!swBuf.isOK()) {
+        return swBuf.getStatus();
+    }
+
+    std::string buf = std::move(swBuf.getValue());
+
+    // Search the buffer for the various strings that make up a PEM file
+    size_t pos = 0;
+
+    while (pos < buf.size()) {
+        auto swBlob = findPEMBlob(buf, "X509 CRL"_sd, pos, pos != 0);
+
+        // We expect to find at least one CRL
+        if (!swBlob.isOK()) {
+            return swBlob.getStatus();
+        }
+
+        auto blobBuf = swBlob.getValue();
+
+        if (blobBuf.empty()) {
+            return Status::OK();
+        }
+
+        pos = (blobBuf.rawData() + blobBuf.size()) - buf.data();
+
+        auto swCert = decodePEMBlob(buf);
+        if (!swCert.isOK()) {
+            return swCert.getStatus();
+        }
+
+        auto certBuf = swCert.getValue();
+
+        PCCRL_CONTEXT crl = CertCreateCRLContext(X509_ASN_ENCODING, certBuf.data(), certBuf.size());
+        if (crl == NULL) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertCreateCRLContext failed to decode crl: "
+                                        << errnoWithDescription(gle));
+        }
+
+        UniqueCRL crlHolder(crl);
+
+        BOOL ret = CertAddCRLContextToStore(certStore, crl, CERT_STORE_ADD_NEW, NULL);
+
+        if (!ret) {
+            DWORD gle = GetLastError();
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "CertAddCRLContextToStore Failed  "
+                                        << errnoWithDescription(gle));
+        }
+    }
+
+    return Status::OK();
+}
+
+StatusWith<UniqueCertStore> readCertChains(StringData caFile, StringData crlFile) {
+    UniqueCertStore certStore = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, NULL, 0, NULL);
+    if (certStore == nullptr) {
+        DWORD gle = GetLastError();
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "CertOpenStore Failed  " << errnoWithDescription(gle));
+    }
+
+    auto status = readCAPEMFile(certStore, caFile);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (!crlFile.empty()) {
+        auto status = readCRLPEMFile(certStore, crlFile);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
+    return std::move(certStore);
+}
+
 Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     _clientCertificates[0] = nullptr;
     _serverCertificates[0] = nullptr;
@@ -713,6 +890,21 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         _clientCertificates[0] = std::get<0>(_clusterPEMCertificate).get();
     }
 
+    if (!params.sslCAFile.empty()) {
+        // TODO: enable hasCA when the users use certificate seletors
+        // SChannel always has a CA even when the user does not specify one
+        // The openssl implementations uses this to decide if it wants to do certificate validation
+        // on the server side.
+        _sslConfiguration.hasCA = true;
+
+        auto swChain = readCertChains(params.sslCAFile, params.sslCRLFile);
+        if (!swChain.isOK()) {
+            return swChain.getStatus();
+        }
+
+        _certStore = std::move(swChain.getValue());
+    }
+
     return Status::OK();
 }
 
@@ -723,6 +915,8 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     memset(cred, 0, sizeof(*cred));
     cred->dwVersion = SCHANNEL_CRED_VERSION;
     cred->dwFlags = SCH_USE_STRONG_CRYPTO;  // Use strong crypto;
+
+    cred->hRootStore = _certStore;
 
     uint32_t supportedProtocols = 0;
 
