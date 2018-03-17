@@ -66,16 +66,27 @@ TEST_F(DocumentSourceSkipTest, ShouldPropagatePauses) {
 }
 
 TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizing) {
-    // $skip should not optimize if overflow
+    // $skip should not optimize if combining the two values of skips would overflow a long long
     auto skipShort = DocumentSourceSkip::create(getExpCtx(), 1);
     auto skipLong = DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
-    Pipeline::SourceContainer overFlowContainer;
-    overFlowContainer.push_back(skipShort);
-    overFlowContainer.push_back(skipLong);
-    skipShort->doOptimizeAt(overFlowContainer.begin(), &overFlowContainer);
-    ASSERT_EQUALS(overFlowContainer.size(), 2U);
+    Pipeline::SourceContainer overflowContainer;
+    overflowContainer.push_back(skipShort);
+    overflowContainer.push_back(skipLong);
+    skipShort->doOptimizeAt(overflowContainer.begin(), &overflowContainer);
+    ASSERT_EQUALS(overflowContainer.size(), 2U);
     ASSERT_EQUALS(skipShort->getSkip(), 1U);
     ASSERT_EQUALS(skipLong->getSkip(), std::numeric_limits<long long>::max());
+
+    // $skip should not optimize if both skips are max values for long long
+    auto firstMaxSkip = DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
+    auto secondMaxSkip = DocumentSourceSkip::create(getExpCtx(), std::numeric_limits<long long>::max());
+    Pipeline::SourceContainer doubleMaxContainer;
+    doubleMaxContainer.push_back(firstMaxSkip);
+    doubleMaxContainer.push_back(secondMaxSkip);
+    firstMaxSkip->doOptimizeAt(doubleMaxContainer.begin(), &doubleMaxContainer);
+    ASSERT_EQUALS(doubleMaxContainer.size(), 2U);
+    ASSERT_EQUALS(firstMaxSkip->getSkip(), std::numeric_limits<long long>::max());
+    ASSERT_EQUALS(secondMaxSkip->getSkip(), std::numeric_limits<long long>::max());
 
     // $skip should optimize if no overflow
     auto skipFirst = DocumentSourceSkip::create(getExpCtx(), 1);
@@ -87,6 +98,21 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     ASSERT_EQUALS(containerOptimized.size(), 1U);
     ASSERT_EQUALS(skipFirst->getSkip(), 2);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 }  // namespace
 }  // namespace mongo
