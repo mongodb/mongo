@@ -249,11 +249,15 @@ jsTestOptions = function() {
             noJournal: TestData.noJournal,
             noJournalPrealloc: TestData.noJournalPrealloc,
             auth: TestData.auth,
+            // Note: keyFile is also used as a flag to indicate cluster auth is turned on, set it
+            // to a truthy value if you'd like to do cluster auth, even if it's not keyFile auth.
+            // Use clusterAuthMode to specify the actual auth mode you want to use.
             keyFile: TestData.keyFile,
             authUser: TestData.authUser || "__system",
             authPassword: TestData.keyFileData,
             authenticationDatabase: TestData.authenticationDatabase || "admin",
             authMechanism: TestData.authMechanism,
+            clusterAuthMode: TestData.clusterAuthMode || "keyFile",
             adminUser: TestData.adminUser || "admin",
             adminPassword: TestData.adminPassword || "password",
             useLegacyConfigServers: TestData.useLegacyConfigServers || false,
