@@ -422,7 +422,7 @@ Status storeSSLServerOptions(const moe::Environment& params) {
             return status;
         }
     }
-    if (params.count("net.ssl.ClusterCertificateSelector")) {
+    if (params.count("net.ssl.clusterCertificateSelector")) {
         const auto status = parseCertificateSelector(
             &sslGlobalParams.sslClusterCertificateSelector,
             "net.ssl.clusterCertificateSelector",

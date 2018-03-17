@@ -35,6 +35,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
@@ -83,11 +84,16 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     * specify a sslCAFile parameter from the shell
     */
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+        sslGlobalParams.sslCertificateSelector.empty() &&
+#endif
         sslGlobalParams.sslCAFile.empty()) {
         log() << "";
         log() << "** WARNING: No SSL certificate validation can be performed since"
                  " no CA file has been provided";
-
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+        log() << "**          and no sslCertificateSelector has been specified.";
+#endif
         log() << "**          Please specify an sslCAFile parameter.";
     }
 

@@ -39,6 +39,8 @@
 #include "mongo/base/initializer_context.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/base64.h"
@@ -100,6 +102,20 @@ StatusWith<std::string> toString(::OSStatus status) {
     return ret;
 }
 
+// Ideally we'd use an operator<< overload,
+// but OSStatus is just a uint32_t.
+// Be explicit about conversion to provide meaningful
+// output in error streams.
+std::string stringFromOSStatus(::OSStatus status) {
+    static_assert(std::is_same<std::int32_t, ::OSStatus>::value,
+                  "CoreFoundation OSStatus has changed type");
+    auto ret = toString(status);
+    if (!ret.isOK()) {
+        return str::stream() << "Unknown error: " << static_cast<std::int32_t>(status);
+    }
+    return ret.getValue();
+}
+
 // CFTypeRef is actually just `void*`.
 // So while we could be polymorphic with the other toString() methods,
 // it's basically asking for a hard to diagnose type error.
@@ -120,19 +136,6 @@ std::ostringstream& operator<<(std::ostringstream& ss, ::CFStringRef str) {
         ss << swStr.getValue();
     } else {
         ss << "Unknown error";
-    }
-    return ss;
-}
-
-std::ostringstream& operator<<(std::ostringstream& ss, ::OSStatus status) {
-    static_assert(std::is_signed<int>::value == std::is_signed<::OSStatus>::value,
-                  "Must cast status to same signedness");
-    static_assert(sizeof(int) >= sizeof(::OSStatus), "Must cast status to same or wider type");
-    auto swStr = toString(status);
-    if (swStr.isOK()) {
-        ss << swStr.getValue();
-    } else {
-        ss << "Unknown error: " << static_cast<int>(status);
     }
     return ss;
 }
@@ -532,7 +535,8 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
                       "key. Consider using a certificate selector or PKCS#12 instead");
     }
     if (status != ::errSecSuccess) {
-        return retFail(str::stream() << "Failing importing certificate(s): " << status);
+        return retFail(str::stream() << "Failing importing certificate(s): "
+                                     << stringFromOSStatus(status));
     }
 
     auto count = ::CFArrayGetCount(cfcerts.get());
@@ -607,7 +611,8 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
             CFUniquePtr<::SecCertificateRef> cfcert(cert);
             if (status != ::errSecSuccess) {
                 return {ErrorCodes::InternalError,
-                        str::stream() << "Unable to extract certificate from identity: " << status};
+                        str::stream() << "Unable to extract certificate from identity: "
+                                      << stringFromOSStatus(status)};
             }
             ::CFArrayAppendValue(strip.get(), cfcert.get());
         }
@@ -625,33 +630,7 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
     return std::move(cfcerts);
 }
 
-StatusWith<std::string> loadAndValidatePEM(const std::string& key,
-                                           const std::string& pass,
-                                           Date_t* expire = nullptr) {
-    auto swCerts = loadPEM(key, pass);
-    if (!swCerts.isOK()) {
-        return swCerts.getStatus();
-    }
-
-    auto certs = std::move(swCerts.getValue());
-    if (::CFArrayGetCount(certs.get()) <= 0) {
-        return {ErrorCodes::InvalidSSLConfiguration, "No certificates in certificate list"};
-    }
-
-    auto root = ::CFArrayGetValueAtIndex(certs.get(), 0);
-    if (!root || (::CFGetTypeID(root) != ::SecIdentityGetTypeID())) {
-        return {ErrorCodes::InvalidSSLConfiguration, "Root certificate not an identity pair"};
-    }
-
-    ::SecCertificateRef idcert = nullptr;
-    auto status = ::SecIdentityCopyCertificate(
-        static_cast<::SecIdentityRef>(const_cast<void*>(root)), &idcert);
-    if (status != ::errSecSuccess) {
-        return {ErrorCodes::InvalidSSLConfiguration,
-                str::stream() << "Unable to get certificate from identity: " << status};
-    }
-    CFUniquePtr<::SecCertificateRef> cert(idcert);
-
+StatusWith<std::string> certificateGetSubject(::SecCertificateRef cert, Date_t* expire = nullptr) {
     // Fetch expiry range and full subject name.
     CFUniquePtr<::CFMutableArrayRef> oids(
         ::CFArrayCreateMutable(nullptr, expire ? 3 : 1, &::kCFTypeArrayCallBacks));
@@ -662,8 +641,7 @@ StatusWith<std::string> loadAndValidatePEM(const std::string& key,
     }
 
     ::CFErrorRef cferror = nullptr;
-    CFUniquePtr<::CFDictionaryRef> cfdict(
-        ::SecCertificateCopyValues(cert.get(), oids.get(), &cferror));
+    CFUniquePtr<::CFDictionaryRef> cfdict(::SecCertificateCopyValues(cert, oids.get(), &cferror));
     if (cferror) {
         CFUniquePtr<::CFErrorRef> deleter(cferror);
         return {ErrorCodes::InvalidSSLConfiguration,
@@ -697,7 +675,174 @@ StatusWith<std::string> loadAndValidatePEM(const std::string& key,
     }
 
     return subject;
-};
+}
+
+StatusWith<std::string> certificateGetSubject(::CFArrayRef certs, Date_t* expire = nullptr) {
+    if (::CFArrayGetCount(certs) <= 0) {
+        return {ErrorCodes::InvalidSSLConfiguration, "No certificates in certificate list"};
+    }
+
+    auto root = ::CFArrayGetValueAtIndex(certs, 0);
+    if (!root || (::CFGetTypeID(root) != ::SecIdentityGetTypeID())) {
+        return {ErrorCodes::InvalidSSLConfiguration, "Root certificate not an identity pair"};
+    }
+
+    ::SecCertificateRef idcert = nullptr;
+    auto status = ::SecIdentityCopyCertificate(
+        static_cast<::SecIdentityRef>(const_cast<void*>(root)), &idcert);
+    if (status != ::errSecSuccess) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Unable to get certificate from identity: "
+                              << stringFromOSStatus(status)};
+    }
+    CFUniquePtr<::SecCertificateRef> cert(idcert);
+    return certificateGetSubject(cert.get(), expire);
+}
+
+StatusWith<CFUniquePtr<::CFArrayRef>> copyMatchingCertificate(
+    const SSLParams::CertificateSelector& selector,
+    SSLManagerInterface::ConnectionDirection direction) {
+    if (selector.subject.empty() && selector.thumbprint.empty()) {
+        // In practice, this should never occur, thanks to the selector.empty()
+        // checks at the callsites of this function.
+        return {ErrorCodes::InvalidSSLConfiguration, "Certificate selector has no values"};
+    }
+    if (!selector.subject.empty() && !selector.thumbprint.empty()) {
+        // This can only happen if the parsing logic in ssl_options.cpp changes.
+        // Guard against it to play it safe.
+        return {ErrorCodes::InvalidSSLConfiguration, "Certificate selector has multiple values"};
+    }
+
+    const bool isServer = (direction == SSLManagerInterface::ConnectionDirection::kIncoming);
+    CFUniquePtr<::SecPolicyRef> cfpolicy(::SecPolicyCreateSSL(isServer, nullptr));
+
+    CFUniquePtr<::CFMutableDictionaryRef> cfquery(::CFDictionaryCreateMutable(
+        nullptr, 5, &::kCFTypeDictionaryKeyCallBacks, &::kCFTypeDictionaryValueCallBacks));
+    ::CFDictionaryAddValue(cfquery.get(), ::kSecClass, ::kSecClassIdentity);
+    ::CFDictionaryAddValue(cfquery.get(), ::kSecReturnRef, ::kCFBooleanTrue);
+    ::CFDictionaryAddValue(cfquery.get(), ::kSecMatchLimit, ::kSecMatchLimitAll);
+    ::CFDictionaryAddValue(cfquery.get(), ::kSecMatchPolicy, cfpolicy.get());
+
+    // Note: These search terms don't ACTUALLY work.
+    // We should be able to specify kSecMatchLimitOne, but instead we have to get
+    // extra (sometimes duplicate) results, and manually filter them below.
+    if (!selector.subject.empty()) {
+        invariant(selector.thumbprint.empty());
+        CFUniquePtr<::CFStringRef> cfsubject(::CFStringCreateWithCString(
+            nullptr, selector.subject.c_str(), ::kCFStringEncodingUTF8));
+        if (!cfsubject) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    str::stream() << "Certificate subject name specified is not UTF-8"
+                                  << selector.subject};
+        }
+        ::CFDictionaryAddValue(cfquery.get(), ::kSecAttrLabel, cfsubject.get());
+    } else {
+        invariant(!selector.thumbprint.empty());
+        CFUniquePtr<::CFDataRef> cfdigest(
+            ::CFDataCreate(nullptr,
+                           static_cast<const uint8_t*>(selector.thumbprint.data()),
+                           selector.thumbprint.size()));
+        if (!cfdigest) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    "Unable to create Public Key Hash from certificate thumbprint selector value"};
+        }
+        // Don't be fooled by the name.
+        // "Public Key Hash" is actually referring to the digest of the entire Certificate.
+        ::CFDictionaryAddValue(cfquery.get(), ::kSecAttrPublicKeyHash, cfdigest.get());
+    }
+
+    ::CFTypeRef identities = nullptr;
+    auto status = ::SecItemCopyMatching(cfquery.get(), &identities);
+    CFUniquePtr<::CFArrayRef> cfident(static_cast<::CFArrayRef>(identities));
+    if (status != ::errSecSuccess) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                str::stream() << "Failure querying system keychain for certificate selector: "
+                              << stringFromOSStatus(status)};
+    }
+
+    if (::CFGetTypeID(cfident.get()) != ::CFArrayGetTypeID()) {
+        return {ErrorCodes::InvalidSSLConfiguration, "System keychain returned invalid result"};
+    }
+
+    // We should be able to return the results at this point,
+    // but the search criteria above will return non-matching results in OSX 10.12 and later.
+    CFUniquePtr<::CFMutableArrayRef> cfresult(
+        ::CFArrayCreateMutable(nullptr, 1, &::kCFTypeArrayCallBacks));
+    for (::CFIndex i = 0; i < ::CFArrayGetCount(cfident.get()); ++i) {
+        auto ident = static_cast<::SecIdentityRef>(
+            const_cast<void*>(::CFArrayGetValueAtIndex(cfident.get(), i)));
+        if (::CFGetTypeID(ident) != ::SecIdentityGetTypeID()) {
+            continue;
+        }
+
+        ::SecCertificateRef cert = nullptr;
+        status = ::SecIdentityCopyCertificate(ident, &cert);
+        CFUniquePtr<::SecCertificateRef> cfcert(cert);
+        if (status != ::errSecSuccess) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    "Unable to retreive certificate from identity"};
+        }
+
+        if (!selector.subject.empty()) {
+            // Try matching subject name to short (common name) portion of subject.
+            CFUniquePtr<::CFStringRef> certSubject(
+                ::SecCertificateCopySubjectSummary(cfcert.get()));
+            if (!certSubject) {
+                return {ErrorCodes::InvalidSSLConfiguration,
+                        "Unable to retreive subject summary from identity"};
+            }
+            auto swSubjectSummary = toString(certSubject.get());
+            if (!swSubjectSummary.isOK()) {
+                return swSubjectSummary.getStatus();
+            }
+            if (swSubjectSummary.getValue() == selector.subject) {
+                ::CFArrayAppendValue(cfresult.get(), ident);
+                break;
+            }
+
+            // Try matching full subject name instead.
+            auto swCertSubject = certificateGetSubject(cfcert.get());
+            if (!swCertSubject.isOK()) {
+                return swCertSubject.getStatus();
+            }
+            if (swCertSubject.getValue() == selector.subject) {
+                ::CFArrayAppendValue(cfresult.get(), ident);
+                break;
+            }
+        }
+
+        if (!selector.thumbprint.empty()) {
+            CFUniquePtr<::CFDataRef> cfCertData(::SecCertificateCopyData(cfcert.get()));
+            ConstDataRange certData(
+                reinterpret_cast<const char*>(::CFDataGetBytePtr(cfCertData.get())),
+                ::CFDataGetLength(cfCertData.get()));
+
+            // Attempt to match SHA1 digest.
+            if (SHA1Block::kHashLength == selector.thumbprint.size()) {
+                const auto certSha1 = SHA1Block::computeHash({certData});
+                if (!memcmp(certSha1.data(), selector.thumbprint.data(), certSha1.size())) {
+                    ::CFArrayAppendValue(cfresult.get(), ident);
+                    break;
+                }
+            }
+
+            // Attempt to match SHA256 digest.
+            if (SHA256Block::kHashLength == selector.thumbprint.size()) {
+                const auto certSha256 = SHA256Block::computeHash({certData});
+                if (!memcmp(certSha256.data(), selector.thumbprint.data(), certSha256.size())) {
+                    ::CFArrayAppendValue(cfresult.get(), ident);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (::CFArrayGetCount(cfresult.get()) == 0) {
+        return {ErrorCodes::InvalidSSLConfiguration, "Certificate selector returned no results"};
+    }
+
+    return CFUniquePtr<::CFArrayRef>(cfresult.release());
+}
 
 }  // namespace
 
@@ -858,8 +1003,6 @@ public:
     int SSL_shutdown(SSLConnectionInterface* conn) final;
 
 private:
-    Status _validatePEMs(const SSLParams& params, bool isServer);
-
     bool _weakValidation;
     bool _allowInvalidCertificates;
     bool _allowInvalidHostnames;
@@ -873,54 +1016,41 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames) {
+
     uassertStatusOK(initSSLContext(&_clientCtx, params, ConnectionDirection::kOutgoing));
+    if (_clientCtx.certs) {
+        _sslConfiguration.clientSubjectName =
+            uassertStatusOK(certificateGetSubject(_clientCtx.certs.get()));
+    }
+
     if (isServer) {
         uassertStatusOK(initSSLContext(&_serverCtx, params, ConnectionDirection::kIncoming));
+        if (_serverCtx.certs) {
+            _sslConfiguration.serverSubjectName = uassertStatusOK(certificateGetSubject(
+                _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate));
+            static auto task =
+                CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
+        }
     }
-    uassertStatusOK(_validatePEMs(params, isServer));
 
     if (!params.sslCAFile.empty()) {
         auto ca = uassertStatusOK(loadPEM(params.sslCAFile, "", kLoadPEMStripKeys));
         _ca = std::move(ca);
         _sslConfiguration.hasCA = _ca && ::CFArrayGetCount(_ca.get());
     }
-}
 
-Status SSLManagerApple::_validatePEMs(const SSLParams& params, bool isServer) {
-    // pick the certificate for use in outgoing connections,
-    std::string clientPEM, clientPassword;
-    if (!isServer || params.sslClusterFile.empty()) {
-        // We are either a client, or a server without a cluster key,
-        // so use the PEM key file, if specified.
-        clientPEM = params.sslPEMKeyFile;
-        clientPassword = params.sslPEMKeyPassword;
-    } else {
-        // We are a server with a cluster key, so use the cluster key file
-        clientPEM = params.sslClusterFile;
-        clientPassword = params.sslClusterPassword;
-    }
-    if (!clientPEM.empty()) {
-        auto swSubject = loadAndValidatePEM(clientPEM, clientPassword);
-        if (!swSubject.isOK()) {
-            return swSubject.getStatus();
-        }
-        _sslConfiguration.clientSubjectName = swSubject.getValue();
+    if (!params.sslCertificateSelector.empty() || !params.sslClusterCertificateSelector.empty()) {
+        // By using the system keychain, we acknowledge it exists.
+        _sslConfiguration.hasCA = true;
     }
 
-    if (isServer) {
-        auto swSubject = loadAndValidatePEM(params.sslPEMKeyFile,
-                                            params.sslPEMKeyPassword,
-                                            &_sslConfiguration.serverCertificateExpirationDate);
-        if (!swSubject.isOK()) {
-            return swSubject.getStatus();
-        }
-        _sslConfiguration.serverSubjectName = swSubject.getValue();
-
-        static auto task =
-            CertificateExpirationMonitor(_sslConfiguration.serverCertificateExpirationDate);
+    if (!_ca) {
+        // No explicit CA was specified, use the Keychain CA explicitly on client connects,
+        // even though we're going to pretend it doesn't exist on server.
+        ::CFArrayRef certs = nullptr;
+        uassertOSStatusOK(SecTrustCopyAnchorCertificates(&certs));
+        _ca.reset(certs);
     }
-
-    return Status::OK();
 }
 
 StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSLParams& params) {
@@ -965,21 +1095,40 @@ Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
     context->protoMax = proto.second;
 
     // Certificate.
-    if (direction == ConnectionDirection::kOutgoing && !params.sslClusterFile.empty()) {
-        auto swCertificates = loadPEM(params.sslClusterFile, params.sslClusterPassword);
-        if (!swCertificates.isOK()) {
-            return swCertificates.getStatus();
+    const auto selectCertificate = [&context,
+                                    direction](const SSLParams::CertificateSelector& selector,
+                                               const std::string& PEMFile,
+                                               const std::string& PEMPass) -> Status {
+        if (!selector.empty()) {
+            auto swCerts = copyMatchingCertificate(selector, direction);
+            if (!swCerts.isOK()) {
+                return swCerts.getStatus();
+            }
+            context->certs = std::move(swCerts.getValue());
+            return Status::OK();
         }
-        context->certs = std::move(swCertificates.getValue());
-    } else if (!params.sslPEMKeyFile.empty()) {
-        auto swCertificates = loadPEM(params.sslPEMKeyFile, params.sslPEMKeyPassword);
-        if (!swCertificates.isOK()) {
-            return swCertificates.getStatus();
+        if (!PEMFile.empty()) {
+            auto swCerts = loadPEM(PEMFile, PEMPass);
+            if (!swCerts.isOK()) {
+                return swCerts.getStatus();
+            }
+            context->certs = std::move(swCerts.getValue());
+            return Status::OK();
         }
-        context->certs = std::move(swCertificates.getValue());
+        return Status::OK();
+    };
+
+    if (direction == ConnectionDirection::kOutgoing) {
+        const auto status = selectCertificate(
+            params.sslClusterCertificateSelector, params.sslClusterFile, params.sslClusterPassword);
+        if (context->certs || !status.isOK()) {
+            return status;
+        }
+        // Fallthrough...
     }
 
-    return Status::OK();
+    return selectCertificate(
+        params.sslCertificateSelector, params.sslPEMKeyFile, params.sslPEMKeyPassword);
 }
 
 SSLConnectionInterface* SSLManagerApple::connect(Socket* socket) {
@@ -1037,7 +1186,8 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     const auto status = ::SSLCopyPeerTrust(ssl, &trust);
     CFUniquePtr<::SecTrustRef> cftrust(trust);
     if ((status != ::errSecSuccess) || (!cftrust)) {
-        return badCert(str::stream() << "Unable to retreive SSL trust from peer: " << status,
+        return badCert(str::stream() << "Unable to retreive SSL trust from peer: "
+                                     << stringFromOSStatus(status),
                        _weakValidation);
     }
 
@@ -1047,7 +1197,8 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
             status = ::SecTrustSetAnchorCertificatesOnly(cftrust.get(), true);
         }
         if (status != ::errSecSuccess) {
-            return badCert(str::stream() << "Unable to bind CA to trust chain: " << status,
+            return badCert(str::stream() << "Unable to bind CA to trust chain: "
+                                         << stringFromOSStatus(status),
                            _weakValidation);
         }
     }
@@ -1213,6 +1364,15 @@ MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerApple(sslGlobalParams, isSSLServer);
+        const auto& config = theSSLManager->getSSLConfiguration();
+        log() << "Secure Transport Initialized";
+        if (!config.clientSubjectName.empty()) {
+            log() << "Client Certificate Name: " << config.clientSubjectName;
+        }
+        if (!config.serverSubjectName.empty()) {
+            log() << "Server Certificate Name: " << config.serverSubjectName;
+            log() << "Server Certificate Expiration: " << config.serverCertificateExpirationDate;
+        }
     }
     return Status::OK();
 }
