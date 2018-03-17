@@ -98,21 +98,5 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     ASSERT_EQUALS(containerOptimized.size(), 1U);
     ASSERT_EQUALS(skipFirst->getSkip(), 2);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }  // namespace
 }  // namespace mongo
