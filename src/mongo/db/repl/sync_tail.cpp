@@ -305,14 +305,13 @@ std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
-                           OplogApplication::Mode oplogApplicationMode,
-                           ApplyOperationInLockFn applyOperationInLock,
-                           ApplyCommandInLockFn applyCommandInLock,
-                           IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+                           OplogApplication::Mode oplogApplicationMode) {
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
 
     const NamespaceString nss(op.getStringField("ns"));
+
+    auto incrementOpsAppliedStats = [] { opsAppliedStats.increment(1); };
 
     auto applyOp = [&](Database* db) {
         // For non-initial-sync, we convert updates to upserts
@@ -329,7 +328,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         // wants to. We should ignore these errors intelligently while in RECOVERING and STARTUP
         // mode (similar to initial sync) instead so we do not accidentally ignore real errors.
         bool shouldAlwaysUpsert = (oplogApplicationMode != OplogApplication::Mode::kInitialSync);
-        Status status = applyOperationInLock(
+        Status status = applyOperation_inlock(
             opCtx, db, op, shouldAlwaysUpsert, oplogApplicationMode, incrementOpsAppliedStats);
         if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
             throw WriteConflictException();
@@ -381,7 +380,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             Lock::GlobalWrite globalWriteLock(opCtx);
 
             // special case apply for commands to avoid implicit database creation
-            Status status = applyCommandInLock(opCtx, op, oplogApplicationMode);
+            Status status = applyCommand_inlock(opCtx, op, oplogApplicationMode);
             incrementOpsAppliedStats();
             return status;
         });
@@ -389,16 +388,6 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     MONGO_UNREACHABLE;
 }
-
-Status SyncTail::syncApply(OperationContext* opCtx,
-                           const BSONObj& op,
-                           OplogApplication::Mode oplogApplicationMode) {
-    return SyncTail::syncApply(
-        opCtx, op, oplogApplicationMode, applyOperation_inlock, applyCommand_inlock, [] {
-            opsAppliedStats.increment(1);
-        });
-}
-
 
 namespace {
 

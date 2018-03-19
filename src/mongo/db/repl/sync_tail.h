@@ -69,38 +69,6 @@ public:
                               WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
-     * Type of function to increment "repl.apply.ops" server status metric.
-     */
-    using IncrementOpsAppliedStatsFn = stdx::function<void()>;
-
-    /**
-     * Type of function that takes a non-command op and applies it locally.
-     * Used for applying from an oplog.
-     * 'db' is the database where the op will be applied.
-     * 'opObj' is a BSONObj describing the op to be applied.
-     * 'alwaysUpsert' indicates to convert updates to upserts for idempotency reasons.
-     * 'mode' indicates the oplog application mode.
-     * 'opCounter' is used to update server status metrics.
-     * Returns failure status if the op was an update that could not be applied.
-     */
-    using ApplyOperationInLockFn =
-        stdx::function<Status(OperationContext* opCtx,
-                              Database* db,
-                              const BSONObj& opObj,
-                              bool alwaysUpsert,
-                              OplogApplication::Mode oplogApplicationMode,
-                              IncrementOpsAppliedStatsFn opCounter)>;
-
-    /**
-     * Type of function that takes a command op and applies it locally.
-     * Used for applying from an oplog.
-     * 'mode' indicates the oplog application mode.
-     * Returns failure status if the op that could not be applied.
-     */
-    using ApplyCommandInLockFn = stdx::function<Status(
-        OperationContext*, const BSONObj&, OplogApplication::Mode oplogApplicationMode)>;
-
-    /**
      *
      * Constructs a SyncTail.
      * During steady state replication, oplogApplication() obtains batches of operations to apply
@@ -123,13 +91,6 @@ public:
      * Functions for applying operations/commands and increment server status counters may
      * be overridden for testing.
      */
-    static Status syncApply(OperationContext* opCtx,
-                            const BSONObj& o,
-                            OplogApplication::Mode oplogApplicationMode,
-                            ApplyOperationInLockFn applyOperationInLock,
-                            ApplyCommandInLockFn applyCommandInLock,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
-
     static Status syncApply(OperationContext* opCtx,
                             const BSONObj& o,
                             OplogApplication::Mode oplogApplicationMode);

@@ -186,6 +186,13 @@ void createDatabase(OperationContext* opCtx, StringData dbName) {
     ASSERT_TRUE(justCreated);
 }
 
+/**
+ * Returns true if collection exists.
+ */
+bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
+    return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+}
+
 auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     BSONElement tsArray;
     Status status =
@@ -203,11 +210,8 @@ TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
     const BSONObj op = BSON("op"
                             << "x");
     ASSERT_THROWS(
-        SyncTail::syncApply(
-            _opCtx.get(), op, OplogApplication::Mode::kInitialSync, _applyOp, _applyCmd, _incOps)
-            .ignore(),
+        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync).ignore(),
         ExceptionFor<ErrorCodes::BadValue>);
-    ASSERT_EQUALS(0U, _opsApplied);
 }
 
 TEST_F(SyncTailTest, SyncApplyNoNamespaceNoOp) {
@@ -215,7 +219,6 @@ TEST_F(SyncTailTest, SyncApplyNoNamespaceNoOp) {
                                   BSON("op"
                                        << "n"),
                                   OplogApplication::Mode::kInitialSync));
-    ASSERT_EQUALS(0U, _opsApplied);
 }
 
 TEST_F(SyncTailTest, SyncApplyBadOp) {
@@ -224,85 +227,16 @@ TEST_F(SyncTailTest, SyncApplyBadOp) {
                             << "ns"
                             << "test.t");
     ASSERT_THROWS(
-        SyncTail::syncApply(
-            _opCtx.get(), op, OplogApplication::Mode::kInitialSync, _applyOp, _applyCmd, _incOps)
-            .ignore(),
+        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync).ignore(),
         ExceptionFor<ErrorCodes::BadValue>);
-    ASSERT_EQUALS(0U, _opsApplied);
-}
-
-TEST_F(SyncTailTest, SyncApplyNoOpInitialSync) {
-    const BSONObj op = BSON("op"
-                            << "n"
-                            << "ns"
-                            << "test.t");
-    bool applyOpCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        applyOpCalled = true;
-        ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
-        ASSERT_FALSE(opCtx->writesAreReplicated());
-        ASSERT_TRUE(documentValidationDisabled(opCtx));
-        ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op, theOperation);
-        ASSERT_FALSE(alwaysUpsert);
-        ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kInitialSync);
-        return Status::OK();
-    };
-    ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
-                                  op,
-                                  OplogApplication::Mode::kInitialSync,
-                                  applyOp,
-                                  failedApplyCommand,
-                                  _incOps));
-    ASSERT_TRUE(applyOpCalled);
-}
-
-TEST_F(SyncTailTest, SyncApplyNoOpNotInitialSync) {
-    const BSONObj op = BSON("op"
-                            << "n"
-                            << "ns"
-                            << "test.t");
-    bool applyOpCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        applyOpCalled = true;
-        ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
-        ASSERT_FALSE(opCtx->writesAreReplicated());
-        ASSERT_TRUE(documentValidationDisabled(opCtx));
-        ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op, theOperation);
-        ASSERT(alwaysUpsert);
-        ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kSecondary);
-        return Status::OK();
-    };
-    ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
-                                  op,
-                                  OplogApplication::Mode::kSecondary,
-                                  applyOp,
-                                  failedApplyCommand,
-                                  _incOps));
-    ASSERT_TRUE(applyOpCalled);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
-    ASSERT_THROWS_CODE(_testSyncApplyInsertDocument(ErrorCodes::OK),
-                       AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+    NamespaceString nss("test.t");
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary).ignore(),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
@@ -316,9 +250,9 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
     createDatabase(_opCtx.get(), nss.db());
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, UUID::gen());
-    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true),
-                       AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary).ignore(),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
@@ -330,17 +264,16 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
-    {
-        Lock::GlobalWrite globalLock(_opCtx.get());
-        bool justCreated = false;
-        Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
-        ASSERT_TRUE(db);
-        ASSERT_TRUE(justCreated);
-    }
+    const NamespaceString nss("test.t");
+    createDatabase(_opCtx.get(), nss.db());
     // Even though the collection doesn't exist, this is handled in the actual application function,
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
-    _testSyncApplyInsertDocument(ErrorCodes::OK);
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), op.toBSON(), OplogApplication::Mode::kSecondary).ignore(),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+    ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionMissing) {
@@ -350,29 +283,22 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionMissing) {
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
+    ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
-    {
-        Lock::GlobalWrite globalLock(_opCtx.get());
-        bool justCreated = false;
-        Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
-        ASSERT_TRUE(db);
-        ASSERT_TRUE(justCreated);
-        WriteUnitOfWork wuow(_opCtx.get());
-        Collection* collection = db->createCollection(_opCtx.get(), "test.t");
-        wuow.commit();
-        ASSERT_TRUE(collection);
-    }
-    _testSyncApplyInsertDocument(ErrorCodes::OK);
+    const NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionExists) {
     const NamespaceString nss("test.t");
     createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
@@ -393,103 +319,49 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
-}
-
-TEST_F(SyncTailTest, SyncApplyIndexBuild) {
-    NamespaceString systemIndexesNss("test.system.indexes");
-    auto op = makeOplogEntry(OpTypeEnum::kInsert, systemIndexesNss, {});
-    bool applyOpCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        applyOpCalled = true;
-        ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
-        ASSERT_FALSE(opCtx->writesAreReplicated());
-        ASSERT_TRUE(documentValidationDisabled(opCtx));
-        ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op.toBSON(), theOperation);
-        ASSERT_FALSE(alwaysUpsert);
-        ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kInitialSync);
-        return Status::OK();
-    };
-    ASSERT_TRUE(_opCtx->writesAreReplicated());
-    ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
-                                  op.toBSON(),
-                                  OplogApplication::Mode::kInitialSync,
-                                  applyOp,
-                                  failedApplyCommand,
-                                  _incOps));
-    ASSERT_TRUE(applyOpCalled);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
 }
 
 TEST_F(SyncTailTest, SyncApplyCommand) {
-    const BSONObj op = BSON("op"
-                            << "c"
-                            << "ns"
-                            << "test.t");
+    NamespaceString nss("test.t");
+    auto op = BSON("op"
+                   << "c"
+                   << "ns"
+                   << nss.getCommandNS().ns()
+                   << "o"
+                   << BSON("create" << nss.coll()));
     bool applyCmdCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        FAIL("applyOperation unexpectedly invoked.");
-        return Status::OK();
-    };
-    SyncTail::ApplyCommandInLockFn applyCmd = [&](OperationContext* opCtx,
-                                                  const BSONObj& theOperation,
-                                                  OplogApplication::Mode oplogApplicationMode) {
+    _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
+                                            Collection*,
+                                            const NamespaceString& collNss,
+                                            const CollectionOptions&,
+                                            const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isW());
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(documentValidationDisabled(opCtx));
-        ASSERT_BSONOBJ_EQ(op, theOperation);
+        ASSERT_EQUALS(nss, collNss);
         return Status::OK();
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_OK(SyncTail::syncApply(
-        _opCtx.get(), op, OplogApplication::Mode::kInitialSync, applyOp, applyCmd, _incOps));
+    ASSERT_OK(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync));
     ASSERT_TRUE(applyCmdCalled);
-    ASSERT_EQUALS(1U, _opsApplied);
 }
 
 TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
     const BSONObj op = BSON("op"
                             << "c"
                             << "ns"
-                            << "test.t");
-    int applyCmdCalled = 0;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        FAIL("applyOperation unexpectedly invoked.");
-        return Status::OK();
-    };
-    SyncTail::ApplyCommandInLockFn applyCmd = [&](OperationContext* opCtx,
-                                                  const BSONObj& theOperation,
-                                                  OplogApplication::Mode oplogApplicationMode) {
-        applyCmdCalled++;
-        if (applyCmdCalled < 5) {
-            throw WriteConflictException();
-        }
-        return Status::OK();
-    };
-    ASSERT_OK(SyncTail::syncApply(
-        _opCtx.get(), op, OplogApplication::Mode::kInitialSync, applyOp, applyCmd, _incOps));
-    ASSERT_EQUALS(5, applyCmdCalled);
-    ASSERT_EQUALS(1U, _opsApplied);
+                            << 12345
+                            << "o"
+                            << BSON("create"
+                                    << "t"));
+    // This test relies on the namespace type check in applyCommand_inlock().
+    ASSERT_THROWS(
+        SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kInitialSync).ignore(),
+        ExceptionFor<ErrorCodes::InvalidNamespace>);
 }
 
 TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullOperationContext) {

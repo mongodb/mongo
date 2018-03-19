@@ -115,18 +115,6 @@ void SyncTailTest::setUp() {
     auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
     opObserverRegistry->addObserver(std::move(opObserver));
 
-    _opsApplied = 0;
-    _applyOp = [](OperationContext* opCtx,
-                  Database* db,
-                  const BSONObj& op,
-                  bool alwaysUpsert,
-                  OplogApplication::Mode oplogApplicationMode,
-                  stdx::function<void()>) { return Status::OK(); };
-    _applyCmd = [](OperationContext* opCtx,
-                   const BSONObj& op,
-                   OplogApplication::Mode oplogApplicationMode) { return Status::OK(); };
-    _incOps = [this]() { _opsApplied++; };
-
     // Initialize the featureCompatibilityVersion server parameter. This is necessary because this
     // test fixture does not create a featureCompatibilityVersion document from which to initialize
     // the server parameter.
@@ -147,44 +135,44 @@ void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                                const BSONObj& op,
                                                bool expectedApplyOpCalled) {
     bool applyOpCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        applyOpCalled = true;
+
+    auto checkOpCtx = [](OperationContext* opCtx) {
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_IX));
         ASSERT_FALSE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode("test.t", MODE_IX));
         ASSERT_FALSE(opCtx->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(opCtx));
-        ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op, theOperation);
-        ASSERT_TRUE(alwaysUpsert);
-        ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kSecondary);
+    };
+
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            applyOpCalled = true;
+            checkOpCtx(opCtx);
+            ASSERT_EQUALS(NamespaceString("test.t"), nss);
+            ASSERT_EQUALS(1U, docs.size());
+            ASSERT_BSONOBJ_EQ(op["o"].Obj(), docs[0]);
+            return Status::OK();
+        };
+
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  OptionalCollectionUUID uuid,
+                                  StmtId stmtId,
+                                  bool fromMigrate,
+                                  const boost::optional<BSONObj>& deletedDoc) {
+        applyOpCalled = true;
+        checkOpCtx(opCtx);
+        ASSERT_EQUALS(NamespaceString("test.t"), nss);
+        ASSERT(deletedDoc);
+        ASSERT_BSONOBJ_EQ(op["o"].Obj(), *deletedDoc);
         return Status::OK();
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(),
-                                  op,
-                                  OplogApplication::Mode::kSecondary,
-                                  applyOp,
-                                  failedApplyCommand,
-                                  _incOps),
+    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kSecondary),
               expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
-}
-
-void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError) {
-    _testSyncApplyCrudOperation(expectedError,
-                                BSON("op"
-                                     << "i"
-                                     << "ns"
-                                     << "test.t"),
-                                expectedError == ErrorCodes::OK);
 }
 
 Status failedApplyCommand(OperationContext* opCtx,
