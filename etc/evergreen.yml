@@ -2766,7 +2766,11 @@ tasks:
         ${activate_virtualenv}
         popd
         # Capture a list of new and modified tests.
-        $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
+        build_variant=${build_variant}
+        if [ -n "${burn_in_tests_build_variant|}" ]; then
+          build_variant=${burn_in_tests_build_variant|}
+        fi
+        $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=$build_variant --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
         # Copy the results to the src dir.
         cp jstests/new_tests.json ../src/jstests/new_tests.json
   - func: "do multiversion setup"
@@ -8577,12 +8581,22 @@ buildvariants:
   run_on:
   - rhel62-small
   batchtime: 1440 # 1 day
-  expansions:
+  expansions: &enterprise-rhel-62-64-bit-mobile-expansions
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    test_flags: --storageEngine=mobile --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_sharding,requires_replication,SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
-    compile_flags: --mobile-se=on --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    test_flags: >-
+      --storageEngine=mobile
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --mobile-se=on
+      --ssl
+      --use-basis-tech-rosette-linguistics-platform=on
+      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+      CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include"
+      MONGO_DISTMOD=rhel62
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     build_mongoreplay: true
@@ -8627,6 +8641,28 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: snmp
 
+- name: enterprise-rhel-62-64-bit-required-mobile
+  display_name: "! Enterprise RHEL 6.2 (mobile)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions:
+    <<: *enterprise-rhel-62-64-bit-mobile-expansions
+    burn_in_tests_build_variant: enterprise-rhel-62-64-bit-mobile
+  tasks:
+  # This build variant exists specifically to test that newly added or modified JavaScript tests are
+  # correctly tagged with "requires_replication" and "requires_sharding" prior to the changes being
+  # pushed. It uses the task list from the enterprise-rhel-62-64-bit-mobile build variant to
+  # determine the resmoke.py YAML suite configurations to run the tests under. Do not add more tasks
+  # to this list.
+  - name: compile
+    requires:
+    - name: burn_in_tests
+    distros:
+    - rhel62-large
+  - name: burn_in_tests
+
 - name: enterprise-osx-1010-mobile
   display_name: Enterprise OS X 10.10 (mobile)
   modules:
@@ -8639,11 +8675,25 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: osx
     push_arch: x86_64-enterprise
-    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    gorootvars: >-
+      CGO_CFLAGS=-mmacosx-version-min=10.10
+      CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include
+      CGO_LDFLAGS=-mmacosx-version-min=10.10
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
-    test_flags: --storageEngine=mobile --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_sharding,requires_replication,SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
+    test_flags: >-
+      --storageEngine=mobile
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --mobile-se=on --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    compile_flags: >-
+      -j$(sysctl -n hw.logicalcpu)
+      --libc++
+      --mobile-se=on
+      --release
+      --ssl
+      CCFLAGS="-mmacosx-version-min=10.10"
+      CPPPATH=/opt/mongodbtoolchain/v2/include
+      LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
