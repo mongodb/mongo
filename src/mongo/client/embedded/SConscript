@@ -163,6 +163,13 @@ embeddedTransport = env.Library(
 
 env.Alias('embedded_capi', embeddedTransport)
 
+if get_option('install-mode') == 'hygienic':
+    env.Install(
+        'include',
+        source=['embedded_transport_layer.h'],
+        INSTALL_ALIAS='mobile-dev'
+    )
+
 embeddedTransportTest = env.Program(
     target='mongo_embedded_transport_test',
     source=[

@@ -1,8 +1,8 @@
 #!/bin/sh
 
-if [ "$#" != "2" ]; then
+if [ "$#" -lt "3" ]; then
     echo "usage:"
-    echo "$0 <android-sdk-path> <test>"
+    echo "$0 <android-sdk-path> <directory> <test-path-in-directory>"
     exit 1
 fi
 
@@ -10,8 +10,11 @@ set -o verbose
 set -o errexit
 
 ANDROID_SDK=$1
-TEST_PATH=$2
-TEST_FILE=`basename $TEST_PATH`
+shift
+DIRECTORY=$1
+shift
+TEST_PATH_IN_DIRECTORY=$1
+shift
 
 EMULATOR_PID=''
 cleanup() {
@@ -36,7 +39,7 @@ $ANDROID_SDK/platform-tools/adb wait-for-device
 $ANDROID_SDK/platform-tools/adb root
 
 #move the test to the device
-$ANDROID_SDK/platform-tools/adb push $TEST_PATH /data
+$ANDROID_SDK/platform-tools/adb push $DIRECTORY /data
 
 #run the device
-$ANDROID_SDK/platform-tools/adb shell /data/$TEST_FILE --tempPath /data
+$ANDROID_SDK/platform-tools/adb shell /data/$(basename $DIRECTORY)/$TEST_PATH_IN_DIRECTORY "$@"

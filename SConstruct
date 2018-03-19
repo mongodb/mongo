@@ -3161,7 +3161,11 @@ if get_option('install-mode') == 'hygienic':
                 env.Literal('\\$$ORIGIN/../lib')
             ],
             LINKFLAGS=[
-                '-Wl,-z,origin',
+                # Most systems *require* -z,origin to make origin work, but android
+                # blows up at runtime if it finds DF_ORIGIN_1 in DT_FLAGS_1.
+                # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/linker/linker.h#68
+                # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/libc/include/elf.h#215
+                '-Wl,-z,origin' if not env.TargetOSIs('android') else [],
                 '-Wl,--enable-new-dtags',
             ],
             SHLINKFLAGS=[

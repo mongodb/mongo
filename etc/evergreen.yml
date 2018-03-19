@@ -563,9 +563,10 @@ functions:
         # remove this patch once SERVER-33101 is released
         patch -p1 < ../src/buildscripts/mongoc-stat.c.diff
         export ${compile_env|}
-        ./configure --prefix=$(pwd)/install --with-libbson=bundled --disable-tests --disable-automatic-init-and-cleanup --disable-ssl --disable-sasl --disable-examples --disable-man-pages --disable-html-docs --disable-shm-counters --disable-shared --enable-static ${cdriver_configure_flags|}
+        ./configure --prefix=$(pwd)/../src/build/mongo-embedded-sdk-${version}-tmp --with-libbson=bundled --disable-tests --disable-automatic-init-and-cleanup --disable-ssl --disable-sasl --disable-examples --disable-man-pages --disable-html-docs --disable-shm-counters --enable-shared --disable-static ${cdriver_configure_flags|}
         make
         make install
+        mv $(pwd)/../src/build/mongo-embedded-sdk-${version}-tmp $(pwd)/../src/build/mongo-embedded-sdk-${version}
         fi
 
   "build new tools" :
@@ -1165,8 +1166,8 @@ functions:
 
         ${activate_virtualenv}
         if [ ${enable_iostvos_sim_tests|false} = "true" ]; then
-            ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/install/bin/mongo_embedded_capi_test"
-            ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/install/bin/mongo_embedded_transport_test"
+            ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test" --tempPath /data
+            ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_transport_test" --tempPath /data
         fi
 
   "run android emulator tests" :
@@ -1181,10 +1182,10 @@ functions:
         ${activate_virtualenv}
         if [ ${enable_android_emu_tests|false} = "true" ]; then
             # strip because the binaries with debug symbols are too big for the default storage on the emulator
-            $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip "build/install/bin/mongo_embedded_capi_test"
-            $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip "build/install/bin/mongo_embedded_transport_test"
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/install/bin/mongo_embedded_capi_test"
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/install/bin/mongo_embedded_transport_test"
+            find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip
+            find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_transport_test" --tempPath /data
         fi
 
   "run powercycle test" :
@@ -2688,10 +2689,29 @@ tasks:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
-    - func: "build cdriver" # noop if ${build_cdriver} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions.
     - func: "apply compile expansions"
+
+    - func: "build cdriver" # noop if ${build_cdriver} is not "true"
+
+    # Need to fixup C driver install names on iOS-ish
+    # TODO: Remove this once building the cdriver with cmake, which will allow
+    # us better control over installation names.
+    - command: shell.exec
+      params:
+        working_dir: "src/build/mongo-embedded-sdk-${version}"
+        script: |
+          set -o errexit
+          set -o verbose
+          if command -v xcrun; then
+            # fixup the install names.
+            _LibBsonInstallName=$(xcrun otool -l lib/libbson-1.0.0.dylib | grep mongo-embedded-sdk-${version} | awk '{ print $2 }')
+            xcrun install_name_tool -id '@loader_path/../lib/libbson-1.0.0.dylib' lib/libbson-1.0.0.dylib
+            xcrun install_name_tool -id '@loader_path/../lib/libmongoc-1.0.0.dylib' lib/libmongoc-1.0.0.dylib
+            xcrun install_name_tool -change $_LibBsonInstallName @loader_path/../lib/libbson-1.0.0.dylib lib/libmongoc-1.0.0.dylib
+          fi
+
     - func: "scons compile"
       vars:
         targets: mobile-dev mobile-test
@@ -2699,8 +2719,42 @@ tasks:
           --disable-warnings-as-errors
           --install-mode=hygienic
           --js-engine=none
-          CPPPATH="$(dirname $(pwd))/mongo-c-driver/install/include/libbson-1.0 $(dirname $(pwd))/mongo-c-driver/install/include/libmongoc-1.0"
-          LIBPATH="$(dirname $(pwd))/mongo-c-driver/install/lib"
+          --link-model=dynamic
+          --prefix='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION'
+          CPPPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libbson-1.0 $BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/include/libmongoc-1.0'
+          LIBPATH='$BUILD_ROOT/mongo-embedded-sdk-$MONGO_VERSION/lib'
+
+    # Need to sign artifacts on iOS-ish.
+    - command: shell.exec
+      params:
+        working_dir: "src/build/mongo-embedded-sdk-${version}"
+        script: |
+          set -o errexit
+          set -o verbose
+          if command -v xcrun; then
+            # Do ad-hoc signing for now, until we have a better answer
+            find ./lib -type f -name "*.dylib" -print0 | xargs -0 -L 1 xcrun codesign -s -
+          fi
+
+    # Not using archive.targz_pack here because I can't get it to work.
+    - command: shell.exec
+      params:
+        working_dir: "src/build"
+        script: |
+          set -o errexit
+          set -o verbose
+          tar cfvz ./embedded_sdk.tgz ./mongo-embedded-sdk-${version}
+
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/embedded_sdk.tgz"
+        remote_file: ${project}/${build_variant}/${revision}/embedded_sdk/${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: "Embedded SDK Tar Archive"
 
     # Run the iOS embedded CAPI tests in the iOS simulator
     # noop if ${enable_iostvos_sim_tests} is not "true"
@@ -6606,7 +6660,6 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     build_cdriver: true
     cdriver_configure_flags: >-
-      --prefix=$(pwd)/install
       --build x86_64-apple-darwin16.6.0
       --host arm-apple-darwin
       CC="$(xcrun -f --sdk iphoneos clang)"
@@ -6614,7 +6667,7 @@ buildvariants:
       CPPFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64"
       CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64"
       CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64"
-      LDFLAGS="-miphoneos-version-min=10.2 -arch arm64"
+      LDFLAGS="-miphoneos-version-min=10.2 -arch arm64 -Wl,-rpath,@loader_path/../lib"
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -6633,7 +6686,6 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     build_cdriver: true
     cdriver_configure_flags: >-
-      --prefix=$(pwd)/install
       --build x86_64-apple-darwin16.6.0
       --host x86_64-apple-darwin
       CC="$(xcrun -f --sdk iphonesimulator clang)"
@@ -6641,7 +6693,7 @@ buildvariants:
       CPPFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
       CFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
       CXXFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
-      LDFLAGS="-miphoneos-version-min=10.2 "
+      LDFLAGS="-miphoneos-version-min=10.2 -Wl,-rpath,@loader_path/../lib"
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -6662,7 +6714,6 @@ buildvariants:
   expansions:
     build_cdriver: true
     cdriver_configure_flags: >-
-      --prefix=$(pwd)/install
       --build x86_64-apple-darwin16.6.0
       --host arm-apple-darwin
       CC="$(xcrun -f --sdk appletvos clang)"
@@ -6670,7 +6721,7 @@ buildvariants:
       CPPFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
       CFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
       CXXFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
-      LDFLAGS="-mtvos-version-min=10.1 -arch arm64"
+      LDFLAGS="-mtvos-version-min=10.1 -arch arm64 -Wl,-rpath,@loader_path/../lib"
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
@@ -6689,7 +6740,6 @@ buildvariants:
   expansions:
     build_cdriver: true
     cdriver_configure_flags: >-
-      --prefix=$(pwd)/install
       --build x86_64-apple-darwin16.6.0
       --host x86_64-apple-darwin
       CC="$(xcrun -f --sdk appletvsimulator clang)"
@@ -6697,7 +6747,7 @@ buildvariants:
       CPPFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
       CFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
       CXXFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
-      LDFLAGS="-mtvos-version-min=10.1"
+      LDFLAGS="-mtvos-version-min=10.1 -Wl,-rpath,@loader_path/../lib"
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
@@ -6719,11 +6769,13 @@ buildvariants:
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     build_cdriver: true
+    # Normally, we would include -Wl,z,origin here to make origin processing a thing
+    # but see the notes in SConstruct about z,origin and android.
     cdriver_configure_flags: >-
-      --prefix=$(pwd)/install
       --host aarch64-unknown-linux-gnu
       CC=$(dirname $(pwd))/android_toolchain/bin/clang
       CXX=$(dirname $(pwd))/android_toolchain/clang++
+      LDFLAGS="-Wl,-rpath,\$ORIGIN/../lib"
     compile_env: JAVA_HOME=/opt/java/jdk8/
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
