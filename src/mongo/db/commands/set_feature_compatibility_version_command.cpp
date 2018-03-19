@@ -43,6 +43,8 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/versioning.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/scopeguard.h"
@@ -167,6 +169,21 @@ public:
 
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
+                    opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+
+                for (const auto& db : allDbs.value) {
+                    const auto dbVersion = Versioning::newDatabaseVersion();
+
+                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                        opCtx,
+                        DatabaseType::ConfigNS,
+                        BSON(DatabaseType::name(db.getName())),
+                        BSON("$set" << BSON(DatabaseType::version(dbVersion.toBSON()))),
+                        false,
+                        ShardingCatalogClient::kLocalWriteConcern));
+                }
+
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx,
