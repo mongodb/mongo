@@ -75,27 +75,23 @@ namespace {
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
  */
-repl::OplogEntry makeOplogEntry(NamespaceString nss) {
-    return repl::OplogEntry(OpTime(Timestamp(1, 1), 1),       // optime
-                            1LL,                              // hash
-                            OpTypeEnum::kDelete,              // opType
-                            nss,                              // namespace
-                            boost::none,                      // uuid
-                            boost::none,                      // fromMigrate
-                            repl::OplogEntry::kOplogVersion,  // version
-                            BSONObj(),                        // o
-                            boost::none,                      // o2
-                            {},                               // sessionInfo
-                            boost::none,                      // upsert
-                            boost::none,                      // wall clock time
-                            boost::none,                      // statement id
-                            boost::none,   // optime of previous write within same transaction
-                            boost::none,   // pre-image optime
-                            boost::none);  // post-image optime
-}
-
-repl::OplogEntry makeOplogEntry(StringData ns) {
-    return makeOplogEntry(NamespaceString(ns));
+OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollectionUUID uuid) {
+    return OplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
+                      1LL,                         // hash
+                      opType,                      // opType
+                      nss,                         // namespace
+                      uuid,                        // uuid
+                      boost::none,                 // fromMigrate
+                      OplogEntry::kOplogVersion,   // version
+                      BSON("_id" << 0),            // o
+                      boost::none,                 // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // upsert
+                      boost::none,                 // wall clock time
+                      boost::none,                 // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none);  // post-image optime
 }
 
 /**
@@ -310,23 +306,17 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
-    const BSONObj op = BSON("op"
-                            << "d"
-                            << "ns"
-                            << "test.othername");
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
+    NamespaceString otherNss("test.othername");
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, {});
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
     const NamespaceString nss("test.t");
     createDatabase(_opCtx.get(), nss.db());
-    const BSONObj op = BSON("op"
-                            << "i"
-                            << "ns"
-                            << nss.getSisterNS("othername")
-                            << "ui"
-                            << UUID::gen());
-    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op, true),
+    NamespaceString otherNss(nss.getSisterNS("othername"));
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, UUID::gen());
+    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true),
                        AssertionException,
                        ErrorCodes::NamespaceNotFound);
 }
@@ -334,13 +324,9 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
     const NamespaceString nss("test.t");
     createDatabase(_opCtx.get(), nss.db());
-    const BSONObj op = BSON("op"
-                            << "d"
-                            << "ns"
-                            << nss.getSisterNS("othername")
-                            << "ui"
-                            << UUID::gen());
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
+    NamespaceString otherNss(nss.getSisterNS("othername"));
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, UUID::gen());
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
@@ -363,11 +349,8 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionMissing) {
     // Even though the collection doesn't exist, this is handled in the actual application function,
     // which in the case of this test just ignores such errors. This tests mostly that we don't
     // implicitly create the collection and lock the database in MODE_X.
-    const BSONObj op = BSON("op"
-                            << "d"
-                            << "ns"
-                            << nss.ns());
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
@@ -388,36 +371,17 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionExists) {
     const NamespaceString nss("test.t");
     createCollection(_opCtx.get(), nss, {});
-    const BSONObj op = BSON("op"
-                            << "d"
-                            << "ns"
-                            << nss.ns());
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    {
-        Lock::GlobalWrite globalLock(_opCtx.get());
-        bool justCreated;
-        Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
-        ASSERT_TRUE(db);
-        ASSERT_TRUE(justCreated);
-        WriteUnitOfWork wuow(_opCtx.get());
-        Collection* collection = db->createCollection(_opCtx.get(), "test.t", options);
-        wuow.commit();
-        ASSERT_TRUE(collection);
-    }
-
+    const NamespaceString nss("test.t");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
-    const BSONObj op = BSON("op"
-                            << "i"
-                            << "ns"
-                            << "test.othername"
-                            << "ui"
-                            << options.uuid.get());
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
+    NamespaceString otherNss(nss.getSisterNS("othername"));
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, uuid);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
 }
 
 TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
@@ -427,20 +391,14 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
     createCollection(_opCtx.get(), nss, options);
 
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
-    auto op = BSON("op"
-                   << "d"
-                   << "ns"
-                   << nss.getSisterNS("othername")
-                   << "ui"
-                   << options.uuid.get());
-    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
+    NamespaceString otherNss(nss.getSisterNS("othername"));
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op.toBSON(), true);
 }
 
 TEST_F(SyncTailTest, SyncApplyIndexBuild) {
-    const BSONObj op = BSON("op"
-                            << "i"
-                            << "ns"
-                            << "test.system.indexes");
+    NamespaceString systemIndexesNss("test.system.indexes");
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, systemIndexesNss, {});
     bool applyOpCalled = false;
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
                                                    Database* db,
@@ -454,7 +412,7 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
         ASSERT_FALSE(opCtx->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(opCtx));
         ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op, theOperation);
+        ASSERT_BSONOBJ_EQ(op.toBSON(), theOperation);
         ASSERT_FALSE(alwaysUpsert);
         ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kInitialSync);
         return Status::OK();
@@ -462,7 +420,7 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
     ASSERT_OK(SyncTail::syncApply(_opCtx.get(),
-                                  op,
+                                  op.toBSON(),
                                   OplogApplication::Mode::kInitialSync,
                                   applyOp,
                                   failedApplyCommand,
@@ -822,8 +780,8 @@ TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperat
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToApplyOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    // This makes a delete operation on a non-existent collection.
-    auto op = makeOplogEntry(nss);
+    // Delete operation without _id in 'o' field.
+    auto op = makeDeleteDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, {});
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, runOpSteadyState(op));
 }
 
