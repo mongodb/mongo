@@ -74,6 +74,11 @@ public:
 
         uassertStatusOK(createShardDatabase(opCtx, dbName));
 
+        uassert(ErrorCodes::InvalidOptions,
+                "specify size:<n> when capped is true",
+                !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() ||
+                    cmdObj.hasField("$nExtents"));
+
         ConfigsvrCreateCollection configCreateCmd;
         configCreateCmd.setNs(nss);
 
