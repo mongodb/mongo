@@ -66,7 +66,7 @@ void ScriptEngine::setup() {
 }
 
 std::string ScriptEngine::getInterpreterVersionString() {
-    return "MozJS-38";
+    return "MozJS-" BOOST_PP_STRINGIZE(MOZJS_MAJOR_VERSION);
 }
 
 namespace mozjs {
