@@ -6704,7 +6704,7 @@ buildvariants:
       CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
       CXXFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
       LDFLAGS="-mmacosx-version-min=10.10 -Wl,-rpath,@loader_path/../lib"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --dbg=on
@@ -6731,7 +6731,7 @@ buildvariants:
       CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64"
       CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64"
       LDFLAGS="-miphoneos-version-min=10.2 -arch arm64 -Wl,-rpath,@loader_path/../lib"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --dbg=on
@@ -6757,7 +6757,7 @@ buildvariants:
       CFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
       CXXFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
       LDFLAGS="-miphoneos-version-min=10.2 -Wl,-rpath,@loader_path/../lib"
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_env: DEVELOPER_DIR=/Applications/Xcode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --dbg=on
@@ -6765,12 +6765,12 @@ buildvariants:
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: iPhone-7
-    ios_sim_runtime: iOS-10-3
+    ios_sim_runtime: iOS-10-2
   tasks:
   - name: compile_mobile
 
-- name: embedded-sdk-appletvos-10.1-debug
-  display_name: "Embedded SDK - tvOS 10.1 DEBUG"
+- name: embedded-sdk-appletvos-10.2-debug
+  display_name: "Embedded SDK - tvOS 10.2 DEBUG"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -6781,12 +6781,12 @@ buildvariants:
       --host arm-apple-darwin
       CC="$(xcrun -f --sdk appletvos clang)"
       CXX="$(xcrun -f --sdk appletvos clang++)"
-      CPPFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
-      CFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
-      CXXFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
-      LDFLAGS="-mtvos-version-min=10.1 -arch arm64 -Wl,-rpath,@loader_path/../lib"
+      CPPFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2 -arch arm64"
+      CFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2 -arch arm64"
+      CXXFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2 -arch arm64"
+      LDFLAGS="-mtvos-version-min=10.2 -arch arm64 -Wl,-rpath,@loader_path/../lib"
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --dbg=on
@@ -6795,8 +6795,8 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: embedded-sdk-appletvsimulator-10.1-debug
-  display_name: "Embedded SDK - tvOS Simulator 10.1 DEBUG"
+- name: embedded-sdk-appletvsimulator-10.2-debug
+  display_name: "Embedded SDK - tvOS Simulator 10.2 DEBUG"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -6807,12 +6807,13 @@ buildvariants:
       --host x86_64-apple-darwin
       CC="$(xcrun -f --sdk appletvsimulator clang)"
       CXX="$(xcrun -f --sdk appletvsimulator clang++)"
-      CPPFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
-      CFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
-      CXXFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
-      LDFLAGS="-mtvos-version-min=10.1 -Wl,-rpath,@loader_path/../lib"
+      CPPFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
+      CFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
+      CXXFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
+      LDFLAGS="-mtvos-version-min=10.2 -Wl,-rpath,@loader_path/../lib"
     test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
-    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_env: DEVELOPER_DIR=/Applications/XCode9.2.app
+
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
       --dbg=on
