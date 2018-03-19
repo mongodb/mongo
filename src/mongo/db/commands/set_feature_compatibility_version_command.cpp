@@ -234,6 +234,20 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
+
+                const auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
+                    opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+
+                for (const auto& db : allDbs.value) {
+                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                        opCtx,
+                        DatabaseType::ConfigNS,
+                        BSON(DatabaseType::name(db.getName())),
+                        BSON("$unset" << BSON("version"
+                                              << "")),
+                        false,
+                        ShardingCatalogClient::kLocalWriteConcern));
+                }
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);

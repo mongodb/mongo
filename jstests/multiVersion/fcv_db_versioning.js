@@ -10,13 +10,13 @@
 
     var st = new ShardingTest({
         shards: 1,
-        shardOptions: {binVersion: "last-stable"},
     });
 
     let configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     let shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
 
-    // Make sure config and shards start with last stable FCV
+    // Change FCV to last stable so databases will not have version
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(configPrimaryAdminDB, lastStableFCV);
     checkFCV(shardPrimaryAdminDB, lastStableFCV);
 
@@ -27,14 +27,15 @@
 
     // Make sure the databases don't have versions when FCV <= 3.6
     let test1 = st.s.getDB("config").getCollection("databases").findOne({_id: "test1"});
+    assert.neq(null, test1);
     assert(!test1.hasOwnProperty("version"), "db test1 has db version before upgrade");
 
     let test2 = st.s.getDB("config").getCollection("databases").findOne({_id: "test2"});
+    assert.neq(null, test2);
     assert(!test2.hasOwnProperty("version"), "db test2 has db version before upgrade");
 
     // Set FCV to latest
-    assert.commandWorked(
-        configPrimaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(configPrimaryAdminDB, latestFCV);
     checkFCV(shardPrimaryAdminDB, latestFCV);
 
@@ -44,6 +45,20 @@
 
     test2 = st.s.getDB("config").getCollection("databases").findOne({_id: "test2"});
     assert(test2.hasOwnProperty("version"), "db test2 does not have db version after upgrade");
+
+    // Set FCV to last-stable
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    checkFCV(configPrimaryAdminDB, lastStableFCV);
+    checkFCV(shardPrimaryAdminDB, lastStableFCV);
+
+    // Make sure versions were removed when FCV changed to <= 3.6
+    test1 = st.s.getDB("config").getCollection("databases").findOne({_id: "test1"});
+    assert.neq(null, test1);
+    assert(!test1.hasOwnProperty("version"), "db test1 has db version before upgrade");
+
+    test2 = st.s.getDB("config").getCollection("databases").findOne({_id: "test2"});
+    assert.neq(null, test2);
+    assert(!test2.hasOwnProperty("version"), "db test2 has db version before upgrade");
 
     st.stop();
 
