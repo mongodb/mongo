@@ -645,6 +645,12 @@ functions:
             --jsonArtifact artifacts.json
         fi
 
+  "send benchmark results" :
+    command: json.send
+    params:
+      name: perf
+      file: src/perf.json
+
   "do setup" :
   - *fetch_artifacts
   - *update_bypass_expansions
@@ -805,15 +811,19 @@ functions:
                   ${test_flags}                           \
                   --log=buildlogger                       \
                   --staggerJobs=on                        \
-                  --taskId=${task_id}                     \
-                  --taskName=${task_name}                 \
+                  --buildId=${build_id}                   \
+                  --distroId=${distro_id}                 \
                   --executionNumber=${execution}          \
                   --projectName=${project}                \
-                  --variantName=${build_variant}          \
-                  --distroId=${distro_id}                 \
                   --gitRevision=${revision}               \
+                  --revisionOrderId=${revision_order_id}  \
+                  --taskId=${task_id}                     \
+                  --taskName=${task_name}                 \
+                  --variantName=${build_variant}          \
+                  --versionId=${version_id}               \
                   --archiveFile=archive.json              \
-                  --reportFile=report.json
+                  --reportFile=report.json                \
+                  --perfReportFile=perf.json
           resmoke_exit_code=$?
           set -o errexit
 
@@ -2789,6 +2799,7 @@ tasks:
     vars:
       resmoke_args: --suites=benchmarks
       run_multiple_jobs: false
+  - func: "send benchmark results"
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify_WT

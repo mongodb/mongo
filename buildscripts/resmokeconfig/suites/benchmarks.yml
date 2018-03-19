@@ -2,7 +2,7 @@ test_kind: benchmark_test
 
 selector:
   root: build/benchmarks.txt
-  # TODO: SERVER-33203 Add path glob for canary tests.
+  # Please always add path glob for canary tests as part of include_files.
 
 executor:
   config: {}

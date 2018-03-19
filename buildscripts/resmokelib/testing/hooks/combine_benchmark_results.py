@@ -49,56 +49,21 @@ class CombineBenchmarkResults(interface.Hook):
         self.create_time = datetime.datetime.now()
 
     def after_suite(self, test_report):
-        self.end_time = datetime.datetime.now()
+        if self.report_file is None:
+            return
 
-        if self.report_file is not None:
-            report = self._generate_perf_plugin_report()
-            with open(self.report_file, "w") as f:
-                json.dump(report, f)
+        self.end_time = datetime.datetime.now()
+        report = self._generate_perf_plugin_report()
+        with open(self.report_file, "w") as f:
+            json.dump(report, f)
 
     def _generate_perf_plugin_report(self):
-        """
-        Format the data to look like a perf plugin report, which has
-        the following format:
-        
-        "name": "perf",
-        "task_name": "update",
-        "project_id": "performance",
-        "task_id": "TASK_ID",
-        "build_id": "BUILD_ID",
-        "variant": "linux-wt-standalone",
-        "version_id": "performance_cfe9d2477fab36aa57ccd2f63206955a248cf266",
-        "create_time": "2018-02-28T03:44:16Z",
-        "is_patch": false,
-        "order": 11249,
-        "revision": "cfe9d2477fab36aa57ccd2f63206955a248cf266",
-        "data": {
-          "end": "2018-02-28T05:36:13.127Z",
-          "errors": [],
-          "results": [
-            {
-              "name": "Update.SetWithIndex.Random",
-              "results": {
-                ...
-        """
+        """Format the data to look like a perf plugin report."""
         perf_report = {
-            "build_id": None,
-            "create_time": self._strftime(self.create_time),
-            "is_patch": _config.EVERGREEN_PATCH_BUILD,
-            "name": "perf",
-            "order": None,
-            "project_id": _config.EVERGREEN_PROJECT_NAME,
-            "revision": _config.EVERGREEN_REVISION,
-            "task_id": _config.EVERGREEN_TASK_ID,
-            "task_name": _config.EVERGREEN_TASK_NAME,
-            "variant": _config.EVERGREEN_VARIANT_NAME,
-            "version_id": None,
-
-            "data": {
-                "end": self._strftime(self.end_time),
-                "errors": [],  # There are no errors if we have gotten this far.
-                "results": []
-            }
+            "start": self._strftime(self.create_time),
+            "end": self._strftime(self.end_time),
+            "errors": [],  # There are no errors if we have gotten this far.
+            "results": []
         }
 
         for name, report in self.benchmark_reports.items():
@@ -108,7 +73,7 @@ class CombineBenchmarkResults(interface.Hook):
                 "context": report.context._asdict()
             }
 
-            perf_report["data"]["results"].append(test_report)
+            perf_report["results"].append(test_report)
 
         return perf_report
 
@@ -116,11 +81,19 @@ class CombineBenchmarkResults(interface.Hook):
         context = report_dict["context"]
 
         for benchmark_res in report_dict["benchmarks"]:
-            name_no_thread = benchmark_res["name"].rsplit("/", 1)[0]
+            # The group name is the benchmark name minus the thread count and any statistics.
+            # Each group will be shown on a single perf graph.
+            group_name = benchmark_res["name"].rsplit("/", 1)[0]
 
-            if name_no_thread not in self.benchmark_reports:
-                self.benchmark_reports[name_no_thread] = _BenchmarkThreadsReport(context)
-            self.benchmark_reports[name_no_thread].add_report(benchmark_res)
+            if group_name == benchmark_res["name"] and group_name.count("_") == 2:
+                # When running with only one thread, the thread count is not in the name;
+                # just remove the mean/median/stddev suffix in this case.
+                # With one thread, the group_name looks like: BM_MyTestNameInCamelCase_statistic.
+                group_name = group_name.rsplit("_", 1)[0]
+
+            if group_name not in self.benchmark_reports:
+                self.benchmark_reports[group_name] = _BenchmarkThreadsReport(context)
+            self.benchmark_reports[group_name].add_report(benchmark_res)
 
 
 class _BenchmarkThreadsReport(object):
@@ -190,11 +163,11 @@ class _BenchmarkThreadsReport(object):
 
         res = {}
         for thread_count, reports in self.thread_benchmark_map.items():
-            if (thread_count.endswith("median")
-                    or thread_count.endswith("mean") or thread_count.endswith("stddev")):
-                # We don't use Benchmark's included statistics for now, in case they're not
-                # available. Just store them as-is for future reference.
-                res[thread_count] = reports[0]
+            if (thread_count.endswith("median") or thread_count.endswith("mean") or
+                    thread_count.endswith("stddev")):
+                # We don't use Benchmark's included statistics for now because they clutter up the
+                # graph.
+                continue
 
             thread_report = {
                 "error_values": [0 for _ in range(len(reports))],
@@ -212,6 +185,15 @@ class _BenchmarkThreadsReport(object):
 
     @staticmethod
     def _thread_from_name(name):
-        # Get the thread from a string that looks like this:
-        # "BM_SetInsert/arg name:1024/threads:10".
-        return name.rsplit("/", 1)[-1].split(":")[-1]
+        # Get the thread from a string:
+        # "BM_SetInsert/arg name:1024/threads:10_mean" -> "10_mean"
+        # "BM_SetInsert" -> "1"
+        # "BM_SetInsert_mean" -> "1_mean"
+        thread_section = name.rsplit("/", 1)[-1]
+        if thread_section.startswith("threads:"):
+            return thread_section.split(":")[-1]
+        else:
+            if name.count("_") == 2:
+                suffix = name.split("_")[-1]
+                return "1_" + suffix
+            return "1"

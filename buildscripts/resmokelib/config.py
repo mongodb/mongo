@@ -79,14 +79,17 @@ DEFAULTS = {
     "transport_layer": None,
 
     # Evergreen options.
+    "build_id": None,
     "distro_id": None,
     "execution_number": 0,
     "git_revision": None,
     "patch_build": False,
     "project_name": "mongodb-mongo-master",
+    "revision_order_id": None,
     "task_id": None,
     "task_name": None,
     "variant_name": None,
+    "version_id": None,
 
     # WiredTiger options.
     "wt_coll_config": None,
@@ -214,6 +217,10 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
+# An identifier consisting of the project name, build variant name, commit hash, and the timestamp.
+# For patch builds, it also includes the patch version id.
+EVERGREEN_BUILD_ID = None
+
 # The identifier for the Evergreen distro that resmoke.py is being run on.
 EVERGREEN_DISTRO_ID = None
 
@@ -229,6 +236,9 @@ EVERGREEN_PROJECT_NAME = None
 # The git revision of the Evergreen task that resmoke.py is being run on.
 EVERGREEN_REVISION = None
 
+# A number for the chronological order of this revision.
+EVERGREEN_REVISION_ORDER_ID = None
+
 # The identifier for the Evergreen task that resmoke.py is being run under. If set, then the
 # Evergreen task id value will be transmitted to logkeeper when creating builds and tests.
 EVERGREEN_TASK_ID = None
@@ -238,6 +248,10 @@ EVERGREEN_TASK_NAME = None
 
 # The name of the Evergreen build variant that resmoke.py is being run on.
 EVERGREEN_VARIANT_NAME = None
+
+# The identifier consisting of the project name and the commit hash. For patch builds, it is just
+# the commit hash.
+EVERGREEN_VERSION_ID = None
 
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None

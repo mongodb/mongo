@@ -226,6 +226,9 @@ def parse_command_line():
                      " script."))
     parser.add_option_group(evergreen_options)
 
+    evergreen_options.add_option("--buildId", dest="build_id", metavar="BUILD_ID",
+                                 help="Sets the build ID of the task.")
+
     evergreen_options.add_option("--distroId", dest="distro_id", metavar="DISTRO_ID",
                                  help=("Sets the identifier for the Evergreen distro running the"
                                        " tests."))
@@ -247,6 +250,10 @@ def parse_command_line():
                                  help=("Sets the name of the Evergreen project running the tests."
                                        ))
 
+    evergreen_options.add_option("--revisionOrderId", dest="revision_order_id",
+                                 metavar="REVISION_ORDER_ID",
+                                 help="Sets the chronological order number of this commit.")
+
     evergreen_options.add_option("--taskName", dest="task_name", metavar="TASK_NAME",
                                  help="Sets the name of the Evergreen task running the tests.")
 
@@ -256,6 +263,9 @@ def parse_command_line():
     evergreen_options.add_option("--variantName", dest="variant_name", metavar="VARIANT_NAME",
                                  help=("Sets the name of the Evergreen build variant running the"
                                        " tests."))
+
+    evergreen_options.add_option("--versionId", dest="version_id", metavar="VERSION_ID",
+                                 help="Sets the version ID of the task.")
 
     benchmark_options = optparse.OptionGroup(
         parser,
@@ -393,14 +403,17 @@ def update_config_vars(values):
     _config.TRANSPORT_LAYER = config.pop("transport_layer")
 
     # Evergreen options.
+    _config.EVERGREEN_BUILD_ID = config.pop("build_id")
     _config.EVERGREEN_DISTRO_ID = config.pop("distro_id")
     _config.EVERGREEN_EXECUTION = config.pop("execution_number")
     _config.EVERGREEN_PATCH_BUILD = config.pop("patch_build")
     _config.EVERGREEN_PROJECT_NAME = config.pop("project_name")
     _config.EVERGREEN_REVISION = config.pop("git_revision")
+    _config.EVERGREEN_REVISION_ORDER_ID = config.pop("revision_order_id")
     _config.EVERGREEN_TASK_ID = config.pop("task_id")
     _config.EVERGREEN_TASK_NAME = config.pop("task_name")
     _config.EVERGREEN_VARIANT_NAME = config.pop("variant_name")
+    _config.EVERGREEN_VERSION_ID = config.pop("version_id")
 
     # Wiredtiger options.
     _config.WT_COLL_CONFIG = config.pop("wt_coll_config")
