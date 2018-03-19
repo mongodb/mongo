@@ -128,6 +128,18 @@ if wiredtiger:
             ],
         )
 
+    wtEnv.CppUnitTest(
+        target='storage_wiredtiger_recovery_unit_test',
+        source=[
+            'wiredtiger_recovery_unit_test.cpp',
+        ],
+        LIBDEPS=[
+            'storage_wiredtiger_mock',
+            '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness',
+            '$BUILD_DIR/mongo/util/clock_source_mock',
+        ]
+    )
+
     wtEnv.Library(
         target='additional_wiredtiger_record_store_tests',
         source=[

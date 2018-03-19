@@ -166,6 +166,18 @@ env.Library(
         ],
     )
 
+
+env.Library(
+    target='recovery_unit_test_harness',
+    source=[
+        'recovery_unit_test_harness.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'test_harness_helper',
+        ],
+    )
+
 env.Library(
     target='storage_engine_lock_file',
     source=[
