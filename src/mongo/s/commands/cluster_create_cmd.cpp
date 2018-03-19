@@ -91,7 +91,8 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 "admin",
-                CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON()),
+                CommandHelpers::appendMajorityWriteConcern(
+                    CommandHelpers::appendPassthroughFields(cmdObj, configCreateCmd.toBSON())),
                 Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));

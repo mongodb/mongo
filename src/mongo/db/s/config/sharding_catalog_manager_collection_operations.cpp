@@ -82,6 +82,7 @@ const Seconds kDefaultFindHostMaxWaitTime(20);
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
+const char kWriteConcernField[] = "writeConcern";
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObjBuilder countBuilder;
@@ -653,11 +654,13 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
     BSONObjBuilder createCmdBuilder;
     createCmdBuilder.append("create", ns.coll());
     collOptions.appendBSON(&createCmdBuilder);
+    createCmdBuilder.append(kWriteConcernField, opCtx->getWriteConcern().toBSON());
+
     auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         ns.db().toString(),
-        CommandHelpers::appendMajorityWriteConcern(createCmdBuilder.obj()),
+        createCmdBuilder.obj(),
         Shard::RetryPolicy::kIdempotent);
 
     auto createStatus = Shard::CommandResponse::getEffectiveStatus(swResponse);
