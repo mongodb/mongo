@@ -189,7 +189,8 @@
         doUpdate(multiPointQuery, oUpdate, multi, makeMongosStaleFunc);
     }
 
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    // TODO: SERVER-33954 remove shardAsReplicaSet: false.
+    var st = new ShardingTest({shards: 2, mongos: 2, other: {shardAsReplicaSet: false}});
 
     var dbName = 'test';
     var collNS = dbName + '.foo';
