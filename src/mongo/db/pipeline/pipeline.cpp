@@ -200,9 +200,6 @@ void Pipeline::validateFacetPipeline() const {
 }
 
 void Pipeline::validateCommon() const {
-    // TODO SERVER-33551: Don't use presence of WUOW to decide whether we are in a snapshot read or
-    // multi-doc transaction.
-    const bool isSnapshotReadOrTxn = static_cast<bool>(pCtx->opCtx->getWriteUnitOfWork());
     size_t i = 0;
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);
@@ -231,7 +228,7 @@ void Pipeline::validateCommon() const {
                 str::stream() << stage->getSourceName() << " can only be run on mongoS",
                 !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
 
-        if (isSnapshotReadOrTxn) {
+        if (pCtx->inSnapshotReadOrMultiDocumentTransaction) {
             uassert(50742,
                     str::stream() << "Stage not supported with readConcern level \"snapshot\" "
                                      "or inside of a multi-document transaction: "

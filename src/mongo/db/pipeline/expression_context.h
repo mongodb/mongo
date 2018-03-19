@@ -175,6 +175,7 @@ public:
     bool inMongos = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
+    bool inSnapshotReadOrMultiDocumentTransaction = false;
 
     NamespaceString ns;
     boost::optional<UUID> uuid;

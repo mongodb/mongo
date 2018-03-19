@@ -59,6 +59,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
@@ -452,6 +453,9 @@ Status runAggregate(OperationContext* opCtx,
                                   std::make_shared<PipelineD::MongoDInterface>(opCtx),
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
+        auto session = OperationContextSession::get(opCtx);
+        expCtx->inSnapshotReadOrMultiDocumentTransaction =
+            session && session->inSnapshotReadOrMultiDocumentTransaction();
 
         auto pipeline = uassertStatusOK(Pipeline::parse(request.getPipeline(), expCtx));
 

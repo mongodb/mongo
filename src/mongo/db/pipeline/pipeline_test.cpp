@@ -1088,20 +1088,20 @@ TEST(PipelineOptimizationTest,
 // optimizations, but it currently does not.
 TEST(PipelineOptimizationTest, MatchOnArrayIndexShouldNotSwapSinceCategoryIsArrayMatching) {
     string inputPipe = R"(
-        [{$project: {_id: true, a: '$b'}}, 
-        {$match: {a: {$_internalSchemaMatchArrayIndex: 
+        [{$project: {_id: true, a: '$b'}},
+        {$match: {a: {$_internalSchemaMatchArrayIndex:
            {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
     assertPipelineOptimizesTo(inputPipe, inputPipe);
 
     inputPipe = R"(
-        [{$project: {redacted: false}}, 
-        {$match: {a: {$_internalSchemaMatchArrayIndex: 
+        [{$project: {redacted: false}},
+        {$match: {a: {$_internalSchemaMatchArrayIndex:
            {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
     assertPipelineOptimizesTo(inputPipe, inputPipe);
 
     inputPipe = R"(
-        [{$addFields : {a : {$const: 1}}}, 
-        {$match: {a: {$_internalSchemaMatchArrayIndex: 
+        [{$addFields : {a : {$const: 1}}},
+        {$match: {a: {$_internalSchemaMatchArrayIndex:
            {index: 0, namePlaceholder: 'i', expression: {i: {$lt: 0}}}}}}])";
     assertPipelineOptimizesTo(inputPipe, inputPipe);
 }
@@ -1207,79 +1207,79 @@ TEST(PipelineOptimizationTest, MatchOnMaxPropertiesShouldNotSwapSinceCategoryIsO
 // optimizations, but it currently does not.
 TEST(PipelineOptimizationTest, MatchOnAllowedPropertiesShouldNotSwapSinceCategoryIsOther) {
     string inputPipe = R"(
-        [{$project: {_id: true, a: '$b'}}, 
+        [{$project: {_id: true, a: '$b'}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: 1}
         }}}])";
     string outputPipe = R"(
-        [{$project: {_id: true, a: '$b'}}, 
+        [{$project: {_id: true, a: '$b'}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: {$eq : 1}}
         }}}])";
     string serializedPipe = R"(
-        [{$project: {_id: true, a: '$b'}}, 
+        [{$project: {_id: true, a: '$b'}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i : 1}}
         }}])";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe = R"(
-        [{$project: {redacted: false}}, 
+        [{$project: {redacted: false}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: 1}
         }}}])";
     outputPipe = R"(
-        [{$project: {redacted: false}}, 
+        [{$project: {redacted: false}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: {$eq: 1}
         }}}}])";
     serializedPipe = R"(
-        [{$project: {redacted: false}}, 
+        [{$project: {redacted: false}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: 1}
         }}}])";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 
     inputPipe = R"(
-        [{$addFields : {a : {$const: 1}}}, 
+        [{$addFields : {a : {$const: 1}}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: 1}
         }}}])";
     outputPipe = R"(
-        [{$addFields: {a: {$const: 1}}}, 
+        [{$addFields: {a: {$const: 1}}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ["b"], 
-            namePlaceholder: "i", 
-            patternProperties: [], 
+            properties: ["b"],
+            namePlaceholder: "i",
+            patternProperties: [],
             otherwise: {i: {$eq: 1}
         }}}}])";
     serializedPipe = R"(
-        [{$addFields : {a : {$const: 1}}}, 
+        [{$addFields : {a : {$const: 1}}},
         {$match: {$_internalSchemaAllowedProperties: {
-            properties: ['b'], 
-            namePlaceholder: 'i', 
-            patternProperties: [], 
+            properties: ['b'],
+            namePlaceholder: 'i',
+            patternProperties: [],
             otherwise: {i: 1}
         }}}])";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
@@ -2463,7 +2463,7 @@ TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalWithSnapsh
     auto&& readConcernArgs = repl::ReadConcernArgs::get(ctx->opCtx);
     ASSERT_OK(readConcernArgs.initialize(readConcernSnapshot["readConcern"]));
     ASSERT(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
-    ctx->opCtx->setWriteUnitOfWork(stdx::make_unique<WriteUnitOfWork>(ctx->opCtx));
+    ctx->inSnapshotReadOrMultiDocumentTransaction = true;
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
@@ -2481,7 +2481,7 @@ TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalWithSnapshotR
     auto&& readConcernArgs = repl::ReadConcernArgs::get(ctx->opCtx);
     ASSERT_OK(readConcernArgs.initialize(readConcernSnapshot["readConcern"]));
     ASSERT(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
-    ctx->opCtx->setWriteUnitOfWork(stdx::make_unique<WriteUnitOfWork>(ctx->opCtx));
+    ctx->inSnapshotReadOrMultiDocumentTransaction = true;
 
     // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
     // creation fails with the expected error code.
