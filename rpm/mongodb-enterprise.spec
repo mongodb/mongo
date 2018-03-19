@@ -202,6 +202,10 @@ if test $1 = 1
 then
     /usr/bin/systemctl enable mongod
 fi
+if test $1 = 2
+then
+    /usr/bin/systemctl daemon-reload
+fi
 
 %preun server
 if test $1 = 0
