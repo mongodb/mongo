@@ -190,6 +190,7 @@ functions:
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
+          authentication: ${authentication}
           EOF
 
           cat > runtime.yml <<EOF
@@ -424,6 +425,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "core"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -437,6 +439,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "short"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -450,6 +453,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "core"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -463,6 +467,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "retryable_writes"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -476,6 +481,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "snapshot_reads"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -489,6 +495,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "agg_query_comparison_bestbuy"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -502,6 +509,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "agg_query_comparison_bestbuy"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -515,6 +523,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "non_sharded"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -528,6 +537,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "non_sharded"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -541,6 +551,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "mongos"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -554,6 +565,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "mongos"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -567,6 +579,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "move_chunk"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -580,6 +593,7 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "move_chunk"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -595,6 +609,7 @@ tasks:
         # Unfortunately the dash/underscore style is different for mongodb_setup and test_control
         test: "secondary_performance"
         setup: "secondary-performance"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -610,6 +625,7 @@ tasks:
         # Unfortunately the dash/underscore style is different for mongodb_setup and test_control
         test: "secondary_performance"
         setup: "secondary-performance"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -663,6 +679,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "change_streams"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -676,6 +693,7 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "change_streams_multi_mongos"
+        authentication: disabled
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -742,6 +760,7 @@ buildvariants:
     cluster: single
     platform: linux
     project: *project
+    authentication: enabled
   run_on:
       - "rhel70-perf-single"
   tasks:
@@ -773,6 +792,7 @@ buildvariants:
     cluster: single
     platform: linux
     project: *project
+    authentication: enabled
   run_on:
       - "rhel70-perf-single"
   tasks:
@@ -801,6 +821,7 @@ buildvariants:
     cluster: shard
     platform: linux
     project: *project
+    authentication: disabled
   run_on:
       - "rhel70-perf-shard"
   tasks:
@@ -836,6 +857,7 @@ buildvariants:
     cluster: replica
     platform: linux
     project: *project
+    authentication: enabled
   run_on:
       - "rhel70-perf-replset"
   tasks:
@@ -918,6 +940,7 @@ buildvariants:
     platform: linux
     project: &project dsi
     wtdevelop: -wtdevelop
+    authentication: enabled
   run_on:
       - "rhel70-perf-single"
   tasks:
@@ -944,6 +967,7 @@ buildvariants:
     platform: linux
     project: *project
     wtdevelop: -wtdevelop
+    authentication: enabled
   run_on:
       - "rhel70-perf-single"
   tasks:
@@ -968,6 +992,7 @@ buildvariants:
     platform: linux
     project: *project
     wtdevelop: -wtdevelop
+    authentication: enabled
   run_on:
       - "rhel70-perf-replset"
   tasks:
