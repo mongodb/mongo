@@ -342,8 +342,9 @@ public:
 
         stdx::unique_lock<stdx::mutex> lk(mx);
         cv->wait(lk, [&] {
-            // The mutex guarantees acquire/release semantics so this can be a relaxed load.
-            return state.load(std::memory_order_relaxed) == SSBState::kFinished;
+            // The mx locking above is insufficient to establish an acquire if state transitions to
+            // kFinished before we get here, but we aquire mx before the producer does.
+            return state.load(std::memory_order_acquire) == SSBState::kFinished;
         });
     }
 

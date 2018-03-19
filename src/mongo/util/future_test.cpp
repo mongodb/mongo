@@ -34,6 +34,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 namespace mongo {
 namespace {
 
@@ -73,7 +77,10 @@ Future<Result> async(Func&& func) {
     auto fut = promise.getFuture();
 
     stdx::thread([ promise = std::move(promise), func = std::forward<Func>(func) ]() mutable {
+#if !__has_feature(thread_sanitizer)
+        // TSAN works better without this sleep, but it is useful for testing correctness.
         sleepmillis(100);  // Try to wait until after the Future has been handled.
+#endif
         try {
             completePromise(&promise, func);
         } catch (const DBException& ex) {
