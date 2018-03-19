@@ -7,6 +7,9 @@
  */
 var $config = (function() {
 
+    // For isWiredTiger.
+    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+
     function _calcTotalMoneyBalances(sessionDb, txnNumber, collName) {
         let res = sessionDb.runCommand({
             find: collName,
@@ -117,8 +120,9 @@ var $config = (function() {
     };
 
     var skip = function skip(cluster) {
-        if (cluster.isSharded() || cluster.isStandalone()) {
-            return {skip: true, msg: 'only runs in a replica set.'};
+        if (cluster.isSharded() || cluster.isStandalone() ||
+            !isWiredTiger(cluster.getDB("admin"))) {
+            return {skip: true, msg: 'only runs in a replica set with WiredTiger.'};
         }
         return {skip: false};
     };
