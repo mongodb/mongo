@@ -1,6 +1,6 @@
 // Test running explains on count commands.
 
-load("jstests/libs/analyze_plan.js"); // For assertExplainCount.
+load("jstests/libs/analyze_plan.js");     // For assertExplainCount.
 load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
 
 var collName = "jstests_explain_count";

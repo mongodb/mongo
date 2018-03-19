@@ -46,23 +46,6 @@
     // Test that $collStats is disallowed with snapshot reads.
     testSnapshotAggFailsWithCode(kCollName, [{$collStats: {}}], kIllegalStageForSnapshotReadCode);
 
-    // Test that $geoNear is disallowed with snapshot reads.
-    assert.commandWorked(sessionDB.runCommand({
-        createIndexes: kCollName,
-        indexes: [{key: {a: "2dsphere"}, name: "a_2dsphere"}],
-        writeConcern: {w: "majority"}
-    }));
-    testSnapshotAggFailsWithCode(kCollName,
-                                 [{
-                                    $geoNear: {
-                                        near: {type: "Point", coordinates: [0, 0]},
-                                        distanceField: "distanceField",
-                                        spherical: true,
-                                        key: "a"
-                                    }
-                                 }],
-                                 kIllegalStageForSnapshotReadCode);
-
     // Test that $indexStats is disallowed with snapshot reads.
     testSnapshotAggFailsWithCode(kCollName, [{$indexStats: {}}], kIllegalStageForSnapshotReadCode);
 
@@ -106,15 +89,13 @@
         let cmdRes = sessionDB.runCommand({
             aggregate: localColl.getName(),
             pipeline: pipeline,
-            // TODO SERVER-33698: Remove this workaround once cursor establishment commands with
-            // batchSize:0 correctly open a snapshot for the read transaction.
-            cursor: {batchSize: 1},
+            cursor: {batchSize: 0},
             readConcern: {level: "snapshot"},
             txnNumber: NumberLong(++txnNumber)
         });
         assert.commandWorked(cmdRes);
         assert.neq(0, cmdRes.cursor.id);
-        assert.eq(1, cmdRes.cursor.firstBatch.length);
+        assert.eq(0, cmdRes.cursor.firstBatch.length);
 
         assert.commandWorked(localColl.insert(localDocsPost, kWCMajority));
         assert.commandWorked(foreignColl.insert(foreignDocsPost, kWCMajority));
@@ -179,8 +160,51 @@
             [{_id: 0, as: []}, {_id: 1, as: [{_id: 1, linkTo: 2}]}, {_id: 2, as: []}]
     });
 
+    // Test that snapshot isolation works for $geoNear. Special care is taken to test snapshot
+    // isolation across getMore for $geoNear as it is an initial document source.
+    const coll = sessionDB.getCollection(kCollName);
+    coll.drop();
+    assert.commandWorked(sessionDB.runCommand({
+        createIndexes: kCollName,
+        indexes: [{key: {geo: "2dsphere"}, name: "geo_2dsphere"}],
+        writeConcern: {w: "majority"}
+    }));
+
+    let bulk = coll.initializeUnorderedBulkOp();
+    const numInitialGeoInsert = 4;
+    for (let i = 0; i < numInitialGeoInsert; ++i) {
+        bulk.insert({_id: i, geo: {type: "Point", coordinates: [0, 0]}});
+    }
+    assert.commandWorked(bulk.execute({w: "majority"}));
+
+    let cmdRes = assert.commandWorked(sessionDB.runCommand({
+        aggregate: kCollName,
+        pipeline: [{
+            $geoNear: {
+                spherical: true,
+                near: {type: "Point", coordinates: [0, 0]},
+                distanceField: "distance"
+            }
+        }],
+        txnNumber: NumberLong(++txnNumber),
+        readConcern: {level: "snapshot"},
+        cursor: {batchSize: 0}
+    }));
+    assert(cmdRes.hasOwnProperty("cursor"));
+    const cursorId = cmdRes.cursor.id;
+    assert.neq(cursorId, 0);
+
+    assert.commandWorked(
+        coll.insert({_id: numInitialGeoInsert, geo: {type: "Point", coordinates: [0, 0]}},
+                    {writeConcern: {w: "majority"}}));
+
+    cmdRes = assert.commandWorked(sessionDB.runCommand(
+        {getMore: NumberLong(cursorId), collection: kCollName, txnNumber: NumberLong(txnNumber)}));
+    assert(cmdRes.hasOwnProperty("cursor"));
+    assert(cmdRes.cursor.hasOwnProperty("nextBatch"));
+    assert.eq(cmdRes.cursor.nextBatch.length, numInitialGeoInsert);
+
     // Test that snapshot reads are legal for $facet.
-    let coll = sessionDB.getCollection(kCollName);
     coll.drop();
     assert.commandWorked(coll.insert(
         [
@@ -190,7 +214,7 @@
         ],
         kWCMajority));
 
-    let cmdRes = sessionDB.runCommand({
+    cmdRes = sessionDB.runCommand({
         aggregate: kCollName,
         pipeline: [
             {

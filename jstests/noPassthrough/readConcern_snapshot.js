@@ -130,15 +130,13 @@
         txnNumber: NumberLong(txnNumber++)
     }));
 
-    // readConcern 'snapshot' is not supported by geoNear.
-    // TODO SERVER-33354: Add snapshot support for geoNear.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // readConcern 'snapshot' is supported by geoNear.
+    assert.commandWorked(sessionDb.runCommand({
         geoNear: collName,
         near: [0, 0],
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    }));
 
     // readConcern 'snapshot' is supported by geoSearch.
     assert.commandWorked(sessionDb.runCommand({

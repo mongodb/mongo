@@ -78,8 +78,15 @@
     function populateCollection() {
         db.coll.drop();
         for (let i = 0; i < TestData.numDocs; i++) {
-            assert.commandWorked(db.coll.insert({_id: i, x: 1}, {writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                db.coll.insert({_id: i, x: 1, location: [0, 0]}, {writeConcern: {w: "majority"}}));
         }
+
+        assert.commandWorked(db.runCommand({
+            createIndexes: "coll",
+            indexes: [{key: {location: "2d"}, name: "geo_2d"}],
+            writeConcern: {w: "majority"}
+        }));
     }
 
     function testCommand(awaitCommandFn, curOpFilter, profilerFilter, testWriteConflict) {
@@ -142,7 +149,8 @@
 
         //
         // Test that the command does not read data that is inserted during its execution.
-        // 'awaitCommandFn' should fail if it reads a document {_id: <numDocs>, x: 1, new: 1}.
+        // 'awaitCommandFn' should fail if it reads the following document:
+        //     {_id: <numDocs>, x: 1, new: 1, location: [0, 0]}
         //
 
         TestData.txnNumber++;
@@ -155,8 +163,8 @@
         waitForOpId(curOpFilter);
 
         // Insert data that should not be read by the command.
-        assert.commandWorked(
-            db.coll.insert({_id: TestData.numDocs, x: 1, new: 1}, {writeConcern: {w: "majority"}}));
+        assert.commandWorked(db.coll.insert({_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]},
+                                            {writeConcern: {w: "majority"}}));
 
         // Remove the hang. The command should complete successfully.
         assert.commandWorked(db.adminCommand(
@@ -165,7 +173,7 @@
 
         //
         // Test that the command fails if a write conflict occurs. 'awaitCommandFn' should write to
-        // {_id: <numDocs>, x: 1, new: 1}.
+        // the following document: {_id: <numDocs>, x: 1, new: 1, location: [0, 0]}
         //
 
         if (testWriteConflict) {
@@ -173,8 +181,9 @@
             populateCollection();
 
             // Insert the document that the command will write to.
-            assert.commandWorked(db.coll.insert({_id: TestData.numDocs, x: 1, new: 1},
-                                                {writeConcern: {w: "majority"}}));
+            assert.commandWorked(
+                db.coll.insert({_id: TestData.numDocs, x: 1, new: 1, location: [0, 0]},
+                               {writeConcern: {w: "majority"}}));
 
             // Start a command that hangs before checking for interrupt.
             assert.commandWorked(db.adminCommand({
@@ -249,6 +258,19 @@
         }));
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.pipeline": [{$match: {x: 1}}]}, {"command.pipeline": [{$match: {x: 1}}]});
+
+    // Test geoNear.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            geoNear: "coll",
+            near: [0, 0],
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert(res.hasOwnProperty("results"));
+        assert.eq(res.results.length, TestData.numDocs, tojson(res));
+    }, {"command.geoNear": "coll"}, {"command.geoNear": "coll"});
 
     // Test getMore with an initial find batchSize of 0. Interrupt behavior of a getMore is not
     // expected to change with a change of batchSize in the originating command.
