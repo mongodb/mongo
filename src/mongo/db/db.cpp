@@ -542,9 +542,16 @@ ExitCode _initAndListen(int listenPort) {
         if (missingRepl) {
             log() << startupWarningsLog;
             log() << "** WARNING: mongod started without --replSet yet " << missingRepl
-                  << " documents are present in local.system.replset" << startupWarningsLog;
-            log() << "**          Restart with --replSet unless you are doing maintenance and "
-                  << " no other clients are connected." << startupWarningsLog;
+                  << " documents are present in local.system.replset." << startupWarningsLog;
+            log() << "**          Database contents may appear inconsistent with the oplog and may "
+                     "appear to not contain"
+                  << startupWarningsLog;
+            log() << "**          writes that were visible when this node was running as part of a "
+                     "replica set."
+                  << startupWarningsLog;
+            log() << "**          Restart with --replSet unless you are doing maintenance and no "
+                     "other clients are connected."
+                  << startupWarningsLog;
             log() << "**          The TTL collection monitor will not start because of this."
                   << startupWarningsLog;
             log() << "**         ";
