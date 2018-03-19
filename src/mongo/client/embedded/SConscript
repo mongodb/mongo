@@ -70,6 +70,17 @@ env.Library(
 )
 
 env.Library(
+    target="embedded_commands",
+    source=[
+        'embedded_commands.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/standalone',
+    ],
+)
+
+env.Library(
     target='embedded',
     source=[
         'embedded.cpp',
@@ -82,7 +93,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
-        '$BUILD_DIR/mongo/db/commands/standalone',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/op_observer_d',
@@ -93,6 +103,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/mobile/storage_mobile',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/version_impl',
+        'embedded_commands',
         'embedded_options',
         'repl_coordinator_embedded',
         'service_context_embedded',
