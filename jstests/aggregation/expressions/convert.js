@@ -212,7 +212,7 @@
     }, [], "Pipeline should have failed");
 
     //
-    // One test document for each conversion that is _not_ supported.
+    // Unsupported conversions.
     //
     var illegalConversionTestDocs = [
         {_id: 0, input: 1.9, target: "objectId"},
@@ -234,6 +234,21 @@
         {_id: 11, input: NumberLong(1), target: "objectId"},
 
         {_id: 12, input: NumberDecimal("1.9"), target: "objectId"},
+
+        {_id: 13, input: 1.9, target: "minKey"},
+        {_id: 14, input: 1.9, target: "missing"},
+        {_id: 15, input: 1.9, target: "object"},
+        {_id: 16, input: 1.9, target: "array"},
+        {_id: 17, input: 1.9, target: "binData"},
+        {_id: 18, input: 1.9, target: "undefined"},
+        {_id: 19, input: 1.9, target: "null"},
+        {_id: 20, input: 1.9, target: "regex"},
+        {_id: 21, input: 1.9, target: "dbPointer"},
+        {_id: 22, input: 1.9, target: "javascript"},
+        {_id: 23, input: 1.9, target: "symbol"},
+        {_id: 24, input: 1.9, target: "javascriptWithScope"},
+        {_id: 25, input: 1.9, target: "timestamp"},
+        {_id: 26, input: 1.9, target: "maxKey"},
     ];
     populateCollection(illegalConversionTestDocs);
 
