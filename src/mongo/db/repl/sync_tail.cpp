@@ -1094,6 +1094,11 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
 
 bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
                                              const OplogEntry& oplogEntry) {
+    if (_observer) {
+        const OplogApplier::Observer::FetchInfo fetchInfo(oplogEntry, BSONObj());
+        _observer->onMissingDocumentsFetchedAndInserted({fetchInfo});
+    }
+
     // Note that using the local UUID/NamespaceString mapping is sufficient for checking
     // whether the collection is capped on the remote because convertToCapped creates a
     // new collection with a different UUID.
