@@ -27,7 +27,7 @@
     const rst = new ReplSetTest({nodes: 1, nodeOptions: x509Options, waitForKeys: false});
 
     rst.startSet();
-    
+
     // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
     // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
     rst.initiateWithAnyNodeAsPrimary(Object.extend(
@@ -41,7 +41,7 @@
             authenticationDatabase: '$external',
             keyFile: 'dummyKeyFile',
             clusterAuthMode: 'x509',
-            
+
         };
         // Explicitly check asCluster can succeed.
         authutil.asCluster(db.getMongo(), 'dummyKeyFile', function() {
