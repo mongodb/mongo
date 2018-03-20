@@ -54,7 +54,7 @@
             assert.writeOK(coll.insert({_id: 1}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.applied, 1);
             assert.eq(res.results[0], true);
             assert.eq(coll.find().itcount(), 1);
@@ -70,7 +70,7 @@
             assert.writeOK(coll.update({a: 1}, {b: 2}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.n, 0);
             assert.eq(res.nModified, 0);
             assert.eq(coll.find().itcount(), 1);
@@ -86,7 +86,7 @@
             assert.writeOK(coll.update({a: 1}, {$set: {b: 2}}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.n, 1);
             assert.eq(res.nModified, 0);
             assert.eq(coll.find().itcount(), 1);
@@ -101,7 +101,7 @@
             assert.writeOK(coll.remove({a: 1}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.n, 0);
             assert.eq(coll.count({a: 1}), 0);
         }
@@ -111,11 +111,11 @@
         req: {createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]},
         setupFunc: function() {
             assert.writeOK(coll.insert({a: 1}));
-            assert.commandWorked(
+            assert.commandWorkedIgnoringWriteConcernErrors(
                 db.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.numIndexesBefore, res.numIndexesAfter);
         }
     });
@@ -125,11 +125,11 @@
         req: {findAndModify: collName, query: {a: 1}, update: {b: 2}},
         setupFunc: function() {
             assert.writeOK(coll.insert({a: 1}));
-            assert.commandWorked(
+            assert.commandWorkedIgnoringWriteConcernErrors(
                 db.runCommand({findAndModify: collName, query: {a: 1}, update: {b: 2}}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.lastErrorObject.updatedExisting, false);
             assert.eq(coll.find().itcount(), 1);
             assert.eq(coll.count({b: 2}), 1);
@@ -141,11 +141,11 @@
         req: {findAndModify: collName, query: {a: 1}, update: {$set: {b: 2}}},
         setupFunc: function() {
             assert.writeOK(coll.insert({a: 1}));
-            assert.commandWorked(
+            assert.commandWorkedIgnoringWriteConcernErrors(
                 db.runCommand({findAndModify: collName, query: {a: 1}, update: {$set: {b: 2}}}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
             assert.eq(res.lastErrorObject.updatedExisting, true);
             assert.eq(coll.find().itcount(), 1);
             assert.eq(coll.count({a: 1, b: 2}), 1);
@@ -156,10 +156,10 @@
         req: {dropDatabase: 1},
         setupFunc: function() {
             assert.writeOK(coll.insert({a: 1}));
-            assert.commandWorked(db.runCommand({dropDatabase: 1}));
+            assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({dropDatabase: 1}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
         }
     });
 
@@ -167,7 +167,7 @@
         req: {drop: collName},
         setupFunc: function() {
             assert.writeOK(coll.insert({a: 1}));
-            assert.commandWorked(db.runCommand({drop: collName}));
+            assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({drop: collName}));
         },
         confirmFunc: function(res) {
             assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
@@ -177,7 +177,7 @@
     commands.push({
         req: {create: collName},
         setupFunc: function() {
-            assert.commandWorked(db.runCommand({create: collName}));
+            assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({create: collName}));
         },
         confirmFunc: function(res) {
             assert.commandFailedWithCode(res, ErrorCodes.NamespaceExists);
@@ -190,7 +190,7 @@
             assert.writeOK(coll.insert({_id: 1}));
         },
         confirmFunc: function(res) {
-            assert.commandWorkedIgnoringWriteErrors(res);
+            assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
             assert.eq(res.n, 0);
             assert.eq(res.writeErrors[0].code, ErrorCodes.DuplicateKey);
             assert.eq(coll.count({_id: 1}), 1);

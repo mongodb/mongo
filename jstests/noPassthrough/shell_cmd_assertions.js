@@ -1,12 +1,27 @@
 /**
  * Tests for the command assertion functions in mongo/shell/assert.js.
  */
+
 (function() {
     "use strict";
+
     const conn = MongoRunner.runMongod();
     const db = conn.getDB("commandAssertions");
     const kFakeErrCode = 1234567890;
     const tests = [];
+
+    const sampleWriteConcernError = {
+        n: 1,
+        ok: 1,
+        writeConcernError: {
+            code: ErrorCodes.WriteConcernFailed,
+            codeName: "WriteConcernFailed",
+            errmsg: "waiting for replication timed out",
+            errInfo: {
+                wtimeout: true,
+            },
+        },
+    };
 
     function setup() {
         db.coll.drop();
@@ -281,6 +296,31 @@
         assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey));
         assert.doesNotThrow(
             () => assert.commandFailedWithCode(res, [ErrorCodes.DuplicateKey, kFakeErrCode]));
+    });
+
+    tests.push(function writeConcernErrorCausesCommandWorkedToAssert() {
+        const result = sampleWriteConcernError;
+
+        assert.throws(() => {
+            assert.commandWorked(result);
+        });
+    });
+
+    tests.push(function writeConcernErrorCausesCommandFailedToPass() {
+        const result = sampleWriteConcernError;
+
+        assert.doesNotThrow(() => {
+            assert.commandFailed(result);
+            assert.commandFailedWithCode(result, ErrorCodes.WriteConcernFailed);
+        });
+    });
+
+    tests.push(function writeConcernErrorCanBeIgnored() {
+        const result = sampleWriteConcernError;
+
+        assert.doesNotThrow(() => {
+            assert.commandWorkedIgnoringWriteConcernErrors(result);
+        });
     });
 
     tests.forEach((test) => {

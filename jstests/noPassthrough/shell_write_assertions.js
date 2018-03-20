@@ -1,9 +1,21 @@
 /**
  * Tests for the write assertion functions in mongo/shell/assert.js.
+ *
+ * @tags: [requires_replication]
  */
+
+load("jstests/libs/write_concern_util.js");
+
 (() => {
     "use strict";
-    const conn = MongoRunner.runMongod();
+
+    const kReallyShortTimeoutMS = 500;
+
+    const replTest = new ReplSetTest({nodes: 1});
+    replTest.startSet();
+    replTest.initiate();
+
+    const conn = replTest.getPrimary();
     const db = conn.getDB("writeAssertions");
     assert.neq(null, conn, "mongodb was unable to start up");
     const tests = [];
@@ -76,6 +88,25 @@
         assert.eq(false, msgFunctionCalled, "message function should not have been called");
     });
 
+    tests.push(function writeConcernErrorIsCaughtFromInsert() {
+        const result = db.coll.insert(
+            {data: "hello world"}, {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+
+        assert.throws(() => {
+            assert.writeOK(result);
+        });
+    });
+
+    tests.push(function writeConcernErrorCanBeIgnored() {
+        const result = db.coll.insert(
+            {data: "hello world"}, {writeConcern: {w: 'invalid', wtimeout: kReallyShortTimeoutMS}});
+
+        assert.doesNotThrow(() => {
+            assert.writeOK(
+                result, 'write can ignore writeConcern', {ignoreWriteConcernErrors: true});
+        });
+    });
+
     /* main */
 
     tests.forEach((test) => {
@@ -85,5 +116,5 @@
     });
 
     /* cleanup */
-    MongoRunner.stopMongod(conn);
+    replTest.stopSet();
 })();
