@@ -551,6 +551,8 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     params.batchSize = request.getBatchSize() == 0
         ? boost::none
         : boost::optional<long long>(request.getBatchSize());
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
 
     if (liteParsedPipeline.hasChangeStream()) {
         // For change streams, we need to set up a custom stage to establish cursors on new shards

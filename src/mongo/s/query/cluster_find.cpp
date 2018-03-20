@@ -246,6 +246,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.skip = query.getQueryRequest().getSkip();
     params.tailableMode = query.getQueryRequest().getTailableMode();
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
@@ -470,6 +472,86 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     MONGO_UNREACHABLE
 }
 
+/**
+ * Validates that the lsid on the OperationContext matches that on the cursor, returning it to the
+ * ClusterClusterCursor manager if it does not.
+ */
+void validateLSID(OperationContext* opCtx,
+                  const GetMoreRequest& request,
+                  ClusterCursorManager::PinnedCursor* cursor) {
+    if (opCtx->getLogicalSessionId() && !cursor->getLsid()) {
+        uasserted(50799,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was not created in a session, in session "
+                                << *opCtx->getLogicalSessionId());
+    }
+
+    if (!opCtx->getLogicalSessionId() && cursor->getLsid()) {
+        uasserted(50800,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in session "
+                                << *cursor->getLsid()
+                                << ", without an lsid");
+    }
+
+    if (opCtx->getLogicalSessionId() && cursor->getLsid() &&
+        (*opCtx->getLogicalSessionId() != *cursor->getLsid())) {
+        uasserted(50801,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in session "
+                                << *cursor->getLsid()
+                                << ", in session "
+                                << *opCtx->getLogicalSessionId());
+    }
+}
+
+/**
+ * Validates that the txnNumber on the OperationContext matches that on the cursor, returning it to
+ * the ClusterClusterCursor manager if it does not.
+ */
+void validateTxnNumber(OperationContext* opCtx,
+                       const GetMoreRequest& request,
+                       ClusterCursorManager::PinnedCursor* cursor) {
+    if (opCtx->getTxnNumber() && !cursor->getTxnNumber()) {
+        uasserted(50802,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was not created in a transaction, in transaction "
+                                << *opCtx->getTxnNumber());
+    }
+
+    if (!opCtx->getTxnNumber() && cursor->getTxnNumber()) {
+        uasserted(50803,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in transaction "
+                                << *cursor->getTxnNumber()
+                                << ", without a txnNumber");
+    }
+
+    if (opCtx->getTxnNumber() && cursor->getTxnNumber() &&
+        (*opCtx->getTxnNumber() != *cursor->getTxnNumber())) {
+        uasserted(50804,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in transaction "
+                                << *cursor->getTxnNumber()
+                                << ", in transaction "
+                                << *opCtx->getTxnNumber());
+    }
+}
+
+/**
+ * Validates that the OperationSessionInfo (i.e. txnNumber and lsid) on the OperationContext match
+ * that stored on the cursor. The cursor is returned to the ClusterCursorManager if it does not.
+ */
+void validateOperationSessionInfo(OperationContext* opCtx,
+                                  const GetMoreRequest& request,
+                                  ClusterCursorManager::PinnedCursor* cursor) {
+    ScopeGuard returnCursorGuard = MakeGuard(
+        [cursor] { cursor->returnCursor(ClusterCursorManager::CursorState::NotExhausted); });
+    validateLSID(opCtx, request, cursor);
+    validateTxnNumber(opCtx, request, cursor);
+    returnCursorGuard.Dismiss();
+}
+
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                                                    const GetMoreRequest& request) {
     auto cursorManager = Grid::get(opCtx)->getCursorManager();
@@ -487,6 +569,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         return pinnedCursor.getStatus();
     }
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
+
+    validateOperationSessionInfo(opCtx, request, &pinnedCursor.getValue());
 
     // Set the originatingCommand object and the cursorID in CurOp.
     {

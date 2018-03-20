@@ -151,6 +151,11 @@ public:
     virtual boost::optional<LogicalSessionId> getLsid() const = 0;
 
     /**
+     * Returns the transaction number for this cursor.
+     */
+    virtual boost::optional<TxnNumber> getTxnNumber() const = 0;
+
+    /**
      * Returns the readPreference for this cursor.
      */
     virtual boost::optional<ReadPreferenceSetting> getReadPreference() const = 0;

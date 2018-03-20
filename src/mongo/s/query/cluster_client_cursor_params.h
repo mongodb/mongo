@@ -85,6 +85,12 @@ struct ClusterClientCursorParams {
         armParams.setBatchSize(batchSize);
         armParams.setNss(nsString);
         armParams.setAllowPartialResults(isAllowPartialResults);
+
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(lsid);
+        sessionInfo.setTxnNumber(txnNumber);
+        armParams.setOperationSessionInfo(sessionInfo);
+
         return armParams;
     }
 
@@ -136,6 +142,12 @@ struct ClusterClientCursorParams {
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.
     bool isAllowPartialResults = false;
+
+    // The logical session id of the command that created the cursor.
+    boost::optional<LogicalSessionId> lsid;
+
+    // The transaction number of the command that created the cursor.
+    boost::optional<TxnNumber> txnNumber;
 };
 
 }  // mongo

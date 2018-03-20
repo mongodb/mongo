@@ -41,6 +41,7 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
@@ -109,6 +110,34 @@ TEST(OperationContextTest, SessionIdAndTransactionNumber) {
 
     ASSERT(opCtx->getTxnNumber());
     ASSERT_EQUALS(5, *opCtx->getTxnNumber());
+}
+
+DEATH_TEST(OperationContextTest, SettingSessionIdMoreThanOnceShouldCrash, "invariant") {
+    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+}
+
+DEATH_TEST(OperationContextTest, SettingTransactionNumberMoreThanOnceShouldCrash, "invariant") {
+    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+
+    opCtx->setTxnNumber(5);
+    opCtx->setTxnNumber(5);
+}
+
+DEATH_TEST(OperationContextTest, SettingTransactionNumberWithoutSessionIdShouldCrash, "invariant") {
+    auto serviceCtx = stdx::make_unique<ServiceContextNoop>();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+
+    opCtx->setTxnNumber(5);
 }
 
 TEST(OperationContextTest, OpCtxGroup) {

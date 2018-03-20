@@ -32,6 +32,7 @@ global:
         - "mongo/db/query/cursor_response.h"
 
 imports:
+    - "mongo/db/logical_session_id.idl"
     - "mongo/db/query/tailable_mode.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
@@ -61,6 +62,8 @@ structs:
 
     AsyncResultsMergerParams:
         description: The parameters needed to establish an AsyncResultsMerger.
+        chained_structs:
+            OperationSessionInfo : OperationSessionInfo
         fields:
             sort:
                 type: object

@@ -94,6 +94,10 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
       _mergeQueue(MergingComparator(_remotes,
                                     _params.getSort() ? *_params.getSort() : BSONObj(),
                                     _params.getCompareWholeSortKey())) {
+    if (params.getTxnNumber()) {
+        invariant(params.getSessionId());
+    }
+
     size_t remoteIndex = 0;
     for (const auto& remote : _params.getRemotes()) {
         _remotes.emplace_back(remote.getHostAndPort(),
@@ -351,6 +355,20 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
                                     boost::none,
                                     boost::none)
                          .toBSON();
+
+    if (_params.getSessionId()) {
+        BSONObjBuilder newCmdBob(std::move(cmdObj));
+
+        BSONObjBuilder lsidBob(newCmdBob.subobjStart(OperationSessionInfo::kSessionIdFieldName));
+        _params.getSessionId()->serialize(&lsidBob);
+        lsidBob.doneFast();
+
+        if (_params.getTxnNumber()) {
+            newCmdBob.append(OperationSessionInfo::kTxnNumberFieldName, *_params.getTxnNumber());
+        }
+
+        cmdObj = newCmdBob.obj();
+    }
 
     executor::RemoteCommandRequest request(
         remote.getTargetHost(), _params.getNss().db().toString(), cmdObj, _opCtx);

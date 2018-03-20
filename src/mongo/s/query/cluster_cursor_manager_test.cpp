@@ -82,7 +82,8 @@ protected:
      * Allocates a mock cursor, which can be used with the 'isMockCursorKilled' method below.
      */
     std::unique_ptr<ClusterClientCursorMock> allocateMockCursor(
-        boost::optional<LogicalSessionId> lsid = boost::none) {
+        boost::optional<LogicalSessionId> lsid = boost::none,
+        boost::optional<TxnNumber> txnNumber = boost::none) {
         // Allocate a new boolean to our list to track when this cursor is killed.
         _cursorKilledFlags.push_back(false);
 
@@ -91,8 +92,8 @@ protected:
         // (std::list<>::push_back() does not invalidate references, and our list outlives the
         // manager).
         bool& killedFlag = _cursorKilledFlags.back();
-        return stdx::make_unique<ClusterClientCursorMock>(std::move(lsid),
-                                                          [&killedFlag]() { killedFlag = true; });
+        return stdx::make_unique<ClusterClientCursorMock>(
+            std::move(lsid), std::move(txnNumber), [&killedFlag]() { killedFlag = true; });
     }
 
     /**
@@ -1266,6 +1267,25 @@ TEST_F(ClusterCursorManagerTest, CheckAuthForKillCursors) {
               getManager()->checkAuthForKillCursors(_opCtx.get(), nss, cursorId, failAuthChecker));
     ASSERT_OK(
         getManager()->checkAuthForKillCursors(_opCtx.get(), nss, cursorId, successAuthChecker));
+}
+
+TEST_F(ClusterCursorManagerTest, PinnedCursorReturnsUnderlyingCursorTxnNumber) {
+    const TxnNumber txnNumber = 5;
+    auto cursorId = assertGet(
+        getManager()->registerCursor(_opCtx.get(),
+                                     allocateMockCursor(makeLogicalSessionIdForTest(), txnNumber),
+                                     nss,
+                                     ClusterCursorManager::CursorType::SingleTarget,
+                                     ClusterCursorManager::CursorLifetime::Mortal,
+                                     UserNameIterator()));
+
+    auto pinnedCursor =
+        getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
+    ASSERT_OK(pinnedCursor.getStatus());
+
+    // The underlying cursor's txnNumber should be returned.
+    ASSERT(pinnedCursor.getValue().getTxnNumber());
+    ASSERT_EQ(txnNumber, *pinnedCursor.getValue().getTxnNumber());
 }
 
 }  // namespace

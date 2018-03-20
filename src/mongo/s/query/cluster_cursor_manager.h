@@ -236,6 +236,16 @@ public:
          */
         Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
 
+        /**
+         * Returns the logical session id of the command that created the underlying cursor.
+         */
+        boost::optional<LogicalSessionId> getLsid() const;
+
+        /**
+         * Returns the transaction number of the command that created the underlying cursor.
+         */
+        boost::optional<TxnNumber> getTxnNumber() const;
+
         Microseconds getLeftoverMaxTimeMicros() const {
             invariant(_cursor);
             return _cursor->getLeftoverMaxTimeMicros();

@@ -32,28 +32,29 @@
     // string. This means that we can't pass it functions which capture variables. Instead we use
     // the trick below, by putting the values for the variables we'd like to capture inside the
     // string. Kudos to Dave Storch for coming up with this idea.
-    function makeParallelShellFunctionString(cursorId, getMoreErrCode, useSession) {
+    function makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, sessionId) {
         let code = `const cursorId = ${cursorId.toString()};`;
         code += `const kDBName = "${kDBName}";`;
         code += `let collName = "${coll.getName()}";`;
-        code += `let getMoreErrCode = ${getMoreErrCode};`;
         code += `const useSession = ${useSession};`;
 
+        TestData.getMoreErrCodes = getMoreErrCodes;
+        if (useSession) {
+            TestData.sessionId = sessionId;
+        }
+
         const runGetMore = function() {
-            let dbToUse = db;
-            let session = null;
+            let getMoreCmd = {getMore: cursorId, collection: collName, batchSize: 4};
+
             if (useSession) {
-                session = db.getMongo().startSession();
-                dbToUse = session.getDatabase(kDBName);
+                getMoreCmd.lsid = TestData.sessionId;
             }
-            let response =
-                dbToUse.runCommand({getMore: cursorId, collection: collName, batchSize: 4});
 
             // We expect that the operation will get interrupted and fail.
-            assert.commandFailedWithCode(response, getMoreErrCode);
+            assert.commandFailedWithCode(db.runCommand(getMoreCmd), TestData.getMoreErrCodes);
 
-            if (session) {
-                session.endSession();
+            if (useSession) {
+                assert.commandWorked(db.adminCommand({endSessions: [TestData.sessionId]}));
             }
         };
 
@@ -67,13 +68,14 @@
     // cursor to hang due to getMore commands hanging on each of the shards. Then invokes
     // 'killFunc', and verifies the cursors on the shards and the mongos cursor get cleaned up.
     //
-    // 'getMoreErrCode' is the error code with which we expect the getMore to fail (e.g. a
+    // 'getMoreErrCodes' are the error codes with which we expect the getMore to fail (e.g. a
     // killCursors command should cause getMore to fail with "CursorKilled", but killOp should cause
     // a getMore to fail with "Interrupted").
     function testShardedKillPinned(
-        {killFunc: killFunc, getMoreErrCode: getMoreErrCode, useSession: useSession}) {
+        {killFunc: killFunc, getMoreErrCodes: getMoreErrCodes, useSession: useSession}) {
         let getMoreJoiner = null;
         let cursorId;
+        let sessionId;
 
         try {
             // Set up the mongods to hang on a getMore request. ONLY set the failpoint on the
@@ -85,13 +87,21 @@
                 {configureFailPoint: kFailPointName, mode: "alwaysOn", data: kFailpointOptions}));
 
             // Run a find against mongos. This should open cursors on both of the shards.
-            let cmdRes = mongosDB.runCommand({find: coll.getName(), batchSize: 2});
+            let findCmd = {find: coll.getName(), batchSize: 2};
+
+            if (useSession) {
+                // Manually start a session so it can be continued from inside a parallel shell.
+                sessionId = assert.commandWorked(mongosDB.adminCommand({startSession: 1})).id;
+                findCmd.lsid = sessionId;
+            }
+
+            let cmdRes = mongosDB.runCommand(findCmd);
             assert.commandWorked(cmdRes);
             cursorId = cmdRes.cursor.id;
             assert.neq(cursorId, NumberLong(0));
 
             const parallelShellFn =
-                makeParallelShellFunctionString(cursorId, getMoreErrCode, useSession);
+                makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, sessionId);
             getMoreJoiner = startParallelShell(parallelShellFn, st.s.port);
 
             // Sleep until we know the mongod cursors are pinned.
@@ -147,7 +157,7 @@
                 assert.eq(cmdRes.cursorsNotFound, []);
                 assert.eq(cmdRes.cursorsUnknown, []);
             },
-            getMoreErrCode: ErrorCodes.CursorKilled,
+            getMoreErrCodes: ErrorCodes.CursorKilled,
             useSession: useSession
         });
 
@@ -167,7 +177,7 @@
                 let killOpResult = shard0DB.killOp(currentGetMore.opid);
                 assert.commandWorked(killOpResult);
             },
-            getMoreErrCode: ErrorCodes.Interrupted,
+            getMoreErrCodes: ErrorCodes.Interrupted,
             useSession: useSession
         });
 
@@ -193,7 +203,7 @@
                 assert.eq(cmdRes.cursorsNotFound, []);
                 assert.eq(cmdRes.cursorsUnknown, []);
             },
-            getMoreErrCode: ErrorCodes.CursorKilled,
+            getMoreErrCodes: ErrorCodes.CursorKilled,
             useSession: useSession
         });
     }
@@ -216,7 +226,10 @@
             const sessionUUID = localSessions[0]._id.id;
             assert.commandWorked(mongosDB.runCommand({killSessions: [{id: sessionUUID}]}));
         },
-        getMoreErrCode: ErrorCodes.Interrupted,
+        // Killing a session on mongos kills all matching remote cursors (through KillCursors) then
+        // all matching local operations (through KillOp), so the getMore can fail with either
+        // CursorKilled or Interrupted depending on which response is returned first.
+        getMoreErrCodes: [ErrorCodes.CursorKilled, ErrorCodes.Interrupted],
         useSession: true,
     });
 

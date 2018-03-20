@@ -43,6 +43,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -63,6 +64,10 @@ const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 
                                                   HostAndPort("FakeShard3Host", 12345)};
 
 const NamespaceString kTestNss("testdb.testcoll");
+
+LogicalSessionId parseSessionIdFromCmd(BSONObj cmdObj) {
+    return LogicalSessionId::parse(IDLParserErrorContext("lsid"), cmdObj["lsid"].Obj());
+}
 
 class AsyncResultsMergerTest : public ShardingTestFixture {
 public:
@@ -136,6 +141,11 @@ protected:
             params.setTailableMode(qr->getTailableMode());
             params.setAllowPartialResults(qr->isAllowPartialResults());
         }
+
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(operationContext()->getLogicalSessionId());
+        sessionInfo.setTxnNumber(operationContext()->getTxnNumber());
+        params.setOperationSessionInfo(sessionInfo);
 
         return stdx::make_unique<AsyncResultsMerger>(
             operationContext(), executor(), std::move(params));
@@ -2002,6 +2012,118 @@ TEST_F(AsyncResultsMergerTest, ShouldBeAbleToBlockUntilKilled) {
     ASSERT_FALSE(arm->remotesExhausted());
 
     arm->blockingKill(operationContext());
+}
+
+TEST_F(AsyncResultsMergerTest, GetMoresShouldNotIncludeLSIDOrTxnNumberIfNoneSpecified) {
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // There should be no lsid txnNumber in the scheduled getMore.
+    ASSERT_OK(arm->nextEvent().getStatus());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT(request.cmdObj["lsid"].eoo());
+        ASSERT(request.cmdObj["txnNumber"].eoo());
+
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+}
+
+TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDIfSpecified) {
+    auto lsid = makeLogicalSessionIdForTest();
+    operationContext()->setLogicalSessionId(lsid);
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // There should be an lsid and no txnNumber in the scheduled getMore.
+    ASSERT_OK(arm->nextEvent().getStatus());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
+        ASSERT(request.cmdObj["txnNumber"].eoo());
+
+        return CursorResponse(kTestNss, 1LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+
+    // Subsequent requests still pass the lsid.
+    ASSERT(arm->ready());
+    ASSERT_OK(arm->nextReady().getStatus());
+    ASSERT_FALSE(arm->ready());
+
+    ASSERT_OK(arm->nextEvent().getStatus());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
+        ASSERT(request.cmdObj["txnNumber"].eoo());
+
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+}
+
+TEST_F(AsyncResultsMergerTest, GetMoresShouldIncludeLSIDAndTxnNumIfSpecified) {
+    auto lsid = makeLogicalSessionIdForTest();
+    operationContext()->setLogicalSessionId(lsid);
+
+    const TxnNumber txnNumber = 5;
+    operationContext()->setTxnNumber(txnNumber);
+
+    std::vector<RemoteCursor> cursors;
+    cursors.emplace_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 1, {})));
+    auto arm = makeARMFromExistingCursors(std::move(cursors));
+
+    // The first scheduled getMore should pass the txnNumber the ARM was constructed with.
+    ASSERT_OK(arm->nextEvent().getStatus());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
+        ASSERT_EQ(request.cmdObj["txnNumber"].numberLong(), txnNumber);
+
+        return CursorResponse(kTestNss, 1LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+
+    // Subsequent requests still pass the txnNumber.
+    ASSERT(arm->ready());
+    ASSERT_OK(arm->nextReady().getStatus());
+    ASSERT_FALSE(arm->ready());
+
+    // Subsequent getMore requests should include txnNumber.
+    ASSERT_OK(arm->nextEvent().getStatus());
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+
+        ASSERT_EQ(parseSessionIdFromCmd(request.cmdObj), lsid);
+        ASSERT_EQ(request.cmdObj["txnNumber"].numberLong(), txnNumber);
+
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+}
+
+DEATH_TEST_F(AsyncResultsMergerTest,
+             ConstructingARMWithTxnNumAndNoLSIDShouldCrash,
+             "Invariant failure params.getSessionId()") {
+    AsyncResultsMergerParams params;
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(5);
+    params.setOperationSessionInfo(sessionInfo);
+
+    // This should trigger an invariant.
+    stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
 }
 
 }  // namespace

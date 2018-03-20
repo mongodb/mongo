@@ -3,6 +3,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/global_snapshot_reads_util.js");
+
     const dbName = "test";
     const shardedCollName = "shardedColl";
     const unshardedCollName = "unshardedColl";
@@ -55,6 +57,8 @@
         // Insert an 11th document which should not be visible to the snapshot cursor. This write is
         // performed outside of the session.
         assert.writeOK(mainDb[collName].insert({_id: 10}, {writeConcern: {w: "majority"}}));
+
+        verifyInvalidGetMoreAttempts(mainDb, sessionDb, collName, cursorId, txnNumber);
 
         // Fetch the 6th document. This confirms that the transaction stash is preserved across
         // multiple getMore invocations.

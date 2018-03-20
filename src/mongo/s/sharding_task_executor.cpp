@@ -35,7 +35,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -129,13 +128,6 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             // TODO SERVER-33702.
             BSONObjBuilder subbob(bob.subobjStart("lsid"));
             request.opCtx->getLogicalSessionId()->serialize(&subbob);
-        }
-
-        // TODO SERVER-33991.
-        if (getTestCommandsEnabled() && request.opCtx->getTxnNumber() &&
-            request.cmdObj.hasField("getMore") &&
-            !request.cmdObj.hasField(OperationSessionInfo::kTxnNumberFieldName)) {
-            bob.append(OperationSessionInfo::kTxnNumberFieldName, *(request.opCtx->getTxnNumber()));
         }
 
         newRequest->cmdObj = bob.obj();

@@ -81,6 +81,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                                   {}));
     params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));
 

@@ -183,6 +183,16 @@ void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     returnCursor(CursorState::Exhausted);
 }
 
+boost::optional<LogicalSessionId> ClusterCursorManager::PinnedCursor::getLsid() const {
+    invariant(_cursor);
+    return _cursor->getLsid();
+}
+
+boost::optional<TxnNumber> ClusterCursorManager::PinnedCursor::getTxnNumber() const {
+    invariant(_cursor);
+    return _cursor->getTxnNumber();
+}
+
 ClusterCursorManager::ClusterCursorManager(ClockSource* clockSource)
     : _clockSource(clockSource),
       _pseudoRandom(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()) {
