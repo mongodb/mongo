@@ -482,6 +482,23 @@ Value ExpressionArray::serialize(bool explain) const {
     return Value(std::move(expressions));
 }
 
+intrusive_ptr<Expression> ExpressionArray::optimize() {
+    bool allValuesConstant = true;
+
+    for (auto&& expr : vpOperand) {
+        expr = expr->optimize();
+        if (!dynamic_cast<ExpressionConstant*>(expr.get())) {
+            allValuesConstant = false;
+        }
+    }
+
+    // If all values in ExpressionArray are constant evaluate to ExpressionConstant.
+    if (allValuesConstant) {
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
+    }
+    return this;
+}
+
 const char* ExpressionArray::getOpName() const {
     // This should never be called, but is needed to inherit from ExpressionNary.
     return "$array";
@@ -2716,31 +2733,113 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
             arrayArg.isArray());
 
     std::vector<Value> array = arrayArg.getArray();
-
-    Value searchItem = vpOperand[1]->evaluate(root);
-
-    size_t startIndex = 0;
-    if (vpOperand.size() > 2) {
-        Value startIndexArg = vpOperand[2]->evaluate(root);
-        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
-        startIndex = static_cast<size_t>(startIndexArg.coerceToInt());
-    }
-
-    size_t endIndex = array.size();
-    if (vpOperand.size() > 3) {
-        Value endIndexArg = vpOperand[3]->evaluate(root);
-        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
-        // Don't let 'endIndex' exceed the length of the array.
-        endIndex = std::min(array.size(), static_cast<size_t>(endIndexArg.coerceToInt()));
-    }
-
-    for (size_t i = startIndex; i < endIndex; i++) {
-        if (getExpressionContext()->getValueComparator().evaluate(array[i] == searchItem)) {
+    auto args = evaluateAndValidateArguments(root, vpOperand, array.size());
+    for (int i = args.startIndex; i < args.endIndex; i++) {
+        if (getExpressionContext()->getValueComparator().evaluate(array[i] ==
+                                                                  args.targetOfSearch)) {
             return Value(static_cast<int>(i));
         }
     }
 
+
     return Value(-1);
+}
+
+ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArguments(
+    const Document& root, const ExpressionVector& operands, size_t arrayLength) const {
+
+    int startIndex = 0;
+    if (operands.size() > 2) {
+        Value startIndexArg = operands[2]->evaluate(root);
+        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
+
+        startIndex = startIndexArg.coerceToInt();
+    }
+
+    int endIndex = arrayLength;
+    if (operands.size() > 3) {
+        Value endIndexArg = operands[3]->evaluate(root);
+        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
+        // Don't let 'endIndex' exceed the length of the array.
+
+        endIndex = std::min(static_cast<int>(arrayLength), endIndexArg.coerceToInt());
+    }
+    return {vpOperand[1]->evaluate(root), startIndex, endIndex};
+}
+
+/**
+ * This class handles the case where IndexOfArray is given an ExpressionConstant
+ * instead of using a vector and searching through it we can use a unordered_map
+ * for O(1) lookup time.
+ */
+class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
+public:
+    Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+              const ValueUnorderedMap<vector<int>>& indexMap,
+              const ExpressionVector& operands)
+        : ExpressionIndexOfArray(expCtx), _indexMap(std::move(indexMap)) {
+        vpOperand = operands;
+    }
+
+    virtual Value evaluate(const Document& root) const {
+
+        auto args = evaluateAndValidateArguments(root, vpOperand, _indexMap.size());
+        auto indexVec = _indexMap.find(args.targetOfSearch);
+
+        if (indexVec == _indexMap.end())
+            return Value(-1);
+
+        // Search through the vector of indecies for first index in our range.
+        for (auto index : indexVec->second) {
+            if (index >= args.startIndex && index < args.endIndex) {
+                return Value(index);
+            }
+        }
+        // The value we are searching for exists but is not in our range.
+        return Value(-1);
+    }
+
+private:
+    // Maps the values in the array to the positions at which they occur. We need to remember the
+    // positions so that we can verify they are in the appropriate range.
+    const ValueUnorderedMap<vector<int>> _indexMap;
+};
+
+intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
+    // This will optimize all arguments to this expression.
+    auto optimized = ExpressionNary::optimize();
+    if (optimized.get() != this) {
+        return optimized;
+    }
+    // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of
+    // an
+    // array.
+    if (auto constantArray = dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
+        const Value valueArray = constantArray->getValue();
+        if (valueArray.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        uassert(50809,
+                str::stream() << "First operand of $indexOfArray must be an array. First "
+                              << "argument is of type: "
+                              << typeName(valueArray.getType()),
+                valueArray.isArray());
+
+        auto arr = valueArray.getArray();
+
+        // To handle the case of duplicate values the values need to map to a vector of indecies.
+        auto indexMap =
+            getExpressionContext()->getValueComparator().makeUnorderedValueMap<vector<int>>();
+
+        for (int i = 0; i < int(arr.size()); i++) {
+            if (indexMap.find(arr[i]) == indexMap.end()) {
+                indexMap.emplace(arr[i], vector<int>());
+            }
+            indexMap[arr[i]].push_back(i);
+        }
+        return new Optimized(getExpressionContext(), indexMap, vpOperand);
+    }
+    return this;
 }
 
 REGISTER_EXPRESSION(indexOfArray, ExpressionIndexOfArray::parse);
