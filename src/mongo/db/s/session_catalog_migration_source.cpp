@@ -78,6 +78,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 const BSONObj& oField,
                                 const boost::optional<BSONObj>& o2Field,
                                 const OperationSessionInfo& sessionInfo,
+                                Date_t wallClockTime,
                                 const boost::optional<StmtId>& statementId) {
     return repl::OplogEntry(opTime,                           // optime
                             hash,                             // hash
@@ -90,7 +91,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             o2Field,                          // o2
                             sessionInfo,                      // session info
                             boost::none,                      // upsert
-                            boost::none,                      // wall clock time
+                            wallClockTime,                    // wall clock time
                             statementId,                      // statement id
                             boost::none,   // optime of previous write within same transaction
                             boost::none,   // pre-image optime
@@ -100,13 +101,14 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
 /**
  * Creates a special "write history lost" sentinel oplog entry.
  */
-repl::OplogEntry makeSentinelOplogEntry(OperationSessionInfo sessionInfo) {
+repl::OplogEntry makeSentinelOplogEntry(OperationSessionInfo sessionInfo, Date_t wallClockTime) {
     return makeOplogEntry({},                         // optime
                           hashGenerator.nextInt64(),  // hash
                           repl::OpTypeEnum::kNoop,    // op type
                           {},                         // o
                           Session::kDeadEndSentinel,  // o2
                           sessionInfo,                // session info
+                          wallClockTime,              // wall clock time
                           kIncompleteHistoryStmtId);  // statement id
 }
 
@@ -337,7 +339,8 @@ repl::OplogEntry SessionCatalogMigrationSource::SessionOplogIterator::getNext(
             OperationSessionInfo sessionInfo;
             sessionInfo.setSessionId(_record.getSessionId());
             sessionInfo.setTxnNumber(_record.getTxnNum());
-            auto oplog = makeSentinelOplogEntry(sessionInfo);
+            auto oplog = makeSentinelOplogEntry(
+                sessionInfo, opCtx->getServiceContext()->getFastClockSource()->now());
 
             _writeHistoryIterator.reset();
 

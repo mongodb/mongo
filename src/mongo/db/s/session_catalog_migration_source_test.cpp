@@ -596,6 +596,8 @@ TEST_F(SessionCatalogMigrationSourceTest, ReturnsDeadEndSentinelForIncompleteHis
         ASSERT_BSONOBJ_EQ(Session::kDeadEndSentinel, *oplog.getObject2());
         ASSERT_TRUE(oplog.getStatementId());
         ASSERT_EQ(kIncompleteHistoryStmtId, *oplog.getStatementId());
+        ASSERT_TRUE(oplog.getWallClockTime());
+        ASSERT_NE(Date_t{}, *oplog.getWallClockTime());
 
         auto sessionInfo = oplog.getOperationSessionInfo();
         ASSERT_TRUE(sessionInfo.getSessionId());
