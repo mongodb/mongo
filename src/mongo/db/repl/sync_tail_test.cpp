@@ -1032,7 +1032,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
-    ASSERT_EQUALS(syncTail.numFetched, 1U);
+
+    // Fetch count should remain zero if we failed to copy the missing document.
+    ASSERT_EQUALS(syncTail.numFetched, 0U);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {

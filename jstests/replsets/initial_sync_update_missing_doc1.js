@@ -72,10 +72,13 @@
               'collection successfully synced to secondary');
 
     res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
-    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 1);
+
+    // Fetch count stays at zero because we are unable to get the document from the sync source.
+    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
+
     var finalOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
-    assert(!friendlyEqual(firstOplogEnd, finalOplogEnd),
-           "minValid was not moved forward when missing document was fetched");
+    assert(friendlyEqual(firstOplogEnd, finalOplogEnd),
+           "minValid was moved forward when missing document was not fetched");
 
     assert.eq(0,
               secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
