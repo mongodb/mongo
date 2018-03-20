@@ -161,6 +161,17 @@ public:
     }
 
     /**
+     * Tells the recovery unit to read at the last applied timestamp, tracked by the SnapshotManger.
+     * This should only be set to true for local and available read concerns. This should be used to
+     * read from a consistent state on a secondary while replicated batches are being applied.
+     */
+    void setShouldReadAtLastAppliedTimestamp(bool value) {
+        invariant(!value || _readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
+                  _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern);
+        _shouldReadAtLastAppliedTimestamp = value;
+    }
+
+    /**
      * Returns the Timestamp being used by this recovery unit or boost::none if not reading from
      * a point in time. Any point in time returned will reflect either:
      *  - A timestamp set via call to setPointInTimeReadTimestamp()
@@ -353,6 +364,7 @@ protected:
     RecoveryUnit() {}
     repl::ReplicationCoordinator::Mode _replicationMode = repl::ReplicationCoordinator::modeNone;
     repl::ReadConcernLevel _readConcernLevel = repl::ReadConcernLevel::kLocalReadConcern;
+    bool _shouldReadAtLastAppliedTimestamp = false;
 };
 
 }  // namespace mongo

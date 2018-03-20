@@ -248,6 +248,7 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     copy->direction = this->direction;
     copy->maxScan = this->maxScan;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
+    copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
 
     return copy;
 }

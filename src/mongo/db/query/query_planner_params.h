@@ -96,6 +96,9 @@ struct QueryPlannerParams {
 
         // Set this to track the most recent timestamp seen by this cursor while scanning the oplog.
         TRACK_LATEST_OPLOG_TS = 1 << 12,
+
+        // Set this so that collection scans on the oplog wait for visibility before reading.
+        OPLOG_SCAN_WAIT_FOR_VISIBLE = 1 << 13,
     };
 
     // See Options enum above.

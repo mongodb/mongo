@@ -1099,6 +1099,11 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
         return;
     }
 
+    // Update the local snapshot before updating the stable timestamp on the storage engine. New
+    // transactions reading from the local snapshot should start before the oldest timestamp is
+    // advanced to avoid races.
+    _externalState->updateLocalSnapshot(opTime);
+
     // Add the new applied optime to the list of stable optime candidates and then set the last
     // stable optime. Stable optimes are used to determine the last optime that it is safe to revert
     // the database to, in the event of a rollback via the 'recover to timestamp' method. If we are

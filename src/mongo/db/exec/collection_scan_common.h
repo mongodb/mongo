@@ -69,6 +69,9 @@ struct CollectionScanParams {
 
     // If non-zero, how many documents will we look at?
     size_t maxScan = 0;
+
+    // Whether or not to wait for oplog visibility on oplog collection scans.
+    bool shouldWaitForOplogVisibility = false;
 };
 
 }  // namespace mongo

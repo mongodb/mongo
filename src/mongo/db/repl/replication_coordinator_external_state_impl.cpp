@@ -800,6 +800,13 @@ void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
     notifyOplogMetadataWaiters(newCommitPoint);
 }
 
+void ReplicationCoordinatorExternalStateImpl::updateLocalSnapshot(const OpTime& optime) {
+    auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
+    if (manager) {
+        manager->setLocalSnapshot(optime.getTimestamp());
+    }
+}
+
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
     return _service->getGlobalStorageEngine()->getSnapshotManager() != nullptr;
 }

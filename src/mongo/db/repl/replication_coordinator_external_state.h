@@ -249,6 +249,13 @@ public:
     virtual void updateCommittedSnapshot(const OpTime& newCommitPoint) = 0;
 
     /**
+     * Updates the local snapshot to a consistent point for secondary reads.
+     *
+     * It is illegal to call with a optime that does not name an existing snapshot.
+     */
+    virtual void updateLocalSnapshot(const OpTime& optime) = 0;
+
+    /**
      * Returns whether or not the SnapshotThread is active.
      */
     virtual bool snapshotsEnabled() const = 0;

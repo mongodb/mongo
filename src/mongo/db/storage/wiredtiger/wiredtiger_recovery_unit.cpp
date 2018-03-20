@@ -319,6 +319,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     }
     WT_SESSION* session = _session->getSession();
 
+    auto ignorePrepare = _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern;
     // '_readAtTimestamp' is available outside of a check for readConcern level 'snapshot' to
     // accommodate unit testing. Note that the order of this if/else chain below is important for
     // correctness. Also, note that we use the '_readAtTimestamp' to work around an oplog visibility
@@ -343,14 +344,19 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         _majorityCommittedSnapshot =
             _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
     } else if (_isOplogReader) {
+        invariant(!_shouldReadAtLastAppliedTimestamp);
         _sessionCache->snapshotManager().beginTransactionOnOplog(
             _sessionCache->getKVEngine()->getOplogManager(), session);
+
+    } else if (_shouldReadAtLastAppliedTimestamp &&
+               _sessionCache->snapshotManager().getLocalSnapshot()) {
+        // Read from the last applied timestamp (tracked globally by the SnapshotManager), which is
+        // the timestamp of the most recent completed replication batch operation. This should only
+        // be true for local or available readConcern on secondaries.
+        _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(session, ignorePrepare);
     } else {
-        invariantWTOK(session->begin_transaction(
-            session,
-            _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern
-                ? "ignore_prepare=true"
-                : nullptr));
+        invariantWTOK(
+            session->begin_transaction(session, ignorePrepare ? "ignore_prepare=true" : nullptr));
     }
 
     LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;

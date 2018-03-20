@@ -105,9 +105,28 @@ public:
     }
 
 private:
+    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
+    // with secondary batch application. This stays in scope with the _autoColl so that locks are
+    // taken and released in the right order.
+    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
+        _shouldNotConflictWithSecondaryBatchApplicationBlock;
+
     // This field is optional, because the code to wait for majority committed snapshot needs to
     // release locks in order to block waiting
     boost::optional<AutoGetCollection> _autoColl;
+
+    // Returns true if we should read from the local snapshot (last applied timestamp) on a
+    // secondary.
+    bool _shouldDoSecondaryLocalSnapshotRead(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             repl::ReadConcernLevel readConcernLevel) const;
+
+    // Returns true if the minSnapshot causes conflicting catalog changes for the provided read
+    // concern level or lastAppliedTimestamp.
+    bool _conflictingCatalogChanges(OperationContext* opCtx,
+                                    repl::ReadConcernLevel readConcernLevel,
+                                    boost::optional<Timestamp> minSnapshot,
+                                    boost::optional<Timestamp> lastAppliedTimestamp) const;
 };
 
 /**

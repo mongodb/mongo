@@ -39,6 +39,7 @@
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -179,6 +180,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(OperationContext* op
     CollectionScanParams params;
     params.collection = collection;
     params.start = startLoc;
+    params.shouldWaitForOplogVisibility = shouldWaitForOplogVisibility(opCtx, collection, false);
 
     if (FORWARD == direction) {
         params.direction = CollectionScanParams::FORWARD;

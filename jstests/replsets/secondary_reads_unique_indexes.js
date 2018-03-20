@@ -25,31 +25,28 @@
  * uniqueness violations on indexes, and require readers on secondaries to wait for the parallel
  * batch insert to complete, at which point the state of the indexes will be consistent.
  */
+
 (function() {
     "use strict";
 
+    load("jstests/replsets/libs/secondary_reads_test.js");
+
     const name = "secondaryReadsUniqueIndexes";
-    let rst = new ReplSetTest({name: name, nodes: 2});
-    let nodes = rst.startSet();
-    rst.initiate({
-        _id: name,
-        members: [
-            {_id: 0, host: nodes[0].host, priority: 1},
-            {_id: 1, host: nodes[1].host, priority: 0}
-        ]
+    const collName = "testColl";
+    let secondaryReadsTest = new SecondaryReadsTest(name);
+
+    // Setup collection.
+    secondaryReadsTest.doOnPrimary(function(db) {
+        db.runCommand({drop: collName});
+        assert.commandWorked(db.runCommand({create: collName}));
+
+        // Create a unique index on the collection in the foreground.
+        assert.commandWorked(db.runCommand(
+            {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
     });
 
-    let primary = rst.getPrimary();
-    let secondary = rst.getSecondary();
-    let testDB = primary.getDB("test");
-    let testCollName = "testColl";
-    let testNs = "test." + testCollName;
-
-    testDB.runCommand({drop: testCollName});
-    assert.commandWorked(testDB.runCommand({create: testCollName}));
-    // Create a unique index on the collection in the foreground.
-    assert.commandWorked(testDB.runCommand(
-        {createIndexes: testCollName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
+    let rst = secondaryReadsTest.getReplset();
+    rst.awaitReplication();
 
     // We want to do updates with at least as many different documents as there are parallel batch
     // writer threads (16). Each iteration increments and decrements a uniquely indexed value, 'x'.
@@ -61,30 +58,28 @@
 
     // Do a bunch of reads using the 'x' index on the secondary.
     // No errors should be encountered on the secondary.
-    let readers = [];
-    let readCmd = `
-        db.getMongo().setSlaveOk();
-        while (true) {
-            for (let x = 0; x < ${nOps}; x++) {
-                assert.commandWorked(db.getSiblingDB('test').runCommand(
-                    {find: "${testCollName}", filter: {x: x}, projection: {x: 1}}));
-            }
-        }`;
-
-    for (let i = 0; i < nReaders; i++) {
-        readers[i] =
-            startMongoProgramNoConnect("mongo", "--port", secondary.port, "--eval", readCmd);
-        print("reader " + i + " started");
-    }
+    let readCmd = `while (true) {
+                       for (let x = 0; x < ${nOps}; x++) {
+                           assert.commandWorked(db.runCommand({
+                               find: "${collName}",
+                               filter: {x: x},
+                               projection: {x: 1},
+                               readConcern: {level: "local"},
+                           }));
+                       }
+                   }`;
+    secondaryReadsTest.startSecondaryReaders(nReaders, readCmd);
 
     // Write the initial documents. Ensure they have been replicated.
-    for (let i = 0; i < nOps; i++) {
-        assert.commandWorked(testDB.runCommand({
-            insert: testCollName,
-            documents: [{_id: i, x: i, iter: 0}],
-            writeConcern: {w: "majority"}
-        }));
-    }
+    secondaryReadsTest.doOnPrimary(function(db) {
+        for (let i = 0; i < nOps; i++) {
+            assert.commandWorked(db.runCommand({
+                insert: collName,
+                documents: [{_id: i, x: i, iter: 0}],
+                writeConcern: {w: "majority"}
+            }));
+        }
+    });
 
     // Cycle the value of x in the document {_id: i, x: i} between i and i+1 each iteration.
     for (let iteration = 0; iteration < nIterations; iteration++) {
@@ -93,7 +88,10 @@
         for (let i = 0; i < nOps; i++) {
             updates[i] = {q: {_id: i}, u: {x: i, iter: iteration}};
         }
-        assert.commandWorked(testDB.runCommand({update: testCollName, updates: updates}));
+
+        secondaryReadsTest.doOnPrimary(function(db) {
+            assert.commandWorked(db.runCommand({update: collName, updates: updates}));
+        });
         updates = [];
 
         // Generate updates that increment x on each document backwards by _id to avoid conficts
@@ -106,18 +104,12 @@
             let nextX = end + 1;
             updates[i] = {q: {_id: end}, u: {x: nextX, iter: iteration}};
         }
-        print('iteration ' + iteration);
-        assert.commandWorked(testDB.runCommand({update: testCollName, updates: updates}));
+        print("iteration " + iteration);
+        secondaryReadsTest.doOnPrimary(function(db) {
+            assert.commandWorked(db.runCommand({update: collName, updates: updates}));
+        });
     }
 
     rst.awaitReplication();
-
-    for (let i = 0; i < nReaders; i++) {
-        const pid = readers[i];
-        const ec = stopMongoProgramByPid(pid);
-        const expect = _isWindows() ? 1 : -15;
-        assert.eq(ec, expect, "Expected mongo shell to exit with code " + expect + ". PID: " + pid);
-        print("reader " + i + " done");
-    }
-    rst.stopSet();
+    secondaryReadsTest.stop();
 })();
