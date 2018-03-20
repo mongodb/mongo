@@ -166,14 +166,6 @@ struct Helpers {
          */
         Status goingToDelete(const BSONObj& o);
 
-        std::string directoryName() const {
-            return _root.generic_string();
-        }
-
-        std::string fileName() const {
-            return _file.generic_string();
-        }
-
     private:
         boost::filesystem::path _root;
         boost::filesystem::path _file;

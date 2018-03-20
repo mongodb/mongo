@@ -33,11 +33,9 @@
 #include "mongo/db/repl/rollback_impl.h"
 
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/apply_ops.h"
@@ -62,9 +60,6 @@ constexpr bool createRollbackFilesDefault = true;
 MONGO_EXPORT_SERVER_PARAMETER(createRollbackDataFiles, bool, createRollbackFilesDefault);
 }  // namespace
 
-constexpr const char* RollbackImpl::kRollbackRemoveSaverType;
-constexpr const char* RollbackImpl::kRollbackRemoveSaverWhy;
-
 bool RollbackImpl::shouldCreateDataFiles() {
     return createRollbackDataFiles.load();
 }
@@ -75,12 +70,12 @@ RollbackImpl::RollbackImpl(OplogInterface* localOplog,
                            ReplicationProcess* replicationProcess,
                            ReplicationCoordinator* replicationCoordinator,
                            Listener* listener)
-    : _listener(listener),
-      _localOplog(localOplog),
+    : _localOplog(localOplog),
       _remoteOplog(remoteOplog),
       _storageInterface(storageInterface),
       _replicationProcess(replicationProcess),
-      _replicationCoordinator(replicationCoordinator) {
+      _replicationCoordinator(replicationCoordinator),
+      _listener(listener) {
 
     invariant(localOplog);
     invariant(remoteOplog);
@@ -134,13 +129,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // incremented by 1 every time a rollback occurs. Note that the Rollback ID must be incremented
     // before modifying any local data.
     status = _replicationProcess->incrementRollbackID(opCtx);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Write a rollback file for each namespace that has documents that would be deleted by
-    // rollback.
-    status = _writeRollbackFiles(opCtx);
     if (!status.isOK()) {
         return status;
     }
@@ -378,22 +366,8 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
         _observerInfo.rollbackSessionIds.insert(sessionId->getId());
     }
 
-    // Keep track of the _ids of inserted and updated documents, as we may need to write them out to
-    // a rollback file.
-    if (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate) {
-        const auto uuid = oplogEntry.getUuid();
-        dassert(uuid);
-        const auto idElem = oplogEntry.getIdElement();
-        if (!idElem.eoo()) {
-            // We call BSONElement::wrap() on each _id element to create a new BSONObj with an owned
-            // buffer, as the underlying storage may be gone when we access this map to write
-            // rollback files.
-            _observerInfo.rollbackDeletedIdsMap[uuid.get()].insert(idElem.wrap());
-        }
-    }
-
+    // Check if the creation of the shard identity document is being rolled back.
     if (opType == OpTypeEnum::kInsert) {
-        // Check if the creation of the shard identity document is being rolled back.
         auto idVal = oplogEntry.getObject().getStringField("_id");
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
             opNss == NamespaceString::kServerConfigurationNamespace &&
@@ -484,68 +458,6 @@ Timestamp RollbackImpl::_findTruncateTimestamp(
     log() << "Marking to truncate all oplog entries with timestamps greater than or equal to "
           << truncatePointTime.getValue();
     return truncatePointTime.getValue().getTimestamp();
-}
-
-boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx,
-                                                         UUID uuid,
-                                                         NamespaceString nss,
-                                                         BSONElement id) {
-    auto document = _storageInterface->findById(opCtx, {nss.db().toString(), uuid}, id);
-    if (document.isOK()) {
-        return document.getValue();
-    } else if (document.getStatus().code() == ErrorCodes::NoSuchKey) {
-        return boost::none;
-    } else {
-        severe() << "Rollback failed to read document with " << redact(id) << " in namespace "
-                 << nss.ns() << " with uuid " << uuid.toString() << causedBy(document.getStatus());
-        fassert(50751, document.getStatus());
-    }
-
-    MONGO_UNREACHABLE;
-}
-
-Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
-    const auto& uuidCatalog = UUIDCatalog::get(opCtx);
-    for (auto&& entry : _observerInfo.rollbackDeletedIdsMap) {
-        const auto& uuid = entry.first;
-        const auto nss = uuidCatalog.lookupNSSByUUID(uuid);
-        invariant(!nss.isEmpty(),
-                  str::stream() << "The collection with UUID " << uuid
-                                << " is unexpectedly missing in the UUIDCatalog");
-
-        if (_isInShutdown()) {
-            log() << "Rollback shutting down; not writing rollback file for namespace " << nss.ns()
-                  << " with uuid " << uuid;
-            continue;
-        }
-
-        _writeRollbackFileForNamespace(opCtx, uuid, nss, entry.second);
-    }
-
-    if (_isInShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "rollback shutting down"};
-    }
-
-    return Status::OK();
-}
-
-void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
-                                                  UUID uuid,
-                                                  NamespaceString nss,
-                                                  const SimpleBSONObjUnorderedSet& idSet) {
-    Helpers::RemoveSaver removeSaver(kRollbackRemoveSaverType, nss.ns(), kRollbackRemoveSaverWhy);
-    log() << "Preparing to write deleted documents to a rollback file for collection " << nss.ns()
-          << " with uuid " << uuid.toString() << " to " << removeSaver.fileName();
-    for (auto&& id : idSet) {
-        // StorageInterface::findById() does not respect the collation, but because we are using
-        // exact _id fields recorded in the oplog, we can get away with binary string
-        // comparisons.
-        auto document = _findDocumentById(opCtx, uuid, nss, id.firstElement());
-        if (document) {
-            fassert(50750, removeSaver.goingToDelete(*document));
-        }
-    }
-    _listener->onRollbackFileWrittenForNamespace(std::move(uuid), std::move(nss));
 }
 
 StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
