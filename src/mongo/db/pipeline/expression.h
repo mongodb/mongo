@@ -728,6 +728,7 @@ public:
 
     Value evaluate(const Document& root) const final;
     Value serialize(bool explain) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 };
 
@@ -1218,13 +1219,19 @@ public:
 };
 
 
-class ExpressionIndexOfArray final : public ExpressionRangedArity<ExpressionIndexOfArray, 2, 4> {
+class ExpressionIndexOfArray  : public ExpressionRangedArity<ExpressionIndexOfArray, 2, 4> {
 public:
     explicit ExpressionIndexOfArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx) {}
 
-    Value evaluate(const Document& root) const final;
+    Value evaluate(const Document& root) const ;
+    std::vector<Value> parseDeps(const Document& root,
+                                  const ExpressionVector& operands,
+                                  size_t arrayLength) const;
+    boost::intrusive_ptr<Expression> optimize() ;
     const char* getOpName() const final;
+private:
+    class Optimized;
 };
 
 

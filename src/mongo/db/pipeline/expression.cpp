@@ -482,6 +482,21 @@ Value ExpressionArray::serialize(bool explain) const {
     return Value(std::move(expressions));
 }
 
+intrusive_ptr<Expression> ExpressionArray::optimize() {
+    bool allValuesConstant = true;
+    for (auto& expr : vpOperand) {
+        expr = expr->optimize();
+        if (!dynamic_cast<ExpressionConstant*>(expr.get())) {
+            allValuesConstant = false;
+        }
+    }
+    // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
+    if (allValuesConstant) {
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
+    }
+    return this;
+}
+
 const char* ExpressionArray::getOpName() const {
     // This should never be called, but is needed to inherit from ExpressionNary.
     return "$array";
@@ -2717,30 +2732,89 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
 
     std::vector<Value> array = arrayArg.getArray();
 
-    Value searchItem = vpOperand[1]->evaluate(root);
-
-    size_t startIndex = 0;
-    if (vpOperand.size() > 2) {
-        Value startIndexArg = vpOperand[2]->evaluate(root);
-        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
-        startIndex = static_cast<size_t>(startIndexArg.coerceToInt());
-    }
-
-    size_t endIndex = array.size();
-    if (vpOperand.size() > 3) {
-        Value endIndexArg = vpOperand[3]->evaluate(root);
-        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
-        // Don't let 'endIndex' exceed the length of the array.
-        endIndex = std::min(array.size(), static_cast<size_t>(endIndexArg.coerceToInt()));
-    }
-
-    for (size_t i = startIndex; i < endIndex; i++) {
-        if (getExpressionContext()->getValueComparator().evaluate(array[i] == searchItem)) {
+    std::vector<Value> operands = parseDeps(root, vpOperand, array.size());
+    for (int i = operands[1].getInt(); i < operands[2].getInt(); i++) {
+        if (getExpressionContext()->getValueComparator().evaluate(array[i] == operands[0])) {
             return Value(static_cast<int>(i));
         }
     }
 
     return Value(-1);
+}
+
+vector<Value> ExpressionIndexOfArray::parseDeps(const Document& root,
+                                                const ExpressionVector& operands,
+                                                size_t arrayLength) const {
+    std::vector<Value> deps;
+    deps.push_back(operands[1]->evaluate(root));
+
+    int startIndex = 0;
+    if (operands.size() > 2) {
+        Value startIndexArg = operands[2]->evaluate(root);
+        uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
+        startIndex = static_cast<int>(startIndexArg.coerceToInt());
+    }
+    deps.push_back(Value(startIndex));
+
+    int endIndex = arrayLength;
+    if (operands.size() > 3) {
+        Value endIndexArg = operands[3]->evaluate(root);
+        uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
+        // Don't let 'endIndex' exceed the length of the array.
+        endIndex = std::min(arrayLength, static_cast<size_t>(endIndexArg.coerceToInt()));
+    }
+    deps.push_back(Value(endIndex));
+    return deps;
+}
+
+class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
+public:
+    Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+              const ValueUnorderedMap<int>& indexMap,
+              const ExpressionVector& operands)
+        : ExpressionIndexOfArray(expCtx), _indexMap(std::move(indexMap)) {
+        vpOperand = operands;
+    }
+
+    virtual Value evaluate(const Document& root) const {
+        std::vector<Value> operands = parseDeps(root, vpOperand, _indexMap.size());
+        auto index = _indexMap.find(operands[0]);
+        if (index != _indexMap.end() && index->second > operands[1].getInt() &&
+            index->second < operands[2].getInt()) {
+            return Value(index->second);
+        } else {
+            return Value(-1);
+        }
+    }
+
+private:
+    const ValueUnorderedMap<int> _indexMap;
+};
+
+intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
+    vpOperand[0]->optimize();
+    if (ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
+        const Value valueArray = ec->getValue();
+        uassert(50749,
+                str::stream() << "First operand of $indexOfArray must be an array. First "
+                              << "argument is of type: " 
+                              << typeName(valueArray.getType()),
+                valueArray.isArray());
+
+        auto arr = valueArray.getArray();
+
+        ValueUnorderedMap<int> indexMap =
+            getExpressionContext()->getValueComparator().makeUnorderedValueMap<int>();
+
+        for (int i = 0; i < int(arr.size()); i++) {
+            auto pair = std::make_pair(arr[i], i);
+            indexMap.insert(pair);
+        }
+        intrusive_ptr<Expression> optimizedWithConstant(
+            new Optimized(getExpressionContext(), indexMap, vpOperand));
+        return optimizedWithConstant;
+    }
+    return this;
 }
 
 REGISTER_EXPRESSION(indexOfArray, ExpressionIndexOfArray::parse);
