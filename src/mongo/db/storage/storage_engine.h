@@ -382,6 +382,14 @@ public:
         return std::vector<CollectionIndexNamePair>();
     };
 
+    /**
+     * Returns the all committed timestamp. All transactions with timestamps earlier than the
+     * all committed timestamp are committed. Only storage engines that support document level
+     * locking must provide an implementation. Other storage engines may provide a no-op
+     * implementation.
+     */
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;
+
 protected:
     /**
      * The destructor will never be called. See cleanShutdown instead.

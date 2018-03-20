@@ -180,6 +180,8 @@ public:
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
+
     bool supportsReadConcernSnapshot() const final;
 
     // wiredtiger specific

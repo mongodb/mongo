@@ -104,6 +104,10 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
+    Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     static void _listDatabases(const std::string& directory, std::vector<std::string>* out);
 

@@ -283,6 +283,11 @@ public:
     }
 
     /**
+     * See `StorageEngine::getAllCommittedTimestamp`
+     */
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;
+
+    /**
      * See `StorageEngine::supportsReadConcernSnapshot`
      */
     virtual bool supportsReadConcernSnapshot() const {

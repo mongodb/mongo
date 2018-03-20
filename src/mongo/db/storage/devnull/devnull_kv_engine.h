@@ -112,6 +112,10 @@ public:
 
     void setJournalListener(JournalListener* jl) final {}
 
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override {
+        return Timestamp();
+    }
+
 private:
     std::shared_ptr<void> _catalogInfo;
 };

@@ -1028,15 +1028,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
         return;
     }
 
-    const auto oplogReadTimestamp = Timestamp(_oplogManager->getOplogReadTimestamp());
-    if (!oplogReadTimestamp.isNull() && stableTimestamp > oplogReadTimestamp) {
-        // When a replica set has one voting node, replication can advance the commit point ahead
-        // of the current oplog read visibility. Allowing that to happen in storage can result in
-        // logically previous transactions trying to commit behind this updated stable
-        // timestamp. Instead, pin the stable timestamp to the oplog read timestamp.
-        stableTimestamp = oplogReadTimestamp;
-    }
-
     const bool keepOldBehavior = true;
     // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints will
     // only persist to disk transactions committed with a timestamp earlier than the "stable
@@ -1071,6 +1062,15 @@ void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp, bool for
     if (oldestTimestamp == Timestamp()) {
         // Nothing to set yet.
         return;
+    }
+    const auto oplogReadTimestamp = Timestamp(_oplogManager->getOplogReadTimestamp());
+    if (!force && !oplogReadTimestamp.isNull() && oldestTimestamp > oplogReadTimestamp) {
+        // Oplog visibility is updated asynchronously from replication updating the commit point.
+        // When force is not set, lag the `oldest_timestamp` to the possibly stale oplog read
+        // timestamp value. This guarantees an oplog reader's `read_timestamp` can always
+        // be serviced. When force is set, we respect the caller's request and do not lag the
+        // oldest timestamp.
+        oldestTimestamp = oplogReadTimestamp;
     }
 
     char oldestTSConfigString["force=true,oldest_timestamp=,commit_timestamp="_sd.size() +
@@ -1141,6 +1141,10 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp() {
     }
     return Status(ErrorCodes::UnrecoverableRollbackError,
                   "WT does not support recover to stable timestamp yet.");
+}
+
+Timestamp WiredTigerKVEngine::getAllCommittedTimestamp(OperationContext* opCtx) const {
+    return Timestamp(_oplogManager->fetchAllCommittedValue(opCtx));
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {

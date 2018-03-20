@@ -110,6 +110,10 @@ public:
         _journalListener = jl;
     }
 
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     typedef StringMap<std::shared_ptr<void>> DataMap;
 
