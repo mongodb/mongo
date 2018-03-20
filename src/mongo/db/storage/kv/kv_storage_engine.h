@@ -121,6 +121,8 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
+
     virtual void replicationBatchIsComplete() const override;
 
     SnapshotManager* getSnapshotManager() const final;

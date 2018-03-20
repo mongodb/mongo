@@ -383,4 +383,8 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
 void KVStorageEngine::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }
+
+Timestamp KVStorageEngine::getAllCommittedTimestamp(OperationContext* opCtx) const {
+    return _engine->getAllCommittedTimestamp(opCtx);
+}
 }  // namespace mongo

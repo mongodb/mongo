@@ -226,6 +226,10 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
     LOG(2) << "setting new oplogReadTimestamp: " << newTimestamp;
 }
 
+uint64_t WiredTigerOplogManager::fetchAllCommittedValue(OperationContext* opCtx) {
+    return _fetchAllCommittedValue(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+}
+
 uint64_t WiredTigerOplogManager::_fetchAllCommittedValue(WT_CONNECTION* conn) {
     // Fetch the latest all_committed value from the storage engine.  This value will be a
     // timestamp that has no holes (uncommitted transactions with lower timestamps) behind it.

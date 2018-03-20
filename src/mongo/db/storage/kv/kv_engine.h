@@ -269,6 +269,11 @@ public:
     }
 
     /**
+     * See `StorageEngine::getAllCommittedTimestamp`
+     */
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;
+
+    /**
      * See `StorageEngine::replicationBatchIsComplete()`
      */
     virtual void replicationBatchIsComplete() const {};
