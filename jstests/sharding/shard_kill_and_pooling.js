@@ -53,11 +53,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         var exitCode = killWith === 9 ? MongoRunner.EXIT_SIGKILL : MongoRunner.EXIT_CLEAN;
 
-        st.rs0.stopSet(killWith, false, {allowedExitCode: exitCode});
+        st.rs0.stopSet(killWith, true, {allowedExitCode: exitCode});
 
         jsTest.log("Restart shard...");
-
-        st.shard0 = MongoRunner.runMongod({restart: st.shard0, forceLock: true});
+        st.rs0.startSet({forceLock: true}, true);
 
         jsTest.log("Waiting for socket timeout time...");
 
