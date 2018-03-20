@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/*.js
+  - jstests/core/txns/**/*.js
   exclude_files:
   # These tests are not expected to pass with replica-sets:
   - jstests/core/dbadmin.js

@@ -4,6 +4,8 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  # Transactions are not supported on MongoDB standalone nodes.
+  - jstests/core/txns/**/*.js
   - jstests/core/repair*.js  # Fails on recovery.
   - jstests/core/shellkillop.js  # Takes forever and doesn't test anything new.
 

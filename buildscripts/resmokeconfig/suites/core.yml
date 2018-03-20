@@ -3,7 +3,10 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
-
+  exclude_files:
+  # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
+  # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
+  - jstests/core/txns/**/*.js
 executor:
   archive:
     hooks:

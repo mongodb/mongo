@@ -4,6 +4,9 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  # Transactions do not support retryability of individual operations.
+  # TODO: Remove this once it is supported (SERVER-33952).
+  - jstests/core/txns/**/*.js
   # These tests are not expected to pass with replica-sets:
   - jstests/core/capped_update.js
   - jstests/core/dbadmin.js

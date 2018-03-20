@@ -3544,6 +3544,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: jsCore_txns
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_txns --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets_jscore_passthrough
   depends_on:
   - name: jsCore
@@ -4868,6 +4877,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -4933,6 +4943,7 @@ buildvariants:
   - name: integration_tests_replset
   - name: integration_tests_sharded
   - name: jsCore
+  - name: jsCore_txns
   - name: parallel
   - name: concurrency
   - name: concurrency_replication
@@ -4991,6 +5002,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: jsonSchema
   - name: mongosTest
   - name: noPassthrough
@@ -5047,9 +5059,10 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    # Running WiredTiger with --nojournal in a replica set is no longer supported,
-    # so this variant does not include replica set tests.
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_mmapv1,requires_sharding
+    # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
+    # does not include replica set tests. Since transactions are only supported on replica sets, we
+    # exclude those tests as well.
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_mmapv1,requires_sharding,uses_transactions
     scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
@@ -5072,6 +5085,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5096,7 +5110,7 @@ buildvariants:
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1
+    test_flags: --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1,uses_transactions
     scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
@@ -5192,6 +5206,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5296,6 +5311,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5385,6 +5401,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5470,6 +5487,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5601,6 +5619,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5697,6 +5716,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5781,6 +5801,7 @@ buildvariants:
   - name: jsCore_ese
   - name: jsCore_auth
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5860,6 +5881,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -5952,6 +5974,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: jsonSchema
   - name: mongosTest
   - name: noPassthrough
@@ -6079,6 +6102,7 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -6211,6 +6235,7 @@ buildvariants:
   - name: concurrency_simultaneous
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -6286,6 +6311,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: jsonSchema
   - name: aggregation_fuzzer
   - name: jstestfuzz
@@ -6430,6 +6456,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -6499,6 +6526,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: mongosTest
   - name: replica_sets
   - name: tool
@@ -6533,6 +6561,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -6554,7 +6583,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     build_cdriver: true
     cdriver_configure_flags: >-
       --prefix=$(pwd)/install
@@ -6581,7 +6610,7 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     build_cdriver: true
     cdriver_configure_flags: >-
       --prefix=$(pwd)/install
@@ -6622,7 +6651,7 @@ buildvariants:
       CFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
       CXXFLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.1 -arch arm64"
       LDFLAGS="-mtvos-version-min=10.1 -arch arm64"
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -6649,7 +6678,7 @@ buildvariants:
       CFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
       CXXFLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.1"
       LDFLAGS="-mtvos-version-min=10.1"
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
       -j$(sysctl -n hw.logicalcpu)
@@ -6668,7 +6697,7 @@ buildvariants:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
     build_cdriver: true
     cdriver_configure_flags: >-
       --prefix=$(pwd)/install
@@ -6783,6 +6812,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: jsonSchema
   - name: aggregation_fuzzer
   - name: jstestfuzz
@@ -6960,6 +6990,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -7045,6 +7076,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7136,6 +7168,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7220,6 +7253,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_decimal
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7329,6 +7363,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7435,6 +7470,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7539,6 +7575,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: mongosTest
   - name: noPassthroughWithMongod
   - name: noPassthrough
@@ -7615,6 +7652,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7691,6 +7729,7 @@ buildvariants:
     - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7748,6 +7787,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7831,6 +7871,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7914,6 +7955,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8004,6 +8046,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8079,6 +8122,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8134,6 +8178,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8201,6 +8246,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8288,6 +8334,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8362,6 +8409,7 @@ buildvariants:
   - name: ese
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8427,6 +8475,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
+  - name: jsCore_txns
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8534,6 +8583,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: aggregation_fuzzer
@@ -8596,9 +8646,11 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    # Transactions are only supported on replica sets, and replication is not supported by the
+    # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
@@ -8691,9 +8743,11 @@ buildvariants:
       CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include
       CGO_LDFLAGS=-mmacosx-version-min=10.10
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    # Transactions are only supported on replica sets, and replication is not supported by the
+    # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
@@ -8716,6 +8770,7 @@ buildvariants:
   - name: audit
   - name: auth
   - name: auth_audit
+
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
@@ -8746,7 +8801,8 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_mmapv1,requires_wiredtiger
+    # Transactions are not explicitly supported on the ephemeralForTest storage engine.
+    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_mmapv1,requires_wiredtiger,uses_transactions
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
@@ -8866,6 +8922,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -8952,6 +9009,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -8992,7 +9050,8 @@ buildvariants:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=rocksdb --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger
+    # Transactions are not explicitly supported on the RocksDB storage engine.
+    test_flags: --storageEngine=rocksdb --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,uses_transactions
     use_scons_cache: true
     build_mongoreplay: true
   stepback: false
@@ -9077,6 +9136,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: jsonSchema
   - name: mongosTest
   - name: multiversion_auth
@@ -9230,6 +9290,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: jsonSchema
   - name: mongosTest
   - name: multiversion_auth
@@ -9359,6 +9420,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
+  - name: jsCore_txns
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -9441,7 +9503,8 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
+    # Transactions are not supported on the MMAPv1 storage engine.
+    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: -tags 'ssl sasl'
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
@@ -9549,7 +9612,8 @@ buildvariants:
   - windows-64-vs2015-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
+    # Transactions are not supported on the MMAPv1 storage engine.
+    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions
     platform_decompress: unzip
     tooltags: -tags 'ssl sasl'
     exe: .exe
@@ -9668,7 +9732,8 @@ buildvariants:
   - macos-1012
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
+    # Transactions are not supported on the MMAPv1 storage engine.
+    test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,uses_transactions
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     gorootvars: >-
       CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10
@@ -9757,7 +9822,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --nojournal --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,requires_journaling
+    test_flags: --nojournal --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,requires_journaling,uses_transactions
     scons_cache_scope: shared
     build_mongoreplay: false
   tasks:

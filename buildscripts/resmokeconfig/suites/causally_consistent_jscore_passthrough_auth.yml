@@ -13,6 +13,8 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  # In MongoDB 4.0, transactions are not supported in sharded clusters.
+  - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
   # Skip any tests that require privileges for non test databases.

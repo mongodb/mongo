@@ -4,6 +4,8 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  # Transactions are not supported on MongoDB standalone nodes.
+  - jstests/core/txns/**/*.js
   # The following tests fail when specifying a minimal batchSize:
   - jstests/core/find9.js # Reduction of objsLeftInBatch.
   - jstests/core/finda.js # Reduction of objsLeftInBatch.
