@@ -1,4 +1,6 @@
 // Do parallel ops with migrates occurring
+// @tags: [requires_sharding]
+
 (function() {
     'use strict';
 
