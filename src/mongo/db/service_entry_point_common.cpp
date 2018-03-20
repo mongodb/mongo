@@ -752,16 +752,19 @@ void execCommandDatabase(OperationContext* opCtx,
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '"
-                   << ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body)
-                   << "' and operationTime '" << operationTime.toString() << "': " << e.toString();
+                   << redact(
+                          ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body))
+                   << "' and operationTime '" << operationTime.toString()
+                   << "': " << redact(e.toString());
 
             generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj(), operationTime);
         } else {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '"
-                   << ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body)
-                   << "': " << e.toString();
+                   << redact(
+                          ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body))
+                   << "': " << redact(e.toString());
 
             generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj());
         }
@@ -828,7 +831,7 @@ DbResponse runCommands(OperationContext* opCtx,
             }
 
             LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '
-                   << ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body);
+                   << redact(ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body));
 
             {
                 // Try to set this as early as possible, as soon as we have figured out the command.
