@@ -275,7 +275,6 @@ Status multiSyncApply(OperationContext* opCtx,
 Status multiInitialSyncApply(OperationContext* opCtx,
                              MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
-                             AtomicUInt32* fetchCount,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 }  // namespace repl

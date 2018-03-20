@@ -1232,7 +1232,6 @@ Status multiSyncApply(OperationContext* opCtx,
 Status multiInitialSyncApply(OperationContext* opCtx,
                              MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
-                             AtomicUInt32* fetchCount,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
@@ -1259,7 +1258,6 @@ Status multiInitialSyncApply(OperationContext* opCtx,
                     }
 
                     // We might need to fetch the missing docs from the sync source.
-                    fetchCount->fetchAndAdd(1);
                     st->fetchAndInsertMissingDocument(opCtx, entry);
                 }
             } catch (const DBException& e) {

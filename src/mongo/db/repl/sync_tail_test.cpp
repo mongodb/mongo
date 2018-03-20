@@ -97,10 +97,20 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, OptionalCollec
 /**
  * Testing-only SyncTail that returns user-provided "document" for getMissingDoc().
  */
-class SyncTailWithLocalDocumentFetcher : public SyncTail {
+class SyncTailWithLocalDocumentFetcher : public SyncTail, OplogApplier::Observer {
 public:
     SyncTailWithLocalDocumentFetcher(const BSONObj& document);
     BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) override;
+
+    // OplogApplier::Observer functions
+    void onBatchBegin(const OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
+        numFetched += docs.size();
+    }
+    void onOperationConsumed(const BSONObj& op) final {}
+
+    std::size_t numFetched = 0U;
 
 private:
     BSONObj _document;
@@ -114,10 +124,11 @@ public:
     SyncTailWithOperationContextChecker();
     bool fetchAndInsertMissingDocument(OperationContext* opCtx,
                                        const OplogEntry& oplogEntry) override;
+    bool called = false;
 };
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
-    : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
+    : SyncTail(this, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
 
 BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const OplogEntry&) {
     return _document;
@@ -131,6 +142,7 @@ bool SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(Operatio
     ASSERT_FALSE(opCtx->writesAreReplicated());
     ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
     ASSERT_TRUE(documentValidationDisabled(opCtx));
+    called = true;
     return false;
 }
 
@@ -630,7 +642,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMake
 
     MultiApplier::OperationPtrs ops = {&op};
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  multiInitialSyncApply(_opCtx.get(), &ops, nullptr, nullptr, nullptr));
+                  multiInitialSyncApply(_opCtx.get(), &ops, nullptr, nullptr));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
@@ -995,10 +1007,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
-    AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
-    ASSERT_EQUALS(fetchCount.load(), 1U);
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT(syncTail.called);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
@@ -1015,14 +1026,13 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
-    AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
-    ASSERT_EQUALS(fetchCount.load(), 1U);
+    ASSERT_EQUALS(syncTail.numFetched, 1U);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
@@ -1038,10 +1048,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, badNss, doc2);
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
-    AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
-    ASSERT_EQUALS(fetchCount.load(), 0U);
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
@@ -1066,8 +1075,8 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
-    ASSERT_EQUALS(fetchCount.load(), 0U);
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
@@ -1088,10 +1097,9 @@ TEST_F(SyncTailTest,
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
     MultiApplier::OperationPtrs ops = {&op};
-    AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &fetchCount, &pathInfo));
-    ASSERT_EQUALS(fetchCount.load(), 1U);
+    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_EQUALS(syncTail.numFetched, 1U);
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold
     // the missing document fetched from the sync source. We verify the contents of the collection

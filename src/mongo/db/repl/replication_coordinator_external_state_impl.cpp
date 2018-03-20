@@ -896,8 +896,7 @@ Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     InitialSyncApplyObserver observer(fetchCount);
     SyncTail syncTail(&observer, SyncTail::MultiSyncApplyFunc(), nullptr);
     syncTail.setHostname(source.toString());
-    AtomicUInt32 unused;
-    return repl::multiInitialSyncApply(opCtx, ops, &syncTail, &unused, workerMultikeyPathInfo);
+    return repl::multiInitialSyncApply(opCtx, ops, &syncTail, workerMultikeyPathInfo);
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(

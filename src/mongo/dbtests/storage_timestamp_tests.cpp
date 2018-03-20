@@ -1353,16 +1353,8 @@ public:
         // after bulk index builds.
         std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
 
-        AtomicUInt32 fetchCount(0);
-        auto applyOpFn = [&fetchCount](OperationContext* opCtx,
-                                       repl::MultiApplier::OperationPtrs* ops,
-                                       repl::SyncTail* st,
-                                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-            return repl::multiInitialSyncApply(opCtx, ops, st, &fetchCount, workerMultikeyPathInfo);
-        };
-
         auto writerPool = repl::SyncTail::makeWriterPool();
-        repl::SyncTail syncTail(nullptr, applyOpFn, writerPool.get());
+        repl::SyncTail syncTail(nullptr, repl::multiInitialSyncApply, writerPool.get());
         auto lastTime = unittest::assertGet(syncTail.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
