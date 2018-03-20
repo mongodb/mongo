@@ -806,7 +806,7 @@ TEST(IndexSpecPartialFilterTest, FailsIfPartialFilterContainsBannedFeature) {
                                     BSON("key" << BSON("field" << 1) << "name"
                                                << "indexName"
                                                << "partialFilterExpression"
-                                               << BSON("$jsonSchema" << BSONObj())),
+                                               << BSON("$isolated" << 1)),
                                     kTestNamespace,
                                     serverGlobalParams.featureCompatibility);
     ASSERT_EQ(result.getStatus(), ErrorCodes::QueryFeatureNotAllowed);

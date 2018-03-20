@@ -27,6 +27,11 @@
         assert.writeError(coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: ["bad"]}),
                           ErrorCodes.TypeMismatch);
 
+        // $isolated in array filter fails to parse.
+        assert.writeError(
+            coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 2, $isolated: true}]}),
+            ErrorCodes.FailedToParse);
+
         // Bad array filter fails to parse.
         res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0, j: 0}]});
         assert.writeErrorWithCode(res, ErrorCodes.FailedToParse);

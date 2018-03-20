@@ -714,6 +714,19 @@ bool QueryRequest::isValidSortOrder(const BSONObj& sortObj) {
     return true;
 }
 
+// static
+bool QueryRequest::isQueryIsolated(const BSONObj& query) {
+    BSONObjIterator iter(query);
+    while (iter.more()) {
+        BSONElement elt = iter.next();
+        if (str::equals(elt.fieldName(), "$isolated") && elt.trueValue())
+            return true;
+        if (str::equals(elt.fieldName(), "$atomic") && elt.trueValue())
+            return true;
+    }
+    return false;
+}
+
 //
 // Old QueryRequest parsing code: SOON TO BE DEPRECATED.
 //

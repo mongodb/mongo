@@ -132,12 +132,14 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
             new ExpressionContext(opCtx, _collator.get()));
 
         // Parsing the partial filter expression is not expected to fail here since the
-        // expression would have been successfully parsed upstream during index creation.
+        // expression would have been successfully parsed upstream during index creation. However,
+        // filters that were allowed in partial filter expressions prior to 3.6 may be present in
+        // the index catalog and must also successfully parse.
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filter,
                                          std::move(expCtx),
                                          ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kBanAllSpecialFeatures);
+                                         MatchExpressionParser::AllowedFeatures::kIsolated);
         invariantOK(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());
         LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "

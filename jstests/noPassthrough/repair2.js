@@ -22,7 +22,7 @@
         }
 
         for (let j = 0; j < 5000; ++j) {
-            bulk.find({_id: j}).remove();
+            bulk.find({_id: j, $isolated: 1}).remove();
         }
 
         assert.writeOK(bulk.execute());

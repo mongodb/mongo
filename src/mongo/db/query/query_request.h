@@ -115,6 +115,12 @@ public:
      */
     static bool isValidSortOrder(const BSONObj& sortObj);
 
+    /**
+     * Returns true if the query described by "query" should execute
+     * at an elevated level of isolation (i.e., $isolated was specified).
+     */
+    static bool isQueryIsolated(const BSONObj& query);
+
     // Read preference is attached to commands in "wrapped" form, e.g.
     //   { $query: { <cmd>: ... } , <kWrappedReadPrefField>: { ... } }
     //
