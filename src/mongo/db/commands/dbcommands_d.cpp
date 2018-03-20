@@ -195,6 +195,13 @@ public:
             // it just passes the buffer through to another mongod.
             BSONElement stateElem = jsobj["md5state"];
             if (!stateElem.eoo()) {
+                uassert(50847,
+                        str::stream() << "The element that calls binDataClean() must be type of "
+                                         "BinData, but type of "
+                                      << typeName(stateElem.type())
+                                      << " found.",
+                        (stateElem.type() == BSONType::BinData));
+
                 int len;
                 const char* data = stateElem.binDataClean(len);
                 massert(16247, "md5 state not correct size", len == sizeof(st));
@@ -248,6 +255,18 @@ public:
 
                 // make a copy of obj since we access data in it while yielding locks
                 BSONObj owned = obj.getOwned();
+                uassert(50848,
+                        str::stream() << "The element that calls binDataClean() must be type "
+                                         "of BinData, but type of misisng found. Field name is "
+                                         "required",
+                        owned["data"]);
+                uassert(50849,
+                        str::stream() << "The element that calls binDataClean() must be type "
+                                         "of BinData, but type of "
+                                      << owned["data"].type()
+                                      << " found.",
+                        owned["data"].type() == BSONType::BinData);
+
                 exec->saveState();
                 // UNLOCKED
                 ctx.reset();
