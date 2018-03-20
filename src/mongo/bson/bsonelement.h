@@ -463,7 +463,7 @@ public:
     /** Get binary data.  Element must be of type BinData. Handles type 2 */
     const char* binDataClean(int& len) const {
         // BinData: <int len> <byte subtype> <byte[len] data>
-        if (binDataType() != ByteArrayDeprecated) {
+        if (type() == BinData && binDataType() != ByteArrayDeprecated) {
             return binData(len);
         } else {
             // Skip extra size
