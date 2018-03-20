@@ -270,6 +270,43 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothResumeAfterClusterTimeAndResumeAft
         40674);
 }
 
+TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtClusterTimeAndResumeAfterOptions) {
+    auto expCtx = getExpCtx();
+
+    // Need to put the collection in the UUID catalog so the resume token is valid.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON(
+                     "resumeAfter" << makeResumeToken(ts, testUuid(), BSON("x" << 2 << "_id" << 1))
+                                   << "startAtClusterTime"
+                                   << BSON("ts" << ts)))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        40674);
+}
+
+TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtAndResumeAfterClusterTimeOptions) {
+    auto expCtx = getExpCtx();
+
+    // Need to put the collection in the UUID catalog so the resume token is valid.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName
+                 << BSON("$_resumeAfterClusterTime" << BSON("ts" << ts) << "startAtClusterTime"
+                                                    << BSON("ts" << ts)))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        50573);
+}
+
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
     const auto spec = fromjson("{$changeStream: {}}");
 

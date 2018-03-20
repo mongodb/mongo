@@ -166,7 +166,7 @@ public:
      */
     static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     Timestamp startFrom,
-                                    bool isResume);
+                                    bool startFromInclusive);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation

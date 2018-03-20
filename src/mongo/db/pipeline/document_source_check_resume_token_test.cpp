@@ -99,11 +99,8 @@ protected:
 
 class ShardCheckResumabilityTest : public CheckResumeTokenTest {
 protected:
-    intrusive_ptr<DocumentSourceShardCheckResumability> createShardCheckResumability(
-        Timestamp ts, StringData id, UUID uuid = testUuid()) {
-        ResumeToken token(ResumeTokenData(ts, Value(Document{{"_id", id}}), uuid));
-        auto shardCheckResumability =
-            DocumentSourceShardCheckResumability::create(getExpCtx(), token);
+    intrusive_ptr<DocumentSourceShardCheckResumability> createShardCheckResumability(Timestamp ts) {
+        auto shardCheckResumability = DocumentSourceShardCheckResumability::create(getExpCtx(), ts);
         shardCheckResumability->setSource(_mock.get());
         return shardCheckResumability;
     }
@@ -270,7 +267,7 @@ TEST_F(ShardCheckResumabilityTest,
     Timestamp oplogTimestamp(100, 1);
     Timestamp resumeTimestamp(100, 2);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "ID");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     addDocument(resumeTimestamp, "ID");
@@ -286,7 +283,7 @@ TEST_F(ShardCheckResumabilityTest,
     Timestamp resumeTimestamp(100, 1);
     Timestamp oplogTimestamp(100, 2);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "ID");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     addDocument(resumeTimestamp, "ID");
@@ -300,7 +297,7 @@ TEST_F(ShardCheckResumabilityTest,
 TEST_F(ShardCheckResumabilityTest, ShouldSucceedIfResumeTokenIsPresentAndOplogIsEmpty) {
     Timestamp resumeTimestamp(100, 1);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "ID");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog;
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     addDocument(resumeTimestamp, "ID");
@@ -316,7 +313,7 @@ TEST_F(ShardCheckResumabilityTest,
     Timestamp oplogTimestamp(100, 1);
     Timestamp resumeTimestamp(100, 2);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     auto result = shardCheckResumability->getNext();
@@ -328,7 +325,7 @@ TEST_F(ShardCheckResumabilityTest,
     Timestamp resumeTimestamp(100, 1);
     Timestamp oplogTimestamp(100, 2);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     ASSERT_THROWS_CODE(shardCheckResumability->getNext(), AssertionException, 40576);
@@ -337,7 +334,7 @@ TEST_F(ShardCheckResumabilityTest,
 TEST_F(ShardCheckResumabilityTest, ShouldSucceedWithNoDocumentsInPipelineAndOplogIsEmpty) {
     Timestamp resumeTimestamp(100, 2);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog;
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     auto result = shardCheckResumability->getNext();
@@ -350,7 +347,7 @@ TEST_F(ShardCheckResumabilityTest,
     Timestamp resumeTimestamp(100, 2);
     Timestamp docTimestamp(100, 3);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
@@ -366,7 +363,7 @@ TEST_F(ShardCheckResumabilityTest,
     Timestamp oplogTimestamp(100, 2);
     Timestamp docTimestamp(100, 3);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
@@ -379,7 +376,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstDoc) {
     Timestamp oplogFutureTimestamp(100, 3);
     Timestamp docTimestamp(100, 4);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
@@ -400,7 +397,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldSucceedWhenOplogEntriesExistBeforeAndAf
     Timestamp oplogFutureTimestamp(100, 3);
     Timestamp docTimestamp(100, 4);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     addDocument(docTimestamp, "ID");
     deque<DocumentSource::GetNextResult> mockOplog(
         {{Document{{"ts", oplogTimestamp}}}, {Document{{"ts", oplogFutureTimestamp}}}});
@@ -418,7 +415,7 @@ TEST_F(ShardCheckResumabilityTest, ShouldIgnoreOplogAfterFirstEOF) {
     Timestamp resumeTimestamp(100, 2);
     Timestamp oplogFutureTimestamp(100, 3);
 
-    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp, "0");
+    auto shardCheckResumability = createShardCheckResumability(resumeTimestamp);
     deque<DocumentSource::GetNextResult> mockOplog({Document{{"ts", oplogTimestamp}}});
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(mockOplog);
     auto result1 = shardCheckResumability->getNext();

@@ -21,16 +21,29 @@
 
     const testDB = rst.getPrimary().getDB(jsTestName());
     const adminDB = rst.getPrimary().getDB("admin");
+    const coll = testDB[jsTestName()];
 
     // Explicitly set feature compatibility version 4.0.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"}));
+    let res = adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"});
+    assert.commandWorked(res);
+    const resumeTime = res.$clusterTime.clusterTime;
 
     // Open and test a change stream using 4.0 features.
     const cst = new ChangeStreamTest(testDB);
-    const cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    assert.writeOK(testDB["random_coll"].insert({_id: 0}));
-    let change = cst.getOneChange(cursor);
+    const wholeDbCursor =
+        cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
+    const resumeCursor = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {startAtClusterTime: {ts: resumeTime}}}],
+        collection: coll.getName()
+    });
+
+    assert.writeOK(coll.insert({_id: 0}));
+    let change = cst.getOneChange(wholeDbCursor);
+    assert.eq(change.operationType, "insert", tojson(change));
+    assert.eq(change.documentKey._id, 0);
+
+    change = cst.getOneChange(resumeCursor);
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 0);
 
@@ -38,15 +51,26 @@
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
 
     // An already created change stream should continue to work.
-    assert.writeOK(testDB["other_random_coll"].insert({_id: 0}));
-    change = cst.getOneChange(cursor);
+    assert.writeOK(coll.insert({_id: 1}));
+    change = cst.getOneChange(wholeDbCursor);
     assert.eq(change.operationType, "insert", tojson(change));
-    assert.eq(change.documentKey._id, 0);
+    assert.eq(change.documentKey._id, 1);
+
+    change = cst.getOneChange(resumeCursor);
+    assert.eq(change.operationType, "insert", tojson(change));
+    assert.eq(change.documentKey._id, 1);
 
     // Creating a new change stream with a 4.0 feature should fail.
     assert.commandFailedWithCode(
         testDB.runCommand({aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}}),
         ErrorCodes.QueryFeatureNotAllowed);
+
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: coll.getName(),
+        pipeline: [{$changeStream: {startAtClusterTime: {ts: resumeTime}}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.QueryFeatureNotAllowed);
 
     rst.stopSet();
 }());

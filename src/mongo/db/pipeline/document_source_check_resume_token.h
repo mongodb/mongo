@@ -39,13 +39,13 @@ namespace mongo {
 /**
  * This checks for resumability on a single shard in the sharded case. The rules are
  *
- * - If the first document in the pipeline for this shard has a matching resume token, we can
+ * - If the first document in the pipeline for this shard has a matching timestamp, we can
  *   always resume.
  * - If the oplog is empty, we can resume.  An empty oplog is rare and can only occur
  *   on a secondary that has just started up from a primary that has not taken a write.
  *   In particular, an empty oplog cannot be the result of oplog truncation.
  * - If neither of the above is true, the least-recent document in the oplog must precede the resume
- *   token.  If we do this check after seeing the first document in the pipeline in the shard, or
+ *   timestamp. If we do this check after seeing the first document in the pipeline in the shard, or
  *   after seeing that there are no documents in the pipeline after the resume token in the shard,
  *   we're guaranteed not to miss any documents.
  *
@@ -73,16 +73,16 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     static boost::intrusive_ptr<DocumentSourceShardCheckResumability> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeToken token);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
 
 private:
     /**
      * Use the create static method to create a DocumentSourceShardCheckResumability.
      */
     DocumentSourceShardCheckResumability(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         ResumeToken token);
+                                         Timestamp ts);
 
-    ResumeToken _token;
+    Timestamp _resumeTimestamp;
     bool _verifiedResumability;
 };
 
@@ -111,10 +111,11 @@ public:
 
     /**
      * SplittableDocumentSource methods; this has to run on the merger, since the resume point could
-     * be at any shard.
+     * be at any shard. Also add a DocumentSourceShardCheckResumability stage on the shards pipeline
+     * to ensure that each shard has enough oplog history to resume the change stream.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return DocumentSourceShardCheckResumability::create(pExpCtx, _token);
+        return DocumentSourceShardCheckResumability::create(pExpCtx, _token.getClusterTime());
     };
 
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {

@@ -1500,6 +1500,11 @@ DBCollection.prototype.watch = function(pipeline, options) {
         delete options.resumeAfter;
     }
 
+    if (options.hasOwnProperty("startAtClusterTime")) {
+        changeStreamStage.startAtClusterTime = options.startAtClusterTime;
+        delete options.startAtClusterTime;
+    }
+
     pipeline.unshift({$changeStream: changeStreamStage});
     // Pass options "batchSize", "collation" and "maxAwaitTimeMS" down to aggregate().
     return this.aggregate(pipeline, options);

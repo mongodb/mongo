@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 
 using boost::intrusive_ptr;
@@ -127,13 +128,13 @@ Value DocumentSourceShardCheckResumability::serialize(
 }
 
 intrusive_ptr<DocumentSourceShardCheckResumability> DocumentSourceShardCheckResumability::create(
-    const intrusive_ptr<ExpressionContext>& expCtx, ResumeToken token) {
-    return new DocumentSourceShardCheckResumability(expCtx, std::move(token));
+    const intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts) {
+    return new DocumentSourceShardCheckResumability(expCtx, ts);
 }
 
 DocumentSourceShardCheckResumability::DocumentSourceShardCheckResumability(
-    const intrusive_ptr<ExpressionContext>& expCtx, ResumeToken token)
-    : DocumentSource(expCtx), _token(std::move(token)), _verifiedResumability(false) {}
+    const intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts)
+    : DocumentSource(expCtx), _resumeTimestamp(ts), _verifiedResumability(false) {}
 
 DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
     pExpCtx->checkForInterrupt();
@@ -146,14 +147,14 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
     if (nextInput.isAdvanced()) {
         auto doc = nextInput.getDocument();
 
-        auto receivedToken = ResumeToken::parse(doc["_id"].getDocument());
-        if (receivedToken == _token) {
+        auto receivedTimestamp = ResumeToken::parse(doc["_id"].getDocument()).getClusterTime();
+        if (receivedTimestamp == _resumeTimestamp) {
             // Pass along the document, as the DocumentSourceEnsureResumeTokenPresent stage on the
-            // merger will
-            // need to see it.
+            // merger will need to see it.
             return nextInput;
         }
     }
+
     // If we make it here, we need to look up the first document in the oplog and compare it
     // with the resume token.
     auto firstEntryExpCtx = pExpCtx->copyWith(NamespaceString::kRsOplogNamespace);
@@ -163,14 +164,23 @@ DocumentSource::GetNextResult DocumentSourceShardCheckResumability::getNext() {
     if (auto first = pipeline->getNext()) {
         auto firstOplogEntry = Value(*first);
         uassert(40576,
-                "resume of change notification was not possible, as the resume point may no longer "
+                "Resume of change stream was not possible, as the resume point may no longer "
                 "be in the oplog. ",
-                firstOplogEntry["ts"].getTimestamp() < _token.getData().clusterTime);
-        return nextInput;
+                firstOplogEntry["ts"].getTimestamp() < _resumeTimestamp);
+    } else {
+        // Very unusual case: the oplog is empty.  We can always resume.  It should never be
+        // possible that the oplog is empty and we got a document matching the filter, however.
+        invariant(nextInput.isEOF());
     }
-    // Very unusual case: the oplog is empty.  We can always resume.  It should never be possible
-    // that the oplog is empty and we got a document matching the filter, however.
-    invariant(nextInput.isEOF());
+
+    // The query on the oplog above will overwrite the namespace in current op which is used in
+    // profiling, reset it back to the original namespace. This is a generic problem with any
+    // aggregation that involves sub-operations on different namespaces, and is being tracked by
+    // SERVER-31098.
+    {
+        stdx::lock_guard<Client> lk(*pExpCtx->opCtx->getClient());
+        CurOp::get(pExpCtx->opCtx)->setNS_inlock(pExpCtx->ns.ns());
+    }
     return nextInput;
 }
 }  // namespace mongo

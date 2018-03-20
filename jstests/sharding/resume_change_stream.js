@@ -58,6 +58,10 @@
 
     // We awaited the replication of the first writes, so the change stream shouldn't return them.
     assert.writeOK(mongosColl.update({_id: -1}, {$set: {updated: true}}));
+
+    // Record current time to resume a change stream later in the test.
+    const resumeTimeFirstUpdate = mongosDB.runCommand({isMaster: 1}).$clusterTime.clusterTime;
+
     assert.writeOK(mongosColl.update({_id: 1}, {$set: {updated: true}}));
 
     // Test that we see the two writes, and remember their resume tokens.
@@ -117,7 +121,13 @@
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
         collection: mongosColl,
-        pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard1}}],
+        expectedCode: 40576
+    });
+
+    ChangeStreamTest.assertChangeStreamThrowsCode({
+        collection: mongosColl,
+        pipeline: [{$changeStream: {startAtClusterTime: {ts: resumeTimeFirstUpdate}}}],
         expectedCode: 40576
     });
 

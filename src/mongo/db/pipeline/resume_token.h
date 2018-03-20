@@ -100,6 +100,10 @@ public:
 
     ResumeTokenData getData() const;
 
+    Timestamp getClusterTime() const {
+        return getData().clusterTime;
+    }
+
     /**
      * Parse a resume token from a BSON object; used as an interface to the IDL parser.
      */
