@@ -1599,7 +1599,12 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
 void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                                 RecordId end,
                                                 bool inclusive) {
+    // Only log messages at a lower level here for testing.
+    bool logLevel = getTestCommandsEnabled() ? 0 : 2;
+
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, true);
+    LOG(logLevel) << "Truncating capped collection '" << _ns
+                  << "' in WiredTiger record store, (inclusive=" << inclusive << ")";
 
     auto record = cursor->seekExact(end);
     massert(28807, str::stream() << "Failed to seek to the record located at " << end, record);
@@ -1620,6 +1625,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
         // that is being deleted.
         record = cursor->next();
         if (!record) {
+            LOG(logLevel) << "No records to delete for truncation";
             return;  // No records to delete.
         }
         lastKeptId = end;
@@ -1636,6 +1642,8 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
             }
             recordsRemoved++;
             bytesRemoved += record->data.size();
+            LOG(logLevel) << "Record id to delete for truncation of '" << _ns << "': " << record->id
+                          << " (" << Timestamp(record->id.repr()) << ")";
         } while ((record = cursor->next()));
     }
 
@@ -1646,6 +1654,10 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     WiredTigerCursor startwrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* start = startwrap.get();
     setKey(start, firstRemovedId);
+
+    LOG(logLevel) << "Truncating collection '" << _ns << "' from " << firstRemovedId << " ("
+                  << Timestamp(firstRemovedId.repr()) << ")"
+                  << " to the end. Number of records to delete: " << recordsRemoved;
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr));
@@ -1659,6 +1671,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
         // Immediately rewind visibility to our truncation point, to prevent new
         // transactions from appearing.
         Timestamp truncTs(lastKeptId.repr());
+        LOG(logLevel) << "Rewinding oplog visibility point to " << truncTs << " after truncation.";
 
 
         char commitTSConfigString["commit_timestamp="_sd.size() +

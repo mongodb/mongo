@@ -1396,7 +1396,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     log() << "Rollback deleted " << deletes << " documents and updated " << updates
           << " documents.";
 
-    log() << "Truncating the oplog at " << fixUpInfo.commonPoint.toString();
+    log() << "Truncating the oplog at " << fixUpInfo.commonPoint.toString() << " ("
+          << fixUpInfo.commonPointOurDiskloc << "), non-inclusive";
 
     // Cleans up the oplog.
     {

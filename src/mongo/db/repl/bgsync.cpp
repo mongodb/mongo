@@ -697,11 +697,14 @@ void BackgroundSync::stop(bool resetLastFetchedOptime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     _state = ProducerState::Stopped;
+    log() << "Stopping replication producer";
+
     _syncSourceHost = HostAndPort();
     if (resetLastFetchedOptime) {
         invariant(_oplogBuffer->isEmpty());
         _lastOpTimeFetched = OpTime();
         _lastFetchedHash = 0;
+        log() << "Resetting last fetched optimes in bgsync";
     }
 
     if (_syncSourceResolver) {
@@ -732,6 +735,9 @@ void BackgroundSync::start(OperationContext* opCtx) {
         // When a node steps down during drain mode, the last fetched optime would be newer than
         // the last applied.
         if (_lastOpTimeFetched <= lastAppliedOpTimeWithHash.opTime) {
+            LOG(1) << "Settting bgsync _lastOpTimeFetched=" << lastAppliedOpTimeWithHash.opTime
+                   << " and _lastFetchedHash=" << lastAppliedOpTimeWithHash.value
+                   << ". Previous _lastOpTimeFetched: " << _lastOpTimeFetched;
             _lastOpTimeFetched = lastAppliedOpTimeWithHash.opTime;
             _lastFetchedHash = lastAppliedOpTimeWithHash.value;
         }
@@ -776,8 +782,11 @@ OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* 
                  << "\" field. Oplog entry: " << redact(oplogEntry) << ": " << redact(status);
         fassertFailed(18902);
     }
+
     OplogEntry parsedEntry(oplogEntry);
-    return OpTimeWithHash(hash, parsedEntry.getOpTime());
+    auto lastOptime = OpTimeWithHash(hash, parsedEntry.getOpTime());
+    LOG(1) << "Successfully read last entry of oplog while starting bgsync: " << redact(oplogEntry);
+    return lastOptime;
 }
 
 bool BackgroundSync::shouldStopFetching() const {
