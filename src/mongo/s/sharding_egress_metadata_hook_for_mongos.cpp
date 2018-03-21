@@ -42,40 +42,7 @@ namespace mongo {
 namespace rpc {
 
 void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
-                                                        StringData hostString) {
-    if (!haveClient()) {
-        // Client will be present only when write commands are used.
-        return;
-    }
-
-    auto swShardingMetadata = rpc::ShardingMetadata::readFromMetadata(metadata);
-    if (swShardingMetadata.getStatus() == ErrorCodes::NoSuchKey) {
-        return;
-    } else if (!swShardingMetadata.isOK()) {
-        warning() << "Got invalid sharding metadata " << redact(swShardingMetadata.getStatus())
-                  << " metadata object was '" << redact(metadata) << "'";
-        return;
-    }
-
-    auto shardConn = ConnectionString::parse(hostString.toString());
-
-    // If we got the reply from this host, we expect that its 'hostString' must be valid.
-    if (!shardConn.isOK()) {
-        severe() << "got bad host string in saveGLEStats: " << hostString;
-    }
-    invariant(shardConn.getStatus());
-
-    auto shardingMetadata = std::move(swShardingMetadata.getValue());
-
-    auto& clientInfo = cc();
-    LOG(4) << "saveGLEStats lastOpTime:" << shardingMetadata.getLastOpTime()
-           << " electionId:" << shardingMetadata.getLastElectionId();
-
-    ClusterLastErrorInfo::get(clientInfo)
-        ->addHostOpTime(
-            shardConn.getValue(),
-            HostOpTime(shardingMetadata.getLastOpTime(), shardingMetadata.getLastElectionId()));
-}
+                                                        StringData hostString) {}
 
 repl::OpTime ShardingEgressMetadataHookForMongos::_getConfigServerOpTime() {
     return Grid::get(_serviceContext)->configOpTime();

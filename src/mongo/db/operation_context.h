@@ -277,6 +277,20 @@ public:
     }
 
     /**
+     * Sets a transport Baton on the operation.  This will trigger the Baton on markKilled.
+     */
+    void setBaton(const transport::BatonHandle& baton) {
+        _baton = baton;
+    }
+
+    /**
+     * Retrieves the baton associated with the operation.
+     */
+    const transport::BatonHandle& getBaton() const {
+        return _baton;
+    }
+
+    /**
      * Associates a transaction number with this operation context. May only be called once for the
      * lifetime of the operation and the operation must have a logical session id assigned.
      */
@@ -465,6 +479,9 @@ private:
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
+    // A transport Baton associated with the operation. The presence of this object implies that a
+    // client thread is doing it's own async networking by blocking on it's own thread.
+    transport::BatonHandle _baton;
 
     // If non-null, _waitMutex and _waitCV are the (mutex, condition variable) pair that the
     // operation is currently waiting on inside a call to waitForConditionOrInterrupt...().

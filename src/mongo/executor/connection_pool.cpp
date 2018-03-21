@@ -649,8 +649,7 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status,
     _readyPool.clear();
 
     // Log something helpful
-    log() << "Dropping all pooled connections to " << _hostAndPort
-          << " due to failed operation on a connection";
+    log() << "Dropping all pooled connections to " << _hostAndPort << " due to " << status;
 
     // Migrate processing connections to the dropped pool
     for (auto&& x : _processingPool) {

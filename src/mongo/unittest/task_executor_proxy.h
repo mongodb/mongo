@@ -66,7 +66,9 @@ public:
     virtual StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
     virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
     virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
-        const executor::RemoteCommandRequest& request, const RemoteCommandCallbackFn& cb) override;
+        const executor::RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
+        const transport::BatonHandle& baton = nullptr) override;
     virtual void cancel(const CallbackHandle& cbHandle) override;
     virtual void wait(const CallbackHandle& cbHandle) override;
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;

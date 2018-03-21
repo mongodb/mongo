@@ -88,6 +88,13 @@ public:
 
     static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 
+    BatonHandle makeBaton(OperationContext* opCtx) override {
+        stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
+        // TODO: figure out what to do about managers with more than one transport layer.
+        invariant(_tls.size() == 1);
+        return _tls[0]->makeBaton(opCtx);
+    }
+
 private:
     template <typename Callable>
     void _foreach(Callable&& cb) const;

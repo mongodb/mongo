@@ -38,6 +38,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class OperationContext;
+
 namespace transport {
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
@@ -103,6 +106,10 @@ public:
     enum WhichReactor { kIngress, kEgress, kNewReactor };
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
 
+    virtual BatonHandle makeBaton(OperationContext* opCtx) {
+        return nullptr;
+    }
+
 protected:
     TransportLayer() = default;
 };
@@ -124,15 +131,15 @@ public:
      *
      * If no future is outstanding, then this is a noop.
      */
-    virtual void cancel() = 0;
+    virtual void cancel(const BatonHandle& baton = nullptr) = 0;
 
     /*
      * Returns a future that will be filled with Status::OK after the timeout has ellapsed.
      *
      * Calling this implicitly calls cancel().
      */
-    virtual Future<void> waitFor(Milliseconds timeout) = 0;
-    virtual Future<void> waitUntil(Date_t timeout) = 0;
+    virtual Future<void> waitFor(Milliseconds timeout, const BatonHandle& baton = nullptr) = 0;
+    virtual Future<void> waitUntil(Date_t timeout, const BatonHandle& baton = nullptr) = 0;
 };
 
 class Reactor {

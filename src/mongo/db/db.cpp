@@ -767,8 +767,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
     return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
         stdx::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface(
-            "NetworkInterfaceASIO-Replication", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface("Replication", nullptr, std::move(hookList)));
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SSLManager", "default"))

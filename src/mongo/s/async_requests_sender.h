@@ -171,7 +171,8 @@ private:
         /**
          * Given a read preference, selects a host on which the command should be run.
          */
-        Status resolveShardIdToHostAndPort(const ReadPreferenceSetting& readPref);
+        Status resolveShardIdToHostAndPort(AsyncRequestsSender* ars,
+                                           const ReadPreferenceSetting& readPref);
 
         /**
          * Returns the Shard object associated with this remote.
@@ -203,12 +204,44 @@ private:
     };
 
     /**
-     * Job for _handleResponse. We use a producer consumer queue to coordinate with TaskExecutors
+     * Job for _makeProgress. We use a producer consumer queue to coordinate with TaskExecutors
      * off thread, and this wraps up the arguments for that call.
      */
     struct Job {
         executor::TaskExecutor::RemoteCommandCallbackArgs cbData;
         size_t remoteIndex;
+    };
+
+    /**
+     * We have to make sure to detach the baton if we throw in construction.  We also need a baton
+     * that lives longer than this type (because it can end up in callbacks that won't actually
+     * modify it).
+     *
+     * TODO: work out actual lifetime semantics for a baton.  For now, leaving this as a wort in ARS
+     */
+    class BatonDetacher {
+    public:
+        explicit BatonDetacher(OperationContext* opCtx);
+        ~BatonDetacher();
+
+        transport::Baton& operator*() const {
+            return *_baton;
+        }
+
+        transport::Baton* operator->() const noexcept {
+            return _baton.get();
+        }
+
+        operator transport::BatonHandle() const {
+            return _baton;
+        }
+
+        explicit operator bool() const noexcept {
+            return static_cast<bool>(_baton);
+        }
+
+    private:
+        transport::BatonHandle _baton;
     };
 
     /**
@@ -246,17 +279,19 @@ private:
     Status _scheduleRequest(size_t remoteIndex);
 
     /**
-     * The callback for a remote command.
+     * Waits for forward progress in gathering responses from a remote.
      *
-     * If the job is not set, we've failed targeting and calling this function is a noop.
+     * If the opCtx is non-null, use it while waiting on completion.
      *
      * Stores the response or error in the remote.
      */
-    void _handleResponse(boost::optional<Job> job);
+    void _makeProgress(OperationContext* opCtx);
 
     OperationContext* _opCtx;
 
     executor::TaskExecutor* _executor;
+    BatonDetacher _baton;
+    size_t _batonRequests = 0;
 
     // The metadata obj to pass along with the command remote. Used to indicate that the command is
     // ok to run on secondaries.

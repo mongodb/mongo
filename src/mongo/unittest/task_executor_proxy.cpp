@@ -99,8 +99,10 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWo
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleRemoteCommand(
-    const executor::RemoteCommandRequest& request, const RemoteCommandCallbackFn& cb) {
-    return _executor->scheduleRemoteCommand(request, cb);
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
+    const transport::BatonHandle& baton) {
+    return _executor->scheduleRemoteCommand(request, cb, baton);
 }
 
 void TaskExecutorProxy::cancel(const CallbackHandle& cbHandle) {

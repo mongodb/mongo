@@ -36,6 +36,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
+#include "mongo/transport/baton.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/future.h"
@@ -57,15 +58,16 @@ public:
                                   transport::ReactorHandle reactor);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
-        executor::RemoteCommandRequest request);
-    Future<rpc::UniqueReply> runCommand(OpMsgRequest request);
+        executor::RemoteCommandRequest request, const transport::BatonHandle& baton = nullptr);
+    Future<rpc::UniqueReply> runCommand(OpMsgRequest request,
+                                        const transport::BatonHandle& baton = nullptr);
 
     Future<void> authenticate(const BSONObj& params);
 
     Future<void> initWireVersion(const std::string& appName,
                                  executor::NetworkConnectionHook* const hook);
 
-    void cancel();
+    void cancel(const transport::BatonHandle& baton = nullptr);
 
     bool isStillConnected();
 
@@ -75,7 +77,7 @@ public:
     const HostAndPort& local() const;
 
 private:
-    Future<Message> _call(Message request);
+    Future<Message> _call(Message request, const transport::BatonHandle& baton = nullptr);
     BSONObj _buildIsMasterRequest(const std::string& appName);
     void _parseIsMasterResponse(BSONObj request,
                                 const std::unique_ptr<rpc::ReplyInterface>& response);

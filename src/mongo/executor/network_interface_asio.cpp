@@ -250,7 +250,8 @@ Status attachMetadataIfNeeded(RemoteCommandRequest& request,
 
 Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                           RemoteCommandRequest& request,
-                                          const RemoteCommandCompletionFn& onFinish) {
+                                          const RemoteCommandCompletionFn& onFinish,
+                                          const transport::BatonHandle& baton) {
     MONGO_ASIO_INVARIANT(onFinish, "Invalid completion function");
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
@@ -422,7 +423,8 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
     return Status::OK();
 }
 
-void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) {
+void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                         const transport::BatonHandle& baton) {
     stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
 
     // If we found a matching cbHandle in _inGetConnection, then
@@ -447,7 +449,9 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     }
 }
 
-Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
+Status NetworkInterfaceASIO::setAlarm(Date_t when,
+                                      const stdx::function<void()>& action,
+                                      const transport::BatonHandle& baton) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceASIO shutdown in progress"};
     }
@@ -462,12 +466,12 @@ Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>&
         return exceptionToStatus();
     }
 
-    alarm->async_wait([alarm, this, action, when](std::error_code ec) {
+    alarm->async_wait([alarm, this, action, when, baton](std::error_code ec) {
         const auto nowValue = now();
         if (nowValue < when) {
             warning() << "ASIO alarm returned early. Expected at: " << when
                       << ", fired at: " << nowValue;
-            const auto status = setAlarm(when, action);
+            const auto status = setAlarm(when, action, baton);
             if ((!status.isOK()) && (status.code() != ErrorCodes::ShutdownInProgress)) {
                 fassertFailedWithStatus(40383, status);
             }

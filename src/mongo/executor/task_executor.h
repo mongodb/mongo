@@ -41,6 +41,7 @@
 #include "mongo/platform/hash_namespace.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/transport/baton.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 
@@ -235,8 +236,10 @@ public:
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
-                                                             const RemoteCommandCallbackFn& cb) = 0;
+    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
+        const transport::BatonHandle& baton = nullptr) = 0;
 
     /**
      * If the callback referenced by "cbHandle" hasn't already executed, marks it as

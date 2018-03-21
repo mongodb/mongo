@@ -125,7 +125,10 @@ public:
         return _listenerPort;
     }
 
+    BatonHandle makeBaton(OperationContext* opCtx) override;
+
 private:
+    class BatonASIO;
     class ASIOSession;
     class ASIOReactor;
 

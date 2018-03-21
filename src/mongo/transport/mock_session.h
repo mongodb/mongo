@@ -83,7 +83,7 @@ public:
         return Message();  // Subclasses can do something different.
     }
 
-    Future<Message> asyncSourceMessage() override {
+    Future<Message> asyncSourceMessage(const transport::BatonHandle& handle = nullptr) override {
         return Future<Message>::makeReady(sourceMessage());
     }
 
@@ -99,11 +99,12 @@ public:
         return Status::OK();
     }
 
-    Future<void> asyncSinkMessage(Message message) override {
+    Future<void> asyncSinkMessage(Message message,
+                                  const transport::BatonHandle& handle = nullptr) override {
         return Future<void>::makeReady(sinkMessage(message));
     }
 
-    void cancelAsyncOperations() override {}
+    void cancelAsyncOperations(const transport::BatonHandle& handle = nullptr) override {}
 
     void setTimeout(boost::optional<Milliseconds>) override {}
 

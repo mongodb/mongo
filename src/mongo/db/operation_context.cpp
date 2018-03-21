@@ -37,6 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/baton.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point_service.h"
@@ -355,6 +356,11 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     if (lkWaitMutex && _numKillers == 0) {
         invariant(_waitCV);
         _waitCV->notify_all();
+    }
+
+    // If we have a baton, we need to wake it up.  The baton itself will check for interruption
+    if (_baton) {
+        _baton->schedule([] {});
     }
 }
 

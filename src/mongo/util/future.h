@@ -537,6 +537,11 @@ public:
         setImpl([&] { sharedState->setError(std::move(status)); });
     }
 
+    // TODO rename to not XXXWith and handle void
+    void setFromStatusWith(StatusWith<T> sw) noexcept {
+        setImpl([&] { sharedState->setFromStatusWith(std::move(sw)); });
+    }
+
     /**
      * Get a copyable SharedPromise that can be used to complete this Promise's Future.
      *
@@ -1008,6 +1013,15 @@ public:
                        [](Func && func, const Status& status) noexcept { call(func, status); });
     }
 
+    /**
+     * Ignores the return value of a future, transforming it down into a Future<void>.
+     *
+     * This only ignores values, not errors.  Those remain propogated until an onError handler.
+     *
+     * Equivalent to then([](auto&&){});
+     */
+    Future<void> ignoreValue() && noexcept;
+
 private:
     template <typename T2>
     friend class Future;
@@ -1203,6 +1217,10 @@ public:
         return std::move(inner).tapAll(std::forward<Func>(func));
     }
 
+    Future<void> ignoreValue() && noexcept {
+        return std::move(*this);
+    }
+
 private:
     template <typename T>
     friend class Future;
@@ -1224,6 +1242,11 @@ private:
 
     Future<FakeVoid> inner;
 };
+
+template <typename T>
+    Future<void> Future<T>::ignoreValue() && noexcept {
+    return std::move(*this).then([](auto&&) {});
+}
 
 /**
  * Makes a ready Future with the return value of a nullary function. This has the same semantics as

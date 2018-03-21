@@ -36,6 +36,7 @@
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/baton.h"
 
 namespace mongo {
 
@@ -58,7 +59,7 @@ public:
      * for network operations.
      */
     ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
-                           std::unique_ptr<NetworkInterface> net);
+                           std::shared_ptr<NetworkInterface> net);
 
     /**
      * Destroys a ThreadPoolTaskExecutor.
@@ -79,8 +80,10 @@ public:
     void waitForEvent(const EventHandle& event) override;
     StatusWith<CallbackHandle> scheduleWork(const CallbackFn& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
-                                                     const RemoteCommandCallbackFn& cb) override;
+    StatusWith<CallbackHandle> scheduleRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
+        const transport::BatonHandle& baton = nullptr) override;
     void cancel(const CallbackHandle& cbHandle) override;
     void wait(const CallbackHandle& cbHandle) override;
 
@@ -128,7 +131,9 @@ private:
      * executing "work" no sooner than "when" (defaults to ASAP). This function may and should be
      * called outside of _mutex.
      */
-    static WorkQueue makeSingletonWorkQueue(CallbackFn work, Date_t when = {});
+    static WorkQueue makeSingletonWorkQueue(CallbackFn work,
+                                            const transport::BatonHandle& baton,
+                                            Date_t when = {});
 
     /**
      * Moves the single callback in "wq" to the end of "queue". It is required that "wq" was
@@ -174,7 +179,7 @@ private:
     stdx::unique_lock<stdx::mutex> _join(stdx::unique_lock<stdx::mutex> lk);
 
     // The network interface used for remote command execution and waiting.
-    std::unique_ptr<NetworkInterface> _net;
+    std::shared_ptr<NetworkInterface> _net;
 
     // The thread pool that executes scheduled work items.
     std::unique_ptr<ThreadPoolInterface> _pool;

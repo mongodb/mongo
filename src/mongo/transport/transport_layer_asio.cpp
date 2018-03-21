@@ -56,6 +56,9 @@
 #endif
 
 // session_asio.h has some header dependencies that require it to be the last header.
+#ifdef __linux__
+#include "mongo/transport/baton_asio_linux.h"
+#endif
 #include "mongo/transport/session_asio.h"
 
 namespace mongo {
@@ -72,7 +75,7 @@ public:
         cancel();
     }
 
-    void cancel() override {
+    void cancel(const BatonHandle& baton = nullptr) override {
         auto promise = [&] {
             stdx::lock_guard<stdx::mutex> lk(_timerState->mutex);
             _timerState->generation++;
@@ -86,18 +89,40 @@ public:
                 promise.setError({ErrorCodes::CallbackCanceled, "Timer was canceled"});
             });
         }
-        _timerState->timer.cancel();
+
+        if (!(baton && baton->cancelTimer(*this))) {
+            _timerState->timer.cancel();
+        }
     }
 
-    Future<void> waitFor(Milliseconds timeout) override {
-        return _asyncWait([&] { _timerState->timer.expires_after(timeout.toSystemDuration()); });
+    Future<void> waitFor(Milliseconds timeout, const BatonHandle& baton = nullptr) override {
+        if (baton) {
+            return _asyncWait([&] { return baton->waitFor(*this, timeout); }, baton);
+        } else {
+            return _asyncWait(
+                [&] { _timerState->timer.expires_after(timeout.toSystemDuration()); });
+        }
     }
 
-    Future<void> waitUntil(Date_t expiration) override {
-        return _asyncWait([&] { _timerState->timer.expires_at(expiration.toSystemTimePoint()); });
+    Future<void> waitUntil(Date_t expiration, const BatonHandle& baton = nullptr) override {
+        if (baton) {
+            return _asyncWait([&] { return baton->waitUntil(*this, expiration); }, baton);
+        } else {
+            return _asyncWait(
+                [&] { _timerState->timer.expires_at(expiration.toSystemTimePoint()); });
+        }
     }
 
 private:
+    std::pair<Future<void>, uint64_t> _getFuture() {
+        stdx::lock_guard<stdx::mutex> lk(_timerState->mutex);
+        auto id = ++_timerState->generation;
+        invariant(!_timerState->finalPromise);
+        _timerState->finalPromise = std::make_unique<Promise<void>>();
+        auto future = _timerState->finalPromise->getFuture();
+        return std::make_pair(std::move(future), id);
+    }
+
     template <typename ArmTimerCb>
     Future<void> _asyncWait(ArmTimerCb&& armTimer) {
         try {
@@ -105,14 +130,7 @@ private:
 
             Future<void> ret;
             uint64_t id;
-            std::tie(ret, id) = [&] {
-                stdx::lock_guard<stdx::mutex> lk(_timerState->mutex);
-                auto id = ++_timerState->generation;
-                invariant(!_timerState->finalPromise);
-                _timerState->finalPromise = std::make_unique<Promise<void>>();
-                auto future = _timerState->finalPromise->getFuture();
-                return std::make_pair(std::move(future), id);
-            }();
+            std::tie(ret, id) = _getFuture();
 
             armTimer();
             _timerState->timer.async_wait(
@@ -135,6 +153,32 @@ private:
         } catch (asio::system_error& ex) {
             return Future<void>::makeReady(errorCodeToStatus(ex.code()));
         }
+    }
+
+    template <typename ArmTimerCb>
+    Future<void> _asyncWait(ArmTimerCb&& armTimer, const BatonHandle& baton) {
+        cancel(baton);
+
+        Future<void> ret;
+        uint64_t id;
+        std::tie(ret, id) = _getFuture();
+
+        armTimer().getAsync([ id, state = _timerState ](Status status) mutable {
+            stdx::unique_lock<stdx::mutex> lk(state->mutex);
+            if (id != state->generation) {
+                return;
+            }
+            auto promise = std::move(state->finalPromise);
+            lk.unlock();
+
+            if (status.isOK()) {
+                promise->emplaceValue();
+            } else {
+                promise->setError(status);
+            }
+        });
+
+        return ret;
     }
 
     // The timer itself and its state are stored in this struct managed by a shared_ptr so we can
@@ -728,6 +772,22 @@ SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
     return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
 }
 #endif
+
+BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) {
+#ifdef __linux__
+    auto baton = std::make_shared<BatonASIO>(opCtx);
+
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        invariant(!opCtx->getBaton());
+        opCtx->setBaton(baton);
+    }
+
+    return std::move(baton);
+#else
+    return nullptr;
+#endif
+}
 
 }  // namespace transport
 }  // namespace mongo

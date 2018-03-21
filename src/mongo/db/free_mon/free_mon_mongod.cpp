@@ -245,8 +245,7 @@ auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
         Client::initThread(threadName.c_str());
     };
     return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        std::make_unique<ThreadPool>(tpOptions),
-        executor::makeNetworkInterface("NetworkInterfaceASIO-FreeMon"));
+        std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMon"));
 }
 
 void registerCollectors(FreeMonController* controller) {

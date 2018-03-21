@@ -34,6 +34,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/transport/baton.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -128,13 +130,33 @@ public:
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
-                                const RemoteCommandCompletionFn& onFinish) = 0;
+                                const RemoteCommandCompletionFn& onFinish,
+                                const transport::BatonHandle& baton = nullptr) = 0;
+
+    Future<TaskExecutor::ResponseStatus> startCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest& request,
+        const transport::BatonHandle& baton = nullptr) {
+        Promise<TaskExecutor::ResponseStatus> promise;
+        auto future = promise.getFuture();
+
+        auto status =
+            startCommand(cbHandle,
+                         request,
+                         [sp = promise.share()](const TaskExecutor::ResponseStatus& rs) mutable {
+                             sp.emplaceValue(rs);
+                         },
+                         baton);
+
+        return future;
+    }
 
     /**
      * Requests cancelation of the network activity associated with "cbHandle" if it has not yet
      * completed.
      */
-    virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) = 0;
+    virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                               const transport::BatonHandle& baton = nullptr) = 0;
 
     /**
      * Sets an alarm, which schedules "action" to run no sooner than "when".
@@ -150,7 +172,9 @@ public:
      * Any callbacks invoked from setAlarm must observe onNetworkThread to
      * return true. See that method for why.
      */
-    virtual Status setAlarm(Date_t when, const stdx::function<void()>& action) = 0;
+    virtual Status setAlarm(Date_t when,
+                            const stdx::function<void()>& action,
+                            const transport::BatonHandle& baton = nullptr) = 0;
 
     /**
      * Returns true if called from a thread dedicated to networking. I.e. not a

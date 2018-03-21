@@ -168,7 +168,7 @@ auto makeTaskExecutor(ServiceContext* service, const std::string& poolName) {
     hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
     return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
         makeThreadPool(poolName),
-        executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
+        executor::makeNetworkInterface("RS", nullptr, std::move(hookList)));
 }
 
 /**

@@ -108,7 +108,8 @@ public:
     virtual std::string getHostName();
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequest& request,
-                                const RemoteCommandCompletionFn& onFinish);
+                                const RemoteCommandCompletionFn& onFinish,
+                                const transport::BatonHandle& baton = nullptr);
 
     /**
      * If the network operation is in the _unscheduled or _processing queues, moves the operation
@@ -116,12 +117,15 @@ public:
      * the _scheduled queue, does nothing. The latter simulates the case where cancelCommand() is
      * called after the task has already completed, but its callback has not yet been run.
      */
-    virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle);
+    virtual void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                               const transport::BatonHandle& baton = nullptr);
 
     /**
      * Not implemented.
      */
-    virtual Status setAlarm(Date_t when, const stdx::function<void()>& action);
+    virtual Status setAlarm(Date_t when,
+                            const stdx::function<void()>& action,
+                            const transport::BatonHandle& baton = nullptr);
 
     virtual bool onNetworkThread();
 

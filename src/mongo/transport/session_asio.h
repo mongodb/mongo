@@ -34,6 +34,7 @@
 #include "mongo/config.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/transport/asio_utils.h"
+#include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/net/sock.h"
 #ifdef MONGO_CONFIG_SSL
@@ -56,6 +57,14 @@ auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
         return Result::makeReady(errorCodeToStatus(ec));
     }
     return Result::makeReady(successValue);
+}
+
+Future<void> futurize(const std::error_code& ec) {
+    using Result = Future<void>;
+    if (MONGO_unlikely(ec)) {
+        return Result::makeReady(errorCodeToStatus(ec));
+    }
+    return Result::makeReady();
 }
 
 using GenericSocket = asio::generic::stream_protocol::socket;
@@ -117,34 +126,35 @@ public:
         return sourceMessageImpl().getNoThrow();
     }
 
-    Future<Message> asyncSourceMessage() override {
+    Future<Message> asyncSourceMessage(const transport::BatonHandle& baton = nullptr) override {
         ensureAsync();
-        return sourceMessageImpl();
+        return sourceMessageImpl(baton);
     }
 
     Status sinkMessage(Message message) override {
         ensureSync();
 
         return write(asio::buffer(message.buf(), message.size()))
-            .then([&message](size_t size) {
-                invariant(size == size_t(message.size()));
-                networkCounter.hitPhysicalOut(message.size());
-            })
+            .then([&message] { networkCounter.hitPhysicalOut(message.size()); })
             .getNoThrow();
     }
 
-    Future<void> asyncSinkMessage(Message message) override {
+    Future<void> asyncSinkMessage(Message message,
+                                  const transport::BatonHandle& baton = nullptr) override {
         ensureAsync();
-        return write(asio::buffer(message.buf(), message.size()))
-            .then([message /*keep the buffer alive*/](size_t size) {
-                invariant(size == size_t(message.size()));
+        return write(asio::buffer(message.buf(), message.size()), baton)
+            .then([message /*keep the buffer alive*/]() {
                 networkCounter.hitPhysicalOut(message.size());
             });
     }
 
-    void cancelAsyncOperations() override {
+    void cancelAsyncOperations(const transport::BatonHandle& baton = nullptr) override {
         LOG(3) << "Cancelling outstanding I/O operations on connection to " << _remote;
-        getSocket().cancel();
+        if (baton) {
+            baton->cancelSession(*this);
+        } else {
+            getSocket().cancel();
+        }
     }
 
     void setTimeout(boost::optional<Milliseconds> timeout) override {
@@ -186,6 +196,7 @@ public:
 
 protected:
     friend class TransportLayerASIO;
+    friend TransportLayerASIO::BatonASIO;
 
 #ifdef MONGO_CONFIG_SSL
     Future<void> handshakeSSLForEgress(const HostAndPort& target) {
@@ -307,18 +318,16 @@ private:
         return _socket;
     }
 
-    Future<Message> sourceMessageImpl() {
+    Future<Message> sourceMessageImpl(const transport::BatonHandle& baton = nullptr) {
         static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
 
         auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
         auto ptr = headerBuffer.get();
-        return read(asio::buffer(ptr, kHeaderSize))
-            .then([ headerBuffer = std::move(headerBuffer), this ](size_t size) mutable {
-                if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), size))) {
-                    return sendHTTPResponse();
+        return read(asio::buffer(ptr, kHeaderSize), baton)
+            .then([ headerBuffer = std::move(headerBuffer), this, baton ]() mutable {
+                if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), kHeaderSize))) {
+                    return sendHTTPResponse(baton);
                 }
-
-                invariant(size == kHeaderSize);
 
                 const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
                 if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
@@ -331,7 +340,7 @@ private:
                     return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
                 }
 
-                if (msgLen == size) {
+                if (msgLen == kHeaderSize) {
                     // This probably isn't a real case since all (current) messages have bodies.
                     networkCounter.hitPhysicalIn(msgLen);
                     return Future<Message>::makeReady(Message(std::move(headerBuffer)));
@@ -341,8 +350,8 @@ private:
                 memcpy(buffer.get(), headerBuffer.get(), kHeaderSize);
 
                 MsgData::View msgView(buffer.get());
-                return read(asio::buffer(msgView.data(), msgView.dataLen()))
-                    .then([ buffer = std::move(buffer), msgLen ](size_t size) mutable {
+                return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
+                    .then([ buffer = std::move(buffer), msgLen ]() mutable {
                         networkCounter.hitPhysicalIn(msgLen);
                         return Message(std::move(buffer));
                     });
@@ -350,55 +359,59 @@ private:
     }
 
     template <typename MutableBufferSequence>
-    Future<size_t> read(const MutableBufferSequence& buffers) {
+    Future<void> read(const MutableBufferSequence& buffers,
+                      const transport::BatonHandle& baton = nullptr) {
 #ifdef MONGO_CONFIG_SSL
         if (_sslSocket) {
-            return opportunisticRead(*_sslSocket, buffers);
+            return opportunisticRead(*_sslSocket, buffers, baton);
         } else if (!_ranHandshake) {
             invariant(asio::buffer_size(buffers) >= sizeof(MSGHEADER::Value));
 
-            return opportunisticRead(_socket, buffers)
-                .then([this, buffers](size_t size) mutable {
+            return opportunisticRead(_socket, buffers, baton)
+                .then([this, buffers]() mutable {
                     _ranHandshake = true;
                     return maybeHandshakeSSLForIngress(buffers);
                 })
-                .then([this, buffers](bool needsRead) mutable {
+                .then([this, buffers, baton](bool needsRead) mutable {
                     if (needsRead) {
-                        return read(buffers);
+                        return read(buffers, baton);
                     } else {
-                        return Future<size_t>::makeReady(asio::buffer_size(buffers));
+                        return Future<void>::makeReady();
                     }
                 });
         }
 #endif
-        return opportunisticRead(_socket, buffers);
+        return opportunisticRead(_socket, buffers, baton);
     }
 
     template <typename ConstBufferSequence>
-    Future<size_t> write(const ConstBufferSequence& buffers) {
+    Future<void> write(const ConstBufferSequence& buffers,
+                       const transport::BatonHandle& baton = nullptr) {
 #ifdef MONGO_CONFIG_SSL
         _ranHandshake = true;
         if (_sslSocket) {
 #ifdef __linux__
             // We do some trickery in asio (see moreToSend), which appears to work well on linux,
             // but fails on other platforms.
-            return opportunisticWrite(*_sslSocket, buffers);
+            return opportunisticWrite(*_sslSocket, buffers, baton);
 #else
             if (_blockingMode == Async) {
                 // Opportunistic writes are broken for async egress SSL (switching between blocking
                 // and non-blocking mode corrupts the TLS exchange).
-                return asio::async_write(*_sslSocket, buffers, UseFuture{});
+                return asio::async_write(*_sslSocket, buffers, UseFuture{}).ignoreValue();
             } else {
-                return opportunisticWrite(*_sslSocket, buffers);
+                return opportunisticWrite(*_sslSocket, buffers, baton);
             }
 #endif
         }
 #endif
-        return opportunisticWrite(_socket, buffers);
+        return opportunisticWrite(_socket, buffers, baton);
     }
 
     template <typename Stream, typename MutableBufferSequence>
-    Future<size_t> opportunisticRead(Stream& stream, const MutableBufferSequence& buffers) {
+    Future<void> opportunisticRead(Stream& stream,
+                                   const MutableBufferSequence& buffers,
+                                   const transport::BatonHandle& baton = nullptr) {
         std::error_code ec;
         auto size = asio::read(stream, buffers, ec);
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
@@ -410,13 +423,17 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            return asio::async_read(stream, asyncBuffers, UseFuture{})
-                .then([size](size_t asyncSize) {
-                    // Add back in the size read opportunistically.
-                    return size + asyncSize;
-                });
+
+            if (baton) {
+                return baton->addSession(*this, Baton::Type::In)
+                    .then([&stream, asyncBuffers, baton, this] {
+                        return opportunisticRead(stream, asyncBuffers, baton);
+                    });
+            }
+
+            return asio::async_read(stream, asyncBuffers, UseFuture{}).ignoreValue();
         } else {
-            return futurize(ec, size);
+            return futurize(ec);
         }
     }
 
@@ -430,24 +447,21 @@ private:
      * needs to keep sending).
      */
     template <typename ConstBufferSequence>
-    boost::optional<Future<size_t>> moreToSend(GenericSocket& socket,
-                                               const ConstBufferSequence& buffers,
-                                               size_t size) {
+    boost::optional<Future<void>> moreToSend(GenericSocket& socket,
+                                             const ConstBufferSequence& buffers,
+                                             const transport::BatonHandle& baton) {
         return boost::none;
     }
 
 #ifdef MONGO_CONFIG_SSL
     template <typename ConstBufferSequence>
-    boost::optional<Future<size_t>> moreToSend(asio::ssl::stream<GenericSocket>& socket,
-                                               const ConstBufferSequence& buffers,
-                                               size_t sizeFromBefore) {
+    boost::optional<Future<void>> moreToSend(asio::ssl::stream<GenericSocket>& socket,
+                                             const ConstBufferSequence& buffers,
+                                             const BatonHandle& baton) {
         if (_sslSocket->getCoreOutputBuffer().size()) {
-            return opportunisticWrite(getSocket(), _sslSocket->getCoreOutputBuffer())
-                .then([this, &socket, buffers, sizeFromBefore](size_t) {
-                    return opportunisticWrite(socket, buffers)
-                        .then([sizeFromBefore](size_t justWritten) {
-                            return justWritten + sizeFromBefore;
-                        });
+            return opportunisticWrite(getSocket(), _sslSocket->getCoreOutputBuffer(), baton)
+                .then([this, &socket, buffers, baton] {
+                    return opportunisticWrite(socket, buffers, baton);
                 });
         }
 
@@ -456,7 +470,9 @@ private:
 #endif
 
     template <typename Stream, typename ConstBufferSequence>
-    Future<size_t> opportunisticWrite(Stream& stream, const ConstBufferSequence& buffers) {
+    Future<void> opportunisticWrite(Stream& stream,
+                                    const ConstBufferSequence& buffers,
+                                    const transport::BatonHandle& baton = nullptr) {
         std::error_code ec;
         auto size = asio::write(stream, buffers, ec);
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
@@ -470,17 +486,20 @@ private:
                 asyncBuffers += size;
             }
 
-            if (auto more = moreToSend(stream, asyncBuffers, size)) {
+            if (auto more = moreToSend(stream, asyncBuffers, baton)) {
                 return std::move(*more);
             }
 
-            return asio::async_write(stream, asyncBuffers, UseFuture{})
-                .then([size](size_t asyncSize) {
-                    // Add back in the size written opportunistically.
-                    return size + asyncSize;
-                });
+            if (baton) {
+                return baton->addSession(*this, Baton::Type::Out)
+                    .then([&stream, asyncBuffers, baton, this] {
+                        return opportunisticWrite(stream, asyncBuffers, baton);
+                    });
+            }
+
+            return asio::async_write(stream, asyncBuffers, UseFuture{}).ignoreValue();
         } else {
-            return futurize(ec, size);
+            return futurize(ec);
         }
     }
 
@@ -568,7 +587,7 @@ private:
     // Called from read() to send an HTTP response back to a client that's trying to use HTTP
     // over a native MongoDB port. This returns a Future<Message> to match its only caller, but it
     // always contains an error, so it could really return Future<Anything>
-    Future<Message> sendHTTPResponse() {
+    Future<Message> sendHTTPResponse(const BatonHandle& baton = nullptr) {
         constexpr auto userMsg =
             "It looks like you are trying to access MongoDB over HTTP"
             " on the native driver port.\r\n"_sd;
@@ -580,17 +599,17 @@ private:
                                                           << userMsg.size() << "\r\n\r\n"
                                                           << userMsg;
 
-        return write(asio::buffer(httpResp.data(), httpResp.size()))
+        return write(asio::buffer(httpResp.data(), httpResp.size()), baton)
             .onError(
                 [](const Status& status) {
-                    return StatusWith<size_t>(
+                    return Status(
                         ErrorCodes::ProtocolError,
                         str::stream()
                             << "Client sent an HTTP request over a native MongoDB connection, "
                                "but there was an error sending a response: "
                             << status.toString());
                 })
-            .then([](size_t size) {
+            .then([] {
                 return StatusWith<Message>(
                     ErrorCodes::ProtocolError,
                     "Client sent an HTTP request over a native MongoDB connection");

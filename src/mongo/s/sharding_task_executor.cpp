@@ -111,11 +111,13 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWorkAt(
 }
 
 StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommand(
-    const RemoteCommandRequest& request, const RemoteCommandCallbackFn& cb) {
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
+    const transport::BatonHandle& baton) {
 
     // schedule the user's callback if there is not opCtx
     if (!request.opCtx) {
-        return _executor->scheduleRemoteCommand(request, cb);
+        return _executor->scheduleRemoteCommand(request, cb, baton);
     }
 
     boost::optional<RemoteCommandRequest> newRequest;
@@ -201,7 +203,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         }
     };
 
-    return _executor->scheduleRemoteCommand(newRequest ? *newRequest : request, shardingCb);
+    return _executor->scheduleRemoteCommand(newRequest ? *newRequest : request, shardingCb, baton);
 }
 
 void ShardingTaskExecutor::cancel(const CallbackHandle& cbHandle) {
