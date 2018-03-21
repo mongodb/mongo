@@ -421,6 +421,20 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .hidden()
         .setSources(moe::SourceAllLegacy);
 
+    options
+        ->addOptionChaining("operationProfiling.slowOpThresholdMs",
+                            "slowms",
+                            moe::Int,
+                            "value of slow for profile and console log")
+        .setDefault(moe::Value(100));
+
+    options
+        ->addOptionChaining("operationProfiling.slowOpSampleRate",
+                            "slowOpSampleRate",
+                            moe::Double,
+                            "fraction of slow ops to include in the profile and console log")
+        .setDefault(moe::Value(1.0));
+
     auto ret = addMessageCompressionOptions(options, false);
     if (!ret.isOK()) {
         return ret;
@@ -1086,6 +1100,15 @@ Status storeServerOptions(const moe::Environment& params) {
         return Status(ErrorCodes::BadValue,
                       "--transitionToAuth must be used with keyFile or x509 authentication");
     }
+
+    if (params.count("operationProfiling.slowOpThresholdMs")) {
+        serverGlobalParams.slowMS = params["operationProfiling.slowOpThresholdMs"].as<int>();
+    }
+
+    if (params.count("operationProfiling.slowOpSampleRate")) {
+        serverGlobalParams.sampleRate = params["operationProfiling.slowOpSampleRate"].as<double>();
+    }
+
 #ifdef MONGO_CONFIG_SSL
     ret = storeSSLServerOptions(params);
     if (!ret.isOK()) {
