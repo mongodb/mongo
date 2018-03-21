@@ -149,6 +149,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual boost::optional<LockerInfo> getLockerInfo() const {
+        return boost::none;
+    }
+
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut) {
         MONGO_UNREACHABLE;
     }

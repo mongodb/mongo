@@ -360,57 +360,53 @@
         });
 
         //
-        // Confirm currentOp content for getMore. This case tests command and legacy getMore with an
-        // originating find command.
+        // Confirm currentOp content for getMore. This case tests command and legacy getMore with
+        // originating find and aggregate commands.
         //
         dropAndRecreateTestCollection();
         for (let i = 0; i < 10; ++i) {
             assert.writeOK(coll.insert({a: i}));
         }
 
-        var cmdRes = testDB.runCommand(
-            {find: "currentop_query", filter: {$comment: "currentop_query"}, batchSize: 0});
-        assert.commandWorked(cmdRes);
-
-        TestData.commandResult = cmdRes;
-
-        // If this is a non-localOps test running via mongoS, then the cursorID we obtained above is
-        // the ID of the mongoS cursor, and will not match the IDs of any of the individual shard
-        // cursors in the currentOp output. We therefore don't perform an exact match on
-        // 'command.getMore', but simply verify that the cursor ID is non-zero.
-        var filter = {
-            "command.getMore": (isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id),
-            "originatingCommand.filter.$comment": "currentop_query"
+        const originatingCommands = {
+            find: {find: "currentop_query", filter: {}, comment: "currentop_query", batchSize: 0},
+            aggregate: {
+                aggregate: "currentop_query",
+                pipeline: [{$match: {}}],
+                comment: "currentop_query",
+                cursor: {batchSize: 0}
+            }
         };
 
-        confirmCurrentOpContents({
-            test: function(db) {
-                var cursor = new DBCommandCursor(db, TestData.commandResult, 5);
-                assert.eq(cursor.itcount(), 10);
-            },
-            planSummary: "COLLSCAN",
-            currentOpFilter: filter
-        });
+        for (let cmdName in originatingCommands) {
+            const cmdObj = originatingCommands[cmdName];
+            const cmdRes = testDB.runCommand(cmdObj);
+            assert.commandWorked(cmdRes);
 
-        delete TestData.commandResult;
+            TestData.commandResult = cmdRes;
 
-        //
-        // Confirm that a legacy query whose filter contains a field named 'query' appears as
-        // expected in currentOp. This test ensures that upconverting a legacy query correctly
-        // identifies this as a user field rather than a wrapped filter spec.
-        //
-        if (readMode === "legacy") {
+            // If this is a non-localOps test running via mongoS, then the cursorID we obtained
+            // above is the ID of the mongoS cursor, and will not match the IDs of any of the
+            // individual shard cursors in the currentOp output. We therefore don't perform an exact
+            // match on 'command.getMore', but simply verify that the cursor ID is non-zero.
+            const filter = {
+                "command.getMore":
+                    (isRemoteShardCurOp ? {$gt: 0} : TestData.commandResult.cursor.id),
+                [`originatingCommand.${cmdName}`]:
+                    {$exists: true}, "originatingCommand.comment": "currentop_query"
+            };
+
             confirmCurrentOpContents({
                 test: function(db) {
-                    assert.eq(db.currentop_query.find({query: "foo", $comment: "currentop_query"})
-                                  .itcount(),
-                              0);
+                    const cursor = new DBCommandCursor(db, TestData.commandResult, 5);
+                    assert.eq(cursor.itcount(), 10);
                 },
-                command: "find",
+                command: "getMore",
                 planSummary: "COLLSCAN",
-                currentOpFilter:
-                    {"command.filter.$comment": "currentop_query", "command.filter.query": "foo"}
+                currentOpFilter: filter
             });
+
+            delete TestData.commandResult;
         }
 
         //
@@ -456,6 +452,25 @@
                 operation: "getmore",
                 planSummary: "COLLSCAN",
                 currentOpFilter: filter
+            });
+        }
+
+        //
+        // Confirm that a legacy query whose filter contains a field named 'query' appears as
+        // expected in currentOp. This test ensures that upconverting a legacy query correctly
+        // identifies this as a user field rather than a wrapped filter spec.
+        //
+        if (readMode === "legacy") {
+            confirmCurrentOpContents({
+                test: function(db) {
+                    assert.eq(db.currentop_query.find({query: "foo", $comment: "currentop_query"})
+                                  .itcount(),
+                              0);
+                },
+                command: "find",
+                planSummary: "COLLSCAN",
+                currentOpFilter:
+                    {"command.filter.$comment": "currentop_query", "command.filter.query": "foo"}
             });
         }
 
@@ -510,7 +525,7 @@
 
         // Verify that an originatingCommand truncated by currentOp appears as { $truncated:
         // <string>, comment: <string> }.
-        cmdRes = testDB.runCommand({
+        const cmdRes = testDB.runCommand({
             find: "currentop_query",
             filter: TestData.queryFilter,
             comment: "currentop_query",

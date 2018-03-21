@@ -1107,8 +1107,8 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
 
     OpDebug& debug = currentOp.debug();
 
-    long long logThresholdMs = serverGlobalParams.slowMS;
-    bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
+    boost::optional<long long> slowMsOverride;
+    bool forceLog = false;
 
     DbResponse dbresponse;
     if (op == dbMsg || op == dbCommand || (op == dbQuery && isCommand)) {
@@ -1117,18 +1117,18 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
         invariant(!isCommand);
         dbresponse = receivedQuery(opCtx, nsString, c, m);
     } else if (op == dbGetMore) {
-        dbresponse = receivedGetMore(opCtx, m, currentOp, &shouldLogOpDebug);
+        dbresponse = receivedGetMore(opCtx, m, currentOp, &forceLog);
     } else {
         // The remaining operations do not return any response. They are fire-and-forget.
         try {
             if (op == dbKillCursors) {
                 currentOp.ensureStarted();
-                logThresholdMs = 10;
+                slowMsOverride = 10;
                 receivedKillCursors(opCtx, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
                 log() << "    operation isn't supported: " << static_cast<int>(op);
                 currentOp.done();
-                shouldLogOpDebug = true;
+                forceLog = true;
             } else {
                 if (!opCtx->getClient()->isInDirectClient()) {
                     uassert(18663,
@@ -1159,25 +1159,20 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
             debug.errInfo = ue.toStatus();
         }
     }
-    currentOp.ensureStarted();
-    currentOp.done();
-    debug.executionTimeMicros = durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses());
+
+    // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
+    // this op should be sampled for profiling.
+    const bool shouldSample = currentOp.completeAndLogOperation(opCtx,
+                                                                logger::LogComponent::kCommand,
+                                                                dbresponse.response.size(),
+                                                                slowMsOverride,
+                                                                forceLog);
 
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(
             opCtx,
             durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses()),
             currentOp.getReadWriteType());
-
-    const bool shouldSample = serverGlobalParams.sampleRate == 1.0
-        ? true
-        : c.getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
-
-    if (shouldLogOpDebug || (shouldSample && debug.executionTimeMicros > logThresholdMs * 1000LL)) {
-        Locker::LockerInfo lockerInfo;
-        opCtx->lockState()->getLockerInfo(&lockerInfo);
-        log() << debug.report(&c, currentOp, lockerInfo.stats);
-    }
 
     if (currentOp.shouldDBProfile(shouldSample)) {
         // Performance profiling is on

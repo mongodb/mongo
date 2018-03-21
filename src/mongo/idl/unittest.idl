@@ -68,22 +68,6 @@ types:
 
 ##################################################################################################
 #
-# Test types that accept multiple serialization types
-#
-##################################################################################################
-
-    safeInt32:
-        description: Accepts any numerical type within int32 range
-        cpp_type: std::int64_t
-        bson_serialization_type: 
-                                - long
-                                - int
-                                - decimal
-                                - double
-        deserializer: "mongo::BSONElement::numberInt"
-
-##################################################################################################
-#
 # Test types used in parser chaining testing
 #
 ##################################################################################################
@@ -614,5 +598,19 @@ commands:
         namespace: type
         type: string
         cpp_name: WellNamedCommand
+        fields:
+            field1: int
+
+    int_type_command:
+        description: Command with custom type int
+        namespace: type
+        type: int
+        fields:
+            field1: int
+
+    int_array_type_command:
+        description: Command with custom type for array of int
+        namespace: type
+        type: array<int>
         fields:
             field1: int

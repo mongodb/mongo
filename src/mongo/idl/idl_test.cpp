@@ -990,7 +990,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                             );
     auto testStruct = Complex_array_fields::parse(ctxt, testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int64_t>&>();
+    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int32_t>&>();
     assert_same_types<decltype(testStruct.getField2()),
                       const std::vector<mongo::NamespaceString>&>();
     assert_same_types<decltype(testStruct.getField3()), const std::vector<mongo::AnyBasicType>&>();
@@ -1001,7 +1001,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                       const std::vector<mongo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
-                      const boost::optional<std::vector<std::int64_t>>&>();
+                      const boost::optional<std::vector<std::int32_t>>&>();
     assert_same_types<decltype(testStruct.getField2o()),
                       const boost::optional<std::vector<mongo::NamespaceString>>&>();
     assert_same_types<decltype(testStruct.getField3o()),
@@ -1013,7 +1013,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField6o()),
                       const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
 
-    std::vector<std::int64_t> field1{1, 2, 3};
+    std::vector<std::int32_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
     std::vector<NamespaceString> field2{{"a", "b"}, {"c", "d"}};
     ASSERT_TRUE(field2 == testStruct.getField2());

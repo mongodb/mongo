@@ -287,6 +287,12 @@ public:
     virtual void getLockerInfo(LockerInfo* lockerInfo) const = 0;
 
     /**
+     * Returns boost::none if this is an instance of LockerNoop, or a populated LockerInfo
+     * otherwise.
+     */
+    virtual boost::optional<LockerInfo> getLockerInfo() const = 0;
+
+    /**
      * LockSnapshot captures the state of all resources that are locked, what modes they're
      * locked in, and how many times they've been locked in that mode.
      */

@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -287,10 +288,14 @@ void CurOp::setGenericOpRequestDetails(OperationContext* opCtx,
                                        const Command* command,
                                        BSONObj cmdObj,
                                        NetworkOp op) {
+    // Set the _isCommand flags based on network op only. For legacy writes on mongoS, we resolve
+    // them to OpMsgRequests and then pass them into the Commands path, so having a valid Command*
+    // here does not guarantee that the op was issued from the client using a command protocol.
+    const bool isCommand = (op == dbMsg || op == dbCommand || (op == dbQuery && nss.isCommand()));
     auto logicalOp = (command ? command->getLogicalOp() : networkOpToLogicalOp(op));
 
     stdx::lock_guard<Client> clientLock(*opCtx->getClient());
-    _isCommand = _debug.iscommand = (command != nullptr);
+    _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
     _opDescription = cmdObj;
@@ -336,6 +341,38 @@ void CurOp::enter_inlock(const char* ns, boost::optional<int> dbProfileLevel) {
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
     _dbprofile = std::max(dbProfileLevel, _dbprofile);
+}
+
+bool CurOp::completeAndLogOperation(OperationContext* opCtx,
+                                    logger::LogComponent component,
+                                    boost::optional<size_t> responseLength,
+                                    boost::optional<long long> slowMsOverride,
+                                    bool forceLog) {
+    // Log the operation if it is eligible according to the current slowMS and sampleRate settings.
+    const bool shouldLogOp = (forceLog || shouldLog(component, logger::LogSeverity::Debug(1)));
+    const long long slowMs = slowMsOverride.value_or(serverGlobalParams.slowMS);
+
+    const auto client = opCtx->getClient();
+
+    // Record the size of the response returned to the client, if applicable.
+    if (responseLength) {
+        _debug.responseLength = *responseLength;
+    }
+
+    // Obtain the total execution time of this operation.
+    _end = curTimeMicros64();
+    _debug.executionTimeMicros = durationCount<Microseconds>(elapsedTimeExcludingPauses());
+
+    const bool shouldSample =
+        client->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
+
+    if (shouldLogOp || (shouldSample && _debug.executionTimeMicros > slowMs * 1000LL)) {
+        const auto lockerInfo = opCtx->lockState()->getLockerInfo();
+        log(component) << _debug.report(client, *this, (lockerInfo ? &lockerInfo->stats : nullptr));
+    }
+
+    // Return 'true' if this operation should also be added to the profiler.
+    return shouldDBProfile(shouldSample);
 }
 
 Command::ReadWriteType CurOp::getReadWriteType() const {
@@ -463,7 +500,7 @@ StringData getProtoString(int op) {
 
 string OpDebug::report(Client* client,
                        const CurOp& curop,
-                       const SingleThreadedLockStats& lockStats) const {
+                       const SingleThreadedLockStats* lockStats) const {
     StringBuilder s;
     if (iscommand)
         s << "command ";
@@ -557,9 +594,9 @@ string OpDebug::report(Client* client,
         s << " reslen:" << responseLength;
     }
 
-    {
+    if (lockStats) {
         BSONObjBuilder locks;
-        lockStats.report(&locks);
+        lockStats->report(&locks);
         s << " locks:" << locks.obj().toString();
     }
 

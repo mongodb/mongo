@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
@@ -67,6 +68,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                 CursorResponse(incomingCursorResponse.getValue().getNSS(),
                                                incomingCursorResponse.getValue().getCursorId(),
                                                {}));
+    params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));

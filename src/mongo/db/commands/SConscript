@@ -265,6 +265,7 @@ env.Library(
         'dcommands_fcv',
         'fsync_locked',
         'killcursors_common',
+        'profile_common',
         'write_commands_common',
     ],
     LIBDEPS_PRIVATE=[
@@ -297,6 +298,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/service_context',
+    ]
+)
+
+env.Library(
+    target='profile_common',
+    source=[
+        'profile_common.cpp',
+        env.Idlc('profile.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands',
     ]
 )
 

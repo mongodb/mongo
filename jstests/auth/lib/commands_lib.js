@@ -4850,6 +4850,49 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "profile_mongos",
+          command: {profile: 0, slowms: 10, sampleRate: 0.5},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_dbAdminAny,
+                privileges:
+                    [{resource: {db: adminDbName, collection: ""}, actions: ["enableProfiler"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                roles: {},
+              }
+          ]
+        },
+        {
+          testname: "profileGetLevel_mongos",
+          command: {profile: -1},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {
+                    backup: 1,
+                    dbAdminAnyDatabase: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges: [{
+                    resource: {db: adminDbName, collection: "system.profile"},
+                    actions: ["find"]
+                }]
+              },
+              {
+                runOnDb: firstDbName,
+                roles: {},
+              }
+          ]
+        },
+        {
           testname: "renameCollection_sameDb",
           command: {renameCollection: firstDbName + ".x", to: firstDbName + ".y", dropTarget: true},
           setup: function(db) {

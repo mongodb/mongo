@@ -1098,7 +1098,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                           ast.Command) and struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
                 if struct.namespace == common.COMMAND_NAMESPACE_TYPE:
                     cpp_type_info = cpp_types.get_cpp_type(struct.command_field)
-                    self._writer.write_line('%s localCmdType;' % (cpp_type_info.get_storage_type()))
+
+                    if struct.command_field.cpp_type and cpp_types.is_primitive_scalar_type(
+                            struct.command_field.cpp_type):
+                        self._writer.write_line('%s localCmdType(%s);' %
+                                                (cpp_type_info.get_storage_type(),
+                                                 cpp_types.get_primitive_scalar_type_default_value(
+                                                     struct.command_field.cpp_type)))
+                    else:
+                        self._writer.write_line('%s localCmdType;' %
+                                                (cpp_type_info.get_storage_type()))
                     self._writer.write_line('%s object(localCmdType);' %
                                             (common.title_case(struct.cpp_name)))
                 elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:

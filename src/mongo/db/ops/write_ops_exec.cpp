@@ -114,19 +114,10 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
                    << ": " << curOp->debug().errInfo.toString();
         }
 
-        const bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
-                                                                 logger::LogSeverity::Debug(1));
-        const bool logSlow = executionTimeMicros > (serverGlobalParams.slowMS * 1000LL);
-
-        const bool shouldSample = serverGlobalParams.sampleRate == 1.0
-            ? true
-            : opCtx->getClient()->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
-
-        if (logAll || (shouldSample && logSlow)) {
-            Locker::LockerInfo lockerInfo;
-            opCtx->lockState()->getLockerInfo(&lockerInfo);
-            log() << curOp->debug().report(opCtx->getClient(), *curOp, lockerInfo.stats);
-        }
+        // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
+        // this op should be sampled for profiling.
+        const bool shouldSample =
+            curOp->completeAndLogOperation(opCtx, logger::LogComponent::kCommand);
 
         // Do not profile individual statements in a write command if we are in a transaction.
         auto session = OperationContextSession::get(opCtx);

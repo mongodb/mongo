@@ -55,7 +55,7 @@ public:
 
     std::string report(Client* client,
                        const CurOp& curop,
-                       const SingleThreadedLockStats& lockStats) const;
+                       const SingleThreadedLockStats* lockStats) const;
 
     /**
      * Appends information about the current operation to "builder"
@@ -185,6 +185,18 @@ public:
                                     const Command* command,
                                     BSONObj cmdObj,
                                     NetworkOp op);
+
+    /**
+     * Marks the operation end time, records the length of the client response if a valid response
+     * exists, and then - subject to the current values of slowMs and sampleRate - logs this CurOp
+     * to file under the given LogComponent. Returns 'true' if, in addition to being logged, this
+     * operation should also be profiled.
+     */
+    bool completeAndLogOperation(OperationContext* opCtx,
+                                 logger::LogComponent logComponent,
+                                 boost::optional<size_t> responseLength = boost::none,
+                                 boost::optional<long long> slowMsOverride = boost::none,
+                                 bool forceLog = false);
 
     bool haveOpDescription() const {
         return !_opDescription.isEmpty();

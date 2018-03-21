@@ -172,6 +172,7 @@ public:
     virtual ResourceId getWaitingResource() const;
 
     virtual void getLockerInfo(LockerInfo* lockerInfo) const;
+    virtual boost::optional<LockerInfo> getLockerInfo() const final;
 
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 

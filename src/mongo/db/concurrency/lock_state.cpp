@@ -602,6 +602,13 @@ void LockerImpl<IsForMMAPV1>::getLockerInfo(LockerInfo* lockerInfo) const {
 }
 
 template <bool IsForMMAPV1>
+boost::optional<Locker::LockerInfo> LockerImpl<IsForMMAPV1>::getLockerInfo() const {
+    Locker::LockerInfo lockerInfo;
+    getLockerInfo(&lockerInfo);
+    return std::move(lockerInfo);
+}
+
+template <bool IsForMMAPV1>
 bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
     // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
     invariant(!inAWriteUnitOfWork());

@@ -367,6 +367,7 @@ void runCommand(OperationContext* opCtx,
             command->incrementCommandsFailed();
             CommandHelpers::appendCommandStatus(bob, e.toStatus());
             LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
+            CurOp::get(opCtx)->debug().errInfo = e.toStatus();
             return;
         }
 
@@ -508,6 +509,9 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         } catch (const DBException& ex) {
             LOG(1) << "Exception thrown while processing command on " << db
                    << " msg id: " << m.header().getId() << causedBy(redact(ex));
+
+            // Record the exception in CurOp.
+            CurOp::get(opCtx)->debug().errInfo = ex.toStatus();
 
             reply->reset();
             auto bob = reply->getInPlaceReplyBuilder(0);

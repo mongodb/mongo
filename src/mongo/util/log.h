@@ -163,8 +163,12 @@ inline LogstreamBuilder log(logger::LogComponent::Value componentValue) {
 /**
  * Runs the same logic as log()/warning()/error(), without actually outputting a stream.
  */
+inline bool shouldLog(logger::LogComponent logComponent, logger::LogSeverity severity) {
+    return logger::globalLogDomain()->shouldLog(logComponent, severity);
+}
+
 inline bool shouldLog(logger::LogSeverity severity) {
-    return logger::globalLogDomain()->shouldLog(::MongoLogDefaultComponent_component, severity);
+    return shouldLog(::MongoLogDefaultComponent_component, severity);
 }
 
 }  // namespace
