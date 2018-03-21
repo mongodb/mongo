@@ -10,26 +10,18 @@
     // Start a MongoD just to get a lockfile in place.
     var mongo1 = MongoRunner.runMongod({dbpath: dbPath, waitForConnect: true});
 
-    try {
-        clearRawMongoProgramOutput();
-        // Start another one which should fail to start as there is already a lockfile in its
-        // dbpath.
-        var mongo2 = null;
-        try {
-            // Can't use assert.throws as behavior is different on Windows/Linux.
-            mongo2 = MongoRunner.runMongod({dbpath: dbPath, noCleanData: true});
-        } catch (ex) {
-        }
-        // We should have failed to start.
-        assert(mongo2 === null);
-        assert.soon(() => {
-            var logContents = rawMongoProgramOutput();
-            return logContents.indexOf("Unable to lock the lock file") > 0 ||
-                // Windows error message is different.
-                logContents.indexOf("Unable to create/open the lock file") > 0;
-        });
-    } finally {
-        MongoRunner.stopMongod(mongo1);
-    }
+    clearRawMongoProgramOutput();
+    // Start another one which should fail to start as there is already a lockfile in its
+    // dbpath.
+    var mongo2 = null;
+    mongo2 = MongoRunner.runMongod({dbpath: dbPath, noCleanData: true});
+    // We should have failed to start.
+    assert(mongo2 === null);
 
+    var logContents = rawMongoProgramOutput();
+    assert(logContents.indexOf("Unable to lock the lock file") > 0 ||
+           // Windows error message is different.
+           logContents.indexOf("Unable to create/open the lock file") > 0);
+
+    MongoRunner.stopMongod(mongo1);
 })();

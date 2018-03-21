@@ -31,15 +31,6 @@
     clearRawMongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(replTest);
 
-    const msgInvalidOption = "The field 'invalidOption' is not valid for an index specification";
-    const msgInitialSyncFatalAssertion = "Fatal assertion 40088 InitialSyncFailure";
-
-    const assertFn = function() {
-        return rawMongoProgramOutput().match(msgInvalidOption) &&
-            rawMongoProgramOutput().match(msgInitialSyncFatalAssertion);
-    };
-    assert.soon(assertFn, "Initial sync should have aborted on invalid index specification");
-
     assert.soon(function() {
         try {
             initSyncNodeAdminDB.runCommand({ping: 1});
@@ -50,6 +41,13 @@
     }, "Node did not terminate due to invalid index spec during initial sync", 60 * 1000);
 
     replTest.stop(initSyncNode, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
-    replTest.stopSet();
 
+    const msgInvalidOption = "The field 'invalidOption' is not valid for an index specification";
+    const msgInitialSyncFatalAssertion = "Fatal assertion 40088 InitialSyncFailure";
+
+    assert(rawMongoProgramOutput().match(msgInvalidOption) &&
+               rawMongoProgramOutput().match(msgInitialSyncFatalAssertion),
+           "Initial sync should have aborted on invalid index specification");
+
+    replTest.stopSet();
 })();

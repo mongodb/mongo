@@ -55,19 +55,23 @@
     // Node C should connect to new master as a sync source because chaining is disallowed.
     // C is ahead of master but it will still connect to it.
     clearRawMongoProgramOutput();
-    // Don't wait for a connection to the node after startup, since it might roll back and crash
-    // immediately.
-    replTest.start(CID, {waitForConnect: false}, true /*restart*/);
+    c_conn = replTest.start(CID, {waitForConnect: true}, true /*restart*/);
 
+    // Wait for node C to fassert
     assert.soon(function() {
         try {
-            return rawMongoProgramOutput().match(
-                "rollback error: not willing to roll back more than 30 minutes of data");
+            c_conn.getDB("local").runCommand({ping: 1});
         } catch (e) {
-            return false;
+            return true;
         }
-    }, "node C failed to fassert", 60 * 1000);
+        return false;
+    }, "Node did not fassert", 60 * 1000);
 
     replTest.stop(CID, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+
+    assert(rawMongoProgramOutput().match(
+               "rollback error: not willing to roll back more than 30 minutes of data"),
+           "node C failed to fassert");
+
     replTest.stopSet();
 }());

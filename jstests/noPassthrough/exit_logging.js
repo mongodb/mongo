@@ -25,32 +25,25 @@
         var conn = launcher.start({});
 
         function checkOutput() {
-            var logContents = "";
-            assert.soon(
-                () => {
-                    logContents = rawMongoProgramOutput();
-                    return matchFn(logContents);
-                },
-                function() {
-                    // We can't just return a string because it will be well over the max
-                    // line length.
-                    // So we just print manually.
-                    print("================ BEGIN LOG CONTENTS ==================");
-                    logContents.split(/\n/).forEach((line) => {
-                        print(line);
-                    });
-                    print("================ END LOG CONTENTS =====================");
-                    return "";
-                },
-                30000);
+            var logContents = rawMongoProgramOutput();
+            function printLog() {
+                // We can't just return a string because it will be well over the max
+                // line length.
+                // So we just print manually.
+                print("================ BEGIN LOG CONTENTS ==================");
+                logContents.split(/\n/).forEach((line) => {
+                    print(line);
+                });
+                print("================ END LOG CONTENTS =====================");
+                return "";
+            }
+
+            assert(matchFn(logContents), printLog);
         }
 
-        try {
-            crashFn(conn);
-            checkOutput();
-        } finally {
-            launcher.stop(conn, undefined, {allowedExitCode: expectedExitCode});
-        }
+        crashFn(conn);
+        launcher.stop(conn, undefined, {allowedExitCode: expectedExitCode});
+        checkOutput();
     }
 
     function runAllTests(launcher) {
