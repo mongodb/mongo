@@ -232,7 +232,7 @@ public:
 private:
     friend class AutoYieldFlushLockForMMAPV1Commit;
 
-    typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
+    typedef FastMapNoAlloc<ResourceId, LockRequest> LockRequestsMap;
 
     /**
      * Like lockGlobalBegin, but accepts a deadline for acquiring a ticket.
@@ -281,6 +281,9 @@ private:
     //
     // This has to be locked inside const methods, hence the mutable.
     mutable SpinLock _lock;
+    // Note: this data structure must always guarantee the continued validity of pointers/references
+    // to its contents (LockRequests). The LockManager maintains a LockRequestList of pointers to
+    // the LockRequests managed by this data structure.
     LockRequestsMap _requests;
 
     // Reuse the notification object across requests so we don't have to create a new mutex

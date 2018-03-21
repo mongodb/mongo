@@ -96,8 +96,8 @@
     applyWithManyLocks(1);
     applyWithManyLocks(2);
 
-    for (let i = 9; i < 16; i++) {
+    for (let i = 9; i < 20; i++) {
         applyWithManyLocks(i);
     }
-    assert(sawTooManyLocksError, "test no longer exhausts the max number of locks held at once");
+    assert(!sawTooManyLocksError, "test should not exhaust the max number of locks held at once");
 })();

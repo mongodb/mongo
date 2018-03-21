@@ -128,7 +128,7 @@ enum LockResult {
     LOCK_DEADLOCK,
 
     /**
-     * This is used as an initialiser value. Should never be returned.
+     * This is used as an initializer value. Should never be returned.
      */
     LOCK_INVALID
 };

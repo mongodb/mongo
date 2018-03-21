@@ -998,7 +998,7 @@ namespace {
 /**
  *  Periodically purges unused lock buckets. The first time the lock is used again after
  *  cleanup it needs to be allocated, and similarly, every first use by a client for an intent
- *  mode may need to create a partitioned lock head. Cleanup is done roughtly once a minute.
+ *  mode may need to create a partitioned lock head. Cleanup is done roughly once a minute.
  */
 class UnusedLockCleaner : PeriodicTask {
 public:
