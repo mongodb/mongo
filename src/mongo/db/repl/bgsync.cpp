@@ -735,7 +735,7 @@ void BackgroundSync::start(OperationContext* opCtx) {
         // When a node steps down during drain mode, the last fetched optime would be newer than
         // the last applied.
         if (_lastOpTimeFetched <= lastAppliedOpTimeWithHash.opTime) {
-            LOG(1) << "Settting bgsync _lastOpTimeFetched=" << lastAppliedOpTimeWithHash.opTime
+            LOG(1) << "Setting bgsync _lastOpTimeFetched=" << lastAppliedOpTimeWithHash.opTime
                    << " and _lastFetchedHash=" << lastAppliedOpTimeWithHash.value
                    << ". Previous _lastOpTimeFetched: " << _lastOpTimeFetched;
             _lastOpTimeFetched = lastAppliedOpTimeWithHash.opTime;
