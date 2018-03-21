@@ -37,10 +37,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
@@ -112,43 +110,6 @@ bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
     out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data));
     return status.isOK();
 }
-
-class PublicGridCommand : public BasicCommand {
-protected:
-    PublicGridCommand(const char* n, const char* oldname = NULL) : BasicCommand(n, oldname) {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    bool adminOnly() const override {
-        return false;
-    }
-
-    bool passthrough(OperationContext* opCtx,
-                     StringData dbName,
-                     const ShardId& shardId,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        const auto shard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
-
-        ShardConnection conn(shard->getConnString(), "");
-
-        BSONObj res;
-        bool ok = conn->runCommand(
-            dbName.toString(), CommandHelpers::filterCommandRequestForPassthrough(cmdObj), res);
-        conn.done();
-
-        // First append the properly constructed writeConcernError. It will then be skipped
-        // in appendElementsUnique.
-        if (auto wcErrorElem = res["writeConcernError"]) {
-            appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, result);
-        }
-        result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(res));
-        return ok;
-    }
-};
 
 class NotAllowedOnShardedCollectionCmd : public BasicCommand {
 protected:
@@ -271,9 +232,13 @@ public:
 
 } renameCollectionCmd;
 
-class CopyDBCmd : public PublicGridCommand {
+class CopyDBCmd : public BasicCommand {
 public:
-    CopyDBCmd() : PublicGridCommand("copydb") {}
+    CopyDBCmd() : BasicCommand("copydb") {}
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
 
     bool adminOnly() const override {
         return true;
@@ -307,46 +272,63 @@ public:
                 "Cannot copy to a sharded database",
                 !toDbInfo.shardingEnabled());
 
-        const std::string fromhost = cmdObj.getStringField("fromhost");
-        if (!fromhost.empty()) {
-            return passthrough(
-                opCtx, NamespaceString::kAdminDb, toDbInfo.primaryId(), cmdObj, result);
-        }
+        const auto copyDbCmdObj = cmdObj["fromhost"] ? cmdObj : [&] {
+            const auto fromDbElt = cmdObj["fromdb"];
+            uassert(ErrorCodes::InvalidNamespace,
+                    "'fromdb' must be of type String",
+                    fromDbElt.type() == BSONType::String);
+            const std::string fromdb = fromDbElt.str();
+            uassert(ErrorCodes::InvalidNamespace,
+                    "invalid fromdb argument",
+                    NamespaceString::validDBName(fromdb,
+                                                 NamespaceString::DollarInDbNameBehavior::Allow));
 
-        const auto fromDbElt = cmdObj["fromdb"];
-        uassert(ErrorCodes::InvalidNamespace,
-                "'fromdb' must be of type String",
-                fromDbElt.type() == BSONType::String);
-        const std::string fromdb = fromDbElt.str();
-        uassert(
-            ErrorCodes::InvalidNamespace,
-            "invalid fromdb argument",
-            NamespaceString::validDBName(fromdb, NamespaceString::DollarInDbNameBehavior::Allow));
+            auto fromDbInfo = uassertStatusOK(createShardDatabase(opCtx, fromdb));
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot copy from a sharded database",
+                    !fromDbInfo.shardingEnabled());
 
-        auto fromDbInfo = uassertStatusOK(createShardDatabase(opCtx, fromdb));
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot copy from a sharded database",
-                !fromDbInfo.shardingEnabled());
-
-        BSONObjBuilder b;
-        BSONForEach(e, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)) {
-            if (strcmp(e.fieldName(), "fromhost") != 0) {
-                b.append(e);
+            // If the source and destination are the same, there is no need to attach the 'fromhost'
+            // field since the copy is entirely local to the node
+            if (fromDbInfo.primaryId() == toDbInfo.primaryId()) {
+                return cmdObj;
             }
-        }
 
-        {
-            const auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromDbInfo.primaryId()));
-            b.append("fromhost", shard->getConnString().toString());
-        }
+            BSONObjBuilder copyDbCmdObjBuilder;
 
-        // copyDb creates multiple collections and should handle collection creation differently.
-        return passthrough(opCtx,
-                           NamespaceString::kAdminDb,
-                           toDbInfo.primaryId(),
-                           appendAllowImplicitCreate(b.obj(), true),
-                           result);
+            // Copy everything but the "fromhost" parameter
+            BSONForEach(e, cmdObj) {
+                if (strcmp(e.fieldName(), "fromhost")) {
+                    copyDbCmdObjBuilder.append(e);
+                }
+            }
+
+            // Append "fromhost" as the database's primary
+            {
+                const auto shard = uassertStatusOK(
+                    Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromDbInfo.primaryId()));
+                copyDbCmdObjBuilder.append("fromhost", shard->getConnString().toString());
+            }
+
+            return copyDbCmdObjBuilder.obj();
+        }();
+
+        // copyDb creates multiple collections and should handle collection creation differently
+        auto response = executeCommandAgainstDatabasePrimary(
+            opCtx,
+            NamespaceString::kAdminDb,
+            toDbInfo,
+            appendAllowImplicitCreate(
+                CommandHelpers::filterCommandRequestForPassthrough(copyDbCmdObj), true),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kNoRetry);
+
+        const auto cmdResponse = uassertStatusOK(std::move(response.swResponse));
+        const auto status = getStatusFromCommandResult(cmdResponse.data);
+
+        result.appendElementsUnique(
+            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data));
+        return status.isOK();
     }
 
 } clusterCopyDBCmd;
@@ -402,16 +384,12 @@ class GroupCmd : public NotAllowedOnShardedCollectionCmd {
 public:
     GroupCmd() : NotAllowedOnShardedCollectionCmd("group") {}
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
@@ -426,49 +404,43 @@ public:
         return nss.ns();
     }
 
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
+        ActionSet actions;
+        actions.addAction(ActionType::find);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
-        // We will time how long it takes to run the commands on the shards.
+        const auto dbName = request.getDatabase();
+        const auto& cmdObj = request.body;
+
+        const NamespaceString nss(parseNs(dbName.toString(), cmdObj));
+
         Timer timer;
-        BSONObj command = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const auto explainCommand = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Passthrough command failed: " << command.toString() << " on ns "
-                              << nss.ns()
-                              << ". Cannot run on sharded namespace.",
-                !routingInfo.cm());
 
-        BSONObj shardResult;
-        try {
-            ShardConnection conn(routingInfo.primary()->getConnString(), "");
-
-            // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
-            if (!conn->runCommand(nss.db().toString(), command, shardResult)) {
-                conn.done();
-                return Status(ErrorCodes::OperationFailed,
-                              str::stream() << "Passthrough command failed: " << command
-                                            << " on ns "
-                                            << nss.ns()
-                                            << "; result: "
-                                            << shardResult);
-            }
-
-            conn.done();
-        } catch (const DBException& ex) {
-            return ex.toStatus();
+        BSONObjBuilder result;
+        if (!nonShardedCollectionCommandPassthrough(opCtx,
+                                                    dbName,
+                                                    nss,
+                                                    routingInfo,
+                                                    explainCommand,
+                                                    Shard::RetryPolicy::kIdempotent,
+                                                    &result)) {
+            return getStatusFromCommandResult(result.done());
         }
 
-        // Fill out the command result.
         Strategy::CommandResult cmdResult;
         cmdResult.shardTargetId = routingInfo.primaryId();
-        cmdResult.result = shardResult;
+        cmdResult.result = result.done();
         cmdResult.target = routingInfo.primary()->getConnString();
 
         return ClusterExplain::buildExplainResult(
