@@ -1156,7 +1156,7 @@ functions:
 
           set -o errexit
           ${activate_virtualenv}
-          pip install boto3
+          pip install boto3==1.5.27
 
           if [ ! -z "${subnet_id}" ]; then
             subnet_id="-n ${subnet_id}"
