@@ -1880,9 +1880,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         if (_maintenanceModeCalls) {
             response->append("maintenanceMode", _maintenanceModeCalls);
         }
-        std::string s = _getHbmsg(now);
-        if (!s.empty())
-            response->append("infoMessage", s);
+        response->append("lastHeartbeatMessage", "");
+        response->append("syncingTo", "");
+
+        response->append("infoMessage", _getHbmsg(now));
         *result = Status(ErrorCodes::InvalidReplicaSetConfig,
                          "Our replica set config is invalid or we are not a member of it");
         return;
@@ -1908,15 +1909,15 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
             if (!_syncSource.empty() && !_iAmPrimary()) {
                 bb.append("syncingTo", _syncSource.toString());
+            } else {
+                bb.append("syncingTo", "");
             }
 
             if (_maintenanceModeCalls) {
                 bb.append("maintenanceMode", _maintenanceModeCalls);
             }
 
-            std::string s = _getHbmsg(now);
-            if (!s.empty())
-                bb.append("infoMessage", s);
+            bb.append("infoMessage", _getHbmsg(now));
 
             if (myState.primary()) {
                 bb.append("electionTime", _electionTime);
@@ -1925,6 +1926,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             }
             bb.appendIntOrLL("configVersion", _rsConfig.getConfigVersion());
             bb.append("self", true);
+            bb.append("lastHeartbeatMessage", "");
             membersOut.push_back(bb.obj());
         } else {
             // add non-self member
@@ -1966,16 +1968,18 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
             Milliseconds ping = _getPing(itConfig.getHostAndPort());
             bb.append("pingMs", durationCount<Milliseconds>(ping));
-            std::string s = it->getLastHeartbeatMsg();
-            if (!s.empty())
-                bb.append("lastHeartbeatMessage", s);
+            bb.append("lastHeartbeatMessage", it->getLastHeartbeatMsg());
             if (it->hasAuthIssue()) {
                 bb.append("authenticated", false);
             }
             const HostAndPort& syncSource = it->getSyncSource();
             if (!syncSource.empty() && !state.primary()) {
                 bb.append("syncingTo", syncSource.toString());
+            } else {
+                bb.append("syncingTo", "");
             }
+
+            bb.append("infoMessage", "");
 
             if (state == MemberState::RS_PRIMARY) {
                 bb.append("electionTime", it->getElectionTime());
@@ -1999,6 +2003,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     // Add sync source info
     if (!_syncSource.empty() && !myState.primary() && !myState.removed()) {
         response->append("syncingTo", _syncSource.toString());
+    } else {
+        response->append("syncingTo", "");
     }
 
     if (_rsConfig.isConfigServer()) {
