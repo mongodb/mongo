@@ -872,6 +872,15 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
     onWriteOpCompleted(opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
 }
 
+void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {
+    invariant(opCtx->getTxnNumber());
+    Session* const session = OperationContextSession::get(opCtx);
+    invariant(session->inMultiDocumentTransaction());
+
+    auto opTime = repl::getNextOpTimeNoPersistForTesting(opCtx).opTime;
+    opCtx->recoveryUnit()->setPrepareTimestamp(opTime.getTimestamp());
+}
+
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
 }

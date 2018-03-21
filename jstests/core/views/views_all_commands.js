@@ -399,6 +399,7 @@
         planCacheListQueryShapes:
             {command: {planCacheListQueryShapes: "view"}, expectFailure: true},
         planCacheSetFilter: {command: {planCacheSetFilter: "view"}, expectFailure: true},
+        prepareTransaction: {skip: isUnrelated},
         profile: {skip: isUnrelated},
         refreshLogicalSessionCacheNow: {skip: isAnInternalCommand},
         reapLogicalSessionCacheNow: {skip: isAnInternalCommand},

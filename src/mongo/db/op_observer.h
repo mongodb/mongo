@@ -238,6 +238,15 @@ public:
     virtual void onTransactionCommit(OperationContext* opCtx) = 0;
 
     /**
+     * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be
+     * called when a transaction is active. It generates an OpTime and sets the prepare timestamp on
+     * the recovery unit.
+     * TODO: This is an incomplete implementation and should only be used for testing. It does not
+     * write the prepare oplog entry, only generates an OpTime.
+     */
+    virtual void onTransactionPrepare(OperationContext* opCtx) = 0;
+
+    /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the
      * RecoveryUnit onRollback() is called.  It must not be called when no transaction is active.
      */

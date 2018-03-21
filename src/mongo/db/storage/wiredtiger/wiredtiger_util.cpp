@@ -38,6 +38,7 @@
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"
@@ -49,6 +50,19 @@
 namespace mongo {
 
 using std::string;
+
+bool kDisableJournalForReplicatedCollections{false};
+
+// For testing purposes only. Disables journaling (write-ahead logging) for replicated collections.
+class DisableJournalForReplicatedCollections
+    : public ExportedServerParameter<bool, ServerParameterType::kStartupOnly> {
+public:
+    DisableJournalForReplicatedCollections()
+        : ExportedServerParameter<bool, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "disableJournalForReplicatedCollections",
+              &kDisableJournalForReplicatedCollections) {}
+} DisableJournalSetting;
 
 Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == 0)

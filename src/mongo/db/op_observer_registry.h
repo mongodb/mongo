@@ -198,6 +198,12 @@ public:
             o->onTransactionCommit(opCtx);
     }
 
+    void onTransactionPrepare(OperationContext* opCtx) override {
+        for (auto& observer : _observers) {
+            observer->onTransactionPrepare(opCtx);
+        }
+    }
+
     void onTransactionAbort(OperationContext* opCtx) override {
         for (auto& o : _observers)
             o->onTransactionAbort(opCtx);

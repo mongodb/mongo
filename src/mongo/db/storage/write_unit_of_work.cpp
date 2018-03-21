@@ -56,10 +56,6 @@ WriteUnitOfWork::~WriteUnitOfWork() {
     }
 }
 
-/**
- * Creates a top-level WriteUnitOfWork without changing RecoveryUnit or Locker state. For use
- * when the RecoveryUnit and Locker are already in an active state.
- */
 std::unique_ptr<WriteUnitOfWork> WriteUnitOfWork::createForSnapshotResume(OperationContext* opCtx) {
     auto wuow = stdx::make_unique<WriteUnitOfWork>();
     wuow->_opCtx = opCtx;
@@ -68,17 +64,24 @@ std::unique_ptr<WriteUnitOfWork> WriteUnitOfWork::createForSnapshotResume(Operat
     return wuow;
 }
 
-/**
- * Releases the OperationContext RecoveryUnit and Locker objects from management without
- * changing state. Allows for use of these objects beyond the WriteUnitOfWork lifespan.
- */
 void WriteUnitOfWork::release() {
     invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
     invariant(!_committed);
+    invariant(!_prepared);
     invariant(_toplevel);
 
     _released = true;
     _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
+}
+
+void WriteUnitOfWork::prepare() {
+    invariant(!_committed);
+    invariant(!_prepared);
+    invariant(_toplevel);
+    invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
+
+    _opCtx->recoveryUnit()->prepareUnitOfWork();
+    _prepared = true;
 }
 
 void WriteUnitOfWork::commit() {

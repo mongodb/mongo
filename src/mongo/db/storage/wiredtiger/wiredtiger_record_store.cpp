@@ -589,7 +589,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     }
     ss << ")";
 
-    const bool keepOldLoggingSettings = true;
+    const bool keepOldLoggingSettings = !kDisableJournalForReplicatedCollections;
     if (keepOldLoggingSettings ||
         WiredTigerUtil::useTableLogging(NamespaceString(ns),
                                         getGlobalReplSettings().usingReplSets())) {

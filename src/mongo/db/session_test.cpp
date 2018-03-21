@@ -645,5 +645,5 @@ TEST_F(SessionTest, RollbackClearsStoredStatements) {
     ASSERT_TRUE(session.transactionOperationsForTest().empty());
 }
 
-}  // anonymous
+}  // namespace
 }  // namespace mongo

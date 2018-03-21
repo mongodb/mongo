@@ -139,7 +139,8 @@ void checkOplogInsert(Status result) {
 void _getNextOpTimes(OperationContext* opCtx,
                      Collection* oplog,
                      std::size_t count,
-                     OplogSlot* slotsOut) {
+                     OplogSlot* slotsOut,
+                     bool persist = true) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     long long term = OpTime::kUninitializedTerm;
 
@@ -158,7 +159,10 @@ void _getNextOpTimes(OperationContext* opCtx,
     lastSetTimestamp = ts;
     newTimestampNotifier.notify_all();
     const bool orderedCommit = false;
-    fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+
+    if (persist) {
+        fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+    }
 
     for (std::size_t i = 0; i < count; i++) {
         slotsOut[i].opTime = {Timestamp(ts.asULL() + i), term};
@@ -647,6 +651,14 @@ OplogSlot getNextOpTime(OperationContext* opCtx) {
     invariant(_localOplogCollection);
     OplogSlot os;
     _getNextOpTimes(opCtx, _localOplogCollection, 1, &os);
+    return os;
+}
+
+OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
+    invariant(_localOplogCollection);
+    OplogSlot os;
+    bool persist = false;  // Don't update the storage engine with the allocated OpTime.
+    _getNextOpTimes(opCtx, _localOplogCollection, 1, &os, persist);
     return os;
 }
 

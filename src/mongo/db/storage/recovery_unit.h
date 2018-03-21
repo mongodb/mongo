@@ -73,6 +73,23 @@ public:
     virtual void abortUnitOfWork() = 0;
 
     /**
+     * Must be called after beginUnitOfWork and before calling either abortUnitOfWork or
+     * commitUnitOfWork. Transitions the current transaction (unit of work) to the
+     * "prepared" state. Must be overridden by storage engines that support prepared
+     * transactions.
+     *
+     * Must be preceded by a call to setPrepareTimestamp().
+     *
+     * It is not valid to call commitUnitOfWork() afterward without calling setCommitTimestamp()
+     * with a value greater than or equal to the prepare timestamp.
+     * This cannot be called after setTimestamp or setCommitTimestamp.
+     */
+    virtual void prepareUnitOfWork() {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support prepared transactions");
+    }
+
+    /**
      * Waits until all commits that happened before this call are durable. Returns true, unless the
      * storage engine cannot guarantee durability, which should never happen when isDurable()
      * returned true. This cannot be called from inside a unit of work, and should fail if it is.
@@ -177,6 +194,17 @@ public:
 
     virtual Timestamp getCommitTimestamp() {
         return {};
+    }
+
+    /**
+     * Sets a prepare timestamp for the current transaction. A subsequent call to
+     * prepareUnitOfWork() is expected and required.
+     * This cannot be called after setTimestamp or setCommitTimestamp.
+     * This must be called inside a WUOW and may only be called once.
+     */
+    virtual void setPrepareTimestamp(Timestamp timestamp) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support prepared transactions");
     }
 
     /**

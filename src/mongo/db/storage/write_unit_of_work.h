@@ -32,6 +32,16 @@
 
 namespace mongo {
 
+/**
+ * The WriteUnitOfWork is an RAII type that begins a storage engine write unit of work on both the
+ * Locker and the RecoveryUnit of the OperationContext. Any writes that occur during the lifetime of
+ * this object will be committed when commit() is called, and rolled back (aborted) when the object
+ * is destructed without a call to commit() or release().
+ *
+ * A WriteUnitOfWork can be nested with others, but only the top level WriteUnitOfWork will commit
+ * the unit of work on the RecoveryUnit. If a low level WriteUnitOfWork aborts, any parents will
+ * also abort.
+ */
 class WriteUnitOfWork {
     MONGO_DISALLOW_COPYING(WriteUnitOfWork);
 
@@ -42,8 +52,35 @@ public:
 
     ~WriteUnitOfWork();
 
+    /**
+     * Creates a top-level WriteUnitOfWork without changing RecoveryUnit or Locker state. For use
+     * when the RecoveryUnit and Locker are already in an active state.
+     */
     static std::unique_ptr<WriteUnitOfWork> createForSnapshotResume(OperationContext* opCtx);
+
+    /**
+     * Releases the OperationContext RecoveryUnit and Locker objects from management without
+     * changing state. Allows for use of these objects beyond the WriteUnitOfWork lifespan. Prepared
+     * units of work are not allowed be released.
+     */
     void release();
+
+    /**
+     * Transitions the WriteUnitOfWork to the "prepared" state. The RecoveryUnit state in the
+     * OperationContext must be active. The WriteUnitOfWork may not be nested and will invariant in
+     * that case. Will throw CommandNotSupported if the storage engine does not support prepared
+     * transactions. May throw WriteConflictException.
+     *
+     * No subsequent operations are allowed except for commit or abort (when the object is
+     * destructed).
+     */
+    void prepare();
+
+    /**
+     * Commits the WriteUnitOfWork. If this is the top level unit of work, the RecoveryUnit's unit
+     * of work is committed. Commit can only be called once on an active unit of work, and may not
+     * be called on a released WriteUnitOfWork.
+     */
     void commit();
 
 private:
@@ -52,6 +89,7 @@ private:
     bool _toplevel;
 
     bool _committed = false;
+    bool _prepared = false;
     bool _released = false;
 };
 
