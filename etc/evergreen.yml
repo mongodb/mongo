@@ -163,7 +163,7 @@ variables:
        value: ${remote_dir}/mongod.log
 
 - &powercycle_test
-  ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
+  ec2_artifacts: ${log_path} ${db_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
@@ -1264,10 +1264,30 @@ functions:
             ${mongod_extra_options}"
           set +o errexit
           $python -u pytests/powertest.py --configFile=$config_file
+          # SERVER-34033: Figure out why shell.exec exits at this point.
           test_status=$?
-          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
-          echo "Test completed, AMI EC2 instance ${instance_id} status: $aws_ec2"
+          echo "Completed pytests/powertest.py, status: $test_status"
           exit $test_status
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          if [ ! -f report.json ]; then
+            exit 0
+          fi
+          grep -q "pass" report.json
+          pass=$?
+          # On test success, we only archive mongod.log.
+          if [ $pass -eq 0 ]; then
+            echo "ec2_artifacts: ${log_path}" > ec2_artifacts.yml
+          fi
+
+    - command: expansions.update
+      params:
+        ignore_missing_file: true
+        file: src/ec2_artifacts.yml
 
   "do multiversion setup" :
     command: shell.exec
