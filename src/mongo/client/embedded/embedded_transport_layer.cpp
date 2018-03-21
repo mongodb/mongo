@@ -37,8 +37,10 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/client/embedded/libmongodbcapi.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
+
 enum RPCState { WaitingForMessageLength, WaitingForMessageContent, HaveOutput };
 
 struct FreeDeleter {
