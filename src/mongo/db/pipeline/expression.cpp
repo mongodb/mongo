@@ -2766,7 +2766,11 @@ vector<Value> ExpressionIndexOfArray::parseDeps(const Document& root,
     deps.push_back(Value(endIndex));
     return deps;
 }
-
+/**
+ *  This class handles the case where IndexOfArray is given an ExpressionConstant
+ *  instead of using a vector and searching through it we can use a unordered_map
+ *  for O(1) lookup time.
+ **/
 class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
 public:
     Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -2793,6 +2797,7 @@ private:
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     vpOperand[0]->optimize();
+    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of a vector.
     if (ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
         const Value valueArray = ec->getValue();
         uassert(50749,
