@@ -351,16 +351,20 @@ public:
 
 } clusterCopyDBCmd;
 
-class ConvertToCappedCmd : public NotAllowedOnShardedCollectionCmd {
+class ConvertToCappedCmd : public BasicCommand {
 public:
-    ConvertToCappedCmd() : NotAllowedOnShardedCollectionCmd("convertToCapped") {}
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
-    }
+    ConvertToCappedCmd() : BasicCommand("convertToCapped") {}
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
     }
 
     void addRequiredPrivileges(const std::string& dbname,
@@ -375,10 +379,21 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        const NamespaceString nss(parseNs(dbName, cmdObj));
+        const auto routingInfo =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
         // convertToCapped creates a temp collection and renames it at the end. It will require
         // special handling for create collection.
-        return NotAllowedOnShardedCollectionCmd::run(
-            opCtx, dbName, appendAllowImplicitCreate(cmdObj, true), result);
+        return nonShardedCollectionCommandPassthrough(
+            opCtx,
+            dbName,
+            nss,
+            routingInfo,
+            appendAllowImplicitCreate(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                                      true),
+            Shard::RetryPolicy::kIdempotent,
+            &result);
     }
 
 } convertToCappedCmd;

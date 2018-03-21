@@ -91,7 +91,7 @@
         connPoolSync: {skip: "executes locally on mongos (not sent to any remote node)"},
         connectionStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
         convertToCapped: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
