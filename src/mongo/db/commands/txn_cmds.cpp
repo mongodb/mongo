@@ -89,6 +89,8 @@ public:
 
 } commitTxn;
 
+MONGO_FP_DECLARE(pauseAfterTransactionPrepare);
+
 // TODO: This is a stub for testing storage prepare functionality.
 class CmdPrepareTxn : public BasicCommand {
 public:
@@ -132,6 +134,8 @@ public:
         // Running commit after prepare is not allowed yet.
         // Prepared units of work cannot be released by the session, so we immediately abort here.
         opCtx->getWriteUnitOfWork()->prepare();
+        // This failpoint will cause readers of prepared documents to return prepare conflicts.
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseAfterTransactionPrepare);
         session->abortActiveTransaction(opCtx);
         return true;
     }

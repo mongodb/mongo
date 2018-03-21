@@ -35,6 +35,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
@@ -116,7 +117,10 @@ public:
 
     // WiredTigerIndex additions
 
-    virtual bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id);
+    virtual bool isDup(OperationContext* opCtx,
+                       WT_CURSOR* c,
+                       const BSONObj& key,
+                       const RecordId& id);
 
     uint64_t tableId() const {
         return _tableId;
@@ -143,12 +147,14 @@ public:
     Status dupKeyError(const BSONObj& key);
 
 protected:
-    virtual Status _insert(WT_CURSOR* c,
+    virtual Status _insert(OperationContext* opCtx,
+                           WT_CURSOR* c,
                            const BSONObj& key,
                            const RecordId& id,
                            bool dupsAllowed) = 0;
 
-    virtual void _unindex(WT_CURSOR* c,
+    virtual void _unindex(OperationContext* opCtx,
+                          WT_CURSOR* c,
                           const BSONObj& key,
                           const RecordId& id,
                           bool dupsAllowed) = 0;
@@ -188,9 +194,17 @@ public:
         return true;
     }
 
-    Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const BSONObj& key,
+                   const RecordId& id,
+                   bool dupsAllowed) override;
 
-    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+    void _unindex(OperationContext* opCtx,
+                  WT_CURSOR* c,
+                  const BSONObj& key,
+                  const RecordId& id,
+                  bool dupsAllowed) override;
 
 private:
     bool _partial;
@@ -217,11 +231,22 @@ public:
         return true;
     }
 
-    Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const BSONObj& key,
+                   const RecordId& id,
+                   bool dupsAllowed) override;
 
-    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+    void _unindex(OperationContext* opCtx,
+                  WT_CURSOR* c,
+                  const BSONObj& key,
+                  const RecordId& id,
+                  bool dupsAllowed) override;
 
-    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id) override;
+    bool isDup(OperationContext* opCtx,
+               WT_CURSOR* c,
+               const BSONObj& key,
+               const RecordId& id) override;
 
 private:
     bool _partial;
@@ -244,9 +269,17 @@ public:
         return false;
     }
 
-    Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const BSONObj& key,
+                   const RecordId& id,
+                   bool dupsAllowed) override;
 
-    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+    void _unindex(OperationContext* opCtx,
+                  WT_CURSOR* c,
+                  const BSONObj& key,
+                  const RecordId& id,
+                  bool dupsAllowed) override;
 };
 
 }  // namespace

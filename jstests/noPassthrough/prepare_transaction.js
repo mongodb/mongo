@@ -22,11 +22,6 @@
     let adminDB = replSet.getPrimary().getDB("admin");
     let testColl = testDB.getCollection(collName);
 
-    if (!testDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
-
     testColl.drop();
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 

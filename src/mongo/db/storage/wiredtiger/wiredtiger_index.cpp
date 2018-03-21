@@ -297,7 +297,7 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
-    return _insert(c, key, id, dupsAllowed);
+    return _insert(opCtx, c, key, id, dupsAllowed);
 }
 
 void WiredTigerIndex::unindex(OperationContext* opCtx,
@@ -312,7 +312,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     WT_CURSOR* c = curwrap.get();
     invariant(c);
 
-    _unindex(c, key, id, dupsAllowed);
+    _unindex(opCtx, c, key, id, dupsAllowed);
 }
 
 void WiredTigerIndex::fullValidate(OperationContext* opCtx,
@@ -407,7 +407,7 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx,
     WiredTigerCursor curwrap(_uri, _tableId, false, opCtx);
     WT_CURSOR* c = curwrap.get();
 
-    if (isDup(c, key, id))
+    if (isDup(opCtx, c, key, id))
         return dupKeyError(key);
     return Status::OK();
 }
@@ -425,7 +425,7 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
     WT_CURSOR* c = curwrap.get();
     if (!c)
         return true;
-    int ret = WT_READ_CHECK(c->next(c));
+    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
     if (ret == WT_NOTFOUND)
         return true;
     invariantWTOK(ret);
@@ -480,7 +480,10 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     return static_cast<long long>(WiredTigerUtil::getIdentSize(session->getSession(), _uri));
 }
 
-bool WiredTigerIndex::isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id) {
+bool WiredTigerIndex::isDup(OperationContext* opCtx,
+                            WT_CURSOR* c,
+                            const BSONObj& key,
+                            const RecordId& id) {
     invariant(unique());
 
     // First check whether the key exists.
@@ -488,7 +491,7 @@ bool WiredTigerIndex::isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id
     WiredTigerItem item(data.getBuffer(), data.getSize());
     setKey(c, item.Get());
 
-    int ret = WT_READ_CHECK(c->search(c));
+    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return false;
     }
@@ -508,7 +511,10 @@ bool WiredTigerIndex::isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id
     return true;
 }
 
-bool WiredTigerIndexUniqueV2::isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id) {
+bool WiredTigerIndexUniqueV2::isDup(OperationContext* opCtx,
+                                    WT_CURSOR* c,
+                                    const BSONObj& key,
+                                    const RecordId& id) {
     KeyString prefixKey(keyStringVersion(), key, _ordering);
     WiredTigerItem prefixKeyItem(prefixKey.getBuffer(), prefixKey.getSize());
     setKey(c, prefixKeyItem.Get());
@@ -516,7 +522,8 @@ bool WiredTigerIndexUniqueV2::isDup(WT_CURSOR* c, const BSONObj& key, const Reco
     // An index entry key is KeyString of the prefix key + RecordId. To prevent duplicate prefix
     // key, search a record matching the prefix key.
     int cmp;
-    auto searchStatus = WT_READ_CHECK(c->search_near(c, &cmp));
+    auto searchStatus =
+        wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search_near(c, &cmp); });
 
     if (searchStatus == WT_NOTFOUND)
         return false;
@@ -538,10 +545,10 @@ bool WiredTigerIndexUniqueV2::isDup(WT_CURSOR* c, const BSONObj& key, const Reco
     // We got the smaller key adjacent to prefix key, check the next key too.
     int ret;
     if (cmp < 0) {
-        ret = WT_READ_CHECK(c->next(c));
+        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
     } else {
         // We got the larger key adjacent to prefix key, check the previous key too.
-        ret = WT_READ_CHECK(c->prev(c));
+        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->prev(c); });
     }
 
     if (ret == 0) {
@@ -1028,7 +1035,8 @@ protected:
 
     void advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
-        int ret = WT_READ_CHECK(_forward ? c->next(c) : c->prev(c));
+        int ret = wiredTigerPrepareConflictRetry(
+            _opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
         if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
             return;
@@ -1050,7 +1058,7 @@ protected:
         const WiredTigerItem keyItem(query.getBuffer(), query.getSize());
         setKey(c, keyItem.Get());
 
-        int ret = WT_READ_CHECK(c->search_near(c, &cmp));
+        int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
         if (ret == WT_NOTFOUND) {
             _cursorAtEof = true;
             TRACE_CURSOR << "\t not found";
@@ -1229,7 +1237,7 @@ public:
         setKey(c, keyItem.Get());
 
         // Using search rather than search_near.
-        int ret = WT_READ_CHECK(c->search(c));
+        int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
         if (ret != WT_NOTFOUND)
             invariantWTOK(ret);
         _cursorAtEof = ret == WT_NOTFOUND;
@@ -1255,7 +1263,7 @@ public:
         setKey(c, keyItem.Get());
 
         // Using search rather than search_near.
-        int ret = WT_READ_CHECK(c->search(c));
+        int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
         if (ret != WT_NOTFOUND)
             invariantWTOK(ret);
         _cursorAtEof = ret == WT_NOTFOUND;
@@ -1304,7 +1312,8 @@ SortedDataBuilderInterface* WiredTigerIndexUniqueV2::getBulkBuilder(OperationCon
     return new UniqueV2BulkBuilder(this, opCtx, dupsAllowed, _prefix);
 }
 
-Status WiredTigerIndexUnique::_insert(WT_CURSOR* c,
+Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
+                                      WT_CURSOR* c,
                                       const BSONObj& key,
                                       const RecordId& id,
                                       bool dupsAllowed) {
@@ -1328,7 +1337,7 @@ Status WiredTigerIndexUnique::_insert(WT_CURSOR* c,
     // we put them all in the "list"
     // Note that we can't omit AllZeros when there are multiple ids for a value. When we remove
     // down to a single value, it will be cleaned up.
-    ret = WT_READ_CHECK(c->search(c));
+    ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     invariantWTOK(ret);
 
     WT_ITEM old;
@@ -1368,7 +1377,8 @@ Status WiredTigerIndexUnique::_insert(WT_CURSOR* c,
     return wtRCToStatus(c->update(c));
 }
 
-Status WiredTigerIndexUniqueV2::_insert(WT_CURSOR* c,
+Status WiredTigerIndexUniqueV2::_insert(OperationContext* opCtx,
+                                        WT_CURSOR* c,
                                         const BSONObj& key,
                                         const RecordId& id,
                                         bool dupsAllowed) {
@@ -1403,7 +1413,7 @@ Status WiredTigerIndexUniqueV2::_insert(WT_CURSOR* c,
         invariantWTOK(ret);
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
-        if (isDup(c, key, id))
+        if (isDup(opCtx, c, key, id))
             return dupKeyError(key);
     }
 
@@ -1415,7 +1425,7 @@ Status WiredTigerIndexUniqueV2::_insert(WT_CURSOR* c,
     // with the exactly same table key.
     if (dupsAllowed) {
         setKey(c, keyItem.Get());
-        ret = WT_READ_CHECK(c->search(c));
+        ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
         if (ret == 0)
             return dupKeyError(key);
     }
@@ -1431,7 +1441,8 @@ Status WiredTigerIndexUniqueV2::_insert(WT_CURSOR* c,
     return Status::OK();
 }
 
-void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
+void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
+                                     WT_CURSOR* c,
                                      const BSONObj& key,
                                      const RecordId& id,
                                      bool dupsAllowed) {
@@ -1454,7 +1465,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
         if (_partial) {
             // Check that the record id matches.  We may be called to unindex records that are not
             // present in the index due to the partial filter expression.
-            int ret = WT_READ_CHECK(c->search(c));
+            int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
             if (ret == WT_NOTFOUND) {
                 triggerWriteConflictAtPoint(c);
                 return;
@@ -1481,7 +1492,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
 
     // dups are allowed, so we have to deal with a vector of RecordIds.
 
-    int ret = WT_READ_CHECK(c->search(c));
+    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         triggerWriteConflictAtPoint(c);
         return;
@@ -1536,7 +1547,8 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
     invariantWTOK(c->update(c));
 }
 
-void WiredTigerIndexUniqueV2::_unindex(WT_CURSOR* c,
+void WiredTigerIndexUniqueV2::_unindex(OperationContext* opCtx,
+                                       WT_CURSOR* c,
                                        const BSONObj& key,
                                        const RecordId& id,
                                        bool dupsAllowed) {
@@ -1589,7 +1601,8 @@ SortedDataBuilderInterface* WiredTigerIndexStandard::getBulkBuilder(OperationCon
     return new StandardBulkBuilder(this, opCtx, _prefix);
 }
 
-Status WiredTigerIndexStandard::_insert(WT_CURSOR* c,
+Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
+                                        WT_CURSOR* c,
                                         const BSONObj& keyBson,
                                         const RecordId& id,
                                         bool dupsAllowed) {
@@ -1616,7 +1629,8 @@ Status WiredTigerIndexStandard::_insert(WT_CURSOR* c,
     return Status::OK();
 }
 
-void WiredTigerIndexStandard::_unindex(WT_CURSOR* c,
+void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
+                                       WT_CURSOR* c,
                                        const BSONObj& key,
                                        const RecordId& id,
                                        bool dupsAllowed) {

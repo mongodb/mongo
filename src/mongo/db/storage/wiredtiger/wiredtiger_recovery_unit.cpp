@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/hex.h"
@@ -44,6 +45,13 @@
 
 namespace mongo {
 namespace {
+
+// Always notifies prepare conflict waiters when a transaction commits or aborts, even when the
+// transaction is not prepared. This should always be enabled if WTPrepareConflictForReads is
+// used, which fails randomly. If this is not enabled, no prepare conflicts will be resolved,
+// because the recovery unit may not ever actually be in a prepared state.
+MONGO_FP_DECLARE(WTAlwaysNotifyPrepareConflictWaiters);
+
 // SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
 // determine if documents changed, but a different recovery unit may be used across a getMore,
 // so there is a chance the snapshot ID will be reused.
@@ -70,8 +78,17 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
 
 void WiredTigerRecoveryUnit::_commit() {
     try {
+        bool notifyDone = !_prepareTimestamp.isNull();
         if (_session && _active) {
             _txnClose(true);
+        }
+
+        if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+            notifyDone = true;
+        }
+
+        if (notifyDone) {
+            _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
         }
 
         for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
@@ -87,8 +104,17 @@ void WiredTigerRecoveryUnit::_commit() {
 
 void WiredTigerRecoveryUnit::_abort() {
     try {
+        bool notifyDone = !_prepareTimestamp.isNull();
         if (_session && _active) {
             _txnClose(false);
+        }
+
+        if (MONGO_FAIL_POINT(WTAlwaysNotifyPrepareConflictWaiters)) {
+            notifyDone = true;
+        }
+
+        if (notifyDone) {
+            _sessionCache->notifyPreparedUnitOfWorkHasCommittedOrAborted();
         }
 
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
@@ -207,11 +233,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
-        // When committing a prepared transaction, a commit timestamp is required.
-        invariant(_prepareTimestamp.isNull() || !_commitTimestamp.isNull());
-        // Commit timestamps should greater than or equal to prepare timestamps.
-        invariant(_prepareTimestamp.isNull() || _commitTimestamp >= _prepareTimestamp);
-
         if (!_commitTimestamp.isNull()) {
             const std::string conf = "commit_timestamp=" + integerToHex(_commitTimestamp.asULL());
             invariantWTOK(s->timestamp_transaction(s, conf.c_str()));

@@ -113,9 +113,10 @@ public:
 
     // The following metrics are initialized with 0 rather than -1 in order to simplify use by the
     // CRUD path.
-    long long nmoved{0};        // updates resulted in a move (moves are expensive)
-    long long keysInserted{0};  // Number of index keys inserted.
-    long long keysDeleted{0};   // Number of index keys removed.
+    long long nmoved{0};                // updates resulted in a move (moves are expensive)
+    long long keysInserted{0};          // Number of index keys inserted.
+    long long keysDeleted{0};           // Number of index keys removed.
+    long long prepareReadConflicts{0};  // Number of read conflicts caused by a prepared transaction
     long long writeConflicts{0};
 
     BSONObj execStats;  // Owned here.

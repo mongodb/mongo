@@ -284,6 +284,25 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
     _journalListener->onDurable(token);
 }
 
+void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx) {
+    invariant(opCtx);
+    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+
+    auto lastCounter = _lastCommitOrAbortCounter;
+    opCtx->waitForConditionOrInterrupt(_prepareCommittedOrAbortedCond, lk, [&] {
+        return lastCounter != _lastCommitOrAbortCounter;
+    });
+}
+
+void WiredTigerSessionCache::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
+    {
+        stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+        _lastCommitOrAbortCounter++;
+    }
+    _prepareCommittedOrAbortedCond.notify_all();
+}
+
+
 void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
