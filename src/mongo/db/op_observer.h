@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
@@ -252,6 +253,13 @@ public:
 
         // Set of all session ids from ops being rolled back.
         std::set<UUID> rollbackSessionIds = {};
+
+        // Maps UUIDs to a set of BSONObjs containing the _ids of the documents that will be deleted
+        // from that collection due to rollback, and is used to populate rollback files.
+        // For simplicity, this BSONObj set uses the simple binary comparison, as it is never wrong
+        // to consider two _ids as distinct even if the collection default collation would put them
+        // in the same equivalence class.
+        stdx::unordered_map<UUID, SimpleBSONObjUnorderedSet, UUID::Hash> rollbackDeletedIdsMap;
 
         // True if the shard identity document was rolled back.
         bool shardIdentityRolledBack = false;
