@@ -2762,14 +2762,16 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          tar cfvz ./embedded_sdk.tgz ./mongo-embedded-sdk-${version}
+          tar cfvz ./embedded-sdk.tgz ./mongo-embedded-sdk-${version}
 
+    # Upload it so we can download from EVG.
     - command: s3.put
       params:
+        optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: "src/build/embedded_sdk.tgz"
-        remote_file: ${project}/${build_variant}/${revision}/embedded_sdk/${build_id}.tgz
+        local_file: "src/build/embedded-sdk.tgz"
+        remote_file: ${project}/embedded-sdk/${build_variant}/${revision}/${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -2782,6 +2784,30 @@ tasks:
     # Run the android embedded CAPI tests in the android emulator
     # noop if ${enable_android_emu_tests} is not "true"
     - func: "run android emulator tests"
+
+    # If this is a patch build, blow away the file so our subsequent and optional s3.put
+    # doesn't run. That way, we won't overwrite the latest part in our patches.
+    - command: shell.exec
+      params:
+        working_dir: "src/build"
+        script: |
+          if [ "${is_patch}" = "true" ]; then
+            rm -f src/build/embedded-sdk.tgz
+          fi
+
+    # A second put, this time to -latest, to give devs a reasonable
+    # way to get the most recent build.
+    - command: s3.put
+      params:
+        visibility: none
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: "src/build/embedded-sdk.tgz"
+        remote_file: ${project}/embedded-sdk/embedded-sdk-${build_variant}-latest.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
 
     - func: "scons cache pruning"
     - func: "umount shared scons directory"
@@ -6670,7 +6696,7 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: ios-102-debug
+- name: ios-10.2-debug
   display_name: "iOS 10.2 DEBUG"
   run_on:
   - macos-1012
@@ -6696,7 +6722,7 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: ios-sim-102-debug
+- name: ios-sim-10.2-debug
   display_name: "iOS Simulator 10.2 DEBUG"
   run_on:
   - macos-1012
@@ -6725,7 +6751,7 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: tvos-101-debug
+- name: tvos-10.1-debug
   display_name: "tvOS 10.1 DEBUG"
   run_on:
   - macos-1012
@@ -6751,7 +6777,7 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: tvos-sim-101-debug
+- name: tvos-sim-10.1-debug
   display_name: "tvOS Simulator 10.1 DEBUG"
   run_on:
   - macos-1012
@@ -6780,8 +6806,8 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: android-emulator
-  display_name: "Android emulator DEBUG"
+- name: android-armv8-debug
+  display_name: "Android ARMv8 DEBUG"
   run_on:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
