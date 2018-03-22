@@ -625,15 +625,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/prefetch',
         '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/net/network',
         'initial_syncer',
+        'oplog',
         'oplog_entry',
+        'oplogreader',
         'repl_coordinator_interface',
         'storage_interface',
-        'bgsync',
     ],
 )
 
@@ -1388,6 +1390,7 @@ env.Library(
         'data_replicator_external_state_impl.cpp',
     ],
     LIBDEPS=[
+        'oplog_application',
         'optime',
         'repl_coordinator_interface',
         '$BUILD_DIR/mongo/base',

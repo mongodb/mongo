@@ -34,6 +34,7 @@
 
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -115,8 +116,9 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(OperationContext
                                                                 OplogApplier::Observer* observer,
                                                                 const HostAndPort& source,
                                                                 ThreadPool* writerPool) {
-    return _replicationCoordinatorExternalState->multiApply(
-        opCtx, std::move(ops), observer, source, writerPool);
+    SyncTail syncTail(observer, repl::multiInitialSyncApply, writerPool);
+    syncTail.setHostname(source.toString());
+    return syncTail.multiApply(opCtx, std::move(ops));
 }
 
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {
