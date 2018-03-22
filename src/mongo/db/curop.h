@@ -128,6 +128,9 @@ public:
     long long executionTimeMicros{0};
     long long nreturned{-1};
     int responseLength{-1};
+
+    // Shard targeting info.
+    int nShards{-1};
 };
 
 /**

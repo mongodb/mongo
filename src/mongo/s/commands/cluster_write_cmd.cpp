@@ -251,6 +251,9 @@ public:
         // Save the last opTimes written on each shard for this client, to allow GLE to work
         ClusterLastErrorInfo::get(opCtx->getClient())->addHostOpTimes(stats.getWriteOpTimes());
 
+        // Record the number of shards targeted by this write.
+        CurOp::get(opCtx)->debug().nShards = stats.getTargetedShards().size();
+
         result.appendElements(response.toBSON());
         return response.getOk();
     }

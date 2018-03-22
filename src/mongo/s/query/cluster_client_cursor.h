@@ -34,6 +34,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/util/time_support.h"
@@ -108,6 +109,11 @@ public:
      * Returns the original command object which created this cursor.
      */
     virtual BSONObj getOriginatingCommand() const = 0;
+
+    /**
+     * Returns a reference to the vector of remote hosts involved in this operation.
+     */
+    virtual const std::vector<ClusterClientCursorParams::RemoteCursor>& getRemotes() const = 0;
 
     /**
      * Returns the number of result documents returned so far by this cursor via the next() method.

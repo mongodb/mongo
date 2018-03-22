@@ -39,6 +39,7 @@
 #include "mongo/db/session_killer.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -193,6 +194,11 @@ public:
          * Returns the command object which originally created this cursor.
          */
         BSONObj getOriginatingCommand() const;
+
+        /**
+         * Returns a reference to the vector of remote hosts involved in this operation.
+         */
+        const std::vector<ClusterClientCursorParams::RemoteCursor>& getRemotes() const;
 
         /**
          * Returns the cursor id for the underlying cursor, or zero if no cursor is owned.

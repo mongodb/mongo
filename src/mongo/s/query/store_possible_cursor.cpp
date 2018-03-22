@@ -60,6 +60,11 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     CurOp::get(opCtx)->debug().nreturned = incomingCursorResponse.getValue().getBatch().size();
 
+    // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
+    // a split aggregation pipeline, and the shards half of that pipeline may have targeted multiple
+    // shards. In that case, leave the current value as-is.
+    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, 1);
+
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
         CurOp::get(opCtx)->debug().cursorExhausted = true;
         return cmdResult;

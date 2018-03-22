@@ -519,6 +519,13 @@ DispatchShardPipelineResults dispatchShardPipeline(
                    << " dispatch attempts";
             continue;  // Try again if allowed.
         }
+
+        // Record the number of shards involved in the aggregation. If we are required to merge on
+        // the primary shard, but the primary shard was not in the set of targeted shards, then we
+        // must increment the number of involved shards.
+        CurOp::get(opCtx)->debug().nShards = shardIds.size() +
+            (needsPrimaryShardMerge && !shardIds.count(executionNsRoutingInfo.primaryId()));
+
         break;  // Success!
     }
 
@@ -623,6 +630,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     ccc->detachFromOperationContext();
 
+    int nShards = ccc->getRemotes().size();
     CursorId clusterCursorId = 0;
 
     if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
@@ -640,6 +648,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     if (clusterCursorId > 0) {
         CurOp::get(opCtx)->debug().cursorid = clusterCursorId;
     }
+    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, nShards);
     CurOp::get(opCtx)->debug().cursorExhausted = (clusterCursorId == 0);
     CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
 

@@ -544,6 +544,7 @@ string OpDebug::report(Client* client,
         s << " planSummary: " << redact(curop.getPlanSummary().toString());
     }
 
+    OPDEBUG_TOSTRING_HELP(nShards);
     OPDEBUG_TOSTRING_HELP(cursorid);
     OPDEBUG_TOSTRING_HELP(ntoreturn);
     OPDEBUG_TOSTRING_HELP(ntoskip);
@@ -637,6 +638,7 @@ void OpDebug::append(const CurOp& curop,
         appendAsObjOrString("originatingCommand", originatingCommand, maxElementSize, &b);
     }
 
+    OPDEBUG_APPEND_NUMBER(nShards);
     OPDEBUG_APPEND_NUMBER(cursorid);
     OPDEBUG_APPEND_BOOL(exhaust);
 

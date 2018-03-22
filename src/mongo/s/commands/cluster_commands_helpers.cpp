@@ -476,6 +476,7 @@ bool appendEmptyResultSet(OperationContext* opCtx,
     invariant(!status.isOK());
 
     CurOp::get(opCtx)->debug().nreturned = 0;
+    CurOp::get(opCtx)->debug().nShards = 0;
 
     if (status == ErrorCodes::NamespaceNotFound) {
         // Old style reply

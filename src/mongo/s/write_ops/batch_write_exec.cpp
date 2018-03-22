@@ -169,6 +169,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 if (pendingBatches.count(targetShardId))
                     continue;
 
+                stats->noteTargetedShard(targetShardId);
+
                 const auto request = [&] {
                     const auto shardBatchRequest(batchOp.buildBatchRequest(*nextBatch));
 
@@ -369,10 +371,18 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
            << " for " << clientRequest.getNS();
 }
 
+void BatchWriteExecStats::noteTargetedShard(const ShardId& shardId) {
+    _targetedShards.insert(shardId);
+}
+
 void BatchWriteExecStats::noteWriteAt(const HostAndPort& host,
                                       repl::OpTime opTime,
                                       const OID& electionId) {
     _writeOpTimes[ConnectionString(host)] = HostOpTime(opTime, electionId);
+}
+
+const std::set<ShardId>& BatchWriteExecStats::getTargetedShards() const {
+    return _targetedShards;
 }
 
 const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
