@@ -68,7 +68,8 @@ Status launchServiceWorkerThread(stdx::function<void()> task) {
         pthread_attr_init(&attrs);
         pthread_attr_setdetachstate(&attrs, PTHREAD_CREATE_DETACHED);
 
-        static const rlim_t kStackSize = 1024 * 1024;  // if we change this we need to update the warning
+        static const rlim_t kStackSize =
+            1024 * 1024;  // if we change this we need to update the warning
 
         struct rlimit limits;
         invariant(getrlimit(RLIMIT_STACK, &limits) == 0);
