@@ -49,6 +49,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -178,6 +179,7 @@ public:
 
     InitialSyncer(InitialSyncerOptions opts,
                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+                  ThreadPool* writerPool,
                   StorageInterface* storage,
                   ReplicationProcess* replicationProcess,
                   const OnCompletionFn& onCompletion);
@@ -575,6 +577,7 @@ private:
     const InitialSyncerOptions _opts;                                           // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)
+    ThreadPool* _writerPool;                                                    // (R)
     StorageInterface* _storage;                                                 // (R)
     ReplicationProcess* _replicationProcess;                                    // (S)
 

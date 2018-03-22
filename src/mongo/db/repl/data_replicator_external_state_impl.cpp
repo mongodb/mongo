@@ -49,10 +49,6 @@ executor::TaskExecutor* DataReplicatorExternalStateImpl::getTaskExecutor() const
     return _replicationCoordinatorExternalState->getTaskExecutor();
 }
 
-ThreadPool* DataReplicatorExternalStateImpl::getDbWorkThreadPool() const {
-    return _replicationCoordinatorExternalState->getDbWorkThreadPool();
-}
-
 OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOpTime() {
     if (!_replicationCoordinator->isV1ElectionProtocol()) {
         return {OpTime::kUninitializedTerm, OpTime()};
@@ -117,8 +113,12 @@ StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() co
 StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
     OperationContext* opCtx,
     MultiApplier::Operations ops,
-    MultiApplier::ApplyOperationFn applyOperation) {
-    return _replicationCoordinatorExternalState->multiApply(opCtx, std::move(ops), applyOperation);
+    OplogApplier::Observer* observer,
+    const HostAndPort& source,
+    MultiApplier::ApplyOperationFn applyOperation,
+    ThreadPool* writerPool) {
+    return _replicationCoordinatorExternalState->multiApply(
+        opCtx, std::move(ops), observer, source, applyOperation, writerPool);
 }
 
 Status DataReplicatorExternalStateImpl::_multiInitialSyncApply(

@@ -849,14 +849,20 @@ bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedBySt
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     OperationContext* opCtx,
     MultiApplier::Operations ops,
-    MultiApplier::ApplyOperationFn applyOperation) {
+    OplogApplier::Observer* observer,
+    const HostAndPort& source,
+    MultiApplier::ApplyOperationFn applyOperation,
+    ThreadPool* writerPool) {
     auto applyOperationsForWriter = [&](OperationContext* opCtx,
                                         MultiApplier::OperationPtrs* ops,
                                         SyncTail* st,
                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
         return applyOperation(opCtx, ops, workerMultikeyPathInfo);
     };
-    SyncTail syncTail(nullptr, applyOperationsForWriter, _writerPool.get());
+    // 'observer' has no effect yet on this SyncTail's operation.
+    SyncTail syncTail(observer, applyOperationsForWriter, writerPool);
+    // 'source' has no effect yet on this SyncTail's operation.
+    syncTail.setHostname(source.toString());
     return syncTail.multiApply(opCtx, std::move(ops));
 }
 

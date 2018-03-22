@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
@@ -279,7 +280,10 @@ public:
      */
     virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
-                                          MultiApplier::ApplyOperationFn applyOperation) = 0;
+                                          OplogApplier::Observer* observer,
+                                          const HostAndPort& source,
+                                          MultiApplier::ApplyOperationFn applyOperation,
+                                          ThreadPool* writerPool) = 0;
 
     /**
      * Used by multiApply() to writes operations to database during initial sync. `fetchCount` is a

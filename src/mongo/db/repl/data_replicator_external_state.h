@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
@@ -74,11 +75,6 @@ public:
      * Returns task executor for scheduling tasks to be run asynchronously.
      */
     virtual executor::TaskExecutor* getTaskExecutor() const = 0;
-
-    /**
-     * Returns shared db worker thread pool for collection cloning.
-     */
-    virtual ThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
      * Returns the current term and last committed optime.
@@ -125,7 +121,10 @@ private:
      */
     virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
                                            MultiApplier::Operations ops,
-                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
+                                           OplogApplier::Observer* observer,
+                                           const HostAndPort& source,
+                                           MultiApplier::ApplyOperationFn applyOperation,
+                                           ThreadPool* writerPool) = 0;
 
     /**
      * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a

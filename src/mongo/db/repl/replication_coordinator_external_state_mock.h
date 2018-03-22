@@ -94,7 +94,10 @@ public:
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
-                                          MultiApplier::ApplyOperationFn applyOperation) override;
+                                          OplogApplier::Observer* observer,
+                                          const HostAndPort& source,
+                                          MultiApplier::ApplyOperationFn applyOperation,
+                                          ThreadPool* writerPool) override;
     virtual Status multiInitialSyncApply(OperationContext* opCtx,
                                          MultiApplier::OperationPtrs* ops,
                                          const HostAndPort& source,

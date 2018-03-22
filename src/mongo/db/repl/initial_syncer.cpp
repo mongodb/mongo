@@ -162,11 +162,31 @@ StatusWith<OpTimeWithHash> parseOpTimeWithHash(const QueryResponseStatus& fetchR
         : StatusWith<OpTimeWithHash>{ErrorCodes::NoMatchingDocument, "no oplog entry found"};
 }
 
+/**
+ * OplogApplier observer that updates 'fetchCount' when applying operations for each writer thread.
+ */
+class InitialSyncApplyObserver : public OplogApplier::Observer {
+public:
+    explicit InitialSyncApplyObserver(AtomicUInt32* fetchCount) : _fetchCount(fetchCount) {}
+
+    // OplogApplier::Observer functions
+    void onBatchBegin(const OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
+        _fetchCount->fetchAndAdd(docs.size());
+    }
+    void onOperationConsumed(const BSONObj& op) final {}
+
+private:
+    AtomicUInt32* const _fetchCount;
+};
+
 }  // namespace
 
 InitialSyncer::InitialSyncer(
     InitialSyncerOptions opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+    ThreadPool* writerPool,
     StorageInterface* storage,
     ReplicationProcess* replicationProcess,
     const OnCompletionFn& onCompletion)
@@ -174,6 +194,7 @@ InitialSyncer::InitialSyncer(
       _opts(opts),
       _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
       _exec(_dataReplicatorExternalState->getTaskExecutor()),
+      _writerPool(writerPool),
       _storage(storage),
       _replicationProcess(replicationProcess),
       _onCompletion(onCompletion) {
@@ -706,12 +727,9 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         return (name != "local");
     };
     _initialSyncState = stdx::make_unique<InitialSyncState>(stdx::make_unique<DatabasesCloner>(
-        _storage,
-        _exec,
-        _dataReplicatorExternalState->getDbWorkThreadPool(),
-        _syncSource,
-        listDatabasesFilter,
-        [=](const Status& status) { _databasesClonerCallback(status, onCompletionGuard); }));
+        _storage, _exec, _writerPool, _syncSource, listDatabasesFilter, [=](const Status& status) {
+            _databasesClonerCallback(status, onCompletionGuard);
+        }));
 
     _initialSyncState->beginTimestamp = lastOpTimeWithHash.opTime.getTimestamp();
 
@@ -944,11 +962,13 @@ void InitialSyncer::_getNextApplierBatchCallback(
                 opCtx, x, source, &_fetchCount, workerMultikeyPathInfo);
         };
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn =
-            [=](OperationContext* opCtx,
-                MultiApplier::Operations ops,
-                MultiApplier::ApplyOperationFn apply) {
-                return _dataReplicatorExternalState->_multiApply(opCtx, ops, apply);
-            };
+            [ =, source = _syncSource ](OperationContext * opCtx,
+                                        MultiApplier::Operations ops,
+                                        MultiApplier::ApplyOperationFn apply) {
+            InitialSyncApplyObserver observer(&_fetchCount);
+            return _dataReplicatorExternalState->_multiApply(
+                opCtx, ops, &observer, source, apply, _writerPool);
+        };
         const auto& lastEntry = ops.back();
         OpTimeWithHash lastApplied(lastEntry.getHash(), lastEntry.getOpTime());
         auto numApplied = ops.size();

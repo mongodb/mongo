@@ -708,6 +708,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                 createInitialSyncerOptions(this, _externalState.get()),
                 stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
                                                                           _externalState.get()),
+                _externalState->getDbWorkThreadPool(),
                 _storage,
                 _replicationProcess,
                 onCompletion);

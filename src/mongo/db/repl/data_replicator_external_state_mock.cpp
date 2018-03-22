@@ -45,10 +45,6 @@ executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const
     return taskExecutor;
 }
 
-ThreadPool* DataReplicatorExternalStateMock::getDbWorkThreadPool() const {
-    return dbWorkThreadPool;
-}
-
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
     return {currentTerm, lastCommittedOpTime};
 }
@@ -92,7 +88,10 @@ StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() co
 StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
     OperationContext* opCtx,
     MultiApplier::Operations ops,
-    MultiApplier::ApplyOperationFn applyOperation) {
+    OplogApplier::Observer* observer,
+    const HostAndPort& source,
+    MultiApplier::ApplyOperationFn applyOperation,
+    ThreadPool* writerPool) {
     return multiApplyFn(opCtx, std::move(ops), applyOperation);
 }
 

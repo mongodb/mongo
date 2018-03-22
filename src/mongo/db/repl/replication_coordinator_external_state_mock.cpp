@@ -240,7 +240,12 @@ bool ReplicationCoordinatorExternalStateMock::isReadConcernSnapshotSupportedBySt
 }
 
 StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
-    OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn) {
+    OperationContext*,
+    MultiApplier::Operations,
+    OplogApplier::Observer* observer,
+    const HostAndPort& source,
+    MultiApplier::ApplyOperationFn,
+    ThreadPool* writerPool) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

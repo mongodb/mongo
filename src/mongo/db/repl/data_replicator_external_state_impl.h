@@ -48,8 +48,6 @@ public:
 
     executor::TaskExecutor* getTaskExecutor() const override;
 
-    ThreadPool* getDbWorkThreadPool() const override;
-
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
     void processMetadata(const rpc::ReplSetMetadata& replMetadata,
@@ -66,7 +64,10 @@ public:
 private:
     StatusWith<OpTime> _multiApply(OperationContext* opCtx,
                                    MultiApplier::Operations ops,
-                                   MultiApplier::ApplyOperationFn applyOperation) override;
+                                   OplogApplier::Observer* observer,
+                                   const HostAndPort& source,
+                                   MultiApplier::ApplyOperationFn applyOperation,
+                                   ThreadPool* writerPool) override;
 
     Status _multiInitialSyncApply(OperationContext* opCtx,
                                   MultiApplier::OperationPtrs* ops,
