@@ -495,7 +495,7 @@ functions:
         set -o verbose
         if [ "${setup_android_toolchain|}" = "true" ]; then
             ${activate_virtualenv}
-            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh
+            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh ${android_toolchain_system_image_arch} ${android_toolchain_target_arch}
         fi
 
   "scons cache pruning" :
@@ -1155,7 +1155,7 @@ functions:
           ${activate_virtualenv}
           $python buildscripts/idl/run_tests.py
 
-  "run ios sim embedded tests" :
+  "run embedded tests" :
     command: shell.exec
     type: test
     params:
@@ -1165,27 +1165,18 @@ functions:
         set -o errexit
 
         ${activate_virtualenv}
-        if [ ${enable_iostvos_sim_tests|false} = "true" ]; then
+        if [ ${enable_embedded_tests|false} = "ios_tvos_simulator" ]; then
             ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test" --tempPath /data
             ${compile_env|} buildscripts/runiossim.sh ${ios_sim_device} ${ios_sim_runtime} "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_transport_test" --tempPath /data
-        fi
-
-  "run android emulator tests" :
-    command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        set -o errexit
-
-        ${activate_virtualenv}
-        if [ ${enable_android_emu_tests|false} = "true" ]; then
+        elif [ ${enable_embedded_tests|false} = "android_emulator" ]; then
             # strip because the binaries with debug symbols are too big for the default storage on the emulator
-            find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip
-            find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
-            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_transport_test" --tempPath /data
+            find build/mongo-embedded-sdk-${version}/bin -type f | xargs $(dirname $(pwd))/android_toolchain/bin/*-linux-android-strip
+            find build/mongo-embedded-sdk-${version}/lib -type f -name "*.so" | xargs $(dirname $(pwd))/android_toolchain/bin/*-linux-android-strip
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_capi_test" --tempPath /data
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk ${android_toolchain_system_image_arch} "build/mongo-embedded-sdk-${version}" "bin/mongo_embedded_transport_test" --tempPath /data
+        elif [ ${enable_embedded_tests|false} = "native" ]; then
+          "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_capi_test"
+          "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_transport_test"
         fi
 
   "run powercycle test" :
@@ -2777,13 +2768,7 @@ tasks:
         content_type: application/tar
         display_name: "Embedded SDK Tar Archive"
 
-    # Run the iOS embedded CAPI tests in the iOS simulator
-    # noop if ${enable_iostvos_sim_tests} is not "true"
-    - func: "run ios sim embedded tests"
-
-    # Run the android embedded CAPI tests in the android emulator
-    # noop if ${enable_android_emu_tests} is not "true"
-    - func: "run android emulator tests"
+    - func: "run embedded tests"
 
     # If this is a patch build, blow away the file so our subsequent and optional s3.put
     # doesn't run. That way, we won't overwrite the latest part in our patches.
@@ -2804,7 +2789,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
-        remote_file: ${project}/embedded-sdk/embedded-sdk-${build_variant}-latest.tgz
+        remote_file: ${project}/embedded-sdk/${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -6696,8 +6681,38 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: ios-10.2-debug
-  display_name: "iOS 10.2 DEBUG"
+
+###########################################
+#          Mobile SDK buildvariants       #
+###########################################
+
+- name: embedded-sdk-macosx-10.10-debug
+  display_name: "Embedded SDK - macOS 10.10 DEBUG"
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    build_cdriver: true
+    cdriver_configure_flags: >-
+      CC="$(xcrun -f --sdk macosx clang)"
+      CXX="$(xcrun -f --sdk macosx clang++)"
+      CPPFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
+      CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
+      CXXFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
+      LDFLAGS="-mmacosx-version-min=10.10 -Wl,-rpath,@loader_path/../lib"
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: >-
+      -j$(sysctl -n hw.logicalcpu)
+      --dbg=on
+      --variables-files=etc/scons/xcode_macos.vars
+    disable_unit_tests: true
+    enable_embedded_tests: native
+  tasks:
+  - name: compile_mobile
+
+- name: embedded-sdk-iphoneos-10.2-debug
+  display_name: "Embedded SDK - iOS 10.2 DEBUG"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -6722,8 +6737,8 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: ios-sim-10.2-debug
-  display_name: "iOS Simulator 10.2 DEBUG"
+- name: embedded-sdk-iphonesimulator-10.2-debug
+  display_name: "Embedded SDK - iOS Simulator 10.2 DEBUG"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -6745,14 +6760,14 @@ buildvariants:
       --dbg=on
       --variables-files=etc/scons/xcode_ios_sim.vars
     disable_unit_tests: true
-    enable_iostvos_sim_tests: true
+    enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: iPhone-7
     ios_sim_runtime: iOS-10-3
   tasks:
   - name: compile_mobile
 
-- name: tvos-10.1-debug
-  display_name: "tvOS 10.1 DEBUG"
+- name: embedded-sdk-appletvos-10.1-debug
+  display_name: "Embedded SDK - tvOS 10.1 DEBUG"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -6777,8 +6792,8 @@ buildvariants:
   tasks:
   - name: compile_mobile
 
-- name: tvos-sim-10.1-debug
-  display_name: "tvOS Simulator 10.1 DEBUG"
+- name: embedded-sdk-appletvsimulator-10.1-debug
+  display_name: "Embedded SDK - tvOS Simulator 10.1 DEBUG"
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -6800,14 +6815,39 @@ buildvariants:
       --dbg=on
       --variables-files=etc/scons/xcode_tvos_sim.vars
     disable_unit_tests: true
-    enable_iostvos_sim_tests: true
+    enable_embedded_tests: ios_tvos_simulator
     ios_sim_device: Apple-TV-1080p
     ios_sim_runtime: tvOS-10-2
   tasks:
   - name: compile_mobile
 
-- name: android-armv8-debug
-  display_name: "Android ARMv8 DEBUG"
+- name: embedded-sdk-ubuntu-1604-x86_64-debug
+  display_name: "Embedded SDK - Ubuntu 16.04 x86_64 DEBUG"
+  run_on:
+  - ubuntu1604-build
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    build_cdriver: true
+    # Normally, we would include -Wl,z,origin here to make origin processing a thing
+    # but see the notes in SConstruct about z,origin and android.
+    cdriver_configure_flags: >-
+      CC="/opt/mongodbtoolchain/v2/bin/gcc"
+      CXX="/opt/mongodbtoolchain/v2/bin/g++"
+      LDFLAGS="-Wl,-rpath,\$ORIGIN/../lib"
+    # We need --allocator=system here to work around SERVER-XXXXX
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --dbg=on
+      --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+      --allocator=system
+    disable_unit_tests: true
+    enable_embedded_tests: native
+  tasks:
+  - name: compile_mobile
+
+- name: embedded-sdk-android-arm64-debug
+  display_name: "Embedded SDK - Android arm64 DEBUG"
   run_on:
   - ubuntu1604-build
   batchtime: 1440 # 1 day
@@ -6828,8 +6868,40 @@ buildvariants:
       --android-toolchain-path=$(dirname $(pwd))/android_toolchain
       --variables-files=etc/scons/android_toolchain.vars
     disable_unit_tests: true
-    enable_android_emu_tests: true
+    enable_embedded_tests: android_emulator
     setup_android_toolchain: true
+    android_toolchain_system_image_arch: "arm64-v8a"
+    android_toolchain_target_arch: "arm64"
+  tasks:
+  - name: compile_mobile
+
+- name: embedded-sdk-android-x86_64-debug
+  display_name: "Embedded SDK - Android x86_64 DEBUG"
+  run_on:
+  - ubuntu1604-build
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1,uses_transactions
+    build_cdriver: true
+    # Normally, we would include -Wl,z,origin here to make origin processing a thing
+    # but see the notes in SConstruct about z,origin and android.
+    cdriver_configure_flags: >-
+      --host x86_64-unknown-linux-gnu
+      CC=$(dirname $(pwd))/android_toolchain/bin/clang
+      CXX=$(dirname $(pwd))/android_toolchain/clang++
+      LDFLAGS="-Wl,-rpath,\$ORIGIN/../lib"
+    compile_env: JAVA_HOME=/opt/java/jdk8/
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --dbg=on
+      --android-toolchain-path=$(dirname $(pwd))/android_toolchain
+      --variables-files=etc/scons/android_toolchain.vars
+    disable_unit_tests: true
+    # The Android x86_64 emulator requires KVM.
+    enable_embedded_tests: false
+    setup_android_toolchain: true
+    android_toolchain_system_image_arch: "x86_64"
+    android_toolchain_target_arch: "x86_64"
   tasks:
   - name: compile_mobile
 

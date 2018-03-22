@@ -361,7 +361,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 #if defined(__ELF_NATIVE_CLASS)
 #define ARCH_BITS __ELF_NATIVE_CLASS
 #else  //__ELF_NATIVE_CLASS
-#if defined(__aarch64__)
+#if defined(__x86_64__) || defined(__aarch64__)
 #define ARCH_BITS 64
 #elif defined(__arm__)
 #define ARCH_BITS 32
