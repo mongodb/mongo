@@ -62,13 +62,6 @@ var blacklist = [
     'indexed_insert_eval.js',  // eval doesn't work with sharded collections
     'indexed_insert_eval_nolock.js',  // eval doesn't work with sharded collections
 
-    // These workloads sometimes triggers an 'unable to target write op for collection ... caused by
-    // ... database not found' error. Further investigation still needs to be done, but these
-    // failures may be due to SERVER-17397 'drops in a sharded cluster may not fully succeed'
-    // because it drops and reuses the same namespaces.
-    'kill_multicollection_aggregation.js',
-    'invalidated_cursors.js',
-
     'plan_cache_drop_database.js',  // cannot ensureIndex after dropDatabase without sharding first
     'remove_single_document.js',    // our .remove(query, {justOne: true}) calls lack shard keys
     'remove_single_document_eval.js',         // eval doesn't work with sharded collections
@@ -150,6 +143,8 @@ var blacklist = [
     'collmod.js',
     'collmod_separate_collections.js',
     'view_catalog.js',
+    'kill_multicollection_aggregation.js',  // Uses getMore.
+    'invalidated_cursors.js',               // Uses getMore.
 
     // The auto_retry_on_network_error.js override needs to overwrite the response from drop on
     // NamespaceNotFound, and since this workload only creates and drops collections there isn't

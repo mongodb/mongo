@@ -54,11 +54,14 @@ var $config = (function() {
                                  .aggregate([
                                      // idleConnections true so we can also kill cursors which are
                                      // not currently active.
-                                     {$currentOp: {idleConnections: true}},
+                                     // localOps true so that currentOp reports the mongos
+                                     // operations when run on a sharded cluster, instead of the
+                                     // shard's operations.
+                                     {$currentOp: {idleConnections: true, localOps: true}},
                                      // We only about getMores.
                                      {$match: {"command.getMore": {$exists: true}}},
                                      // Only find getMores running on the database for this test.
-                                     {$match: {"ns": this.uniqueDBName + ".$cmd"}}
+                                     {$match: {"ns": {$regex: this.uniqueDBName + "\."}}}
                                  ])
                                  .toArray();
 
@@ -116,11 +119,6 @@ var $config = (function() {
          * Choose a random cursor that's open and kill it.
          */
         killCursor: function killCursor(unusedDB, unusedCollName) {
-            if (isMongos(unusedDB)) {
-                // SERVER-33700: We can't list operations running locally on a mongos.
-                return;
-            }
-
             const myDB = unusedDB.getSiblingDB(this.uniqueDBName);
 
             // Not checking the return value, since the cursor may be closed on its own
@@ -133,11 +131,6 @@ var $config = (function() {
         },
 
         killOp: function killOp(unusedDB, unusedCollName) {
-            if (isMongos(unusedDB)) {
-                // SERVER-33700: We can't list operations running locally on a mongos.
-                return;
-            }
-
             const myDB = unusedDB.getSiblingDB(this.uniqueDBName);
             // Not checking return value since the operation may end on its own before we have
             // a chance to kill it.
@@ -184,9 +177,11 @@ var $config = (function() {
          */
         dropDatabase: function dropDatabase(unusedDB, unusedCollName) {
             if (isMongos(unusedDB)) {
-                // SERVER-17397: Drops in a sharded cluster may not fully succeed. It is not safe
-                // to drop and then recreate a collection with the same name, so we skip dropping
-                // and recreating the database.
+                // This workload can sometimes triggers an 'unable to target write op for
+                // collection ... caused by ... database not found' error. Further investigation
+                // still needs to be done, but these failures may be due to SERVER-17397 'drops in
+                // a sharded cluster may not fully succeed' because it drops and reuses the same
+                // namespaces. For now, we avoid dropping the database on a sharded cluster.
                 return;
             }
 
@@ -205,8 +200,11 @@ var $config = (function() {
          */
         dropCollection: function dropCollection(unusedDB, unusedCollName) {
             if (isMongos(unusedDB)) {
-                // SERVER-17397: Drops in a sharded cluster may not fully succeed. It is not safe
-                // to drop and then recreate a collection with the same name, so we skip it.
+                // This workload can sometimes triggers an 'unable to target write op for
+                // collection ... caused by ... database not found' error. Further investigation
+                // still needs to be done, but these failures may be due to SERVER-17397 'drops in
+                // a sharded cluster may not fully succeed' because it drops and reuses the same
+                // namespaces. For now, we avoid dropping the collection on a sharded cluster.
                 return;
             }
 
