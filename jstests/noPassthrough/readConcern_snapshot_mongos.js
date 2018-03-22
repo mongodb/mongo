@@ -10,6 +10,12 @@
     let testDB = st.getDB(dbName);
     let coll = testDB.coll;
 
+    let shardDB = st.rs0.getPrimary().getDB(dbName);
+    if (!shardDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
+        st.stop();
+        return;
+    }
+
     // noPassthrough tests
     // readConcern 'snapshot' is not allowed outside session context.
     assert.commandFailedWithCode(
