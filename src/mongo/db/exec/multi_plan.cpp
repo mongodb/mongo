@@ -132,7 +132,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
         _collection->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
 
         _bestPlanIdx = _backupPlanIdx;
-        _backupPlanIdx = kNoSuchPlan;
+        // _backupPlanIdx = kNoSuchPlan;
 
         return _candidates[_bestPlanIdx].root->work(out);
     }
@@ -245,6 +245,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
         LOG(5) << "Winner has blocking stage, looking for backup plan...";
+               
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
             if (!_candidates[ix].solution->hasBlockingStage) {
                 LOG(5) << "Candidate " << ix << " is backup child";
@@ -451,6 +452,9 @@ void MultiPlanStage::doInvalidate(OperationContext* opCtx,
 
 bool MultiPlanStage::hasBackupPlan() const {
     return kNoSuchPlan != _backupPlanIdx;
+}
+int MultiPlanStage::backupPlanIdx() const {
+    return _backupPlanIdx;
 }
 
 bool MultiPlanStage::bestPlanChosen() const {

@@ -132,6 +132,9 @@ public:
     /** Return the index of the best plan chosen, for testing */
     int bestPlanIdx() const;
 
+    /** Return the index of the backup plan chosen, for testing */
+    int backupPlanIdx() const;
+
     /**
      * Returns the QuerySolution for the best plan, or NULL if no best plan
      *

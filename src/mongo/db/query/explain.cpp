@@ -767,6 +767,14 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
     }
     BSONObjBuilder execBob(out->subobjStart("executionStats"));
 
+    const auto mps = getMultiPlanStage(exec->getRootStage());
+    BSONObjBuilder bob;
+    int i = static_cast<size_t>(mps->backupPlanIdx());
+    if (i >= 0) {
+        bob.append("backupPlanUsed", true);
+        // out->append("backupPlanUsed", true);
+    }
+
     // If there is an execution error while running the query, the error is reported under
     // the "executionStats" section and the explain as a whole succeeds.
     execBob.append("executionSuccess", executePlanStatus.isOK());
