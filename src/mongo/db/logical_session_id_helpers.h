@@ -72,6 +72,4 @@ LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromCl
                                           OperationContext* opCtx,
                                           std::initializer_list<Privilege> allowSpoof = {});
 
-Status SessionsCommandFCV34Status(StringData command);
-
 }  // namespace mongo
