@@ -513,10 +513,13 @@ env.Alias("tools", "#/" + add_exe("mongobridge"))
 installBinary( env, "mongod" )
 installBinary( env, "mongos" )
 
+core_alias_binaries = [ add_exe( "mongod" ), add_exe( "mongos" ) ]
+
 if shellEnv is not None:
     installBinary( shellEnv, "mongo" )
+    core_alias_binaries += [ add_exe( "mongo" ) ]
 
-env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
+env.Alias( "core", [ '#/%s' % b for b in  core_alias_binaries] )
 
 # Stage the top-level mongodb banners
 distsrc = env.Dir('#distsrc')
