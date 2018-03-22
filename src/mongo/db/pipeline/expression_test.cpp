@@ -2211,6 +2211,8 @@ TEST(ExpressionPowTest, NegativeOneRaisedToNegativeOddExponentShouldOutPutNegati
 TEST(ExpressionArrayTest, ExpressionArrayWithALlConstantValuesShouldOptimizeToExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
+
+    // ExpressionArray of constant values should optimize to ExpressionConsant.
     BSONObj bsonarrayOfConstants = BSON("" << BSON_ARRAY(1 << 2 << 3 << 4));
     BSONElement elementArray = bsonarrayOfConstants.firstElement();
     auto expressionArr = ExpressionArray::parse(expCtx, elementArray, vps);
@@ -2218,20 +2220,25 @@ TEST(ExpressionArrayTest, ExpressionArrayWithALlConstantValuesShouldOptimizeToEx
     auto exprConstant = dynamic_cast<ExpressionConstant*>(optimizedToConstant.get());
     ASSERT_TRUE(exprConstant);
 
+    // ExpressionArray with not all constant values should not optimize to ExpressionConstant.
     BSONObj bsonarray = BSON("" << BSON_ARRAY(1 << "$x" << 3 << 4));
     BSONElement elementArrayNotConstant = bsonarray.firstElement();
     auto expressionArrNotConstant = ExpressionArray::parse(expCtx, elementArrayNotConstant, vps);
     auto notOptimized = expressionArrNotConstant->optimize();
     auto notExprConstant = dynamic_cast<ExpressionConstant*>(notOptimized.get());
     ASSERT_FALSE(notExprConstant);
+}
 
-    BSONObj bsonarrayWithAdd =
+TEST(ExpressionArrayTest, ExpressionArrayShouldOptimizeSubExpressionToExpressionConstant) {
+    // ExpressionArray with constant values and sub expression that evaluates to constant should
+    // optimize to Expression constant.
+    BSONObj bsonarrayWithSubExpression =
         BSON("" << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(1 << 1)) << 3 << 4));
-    BSONElement elementArrayWithAdd = bsonarrayWithAdd.firstElement();
-    auto expressionArrWithAdd = ExpressionArray::parse(expCtx, elementArrayWithAdd, vps);
-    auto optimizedToConstantWithAdd = expressionArrWithAdd->optimize();
-    auto constantWithAdd = dynamic_cast<ExpressionConstant*>(optimizedToConstantWithAdd.get());
-    ASSERT_TRUE(constantWithAdd);
+    BSONElement elementArrayWithSubExpression = bsonarrayWithSubExpression.firstElement();
+    auto expressionArrWithSubExpression = ExpressionArray::parse(expCtx, elementArrayWithSubExpression, vps);
+    auto optimizedToConstantWithSubExpression = expressionArrWithSubExpression->optimize();
+    auto constantExpression = dynamic_cast<ExpressionConstant*>(optimizedToConstantWithSubExpression.get());
+    ASSERT_TRUE(constantExpression);
 }
 
 namespace FieldPath {

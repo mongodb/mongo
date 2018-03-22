@@ -489,7 +489,7 @@ intrusive_ptr<Expression> ExpressionArray::optimize() {
             allValuesConstant = false;
         }
     }
-    // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
+    // If all values in ExpressionArray are constant evaluate to ExpressionConstant.
     if (allValuesConstant) {
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }
@@ -2785,6 +2785,7 @@ public:
             index->second < operands[2].getInt()) {
             return Value(index->second);
         } else {
+            // If the item we are searching is not found or if not found in given range return -1.
             return Value(-1);
         }
     }
@@ -2796,10 +2797,13 @@ private:
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     ExpressionNary::optimize();
 
-    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of a
+    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of an Array
     if (dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
         ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get());
         const Value valueArray = ec->getValue();
+        if (valueArray.nullish()) {
+            return this;
+        }
         uassert(50749,
                 str::stream() << "First operand of $indexOfArray must be an array. First "
                               << "argument is of type: "
