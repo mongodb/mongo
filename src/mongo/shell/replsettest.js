@@ -1786,6 +1786,46 @@ var ReplSetTest = function(opts) {
     }
 
     /**
+     * Checks that 'fastCount' matches an iterative count for all collections.
+     */
+    this.checkCollectionCounts = function(msgPrefix = 'checkCollectionCounts') {
+        let success = true;
+        const errPrefix = `${msgPrefix}, counts did not match for collection`;
+
+        function checkCollectionCount(coll) {
+            const itCount = coll.find().itcount();
+            const fastCount = coll.count();
+            if (itCount !== fastCount) {
+                print(`${errPrefix} ${coll.getFullName()} on ${coll.getMongo().host}.` +
+                      ` itcount: ${itCount}, fast count: ${fastCount}`);
+                print("Collection info: " +
+                      tojson(coll.getDB().getCollectionInfos({name: coll.getName()})));
+                print("Collection stats: " + tojson(coll.stats()));
+                success = false;
+            }
+        }
+
+        function checkCollectionCountsForDB(_db) {
+            const res = assert.commandWorked(
+                _db.runCommand({listCollections: 1, includePendingDrops: true}));
+            const collNames = new DBCommandCursor(_db, res).toArray();
+            collNames.forEach(c => checkCollectionCount(_db.getCollection(c.name)));
+        }
+
+        function checkCollectionCountsForNode(node) {
+            const dbNames = node.getDBNames();
+            dbNames.forEach(dbName => checkCollectionCountsForDB(node.getDB(dbName)));
+        }
+
+        function checkCollectionCountsForReplSet(rst) {
+            rst.nodes.forEach(node => checkCollectionCountsForNode(node));
+            assert(success, `Collection counts did not match. search for '${errPrefix}' in logs.`);
+        }
+
+        this.checkReplicaSet(checkCollectionCountsForReplSet, this);
+    };
+
+    /**
      * Starts up a server.  Options are saved by default for subsequent starts.
      *
      *

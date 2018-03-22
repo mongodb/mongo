@@ -128,6 +128,8 @@ function RollbackTest(name = "RollbackTest", replSet) {
                   State.kSteadyStateOps,
                   "Not in kSteadyStateOps state, cannot check data consistency");
         const name = rst.name;
+        // We must check counts before we validate since validate fixes counts.
+        rst.checkCollectionCounts(name);
         rst.checkOplogs(name);
         rst.checkReplicatedDataHashes(name);
         collectionValidator.validateNodes(rst.nodeList());
