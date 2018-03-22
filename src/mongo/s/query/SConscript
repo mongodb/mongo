@@ -156,6 +156,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'store_possible_cursor',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],

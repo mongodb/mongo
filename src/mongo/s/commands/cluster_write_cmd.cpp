@@ -35,6 +35,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -227,18 +228,24 @@ public:
         }
 
         // TODO: increase opcounters by more than one
+        auto& debug = CurOp::get(opCtx)->debug();
         if (_writeType == BatchedCommandRequest::BatchType_Insert) {
             for (size_t i = 0; i < numAttempts; ++i) {
                 globalOpCounters.gotInsert();
             }
+            debug.ninserted = response.getN();
         } else if (_writeType == BatchedCommandRequest::BatchType_Update) {
             for (size_t i = 0; i < numAttempts; ++i) {
                 globalOpCounters.gotUpdate();
             }
+            debug.upsert = response.isUpsertDetailsSet();
+            debug.nMatched = response.getN() - (debug.upsert ? response.sizeUpsertDetails() : 0);
+            debug.nModified = response.getNModified();
         } else if (_writeType == BatchedCommandRequest::BatchType_Delete) {
             for (size_t i = 0; i < numAttempts; ++i) {
                 globalOpCounters.gotDelete();
             }
+            debug.ndeleted = response.getN();
         }
 
         // Save the last opTimes written on each shard for this client, to allow GLE to work

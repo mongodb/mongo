@@ -73,6 +73,7 @@ void CursorResponseBuilder::abandon() {
     _batch.doneFast();
     _cursorObject.doneFast();
     _commandResponse->bb().setlen(_responseInitialLen);  // Removes everything we've added.
+    _numDocs = 0;
     _active = false;
 }
 

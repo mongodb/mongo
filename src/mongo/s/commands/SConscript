@@ -12,6 +12,7 @@ env.Library(
         'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/s/async_requests_sender',
     ]
 )

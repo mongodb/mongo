@@ -180,7 +180,10 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
 /**
  * Utility function to return an empty result set from a command.
  */
-bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
+bool appendEmptyResultSet(OperationContext* opCtx,
+                          BSONObjBuilder& result,
+                          Status status,
+                          const std::string& ns);
 
 /**
  * If the specified database exists already, loads it in the cache (if not already there) and

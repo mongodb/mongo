@@ -33,6 +33,7 @@
 #include "mongo/s/commands/cluster_commands_helpers.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
@@ -466,8 +467,13 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
     return commonErrCode;
 }
 
-bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns) {
+bool appendEmptyResultSet(OperationContext* opCtx,
+                          BSONObjBuilder& result,
+                          Status status,
+                          const std::string& ns) {
     invariant(!status.isOK());
+
+    CurOp::get(opCtx)->debug().nreturned = 0;
 
     if (status == ErrorCodes::NamespaceNotFound) {
         // Old style reply

@@ -69,10 +69,15 @@ public:
     void append(const BSONObj& obj) {
         invariant(_active);
         _batch.append(obj);
+        _numDocs++;
     }
 
     void setLatestOplogTimestamp(Timestamp ts) {
         _latestOplogTimestamp = ts;
+    }
+
+    long long numDocs() const {
+        return _numDocs;
     }
 
     /**
@@ -94,6 +99,7 @@ private:
     BSONObjBuilder* const _commandResponse;
     BSONObjBuilder _cursorObject;
     BSONArrayBuilder _batch;
+    long long _numDocs = 0;
     Timestamp _latestOplogTimestamp;
 };
 

@@ -338,9 +338,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
+    // Fill out query exec properties.
+    CurOp::get(opCtx)->debug().nreturned = results->size();
+
     // If the cursor is exhausted, then there are no more results to return and we don't need to
     // allocate a cursor id.
     if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
+        CurOp::get(opCtx)->debug().cursorExhausted = true;
         return CursorId(0);
     }
 
@@ -352,8 +356,12 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         : ClusterCursorManager::CursorLifetime::Mortal;
     auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
 
-    return uassertStatusOK(cursorManager->registerCursor(
+    auto cursorId = uassertStatusOK(cursorManager->registerCursor(
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUsers));
+
+    // Record the cursorID in CurOp.
+    CurOp::get(opCtx)->debug().cursorid = cursorId;
+    return cursorId;
 }
 
 /**
@@ -553,6 +561,11 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
         ? CursorId(0)
         : request.cursorid;
+
+    // Set nReturned and whether the cursor has been exhausted.
+    CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
+    CurOp::get(opCtx)->debug().nreturned = batch.size();
+
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 

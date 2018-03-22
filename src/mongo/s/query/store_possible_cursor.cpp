@@ -58,7 +58,10 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return incomingCursorResponse.getStatus();
     }
 
+    CurOp::get(opCtx)->debug().nreturned = incomingCursorResponse.getValue().getBatch().size();
+
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
+        CurOp::get(opCtx)->debug().cursorExhausted = true;
         return cmdResult;
     }
 
@@ -87,6 +90,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     if (!clusterCursorId.isOK()) {
         return clusterCursorId.getStatus();
     }
+
+    CurOp::get(opCtx)->debug().cursorid = clusterCursorId.getValue();
 
     CursorResponse outgoingCursorResponse(
         requestedNss, clusterCursorId.getValue(), incomingCursorResponse.getValue().getBatch());

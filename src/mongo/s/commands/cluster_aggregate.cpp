@@ -590,6 +590,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
             authUsers));
     }
 
+    // Fill out the aggregation metrics in CurOp.
+    if (clusterCursorId > 0) {
+        CurOp::get(opCtx)->debug().cursorid = clusterCursorId;
+    }
+    CurOp::get(opCtx)->debug().cursorExhausted = (clusterCursorId == 0);
+    CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
+
     responseBuilder.done(clusterCursorId, requestedNss.ns());
 
     CommandHelpers::appendCommandStatus(cursorResponse, Status::OK());
@@ -666,7 +673,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                        "failed to open $changeStream");
         }
         appendEmptyResultSet(
-            *result, executionNsRoutingInfoStatus.getStatus(), namespaces.requestedNss.ns());
+            opCtx, *result, executionNsRoutingInfoStatus.getStatus(), namespaces.requestedNss.ns());
+
         return Status::OK();
     }
 

@@ -529,7 +529,7 @@ public:
 
         auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!dbInfoStatus.isOK()) {
-            return appendEmptyResultSet(result, dbInfoStatus.getStatus(), nss.ns());
+            return appendEmptyResultSet(opCtx, result, dbInfoStatus.getStatus(), nss.ns());
         }
 
         return cursorCommandPassthrough(
