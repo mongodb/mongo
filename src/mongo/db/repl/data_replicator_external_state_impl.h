@@ -66,14 +66,7 @@ private:
                                    MultiApplier::Operations ops,
                                    OplogApplier::Observer* observer,
                                    const HostAndPort& source,
-                                   MultiApplier::ApplyOperationFn applyOperation,
                                    ThreadPool* writerPool) override;
-
-    Status _multiInitialSyncApply(OperationContext* opCtx,
-                                  MultiApplier::OperationPtrs* ops,
-                                  const HostAndPort& source,
-                                  AtomicUInt32* fetchCount,
-                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
 
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;

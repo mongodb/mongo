@@ -108,13 +108,7 @@ public:
                                           MultiApplier::Operations ops,
                                           OplogApplier::Observer* observer,
                                           const HostAndPort& source,
-                                          MultiApplier::ApplyOperationFn applyOperation,
                                           ThreadPool* writerPool) override;
-    virtual Status multiInitialSyncApply(OperationContext* opCtx,
-                                         MultiApplier::OperationPtrs* ops,
-                                         const HostAndPort& source,
-                                         AtomicUInt32* fetchCount,
-                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
         OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;

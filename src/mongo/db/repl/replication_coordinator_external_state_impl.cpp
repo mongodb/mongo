@@ -851,50 +851,10 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     MultiApplier::Operations ops,
     OplogApplier::Observer* observer,
     const HostAndPort& source,
-    MultiApplier::ApplyOperationFn applyOperation,
     ThreadPool* writerPool) {
     SyncTail syncTail(observer, repl::multiInitialSyncApply, writerPool);
     syncTail.setHostname(source.toString());
     return syncTail.multiApply(opCtx, std::move(ops));
-}
-
-namespace {
-
-/**
- * OplogApplier observer that updates 'fetchCount' when applying operations for each writer thread.
- */
-class InitialSyncApplyObserver : public OplogApplier::Observer {
-public:
-    explicit InitialSyncApplyObserver(AtomicUInt32* fetchCount) : _fetchCount(fetchCount) {}
-
-    // OplogApplier::Observer functions
-    void onBatchBegin(const OplogApplier::Operations&) final {}
-    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
-    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>& docs) final {
-        _fetchCount->fetchAndAdd(docs.size());
-    }
-    void onOperationConsumed(const BSONObj& op) final {}
-
-private:
-    AtomicUInt32* const _fetchCount;
-};
-
-}  // namespace
-
-Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
-    const HostAndPort& source,
-    AtomicUInt32* fetchCount,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
-    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
-    // with MultiSyncApplyFunc and writerPool arguments because we will not be accessing any
-    // SyncTail functionality that require these constructor parameters.
-    InitialSyncApplyObserver observer(fetchCount);
-    SyncTail syncTail(&observer, SyncTail::MultiSyncApplyFunc(), nullptr);
-    syncTail.setHostname(source.toString());
-    return repl::multiInitialSyncApply(opCtx, ops, &syncTail, workerMultikeyPathInfo);
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(

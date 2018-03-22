@@ -39,7 +39,7 @@ namespace repl {
 DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
     : multiApplyFn([](OperationContext*,
                       const MultiApplier::Operations& ops,
-                      MultiApplier::ApplyOperationFn) { return ops.back().getOpTime(); }) {}
+                      OplogApplier::Observer*) { return ops.back().getOpTime(); }) {}
 
 executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const {
     return taskExecutor;
@@ -85,24 +85,12 @@ StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() co
     return replSetConfigResult;
 }
 
-StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
-    OperationContext* opCtx,
-    MultiApplier::Operations ops,
-    OplogApplier::Observer* observer,
-    const HostAndPort& source,
-    MultiApplier::ApplyOperationFn applyOperation,
-    ThreadPool* writerPool) {
-    return multiApplyFn(opCtx, std::move(ops), applyOperation);
-}
-
-Status DataReplicatorExternalStateMock::_multiInitialSyncApply(
-    OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
-    const HostAndPort& source,
-    AtomicUInt32* fetchCount,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-
-    return multiInitialSyncApplyFn(opCtx, ops, source, fetchCount, workerMultikeyPathInfo);
+StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(OperationContext* opCtx,
+                                                                MultiApplier::Operations ops,
+                                                                OplogApplier::Observer* observer,
+                                                                const HostAndPort& source,
+                                                                ThreadPool* writerPool) {
+    return multiApplyFn(opCtx, std::move(ops), observer);
 }
 
 }  // namespace repl

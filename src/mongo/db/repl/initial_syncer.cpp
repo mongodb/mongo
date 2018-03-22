@@ -955,19 +955,16 @@ void InitialSyncer::_getNextApplierBatchCallback(
     if (!ops.empty()) {
         _fetchCount.store(0);
         MultiApplier::ApplyOperationFn applyOperationsForEachReplicationWorkerThreadFn =
-            [ =, source = _syncSource ](OperationContext * opCtx,
-                                        MultiApplier::OperationPtrs * x,
-                                        WorkerMultikeyPathInfo * workerMultikeyPathInfo) {
-            return _dataReplicatorExternalState->_multiInitialSyncApply(
-                opCtx, x, source, &_fetchCount, workerMultikeyPathInfo);
-        };
+            [](OperationContext*, MultiApplier::OperationPtrs*, WorkerMultikeyPathInfo*) {
+                return Status::OK();
+            };
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn =
             [ =, source = _syncSource ](OperationContext * opCtx,
                                         MultiApplier::Operations ops,
                                         MultiApplier::ApplyOperationFn apply) {
             InitialSyncApplyObserver observer(&_fetchCount);
             return _dataReplicatorExternalState->_multiApply(
-                opCtx, ops, &observer, source, apply, _writerPool);
+                opCtx, ops, &observer, source, _writerPool);
         };
         const auto& lastEntry = ops.back();
         OpTimeWithHash lastApplied(lastEntry.getHash(), lastEntry.getOpTime());

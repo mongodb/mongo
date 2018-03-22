@@ -244,18 +244,8 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
     MultiApplier::Operations,
     OplogApplier::Observer* observer,
     const HostAndPort& source,
-    MultiApplier::ApplyOperationFn,
     ThreadPool* writerPool) {
     return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
-Status ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
-    OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
-    const HostAndPort& source,
-    AtomicUInt32* fetchCount,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    return Status::OK();
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(

@@ -79,22 +79,9 @@ public:
     bool shouldStopFetchingResult = false;
 
     // Override to change multiApply behavior.
-    MultiApplier::MultiApplyFn multiApplyFn;
-
-    // Override to change _multiInitialSyncApply behavior.
-    using MultiInitialSyncApplyFn =
-        stdx::function<Status(OperationContext* opCtx,
-                              MultiApplier::OperationPtrs* ops,
-                              const HostAndPort& source,
-                              AtomicUInt32* fetchCount,
-                              WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
-    MultiInitialSyncApplyFn multiInitialSyncApplyFn = [](OperationContext*,
-                                                         MultiApplier::OperationPtrs*,
-                                                         const HostAndPort&,
-                                                         AtomicUInt32*,
-                                                         WorkerMultikeyPathInfo*) {
-        return Status::OK();
-    };
+    using MultiApplyFn = stdx::function<StatusWith<OpTime>(
+        OperationContext*, MultiApplier::Operations, OplogApplier::Observer*)>;
+    MultiApplyFn multiApplyFn;
 
     StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();
 
@@ -103,14 +90,7 @@ private:
                                    MultiApplier::Operations ops,
                                    OplogApplier::Observer* observer,
                                    const HostAndPort& source,
-                                   MultiApplier::ApplyOperationFn applyOperation,
                                    ThreadPool* writerPool) override;
-
-    Status _multiInitialSyncApply(OperationContext* opCtx,
-                                  MultiApplier::OperationPtrs* ops,
-                                  const HostAndPort& source,
-                                  AtomicUInt32* fetchCount,
-                                  WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
 };
 
 

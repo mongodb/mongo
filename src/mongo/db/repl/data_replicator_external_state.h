@@ -114,8 +114,7 @@ public:
 
 private:
     /**
-     * Applies the operations described in the oplog entries contained in "ops" using the
-     * "applyOperation" function.
+     * Applies the operations described in the oplog entries contained in "ops".
      *
      * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
@@ -123,22 +122,7 @@ private:
                                            MultiApplier::Operations ops,
                                            OplogApplier::Observer* observer,
                                            const HostAndPort& source,
-                                           MultiApplier::ApplyOperationFn applyOperation,
                                            ThreadPool* writerPool) = 0;
-
-    /**
-     * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a
-     * pointer to a counter that is incremented every time we fetch a missing document.
-     * `workerMultikeyPathInfo` is a pointer to a list of objects tracking which indexes to set as
-     * multikey at the end of the batch. It should never be null.
-     *
-     * Used exclusively by the InitialSyncer to construct a MultiApplier.
-     */
-    virtual Status _multiInitialSyncApply(OperationContext* opCtx,
-                                          MultiApplier::OperationPtrs* ops,
-                                          const HostAndPort& source,
-                                          AtomicUInt32* fetchCount,
-                                          WorkerMultikeyPathInfo* workerMultikeyPathInfo) = 0;
 
     // Provides InitialSyncer with access to _multiApply, _multiSyncApply and
     // _multiInitialSyncApply.
