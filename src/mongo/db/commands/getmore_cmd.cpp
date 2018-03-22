@@ -68,6 +68,8 @@ namespace {
 
 MONGO_FP_DECLARE(rsStopGetMoreCmd);
 
+MONGO_FP_DECLARE(waitWithPinnedCursorDuringGetMoreBatch);
+
 /**
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the lsid of 'cursor'.

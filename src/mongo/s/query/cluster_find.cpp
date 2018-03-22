@@ -498,8 +498,13 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             pinnedCursor.getValue().getOriginatingCommand());
     }
 
-    // If the fail point is enabled, busy wait until it is disabled.
-    while (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+    // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
+    // field of this operation's CurOp to signal that we've hit this point.
+    if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &waitAfterPinningCursorBeforeGetMoreBatch,
+            opCtx,
+            "waitAfterPinningCursorBeforeGetMoreBatch");
     }
 
     auto opCtxSetupStatus =
@@ -572,6 +577,13 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     // Set nReturned and whether the cursor has been exhausted.
     CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
     CurOp::get(opCtx)->debug().nreturned = batch.size();
+
+    if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
+            opCtx,
+            "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
+    }
 
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
