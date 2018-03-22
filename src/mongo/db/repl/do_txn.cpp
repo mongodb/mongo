@@ -76,7 +76,7 @@ bool _areOpsCrudOnly(const BSONObj& doTxnCmd) {
         BSONElement& fieldOp = fields[1];
 
         const char* opType = fieldOp.valuestrsafe();
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
 
         // All atomic ops have an opType of length 1.
         if (opType[0] == '\0' || opType[1] != '\0')

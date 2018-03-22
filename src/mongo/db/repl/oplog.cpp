@@ -1066,7 +1066,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         uassert(ErrorCodes::InvalidNamespace,
                 "'ns' must be of type String",
                 fieldNs.type() == BSONType::String);
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
         requestNss = NamespaceString(ns);
         if (nsIsFull(ns)) {
             if (supportsDocLocking()) {
@@ -1318,7 +1318,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 UpdateLifecycleImpl updateLifecycle(requestNss);
                 request.setLifecycle(&updateLifecycle);
 
-                const StringData ns = fieldNs.valueStringData();
+                const StringData ns = fieldNs.valuestrsafe();
                 writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
                     WriteUnitOfWork wuow(opCtx);
                     // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is true),
@@ -1368,7 +1368,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             timestamp = fieldTs.timestamp();
         }
 
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
         auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
             if (timestamp != Timestamp::min()) {
@@ -1443,7 +1443,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             timestamp = fieldTs.timestamp();
         }
 
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
         writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
             if (timestamp != Timestamp::min()) {
