@@ -4,11 +4,9 @@
  * Creates several bank accounts. On each iteration, each thread:
  *  - chooses two accounts and amount of money being transfer
  *  - or checks the balance of each account
+ * @tags: [uses_transactions]
  */
 var $config = (function() {
-
-    // For isWiredTiger.
-    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 
     function _calcTotalMoneyBalances(sessionDb, txnNumber, collName) {
         let res = sessionDb.runCommand({
@@ -120,9 +118,8 @@ var $config = (function() {
     };
 
     var skip = function skip(cluster) {
-        if (cluster.isSharded() || cluster.isStandalone() ||
-            !isWiredTiger(cluster.getDB("admin"))) {
-            return {skip: true, msg: 'only runs in a replica set with WiredTiger.'};
+        if (cluster.isSharded() || cluster.isStandalone()) {
+            return {skip: true, msg: 'only runs in a replica set.'};
         }
         return {skip: false};
     };
