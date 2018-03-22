@@ -945,8 +945,9 @@ var ReplSetTest = function(opts) {
                 let val = self.nodeOptions[key];
                 if (typeof(val) === "object" &&
                     (val.hasOwnProperty("shardsvr") ||
-                     // TODO: SERVER-31376
-                     val.hasOwnProperty("binVersion") && val.binVersion != "latest")) {
+                     val.hasOwnProperty("binVersion") &&
+                         // Should not wait for keys if version is less than 3.6
+                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
                     shouldWaitForKeys = false;
                     print("Set shouldWaitForKeys from node options: " + shouldWaitForKeys);
                 }
@@ -955,7 +956,9 @@ var ReplSetTest = function(opts) {
                 let val = self.startOptions;
                 if (typeof(val) === "object" &&
                     (val.hasOwnProperty("shardsvr") ||
-                     val.hasOwnProperty("binVersion") && val.binVersion != "latest")) {
+                     val.hasOwnProperty("binVersion") &&
+                         // Should not wait for keys if version is less than 3.6
+                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
                     shouldWaitForKeys = false;
                     print("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
                 }
