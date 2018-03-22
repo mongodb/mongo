@@ -336,6 +336,18 @@ private:
     // Releases stashed transaction resources to abort the transaction.
     void _abortTransaction(WithLock);
 
+    // Committing a transaction first changes its state to "Committing" and writes to the oplog,
+    // then it changes the state to "Committed".
+    //
+    // When a transaction is in "Committing" state, it's not allowed for other threads to change its
+    // state (i.e. abort the transaction), otherwise the on-disk state will diverge from the
+    // in-memory state.
+    // There are 3 cases where the transaction will be aborted.
+    // 1) abortTransaction command. Session check-out mechanism only allows one client to access a
+    // transaction.
+    // 2) killSession, stepdown, transaction timeout and any thread that aborts the transaction
+    // outside of session checkout. They can safely skip the committing transactions.
+    // 3) Migration. Should be able to skip committing transactions.
     void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
 
     const LogicalSessionId _sessionId;

@@ -78,6 +78,65 @@
             {abortTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}),
         [ErrorCodes.CommandFailed]);
 
+    jsTest.log("Higher transaction number aborts existing running transaction.");
+    txnNumber++;
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "running-txn-1"}, {_id: "running-txn-2"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+    // A higher txnNumber aborts the old and inserts the same document.
+    txnNumber++;
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "running-txn-2"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+    assert.commandWorked(sessionDb.runCommand(
+        {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
+    // Read with default read concern sees the committed transaction but cannot see the aborted one.
+    assert.eq(null, testDB.coll.findOne({_id: "running-txn-1"}));
+    assert.eq({_id: "running-txn-2"}, testDB.coll.findOne({_id: "running-txn-2"}));
+
+    jsTest.log("Higher transaction number aborts existing running snapshot read.");
+    assert.commandWorked(coll.remove({}));
+    assert.commandWorked(
+        coll.insert([{doc: 1}, {doc: 2}, {doc: 3}], {writeConcern: {w: "majority"}}));
+    txnNumber++;
+    // Perform a snapshot read under a new transaction.
+    let runningReadResult = assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        batchSize: 2,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+
+    // The cursor has not been exhausted.
+    assert(runningReadResult.hasOwnProperty("cursor"), tojson(runningReadResult));
+    assert.neq(0, runningReadResult.cursor.id, tojson(runningReadResult));
+
+    txnNumber++;
+    // Perform a second snapshot read under a new transaction.
+    let newReadResult = assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+
+    // The cursor has been exhausted.
+    assert(newReadResult.hasOwnProperty("cursor"), tojson(newReadResult));
+    assert.eq(0, newReadResult.cursor.id, tojson(newReadResult));
+    assert.commandWorked(sessionDb.runCommand(
+        {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
+
+    // TODO: SERVER-33690 Test the old cursor has been killed when the transaction is aborted.
+
     session.endSession();
     rst.stopSet();
 }());

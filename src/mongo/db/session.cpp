@@ -500,16 +500,6 @@ void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
                           << _activeTxnNumber
                           << " has already started.",
             txnNumber >= _activeTxnNumber);
-    // TODO(SERVER-33432): Auto-abort an old transaction when a new one starts instead of asserting.
-    uassert(40691,
-            str::stream() << "Cannot start transaction " << txnNumber << " on session "
-                          << getSessionId()
-                          << " because a multi-document transaction "
-                          << _activeTxnNumber
-                          << " is in progress.",
-            txnNumber == _activeTxnNumber ||
-                (_transactionOperations.empty() &&
-                 _txnState != MultiDocumentTransactionState::kCommitting));
 }
 
 Session::TxnResources::TxnResources(OperationContext* opCtx) {
@@ -640,8 +630,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
             // occurs, we abort the current transaction. Note that it would indicate a user bug to
             // have a newer transaction on one shard while an older transaction is still active on
             // another shard.
-            _abortTransaction(lg);
-            _txnState = MultiDocumentTransactionState::kNone;
             uasserted(ErrorCodes::TransactionAborted,
                       str::stream() << "Transaction aborted. Active txnNumber is now "
                                     << _activeTxnNumber);
@@ -731,11 +719,16 @@ void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
     _setActiveTxn(wl, txnNumber);
 }
 
-void Session::_setActiveTxn(WithLock, TxnNumber txnNumber) {
+void Session::_setActiveTxn(WithLock wl, TxnNumber txnNumber) {
+    // Abort the existing transaction if it's not committed or aborted.
+    if (_txnState == MultiDocumentTransactionState::kInProgress ||
+        _txnState == MultiDocumentTransactionState::kInSnapshotRead) {
+        _abortTransaction(wl);
+    }
     _activeTxnNumber = txnNumber;
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
-    _txnResourceStash = boost::none;
+    _txnState = MultiDocumentTransactionState::kNone;
 }
 
 void Session::addTransactionOperation(OperationContext* opCtx,
