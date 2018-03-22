@@ -853,15 +853,7 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     const HostAndPort& source,
     MultiApplier::ApplyOperationFn applyOperation,
     ThreadPool* writerPool) {
-    auto applyOperationsForWriter = [&](OperationContext* opCtx,
-                                        MultiApplier::OperationPtrs* ops,
-                                        SyncTail* st,
-                                        WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
-        return applyOperation(opCtx, ops, workerMultikeyPathInfo);
-    };
-    // 'observer' has no effect yet on this SyncTail's operation.
-    SyncTail syncTail(observer, applyOperationsForWriter, writerPool);
-    // 'source' has no effect yet on this SyncTail's operation.
+    SyncTail syncTail(observer, repl::multiInitialSyncApply, writerPool);
     syncTail.setHostname(source.toString());
     return syncTail.multiApply(opCtx, std::move(ops));
 }
