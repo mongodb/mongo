@@ -81,6 +81,7 @@
         },
         appendOplogNote: {skip: "primary only"},
         applyOps: {skip: "primary only"},
+        authSchemaUpgrade: {skip: "primary only"},
         authenticate: {skip: "does not return user data"},
         availableQueryOptions: {skip: "does not return user data"},
         balancerStart: {skip: "primary only"},
@@ -166,6 +167,7 @@
         },
         findAndModify: {skip: "primary only"},
         flushRouterConfig: {skip: "does not return user data"},
+        forceerror: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
         geoNear: {
