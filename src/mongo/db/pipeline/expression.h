@@ -1228,7 +1228,7 @@ public:
     std::vector<Value> parseDeps(const Document& root,
                                   const ExpressionVector& operands,
                                   size_t arrayLength) const;
-    boost::intrusive_ptr<Expression> optimize() ;
+    boost::intrusive_ptr<Expression> optimize() override;
     const char* getOpName() const final;
 private:
     class Optimized;

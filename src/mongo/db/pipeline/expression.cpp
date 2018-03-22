@@ -26,7 +26,6 @@
  * it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression.h"
@@ -484,7 +483,7 @@ Value ExpressionArray::serialize(bool explain) const {
 
 intrusive_ptr<Expression> ExpressionArray::optimize() {
     bool allValuesConstant = true;
-    for (auto& expr : vpOperand) {
+    for (auto&& expr : vpOperand) {
         expr = expr->optimize();
         if (!dynamic_cast<ExpressionConstant*>(expr.get())) {
             allValuesConstant = false;
@@ -2731,7 +2730,6 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
             arrayArg.isArray());
 
     std::vector<Value> array = arrayArg.getArray();
-
     std::vector<Value> operands = parseDeps(root, vpOperand, array.size());
     for (int i = operands[1].getInt(); i < operands[2].getInt(); i++) {
         if (getExpressionContext()->getValueComparator().evaluate(array[i] == operands[0])) {
@@ -2796,14 +2794,16 @@ private:
 };
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
-    vpOperand[0]->optimize();
-    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of a vector.
-    if (ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
+    ExpressionNary::optimize();
+
+    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of a
+    if (dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
+        ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get());
         const Value valueArray = ec->getValue();
         uassert(50749,
                 str::stream() << "First operand of $indexOfArray must be an array. First "
-                              << "argument is of type: " 
-                              << typeName(valueArray.getType()),
+                              << "argument is of type: "
+                               << typeName(valueArray.getType()),
                 valueArray.isArray());
 
         auto arr = valueArray.getArray();
@@ -2815,9 +2815,8 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
             auto pair = std::make_pair(arr[i], i);
             indexMap.insert(pair);
         }
-        intrusive_ptr<Expression> optimizedWithConstant(
+        return intrusive_ptr<Expression>(
             new Optimized(getExpressionContext(), indexMap, vpOperand));
-        return optimizedWithConstant;
     }
     return this;
 }
