@@ -13,7 +13,7 @@ def generate(env):
         '.so' : 'lib',
     }
 
-    def tag_install(env, target, source, **kwargs):
+    def auto_install(env, target, source, **kwargs):
         prefixDir = env.Dir('$INSTALL_DIR')
 
         actions = []
@@ -28,11 +28,11 @@ def generate(env):
 
         tags = kwargs.get('INSTALL_ALIAS', [])
         if tags:
-            env.Alias(tags, actions)
+            env.Alias(['install-' + tag for tag in tags], actions)
 
         return actions
 
-    env.AddMethod(tag_install, 'Install')
+    env.AddMethod(auto_install, 'AutoInstall')
 
     def auto_install_emitter(target, source, env):
         for t in target:
@@ -46,7 +46,7 @@ def generate(env):
             if auto_install_location:
                 tentry_install_tags = env.get('INSTALL_ALIAS', [])
                 setattr(tentry.attributes, 'INSTALL_ALIAS', tentry_install_tags)
-                install = env.Install(auto_install_location, tentry, INSTALL_ALIAS=tentry_install_tags)
+                install = env.AutoInstall(auto_install_location, tentry, INSTALL_ALIAS=tentry_install_tags)
         return (target, source)
 
     def add_emitter(builder):

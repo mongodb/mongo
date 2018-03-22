@@ -24,10 +24,13 @@ def build_cpp_unit_test(env, target, source, **kwargs):
     libdeps.append( '$BUILD_DIR/mongo/unittest/unittest_main' )
 
     kwargs['LIBDEPS'] = libdeps
+    kwargs['INSTALL_ALIAS'] = ['tests']
 
     result = env.Program(target, source, **kwargs)
     env.RegisterUnitTest(result[0])
-    env.Install("#/build/unittests/", result[0])
+    hygienic = env.GetOption('install-mode') == 'hygienic'
+    if not hygienic:
+        env.Install("#/build/unittests/", result[0])
     return result
 
 def generate(env):

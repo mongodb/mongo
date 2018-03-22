@@ -2724,7 +2724,7 @@ tasks:
 
     - func: "scons compile"
       vars:
-        targets: mobile-dev mobile-test
+        targets: install-mobile-dev install-mobile-test
         task_compile_flags: >-
           --disable-warnings-as-errors
           --install-mode=hygienic

@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 Import("env")
+Import("get_option")
 
 env = env.Clone()
 
@@ -146,6 +147,11 @@ dbtest = env.Program(
         "mocklib",
         "testframework",
     ],
+    INSTALL_ALIAS=[
+        'tests'
+    ],
 )
 
-env.Alias("dbtest", env.Install('#/', dbtest))
+hygienic = get_option('install-mode') == 'hygienic'
+if not hygienic:
+    env.Alias("dbtest", env.Install('#/', dbtest))

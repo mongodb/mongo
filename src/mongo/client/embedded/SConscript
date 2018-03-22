@@ -110,16 +110,20 @@ capi = env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         'embedded',
     ],
-    INSTALL_ALIAS='mobile-dev',
+    INSTALL_ALIAS=[
+        'mobile-dev',
+    ],
 )
 
 env.Alias('embedded_capi', capi)
 
 if get_option('install-mode') == 'hygienic':
-    env.Install(
+    env.AutoInstall(
         'include',
         source=['libmongodbcapi.h'],
-        INSTALL_ALIAS='mobile-dev'
+        INSTALL_ALIAS=[
+            'mobile-dev',
+        ],
     )
 
 capiTest = env.Program(
@@ -136,7 +140,9 @@ capiTest = env.Program(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
-    INSTALL_ALIAS='mobile-test',
+    INSTALL_ALIAS=[
+        'mobile-test',
+    ],
 )
 
 env.RegisterUnitTest(capiTest[0])
@@ -161,16 +167,20 @@ embeddedTransport = env.Library(
         'mongoc-1.0',
         'bson-1.0',
     ],
-    INSTALL_ALIAS='mobile-dev',
+    INSTALL_ALIAS=[
+        'mobile-dev',
+    ],
 )
 
 env.Alias('embedded_capi', embeddedTransport)
 
 if get_option('install-mode') == 'hygienic':
-    env.Install(
+    env.AutoInstall(
         'include',
         source=['embedded_transport_layer.h'],
-        INSTALL_ALIAS='mobile-dev'
+        INSTALL_ALIAS=[
+            'mobile-dev',
+        ],
     )
 
 embeddedTransportTest = env.Program(
@@ -187,7 +197,9 @@ embeddedTransportTest = env.Program(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
-    INSTALL_ALIAS='mobile-test',
+    INSTALL_ALIAS=[
+        'mobile-test',
+    ],
 )
 
 env.Alias('embedded_capi', embeddedTransportTest)
