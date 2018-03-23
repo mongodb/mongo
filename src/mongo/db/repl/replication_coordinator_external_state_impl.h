@@ -178,6 +178,9 @@ private:
     // Thread running SyncSourceFeedback::run().
     std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;
 
+    // Thread running oplog application.
+    std::unique_ptr<executor::TaskExecutor> _oplogApplierTaskExecutor;
+
     // Thread running runSyncThread().
     std::unique_ptr<RSDataSync> _applierThread;
 

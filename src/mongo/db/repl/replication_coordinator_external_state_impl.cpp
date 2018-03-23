@@ -148,14 +148,25 @@ Status ExportedOplogFetcherMaxFetcherRestartsServerParameter::validate(
 /**
  * Returns new thread pool for thread pool task executor.
  */
-std::unique_ptr<ThreadPool> makeThreadPool() {
+auto makeThreadPool(const std::string& poolName) {
     ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.poolName = "replication";
+    threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
         AuthorizationSession::get(cc())->grantInternalAuthorization();
     };
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
+}
+
+/**
+ * Returns a new thread pool task executor.
+ */
+auto makeTaskExecutor(ServiceContext* service, const std::string& poolName) {
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        makeThreadPool(poolName),
+        executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
 }
 
 /**
@@ -306,11 +317,10 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     log() << "Starting replication storage threads";
     _service->getGlobalStorageEngine()->setJournalListener(this);
 
-    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(_service));
-    _taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        makeThreadPool(),
-        executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
+    _oplogApplierTaskExecutor = makeTaskExecutor(_service, "rsSync");
+    _oplogApplierTaskExecutor->startup();
+
+    _taskExecutor = makeTaskExecutor(_service, "replication");
     _taskExecutor->startup();
 
     _writerPool = SyncTail::makeWriterPool();
@@ -334,6 +344,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     log() << "Stopping replication storage threads";
     _taskExecutor->shutdown();
+    _oplogApplierTaskExecutor->shutdown();
+
+    _oplogApplierTaskExecutor->join();
     _taskExecutor->join();
     lk.unlock();
 
