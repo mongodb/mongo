@@ -34,9 +34,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
@@ -75,15 +72,6 @@ void RSDataSync::join() {
 void RSDataSync::_run() {
     Client::initThread("rsSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization();
-
-    // Overwrite prefetch index mode in BackgroundSync if ReplSettings has a mode set.
-    auto&& replSettings = _replCoord->getSettings();
-    if (replSettings.isPrefetchIndexModeSet())
-        _replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
-
-    // We don't start data replication for arbiters at all and it's not allowed to reconfig
-    // arbiterOnly field for any member.
-    invariant(!_replCoord->getMemberState().arbiter());
 
     try {
         // Once we call into SyncTail::oplogApplication we never return, so this code only runs at

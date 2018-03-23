@@ -782,6 +782,18 @@ private:
 };
 
 void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator* replCoord) {
+    if (isMMAPV1()) {
+        // Overwrite prefetch index mode if ReplSettings has a mode set.
+        auto&& replSettings = replCoord->getSettings();
+        if (replSettings.isPrefetchIndexModeSet()) {
+            replCoord->setIndexPrefetchConfig(replSettings.getPrefetchIndexMode());
+        }
+    }
+
+    // We don't start data replication for arbiters at all and it's not allowed to reconfig
+    // arbiterOnly field for any member.
+    invariant(!replCoord->getMemberState().arbiter());
+
     OpQueueBatcher batcher(this, oplogBuffer);
 
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
@@ -1304,8 +1316,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         return {ErrorCodes::BadValue, "invalid apply operation function"};
     }
 
-    const auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
-    if (storageEngine->isMmapV1()) {
+    if (isMMAPV1()) {
         // Use a ThreadPool to prefetch all the operations in a batch.
         prefetchOps(ops, workerPool);
     }
