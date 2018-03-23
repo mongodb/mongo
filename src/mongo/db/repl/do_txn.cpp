@@ -312,14 +312,10 @@ Status doTxn(OperationContext* opCtx,
 
         numApplied = 0;
         uassertStatusOK(_doTxn(opCtx, dbName, doTxnCmd, &intermediateResult, &numApplied));
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        invariant(opObserver);
-        opObserver->onTransactionCommit(opCtx);
+        session->commitTransaction(opCtx);
         result->appendElements(intermediateResult.obj());
-
-        // Commit the global WUOW if the command succeeds.
-        opCtx->getWriteUnitOfWork()->commit();
     } catch (const DBException& ex) {
+        session->abortActiveTransaction(opCtx);
         BSONArrayBuilder ab;
         ++numApplied;
         for (int j = 0; j < numApplied; j++)

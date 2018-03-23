@@ -229,6 +229,12 @@ public:
     void abortIfSnapshotRead(TxnNumber txnNumber);
 
     /**
+     * Commits the transaction, including committing the write unit of work and updating
+     * transaction state.
+     */
+    void commitTransaction(OperationContext* opCtx);
+
+    /**
      * Aborts the transaction outside the transaction, releasing transaction resources.
      */
     void abortArbitraryTransaction();
@@ -260,6 +266,16 @@ public:
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _txnState == MultiDocumentTransactionState::kInProgress ||
             _txnState == MultiDocumentTransactionState::kInSnapshotRead;
+    }
+
+    bool transactionIsCommitted() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState == MultiDocumentTransactionState::kCommitted;
+    }
+
+    bool transactionIsAborted() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState == MultiDocumentTransactionState::kAborted;
     }
 
     /**
@@ -320,10 +336,15 @@ private:
     // Releases stashed transaction resources to abort the transaction.
     void _abortTransaction(WithLock);
 
+    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
+
     const LogicalSessionId _sessionId;
 
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
+
+    // Condition variable notified when we finish an attempt to commit the global WUOW.
+    stdx::condition_variable _commitcv;
 
     // Specifies whether the session information needs to be refreshed from storage
     bool _isValid{false};

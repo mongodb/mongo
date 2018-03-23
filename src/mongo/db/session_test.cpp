@@ -586,8 +586,8 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
     ASSERT(opCtx()->getWriteUnitOfWork());
 
-    // Commit the WriteUnitOfWork. This allows us to release locks.
-    opCtx()->getWriteUnitOfWork()->commit();
+    // Commit the transaction. This allows us to release locks.
+    session.commitTransaction(opCtx());
 }
 
 TEST_F(SessionTest, CheckAutocommitOnlyAllowedAtBeginningOfTxn) {
@@ -634,14 +634,57 @@ TEST_F(SessionTest, AbortClearsStoredStatements) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 24;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
     session.beginOrContinueTxn(opCtx(), txnNum, false);
-
-    WriteUnitOfWork wuow(opCtx());
+    session.unstashTransactionResources(opCtx());
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     session.addTransactionOperation(opCtx(), operation);
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
-    session.abortActiveTransaction(opCtx());
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    session.stashTransactionResources(opCtx());
+    session.abortArbitraryTransaction();
     ASSERT_TRUE(session.transactionOperationsForTest().empty());
+    ASSERT_TRUE(session.transactionIsAborted());
+}
+
+// This test makes sure the commit machinery works even when no operations are done on the
+// transaction.
+TEST_F(SessionTest, EmptyTransactionCommit) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 25;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false);
+    session.unstashTransactionResources(opCtx());
+    // The transaction machinery cannot store an empty locker.
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now());
+    session.commitTransaction(opCtx());
+    session.stashTransactionResources(opCtx());
+    ASSERT_TRUE(session.transactionIsCommitted());
+}
+
+// This test makes sure the abort machinery works even when no operations are done on the
+// transaction.
+TEST_F(SessionTest, EmptyTransactionAbort) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 26;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false);
+    session.unstashTransactionResources(opCtx());
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    session.stashTransactionResources(opCtx());
+    session.abortArbitraryTransaction();
+    ASSERT_TRUE(session.transactionIsAborted());
 }
 
 }  // namespace

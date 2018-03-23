@@ -78,11 +78,7 @@ public:
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 
-        auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        invariant(opObserver);
-        opObserver->onTransactionCommit(opCtx);
-        opCtx->getWriteUnitOfWork()->commit();
-        opCtx->setWriteUnitOfWork(nullptr);
+        session->commitTransaction(opCtx);
 
         return true;
     }

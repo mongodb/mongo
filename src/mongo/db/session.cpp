@@ -575,7 +575,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     // access Session state. We must lock the Client before the Session mutex, since the Client
     // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
     // away, and then lock the Session owned by that client. We rely on the fact that we are not
-    // using the  DefaultLockerImpl to avoid deadlock.
+    // using the DefaultLockerImpl to avoid deadlock.
 
     invariant(!isMMAPV1());
     stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -602,13 +602,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     if (_txnState == MultiDocumentTransactionState::kInSnapshotRead && !opCtx->hasStashedCursor()) {
         // The snapshot read is complete.
         invariant(opCtx->getWriteUnitOfWork());
-        // We cannot hold the session lock during the commit, or a deadlock results.
-        _txnState = MultiDocumentTransactionState::kCommitting;
-        lg.unlock();
-        opCtx->getWriteUnitOfWork()->commit();
-        opCtx->setWriteUnitOfWork(nullptr);
-        lg.lock();
-        _txnState = MultiDocumentTransactionState::kCommitted;
+        _commitTransaction(std::move(lg), opCtx);
         return;
     }
 
@@ -655,10 +649,15 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
         }
 
         if (_txnResourceStash) {
+            // Transaction resources already exist for this transaction.  Transfer them from the
+            // stash to the operation context.
             invariant(_txnState != MultiDocumentTransactionState::kNone);
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
         } else {
+            // Stashed transaction resources do not exist for this transaction.  If this is a
+            // snapshot read or a multi-document transaction, set up the transaction resources on
+            // the opCtx.
             auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
             if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
                 _txnState == MultiDocumentTransactionState::kInProgress) {
@@ -710,7 +709,10 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
 
 void Session::_abortTransaction(WithLock wl) {
     // TODO SERVER-33432 Disallow aborting committed transaction after we implement implicit abort.
-    if (_txnState == MultiDocumentTransactionState::kCommitted) {
+    // A transaction in kCommitting state will either commit or abort for storage-layer reasons;
+    // it is too late to abort externally.
+    if (_txnState == MultiDocumentTransactionState::kCommitting ||
+        _txnState == MultiDocumentTransactionState::kCommitted) {
         return;
     }
     _txnResourceStash = boost::none;
@@ -742,28 +744,69 @@ void Session::addTransactionOperation(OperationContext* opCtx,
     invariant(_txnState == MultiDocumentTransactionState::kInProgress);
     invariant(!_autocommit && _activeTxnNumber != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
-    if (_transactionOperations.empty()) {
-        auto txnNumberCompleting = _activeTxnNumber;
-        opCtx->recoveryUnit()->onCommit([this, txnNumberCompleting] {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            invariant(_activeTxnNumber == txnNumberCompleting);
-            invariant(_txnState == MultiDocumentTransactionState::kCommitting ||
-                      _txnState == MultiDocumentTransactionState::kCommitted);
-            _txnState = MultiDocumentTransactionState::kCommitted;
-        });
-    }
     _transactionOperations.push_back(operation);
 }
 
 std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_autocommit);
-    invariant(_txnState == MultiDocumentTransactionState::kInProgress);
-    // If _transactionOperations is empty, we will not see a commit because the write unit
-    // of work is empty.
-    _txnState = _transactionOperations.empty() ? MultiDocumentTransactionState::kCommitted
-                                               : MultiDocumentTransactionState::kCommitting;
     return std::move(_transactionOperations);
+}
+
+void Session::commitTransaction(OperationContext* opCtx) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (opCtx->getTxnNumber() != _activeTxnNumber) {
+        uasserted(ErrorCodes::TransactionAborted,
+                  str::stream() << "Transaction aborted. Active txnNumber is now "
+                                << _activeTxnNumber);
+    }
+    if (_txnState == MultiDocumentTransactionState::kCommitted)
+        return;
+    _commitTransaction(std::move(lk), opCtx);
+}
+
+void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx) {
+    invariant(_txnState == MultiDocumentTransactionState::kInProgress ||
+              _txnState == MultiDocumentTransactionState::kInSnapshotRead);
+    const bool isMultiDocumentTransaction = _txnState == MultiDocumentTransactionState::kInProgress;
+    if (isMultiDocumentTransaction) {
+        // We need to unlock the session to run the opObserver onTransactionCommit, which calls back
+        // into the session.
+        lk.unlock();
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onTransactionCommit(opCtx);
+        lk.lock();
+        // It's possible some other thread aborted the transaction (e.g. through killSession)
+        // while the opObserver was running.  If that happened, the commit should be reported
+        // as failed.
+        uassert(ErrorCodes::TransactionAborted,
+                str::stream() << "Transaction " << opCtx->getTxnNumber()
+                              << " aborted while attempting to commit",
+                _txnState == MultiDocumentTransactionState::kInProgress &&
+                    _activeTxnNumber == opCtx->getTxnNumber());
+    }
+    _txnState = MultiDocumentTransactionState::kCommitting;
+    bool committed = false;
+    ON_BLOCK_EXIT([this, &committed, opCtx]() {
+        // If we're still "committing", the recovery unit failed to commit, and the lock
+        // is not held.  We can't safely use _txnState here, as it is protected by the lock.
+        if (!committed) {
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
+            opCtx->setWriteUnitOfWork(nullptr);
+            // Make sure the transaction didn't change because of chunk migration.
+            if (opCtx->getTxnNumber() == _activeTxnNumber) {
+                _txnState = MultiDocumentTransactionState::kAborted;
+            }
+        }
+        _commitcv.notify_all();
+    });
+    lk.unlock();
+    opCtx->getWriteUnitOfWork()->commit();
+    opCtx->setWriteUnitOfWork(nullptr);
+    committed = true;
+    lk.lock();
+    _txnState = MultiDocumentTransactionState::kCommitted;
 }
 
 void Session::_checkValid(WithLock) const {

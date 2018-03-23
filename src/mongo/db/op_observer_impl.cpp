@@ -840,7 +840,6 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
     invariant(session);
-    invariant(session->inMultiDocumentTransaction());
     auto stmts = session->endTransactionAndRetrieveOperations();
 
     // It is possible that the transaction resulted in no changes.  In that case, we should
