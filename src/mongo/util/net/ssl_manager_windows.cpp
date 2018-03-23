@@ -1104,7 +1104,8 @@ StatusWith<UniqueCertificate> loadCertificateSelectorFromAllStores(
     return swSelectMachine;
 }
 
-StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(SSLParams::CertificateSelector selector) {
+StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(
+    SSLParams::CertificateSelector selector) {
     auto swCert = loadCertificateSelectorFromAllStores(selector);
     if (!swCert.isOK()) {
         return swCert;
