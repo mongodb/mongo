@@ -1,24 +1,9 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [uses_transactions]
 
 (function() {
     "use strict";
 
-    load("jstests/libs/get_index_helpers.js");
-    // For isWiredTiger.
-    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
-    // For isReplSet
-    load("jstests/libs/fixture_helpers.js");
-
     const t = db.do_txn1;
-
-    if (!FixtureHelpers.isReplSet(db)) {
-        jsTestLog("Skipping test as doTxn requires a replSet and replication is not enabled.");
-        return;
-    }
-    if (!isWiredTiger(db)) {
-        jsTestLog("Skipping test as the storage engine does not support doTxn.");
-        return;
-    }
 
     var session = db.getMongo().startSession();
     db = session.getDatabase("test");
