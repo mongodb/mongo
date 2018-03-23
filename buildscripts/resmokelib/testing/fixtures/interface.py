@@ -147,3 +147,16 @@ class ReplFixture(Fixture):
                 if remaining <= 0.0:
                     raise errors.ServerFailure("Failed to connect to the primary on port %d" %
                                                self.port)
+
+class NoOpFixture(Fixture):
+    """A Fixture implementation that does not start any servers.
+
+    Used when the MongoDB deployment is started by the JavaScript test itself with MongoRunner,
+    ReplSetTest, or ShardingTest.
+    """
+
+    def get_internal_connection_string(self):
+        return None
+
+    def get_driver_connection_url(self):
+        return None
