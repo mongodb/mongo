@@ -2230,14 +2230,20 @@ TEST(ExpressionArrayTest, ExpressionArrayWithALlConstantValuesShouldOptimizeToEx
 }
 
 TEST(ExpressionArrayTest, ExpressionArrayShouldOptimizeSubExpressionToExpressionConstant) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+
+
     // ExpressionArray with constant values and sub expression that evaluates to constant should
     // optimize to Expression constant.
     BSONObj bsonarrayWithSubExpression =
         BSON("" << BSON_ARRAY(1 << BSON("$add" << BSON_ARRAY(1 << 1)) << 3 << 4));
     BSONElement elementArrayWithSubExpression = bsonarrayWithSubExpression.firstElement();
-    auto expressionArrWithSubExpression = ExpressionArray::parse(expCtx, elementArrayWithSubExpression, vps);
+    auto expressionArrWithSubExpression =
+        ExpressionArray::parse(expCtx, elementArrayWithSubExpression, vps);
     auto optimizedToConstantWithSubExpression = expressionArrWithSubExpression->optimize();
-    auto constantExpression = dynamic_cast<ExpressionConstant*>(optimizedToConstantWithSubExpression.get());
+    auto constantExpression =
+        dynamic_cast<ExpressionConstant*>(optimizedToConstantWithSubExpression.get());
     ASSERT_TRUE(constantExpression);
 }
 

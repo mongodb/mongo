@@ -2781,8 +2781,10 @@ public:
     virtual Value evaluate(const Document& root) const {
         std::vector<Value> operands = parseDeps(root, vpOperand, _indexMap.size());
         auto index = _indexMap.find(operands[0]);
-        if (index != _indexMap.end() && index->second > operands[1].getInt() &&
-            index->second < operands[2].getInt()) {
+        auto comparator = getExpressionContext()->getValueComparator();
+        Value vIndex = Value(index->second);
+        if (index != _indexMap.end() && comparator.evaluate(Value(index->second) >= operands[1]) &&
+            comparator.evaluate(Value(index->second) < operands[2])) {
             return Value(index->second);
         } else {
             // If the item we are searching is not found or if not found in given range return -1.
@@ -2797,7 +2799,8 @@ private:
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     ExpressionNary::optimize();
 
-    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of an Array
+    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of an
+    // Array
     if (dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
         ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get());
         const Value valueArray = ec->getValue();
