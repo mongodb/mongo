@@ -32,23 +32,46 @@
 
 #include "mongo/db/repl/oplog_applier.h"
 
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
+using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,
                            Observer* observer,
-                           const OplogApplier::Options& options)
-    : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {}
-
-Status OplogApplier::startup() {
-    return Status::OK();
+                           ReplicationCoordinator* replCoord,
+                           const OplogApplier::Options& options,
+                           ThreadPool* writerPool)
+    : _executor(executor),
+      _oplogBuffer(oplogBuffer),
+      _observer(observer),
+      _replCoord(replCoord),
+      _options(options),
+      _syncTail(std::make_unique<SyncTail>(_observer, multiSyncApply, writerPool)) {
+    invariant(!options.allowNamespaceNotFoundErrorsOnCrudOps);
+    invariant(!options.relaxUniqueIndexConstraints);
 }
 
-Future<void> shutdown() {
-    return {};
+Future<void> OplogApplier::startup() {
+    auto future = _promise.getFuture();
+    auto callback =
+        [ this, promise = _promise.share() ](const CallbackArgs& args) mutable noexcept {
+        invariantOK(args.status);
+        log() << "Starting oplog application";
+        _syncTail->oplogApplication(_oplogBuffer, _replCoord);
+        log() << "Finished oplog application";
+        promise.setWith([] {});
+    };
+    invariantOK(_executor->scheduleWork(callback).getStatus());
+    return future;
+}
+
+void OplogApplier::shutdown() {
+    _syncTail->shutdown();
 }
 
 /**

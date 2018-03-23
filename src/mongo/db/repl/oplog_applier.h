@@ -37,11 +37,15 @@
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
 namespace repl {
+
+class SyncTail;
 
 /**
  * Applies oplog entries.
@@ -54,7 +58,7 @@ public:
      **/
     class Options {
     public:
-        bool failOnCrudOpsNamespaceNotFoundErrors = true;
+        bool allowNamespaceNotFoundErrorsOnCrudOps = false;
         bool relaxUniqueIndexConstraints = false;
     };
 
@@ -71,19 +75,21 @@ public:
     OplogApplier(executor::TaskExecutor* executor,
                  OplogBuffer* oplogBuffer,
                  Observer* observer,
-                 const Options& options);
+                 ReplicationCoordinator* replCoord,
+                 const Options& options,
+                 ThreadPool* writerPool);
 
     /**
      * Starts this OplogApplier.
+     * Use the Future object to be notified when this OplogApplier has finished shutting down.
      */
-    Status startup();
+    Future<void> startup();
 
     /**
      * Starts the shutdown process for this OplogApplier.
-     * Use the Future object to be notified when this OplogApplier has finished shutting down.
      * It is safe to call shutdown() multiplie times.
      */
-    Future<void> shutdown();
+    void shutdown();
 
     /**
      * Pushes operations read into oplog buffer.
@@ -92,6 +98,7 @@ public:
 
 
 private:
+    // Used to schedule task for oplog application loop.
     // Not owned by us.
     executor::TaskExecutor* const _executor;
 
@@ -101,8 +108,17 @@ private:
     // Not owned by us.
     Observer* const _observer;
 
+    // Not owned by us.
+    ReplicationCoordinator* const _replCoord;
+
     // Used to configure OplogApplier behavior.
     const Options _options;
+
+    // Used to run oplog application loop.
+    std::unique_ptr<SyncTail> _syncTail;
+
+    // Used to generate Future to allow callers to wait for oplog application shutdown.
+    Promise<void> _promise;
 };
 
 /**
