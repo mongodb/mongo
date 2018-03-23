@@ -1391,9 +1391,14 @@ env.Library(
     ],
     LIBDEPS=[
         'oplog_application',
+        'oplog_buffer_blocking_queue',
+        'oplog_buffer_collection',
+        'oplog_buffer_proxy',
         'optime',
         'repl_coordinator_interface',
+        'storage_interface',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_parameters',
     ],
 )
 
