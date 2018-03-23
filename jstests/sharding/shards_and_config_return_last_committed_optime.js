@@ -12,6 +12,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/write_concern_util.js");  // For stopReplProducer
+
     function assertCmdDoesNotReturnLastCommittedOpTime(testDB, cmdObj, connType, expectSuccess) {
         const res = testDB.runCommand(cmdObj);
         assert.eq(expectSuccess ? 1 : 0, res.ok);
@@ -109,8 +111,8 @@
     let primary = st.rs0.getPrimary();
     let secondary = st.rs0.getSecondary();
 
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+    st.rs0.awaitLastOpCommitted();
+    stopServerReplication(secondary);
     assert.writeOK(primary.getDB("test").foo.insert({x: 1}, {writeConcern: {w: 1}}));
 
     // Sharded collection.
@@ -124,8 +126,7 @@
     assertReturnsLastCommittedOpTime(
         secondary.getDB("test"), "unsharded", "sharding-aware shard secondary");
 
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+    restartServerReplication(secondary);
 
     //
     // A config server in a sharded replica set returns lastCommittedOpTime.
@@ -136,16 +137,14 @@
     primary = st.configRS.getPrimary();
     secondary = st.configRS.getSecondary();
 
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+    st.configRS.awaitLastOpCommitted();
+    stopServerReplication(secondary);
     assert.writeOK(primary.getDB("config").foo.insert({x: 1}, {writeConcern: {w: 1}}));
 
     assertReturnsLastCommittedOpTime(primary.getDB("test"), "foo", "config server primary");
     assertReturnsLastCommittedOpTime(secondary.getDB("test"), "foo", "config server secondary");
 
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
-
+    restartServerReplication(secondary);
     st.stop();
 
     //
