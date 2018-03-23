@@ -92,13 +92,6 @@ public:
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                          MultiApplier::Operations ops,
-                                          OplogApplier::Observer* observer,
-                                          const HostAndPort& source,
-                                          ThreadPool* writerPool) override;
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
 
     /**

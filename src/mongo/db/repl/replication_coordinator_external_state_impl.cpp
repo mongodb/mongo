@@ -66,6 +66,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -820,22 +821,6 @@ bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedBySt
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
     return storageEngine->supportsReadConcernSnapshot();
-}
-
-StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
-    OperationContext* opCtx,
-    MultiApplier::Operations ops,
-    OplogApplier::Observer* observer,
-    const HostAndPort& source,
-    ThreadPool* writerPool) {
-    SyncTail syncTail(observer, repl::multiInitialSyncApply, writerPool);
-    syncTail.setHostname(source.toString());
-    return syncTail.multiApply(opCtx, std::move(ops));
-}
-
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
-    OperationContext* opCtx) const {
-    return {};
 }
 
 std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {

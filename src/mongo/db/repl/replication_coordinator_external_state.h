@@ -275,22 +275,6 @@ public:
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const = 0;
 
     /**
-     * Applies the operations described in the oplog entries contained in "ops" using the
-     * "applyOperation" function.
-     */
-    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                          MultiApplier::Operations ops,
-                                          OplogApplier::Observer* observer,
-                                          const HostAndPort& source,
-                                          ThreadPool* writerPool) = 0;
-
-    /**
-     * This function creates an oplog buffer of the type specified at server startup.
-     */
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* opCtx) const = 0;
-
-    /**
      * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog
      * tailing query on non-cancellation errors.
      */

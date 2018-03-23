@@ -239,20 +239,6 @@ bool ReplicationCoordinatorExternalStateMock::isReadConcernSnapshotSupportedBySt
     return true;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
-    OperationContext*,
-    MultiApplier::Operations,
-    OplogApplier::Observer* observer,
-    const HostAndPort& source,
-    ThreadPool* writerPool) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(
-    OperationContext* opCtx) const {
-    return stdx::make_unique<OplogBufferBlockingQueue>();
-}
-
 std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRestarts() const {
     return 0;
 }
