@@ -37,6 +37,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -152,6 +153,7 @@ std::unique_ptr<ThreadPool> makeThreadPool() {
     threadPoolOptions.poolName = "replication";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
     };
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
 }
