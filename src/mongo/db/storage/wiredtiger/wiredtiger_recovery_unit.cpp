@@ -305,7 +305,9 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     WT_SESSION* session = _session->getSession();
 
     // '_readAtTimestamp' is available outside of a check for readConcern level 'snapshot' to
-    // accommodate unit testing.
+    // accommodate unit testing. Note that the order of this if/else chain below is important for
+    // correctness. Also, note that we use the '_readAtTimestamp' to work around an oplog visibility
+    // issue in cappedTruncateAfter by setting the timestamp to the maximum value.
     if (_readAtTimestamp != Timestamp::min()) {
         auto status =
             _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
