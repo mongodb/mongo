@@ -29,6 +29,7 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kGeo
 
 #include <chrono>
+#include <memory>
 #include <random>
 
 #include "mongo/db/geo/r2_region_coverer.h"
@@ -42,7 +43,6 @@
 
 namespace {
 
-using std::auto_ptr;
 using namespace mongo;
 using mongo::Polygon;  // "windows.h" has another Polygon for Windows GDI.
 
@@ -299,7 +299,7 @@ TEST(R2RegionCoverer, RandomCircles) {
         coverer.setMaxLevel(coverer.minLevel() + 4);
 
         double radius = randDouble(0.0, MAXBOUND / 2);
-        auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+        std::unique_ptr<GeometryContainer> geometry(getRandomCircle(radius));
         const R2Region& region = geometry->getR2Region();
 
         vector<GeoHash> covering;
@@ -322,7 +322,7 @@ TEST(R2RegionCoverer, RandomTinyCircles) {
 
         // 100 * 2 ^ -32 ~= 2.3E-8 (cell edge length)
         double radius = randDouble(1E-15, ldexp(100.0, -32) * 10);
-        auto_ptr<GeometryContainer> geometry(getRandomCircle(radius));
+        std::unique_ptr<GeometryContainer> geometry(getRandomCircle(radius));
         const R2Region& region = geometry->getR2Region();
 
         vector<GeoHash> covering;
