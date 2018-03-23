@@ -65,7 +65,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/balancer/balancer.h"
@@ -231,9 +230,15 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _bgSync->startup(opCtx);
 
     log() << "Starting replication applier thread";
-    invariant(!_applierThread);
-    _applierThread.reset(new RSDataSync{_bgSync.get(), _oplogBuffer.get(), replCoord});
-    _applierThread->startup();
+    invariant(!_oplogApplier);
+    _oplogApplier = stdx::make_unique<OplogApplier>(_oplogApplierTaskExecutor.get(),
+                                                    _oplogBuffer.get(),
+                                                    _bgSync.get(),
+                                                    replCoord,
+                                                    OplogApplier::Options(),
+                                                    _writerPool.get());
+    _oplogApplierShutdownFuture = _oplogApplier->startup();
+
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
     // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
@@ -259,7 +264,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldSSF = std::move(_syncSourceFeedbackThread);
     auto oldOplogBuffer = std::move(_oplogBuffer);
     auto oldBgSync = std::move(_bgSync);
-    auto oldApplier = std::move(_applierThread);
+    auto oldApplier = std::move(_oplogApplier);
     lock->unlock();
 
     // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
@@ -295,7 +300,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     }
 
     if (oldApplier) {
-        oldApplier->join();
+        _oplogApplierShutdownFuture.get();
     }
 
     if (oldOplogBuffer) {

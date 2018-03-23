@@ -33,8 +33,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/storage/journal_listener.h"
@@ -180,9 +180,8 @@ private:
 
     // Thread running oplog application.
     std::unique_ptr<executor::TaskExecutor> _oplogApplierTaskExecutor;
-
-    // Thread running runSyncThread().
-    std::unique_ptr<RSDataSync> _applierThread;
+    std::unique_ptr<OplogApplier> _oplogApplier;
+    Future<void> _oplogApplierShutdownFuture;
 
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
     stdx::mutex _nextThreadIdMutex;
