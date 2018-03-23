@@ -63,7 +63,7 @@ class Document;
 struct CommandHelpers {
     // The type of the first field in 'cmdObj' must be mongo::String. The first field is
     // interpreted as a collection name.
-    static std::string parseNsFullyQualified(StringData dbname, const BSONObj& cmdObj);
+    static std::string parseNsFullyQualified(const BSONObj& cmdObj);
 
     // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
     // The first field is interpreted as a collection name.

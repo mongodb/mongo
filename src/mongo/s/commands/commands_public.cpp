@@ -170,7 +170,7 @@ public:
     RenameCollectionCmd() : BasicCommand("renameCollection") {}
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool adminOnly() const override {
@@ -454,7 +454,7 @@ public:
     SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

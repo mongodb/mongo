@@ -128,7 +128,7 @@ void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
             request.sequences.empty());
 }
 
-std::string CommandHelpers::parseNsFullyQualified(StringData dbname, const BSONObj& cmdObj) {
+std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(first.type()),

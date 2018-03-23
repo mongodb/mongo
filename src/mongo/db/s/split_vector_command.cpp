@@ -80,7 +80,7 @@ public:
     }
 
     std::string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
