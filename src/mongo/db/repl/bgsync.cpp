@@ -50,7 +50,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/server_parameters.h"

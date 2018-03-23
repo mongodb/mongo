@@ -1535,7 +1535,6 @@ env.Library(
     source=[
         'noop_writer.cpp',
         "replication_coordinator_external_state_impl.cpp",
-        "rs_sync.cpp",
         "sync_source_feedback.cpp",
     ],
     LIBDEPS=[
