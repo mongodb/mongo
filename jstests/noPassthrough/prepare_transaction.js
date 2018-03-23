@@ -2,7 +2,7 @@
  * Tests prepared transaction support.
  * The current stub for prepareTransaction prepares and immediately aborts.
  *
- * @tags: [requires_wiredtiger]
+ * @tags: [uses_transactions]
  */
 (function() {
     "use strict";
