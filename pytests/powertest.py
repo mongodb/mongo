@@ -2535,7 +2535,7 @@ Examples:
             if not hasattr(aws_status, address_type):
                 raise Exception("Cannot determine address_type {} from AWS EC2 status {}".format(
                     address_type, aws_status))
-            ssh_host = aws_status.address_type
+            ssh_host = getattr(aws_status, address_type)
             if ssh_user is None:
                 ssh_user_host = ssh_host
             else:
