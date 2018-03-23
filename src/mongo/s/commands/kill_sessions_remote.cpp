@@ -62,7 +62,7 @@ std::vector<HostAndPort> getAllClusterHosts(OperationContext* opCtx) {
     auto registry = Grid::get(opCtx)->shardRegistry();
 
     std::vector<ShardId> shardIds;
-    registry->getAllShardIds(&shardIds);
+    registry->getAllShardIds(opCtx, &shardIds);
 
     std::vector<HostAndPort> servers;
     for (const auto& shardId : shardIds) {

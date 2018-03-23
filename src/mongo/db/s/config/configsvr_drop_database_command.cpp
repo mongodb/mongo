@@ -154,7 +154,7 @@ public:
         // Drop the database from each of the remaining shards.
         {
             std::vector<ShardId> allShardIds;
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&allShardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
 
             for (const ShardId& shardId : allShardIds) {
                 _dropDatabaseFromShard(opCtx, shardId, dbname);

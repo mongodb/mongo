@@ -167,7 +167,7 @@ StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationConte
     // further check that at least one shard exists if the aggregation is collectionless.
     if (swRoutingInfo.isOK() && execNss.isCollectionlessAggregateNS()) {
         std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
 
         if (shardIds.size() == 0) {
             return {ErrorCodes::NamespaceNotFound, "No shards are present in the cluster"};
@@ -186,7 +186,7 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
     if (mustRunOnAllShards(nss, routingInfo, litePipe)) {
         // The pipeline begins with a stage which must be run on all shards.
         std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
         return {shardIds.begin(), shardIds.end()};
     }
 

@@ -83,7 +83,7 @@ public:
         int numFiles = 0;
 
         std::vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIds(&shardIds);
+        grid.shardRegistry()->getAllShardIdsNoReload(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
             auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);

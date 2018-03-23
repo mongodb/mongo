@@ -87,7 +87,7 @@ public:
         std::map<std::string, std::unique_ptr<BSONObjBuilder>> dbShardInfo;
 
         std::vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIds(&shardIds);
+        grid.shardRegistry()->getAllShardIdsNoReload(&shardIds);
         shardIds.emplace_back(ShardRegistry::kConfigServerShardId);
 
         auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);

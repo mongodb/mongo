@@ -163,10 +163,24 @@ shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
     return _data.findByRSName(name);
 }
 
-void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
+void ShardRegistry::getAllShardIdsNoReload(vector<ShardId>* all) const {
     std::set<ShardId> seen;
     _data.getAllShardIds(seen);
     all->assign(seen.begin(), seen.end());
+}
+
+void ShardRegistry::getAllShardIds(OperationContext* opCtx, vector<ShardId>* all) {
+    getAllShardIdsNoReload(all);
+    if (all->empty()) {
+        bool didReload = reload(opCtx);
+        getAllShardIdsNoReload(all);
+        // If we didn't do the reload ourselves, we should retry to ensure
+        // that the reload is actually initiated while we're executing this
+        if (!didReload && all->empty()) {
+            reload(opCtx);
+            getAllShardIdsNoReload(all);
+        }
+    }
 }
 
 int ShardRegistry::getNumShards() const {

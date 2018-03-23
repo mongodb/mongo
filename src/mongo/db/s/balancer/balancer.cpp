@@ -467,7 +467,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
     auto shardingContext = Grid::get(opCtx);
 
     vector<ShardId> all;
-    shardingContext->shardRegistry()->getAllShardIds(&all);
+    shardingContext->shardRegistry()->getAllShardIdsNoReload(&all);
 
     // map of OID machine ID => shardId
     map<int, ShardId> oids;

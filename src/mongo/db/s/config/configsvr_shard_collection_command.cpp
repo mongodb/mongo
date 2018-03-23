@@ -745,6 +745,7 @@ public:
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
+        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         // Make the distlocks boost::optional so that they can be released by being reset below.
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock(
@@ -773,7 +774,7 @@ public:
         ShardKeyPattern shardKeyPattern(proposedKey);
 
         std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        shardRegistry->getAllShardIds(opCtx, &shardIds);
         const int numShards = shardIds.size();
 
         uassert(ErrorCodes::IllegalOperation,
@@ -788,8 +789,7 @@ public:
                     "only special collections in the config db may be sharded",
                     nss.ns() == SessionsCollection::kSessionsFullNS || getTestCommandsEnabled());
 
-            auto configShard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbType.getPrimary()));
+            auto configShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
             ScopedDbConnection configConn(configShard->getConnString());
             ON_BLOCK_EXIT([&configConn] { configConn.done(); });
 
@@ -810,8 +810,7 @@ public:
             }
         }();
 
-        auto primaryShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+        auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, primaryShardId));
         ScopedDbConnection conn(primaryShard->getConnString());
         ON_BLOCK_EXIT([&conn] { conn.done(); });
 

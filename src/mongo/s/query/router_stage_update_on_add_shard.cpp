@@ -97,7 +97,7 @@ RouterStageUpdateOnAddShard::establishShardCursorsOnNewShards(std::vector<ShardI
     }
 
     std::vector<ShardId> shardIds, newShardIds;
-    shardRegistry->getAllShardIds(&shardIds);
+    shardRegistry->getAllShardIdsNoReload(&shardIds);
     std::sort(existingShardIds.begin(), existingShardIds.end());
     std::sort(shardIds.begin(), shardIds.end());
     std::set_difference(shardIds.begin(),

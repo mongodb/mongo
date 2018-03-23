@@ -601,7 +601,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetAllShards(
     }
 
     std::vector<ShardId> shardIds;
-    Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+    Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {

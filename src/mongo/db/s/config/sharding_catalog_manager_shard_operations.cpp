@@ -887,14 +887,9 @@ StatusWith<ShardId> ShardingCatalogManager::_selectShardForNewDatabase(
     OperationContext* opCtx, ShardRegistry* shardRegistry) {
     std::vector<ShardId> allShardIds;
 
-    shardRegistry->getAllShardIds(&allShardIds);
+    shardRegistry->getAllShardIds(opCtx, &allShardIds);
     if (allShardIds.empty()) {
-        shardRegistry->reload(opCtx);
-        shardRegistry->getAllShardIds(&allShardIds);
-
-        if (allShardIds.empty()) {
-            return Status(ErrorCodes::ShardNotFound, "No shards found");
-        }
+        return Status(ErrorCodes::ShardNotFound, "No shards found");
     }
 
     ShardId candidateShardId = allShardIds[0];

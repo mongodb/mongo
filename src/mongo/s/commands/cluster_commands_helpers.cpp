@@ -112,7 +112,7 @@ std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForShards(
 std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForAllShards(
     OperationContext* opCtx, const BSONObj& cmdObj) {
     std::vector<ShardId> shardIds;
-    Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+    Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
     return buildUnversionedRequestsForShards(std::move(shardIds), cmdObj);
 }
 

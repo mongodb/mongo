@@ -191,7 +191,7 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         [&opCtx, primaryShardId, &shardIds, primaryDraining]() {
             if (primaryDraining) {
                 vector<ShardId> allShardIds;
-                Grid::get(opCtx)->shardRegistry()->getAllShardIds(&allShardIds);
+                Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
 
                 auto dbShardId = allShardIds[0];
                 if (allShardIds[0] == primaryShardId && allShardIds.size() > 1) {
@@ -238,7 +238,7 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         // If docs already exist for the collection, must use primary shard,
         // otherwise defer to passed-in distribution option.
         if (numObjects == 0 && distributeInitialChunks) {
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
             if (primaryDraining && shardIds.size() > 1) {
                 shardIds.erase(std::remove(shardIds.begin(), shardIds.end(), primaryShardId),
                                shardIds.end());
@@ -259,7 +259,7 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         }
 
         if (distributeInitialChunks) {
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
             if (primaryDraining) {
                 shardIds.erase(std::remove(shardIds.begin(), shardIds.end(), primaryShardId),
                                shardIds.end());
@@ -655,7 +655,6 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
     createCmdBuilder.append("create", ns.coll());
     collOptions.appendBSON(&createCmdBuilder);
     createCmdBuilder.append(kWriteConcernField, opCtx->getWriteConcern().toBSON());
-
     auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
