@@ -229,6 +229,14 @@ public:
         return lockComplete(nullptr, resId, mode, deadline, checkDeadlock);
     }
 
+    /**
+     * This function is for unit testing only.
+     */
+    FastMapNoAlloc<ResourceId, LockRequest> getRequestsForTest() const {
+        scoped_spinlock scopedLock(_lock);
+        return _requests;
+    }
+
 private:
     friend class AutoYieldFlushLockForMMAPV1Commit;
 

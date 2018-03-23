@@ -390,6 +390,12 @@ public:
     bool shouldAcquireTicket() const {
         return _shouldAcquireTicket;
     }
+    /**
+     * This function is for unit testing only.
+     */
+    unsigned numResourcesToUnlockAtEndUnitOfWorkForTest() const {
+        return _numResourcesToUnlockAtEndUnitOfWork;
+    }
 
 
 protected:
@@ -402,6 +408,11 @@ protected:
      * never interruptible.
      */
     int _uninterruptibleLocksRequested = 0;
+    /**
+     * The number of LockRequests to unlock at the end of this WUOW. This is used for locks
+     * participating in two-phase locking.
+     */
+    unsigned _numResourcesToUnlockAtEndUnitOfWork = 0;
 
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
