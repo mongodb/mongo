@@ -248,6 +248,7 @@ error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
 error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion");
 error_code("StaleChunkHistory", 250);
+error_code("NoSuchTransaction", 251)
 
 # Error codes 4000-8999 are reserved.
 

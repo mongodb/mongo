@@ -74,7 +74,7 @@ public:
             ErrorCodes::CommandFailed, "commitTransaction must be run within a session", session);
 
         // TODO SERVER-33501 Change this when commitTransaction is retryable.
-        uassert(ErrorCodes::CommandFailed,
+        uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 
@@ -118,7 +118,7 @@ public:
         uassert(
             ErrorCodes::CommandFailed, "prepareTransaction must be run within a session", session);
 
-        uassert(ErrorCodes::CommandFailed,
+        uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 
@@ -175,7 +175,7 @@ public:
             ErrorCodes::CommandFailed, "abortTransaction must be run within a session", session);
 
         // TODO SERVER-33501 Change this when abortTransaction is retryable.
-        uassert(ErrorCodes::CommandFailed,
+        uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 

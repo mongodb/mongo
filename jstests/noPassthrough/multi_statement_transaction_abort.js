@@ -18,8 +18,7 @@
         return;
     }
 
-    assert.commandWorked(
-        testDB.runCommand({create: coll.getName(), writeConcern: {w: "majority"}}));
+    assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
     let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
@@ -76,7 +75,81 @@
     assert.commandFailedWithCode(
         sessionDb.runCommand(
             {abortTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}),
-        [ErrorCodes.CommandFailed]);
+        ErrorCodes.NoSuchTransaction);
+
+    jsTest.log("Abort transaction on duplicated key errors");
+    coll.drop();
+    assert.commandWorked(coll.insert({_id: "insert-1"}, {writeConcern: {w: "majority"}}));
+    txnNumber++;
+    // The first insert works well.
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "insert-2"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+    // But the second insert throws duplicated index key error.
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "insert-1", x: 0}],
+        txnNumber: NumberLong(txnNumber),
+    }),
+                                 ErrorCodes.DuplicateKey);
+    // The error aborts the transaction.
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        commitTransaction: 1,
+        writeConcern: {w: "majority"},
+        txnNumber: NumberLong(txnNumber)
+    }),
+                                 ErrorCodes.NoSuchTransaction);
+    // Verify the documents are the same.
+    assert.eq({_id: "insert-1"}, testDB.coll.findOne({_id: "insert-1"}));
+    assert.eq(null, testDB.coll.findOne({_id: "insert-2"}));
+
+    jsTest.log("Abort transaction on write conflict errors");
+    coll.drop();
+    assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
+    txnNumber++;
+    const session2 = testDB.getMongo().startSession(sessionOptions);
+    const sessionDb2 = session2.getDatabase(dbName);
+    // Insert a doc from session 1.
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "insert-1", from: 1}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+    let txnNumber2 = 0;
+    // Insert a doc from session 2 that doesn't conflict with session 1.
+    assert.commandWorked(sessionDb2.runCommand({
+        insert: collName,
+        documents: [{_id: "insert-2", from: 2}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+    // Insert a doc from session 2 that conflicts with session 1.
+    assert.commandFailedWithCode(sessionDb2.runCommand({
+        insert: collName,
+        documents: [{_id: "insert-1", from: 2}],
+        txnNumber: NumberLong(txnNumber),
+    }),
+                                 ErrorCodes.WriteConflict);
+    // Session 1 isn't affected.
+    assert.commandWorked(sessionDb.runCommand(
+        {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
+    // Transaction on session 2 is aborted.
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        commitTransaction: 1,
+        writeConcern: {w: "majority"},
+        txnNumber: NumberLong(txnNumber)
+    }),
+                                 ErrorCodes.NoSuchTransaction);
+    // Verify the documents only reflect the first transaction.
+    assert.eq({_id: "insert-1", from: 1}, testDB.coll.findOne({_id: "insert-1"}));
+    assert.eq(null, testDB.coll.findOne({_id: "insert-2"}));
 
     jsTest.log("Higher transaction number aborts existing running transaction.");
     txnNumber++;
