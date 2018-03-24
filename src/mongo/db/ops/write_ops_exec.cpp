@@ -117,7 +117,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
         // this op should be sampled for profiling.
         const bool shouldSample =
-            curOp->completeAndLogOperation(opCtx, logger::LogComponent::kCommand);
+            curOp->completeAndLogOperation(opCtx, MONGO_LOG_DEFAULT_COMPONENT);
 
         // Do not profile individual statements in a write command if we are in a transaction.
         auto session = OperationContextSession::get(opCtx);
