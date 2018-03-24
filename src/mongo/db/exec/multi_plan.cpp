@@ -71,6 +71,7 @@ MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
       _query(cq),
       _bestPlanIdx(kNoSuchPlan),
       _backupPlanIdx(kNoSuchPlan),
+      _originalWinningPlanIdx(kNoSuchPlan),
       _failure(false),
       _failureCount(0),
       _statusMemberId(WorkingSet::INVALID_ID) {
@@ -128,10 +129,10 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
         // cached plan runner to fall back on a different solution
         // if the best solution fails. Alternatively we could try to
         // defer cache insertion to be after the first produced result.
+        _originalWinningPlanIdx = _bestPlanIdx;
 
         _collection->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
 
-        _originalWinningPlanIdx = _bestPlanIdx;
         _bestPlanIdx = _backupPlanIdx;
         _backupPlanIdx = kNoSuchPlan;
 
