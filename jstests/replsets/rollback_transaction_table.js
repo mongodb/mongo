@@ -16,6 +16,8 @@
  *  - There is no record for the second session id.
  *  - A record for the third session id was created during oplog replay.
  *
+ * TODO(SERVER-33879): Unblacklist this test from WiredTiger.
+ * @tags: [requires_mmapv1]
  */
 (function() {
     "use strict";
@@ -32,6 +34,9 @@
     function assertSameRecordOnBothConnections(primary, secondary, lsid) {
         let primaryRecord = primary.getDB("config").transactions.findOne({"_id.id": lsid.id});
         let secondaryRecord = secondary.getDB("config").transactions.findOne({"_id.id": lsid.id});
+
+        jsTestLog("Primary record: " + tojson(primaryRecord));
+        jsTestLog("Secondary record: " + tojson(secondaryRecord));
 
         assert.eq(bsonWoCompare(primaryRecord, secondaryRecord),
                   0,

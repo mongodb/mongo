@@ -235,14 +235,8 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
         {
             stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
             JournalListener::Token token = _journalListener->getToken();
-            const bool keepOldBehavior = true;
-            if (keepOldBehavior) {
-                invariantWTOK(s->checkpoint(s, nullptr));
-            } else {
-                std::string config =
-                    stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
-                invariantWTOK(s->checkpoint(s, config.c_str()));
-            }
+            auto config = stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
+            invariantWTOK(s->checkpoint(s, config));
             _journalListener->onDurable(token);
         }
         LOG(4) << "created checkpoint (forced)";

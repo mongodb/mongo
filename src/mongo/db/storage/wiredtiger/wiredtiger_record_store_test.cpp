@@ -752,11 +752,25 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
 
+    // Fail to truncate stone when cappedMaxSize is exceeded, but the persisted timestamp is
+    // before the truncation point (i.e: leaves a gap that replication recovery would rely on).
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 0));
+
+        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(330, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+
     // Truncate a stone when cappedMaxSize is exceeded.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get());
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 3));
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(230, rs->dataSize(opCtx.get()));
@@ -783,7 +797,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get());
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 6));
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(190, rs->dataSize(opCtx.get()));
@@ -796,7 +810,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        wtrs->reclaimOplog(opCtx.get());
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 6));
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(190, rs->dataSize(opCtx.get()));

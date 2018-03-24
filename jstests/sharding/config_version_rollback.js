@@ -1,7 +1,11 @@
 /**
  * Tests that if the config.version document on a config server is rolled back, that config server
  * will detect the new config.version document when it gets recreated.
- * @tags: [requires_persistence]
+ *
+ * This test performs a rollback before a stable checkpoint can be taken, which is not supported
+ * by rollback to a stable timestamp and thus requires mmapv1. The behavior is covered by rollback
+ * op observer unittests.
+ * @tags: [requires_persistence, requires_mmapv1]
  */
 
 (function() {

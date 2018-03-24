@@ -535,8 +535,9 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
     // Run rollback.
     auto rollbackStatus = _rollback->runRollback(_opCtx.get());
 
-    // Make sure rollback failed, and didn't execute the recover to timestamp logic.
-    ASSERT_EQUALS(recoverToTimestampStatus, rollbackStatus);
+    // Make sure rollback failed with an UnrecoverableRollbackError, and didn't execute the
+    // recover to timestamp logic.
+    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, rollbackStatus.code());
     ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
     ASSERT_EQUALS(Timestamp(), _stableTimestamp);
 

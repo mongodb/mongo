@@ -2,7 +2,11 @@
  * Tests that temporary collections are not dropped when a member of a replica set is started up as
  * a stand-alone mongod, i.e. without the --replSet parameter.
  *
- * @tags: [requires_persistence]
+ * This test restarts a node as a standalone. With RTT, standalones start up at a time in the past
+ * since they do not perform replication recovery, so we must only run it with
+ * mmapv1. SERVER-34070 will make this feasible to test again on RTT storage engines.
+ *
+ * @tags: [requires_persistence, requires_mmapv1]
  */
 (function() {
     var rst = new ReplSetTest({nodes: 2});

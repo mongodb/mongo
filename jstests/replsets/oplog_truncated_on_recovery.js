@@ -15,7 +15,10 @@
  *     will start an initial sync in this scenario, invalidating the test.
  *  2. It uses a single node replica set, which cannot be restarted in any meaningful way with an
  *     ephemeral storage engine.
- * @tags: [requires_persistence]
+ *
+ * This test requires mmapv1 because rollback to a stable timestamp does not allow arbitrary
+ * writes to the minValid document. This has been replaced by unittests.
+ * @tags: [requires_persistence, requires_mmapv1]
  */
 (function() {
     "use strict";

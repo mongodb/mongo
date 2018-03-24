@@ -251,6 +251,8 @@ public:
 
     void reclaimOplog(OperationContext* opCtx);
 
+    void reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp);
+
     int64_t cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted);
 
     int64_t cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);

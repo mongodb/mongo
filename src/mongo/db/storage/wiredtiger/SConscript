@@ -212,13 +212,15 @@ if wiredtiger:
 
         wtEnv.CppUnitTest(
             target='storage_wiredtiger_kv_engine_test',
-            source=['wiredtiger_kv_engine_test.cpp',
-                    ],
+            source=[
+                'wiredtiger_kv_engine_test.cpp',
+            ],
             LIBDEPS=[
-                'storage_wiredtiger_mock',
+                '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
-                ],
-            )
+                'storage_wiredtiger_mock',
+            ],
+        )
 
         wtEnv.CppUnitTest(
             target='storage_wiredtiger_util_test',

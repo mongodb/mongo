@@ -243,7 +243,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             client = secondary.mongo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
-            checkpoint_timestamp_doc = client.local["replset.checkpointTimestamp"].find_one()
+            self.logger.info("minValid: {}, oTAP: {}".format(minvalid_doc, oplog_truncate_after_doc))
 
             latest_oplog_doc = client.local["oplog.rs"].find_one(
                 sort=[("$natural", pymongo.DESCENDING)])
@@ -265,56 +265,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 oplog_truncate_after_ts = oplog_truncate_after_doc.get(
                     "oplogTruncateAfterPoint", null_ts)
 
-            # The "checkpointTimestamp" document may not exist at startup. If so, we default
-            # it to null.
-            checkpoint_timestamp = null_ts
-            if checkpoint_timestamp_doc is not None:
-                checkpoint_timestamp = checkpoint_timestamp_doc.get("checkpointTimestamp")
-                if checkpoint_timestamp is None:
-                    raise errors.ServerFailure(
-                        "Checkpoint timestamp document had no 'checkpointTimestamp'"
-                        "field: {}".format(checkpoint_timestamp_doc))
-
-            # checkpointTimestamp <= top of oplog
-            # If the oplog is empty, the checkpoint timestamp should also be null.
-            if not checkpoint_timestamp <= latest_oplog_entry_ts:
-                raise errors.ServerFailure(
-                    "The condition checkpointTimestamp <= top of oplog ({} <= {}) doesn't hold:"
-                    " checkpointTimestamp document={}, latest oplog entry={}".format(
-                        checkpoint_timestamp, latest_oplog_entry_ts, checkpoint_timestamp_doc,
-                        latest_oplog_doc))
-
             if minvalid_doc is not None:
                 applied_through_ts = minvalid_doc.get("begin", {}).get("ts", null_ts)
                 minvalid_ts = minvalid_doc.get("ts", null_ts)
-
-                # The "appliedThrough" value should always equal the "checkpointTimestamp".
-                # The writes to "appliedThrough" are given the timestamp of the end of the batch,
-                # and batch boundaries are the only valid timestamps in which we could take
-                # checkpoints, so if you see a non-null applied through in a stable checkpoint it
-                # must be at the same timestamp as the checkpoint.
-                if (checkpoint_timestamp != null_ts
-                        and applied_through_ts != null_ts
-                        and (not checkpoint_timestamp == applied_through_ts)):
-                    raise errors.ServerFailure(
-                        "The condition checkpointTimestamp ({}) == appliedThrough ({})"
-                        " doesn't hold: minValid document={},"
-                        " checkpointTimestamp document={}, last oplog entry={}".format(
-                            checkpoint_timestamp, applied_through_ts, minvalid_doc,
-                            checkpoint_timestamp_doc, latest_oplog_doc))
-
-                if applied_through_ts == null_ts:
-                    # We clear "appliedThrough" to represent having applied through the top of the
-                    # oplog in PRIMARY state or immediately after "rollback via refetch".
-                    # If we are using a storage engine that supports "recover to a checkpoint,"
-                    # then we will have a "checkpointTimestamp" and we should use that as our
-                    # "appliedThrough" (similarly to why we assert their equality above).
-                    # If both are null, then we are in PRIMARY state on a storage engine that does
-                    # not support "recover to a checkpoint" or in RECOVERING immediately after
-                    # "rollback via refetch". Since we do not update "minValid" in PRIMARY state,
-                    # we leave "appliedThrough" as null so that the invariants below hold, rather
-                    # than substituting the latest oplog entry for the "appliedThrough" value.
-                    applied_through_ts = checkpoint_timestamp
 
                 if minvalid_ts == null_ts:
                     # The server treats the "ts" field in the minValid document as missing when its

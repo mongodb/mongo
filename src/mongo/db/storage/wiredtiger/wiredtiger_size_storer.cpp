@@ -57,7 +57,6 @@ int MAGIC = 123123;
 
 WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn,
                                            const std::string& storageUri,
-                                           bool logSizeStorerTable,
                                            bool readOnly)
     : _session(conn) {
     WT_SESSION* session = _session.getSession();
@@ -66,12 +65,6 @@ WiredTigerSizeStorer::WiredTigerSizeStorer(WT_CONNECTION* conn,
                              ->getTableCreateConfig(storageUri);
     if (!readOnly) {
         invariantWTOK(session->create(session, storageUri.c_str(), config.c_str()));
-        const bool keepOldLoggingSettings = true;
-        if (keepOldLoggingSettings) {
-            logSizeStorerTable = true;
-        }
-        uassertStatusOK(
-            WiredTigerUtil::setTableLogging(session, storageUri.c_str(), logSizeStorerTable));
     }
 
     invariantWTOK(
@@ -211,7 +204,8 @@ void WiredTigerSizeStorer::syncCache(bool syncToDisk) {
 
     WT_SESSION* session = _session.getSession();
     invariantWTOK(session->begin_transaction(session, syncToDisk ? "sync=true" : ""));
-    ScopeGuard rollbacker = MakeGuard(session->rollback_transaction, session, "");
+    auto rollbacker =
+        MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
 
     for (Map::iterator it = myMap.begin(); it != myMap.end(); ++it) {
         string uriKey = it->first;
@@ -246,4 +240,4 @@ void WiredTigerSizeStorer::syncCache(bool syncToDisk) {
         }
     }
 }
-}
+}  // namespace mongo

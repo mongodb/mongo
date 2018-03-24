@@ -271,7 +271,7 @@ public:
     /**
      * See `StorageEngine::recoverToStableTimestamp`
      */
-    virtual StatusWith<Timestamp> recoverToStableTimestamp() {
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) {
         fassertFailed(50664);
     }
 

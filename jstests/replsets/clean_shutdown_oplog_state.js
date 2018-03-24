@@ -3,7 +3,13 @@
 // present without this test failing. In particular if the rst.stop(1) doesn't execute mid-batch,
 // it isn't fully exercising the code. However, if the test fails there is definitely a bug.
 //
-// @tags: [requires_persistence]
+// SERVER-33525: Adding `requires_mmapv1`. This test shuts down MongoD while replicating and
+// brings it back up as a standalone. Then it asserts the documents in the collection exactly
+// match the entries in the oplog. With RTT, this assertion will only hold if the commit point is
+// also advancing at the same pace. However, there may be other, softer assertions this test can
+// make instead going forward.
+//
+// @tags: [requires_persistence, requires_mmapv1]
 (function() {
     "use strict";
 

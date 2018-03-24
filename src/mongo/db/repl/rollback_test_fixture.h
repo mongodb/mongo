@@ -135,7 +135,7 @@ public:
      * empty, updates '_currTimestamp' to be equal to '_stableTimestamp' and returns the new value
      * of '_currTimestamp'.
      */
-    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_recoverToTimestampStatus) {
             return _recoverToTimestampStatus.get();

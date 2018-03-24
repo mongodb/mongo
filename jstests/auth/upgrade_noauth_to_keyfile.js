@@ -38,13 +38,13 @@ TestData.skipGossipingClusterTime = true;
     rstConn1.getDB('admin').createUser({user: 'root', pwd: 'root', roles: ['root']});
 
     rstConn1.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'});
-    assert.eq(1, rstConn1.getDB('test').a.count(), 'Error interacting with replSet');
+    assert.eq(1, rstConn1.getDB('test').a.find().itcount(), 'Error interacting with replSet');
 
     print('=== UPGRADE noauth -> transitionToAuth/keyFile ===');
     rst.upgradeSet(transitionToAuthOptions);
     var rstConn2 = rst.getPrimary();
     rstConn2.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'});
-    assert.eq(2, rstConn2.getDB('test').a.count(), 'Error interacting with replSet');
+    assert.eq(2, rstConn2.getDB('test').a.find().itcount(), 'Error interacting with replSet');
 
     print('=== UPGRADE transitionToAuth/keyFile -> keyFile ===');
     rst.upgradeSet(keyFileOptions, 'root', 'root');
@@ -52,7 +52,7 @@ TestData.skipGossipingClusterTime = true;
     // upgradeSet leaves its connections logged in as root
     var rstConn3 = rst.getPrimary();
     rstConn3.getDB('test').a.insert({a: 1, str: 'TESTTESTTEST'});
-    assert.eq(3, rstConn3.getDB('test').a.count(), 'Error interacting with replSet');
+    assert.eq(3, rstConn3.getDB('test').a.find().itcount(), 'Error interacting with replSet');
 
     rst.stopSet();
 }());

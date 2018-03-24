@@ -3,7 +3,9 @@
 // having an update and a delete of the same document in the same batch. This is a bit of an edge
 // case because if the delete has been applied already, the update won't find any documents.
 //
-// @tags: [requires_persistence]
+// This test requires mmapv1 because rollback to a stable timestamp does not allow arbitrary
+// writes to the minValid document. This has been replaced by unittests.
+// @tags: [requires_persistence, requires_mmapv1]
 (function() {
     "use strict";
 

@@ -285,7 +285,7 @@ public:
 
     Timestamp getInitialDataTimestamp() const;
 
-    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override {
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
     }
 

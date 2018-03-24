@@ -4,7 +4,6 @@
 // does not return error statuses to indicate an error.
 // This test requires ssl support in mongo-tools
 // @tags: [requires_ssl_mongo_tools]
-
 load('jstests/ssl/libs/ssl_helpers.js');
 requireSSLProvider('openssl', function() {
     var baseName = "jstests_ssl_ssl_cert_password";
@@ -42,9 +41,10 @@ requireSSLProvider('openssl', function() {
 
     // Test that mongodump and mongorestore support ssl
     c = md.getDB("dumprestore_ssl").getCollection("foo");
-    assert.eq(0, c.count(), "dumprestore_ssl.foo collection is not initially empty");
+    assert.eq(0, c.find().itcount(), "dumprestore_ssl.foo collection is not initially empty");
     c.save({a: 22});
-    assert.eq(1, c.count(), "failed to insert document into dumprestore_ssl.foo collection");
+    assert.eq(
+        1, c.find().itcount(), "failed to insert document into dumprestore_ssl.foo collection");
 
     exit_code = MongoRunner.runMongoTool("mongodump", {
         out: external_scratch_dir,
@@ -58,7 +58,7 @@ requireSSLProvider('openssl', function() {
     assert.eq(exit_code, 0, "Failed to start mongodump with ssl");
 
     c.drop();
-    assert.eq(0, c.count(), "dumprestore_ssl.foo collection is not empty after drop");
+    assert.eq(0, c.find().itcount(), "dumprestore_ssl.foo collection is not empty after drop");
 
     exit_code = MongoRunner.runMongoTool("mongorestore", {
         dir: external_scratch_dir,
@@ -75,16 +75,17 @@ requireSSLProvider('openssl', function() {
                 "no data after sleep.  Expected a document after calling mongorestore");
     assert.eq(
         1,
-        c.count(),
+        c.find().itcount(),
         "did not find expected document in dumprestore_ssl.foo collection after mongorestore");
     assert.eq(22, c.findOne().a, "did not find correct value in document after mongorestore");
 
     // Test that mongoimport and mongoexport support ssl
     var exportimport_ssl_dbname = "exportimport_ssl";
     c = md.getDB(exportimport_ssl_dbname).getCollection("foo");
-    assert.eq(0, c.count(), "exportimport_ssl.foo collection is not initially empty");
+    assert.eq(0, c.find().itcount(), "exportimport_ssl.foo collection is not initially empty");
     c.save({a: 22});
-    assert.eq(1, c.count(), "failed to insert document into exportimport_ssl.foo collection");
+    assert.eq(
+        1, c.find().itcount(), "failed to insert document into exportimport_ssl.foo collection");
 
     var exportimport_file = "data.json";
 
@@ -102,7 +103,7 @@ requireSSLProvider('openssl', function() {
     assert.eq(exit_code, 0, "Failed to start mongoexport with ssl");
 
     c.drop();
-    assert.eq(0, c.count(), "afterdrop", "-d", exportimport_ssl_dbname, "-c", "foo");
+    assert.eq(0, c.find().itcount(), "afterdrop", "-d", exportimport_ssl_dbname, "-c", "foo");
 
     exit_code = MongoRunner.runMongoTool("mongoimport", {
         file: external_scratch_dir + exportimport_file,
@@ -120,7 +121,7 @@ requireSSLProvider('openssl', function() {
     assert.soon("c.findOne()",
                 "no data after sleep.  Expected a document after calling mongoimport");
     assert.eq(1,
-              c.count(),
+              c.find().itcount(),
               "did not find expected document in dumprestore_ssl.foo collection after mongoimport");
     assert.eq(22, c.findOne().a, "did not find correct value in document after mongoimport");
 

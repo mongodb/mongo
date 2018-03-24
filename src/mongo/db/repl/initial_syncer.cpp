@@ -52,6 +52,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -403,6 +404,10 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     // this node's oplog, it won't appear empty.
     _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
+    _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
+
+    // All updates that represent initial sync must be completed before setting the initial data
+    // timestamp.
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(),
                                       lastApplied.getValue().opTime.getTimestamp());
 
@@ -414,7 +419,6 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
         invariant(currentLastAppliedOpTime == lastApplied.getValue().opTime);
     }
 
-    _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
     log() << "initial sync done; took "
           << duration_cast<Seconds>(_stats.initialSyncEnd - _stats.initialSyncStart) << ".";
     initialSyncCompletes.increment();

@@ -334,6 +334,11 @@ private:
      */
     Status _writeRollbackFiles(OperationContext* opCtx);
 
+    /**
+     * Aligns the drop pending reaper's state with the catalog.
+     */
+    void _resetDropPendingState(OperationContext* opCtx);
+
     // Guards access to member variables.
     mutable stdx::mutex _mutex;  // (S)
 

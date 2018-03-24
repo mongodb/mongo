@@ -14,7 +14,14 @@
     var name = 'initial_sync_oplog_rollover';
     var replSet = new ReplSetTest({
         name: name,
-        nodes: 1,
+        // This test requires a third node (added later) to be syncing when the oplog rolls
+        // over. Rolling over the oplog requires a majority of nodes to have confirmed and
+        // persisted those writes. Set the syncdelay to one to speed up checkpointing.
+        nodeOptions: {syncdelay: 1},
+        nodes: [
+            {rsConfig: {priority: 1}},
+            {rsConfig: {priority: 0}},
+        ],
     });
 
     var oplogSizeOnPrimary = 1;  // size in MB

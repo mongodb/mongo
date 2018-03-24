@@ -50,8 +50,8 @@ env.Library(
     LIBDEPS=[
         'storage_mobile_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
-        ]   
-    )  
+        ]
+    )
 '''
 env.CppUnitTest(
     target='storage_mobile_index_test',
@@ -86,5 +86,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'storage_mobile_core',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/repl/service_context_repl_mock_init',
+    ],
 )

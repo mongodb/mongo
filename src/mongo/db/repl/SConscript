@@ -573,14 +573,18 @@ env.Library(
         'rollback_impl.cpp',
     ],
     LIBDEPS=[
-        'optime',
-        'repl_coordinator_interface',
-        'roll_back_local_operations',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/repair_database_and_check_version',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/util/net/network',
+        'optime',
+        'repl_coordinator_interface',
+        'roll_back_local_operations',
+    ],
+    LIBDEPS_PRIVATE=[
+        'drop_pending_collection_reaper',
     ],
 )
 

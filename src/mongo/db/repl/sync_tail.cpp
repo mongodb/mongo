@@ -361,6 +361,10 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
                 return applyOp(ctx.db());
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                if (oplogApplicationMode == OplogApplication::Mode::kRecovering) {
+                    return Status::OK();
+                }
+
                 // Delete operations on non-existent namespaces can be treated as successful for
                 // idempotency reasons.
                 // During RECOVERING mode, we ignore NamespaceNotFound for all CRUD ops since
@@ -369,6 +373,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                     oplogApplicationMode == OplogApplication::Mode::kRecovering) {
                     return Status::OK();
                 }
+
                 ex.addContext(str::stream() << "Failed to apply operation: " << redact(op));
                 throw;
             }
@@ -1261,9 +1266,9 @@ Status multiInitialSyncApply(OperationContext* opCtx,
                     SyncTail::syncApply(opCtx, entry.raw, OplogApplication::Mode::kInitialSync);
                 if (!s.isOK()) {
                     // In initial sync, update operations can cause documents to be missed during
-                    // collection cloning. As a result, it is possible that a document that we need
-                    // to update is not present locally. In that case we fetch the document from the
-                    // sync source.
+                    // collection cloning. As a result, it is possible that a document that we
+                    // need to update is not present locally. In that case we fetch the document
+                    // from the sync source.
                     if (s != ErrorCodes::UpdateOperationFailed) {
                         error() << "Error applying operation: " << redact(s) << " ("
                                 << redact(entry.toBSON()) << ")";

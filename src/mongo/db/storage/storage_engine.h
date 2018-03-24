@@ -330,7 +330,7 @@ public:
      * It is illegal to call this concurrently with `setStableTimestamp` or
      * `setInitialDataTimestamp`.
      */
-    virtual StatusWith<Timestamp> recoverToStableTimestamp() {
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) {
         fassertFailed(40547);
     }
 

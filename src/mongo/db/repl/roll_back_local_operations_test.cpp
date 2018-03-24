@@ -83,7 +83,7 @@ TEST(RollBackLocalOperationsTest, RollbackPeriodTooLong) {
     OplogInterfaceMock localOplog({makeOpAndRecordId(1802, 0)});
     RollBackLocalOperations finder(localOplog, [](const BSONObj&) { return Status::OK(); });
     auto result = finder.onRemoteOperation(makeOp(1, 0));
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, result.getStatus().code());
+    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, result.getStatus().code());
 }
 
 TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
@@ -247,7 +247,7 @@ TEST(SyncRollBackLocalOperationsTest, RemoteOplogMissing) {
 }
 
 TEST(SyncRollBackLocalOperationsTest, RollbackPeriodTooLong) {
-    ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError,
                   syncRollBackLocalOperations(OplogInterfaceMock({makeOpAndRecordId(1802, 0)}),
                                               OplogInterfaceMock({makeOpAndRecordId(1, 0)}),
                                               [](const BSONObj&) { return Status::OK(); })

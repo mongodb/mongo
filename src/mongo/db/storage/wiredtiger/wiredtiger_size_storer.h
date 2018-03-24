@@ -48,7 +48,6 @@ class WiredTigerSizeStorer {
 public:
     WiredTigerSizeStorer(WT_CONNECTION* conn,
                          const std::string& storageUri,
-                         const bool isWiredTigerLoggingEnabled,
                          const bool readOnly = false);
     ~WiredTigerSizeStorer();
 

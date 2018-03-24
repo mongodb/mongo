@@ -10,7 +10,6 @@
     let replSet = new ReplSetTest({
         name: "prepareTransaction",
         nodes: 1,
-        nodeOptions: {"setParameter": "disableJournalForReplicatedCollections=1"}
     });
 
     replSet.startSet();

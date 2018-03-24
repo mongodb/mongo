@@ -60,7 +60,7 @@ rstConn1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]}, 
 rstConn1.getDB("admin").auth("root", "pwd");
 rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});
 rstConn1.getDB("test").a.insert({a: 1, str: "WOOPWOOPWOOPWOOPWOOP"});
-assert.eq(2, rstConn1.getDB("test").a.count(), "Error interacting with replSet");
+assert.eq(2, rstConn1.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 print("===== UPGRADE allowSSL,sendKeyfile -> preferSSL,sendX509 =====");
 authAllNodes();
@@ -79,7 +79,7 @@ rst.upgradeSet({
 authAllNodes();
 var rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a: 3, str: "TESTTESTTEST"});
-assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
+assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
 rst.awaitReplication();
 // Test that a non-ssl connection can still be made
 var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval", ";");
@@ -99,5 +99,5 @@ rst.upgradeSet({
 authAllNodes();
 var rstConn4 = rst.getPrimary();
 rstConn4.getDB("test").a.insert({a: 4, str: "TESTTESTTEST"});
-assert.eq(4, rstConn4.getDB("test").a.count(), "Error interacting with replSet");
+assert.eq(4, rstConn4.getDB("test").a.find().itcount(), "Error interacting with replSet");
 rst.stopSet();

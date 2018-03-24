@@ -23,14 +23,14 @@ rst.initiate();
 
 var rstConn1 = rst.getPrimary();
 rstConn1.getDB("test").a.insert({a: 1, str: "TESTTESTTEST"});
-assert.eq(1, rstConn1.getDB("test").a.count(), "Error interacting with replSet");
+assert.eq(1, rstConn1.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 print("===== UPGRADE allowSSL -> preferSSL =====");
 opts.sslMode = "preferSSL";
 rst.upgradeSet(opts);
 var rstConn2 = rst.getPrimary();
 rstConn2.getDB("test").a.insert({a: 2, str: "CHECKCHECK"});
-assert.eq(2, rstConn2.getDB("test").a.count(), "Error interacting with replSet");
+assert.eq(2, rstConn2.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 // Check that non-ssl connections can still be made
 var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval", ";");
@@ -41,7 +41,7 @@ opts.sslMode = "requireSSL";
 rst.upgradeSet(opts);
 var rstConn3 = rst.getPrimary();
 rstConn3.getDB("test").a.insert({a: 3, str: "GREENEGGSANDHAM"});
-assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
+assert.eq(3, rstConn3.getDB("test").a.find().itcount(), "Error interacting with replSet");
 
 // Check that ssl connections can be made
 var canConnectSSL = runMongoProgram(

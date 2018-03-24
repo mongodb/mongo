@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/replication_recovery.h"
 
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -110,8 +111,10 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
                                                           OpTime topOfOplog) {
     invariant(!stableTimestamp.isNull());
     invariant(!topOfOplog.isNull());
+    const auto truncateAfterPoint = _consistencyMarkers->getOplogTruncateAfterPoint(opCtx);
     log() << "Recovering from stable timestamp: " << stableTimestamp
-          << " (top of oplog: " << topOfOplog << ", appliedThrough: " << appliedThrough << ")";
+          << " (top of oplog: " << topOfOplog << ", appliedThrough: " << appliedThrough
+          << ", TruncateAfter: " << truncateAfterPoint << ")";
 
     log() << "Starting recovery oplog application at the stable timestamp: " << stableTimestamp;
     _applyToEndOfOplog(opCtx, stableTimestamp, topOfOplog.getTimestamp());
@@ -186,6 +189,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     // Apply remaining ops one at at time, but don't log them because they are already logged.
     UnreplicatedWritesBlock uwb(opCtx);
+    DisableDocumentValidation validationDisabler(opCtx);
 
     BSONObj entry;
     while (cursor->more()) {
@@ -260,6 +264,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
             if (count != 1) {
                 invariant(!oldestIDToDelete.isNull());
                 oplogCollection->cappedTruncateAfter(opCtx, oldestIDToDelete, /*inclusive=*/true);
+                opCtx->recoveryUnit()->waitUntilDurable();
             }
             return;
         }

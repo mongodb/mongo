@@ -28,7 +28,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
     var testDB = rst.getPrimary().getDB(dbName);
     assert.writeOK(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
-    assert.eq(1, testDB.a.count(), 'Error interacting with replSet');
+    assert.eq(1, testDB.a.find().itcount(), 'Error interacting with replSet');
 
     print('=== UPGRADE no-auth/no-ssl -> transition to X509/allowSSL ===');
     rst.upgradeSet(transitionToX509AllowSSL);
@@ -36,7 +36,7 @@ load('jstests/ssl/libs/ssl_helpers.js');
     // Connect to the new primary
     testDB = rst.getPrimary().getDB(dbName);
     assert.writeOK(testDB.a.insert({a: 1, str: 'TESTTESTTEST'}));
-    assert.eq(2, testDB.a.count(), 'Error interacting with replSet');
+    assert.eq(2, testDB.a.find().itcount(), 'Error interacting with replSet');
 
     rst.stopSet();
 }());

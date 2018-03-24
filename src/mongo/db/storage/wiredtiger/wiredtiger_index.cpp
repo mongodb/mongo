@@ -222,9 +222,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
        << "formatVersion=" << keyStringVersion << ',' << "infoObj=" << desc.infoObj().jsonString()
        << "),";
 
-    const bool keepOldLoggingSettings = !kDisableJournalForReplicatedCollections;
-    if (keepOldLoggingSettings ||
-        WiredTigerUtil::useTableLogging(NamespaceString(desc.parentNS()),
+    if (WiredTigerUtil::useTableLogging(NamespaceString(desc.parentNS()),
                                         getGlobalReplSettings().usingReplSets())) {
         ss << "log=(enabled=true)";
     } else {

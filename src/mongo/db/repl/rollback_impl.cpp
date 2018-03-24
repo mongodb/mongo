@@ -33,6 +33,7 @@
 #include "mongo/db/repl/rollback_impl.h"
 
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -40,7 +41,9 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
@@ -55,6 +58,9 @@
 namespace mongo {
 namespace repl {
 namespace {
+
+RollbackImpl::Listener kNoopListener;
+
 // Control whether or not the server will write out data files containing deleted documents during
 // rollback. This server parameter affects both rollback via refetch and rollback via recovery to
 // stable timestamp.
@@ -100,7 +106,7 @@ RollbackImpl::RollbackImpl(OplogInterface* localOplog,
                    storageInterface,
                    replicationProcess,
                    replicationCoordinator,
-                   {}) {}
+                   &kNoopListener) {}
 
 RollbackImpl::~RollbackImpl() {
     shutdown();
@@ -171,6 +177,10 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // timestamp, but does not revert the oplog, which must be done as part of the rollback process.
     _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, truncatePoint);
     _listener->onSetOplogTruncateAfterPoint(truncatePoint);
+
+    // Align the drop pending reaper state with what's on disk. Oplog recovery depends on those
+    // being consistent.
+    _resetDropPendingState(opCtx);
 
     // Run the oplog recovery logic.
     status = _oplogRecovery(opCtx, stableTimestampSW.getValue());
@@ -553,11 +563,17 @@ StatusWith<Timestamp> RollbackImpl::_recoverToStableTimestamp(OperationContext* 
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
     // Recover to the stable timestamp while holding the global exclusive lock.
-    auto serviceCtx = opCtx->getServiceContext();
     {
         Lock::GlobalWrite globalWrite(opCtx);
         try {
-            return _storageInterface->recoverToStableTimestamp(serviceCtx);
+            auto stableTimestampSW = _storageInterface->recoverToStableTimestamp(opCtx);
+            if (!stableTimestampSW.isOK()) {
+                severe() << "RecoverToStableTimestamp failed. "
+                         << causedBy(stableTimestampSW.getStatus());
+                return {ErrorCodes::UnrecoverableRollbackError,
+                        "Recover to stable timestamp failed."};
+            }
+            return stableTimestampSW;
         } catch (...) {
             return exceptionToStatus();
         }
@@ -597,6 +613,18 @@ void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
                  << "; found self in " << _replicationCoordinator->getMemberState()
                  << causedBy(status);
         fassertFailedNoTrace(40408);
+    }
+}
+
+void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
+    DropPendingCollectionReaper::get(opCtx)->clearDropPendingState();
+
+    std::vector<std::string> dbNames;
+    opCtx->getServiceContext()->getGlobalStorageEngine()->listDatabases(&dbNames);
+    for (const auto& dbName : dbNames) {
+        Lock::DBLock dbLock(opCtx, dbName, MODE_X);
+        Database* db = dbHolder().openDb(opCtx, dbName);
+        checkForIdIndexesAndDropPendingCollections(opCtx, db);
     }
 }
 

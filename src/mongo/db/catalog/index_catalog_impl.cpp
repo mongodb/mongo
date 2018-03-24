@@ -336,7 +336,12 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
 StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationContext* opCtx,
                                                                    BSONObj spec) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));
-    invariant(_collection->numRecords(opCtx) == 0);
+    invariant(_collection->numRecords(opCtx) == 0,
+              str::stream() << "Collection must be empty. Collection: " << _collection->ns().ns()
+                            << " UUID: "
+                            << _collection->uuid()
+                            << " Count: "
+                            << _collection->numRecords(opCtx));
 
     _checkMagic();
     Status status = checkUnfinished();
@@ -456,6 +461,7 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
     invariant(_opCtx->lockState()->inAWriteUnitOfWork());
 
     Collection* collection = _catalog->_getCollection();
+
     fassert(17207, collection->ok());
     NamespaceString ns(_indexNamespace);
     invariant(_opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));

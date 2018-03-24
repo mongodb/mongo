@@ -352,7 +352,7 @@ public:
      *
      * The 'stable' timestamp is set by calling StorageInterface::setStableTimestamp.
      */
-    virtual StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) = 0;
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) = 0;
 
     /**
      * Returns whether the storage engine supports "recover to stable timestamp".

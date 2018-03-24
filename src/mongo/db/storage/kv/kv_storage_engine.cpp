@@ -27,13 +27,17 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define LOG_FOR_ROLLBACK(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationRollback)
 
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
 #include <algorithm>
 
+#include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/kv/kv_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/unclean_shutdown.h"
@@ -112,6 +116,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
     _catalogRecordStore = _engine->getGroupedRecordStore(
         opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+    LOG_FOR_ROLLBACK(2) << "loadCatalog:" << _dumpCatalog(opCtx);
+
     _catalog.reset(new KVCatalog(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
     _catalog->init(opCtx);
@@ -172,6 +178,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isLocked());
+    LOG_FOR_ROLLBACK(2) << "closeCatalog:" << _dumpCatalog(opCtx);
+
     stdx::lock_guard<stdx::mutex> lock(_dbsLock);
     for (auto entry : _dbs) {
         delete entry.second;
@@ -216,6 +224,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         engineIdents.erase(catalogInfo);
     }
 
+    LOG_FOR_ROLLBACK(2) << "Reconciling collection and index idents.";
     std::set<std::string> catalogIdents;
     {
         std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
@@ -312,7 +321,9 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         }
 
         for (auto&& indexName : indexesToDrop) {
-            dassert(metaData.eraseIndex(indexName));
+            invariant(metaData.eraseIndex(indexName),
+                      str::stream() << "Index is missing. Collection: " << coll << " Index: "
+                                    << indexName);
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
@@ -459,21 +470,6 @@ Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
         std::string coll = *toDrop;
         NamespaceString nss(coll);
 
-        // When in steady state replication and after filtering out drop-pending namespaces, the
-        // only collections that may show up here are either 1) not replicated 2) `tmp.mr` 3)
-        // `system.indexes`.
-        //
-        // Due to a bug in the `createCollection` command, `system.indexes` can become a real
-        // collection in the storage engine's catalog. However, this collection is often treated
-        // as a special collection. For example, dropping a database will skip over
-        // `system.indexes` and it will never be renamed to the drop pending namespace.
-        if (_initialDataTimestamp != Timestamp::kAllowUnstableCheckpointsSentinel) {
-            invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr") ||
-                          nss.isSystemDotIndexes(),
-                      str::stream() << "Collection drop is not being timestamped. Namespace: "
-                                    << nss.ns());
-        }
-
         Status result = dbce->dropCollection(opCtx, coll);
         if (!result.isOK() && firstError.isOK()) {
             firstError = result;
@@ -587,8 +583,30 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
-StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp() {
-    return _engine->recoverToStableTimestamp();
+StatusWith<Timestamp> KVStorageEngine::recoverToStableTimestamp(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isW());
+
+    // The "feature document" should not be rolled back. Perform a non-timestamped update to the
+    // feature document to lock in the current state.
+    KVCatalog::FeatureTracker::FeatureBits featureInfo;
+    {
+        WriteUnitOfWork wuow(opCtx);
+        featureInfo = _catalog->getFeatureTracker()->getInfo(opCtx);
+        _catalog->getFeatureTracker()->putInfo(opCtx, featureInfo);
+        wuow.commit();
+    }
+
+    catalog::closeCatalog(opCtx);
+
+    StatusWith<Timestamp> swTimestamp = _engine->recoverToStableTimestamp(opCtx);
+    if (!swTimestamp.isOK()) {
+        return swTimestamp;
+    }
+
+    catalog::openCatalog(opCtx);
+
+    log() << "recoverToStableTimestamp successful. Stable Timestamp: " << swTimestamp.getValue();
+    return {swTimestamp.getValue()};
 }
 
 boost::optional<Timestamp> KVStorageEngine::getRecoveryTimestamp() const {
@@ -606,4 +624,19 @@ void KVStorageEngine::replicationBatchIsComplete() const {
 Timestamp KVStorageEngine::getAllCommittedTimestamp(OperationContext* opCtx) const {
     return _engine->getAllCommittedTimestamp(opCtx);
 }
+
+std::string KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
+    StringBuilder builder;
+    auto catalogRs = _catalogRecordStore.get();
+    auto cursor = catalogRs->getCursor(opCtx);
+    boost::optional<Record> rec = cursor->next();
+    while (rec) {
+        builder << "\n\tId: " << rec->id << " Value: " << rec->data.toBson();
+        rec = cursor->next();
+    }
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    return builder.str();
+}
+
 }  // namespace mongo

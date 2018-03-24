@@ -12,7 +12,6 @@
     let replSet = new ReplSetTest({
         name: "prepareReadConflicts",
         nodes: 3,
-        nodeOptions: {"setParameter": "disableJournalForReplicatedCollections=1"}
     });
 
     replSet.startSet();

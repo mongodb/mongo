@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "repair_database_and_check_version.h"
+
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -177,49 +179,6 @@ const NamespaceString startupLogCollectionName("local.startup_log");
 const NamespaceString kSystemReplSetCollection("local.system.replset");
 
 /**
- * If we are in a replset, every replicated collection must have an _id index.
- * As we scan each database, we also gather a list of drop-pending collection namespaces for
- * the DropPendingCollectionReaper to clean up eventually.
- */
-void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Database* db) {
-    if (db->name() == "local") {
-        // Collections in the local database are not replicated, so we do not need an _id index on
-        // any collection. For the same reason, it is not possible for the local database to contain
-        // any drop-pending collections (drops are effective immediately).
-        return;
-    }
-
-    std::list<std::string> collectionNames;
-    db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collectionNames);
-
-    for (const auto& collectionName : collectionNames) {
-        const NamespaceString ns(collectionName);
-
-        if (ns.isDropPendingNamespace()) {
-            auto dropOpTime = fassert(40459, ns.getDropPendingNamespaceOpTime());
-            log() << "Found drop-pending namespace " << ns << " with drop optime " << dropOpTime;
-            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, ns);
-        }
-
-        if (ns.isSystem())
-            continue;
-
-        Collection* coll = db->getCollection(opCtx, collectionName);
-        if (!coll)
-            continue;
-
-        if (coll->getIndexCatalog()->findIdIndex(opCtx))
-            continue;
-
-        log() << "WARNING: the collection '" << collectionName << "' lacks a unique index on _id."
-              << " This index is needed for replication to function properly" << startupWarningsLog;
-        log() << "\t To fix this, you need to create a unique index on _id."
-              << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
-              << startupWarningsLog;
-    }
-}
-
-/**
  * Checks if this server was started without --replset but has a config in local.system.replset
  * (meaning that this is probably a replica set member started in stand-alone mode).
  *
@@ -268,6 +227,47 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
     storageEngine->listDatabases(&dbNames);
 
+    // Rebuilding indexes must be done before a database can be opened.
+    if (!storageGlobalParams.readOnly) {
+        StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
+            storageEngine->reconcileCatalogAndIdents(opCtx);
+        fassert(40593, swIndexesToRebuild);
+
+        if (!swIndexesToRebuild.getValue().empty() && serverGlobalParams.indexBuildRetry) {
+            log() << "note: restart the server with --noIndexBuildRetry "
+                  << "to skip index rebuilds";
+        }
+
+        if (!serverGlobalParams.indexBuildRetry) {
+            log() << "  not rebuilding interrupted indexes";
+            swIndexesToRebuild.getValue().clear();
+        }
+
+        for (auto&& collIndexPair : swIndexesToRebuild.getValue()) {
+            const std::string& coll = collIndexPair.first;
+            const std::string& indexName = collIndexPair.second;
+            DatabaseCatalogEntry* dbce =
+                storageEngine->getDatabaseCatalogEntry(opCtx, NamespaceString(coll).db());
+            invariant(dbce);
+            CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(coll);
+            invariant(cce);
+
+            StatusWith<IndexNameObjs> swIndexToRebuild(
+                getIndexNameObjs(opCtx, dbce, cce, [&indexName](const std::string& str) {
+                    return str == indexName;
+                }));
+            if (!swIndexToRebuild.isOK() || swIndexToRebuild.getValue().first.empty()) {
+                severe() << "Unable to get indexes for collection. Collection: " << coll;
+                fassertFailedNoTrace(40590);
+            }
+
+            invariant(swIndexToRebuild.getValue().first.size() == 1 &&
+                      swIndexToRebuild.getValue().second.size() == 1);
+            fassert(40592,
+                    rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexToRebuild.getValue()));
+        }
+    }
+
     bool repairVerifiedAllCollectionsHaveUUIDs = false;
 
     // Repair all databases first, so that we do not try to open them if they are in bad shape
@@ -312,48 +312,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
     }
 
-    const repl::ReplSettings& replSettings =
-        repl::ReplicationCoordinator::get(opCtx)->getSettings();
-
     if (!storageGlobalParams.readOnly) {
-        StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
-            storageEngine->reconcileCatalogAndIdents(opCtx);
-        fassert(40593, swIndexesToRebuild);
-
-        if (!swIndexesToRebuild.getValue().empty() && serverGlobalParams.indexBuildRetry) {
-            log() << "note: restart the server with --noIndexBuildRetry "
-                  << "to skip index rebuilds";
-        }
-
-        if (!serverGlobalParams.indexBuildRetry) {
-            log() << "  not rebuilding interrupted indexes";
-            swIndexesToRebuild.getValue().clear();
-        }
-
-        for (auto&& collIndexPair : swIndexesToRebuild.getValue()) {
-            const std::string& coll = collIndexPair.first;
-            const std::string& indexName = collIndexPair.second;
-            DatabaseCatalogEntry* dbce =
-                storageEngine->getDatabaseCatalogEntry(opCtx, NamespaceString(coll).db());
-            invariant(dbce);
-            CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(coll);
-            invariant(cce);
-
-            StatusWith<IndexNameObjs> swIndexToRebuild(
-                getIndexNameObjs(opCtx, dbce, cce, [&indexName](const std::string& str) {
-                    return str == indexName;
-                }));
-            if (!swIndexToRebuild.isOK() || swIndexToRebuild.getValue().first.empty()) {
-                severe() << "Unable to get indexes for collection. Collection: " << coll;
-                fassertFailedNoTrace(40590);
-            }
-
-            invariant(swIndexToRebuild.getValue().first.size() == 1 &&
-                      swIndexToRebuild.getValue().second.size() == 1);
-            fassert(40592,
-                    rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexToRebuild.getValue()));
-        }
-
         // We open the "local" database before calling checkIfReplMissingFromCommandLine() to
         // ensure the in-memory catalog entries for the 'kSystemReplSetCollection' collection have
         // been populated if the collection exists. If the "local" database didn't exist at this
@@ -363,6 +322,9 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
         dbHolder().openDb(opCtx, kSystemReplSetCollection.db());
     }
+
+    const repl::ReplSettings& replSettings =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings();
 
     // On replica set members we only clear temp collections on DBs other than "local" during
     // promotion to primary. On pure slaves, they are only cleared when the oplog tells them
@@ -539,4 +501,48 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "done repairDatabases";
     return nonLocalDatabases;
 }
+
+/**
+ * If we are in a replset, every replicated collection must have an _id index.
+ * As we scan each database, we also gather a list of drop-pending collection namespaces for
+ * the DropPendingCollectionReaper to clean up eventually.
+ */
+void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Database* db) {
+    if (db->name() == "local") {
+        // Collections in the local database are not replicated, so we do not need an _id index on
+        // any collection. For the same reason, it is not possible for the local database to contain
+        // any drop-pending collections (drops are effective immediately).
+        return;
+    }
+
+    std::list<std::string> collectionNames;
+    db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collectionNames);
+
+    for (const auto& collectionName : collectionNames) {
+        const NamespaceString ns(collectionName);
+
+        if (ns.isDropPendingNamespace()) {
+            auto dropOpTime = fassert(40459, ns.getDropPendingNamespaceOpTime());
+            log() << "Found drop-pending namespace " << ns << " with drop optime " << dropOpTime;
+            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, ns);
+        }
+
+        if (ns.isSystem())
+            continue;
+
+        Collection* coll = db->getCollection(opCtx, collectionName);
+        if (!coll)
+            continue;
+
+        if (coll->getIndexCatalog()->findIdIndex(opCtx))
+            continue;
+
+        log() << "WARNING: the collection '" << collectionName << "' lacks a unique index on _id."
+              << " This index is needed for replication to function properly" << startupWarningsLog;
+        log() << "\t To fix this, you need to create a unique index on _id."
+              << " See http://dochub.mongodb.org/core/build-replica-set-indexes"
+              << startupWarningsLog;
+    }
+}
+
 }  // namespace mongo

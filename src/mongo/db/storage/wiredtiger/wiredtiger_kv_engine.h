@@ -176,7 +176,7 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
-    virtual StatusWith<Timestamp> recoverToStableTimestamp() override;
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
@@ -232,6 +232,13 @@ public:
      * refresh our oplog visiblity read-at-timestamp value.
      */
     void replicationBatchIsComplete() const override;
+
+    /**
+     * Return a timestamp value that is at or before the last checkpoint. Everything before this
+     * value is guaranteed to be persisted on disk and replication recovery will not need to
+     * replay documents with an earlier time.
+     */
+    Timestamp getLastStableCheckpointTimestamp() const;
 
     /**
      * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the
@@ -297,5 +304,6 @@ private:
     mutable Date_t _previousCheckedDropsQueued;
 
     std::unique_ptr<WiredTigerSession> _backupSession;
+    Timestamp _recoveryTimestamp;
 };
 }

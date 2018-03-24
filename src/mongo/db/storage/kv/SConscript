@@ -48,6 +48,7 @@ env.Library(
     source=['kv_storage_engine.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
@@ -78,6 +79,7 @@ env.Library(
         'kv_database_catalog_entry_mock.cpp'
         ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
         'kv_engine_core',
@@ -106,7 +108,7 @@ env.CppUnitTest(
     target='kv_database_catalog_entry_test',
     source=[
         'kv_database_catalog_entry_test.cpp',
-        ],
+    ],
     LIBDEPS=[
         'kv_engine_mock',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
@@ -114,8 +116,11 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
-        ]
-    )
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init'
+    ],
+)
 
 env.CppUnitTest(
     target='kv_collection_catalog_entry_test',
@@ -129,8 +134,11 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
-        ]
-    )
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init'
+    ],
+)
 
 env.CppUnitTest(
     target='kv_storage_engine_test',

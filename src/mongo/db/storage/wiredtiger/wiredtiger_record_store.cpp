@@ -592,9 +592,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     }
     ss << ")";
 
-    const bool keepOldLoggingSettings = !kDisableJournalForReplicatedCollections;
-    if (keepOldLoggingSettings ||
-        WiredTigerUtil::useTableLogging(NamespaceString(ns),
+    if (WiredTigerUtil::useTableLogging(NamespaceString(ns),
                                         getGlobalReplSettings().usingReplSets())) {
         ss << ",log=(enabled=true)";
     } else {
@@ -1055,8 +1053,19 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
+    reclaimOplog(opCtx, _kvEngine->getLastStableCheckpointTimestamp());
+}
+
+void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp) {
+
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
         invariant(stone->lastRecord.isNormal());
+
+        const auto persistedAsNumber = static_cast<std::int64_t>(persistedTimestamp.asULL());
+        if (stone->lastRecord.repr() >= persistedAsNumber) {
+            // Do not truncate oplogs needed for replication recovery.
+            return;
+        }
 
         LOG(1) << "Truncating the oplog between " << _oplogStones->firstRecord << " and "
                << stone->lastRecord << " to remove approximately " << stone->records

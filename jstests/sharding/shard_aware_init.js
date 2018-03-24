@@ -36,6 +36,14 @@
          */
         var restartAndFixShardIdentityDoc = function(startOptions) {
             var options = Object.extend({}, startOptions);
+            // With Recover to a Timestamp, writes to a replica set member may not be written to
+            // disk in the collection, but are instead re-applied from the oplog at startup. When
+            // restarting with `--shardsvr`, the update to the `shardIdentity` document is not
+            // processed. Turning off `--replSet` guarantees the update is written out to the
+            // collection and the test no longer relies on replication recovery from performing
+            // the update with `--shardsvr` on.
+            var rsName = options.replSet;
+            delete options.replSet;
             delete options.shardsvr;
             var mongodConn = MongoRunner.runMongod(options);
             waitForMaster(mongodConn);
@@ -47,6 +55,7 @@
             MongoRunner.stopMongod(mongodConn);
 
             newMongodOptions.shardsvr = '';
+            newMongodOptions.replSet = rsName;
             mongodConn = MongoRunner.runMongod(newMongodOptions);
             waitForMaster(mongodConn);
 
@@ -104,6 +113,9 @@
 
         // Note: modification of the shardIdentity is allowed only when not running with --shardsvr
         MongoRunner.stopMongod(mongodConn);
+        // The manipulation of `--replSet` is explained in `restartAndFixShardIdentityDoc`.
+        var rsName = newMongodOptions.replSet;
+        delete newMongodOptions.replSet;
         delete newMongodOptions.shardsvr;
         mongodConn = MongoRunner.runMongod(newMongodOptions);
         waitForMaster(mongodConn);
@@ -114,6 +126,7 @@
         MongoRunner.stopMongod(mongodConn);
 
         newMongodOptions.shardsvr = '';
+        newMongodOptions.replSet = rsName;
         assert.throws(function() {
             mongodConn = MongoRunner.runMongod(newMongodOptions);
             waitForMaster(mongodConn);

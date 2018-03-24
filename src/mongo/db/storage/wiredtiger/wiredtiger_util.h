@@ -50,9 +50,6 @@ inline bool wt_keeptxnopen() {
     return false;
 }
 
-// For testing purposes only. Disables journaling (write-ahead logging) for replicated collections.
-extern bool kDisableJournalForReplicatedCollections;
-
 Status wtRCToStatus_slow(int retCode, const char* prefix);
 
 /**

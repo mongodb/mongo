@@ -129,7 +129,6 @@ public:
         return _status.isOK();
     }
 
-
     /**
      * This method is a transitional tool, to facilitate transition to compile-time enforced status
      * checking.
