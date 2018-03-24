@@ -15,4 +15,10 @@ db.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: 100});
 
 //3. Run the query that will have lots of matching documents that are not sorted from the x index, and lots of non-matching documents that are sorted from the _id index:
 db.foo.find({x: {$gte: 90000}}).sort({_id: 1}).explain(true)
+db.foo.find({x: 1}).sort({_id: 1}).explain(true)
 
+const auto mps = getMultiPlanStage(exec->getRootStage());
+int i = static_cast<size_t>(mps->originalWinningPlanIdx());
+if (i >= 0) {
+    plannerBob.append("backupPlanUsed", true);
+}

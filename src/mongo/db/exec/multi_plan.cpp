@@ -131,8 +131,9 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
         _collection->infoCache()->getPlanCache()->remove(*_query).transitional_ignore();
 
+        _originalWinningPlanIdx = _bestPlanIdx;
         _bestPlanIdx = _backupPlanIdx;
-        // _backupPlanIdx = kNoSuchPlan;
+        _backupPlanIdx = kNoSuchPlan;
 
         return _candidates[_bestPlanIdx].root->work(out);
     }
@@ -455,6 +456,9 @@ bool MultiPlanStage::hasBackupPlan() const {
 }
 int MultiPlanStage::backupPlanIdx() const {
     return _backupPlanIdx;
+}
+int MultiPlanStage::originalWinningPlanIdx() const {
+    return _originalWinningPlanIdx;
 }
 
 bool MultiPlanStage::bestPlanChosen() const {

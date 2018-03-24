@@ -289,6 +289,28 @@ unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutor* exec) {
                : std::move(exec->getRootStage()->getStats());
 }
 
+/**
+ * Get PlanExecutor's original winning plan stats tree.
+ */
+std::vector<std::unique_ptr<PlanStageStats>> getOriginalWinningPlanStatsTree(PlanExecutor* exec) {
+    // Inspect the tree to see if there is a MultiPlanStage. Plan selection has already happened at
+    // this point, since we have a PlanExecutor.
+    const auto mps = getMultiPlanStage(exec->getRootStage());
+    std::vector<std::unique_ptr<PlanStageStats>> res;
+
+    // Get the stats from the trial period for all the plans.
+    if (mps) {
+        const auto mpsStats = mps->getStats();
+        for (size_t i = 0; i < mpsStats->children.size(); ++i) {
+            if (i != static_cast<size_t>(mps->originalWinningPlanIdx())) {
+                res.emplace_back(std::move(mpsStats->children[i]));
+            }
+        }
+    }
+
+    return res;
+}
+
 }  // namespace
 
 namespace mongo {
@@ -644,6 +666,12 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
     plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
+
+    const auto mps = getMultiPlanStage(exec->getRootStage());
+    int i = static_cast<size_t>(mps->originalWinningPlanIdx());
+    if (i >= 0) {
+        plannerBob.append("backupPlanUsed", true);
+    }
     plannerBob.append("namespace", exec->nss().ns());
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet'
@@ -682,10 +710,26 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     // Genenerate array of rejected plans.
     const vector<unique_ptr<PlanStageStats>> rejectedStats = getRejectedPlansTrialStats(exec);
     BSONArrayBuilder allPlansBob(plannerBob.subarrayStart("rejectedPlans"));
+    // BSONArrayBuilder originalWinningPlansBob(plannerBob.subarrayStart("originalWinningPlan"));
     for (size_t i = 0; i < rejectedStats.size(); i++) {
         BSONObjBuilder childBob(allPlansBob.subobjStart());
         statsToBSON(*rejectedStats[i], &childBob, ExplainOptions::Verbosity::kQueryPlanner);
     }
+
+    // // Genenerate array of rejected plans.
+    // const vector<unique_ptr<PlanStageStats>> originalPlanStats = getRejectedPlansTrialStats(exec);
+    // BSONArrayBuilder originalWinningPlansBob(plannerBob.subarrayStart("originalWinningPlan"));
+    // for (size_t i = 0; i < originalPlanStats.size(); i++) {
+    //     BSONObjBuilder childBob(originalWinningPlansBob.subobjStart());
+    //     statsToBSON(*originalPlanStats[i], &childBob, ExplainOptions::Verbosity::kQueryPlanner);
+    // }
+
+    // Generate array of original winning plan
+    BSONObjBuilder originalWinningPlanBob(plannerBob.subobjStart("originalWinningPlan"));
+    const auto originalWinnerStats = getOriginalWinningPlanStatsTree(exec);
+    //statsToBSON(*originalWinnerStats.get(), &originalWinningPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
+    originalWinningPlanBob.doneFast();
+
     allPlansBob.doneFast();
 
     plannerBob.doneFast();
@@ -766,14 +810,6 @@ void Explain::generateExecutionInfo(PlanExecutor* exec,
                   "winningPlanTrialStats must be non-null when requesting all execution stats");
     }
     BSONObjBuilder execBob(out->subobjStart("executionStats"));
-
-    const auto mps = getMultiPlanStage(exec->getRootStage());
-    BSONObjBuilder bob;
-    int i = static_cast<size_t>(mps->backupPlanIdx());
-    if (i >= 0) {
-        bob.append("backupPlanUsed", true);
-        // out->append("backupPlanUsed", true);
-    }
 
     // If there is an execution error while running the query, the error is reported under
     // the "executionStats" section and the explain as a whole succeeds.
