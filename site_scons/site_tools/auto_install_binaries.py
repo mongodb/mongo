@@ -65,7 +65,7 @@ def generate(env):
         for install_source in install_sources:
             is_executor = install_source.get_executor()
             is_targets = is_executor.get_all_targets()
-            for is_target in is_targets:
+            for is_target in (is_targets or []):
                 grandchildren = is_target.children()
                 for grandchild in grandchildren:
                     actions = getattr(grandchild.attributes, "aib_install_actions", None)
