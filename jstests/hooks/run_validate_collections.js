@@ -11,9 +11,14 @@
         const res = conn.adminCommand({isMaster: 1});
         const connections = [];
 
-        if (res.hasOwnProperty('hosts')) {
+        if (res.hasOwnProperty('setName')) {
             for (let hostString of res.hosts) {
                 connections.push(new Mongo(hostString));
+            }
+            if (res.hasOwnProperty('passives')) {
+                for (let hostString of res.passives) {
+                    connections.push(new Mongo(hostString));
+                }
             }
         } else {
             connections.push(conn);
