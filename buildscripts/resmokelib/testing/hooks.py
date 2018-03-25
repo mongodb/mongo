@@ -467,13 +467,17 @@ class PeriodicKillSecondaries(CustomBehavior):
             self._kill_secondaries()
             self._check_secondaries_and_restart_fixture()
 
-            # Validate all collections on all nodes after having the secondaries reconcile the end
-            # of their oplogs.
-            self._validate_collections(test_report)
-
+            # The CheckReplDBHash hook waits until all operations have replicated to and have been
+            # applied on the secondaries, so we run the ValidateCollections hook after it to ensure
+            # we're validating the entire contents of the collection.
+            #
             # Verify that the dbhashes match across all nodes after having the secondaries reconcile
             # the end of their oplogs.
             self._check_repl_dbhash(test_report)
+
+            # Validate all collections on all nodes after having the secondaries reconcile the end
+            # of their oplogs.
+            self._validate_collections(test_report)
 
             self._restart_and_clear_fixture()
         except Exception as err:
