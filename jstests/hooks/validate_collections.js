@@ -56,8 +56,18 @@ function validateCollections(db, obj) {
             }
         }
 
-        setFeatureCompatibilityVersion(
-            adminDB, jsTest.options().forceValidationWithFeatureCompatibilityVersion);
+        try {
+            setFeatureCompatibilityVersion(
+                adminDB, jsTest.options().forceValidationWithFeatureCompatibilityVersion);
+        } catch (e) {
+            if (e.code === ErrorCodes.NotMaster) {
+                print('Skipping collection validation on ' + db.getMongo() + ' because the' +
+                      ' featureCompatibilityVersion cannot be changed while connected to a' +
+                      ' secondary');
+                return true;
+            }
+            throw e;
+        }
     }
 
     // Don't run validate on view namespaces.
