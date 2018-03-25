@@ -264,8 +264,8 @@ tasks:
           mv mongos${extension|} mongodb/bin
           if [ -d jstests/hooks ]
           then
-            echo "Fetching JS test DB correctness checks from directory jstests/hooks"
-            cp -a jstests/hooks/* mongodb/jstests/hooks
+            echo "Fetching JS test DB correctness checks from directory jstests"
+            cp -a jstests/* mongodb/jstests
 
             echo "Now adding our own special run_validate_collections.js wrapper"
             mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
