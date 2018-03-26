@@ -1619,7 +1619,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                                 RecordId end,
                                                 bool inclusive) {
     // Only log messages at a lower level here for testing.
-    bool logLevel = getTestCommandsEnabled() ? 0 : 2;
+    int logLevel = getTestCommandsEnabled() ? 0 : 2;
 
     if (_isOplog) {
         // If we are truncating the oplog, we want to make sure that a forward cursor reads all
