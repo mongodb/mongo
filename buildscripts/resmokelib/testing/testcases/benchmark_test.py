@@ -36,7 +36,10 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         bm_options = {
             "benchmark_out": self.report_name(),
             "benchmark_min_time": _config.DEFAULT_BENCHMARK_MIN_TIME.total_seconds(),
-            "benchmark_repetitions": _config.DEFAULT_BENCHMARK_REPETITIONS
+            "benchmark_repetitions": _config.DEFAULT_BENCHMARK_REPETITIONS,
+            # TODO: remove the following line once we bump our Google Benchmark version to one that
+            # contains the fix for https://github.com/google/benchmark/issues/559 .
+            "benchmark_color": False
         }
 
         # 2. Override Benchmark options with options set through `program_options` in the suite
