@@ -296,7 +296,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 /*
  * __wt_txn_modify_page_delete --
- *	Remember a page fast-deleted by the current transaction.
+ *	Remember a page truncated by the current transaction.
  */
 static inline int
 __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)

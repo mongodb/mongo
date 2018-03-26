@@ -11,7 +11,10 @@
  * and unused function return values.
  */
 #define	WT_UNUSED(var)		(void)(var)
-#define	WT_NOT_READ(var)	(void)(var)
+#define	WT_NOT_READ(v, val) do {					\
+	(v) = (val);							\
+	(void)(v);							\
+} while (0);
 #define	WT_IGNORE_RET(call) do {					\
 	int __ignored_ret;						\
 	__ignored_ret = (call);						\

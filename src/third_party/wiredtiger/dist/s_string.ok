@@ -138,6 +138,7 @@ FULLFSYNC
 Facebook
 FindClose
 FindFirstFile
+FindNextFileW
 Fixup
 Fk
 FlushFileBuffers
@@ -523,7 +524,7 @@ ccr
 cd
 centric
 cfg
-cfkos
+cfko
 change's
 changelog
 chdir

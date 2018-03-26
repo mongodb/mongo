@@ -1379,7 +1379,7 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
 		return (ret);
 	}
 
-	if (g.logging == LOG_OPS)
+	if (ret == 0 && g.logging == LOG_OPS)
 		switch (g.type) {
 		case FIX:
 			(void)g.wt_api->msg_printf(g.wt_api,

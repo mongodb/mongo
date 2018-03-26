@@ -238,7 +238,8 @@
 	JOINABLE_CURSOR_CALL_CHECK(cur)
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
-	((ret == WT_PREPARE_CONFLICT) ? (ret = WT_ROLLBACK) : ret );	\
+	if ((ret) == WT_PREPARE_CONFLICT)				\
+		(ret) = WT_ROLLBACK;					\
 	TXN_API_END(s, ret)
 
 #define	ASYNCOP_API_CALL(conn, s, n)					\

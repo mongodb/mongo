@@ -370,7 +370,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM tmp;
-	WT_PAGE *page;
+	WT_PAGE *notused;
 	size_t addr_size;
 	uint64_t time_start, time_stop;
 	uint32_t page_flags, final_state, new_state, previous_state;
@@ -378,7 +378,6 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	bool timer;
 
 	btree = S2BT(session);
-	page = NULL;
 	time_start = time_stop = 0;
 
 	/*
@@ -427,11 +426,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state != WT_REF_DISK);
 
-		WT_ERR(__wt_btree_new_leaf_page(session, &page));
-		ref->page = page;
-		if (previous_state == WT_REF_LOOKASIDE)
-			goto skip_read;
-		goto done;
+		WT_ERR(__wt_btree_new_leaf_page(session, &ref->page));
+		goto skip_read;
 	}
 
 	/*
@@ -464,7 +460,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    WT_DATA_IN_ITEM(&tmp) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED;
 	if (LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
 		FLD_SET(page_flags, WT_PAGE_EVICT_NO_PROGRESS);
-	WT_ERR(__wt_page_inmem(session, ref, tmp.data, page_flags, &page));
+	WT_ERR(__wt_page_inmem(session, ref, tmp.data, page_flags, &notused));
 	tmp.mem = NULL;
 
 	/*
@@ -481,7 +477,7 @@ skip_read:
 	switch (previous_state) {
 	case WT_REF_DELETED:
 		/*
-		 * A fast-deleted page may also have lookaside information. The
+		 * A truncated page may also have lookaside information. The
 		 * delete happened after page eviction (writing the lookaside
 		 * information), first update based on the lookaside table and
 		 * then apply the delete.
@@ -491,6 +487,7 @@ skip_read:
 			ref->page_las->eviction_to_lookaside = false;
 		}
 
+		/* Move all records to a deleted state. */
 		WT_ERR(__wt_delete_page_instantiate(session, ref));
 		break;
 	case WT_REF_LOOKASIDE:
@@ -523,7 +520,7 @@ skip_read:
 		WT_IGNORE_RET(__wt_las_remove_block(
 		    session, btree->id, ref->page_las->las_pageid));
 
-done:	WT_PUBLISH(ref->state, final_state);
+	WT_PUBLISH(ref->state, final_state);
 	return (ret);
 
 err:	/*
@@ -719,8 +716,7 @@ read:			/*
 				ret = __wt_page_release_evict(session, ref);
 				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
-					ret = 0;
-					WT_NOT_READ(ret);
+					WT_NOT_READ(ret, 0);
 					WT_STAT_CONN_INCR(session,
 					    page_forcible_evict_blocked);
 					stalled = true;

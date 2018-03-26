@@ -655,30 +655,43 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		exact = 0;
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-	} else if ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND) {
-		WT_ERR(ret);
-		exact = 1;
 	} else {
 		/*
-		 * The cursor next call may have overwritten our caller's key,
-		 * restore it to its original value.
+		 * We didn't find an exact match: try after the search key,
+		 * then before.  We have to loop here because at low isolation
+		 * levels, new records could appear as we are stepping through
+		 * the tree.
 		 */
-		__cursor_state_restore(cursor, &state);
-
-		WT_ERR(__cursor_func_init(cbt, true));
-		WT_ERR(btree->type == BTREE_ROW ?
-		    __cursor_row_search(session, cbt, NULL, true) :
-		    __cursor_col_search(session, cbt, NULL));
-		WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
-		if (valid) {
-			exact = cbt->compare;
-			ret = __cursor_kv_return(session, cbt, upd);
-		} else if ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+		while ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND) {
 			WT_ERR(ret);
-			exact = -1;
+			if (btree->type == BTREE_ROW)
+				WT_ERR(__wt_compare(session, btree->collator,
+				    &cursor->key, &state.key, &exact));
+			else
+				exact = cbt->recno < state.recno ? -1 :
+				    cbt->recno == state.recno ? 0 : 1;
+			if (exact >= 0)
+				goto done;
+		}
+
+		/*
+		 * We walked to the end of the tree without finding a match.
+		 * Walk backwards instead.
+		 */
+		while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+			WT_ERR(ret);
+			if (btree->type == BTREE_ROW)
+				WT_ERR(__wt_compare(session, btree->collator,
+				    &cursor->key, &state.key, &exact));
+			else
+				exact = cbt->recno < state.recno ? -1 :
+				    cbt->recno == state.recno ? 0 : 1;
+			if (exact <= 0)
+				goto done;
 		}
 	}
 
+done:
 err:	if (ret == 0 && exactp != NULL)
 		*exactp = exact;
 

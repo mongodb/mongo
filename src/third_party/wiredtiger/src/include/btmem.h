@@ -773,7 +773,7 @@ struct __wt_page {
 
 /*
  * WT_PAGE_DELETED --
- *	Related information for fast-delete, on-disk pages.
+ *	Related information for truncated pages.
  */
 struct __wt_page_deleted {
 	volatile uint64_t txnid;		/* Transaction ID */

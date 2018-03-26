@@ -39,7 +39,8 @@ static struct {
 	uint32_t c_ops;
 	uint32_t c_k;				/* Number of hash iterations */
 	uint32_t c_factor;			/* Number of bits per item */
-	uint32_t c_srand;
+
+	WT_RAND_STATE rand;
 
 	uint8_t **entries;
 } g;
@@ -67,10 +68,9 @@ main(int argc, char *argv[])
 	g.c_key_max = 100;
 	g.c_k = 8;
 	g.c_factor = 16;
-	g.c_srand = 3233456;
 
 	/* Set values from the command line. */
-	while ((ch = __wt_getopt(progname, argc, argv, "c:f:k:o:s:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "c:f:k:o:")) != EOF)
 		switch (ch) {
 		case 'c':			/* Cache size */
 			g.c_cache = (u_int)atoi(__wt_optarg);
@@ -78,14 +78,11 @@ main(int argc, char *argv[])
 		case 'f':			/* Factor */
 			g.c_factor = (u_int)atoi(__wt_optarg);
 			break;
-		case  'k':			/* Number of hash functions */
+		case 'k':			/* Number of hash functions */
 			g.c_k = (u_int)atoi(__wt_optarg);
 			break;
 		case 'o':			/* Number of ops */
 			g.c_ops = (u_int)atoi(__wt_optarg);
-			break;
-		case 's':			/* Number of ops */
-			g.c_srand = (u_int)atoi(__wt_optarg);
 			break;
 		default:
 			usage();
@@ -184,7 +181,7 @@ run(void)
 	memset((void *)item.data, 'a', item.size);
 	for (i = 0, fp = 0; i < g.c_ops; i++) {
 		((uint8_t *)item.data)[i % item.size] =
-		    'a' + ((uint8_t)rand() % 26);
+		    'a' + (__wt_random(&g.rand) % 26);
 		if ((ret = __wt_bloom_get(bloomp, &item)) == 0)
 			++fp;
 		if (ret != 0 && ret != WT_NOTFOUND)
@@ -219,14 +216,14 @@ populate_entries(void)
 	uint32_t i, j;
 	uint8_t **entries;
 
-	srand(g.c_srand);
+	__wt_random_init_seed(NULL, &g.rand);
 
 	entries = dcalloc(g.c_ops, sizeof(uint8_t *));
 
 	for (i = 0; i < g.c_ops; i++) {
 		entries[i] = dcalloc(g.c_key_max, sizeof(uint8_t));
 		for (j = 0; j < g.c_key_max; j++)
-			entries[i][j] = 'a' + ((uint8_t)rand() % 26);
+			entries[i][j] = 'a' + (__wt_random(&g.rand) % 26);
 	}
 
 	g.entries = entries;
@@ -239,13 +236,12 @@ populate_entries(void)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-cfkos]\n", progname);
+	fprintf(stderr, "usage: %s [-cfko]\n", progname);
 	fprintf(stderr, "%s",
 	    "\t-c cache size\n"
 	    "\t-f number of bits per item\n"
 	    "\t-k size of entry strings\n"
-	    "\t-o number of operations to perform\n"
-	    "\t-s random seed for run\n");
+	    "\t-o number of operations to perform\n");
 
 	exit(EXIT_FAILURE);
 }

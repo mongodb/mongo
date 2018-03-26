@@ -452,16 +452,14 @@ fail_fs_directory_list(WT_FILE_SYSTEM *file_system,
 		 * matter if the list is a bit longer than necessary.
 		 */
 		if (count >= allocated) {
-			p = realloc(
-			    entries, (allocated + 10) * sizeof(*entries));
-			if (p == NULL) {
+			allocated += 10;
+			if ((p = realloc(
+			    entries, allocated * sizeof(*entries))) == NULL) {
 				ret = ENOMEM;
 				goto err;
 			}
 			entries = p;
-			memset(entries + allocated * sizeof(*entries),
-			    0, 10 * sizeof(*entries));
-			allocated += 10;
+			memset(entries + count, 0, 10 * sizeof(*entries));
 		}
 		entries[count++] = strdup(name);
 	}

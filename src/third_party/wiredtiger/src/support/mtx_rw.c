@@ -178,12 +178,10 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 	int pause_cnt;
 	bool set_stats;
 
+	stats = NULL;			/* -Wconditional-uninitialized */
+	time_start = time_stop = 0;	/* -Wconditional-uninitialized */
+
 	WT_STAT_CONN_INCR(session, rwlock_read);
-	stats = (int64_t **)S2C(session)->stats;
-	set_stats = (l->stat_read_count_off != -1 && WT_STAT_ENABLED(session));
-	time_start = time_stop = 0;
-	if (set_stats)
-		stats[session->stat_bucket][l->stat_read_count_off]++;
 
 	WT_DIAGNOSTIC_YIELD;
 
@@ -241,8 +239,12 @@ stall:			__wt_cond_wait(session,
 			break;
 	}
 
-	if (set_stats)
+	set_stats = (l->stat_read_count_off != -1 && WT_STAT_ENABLED(session));
+	if (set_stats) {
+		stats = (int64_t **)S2C(session)->stats;
+		stats[session->stat_bucket][l->stat_read_count_off]++;
 		time_start = __wt_clock(session);
+	}
 	/* Wait for our group to start. */
 	for (pause_cnt = 0; ticket != l->u.s.current; pause_cnt++) {
 		if (pause_cnt < 1000)
@@ -375,12 +377,10 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 	int pause_cnt;
 	bool set_stats;
 
+	stats = NULL;			/* -Wconditional-uninitialized */
+	time_start = time_stop = 0;	/* -Wconditional-uninitialized */
+
 	WT_STAT_CONN_INCR(session, rwlock_write);
-	stats = (int64_t **)S2C(session)->stats;
-	set_stats = (l->stat_write_count_off != -1 && WT_STAT_ENABLED(session));
-	time_start = time_stop = 0;
-	if (set_stats)
-		stats[session->stat_bucket][l->stat_write_count_off]++;
 
 	for (;;) {
 		old.u.v = l->u.v;
@@ -403,6 +403,12 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 			break;
 	}
 
+	set_stats = (l->stat_write_count_off != -1 && WT_STAT_ENABLED(session));
+	if (set_stats) {
+		stats = (int64_t **)S2C(session)->stats;
+		stats[session->stat_bucket][l->stat_write_count_off]++;
+		time_start = __wt_clock(session);
+	}
 	/*
 	 * Wait for our group to start and any readers to drain.
 	 *
@@ -411,8 +417,6 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 	 * could see no readers active from a different batch and decide that
 	 * we have the lock.
 	 */
-	if (set_stats)
-		time_start = __wt_clock(session);
 	for (pause_cnt = 0, old.u.v = l->u.v;
 	    ticket != old.u.s.current || old.u.s.readers_active != 0;
 	    pause_cnt++, old.u.v = l->u.v) {

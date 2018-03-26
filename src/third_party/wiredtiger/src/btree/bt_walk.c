@@ -517,8 +517,7 @@ restart:	/*
 			 * in-cache pages, or if we see a deleted page.
 			 */
 			if (ret == WT_NOTFOUND) {
-				ret = 0;
-				WT_NOT_READ(ret);
+				WT_NOT_READ(ret, 0);
 				break;
 			}
 

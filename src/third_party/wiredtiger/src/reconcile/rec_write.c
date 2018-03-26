@@ -1785,12 +1785,12 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * If called during checkpoint, the child is being
 			 * considered by the eviction server or the child is a
-			 * fast-delete page being read.  The eviction may have
+			 * truncated page being read.  The eviction may have
 			 * started before the checkpoint and so we must wait
 			 * for the eviction to be resolved.  I suspect we could
-			 * handle fast-delete reads, but we can't distinguish
-			 * between the two and fast-delete reads aren't expected
-			 * to be common.
+			 * handle reads of truncated pages, but we can't
+			 * distinguish between the two and reads of truncated
+			 * pages aren't expected to be common.
 			 */
 			break;
 
@@ -5632,8 +5632,7 @@ build:
 				if (key_onpage_ovfl) {
 					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
-					key_onpage_ovfl = false;
-					WT_NOT_READ(key_onpage_ovfl);
+					WT_NOT_READ(key_onpage_ovfl, false);
 				}
 
 				/*
