@@ -67,4 +67,13 @@ SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
     return {std::vector<HostAndPort>{}};
 }
 
+void killAllExpiredTransactions(OperationContext* opCtx) {
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    SessionCatalog::get(opCtx)->scanSessions(
+        opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
+            session->abortArbitraryTransactionIfExpired();
+        });
+}
+
 }  // namespace mongo

@@ -39,10 +39,13 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
+
+extern AtomicInt32 transactionLifetimeLimitSeconds;
 
 class OperationContext;
 class UpdateRequest;
@@ -246,6 +249,12 @@ public:
      */
     void abortArbitraryTransaction();
 
+    /**
+     * Same as abortArbitraryTransaction, except only executes if _transactionExpireDate indicates
+     * that the transaction has expired.
+     */
+    void abortArbitraryTransactionIfExpired();
+
     /*
      * Aborts the transaction inside the transaction, releasing transaction resources.
      * We're inside the transaction when we have the Session checked out and 'opCtx' owns the
@@ -370,6 +379,8 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
+    void _abortArbitraryTransaction(WithLock);
+
     // Releases stashed transaction resources to abort the transaction.
     void _abortTransaction(WithLock);
 
@@ -439,6 +450,13 @@ private:
 
     // Set in _beginOrContinueTxn and applies to the activeTxn on the session.
     bool _autocommit{true};
+
+    // Set when a snapshot read / transaction begins. Alleviates cache pressure by limiting how long
+    // a snapshot will remain open and available. Checked in combination with _txnState to determine
+    // whether the transaction should be aborted.
+    // This is unset until a transaction begins on the session, and then reset only when new
+    // transactions begin.
+    boost::optional<Date_t> _transactionExpireDate;
 };
 
 }  // namespace mongo

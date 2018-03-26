@@ -46,6 +46,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/memory.h"
@@ -56,6 +57,36 @@
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
+
+// Server parameter that dictates the lifetime given to each transaction.
+// Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
+server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
+    transactionLifetimeLimitSeconds(60);
+
+/**
+ * Implements a validation function for server parameter 'transactionLifetimeLimitSeconds'
+ * instantiated above. 'transactionLifetimeLimitSeconds' can only be set to >= 1.
+ */
+class ExportedTransactionLifetimeLimitSeconds
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedTransactionLifetimeLimitSeconds()
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "transactionLifetimeLimitSeconds",
+              &transactionLifetimeLimitSeconds) {}
+
+    Status validate(const std::int32_t& potentialNewValue) override {
+        if (potentialNewValue < 1) {
+            return Status(ErrorCodes::BadValue,
+                          "transactionLifetimeLimitSeconds must be greater than or equal to 1s");
+        }
+
+        return Status::OK();
+    }
+
+} exportedTransactionLifetimeLimitSeconds;
+
 namespace {
 
 void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
@@ -520,8 +551,10 @@ void Session::_beginOrContinueTxn(WithLock wl,
              ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40));
 
         _setActiveTxn(wl, txnNumber);
-        _txnState = MultiDocumentTransactionState::kInProgress;
         _autocommit = false;
+        _txnState = MultiDocumentTransactionState::kInProgress;
+        _transactionExpireDate =
+            Date_t::now() + stdx::chrono::seconds{transactionLifetimeLimitSeconds.load()};
     } else {
         // Execute a retryable write or snapshot read.
         invariant(startTransaction == boost::none);
@@ -708,10 +741,23 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
 
 void Session::abortArbitraryTransaction() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (_txnState == MultiDocumentTransactionState::kInProgress ||
-        _txnState == MultiDocumentTransactionState::kInSnapshotRead) {
-        _abortTransaction(lock);
+    _abortArbitraryTransaction(lock);
+}
+
+void Session::abortArbitraryTransactionIfExpired() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (!_transactionExpireDate || _transactionExpireDate >= Date_t::now()) {
+        return;
     }
+    _abortArbitraryTransaction(lock);
+}
+
+void Session::_abortArbitraryTransaction(WithLock lock) {
+    if (_txnState != MultiDocumentTransactionState::kInProgress &&
+        _txnState != MultiDocumentTransactionState::kInSnapshotRead) {
+        return;
+    }
+    _abortTransaction(lock);
 }
 
 void Session::abortActiveTransaction(OperationContext* opCtx) {

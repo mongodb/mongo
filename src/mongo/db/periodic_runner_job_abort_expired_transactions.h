@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2017 MongoDB Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,29 +28,18 @@
 
 #pragma once
 
-#include "mongo/db/session_killer.h"
-
-/**
- * Mongod local kill session / transaction functionality library.
- */
 namespace mongo {
 
-/**
- * Kills all cursors, ops, and transactions on mongod for sessions matching 'matcher'.
- */
-SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
-                                        const SessionKiller::Matcher& matcher,
-                                        SessionKiller::UniformRandomBitGenerator* urbg);
+class ServiceContext;
 
 /**
- * Kills all transactions on mongod for sessions matching 'matcher'.
+ * Defines and starts a periodic background job to check for and abort expired transactions.
+ * The job will run every (transactionLifetimeLimitSeconds/2) seconds, or at most once per second
+ * and at least once per minute.
+ *
+ * This function should only ever be called once, during mongod server startup (db.cpp).
+ * The PeriodicRunner will handle shutting down the job on shutdown, no extra handling necessary.
  */
-void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher);
-
-/**
- * Aborts any expired transactions.
- */
-void killAllExpiredTransactions(OperationContext* opCtx);
+void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContext);
 
 }  // namespace mongo

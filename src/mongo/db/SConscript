@@ -1447,6 +1447,17 @@ env.Library(
 )
 
 env.Library(
+    target='periodic_runner_job_abort_expired_transactions',
+    source=[
+        'periodic_runner_job_abort_expired_transactions.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/periodic_runner',
+        'kill_sessions_local',
+    ],
+)
+
+env.Library(
     target='signed_logical_time',
     source=[
         'signed_logical_time.cpp',

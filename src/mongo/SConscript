@@ -304,6 +304,7 @@ env.Library(
         'db/mongod_options',
         'db/mongodandmongos',
         'db/op_observer_d',
+        'db/periodic_runner_job_abort_expired_transactions',
         'db/query_exec',
         'db/repair_database',
         'db/repair_database_and_check_version',

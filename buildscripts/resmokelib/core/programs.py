@@ -48,6 +48,14 @@ def mongod_program(  # pylint: disable=too-many-branches
     if "disableLogicalSessionCacheRefresh" not in suite_set_parameters:
         suite_set_parameters["disableLogicalSessionCacheRefresh"] = True
 
+    # There's a periodic background thread that checks for and aborts expired transactions.
+    # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
+    # and being aborted by the background thread. It defaults to 60 seconds, which is too short to
+    # be reliable for our tests. Setting it to 3 hours, so that it is longer than the 2 hours we
+    # allow JS tests to run before timing them out.
+    if "transactionLifetimeLimitSeconds" not in suite_set_parameters:
+        suite_set_parameters["transactionLifetimeLimitSeconds"] = 3 * 60 * 60;
+
     # The periodic no-op writer writes an oplog entry of type='n' once every 10 seconds. This has
     # the potential to mask issues such as SERVER-31609 because it allows the operationTime of
     # cluster to advance even if the client is blocked for other reasons. We should disable the
