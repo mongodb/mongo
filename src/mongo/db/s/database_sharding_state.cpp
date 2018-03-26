@@ -102,9 +102,8 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
                                                         ? ShardingMigrationCriticalSection::kWrite
                                                         : ShardingMigrationCriticalSection::kRead);
     if (criticalSectionSignal) {
-        // TODO (SERVER-33773): Set movePrimary critical section signal on the
-        // OperationShardingState (so that the operation can wait outside the DBLock for the
-        // movePrimary critical section to end before returning to the client).
+        OperationShardingState::get(opCtx).setMovePrimaryCriticalSectionSignal(
+            criticalSectionSignal);
 
         uasserted(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),
                   "movePrimary critical section active");

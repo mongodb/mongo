@@ -42,6 +42,9 @@ const OperationContext::Decoration<OperationShardingState> shardingMetadataDecor
 // Max time to wait for the migration critical section to complete
 const Milliseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
 
+// Max time to wait for the movePrimary critical section to complete
+const Milliseconds kMaxWaitForMovePrimaryCriticalSection = Minutes(5);
+
 // The name of the field in which the client attaches its database version.
 constexpr auto kDbVersionField = "databaseVersion"_sd;
 }  // namespace
@@ -159,6 +162,29 @@ void OperationShardingState::setMigrationCriticalSectionSignal(
     std::shared_ptr<Notification<void>> critSecSignal) {
     invariant(critSecSignal);
     _migrationCriticalSectionSignal = std::move(critSecSignal);
+}
+
+bool OperationShardingState::waitForMovePrimaryCriticalSectionSignal(OperationContext* opCtx) {
+    // Must not block while holding a lock
+    invariant(!opCtx->lockState()->isLocked());
+
+    if (_movePrimaryCriticalSectionSignal) {
+        _movePrimaryCriticalSectionSignal->waitFor(
+            opCtx,
+            opCtx->hasDeadline() ? std::min(opCtx->getRemainingMaxTimeMillis(),
+                                            kMaxWaitForMovePrimaryCriticalSection)
+                                 : kMaxWaitForMovePrimaryCriticalSection);
+        _movePrimaryCriticalSectionSignal = nullptr;
+        return true;
+    }
+
+    return false;
+}
+
+void OperationShardingState::setMovePrimaryCriticalSectionSignal(
+    std::shared_ptr<Notification<void>> critSecSignal) {
+    invariant(critSecSignal);
+    _movePrimaryCriticalSectionSignal = std::move(critSecSignal);
 }
 
 }  // namespace mongo

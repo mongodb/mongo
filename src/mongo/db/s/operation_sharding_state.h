@@ -135,6 +135,23 @@ public:
      */
     void setMigrationCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
 
+    /**
+     * This call is a no op if there isn't a currently active movePrimary critical section.
+     * Otherwise it will wait for the critical section to complete up to the remaining operation
+     * time.
+     *
+     * Returns true if the call actually waited because of movePrimary critical section (regardless
+     * whether it timed out or not), false if there was no active movePrimary critical section.
+     */
+    bool waitForMovePrimaryCriticalSectionSignal(OperationContext* opCtx);
+
+    /**
+     * Setting this value indicates that when the version check failed, there was an active
+     * movePrimary for the namespace and that it would be prudent to wait for the critical section
+     * to complete before retrying so the router doesn't make wasteful requests.
+     */
+    void setMovePrimaryCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
+
 private:
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowImplicitCollectionCreation{true};
@@ -147,6 +164,11 @@ private:
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.
     std::shared_ptr<Notification<void>> _migrationCriticalSectionSignal;
+
+    // This value will only be non-null if version check during the operation execution failed due
+    // to stale version and there was a movePrimary for that namespace, which was in critical
+    // section.
+    std::shared_ptr<Notification<void>> _movePrimaryCriticalSectionSignal;
 };
 
 }  // namespace mongo
