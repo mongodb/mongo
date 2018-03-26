@@ -6265,7 +6265,6 @@ buildvariants:
   stepback: true
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     tooltags: "-tags 'ssl sasl'"
     exe: ".exe"
@@ -6284,7 +6283,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
-    test_flags: --serviceExecutor=adaptive
+    test_flags: --serviceExecutor=adaptive --excludeWithAnyTags=requires_mmapv1
   tasks:
   - name: compile
     distros:
