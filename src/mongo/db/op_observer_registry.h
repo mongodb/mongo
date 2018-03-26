@@ -194,17 +194,20 @@ public:
     }
 
     void onTransactionCommit(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onTransactionCommit(opCtx);
     }
 
     void onTransactionPrepare(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
         for (auto& observer : _observers) {
             observer->onTransactionPrepare(opCtx);
         }
     }
 
     void onTransactionAbort(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onTransactionAbort(opCtx);
     }

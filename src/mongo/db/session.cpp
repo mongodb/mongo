@@ -223,13 +223,6 @@ boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
         return boost::none;
     }
 
-    // Do not write session table entries for applyOps, as multi-document transactions
-    // and retryable writes do not work together.
-    // TODO(SERVER-33501): Make multi-docunment transactions work with retryable writes.
-    if (entry.isCommand() && entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
-        return boost::none;
-    }
-
     invariant(sessionInfo.getSessionId());
     invariant(entry.getWallClockTime());
 
@@ -346,10 +339,6 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
-    // Multi-document transactions currently do not write to the transaction table.
-    // TODO(SERVER-32323): Update transaction table appropriately when a transaction commits.
-    if (!_autocommit)
-        return;
 
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
