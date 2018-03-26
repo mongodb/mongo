@@ -4,8 +4,6 @@ selector:
   roots:
   - jstests/sharding/*.js
   exclude_files:
-  # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
-  - jstests/sharding/config_version_rollback.js
   # Behavior change to addShard
   - jstests/sharding/addshard_idempotent.js
   # SERVER-27597: Reenable when 3.4.6 becomes last-stable
