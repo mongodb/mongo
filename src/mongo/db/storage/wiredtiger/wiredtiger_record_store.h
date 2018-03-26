@@ -251,6 +251,10 @@ public:
 
     void reclaimOplog(OperationContext* opCtx);
 
+    /**
+     * The `persistedTimestamp` is when replication recovery would need to replay from on a
+     * restart. `reclaimOplog` will not truncate oplog entries in front of this time.
+     */
     void reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp);
 
     int64_t cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted);

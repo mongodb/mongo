@@ -1053,16 +1053,19 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
+    if (!_kvEngine->supportsRecoverToStableTimestamp()) {
+        // For non-RTT storage engines, the oplog can always be truncated.
+        reclaimOplog(opCtx, Timestamp::max());
+        return;
+    }
     reclaimOplog(opCtx, _kvEngine->getLastStableCheckpointTimestamp());
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp) {
-
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
         invariant(stone->lastRecord.isNormal());
 
-        const auto persistedAsNumber = static_cast<std::int64_t>(persistedTimestamp.asULL());
-        if (stone->lastRecord.repr() >= persistedAsNumber) {
+        if (static_cast<std::uint64_t>(stone->lastRecord.repr()) >= persistedTimestamp.asULL()) {
             // Do not truncate oplogs needed for replication recovery.
             return;
         }
