@@ -102,7 +102,7 @@
         writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber)
     }),
-                                 ErrorCodes.NoSuchTransaction);
+                                 ErrorCodes.TransactionAborted);
     // Verify the documents are the same.
     assert.eq({_id: "insert-1"}, testDB.coll.findOne({_id: "insert-1"}));
     assert.eq(null, testDB.coll.findOne({_id: "insert-2"}));

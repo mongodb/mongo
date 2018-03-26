@@ -840,7 +840,7 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
     invariant(session);
-    auto stmts = session->endTransactionAndRetrieveOperations();
+    auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
 
     // It is possible that the transaction resulted in no changes.  In that case, we should
     // not write an empty applyOps entry.

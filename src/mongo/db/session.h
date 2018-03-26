@@ -284,10 +284,15 @@ public:
      * and marks the transaction as closed.  It is illegal to attempt to add operations to the
      * transaction after this is called.
      */
-    std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations();
+    std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations(OperationContext* opCtx);
 
     const std::vector<repl::ReplOperation>& transactionOperationsForTest() {
         return _transactionOperations;
+    }
+
+    TxnNumber getActiveTxnNumberForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _activeTxnNumber;
     }
 
     /**
