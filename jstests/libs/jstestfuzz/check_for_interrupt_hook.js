@@ -28,11 +28,10 @@
     };
 
     const enableCheckForInterruptFailFP = function() {
-        if (TestData.enableCheckForInterruptFailpoint === false) {
-            return;
-        }
-
         const chance = TestData.checkForInterruptFailpointChance;
+
+        assert.gte(chance, 0, "checkForInterruptFailpointChance must be >= 0");
+        assert.lte(chance, 1, "checkForInterruptFailpointChance must be <= 1");
 
         assert.commandWorked(db.adminCommand({
             configureFailPoint: 'checkForInterruptFail',

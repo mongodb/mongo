@@ -3161,6 +3161,28 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded_session --storageEngine=wiredTiger --numClientsPerFixture=10
 
+# jstestfuzz interrupt #
+- <<: *jstestfuzz_template
+  name: jstestfuzz_interrupt
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_interrupt --storageEngine=wiredTiger
+
+# jstestfuzz interrupt #
+- <<: *jstestfuzz_template
+  name: jstestfuzz_interrupt_replication
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_interrupt_replication --storageEngine=wiredTiger
+
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication
@@ -6429,6 +6451,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
@@ -6573,6 +6597,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
@@ -7017,6 +7043,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_session
@@ -8788,6 +8816,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
@@ -9406,6 +9436,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_session
   - name: jstestfuzz_sharded
@@ -9751,6 +9783,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_session
@@ -9874,6 +9908,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_session
@@ -9974,6 +10010,8 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_causal_consistency
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_concurrent_sharded_session
+  - name: jstestfuzz_interrupt
+  - name: jstestfuzz_interrupt_replication
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_session
