@@ -156,7 +156,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
         if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
             auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
                 opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(),
+                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
                 ws.get(),
                 stage.release());
             return PlanExecutor::make(opCtx,
@@ -591,7 +591,7 @@ bool PipelineD::MongoDInterface::isSharded(OperationContext* opCtx, const Namesp
     // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
     // state.
     auto css = CollectionShardingState::get(opCtx, nss);
-    return bool(css->getMetadata());
+    return bool(css->getMetadata(opCtx));
 }
 
 BSONObj PipelineD::MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -728,7 +728,7 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     auto css = CollectionShardingState::get(expCtx->opCtx, expCtx->ns);
     uassert(4567,
             str::stream() << "from collection (" << expCtx->ns.ns() << ") cannot be sharded",
-            !bool(css->getMetadata()));
+            !bool(css->getMetadata(expCtx->opCtx)));
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
@@ -751,7 +751,7 @@ std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
 
     auto scm = [this, opCtx, &nss]() -> ScopedCollectionMetadata {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     if (!scm) {

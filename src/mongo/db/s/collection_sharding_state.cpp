@@ -125,14 +125,14 @@ public:
         return *it->second;
     }
 
-    void report(BSONObjBuilder* builder) {
+    void report(OperationContext* opCtx, BSONObjBuilder* builder) {
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
         {
             stdx::lock_guard<stdx::mutex> lg(_mutex);
 
             for (auto& coll : _collections) {
-                ScopedCollectionMetadata metadata = coll.second->getMetadata();
+                ScopedCollectionMetadata metadata = coll.second->getMetadata(opCtx);
                 if (metadata) {
                     versionB.appendTimestamp(coll.first, metadata->getShardVersion().toLong());
                 } else {
@@ -182,11 +182,14 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
     auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
-    collectionsMap.report(builder);
+    collectionsMap.report(opCtx, builder);
 }
 
-ScopedCollectionMetadata CollectionShardingState::getMetadata() {
-    return _metadataManager->getActiveMetadata(_metadataManager);
+ScopedCollectionMetadata CollectionShardingState::getMetadata(OperationContext* opCtx) {
+    // TODO: SERVER-34276 - find an alternative to get the atClusterTime.
+    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    return atClusterTime ? _metadataManager->createMetadataAt(opCtx, atClusterTime.get())
+                         : _metadataManager->getActiveMetadata(_metadataManager);
 }
 
 void CollectionShardingState::refreshMetadata(OperationContext* opCtx,
@@ -261,8 +264,8 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     }
 }
 
-bool CollectionShardingState::collectionIsSharded() {
-    auto metadata = getMetadata().getMetadata();
+bool CollectionShardingState::collectionIsSharded(OperationContext* opCtx) {
+    auto metadata = getMetadata(opCtx).getMetadata();
     if (metadata && (metadata->getCollVersion().isStrictlyEqualTo(ChunkVersion::UNSHARDED()))) {
         return false;
     }
@@ -352,8 +355,9 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
     }
 }
 
-auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState {
-    return {getMetadata().extractDocumentKey(doc).getOwned(),
+auto CollectionShardingState::makeDeleteState(OperationContext* opCtx, BSONObj const& doc)
+    -> DeleteState {
+    return {getMetadata(opCtx).extractDocumentKey(doc).getOwned(),
             _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
 }
 
@@ -407,7 +411,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
     }
 
     // Set this for error messaging purposes before potentially returning false.
-    auto metadata = getMetadata();
+    auto metadata = getMetadata(opCtx);
     *actualShardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
     auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()

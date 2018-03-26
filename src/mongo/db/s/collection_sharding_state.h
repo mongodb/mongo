@@ -75,7 +75,7 @@ public:
         bool isMigrating;
     };
 
-    DeleteState makeDeleteState(BSONObj const& doc);
+    DeleteState makeDeleteState(OperationContext* opCtx, BSONObj const& doc);
 
     /**
      * Obtains the sharding state for the specified collection. If it does not exist, it will be
@@ -93,8 +93,10 @@ public:
      * Returns the chunk metadata for the collection. The metadata it represents lives as long as
      * the object itself, and the collection, exist. After dropping the collection lock, the
      * collection may no longer exist, but it is still safe to destroy the object.
+     * The metadata is tied to a specific point in time (atClusterTime) and the time is retrieved
+     * from the operation context (opCtx).
      */
-    ScopedCollectionMetadata getMetadata();
+    ScopedCollectionMetadata getMetadata(OperationContext* opCtx);
 
     /**
      * BSON output of the pending metadata into a BSONArray
@@ -198,7 +200,7 @@ public:
      * Returns whether this collection is sharded. Valid only if mongoD is primary.
      * TODO SERVER-24960: This method may return a false positive until SERVER-24960 is fixed.
      */
-    bool collectionIsSharded();
+    bool collectionIsSharded(OperationContext* opCtx);
 
     /**
      * Tracks deletion of any documents within the range, returning when deletion is complete.

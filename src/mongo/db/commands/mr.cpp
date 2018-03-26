@@ -1424,7 +1424,7 @@ public:
             // Get metadata before we check our version, to make sure it doesn't increment in the
             // meantime
             AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-            return CollectionShardingState::get(opCtx, config.nss)->getMetadata();
+            return CollectionShardingState::get(opCtx, config.nss)->getMetadata(opCtx);
         }();
 
         bool shouldHaveData = false;

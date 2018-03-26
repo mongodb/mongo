@@ -1112,7 +1112,7 @@ CollectionShardingState::CleanupNotification MigrationDestinationManager::_noteP
 
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
-    auto metadata = css->getMetadata();
+    auto metadata = css->getMetadata(opCtx);
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.
@@ -1146,7 +1146,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
-    auto metadata = css->getMetadata();
+    auto metadata = css->getMetadata(opCtx);
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.

@@ -161,7 +161,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
 
     // Make sure the source collection is not sharded.
-    if (CollectionShardingState::get(opCtx, source)->getMetadata()) {
+    if (CollectionShardingState::get(opCtx, source)->getMetadata(opCtx)) {
         return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
     }
 
@@ -189,7 +189,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             invariant(source == target);
             return Status::OK();
         }
-        if (CollectionShardingState::get(opCtx, target)->getMetadata()) {
+        if (CollectionShardingState::get(opCtx, target)->getMetadata(opCtx)) {
             return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
         }
 

@@ -150,7 +150,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
         auto statusWithPlanExecutor =
             getExecutorCount(opCtx, collection, request.getValue(), true /*explain*/);
@@ -202,7 +202,7 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
         auto statusWithPlanExecutor =
             getExecutorCount(opCtx, collection, request.getValue(), false /*explain*/);

@@ -163,7 +163,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             collectionUUID = autoColl.getCollection()->uuid().value();
         }
 
-        auto metadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
+        auto metadata = CollectionShardingState::get(opCtx, getNss())->getMetadata(opCtx);
         uassert(ErrorCodes::IncompatibleShardingMetadata,
                 str::stream() << "cannot move chunks for an unsharded collection",
                 metadata);
@@ -238,7 +238,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         auto css = CollectionShardingState::get(opCtx, getNss());
 
-        const auto metadata = css->getMetadata();
+        const auto metadata = css->getMetadata(opCtx);
         Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
         if (!status.isOK())
             return status;
@@ -293,7 +293,7 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
         const auto metadata = [&] {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
-            return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata();
+            return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata(opCtx);
         }();
 
         Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
@@ -390,7 +390,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         const auto metadata = [&] {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
-            return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata();
+            return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata(opCtx);
         }();
 
         Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
@@ -545,7 +545,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     auto refreshedMetadata = [&] {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
-        return CollectionShardingState::get(opCtx, getNss())->getMetadata();
+        return CollectionShardingState::get(opCtx, getNss())->getMetadata(opCtx);
     }();
 
     if (!refreshedMetadata) {

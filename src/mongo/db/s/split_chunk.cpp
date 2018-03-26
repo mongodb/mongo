@@ -98,7 +98,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const std::vector<BSONObj>& splitKeys) {
     const auto metadataAfterSplit = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     uassert(ErrorCodes::StaleEpoch,

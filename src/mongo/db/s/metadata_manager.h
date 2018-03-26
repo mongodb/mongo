@@ -69,6 +69,12 @@ public:
     ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self);
 
     /**
+     * Creates the metadata on demand for a specific point in time. The object is not tracked by
+     * the metadata manager.
+     */
+    ScopedCollectionMetadata createMetadataAt(OperationContext* opCtx, LogicalTime atCusterTime);
+
+    /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
      * queries.  The actual number may vary after it returns, so this is really only useful for unit
      * tests.
@@ -291,6 +297,9 @@ private:
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
         std::shared_ptr<MetadataManager>);
 
+    friend ScopedCollectionMetadata MetadataManager::createMetadataAt(OperationContext*,
+                                                                      LogicalTime);
+
     friend std::vector<ScopedCollectionMetadata> MetadataManager::overlappingMetadata(
         std::shared_ptr<MetadataManager> const&, ChunkRange const&);
 
@@ -308,6 +317,12 @@ private:
     ScopedCollectionMetadata(
         WithLock,
         std::shared_ptr<MetadataManager> metadataManager,
+        std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
+
+    /**
+     * Metadata not tracked by the manager - created on demand for a specific point in time.
+     */
+    ScopedCollectionMetadata(
         std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
 
     /**

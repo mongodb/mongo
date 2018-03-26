@@ -481,7 +481,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    BSONObj const& doc) {
     auto& deleteState = getDeleteState(opCtx);
     auto* css = CollectionShardingState::get(opCtx, nss);
-    deleteState = css->makeDeleteState(doc);
+    deleteState = css->makeDeleteState(opCtx, doc);
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,

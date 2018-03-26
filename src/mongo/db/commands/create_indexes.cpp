@@ -420,7 +420,7 @@ private:
                                               const BSONObj& newIdxKey) {
         invariant(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
 
-        auto metadata(CollectionShardingState::get(opCtx, nss)->getMetadata());
+        auto metadata(CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx));
         if (metadata) {
             ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
             if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {

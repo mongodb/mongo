@@ -62,7 +62,7 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
                              const BSONObj& maxKey) {
     const auto metadataAfterMerge = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     uassert(ErrorCodes::StaleEpoch,
@@ -107,7 +107,7 @@ Status mergeChunks(OperationContext* opCtx,
 
     const auto metadata = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     if (!metadata) {

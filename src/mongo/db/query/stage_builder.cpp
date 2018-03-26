@@ -296,7 +296,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             }
             return new ShardFilterStage(
                 opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(),
+                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
                 ws,
                 childStage);
         }

@@ -40,6 +40,8 @@
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
@@ -188,6 +190,27 @@ ScopedCollectionMetadata MetadataManager::getActiveMetadata(std::shared_ptr<Meta
     }
 
     return ScopedCollectionMetadata();
+}
+
+ScopedCollectionMetadata MetadataManager::createMetadataAt(OperationContext* opCtx,
+                                                           LogicalTime atClusterTime) {
+    auto cache = Grid::get(opCtx)->catalogCache();
+    if (!cache) {
+        return ScopedCollectionMetadata();
+    }
+
+    auto routingTable = cache->getCollectionRoutingTableHistoryNoRefresh(_nss);
+    if (!routingTable) {
+        return ScopedCollectionMetadata();
+    }
+    auto cm = std::make_shared<ChunkManager>(routingTable, atClusterTime.asTimestamp());
+
+    CollectionMetadata metadata(std::move(cm), ShardingState::get(opCtx)->getShardName());
+
+    auto metadataTracker =
+        std::make_shared<MetadataManager::CollectionMetadataTracker>(std::move(metadata));
+
+    return ScopedCollectionMetadata(std::move(metadataTracker));
 }
 
 size_t MetadataManager::numberOfMetadataSnapshots() const {
@@ -538,6 +561,12 @@ ScopedCollectionMetadata::ScopedCollectionMetadata(
     invariant(_metadataManager);
     invariant(_metadataTracker);
     ++_metadataTracker->usageCounter;
+}
+
+ScopedCollectionMetadata::ScopedCollectionMetadata(
+    std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker)
+    : _metadataTracker(std::move(metadataTracker)) {
+    invariant(_metadataTracker);
 }
 
 ScopedCollectionMetadata::ScopedCollectionMetadata(ScopedCollectionMetadata&& other) {

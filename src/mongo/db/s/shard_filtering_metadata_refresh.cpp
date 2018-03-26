@@ -72,7 +72,7 @@ Status onShardVersionMismatch(OperationContext* opCtx,
 
     const auto currentShardVersion = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        const auto currentMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        const auto currentMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
         if (currentMetadata) {
             return currentMetadata->getShardVersion();
         }
@@ -122,15 +122,14 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
 
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto css = CollectionShardingState::get(opCtx, nss);
+        auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
         // We already have newer version
-        if (css->getMetadata() &&
-            css->getMetadata()->getCollVersion().epoch() == cm->getVersion().epoch() &&
-            css->getMetadata()->getCollVersion() >= cm->getVersion()) {
+        if (metadata && metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
+            metadata->getCollVersion() >= cm->getVersion()) {
             LOG(1) << "Skipping refresh of metadata for " << nss << " "
-                   << css->getMetadata()->getCollVersion() << " with an older " << cm->getVersion();
-            return css->getMetadata()->getShardVersion();
+                   << metadata->getCollVersion() << " with an older " << cm->getVersion();
+            return metadata->getShardVersion();
         }
     }
 
@@ -138,14 +137,14 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
     auto css = CollectionShardingState::get(opCtx, nss);
+    auto metadata = css->getMetadata(opCtx);
 
     // We already have newer version
-    if (css->getMetadata() &&
-        css->getMetadata()->getCollVersion().epoch() == cm->getVersion().epoch() &&
-        css->getMetadata()->getCollVersion() >= cm->getVersion()) {
-        LOG(1) << "Skipping refresh of metadata for " << nss << " "
-               << css->getMetadata()->getCollVersion() << " with an older " << cm->getVersion();
-        return css->getMetadata()->getShardVersion();
+    if (metadata && metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
+        metadata->getCollVersion() >= cm->getVersion()) {
+        LOG(1) << "Skipping refresh of metadata for " << nss << " " << metadata->getCollVersion()
+               << " with an older " << cm->getVersion();
+        return metadata->getShardVersion();
     }
 
     std::unique_ptr<CollectionMetadata> newCollectionMetadata =
@@ -153,7 +152,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
 
     css->refreshMetadata(opCtx, std::move(newCollectionMetadata));
 
-    return css->getMetadata()->getShardVersion();
+    return css->getMetadata(opCtx)->getShardVersion();
 }
 
 void onDbVersionMismatch(OperationContext* opCtx,

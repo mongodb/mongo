@@ -156,7 +156,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
 
     // First, check that an order for deletion from an unsharded collection (where css has not been
     // "refreshed" with chunk metadata) extracts just the "_id" field:
-    auto deleteState = css->makeDeleteState(doc);
+    auto deleteState = css->makeDeleteState(operationContext(), doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("_id"
                            << "hello"));
@@ -181,7 +181,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
                     << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    auto deleteState = css->makeDeleteState(doc);
+    auto deleteState = css->makeDeleteState(operationContext(), doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("key" << 100 << "key3"
                                  << "abc"
@@ -207,7 +207,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
                            << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    auto deleteState = css->makeDeleteState(doc);
+    auto deleteState = css->makeDeleteState(operationContext(), doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("key" << 100 << "_id"
                                  << "hello"
@@ -231,7 +231,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
                            << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    auto deleteState = css->makeDeleteState(doc);
+    auto deleteState = css->makeDeleteState(operationContext(), doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("_id"
                            << "hello"));
