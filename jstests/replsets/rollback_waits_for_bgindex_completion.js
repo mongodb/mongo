@@ -5,14 +5,6 @@
 (function() {
     'use strict';
 
-    let skip = true;
-
-    // TODO: Re-enable test once Recoverable Rollback via WT Checkpoints is complete and ready to
-    // test. See SERVER-32844.
-    if (skip) {
-        return;
-    }
-
     load('jstests/libs/check_log.js');
     load("jstests/replsets/rslib.js");
     load('jstests/replsets/libs/rollback_test.js');

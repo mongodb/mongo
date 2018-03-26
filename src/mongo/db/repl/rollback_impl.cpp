@@ -255,9 +255,13 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
     std::vector<StringData> dbNames(dbs.begin(), dbs.end());
     log() << "Waiting for all background operations to complete before starting rollback";
     for (auto db : dbNames) {
-        LOG(1) << "Waiting for " << BackgroundOperation::numInProgForDb(db)
-               << " background operations to complete on database '" << db << "'";
-        BackgroundOperation::awaitNoBgOpInProgForDb(db);
+        auto numInProg = BackgroundOperation::numInProgForDb(db);
+        if (numInProg > 0) {
+            LOG(1) << "Waiting for " << numInProg
+                   << " background operations to complete on database '" << db << "'";
+            BackgroundOperation::awaitNoBgOpInProgForDb(db);
+        }
+
         // Check for shutdown again.
         if (_isInShutdown()) {
             return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
