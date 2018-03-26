@@ -143,7 +143,7 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
         [&](const HostAndPort& remoteHost) {
             makeRequestCalled = true;
             hostCorrectForRequest = (remoteHost == testHost());
-            return boost::make_optional<RemoteCommandRequest>(expectedRequest);
+            return boost::make_optional(expectedRequest);
         },
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
             handleReplyCalled = true;
