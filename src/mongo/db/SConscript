@@ -571,8 +571,10 @@ env.CppUnitTest(
     target="commands_test",
     source=[
         "commands_test.cpp",
+        env.Idlc('commands_test_example.idl')[0],
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
         "commands",
         "service_context_noop_init",
         "auth/authorization_manager_mock_init",

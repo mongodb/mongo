@@ -334,6 +334,14 @@ void CommandReplyBuilder::reset() {
     getBodyBuilder().resetToEmpty();
 }
 
+void CommandReplyBuilder::fillFrom(const Status& status) {
+    if (!status.isOK()) {
+        reset();
+    }
+    auto bob = getBodyBuilder();
+    CommandHelpers::appendCommandStatus(bob, status);
+}
+
 //////////////////////////////////////////////////////////////
 // CommandInvocation
 
