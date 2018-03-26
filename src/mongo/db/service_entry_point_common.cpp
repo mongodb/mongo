@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_metrics.h"
@@ -657,10 +658,14 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
-                    "readConcernLevel snapshot requires a session ID",
+                    "readConcern level snapshot in only valid in multi-statement transactions",
+                    getTestCommandsEnabled() ||
+                        (autocommitVal != boost::none && *autocommitVal == false));
+            uassert(ErrorCodes::InvalidOptions,
+                    "readConcern level snapshot requires a session ID",
                     opCtx->getLogicalSessionId());
             uassert(ErrorCodes::InvalidOptions,
-                    "readConcernLevel snapshot requires a txnNumber",
+                    "readConcern level snapshot requires a txnNumber",
                     opCtx->getTxnNumber());
 
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);

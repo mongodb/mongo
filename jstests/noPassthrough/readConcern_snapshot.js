@@ -25,6 +25,24 @@
         rst.stopSet();
         return;
     }
+    session.endSession();
+    rst.stopSet();
+
+    // readConcern 'snapshot' should fail for autocommit:true transactions when test
+    // 'enableTestCommands' is set to false.
+    jsTest.setOption('enableTestCommands', false);
+    rst = new ReplSetTest({nodes: 1});
+    rst.startSet();
+    rst.initiate();
+    session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+    sessionDb = session.getDatabase(dbName);
+    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
+    assert.commandFailedWithCode(
+        sessionDb.runCommand(
+            {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(1)}),
+        ErrorCodes.InvalidOptions);
+    jsTest.setOption('enableTestCommands', true);
+    session.endSession();
     rst.stopSet();
 
     // readConcern 'snapshot' is not allowed on a standalone.
@@ -36,6 +54,7 @@
         sessionDb.runCommand(
             {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(0)}),
         ErrorCodes.IllegalOperation);
+    session.endSession();
     MongoRunner.stopMongod(conn);
 
     // readConcern 'snapshot' is allowed on a replica set primary.
@@ -66,6 +85,7 @@
         txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.InvalidOptions);
+    session.endSession();
 
     // readConcern 'snapshot' is allowed on a replica set secondary.
     session = rst.getSecondary().getDB(dbName).getMongo().startSession({causalConsistency: false});
@@ -83,6 +103,7 @@
         txnNumber: NumberLong(txnNumber++)
     }));
 
+    session.endSession();
     rst.stopSet();
 
     //
@@ -251,5 +272,6 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
+    session.endSession();
     rst.stopSet();
 }());
