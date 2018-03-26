@@ -351,6 +351,13 @@ public:
                 RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 parseOplogEntryForFindAndModify(opCtx, args, *entry, &result);
+
+                // Make sure to wait for writeConcern on the opTime that will include this write.
+                // Needs to set to the system last opTime to get the latest term in an event when
+                // an election happened after the actual write.
+                auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+                replClient.setLastOpToSystemLastOpTime(opCtx);
+
                 return true;
             }
         }
