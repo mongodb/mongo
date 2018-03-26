@@ -49,7 +49,7 @@
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }),
-                                 ErrorCodes.NoSuchTransaction);
+                                 ErrorCodes.TransactionAborted);
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     jsTest.log("Cannot implicitly create a collection in a transaction using update.");
@@ -84,7 +84,7 @@
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }),
-                                 ErrorCodes.NoSuchTransaction);
+                                 ErrorCodes.TransactionAborted);
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     // Update without upsert=true succeeds when the collection does not exist.
@@ -137,7 +137,7 @@
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }),
-                                 ErrorCodes.NoSuchTransaction);
+                                 ErrorCodes.TransactionAborted);
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     // findAndModify without upsert=true succeeds when the collection does not exist.

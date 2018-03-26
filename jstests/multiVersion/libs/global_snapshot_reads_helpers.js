@@ -13,7 +13,7 @@ function supportsSnapshotReadConcern() {
 
 /**
  * Runs the given command on the given database, asserting the command failed or succeeded
- * depending on the value of expectSuccess.
+ * depending on the value of expectSuccess. Returns the last used txnNumber.
  */
 function runCommandAndVerifyResponse(sessionDb, txnNumber, cmdObj, expectSuccess, expectedCode) {
     if (expectSuccess) {
@@ -22,14 +22,18 @@ function runCommandAndVerifyResponse(sessionDb, txnNumber, cmdObj, expectSuccess
         // noop writes may advance the majority commit point past the given atClusterTime
         // resulting in a SnapshotTooOld error. Eventually the read should succeed, when all
         // targeted shards are at the same cluster time, so retry until it does.
+        // A snapshot read may also fail with TransactionAborted if it encountered a StaleEpoch
+        // error while it was running.
         assert.soon(() => {
             const res = sessionDb.runCommand(cmdObj);
             if (!res.ok) {
-                assert.commandFailedWithCode(
-                    res,
-                    ErrorCodes.SnapshotTooOld,
-                    "expected command to fail with SnapshotTooOld, cmd: " + tojson(cmdObj));
-                print("Retrying because of SnapshotTooOld error.");
+                assert(res.code === ErrorCodes.SnapshotTooOld ||
+                           res.code === ErrorCodes.TransactionAborted,
+                       "expected command to fail with SnapshotTooOld or TransactionAborted, cmd: " +
+                           tojson(cmdObj) + ", result: " + tojson(res));
+                print("Retrying because of SnapshotTooOld or TransactionAborted error.");
+                txnNumber++;
+                cmdObj.txnNumber = NumberLong(txnNumber);
                 return false;
             }
 
@@ -43,6 +47,7 @@ function runCommandAndVerifyResponse(sessionDb, txnNumber, cmdObj, expectSuccess
                                          tojson(cmdObj) + ", expectedCode: " +
                                          tojson(expectedCode));
     }
+    return txnNumber;
 }
 
 /**
@@ -55,31 +60,33 @@ function verifyGlobalSnapshotReads(conn, expectSuccess, expectedCode) {
 
     // Unsharded collection.
     const unshardedDb = session.getDatabase("unshardedDb");
-    runCommandAndVerifyResponse(
+    txnNumber = runCommandAndVerifyResponse(
         unshardedDb,
         txnNumber,
-        {find: "unsharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)},
+        {find: "unsharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber)},
         expectSuccess,
         expectedCode);
 
     // Sharded collection, one shard.
+    txnNumber++;
     const shardedDb = session.getDatabase("shardedDb");
-    runCommandAndVerifyResponse(shardedDb,
-                                txnNumber,
-                                {
-                                  find: "sharded",
-                                  filter: {x: 1},
-                                  readConcern: {level: "snapshot"},
-                                  txnNumber: NumberLong(txnNumber++)
-                                },
-                                expectSuccess,
-                                expectedCode);
+    txnNumber = runCommandAndVerifyResponse(shardedDb,
+                                            txnNumber,
+                                            {
+                                              find: "sharded",
+                                              filter: {x: 1},
+                                              readConcern: {level: "snapshot"},
+                                              txnNumber: NumberLong(txnNumber)
+                                            },
+                                            expectSuccess,
+                                            expectedCode);
 
     // Sharded collection, all shards.
-    runCommandAndVerifyResponse(
+    txnNumber++;
+    txnNumber = runCommandAndVerifyResponse(
         shardedDb,
         txnNumber,
-        {find: "sharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)},
+        {find: "sharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber)},
         expectSuccess,
         expectedCode);
 }
