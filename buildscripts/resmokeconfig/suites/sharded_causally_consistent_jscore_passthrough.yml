@@ -10,7 +10,6 @@ selector:
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
-  - jstests/core/awaitdata_getmore_cmd.js  # capped collections.
   - jstests/core/bypass_doc_validation.js  # copyDatabase
   - jstests/core/capped*.js  # capped collections.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
@@ -29,13 +28,10 @@ selector:
   - jstests/core/evalb.js  # profiling.
   - jstests/core/fsync.js  # uses fsync.
   - jstests/core/geo_haystack*.js  # geoSearch.
-  - jstests/core/geo_s2cursorlimitskip.js  # profiling.
   - jstests/core/geo_update_btree2.js  # notablescan.
   - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
   - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
-  - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
-  - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/repair_database.js # repairDatabase
@@ -47,7 +43,6 @@ selector:
   - jstests/core/tailable_cursor_invalidation.js # capped collections.
   - jstests/core/tailable_getmore_batch_size.js # capped collections.
   - jstests/core/tailable_skip_limit.js # capped collections.
-  - jstests/core/top.js  # top.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
   - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos, SERVER-18047.
@@ -55,7 +50,7 @@ selector:
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
   - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
-  # TODO: SERVER-17284 remove once find cmd is implemented in mongos.
+  # Can't specify both 'afterClusterTime' and 'afterOpTime'.
   - jstests/core/read_after_optime.js
   # The following tests fail because they count indexes. These counts do not take into account the
   # additional hashed shard key indexes that are automatically added by this passthrough.
@@ -135,7 +130,6 @@ selector:
   - jstests/core/loadserverscripts.js
   - jstests/core/commands_namespace_parsing.js
   - jstests/core/constructors.js
-  - jstests/core/index_stats.js
   - jstests/core/views/views_all_commands.js
   - jstests/core/or4.js
   - jstests/core/recursion.js
@@ -167,15 +161,8 @@ selector:
   - jstests/core/sort3.js
   - jstests/core/sort4.js
   - jstests/core/ord.js
-  # plan_cache tests does not work because they check the plan_cache on the primary while the
-  # cache is created on the secondary.
-  - jstests/core/plan_cache*.js
-  - jstests/core/collation_plan_cache.js
-  - jstests/core/index_filter_commands.js
   # Parallel shell is not causally consistent
-  - jstests/core/count10.js
   - jstests/core/cursora.js
-  - jstests/core/count_plan_summary.js
   - jstests/core/shellstartparallel.js
   # TODO SERVER-30466
   - jstests/core/explain_multi_plan.js
@@ -187,12 +174,23 @@ selector:
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/system_profile.js
   - jstests/core/orf.js #explain.executionStats is not CC
+  # The `dbstats` command builds in-memory structures that are not causally consistent.
+  - jstests/core/dbstats.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  ##
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  ##
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
 
 executor:
   archive:
@@ -236,9 +234,6 @@ executor:
     num_rs_nodes_per_shard: 2
     # TODO SERVER-32572 remove voting_secondaries: true
     shard_options:
-      voting_secondaries: true
-    configsvr_options:
-      num_nodes: 3
       voting_secondaries: true
     enable_sharding:
     - test

@@ -23,7 +23,6 @@ selector:
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # profiling.
   - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
-  - jstests/core/capped6.js  # captrunc.
   - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
   - jstests/core/capped_empty.js  # emptycapped.
   - jstests/core/capped_update.js # uses godinsert and can't run under replication.
@@ -40,12 +39,9 @@ selector:
   - jstests/core/evalb.js  # db.eval() and profiling.
   - jstests/core/fsync.js  # uses fsync.
   - jstests/core/geo_haystack*.js  # geoSearch.
-  - jstests/core/geo_s2cursorlimitskip.js  # db.eval() and profiling.
   - jstests/core/geo_update_btree2.js  # notablescan.
   - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
   - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
-  - jstests/core/max_time_ms.js  # sleep, SERVER-2212.
-  - jstests/core/notablescan.js  # notablescan.
   - jstests/core/profile*.js  # profiling.
   - jstests/core/repair_database.js # repairDatabase
   - jstests/core/repair_database_input_validation.js # repairDatabase
@@ -60,7 +56,6 @@ selector:
   - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
-  - jstests/core/operation_latency_histogram.js  # Stats are counted differently on mongos, SERVER-24880.
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
@@ -122,7 +117,6 @@ selector:
   - jstests/core/tailable_getmore_batch_size.js
   - jstests/core/tailable_skip_limit.js
   - jstests/core/constructors.js
-  - jstests/core/index_stats.js
   - jstests/core/views/views_all_commands.js
   - jstests/core/or4.js
   - jstests/core/recursion.js
@@ -133,14 +127,7 @@ selector:
   - jstests/core/find1.js
   # An index drop does not necessarily cause cursors to be killed on the secondary.
   - jstests/core/ord.js
-  # plan_cache tests does not work because they check the plan_cache on the primary while the 
-  # cache is created on the secondary.
-  - jstests/core/plan_cache*.js 
-  - jstests/core/collation_plan_cache.js
-  - jstests/core/index_filter_commands.js
   # Parallel shell is not causally consistent
-  - jstests/core/count10.js
-  - jstests/core/count_plan_summary.js
   - jstests/core/cursora.js
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/shellstartparallel.js
@@ -152,21 +139,34 @@ selector:
   # TODO: SERVER-30488
   - jstests/core/apitest_dbcollection.js 
   - jstests/core/getmore_invalidated_cursors.js
-  - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
   # getMore is not causally consistent if collection is dropped
   - jstests/core/drop3.js
   # Logical sessions require that only one user be authenticated,
   # but this suite puts us in a multi-auth state.
-  - jstests/core/list_local_sessions.js # Too many users authenticated
   - jstests/core/list_all_local_cursors.js # Too many users authenticated
-  - jstests/core/list_all_local_sessions.js # Too many users authenticated
   - jstests/core/list_all_sessions.js # Too many users authenticated
   - jstests/core/list_sessions.js # Too many users authenticated
+  # The following tests fail because of divergent dropCollection behavior between standalones and 
+  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+  # we expect a second drop to return status OK. 
+  - jstests/core/drop.js
+  - jstests/core/explain_upsert.js
+  # The `dbstats` command builds in-memory structures that are not causally consistent.
+  - jstests/core/dbstats.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - requires_collstats
+  ##
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  ##
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
 
 executor:
   archive:
@@ -256,9 +256,6 @@ executor:
     num_rs_nodes_per_shard: 2
     # TODO SERVER-32572 remove voting_secondaries: true
     shard_options:
-      voting_secondaries: true
-    configsvr_options:
-      num_nodes: 3
       voting_secondaries: true
     enable_sharding:
     - test
