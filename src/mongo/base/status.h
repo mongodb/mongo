@@ -43,6 +43,10 @@ class stream;
 
 namespace mongo {
 
+// Including builder.h here would cause a cycle.
+template <typename Allocator>
+class StringBuilderImpl;
+
 /**
  * Status represents an error state or the absence thereof.
  *
@@ -258,6 +262,10 @@ inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
 inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
 
 std::ostream& operator<<(std::ostream& os, const Status& status);
+
+// This is only implemented for StringBuilder, not StackStringBuilder.
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const Status& status);
 
 }  // namespace mongo
 

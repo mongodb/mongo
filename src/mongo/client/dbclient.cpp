@@ -970,7 +970,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
         return Status(ErrorCodes::HostUnreachable,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
                                     << ", connection attempt failed: "
-                                    << sws.getStatus().toString());
+                                    << sws.getStatus());
     }
 
     _session = std::move(sws.getValue());
