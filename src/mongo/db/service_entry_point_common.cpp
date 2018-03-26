@@ -214,6 +214,10 @@ void generateErrorResponse(OperationContext* opCtx,
     replyBuilder->setMetadata(replyMetadata);
 }
 
+bool hasClusterTime(BSONObj metadata) {
+    return metadata.hasField(rpc::LogicalTimeMetadata::fieldName());
+}
+
 /**
  * Guard object for making a good-faith effort to enter maintenance mode and leave it when it
  * goes out of scope.
@@ -266,8 +270,10 @@ void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadat
         } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
             auto currentTime =
                 validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-            logicalTimeMetadata.writeToMetadata(metadataBob);
+            if (currentTime.getKeyId() != 0) {
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            }
         }
     }
 
@@ -309,8 +315,11 @@ void appendReplyMetadata(OperationContext* opCtx,
         } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
             auto currentTime =
                 validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-            logicalTimeMetadata.writeToMetadata(metadataBob);
+            // Do not add $clusterTime if the signature and keyId is dummy.
+            if (currentTime.getKeyId() != 0) {
+                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                logicalTimeMetadata.writeToMetadata(metadataBob);
+            }
         }
 
         if (isShardingAware || isConfig) {
@@ -474,20 +483,22 @@ bool runCommandImpl(OperationContext* opCtx,
     }();
     behaviors.attachCurOpErrInfo(opCtx, crb.getBodyBuilder().asTempObj());
 
-    auto operationTime = computeOperationTime(
-        opCtx, startOperationTime, repl::ReadConcernArgs::get(opCtx).getLevel());
-
-    // An uninitialized operation time means the cluster time is not propagated, so the operation
-    // time should not be attached to the response.
-    if (operationTime != LogicalTime::kUninitialized) {
-        auto body = crb.getBodyBuilder();
-        operationTime.appendAsOperationTime(&body);
-    }
-
     BSONObjBuilder metadataBob;
     appendReplyMetadata(opCtx, request, &metadataBob);
-    replyBuilder->setMetadata(metadataBob.done());
 
+    auto metadata = metadataBob.done();
+
+    if (hasClusterTime(metadata)) {
+        auto operationTime = computeOperationTime(
+            opCtx, startOperationTime, repl::ReadConcernArgs::get(opCtx).getLevel());
+
+        if (operationTime != LogicalTime::kUninitialized) {
+            auto body = crb.getBodyBuilder();
+            operationTime.appendAsOperationTime(&body);
+        }
+    }
+
+    replyBuilder->setMetadata(metadata);
     return ok;
 }
 
@@ -736,19 +747,19 @@ void execCommandDatabase(OperationContext* opCtx,
 
         BSONObjBuilder metadataBob;
         appendReplyMetadata(opCtx, request, &metadataBob);
-
-        // Note: the read concern may not have been successfully or yet placed on the opCtx, so
-        // parsing it separately here.
-        const std::string db = request.getDatabase().toString();
-        auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body);
-        auto operationTime = readConcernArgsStatus.isOK()
-            ? computeOperationTime(
-                  opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())
-            : LogicalClock::get(opCtx)->getClusterTime();
-
+        auto metadata = metadataBob.obj();
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
-        if (operationTime != LogicalTime::kUninitialized) {
+        if (hasClusterTime(metadata)) {
+            // Note: the read concern may not have been successfully or yet placed on the opCtx, so
+            // parsing it separately here.
+            const std::string db = request.getDatabase().toString();
+            auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body);
+            auto operationTime = readConcernArgsStatus.isOK()
+                ? computeOperationTime(
+                      opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())
+                : LogicalClock::get(opCtx)->getClusterTime();
+
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '"
@@ -757,7 +768,7 @@ void execCommandDatabase(OperationContext* opCtx,
                    << "' and operationTime '" << operationTime.toString()
                    << "': " << redact(e.toString());
 
-            generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj(), operationTime);
+            generateErrorResponse(opCtx, replyBuilder, e, metadata, operationTime);
         } else {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
@@ -766,7 +777,7 @@ void execCommandDatabase(OperationContext* opCtx,
                           ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body))
                    << "': " << redact(e.toString());
 
-            generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj());
+            generateErrorResponse(opCtx, replyBuilder, e, metadata);
         }
     }
 }
@@ -801,14 +812,20 @@ DbResponse runCommands(OperationContext* opCtx,
             if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
                 throw;
 
-            auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
             BSONObjBuilder metadataBob;
             appendReplyMetadataOnError(opCtx, &metadataBob);
+            auto metadata = metadataBob.obj();
+
             // Otherwise, reply with the parse error. This is useful for cases where parsing fails
             // due to user-supplied input, such as the document too deep error. Since we failed
             // during parsing, we can't log anything about the command.
             LOG(1) << "assertion while parsing command: " << ex.toString();
-            generateErrorResponse(opCtx, replyBuilder.get(), ex, metadataBob.obj(), operationTime);
+            if (hasClusterTime(metadata)) {
+                auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, operationTime);
+            } else {
+                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata);
+            }
 
             return;  // From lambda. Don't try executing if parsing failed.
         }
@@ -843,11 +860,17 @@ DbResponse runCommands(OperationContext* opCtx,
         } catch (const DBException& ex) {
             BSONObjBuilder metadataBob;
             appendReplyMetadataOnError(opCtx, &metadataBob);
-            auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
-            LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
-                   << "on database '" << request.getDatabase() << "': " << ex.toString();
+            auto metadata = metadataBob.obj();
 
-            generateErrorResponse(opCtx, replyBuilder.get(), ex, metadataBob.obj(), operationTime);
+            if (hasClusterTime(metadata)) {
+                auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+                LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+                       << "on database '" << request.getDatabase() << "': " << ex.toString();
+
+                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, operationTime);
+            } else {
+                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata);
+            }
         }
     }();
 
