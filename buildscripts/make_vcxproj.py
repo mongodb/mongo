@@ -33,6 +33,7 @@ VCXPROJ_FOOTER = r"""
 </Project>
 """
 
+
 def get_defines(args):
     """Parse a compiler argument list looking for defines"""
     ret = set()
@@ -40,6 +41,7 @@ def get_defines(args):
         if arg.startswith('/D'):
             ret.add(arg[2:])
     return ret
+
 
 def get_includes(args):
     """Parse a compiler argument list  looking for includes"""
@@ -49,8 +51,10 @@ def get_includes(args):
             ret.add(arg[2:])
     return ret
 
+
 class ProjFileGenerator(object):
     """Generate a .vcxproj and .vcxprof.filters file"""
+
     def __init__(self, target):
         # we handle DEBUG in the vcxproj header:
         self.common_defines = set()
@@ -75,8 +79,8 @@ class ProjFileGenerator(object):
         with open('buildscripts/vcxproj.header', 'r') as header_file:
             header_str = header_file.read()
             header_str = header_str.replace("%_TARGET_%", self.target)
-            header_str = header_str.replace("%AdditionalIncludeDirectories%",
-                                            ';'.join(sorted(self.includes)))
+            header_str = header_str.replace("%AdditionalIncludeDirectories%", ';'.join(
+                sorted(self.includes)))
             self.vcxproj.write(header_str)
 
         common_defines = self.all_defines
@@ -84,19 +88,18 @@ class ProjFileGenerator(object):
             common_defines = common_defines.intersection(c['defines'])
 
         self.vcxproj.write("<!-- common_defines -->\n")
-        self.vcxproj.write("<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>"
-                           + ';'.join(common_defines) + ";%(PreprocessorDefinitions)\n")
+        self.vcxproj.write("<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>" +
+                           ';'.join(common_defines) + ";%(PreprocessorDefinitions)\n")
         self.vcxproj.write("</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n")
 
         self.vcxproj.write("  <ItemGroup>\n")
         for command in self.compiles:
             defines = command["defines"].difference(common_defines)
             if len(defines) > 0:
-                self.vcxproj.write("    <ClCompile Include=\"" + command["file"] +
-                                   "\"><PreprocessorDefinitions>" +
-                                   ';'.join(defines) +
-                                   ";%(PreprocessorDefinitions)" +
-                                   "</PreprocessorDefinitions></ClCompile>\n")
+                self.vcxproj.write(
+                    "    <ClCompile Include=\"" + command["file"] + "\"><PreprocessorDefinitions>" +
+                    ';'.join(defines) + ";%(PreprocessorDefinitions)" +
+                    "</PreprocessorDefinitions></ClCompile>\n")
             else:
                 self.vcxproj.write("    <ClCompile Include=\"" + command["file"] + "\" />\n")
         self.vcxproj.write("  </ItemGroup>\n")
@@ -141,7 +144,7 @@ class ProjFileGenerator(object):
         for arg in get_includes(args):
             self.includes.add(arg)
 
-        self.compiles.append({"file" : file_name, "defines" : file_defines})
+        self.compiles.append({"file": file_name, "defines": file_defines})
 
     def __is_header(self, name):
         """Is this a header file?"""
@@ -167,7 +170,7 @@ class ProjFileGenerator(object):
         for directory in dirs:
             if not os.path.exists(directory):
                 print(("Warning: skipping include file scan for directory '%s'" +
-                      " because it does not exist.") % str(directory))
+                       " because it does not exist.") % str(directory))
                 continue
 
             # Get all the header files
@@ -239,6 +242,7 @@ class ProjFileGenerator(object):
             self.vcxproj.write("    <None Include='%s' />\n" % file_name)
         self.vcxproj.write("  </ItemGroup>\n")
 
+
 def main():
     if len(sys.argv) != 2:
         print r"Usage: python buildscripts\make_vcxproj.py FILE_NAME"
@@ -252,5 +256,6 @@ def main():
         for command in commands:
             command_str = command["command"]
             projfile.parse_line(command_str)
+
 
 main()

@@ -96,10 +96,12 @@ def generate_scons_cache_expansions():
 
         # Patches are read only
         if os.getenv("IS_PATCH"):
-            expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}' --cache-readonly".format(
-                scons_cache_mode, default_cache_path)
+            expansions[
+                "scons_cache_args"] = "--cache={0} --cache-dir='{1}' --cache-readonly".format(
+                    scons_cache_mode, default_cache_path)
         else:
-            expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(scons_cache_mode, default_cache_path)
+            expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(
+                scons_cache_mode, default_cache_path)
 
     # Local shared cache - host-based
     elif os.getenv("SCONS_CACHE_SCOPE") == "local":
@@ -111,7 +113,8 @@ def generate_scons_cache_expansions():
 
         default_cache_path = os.path.join(default_cache_path_base, system_uuid)
         expansions["scons_cache_path"] = default_cache_path
-        expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(scons_cache_mode, default_cache_path)
+        expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(
+            scons_cache_mode, default_cache_path)
     # No cache
     else:
         # Anything else is 'none'

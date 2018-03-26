@@ -40,8 +40,8 @@ def configure_loggers(logging_config):
     fixture_logger = FixtureRootLogger(logging_config, build_logger_server)
     tests_logger = TestsRootLogger(logging_config, build_logger_server)
     global EXECUTOR_LOGGER
-    EXECUTOR_LOGGER = ExecutorRootLogger(logging_config, build_logger_server,
-                                         fixture_logger, tests_logger)
+    EXECUTOR_LOGGER = ExecutorRootLogger(logging_config, build_logger_server, fixture_logger,
+                                         tests_logger)
 
 
 class BaseLogger(logging.Logger):
@@ -50,6 +50,7 @@ class BaseLogger(logging.Logger):
     Custom loggers share access to the logging configuration and provide methods
     to create other loggers.
     """
+
     def __init__(self, name, logging_config=None, build_logger_server=None, parent=None):
         """Initialize a BaseLogger.
 
@@ -93,6 +94,7 @@ class BaseLogger(logging.Logger):
 
 class RootLogger(BaseLogger):
     """A custom class for top-level loggers (executor, fixture, tests)."""
+
     def __init__(self, name, logging_config, build_logger_server):
         """Initialize a RootLogger.
 
@@ -115,8 +117,8 @@ class RootLogger(BaseLogger):
     def _add_handler(self, handler_info, formatter):
         handler_class = handler_info["class"]
         if handler_class == "logging.FileHandler":
-            handler = logging.FileHandler(filename=handler_info["filename"],
-                                          mode=handler_info.get("mode", "w"))
+            handler = logging.FileHandler(filename=handler_info["filename"], mode=handler_info.get(
+                "mode", "w"))
         elif handler_class == "logging.NullHandler":
             handler = logging.NullHandler()
         elif handler_class == "logging.StreamHandler":
@@ -131,6 +133,7 @@ class RootLogger(BaseLogger):
 
 class ExecutorRootLogger(RootLogger):
     """Class for the "executor" top-level logger."""
+
     def __init__(self, logging_config, build_logger_server, fixture_root_logger, tests_root_logger):
         """Initialize an ExecutorRootLogger."""
         RootLogger.__init__(self, EXECUTOR_LOGGER_NAME, logging_config, build_logger_server)
@@ -231,6 +234,7 @@ class TestLogger(BaseLogger):
 
 class FixtureRootLogger(RootLogger):
     """Class for the "fixture" top-level logger."""
+
     def __init__(self, logging_config, build_logger_server):
         """Initialize a FixtureRootLogger.
 
@@ -289,12 +293,13 @@ class FixtureNodeLogger(BaseLogger):
 
     def new_fixture_node_logger(self, node_name):
         """Create a new child FixtureNodeLogger."""
-        return FixtureNodeLogger(self.fixture_class, self.job_num,
-                                 "%s:%s" % (self.node_name, node_name), self)
+        return FixtureNodeLogger(self.fixture_class, self.job_num, "%s:%s" % (self.node_name,
+                                                                              node_name), self)
 
 
 class TestsRootLogger(RootLogger):
     """Class for the "tests" top-level logger."""
+
     def __init__(self, logging_config, build_logger_server):
         """Initialize a TestsRootLogger.
 
@@ -329,6 +334,7 @@ class HookLogger(BaseLogger):
 
 
 # Util methods
+
 
 def _fallback_buildlogger_handler(include_logger_name=True):
     """

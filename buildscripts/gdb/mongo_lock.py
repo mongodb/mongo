@@ -131,8 +131,8 @@ class Graph(object):
             color = ""
             if nodes and node_key in nodes:
                 color = "color = red"
-            sb.append('    "{}" [label="{}" {}]'.format(
-                node_key, self.nodes[node_key]['node'], color))
+            sb.append('    "{}" [label="{}" {}]'.format(node_key, self.nodes[node_key]['node'],
+                                                        color))
         sb.append("}")
         return "\n".join(sb)
 
@@ -222,8 +222,8 @@ def find_mutex_holder(graph, thread_dict, show):
     # Use the thread LWP as a substitute for showing output or generating the graph.
     if mutex_holder not in thread_dict:
         print("Warning: Mutex at {} held by thread with LWP {}"
-            " not found in thread_dict. Using LWP to track thread.".format(mutex_value,
-                                                                           mutex_holder))
+              " not found in thread_dict. Using LWP to track thread.".format(
+                  mutex_value, mutex_holder))
         mutex_holder_id = mutex_holder
     else:
         mutex_holder_id = thread_dict[mutex_holder]
@@ -232,14 +232,11 @@ def find_mutex_holder(graph, thread_dict, show):
     mutex_waiter_id = thread_dict[mutex_waiter_lwpid]
     if show:
         print("Mutex at {} held by thread 0x{:x} (LWP {})"
-              " waited on by thread 0x{:x} (LWP {})".format(mutex_value,
-                                                            mutex_holder_id,
-                                                            mutex_holder,
-                                                            mutex_waiter_id,
-                                                            mutex_waiter_lwpid))
+              " waited on by thread 0x{:x} (LWP {})".format(
+                  mutex_value, mutex_holder_id, mutex_holder, mutex_waiter_id, mutex_waiter_lwpid))
     if graph:
-        graph.add_edge(Thread(mutex_waiter_id, mutex_waiter_lwpid),
-                       Lock(long(mutex_value), "Mutex"))
+        graph.add_edge(
+            Thread(mutex_waiter_id, mutex_waiter_lwpid), Lock(long(mutex_value), "Mutex"))
         graph.add_edge(Lock(long(mutex_value), "Mutex"), Thread(mutex_holder_id, mutex_holder))
 
 
@@ -268,11 +265,11 @@ def find_lock_manager_holders(graph, thread_dict, show):
         if show:
             print("MongoDB Lock at {} ({}) held by thread id 0x{:x} (LWP {})".format(
                 lock_head, lock_request["mode"], lock_thread_id, lock_thread_lwpid) +
-                " waited on by thread 0x{:x} (LWP {})".format(thread_dict[lwpid], lwpid))
+                  " waited on by thread 0x{:x} (LWP {})".format(thread_dict[lwpid], lwpid))
         if graph:
             graph.add_edge(Thread(thread_dict[lwpid], lwpid), Lock(long(lock_head), "MongoDB lock"))
-            graph.add_edge(Lock(long(lock_head), "MongoDB lock"),
-                           Thread(lock_thread_id, lock_thread_lwpid))
+            graph.add_edge(
+                Lock(long(lock_head), "MongoDB lock"), Thread(lock_thread_id, lock_thread_lwpid))
         lock_request_ptr = lock_request["next"]
 
 
@@ -311,6 +308,7 @@ def get_threads_info(graph=None):
 
 class MongoDBShowLocks(gdb.Command):
     """Show MongoDB locks & pthread mutexes"""
+
     def __init__(self):
         register_mongo_command(self, "mongodb-show-locks", gdb.COMMAND_DATA)
 
@@ -325,11 +323,13 @@ class MongoDBShowLocks(gdb.Command):
         except gdb.error as err:
             print("Ignoring GDB error '%s' in mongodb_show_locks" % str(err))
 
+
 MongoDBShowLocks()
 
 
 class MongoDBWaitsForGraph(gdb.Command):
     """Create MongoDB WaitsFor lock graph [graph_file]"""
+
     def __init__(self):
         register_mongo_command(self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
 

@@ -12,7 +12,6 @@ import requests
 from . import handlers
 from .. import config as _config
 
-
 CREATE_BUILD_ENDPOINT = "/build"
 APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"
 CREATE_TEST_ENDPOINT = "/build/%(build_id)s/test"
@@ -94,10 +93,7 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
     handler for the test logs.
     """
 
-    def __init__(self,
-                 build_config,
-                 endpoint,
-                 capacity=_SEND_AFTER_LINES,
+    def __init__(self, build_config, endpoint, capacity=_SEND_AFTER_LINES,
                  interval_secs=_SEND_AFTER_SECS):
         """
         Initializes the buildlogger handler with the build id and
@@ -213,8 +209,8 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
     Buildlogger handler for the test logs.
     """
 
-    def __init__(self, build_config, build_id, test_id,
-                 capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS):
+    def __init__(self, build_config, build_id, test_id, capacity=_SEND_AFTER_LINES,
+                 interval_secs=_SEND_AFTER_SECS):
         """Initializes the buildlogger handler with the credentials, build id, and test id."""
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {
             "build_id": build_id,
@@ -249,8 +245,8 @@ class BuildloggerGlobalHandler(_BaseBuildloggerHandler):
     Buildlogger handler for the global logs.
     """
 
-    def __init__(self, build_config, build_id,
-                 capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS):
+    def __init__(self, build_config, build_id, capacity=_SEND_AFTER_LINES,
+                 interval_secs=_SEND_AFTER_SECS):
         """Initializes the buildlogger handler with the credentials and build id."""
         endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
         _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
@@ -289,10 +285,8 @@ class BuildloggerServer(object):
         builder = "%s_%s" % (self.config["builder"], suffix)
         build_num = int(self.config["build_num"])
 
-        handler = handlers.HTTPHandler(
-            url_root=_config.BUILDLOGGER_URL,
-            username=username,
-            password=password)
+        handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL, username=username,
+                                       password=password)
 
         response = handler.post(CREATE_BUILD_ENDPOINT, data={
             "builder": builder,
@@ -307,18 +301,18 @@ class BuildloggerServer(object):
         """
         Returns a new test id for sending test logs to.
         """
-        handler = handlers.HTTPHandler(
-            url_root=_config.BUILDLOGGER_URL,
-            username=self.config["username"],
-            password=self.config["password"])
+        handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL,
+                                       username=self.config["username"],
+                                       password=self.config["password"])
 
         endpoint = CREATE_TEST_ENDPOINT % {"build_id": build_id}
-        response = handler.post(endpoint, data={
-            "test_filename": test_filename,
-            "command": test_command,
-            "phase": self.config.get("build_phase", "unknown"),
-            "task_id": _config.EVERGREEN_TASK_ID,
-        })
+        response = handler.post(
+            endpoint, data={
+                "test_filename": test_filename,
+                "command": test_command,
+                "phase": self.config.get("build_phase", "unknown"),
+                "task_id": _config.EVERGREEN_TASK_ID,
+            })
 
         return response["id"]
 

@@ -18,10 +18,7 @@ class BenchmarkTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "benchmark_test"
 
-    def __init__(self,
-                 logger,
-                 program_executable,
-                 program_options=None):
+    def __init__(self, logger, program_executable, program_options=None):
         """
         Initializes the BenchmarkTestCase with the executable to run.
         """
@@ -49,9 +46,8 @@ class BenchmarkTestCase(interface.ProcessTestCase):
 
         # 3. Override Benchmark options with options set through resmoke's command line.
         resmoke_bm_options = {
-            "benchmark_filter": _config.BENCHMARK_FILTER,
-            "benchmark_list_tests": _config.BENCHMARK_LIST_TESTS,
-            "benchmark_min_time": _config.BENCHMARK_MIN_TIME,
+            "benchmark_filter": _config.BENCHMARK_FILTER, "benchmark_list_tests":
+                _config.BENCHMARK_LIST_TESTS, "benchmark_min_time": _config.BENCHMARK_MIN_TIME,
             "benchmark_out_format": _config.BENCHMARK_OUT_FORMAT,
             "benchmark_repetitions": _config.BENCHMARK_REPETITIONS
         }
@@ -69,6 +65,4 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         return self.bm_executable + ".json"
 
     def _make_process(self):
-        return core.programs.generic_program(self.logger,
-                                             [self.bm_executable],
-                                             **self.bm_options)
+        return core.programs.generic_program(self.logger, [self.bm_executable], **self.bm_options)

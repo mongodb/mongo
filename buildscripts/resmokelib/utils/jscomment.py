@@ -8,7 +8,6 @@ import re
 
 import yaml
 
-
 # TODO: use a more robust regular expression for matching tags
 _JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
@@ -43,8 +42,8 @@ def get_tags(pathname):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
                 return tags
             except yaml.YAMLError as err:
-                raise ValueError("File '%s' contained invalid tags (expected YAML): %s"
-                                 % (pathname, err))
+                raise ValueError("File '%s' contained invalid tags (expected YAML): %s" % (pathname,
+                                                                                           err))
 
     return []
 

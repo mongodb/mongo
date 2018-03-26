@@ -25,21 +25,11 @@ class ReplicaSetFixture(interface.ReplFixture):
     # Error response codes copied from mongo/base/error_codes.err.
     _NODE_NOT_FOUND = 74
 
-    def __init__(self,
-                 logger,
-                 job_num,
-                 mongod_executable=None,
-                 mongod_options=None,
-                 dbpath_prefix=None,
-                 preserve_dbpath=False,
-                 num_nodes=2,
-                 start_initial_sync_node=False,
-                 write_concern_majority_journal_default=None,
-                 auth_options=None,
-                 replset_config_options=None,
-                 voting_secondaries=None,
-                 all_nodes_electable=False,
-                 use_replica_set_connection_string=None):
+    def __init__(self, logger, job_num, mongod_executable=None, mongod_options=None,
+                 dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
+                 start_initial_sync_node=False, write_concern_majority_journal_default=None,
+                 auth_options=None, replset_config_options=None, voting_secondaries=None,
+                 all_nodes_electable=False, use_replica_set_connection_string=None):
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
@@ -117,11 +107,11 @@ class ReplicaSetFixture(interface.ReplFixture):
                     member_info["votes"] = 0
             members.append(member_info)
         if self.initial_sync_node:
-            members.append({"_id": self.initial_sync_node_idx,
-                            "host": self.initial_sync_node.get_internal_connection_string(),
-                            "priority": 0,
-                            "hidden": 1,
-                            "votes": 0})
+            members.append({
+                "_id": self.initial_sync_node_idx,
+                "host": self.initial_sync_node.get_internal_connection_string(), "priority": 0,
+                "hidden": 1, "votes": 0
+            })
 
         config = {"_id": self.replset_name}
         client = self.nodes[0].mongo_client()
@@ -137,13 +127,13 @@ class ReplicaSetFixture(interface.ReplFixture):
             return
 
         if self.write_concern_majority_journal_default is not None:
-            config["writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
+            config[
+                "writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
         else:
             server_status = client.admin.command({"serverStatus": 1})
             cmd_line_opts = client.admin.command({"getCmdLineOpts": 1})
-            if not (server_status["storageEngine"]["persistent"] and
-                    cmd_line_opts["parsed"].get("storage", {}).get(
-                        "journal", {}).get("enabled", True)):
+            if not (server_status["storageEngine"]["persistent"] and cmd_line_opts["parsed"].get(
+                    "storage", {}).get("journal", {}).get("enabled", True)):
                 config["writeConcernMajorityJournalDefault"] = False
 
         if self.replset_config_options.get("configsvr", False):
@@ -326,11 +316,9 @@ class ReplicaSetFixture(interface.ReplFixture):
         mongod_options["replSet"] = replset_name
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
 
-        return standalone.MongoDFixture(mongod_logger,
-                                        self.job_num,
-                                        mongod_executable=self.mongod_executable,
-                                        mongod_options=mongod_options,
-                                        preserve_dbpath=self.preserve_dbpath)
+        return standalone.MongoDFixture(
+            mongod_logger, self.job_num, mongod_executable=self.mongod_executable,
+            mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath)
 
     def _get_logger_for_mongod(self, index):
         """

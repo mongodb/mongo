@@ -17,9 +17,7 @@ class MongosTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "mongos_test"
 
-    def __init__(self,
-                 logger,
-                 mongos_options):
+    def __init__(self, logger, mongos_options):
         """
         Initializes the mongos test and saves the options.
         """
@@ -41,6 +39,5 @@ class MongosTestCase(interface.ProcessTestCase):
             self.options["test"] = ""
 
     def _make_process(self):
-        return core.programs.mongos_program(self.logger,
-                                            executable=self.mongos_executable,
+        return core.programs.mongos_program(self.logger, executable=self.mongos_executable,
                                             **self.options)

@@ -20,8 +20,10 @@ class EvergreenProjectConfig(object):
         self.path = path
         self.tasks = [Task(task_dict) for task_dict in self._conf["tasks"]]
         self._tasks_by_name = {task.name: task for task in self.tasks}
-        self.variants = [Variant(variant_dict, self._tasks_by_name)
-                         for variant_dict in self._conf["buildvariants"]]
+        self.variants = [
+            Variant(variant_dict, self._tasks_by_name)
+            for variant_dict in self._conf["buildvariants"]
+        ]
         self._variants_by_name = {variant.name: variant for variant in self.variants}
         self.distro_names = set()
         for variant in self.variants:
@@ -106,8 +108,10 @@ class Variant(object):
     def __init__(self, conf_dict, task_map):
         self.raw = conf_dict
         run_on = self.run_on
-        self.tasks = [VariantTask(task_map.get(t["name"]), t.get("distros", run_on), self)
-                      for t in conf_dict["tasks"]]
+        self.tasks = [
+            VariantTask(task_map.get(t["name"]), t.get("distros", run_on), self)
+            for t in conf_dict["tasks"]
+        ]
         self.distro_names = set(run_on)
         for task in self.tasks:
             self.distro_names.update(task.run_on)
@@ -176,6 +180,7 @@ class Variant(object):
 
 class VariantTask(Task):
     """Represent a task definition in the context of a build variant."""
+
     def __init__(self, task, run_on, variant):
         Task.__init__(self, task.raw)
         self.run_on = run_on
@@ -199,7 +204,6 @@ class VariantTask(Task):
 
 
 class ResmokeArgs(object):
-
     @staticmethod
     def get_arg(resmoke_args, name):
         """Return the value of the option --'name' in the 'resmoke_args' string or

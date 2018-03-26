@@ -48,7 +48,8 @@ class TestGenerator(testcase.IDLTestcase):
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         src_dir = os.path.join(
             base_dir,
-            'src', )
+            'src',
+        )
         idl_dir = os.path.join(src_dir, 'mongo', 'idl')
 
         args = idl.compiler.CompilerArgs()

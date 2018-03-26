@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 Utility for computing test failure rates from the Evergreen API.
 """
@@ -31,10 +30,9 @@ import yaml
 LOGGER = logging.getLogger(__name__)
 
 if sys.version_info[0] == 2:
-    _STRING_TYPES = (basestring,)
+    _STRING_TYPES = (basestring, )
 else:
-    _STRING_TYPES = (str,)
-
+    _STRING_TYPES = (str, )
 
 _ReportEntry = collections.namedtuple("_ReportEntry", [
     "test",
@@ -175,13 +173,8 @@ class ReportEntry(_ReportEntry):
         variant = next(iter(variant)) if len(variant) == 1 else ReportEntry._MULTIPLE_VARIANTS
         distro = next(iter(distro)) if len(distro) == 1 else ReportEntry._MULTIPLE_DISTROS
 
-        return ReportEntry(test=test,
-                           task=task,
-                           variant=variant,
-                           distro=distro,
-                           start_date=start_date,
-                           end_date=end_date,
-                           num_pass=num_pass,
+        return ReportEntry(test=test, task=task, variant=variant, distro=distro,
+                           start_date=start_date, end_date=end_date, num_pass=num_pass,
                            num_fail=num_fail)
 
 
@@ -190,7 +183,7 @@ class Report(object):
     A class for generating summarizations about Evergreen test executions.
     """
 
-    TEST = ("test",)
+    TEST = ("test", )
     TEST_TASK = ("test", "task")
     TEST_TASK_VARIANT = ("test", "task", "variant")
     TEST_TASK_VARIANT_DISTRO = ("test", "task", "variant", "distro")
@@ -251,9 +244,8 @@ class Report(object):
             if not isinstance(component, _STRING_TYPES):
                 raise TypeError("Each element of 'components' argument must be a string")
             elif component not in ReportEntry._fields:
-                raise ValueError(
-                    "Each element of 'components' argument must be one of {}".format(
-                        ReportEntry._fields))
+                raise ValueError("Each element of 'components' argument must be one of {}".format(
+                    ReportEntry._fields))
 
         group_by = [operator.attrgetter(component) for component in components]
 
@@ -353,13 +345,8 @@ class TestHistory(object):
 
     _MISSING_DISTRO = Missing("distro")
 
-    def __init__(self,
-                 api_server=DEFAULT_API_SERVER,
-                 project=DEFAULT_PROJECT,
-                 tests=None,
-                 tasks=None,
-                 variants=None,
-                 distros=None):
+    def __init__(self, api_server=DEFAULT_API_SERVER, project=DEFAULT_PROJECT, tests=None,
+                 tasks=None, variants=None, distros=None):
         """
         Initializes the TestHistory instance with the list of tests, tasks, variants, and distros
         specified.
@@ -384,9 +371,7 @@ class TestHistory(object):
             project=project,
         )
 
-    def get_history_by_revision(self,
-                                start_revision,
-                                end_revision,
+    def get_history_by_revision(self, start_revision, end_revision,
                                 test_statuses=DEFAULT_TEST_STATUSES,
                                 task_statuses=DEFAULT_TASK_STATUSES):
         """
@@ -421,10 +406,7 @@ class TestHistory(object):
 
         return history_data
 
-    def get_history_by_date(self,
-                            start_date,
-                            end_date,
-                            test_statuses=DEFAULT_TEST_STATUSES,
+    def get_history_by_date(self, start_date, end_date, test_statuses=DEFAULT_TEST_STATUSES,
                             task_statuses=DEFAULT_TASK_STATUSES):
         """
         Returns a list of ReportEntry instances corresponding to each individual test execution
@@ -485,8 +467,8 @@ class TestHistory(object):
                 LOGGER.debug("Request took %fs", round(time.time() - start, 2))
                 response.raise_for_status()
                 return self._get_json(response)
-            except (requests.exceptions.HTTPError,
-                    requests.exceptions.ConnectionError, JSONResponseError) as err:
+            except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError,
+                    JSONResponseError) as err:
                 if isinstance(err, JSONResponseError):
                     err = err.cause
                 retries += 1
@@ -527,13 +509,10 @@ class TestHistory(object):
 
         return ReportEntry(
             test=self._normalize_test_file(test_result["test_file"]),
-            task=test_result["task_name"],
-            variant=test_result["variant"],
-            distro=test_result.get("distro", self._MISSING_DISTRO),
-            start_date=start_date,
-            end_date=end_date,
-            num_pass=(1 if test_result["test_status"] == "pass" else 0),
-            num_fail=(1 if test_result["test_status"] not in ("pass", "skip") else 0))
+            task=test_result["task_name"], variant=test_result["variant"], distro=test_result.get(
+                "distro", self._MISSING_DISTRO), start_date=start_date, end_date=end_date,
+            num_pass=(1 if test_result["test_status"] == "pass" else
+                      0), num_fail=(1 if test_result["test_status"] not in ("pass", "skip") else 0))
 
     @staticmethod
     def _normalize_test_file(test_file):
@@ -619,87 +598,72 @@ def main():
     parser = optparse.OptionParser(description=main.__doc__,
                                    usage="Usage: %prog [options] [test1 test2 ...]")
 
-    parser.add_option("--project", dest="project",
-                      metavar="<project-name>",
+    parser.add_option("--project", dest="project", metavar="<project-name>",
                       default=TestHistory.DEFAULT_PROJECT,
                       help="The Evergreen project to analyze. Defaults to '%default'.")
 
     today = datetime.datetime.utcnow().replace(microsecond=0, tzinfo=None)
-    parser.add_option("--sinceDate", dest="since_date",
-                      metavar="<yyyy-mm-dd>",
+    parser.add_option("--sinceDate", dest="since_date", metavar="<yyyy-mm-dd>",
                       default="{:%Y-%m-%d}".format(today - datetime.timedelta(days=6)),
                       help=("The starting period as a date in UTC to analyze the test history for,"
                             " including the specified date. Defaults to 1 week ago (%default)."))
 
-    parser.add_option("--untilDate", dest="until_date",
-                      metavar="<yyyy-mm-dd>",
+    parser.add_option("--untilDate", dest="until_date", metavar="<yyyy-mm-dd>",
                       default="{:%Y-%m-%d}".format(today),
                       help=("The ending period as a date in UTC to analyze the test history for,"
                             " including the specified date. Defaults to today (%default)."))
 
-    parser.add_option("--sinceRevision", dest="since_revision",
-                      metavar="<gitrevision>",
+    parser.add_option("--sinceRevision", dest="since_revision", metavar="<gitrevision>",
                       default=None,
                       help=("The starting period as a git revision to analyze the test history for,"
                             " excluding the specified commit. This option must be specified in"
                             " conjuction with --untilRevision and takes precedence over --sinceDate"
                             " and --untilDate."))
 
-    parser.add_option("--untilRevision", dest="until_revision",
-                      metavar="<gitrevision>",
+    parser.add_option("--untilRevision", dest="until_revision", metavar="<gitrevision>",
                       default=None,
                       help=("The ending period as a git revision to analyze the test history for,"
                             " including the specified commit. This option must be specified in"
                             " conjuction with --sinceRevision and takes precedence over --sinceDate"
                             " and --untilDate."))
 
-    parser.add_option("--groupPeriod", dest="group_period",
-                      metavar="[{}]".format("|".join([Report.DAILY, Report.WEEKLY, "<ndays>"])),
-                      default=Report.WEEKLY,
+    parser.add_option("--groupPeriod", dest="group_period", metavar="[{}]".format(
+        "|".join([Report.DAILY, Report.WEEKLY, "<ndays>"])), default=Report.WEEKLY,
                       help=("The time period over which to group test executions. Defaults to"
                             " '%default'."))
 
     parser.add_option("--weekStartDay", dest="start_day_of_week",
-                      choices=(Report.SUNDAY, Report.MONDAY, Report.FIRST_DAY),
-                      metavar="[{}]".format(
-                          "|".join([Report.SUNDAY, Report.MONDAY, Report.FIRST_DAY])),
-                      default=Report.FIRST_DAY,
+                      choices=(Report.SUNDAY, Report.MONDAY,
+                               Report.FIRST_DAY), metavar="[{}]".format(
+                                   "|".join([Report.SUNDAY, Report.MONDAY,
+                                             Report.FIRST_DAY])), default=Report.FIRST_DAY,
                       help=("The day to use as the beginning of the week when grouping over time."
                             " This option is only relevant in conjuction with --groupPeriod={}. If"
                             " '{}' is specified, then the day of week of the earliest date is used"
                             " as the beginning of the week. Defaults to '%default'.".format(
                                 Report.WEEKLY, Report.FIRST_DAY)))
 
-    parser.add_option("--tasks", dest="tasks",
-                      metavar="<task1,task2,...>",
-                      default="",
+    parser.add_option("--tasks", dest="tasks", metavar="<task1,task2,...>", default="",
                       help="Comma-separated list of Evergreen task names to analyze.")
 
-    parser.add_option("--variants", dest="variants",
-                      metavar="<variant1,variant2,...>",
-                      default="",
+    parser.add_option("--variants", dest="variants", metavar="<variant1,variant2,...>", default="",
                       help="Comma-separated list of Evergreen build variants to analyze.")
 
-    parser.add_option("--distros", dest="distros",
-                      metavar="<distro1,distro2,...>",
-                      default="",
+    parser.add_option("--distros", dest="distros", metavar="<distro1,distro2,...>", default="",
                       help="Comma-separated list of Evergreen build distros to analyze.")
 
     parser.add_option("--numRequestRetries", dest="num_request_retries",
-                      metavar="<num-request-retries>",
-                      default=TestHistory.DEFAULT_NUM_RETRIES,
+                      metavar="<num-request-retries>", default=TestHistory.DEFAULT_NUM_RETRIES,
                       help=("The number of times a request to the Evergreen API will be retried on"
                             " failure. Defaults to '%default'."))
 
     (options, tests) = parser.parse_args()
 
-    for (option_name, option_dest) in (("--sinceDate", "since_date"),
-                                       ("--untilDate", "until_date")):
+    for (option_name, option_dest) in (("--sinceDate", "since_date"), ("--untilDate",
+                                                                       "until_date")):
         option_value = getattr(options, option_dest)
         try:
-            setattr(options,
-                    option_dest,
-                    _parse_date(option_value))
+            setattr(options, option_dest, _parse_date(option_value))
         except ValueError:
             parser.print_help(file=sys.stderr)
             print(file=sys.stderr)
@@ -754,26 +718,20 @@ def main():
     api_server = "{url.scheme}://{url.netloc}".format(
         url=urlparse(evg_config.get("api_server_host", TestHistory.DEFAULT_API_SERVER)))
 
-    test_history = TestHistory(api_server=api_server,
-                               project=options.project,
-                               tests=tests,
-                               tasks=options.tasks.split(","),
-                               variants=options.variants.split(","),
+    test_history = TestHistory(api_server=api_server, project=options.project, tests=tests,
+                               tasks=options.tasks.split(","), variants=options.variants.split(","),
                                distros=options.distros.split(","))
     test_history.num_retries = options.num_request_retries
 
     if options.since_revision:
-        history_data = test_history.get_history_by_revision(
-            start_revision=options.since_revision,
-            end_revision=options.until_revision)
+        history_data = test_history.get_history_by_revision(start_revision=options.since_revision,
+                                                            end_revision=options.until_revision)
     elif options.since_date:
-        history_data = test_history.get_history_by_date(
-            start_date=options.since_date,
-            end_date=options.until_date)
+        history_data = test_history.get_history_by_date(start_date=options.since_date,
+                                                        end_date=options.until_date)
 
     report = Report(history_data)
-    summary = report.summarize_by(Report.TEST_TASK_VARIANT_DISTRO,
-                                  time_period=options.group_period,
+    summary = report.summarize_by(Report.TEST_TASK_VARIANT_DISTRO, time_period=options.group_period,
                                   start_day_of_week=options.start_day_of_week)
 
     for entry in summary:

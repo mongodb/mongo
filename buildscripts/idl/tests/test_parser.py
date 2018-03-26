@@ -223,9 +223,7 @@ class TestParser(testcase.IDLTestcase):
             textwrap.dedent("""
         types:
             - foo:
-            """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-            multiple=True)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, multiple=True)
 
         # test list instead of scalar
         self.assert_parse_fail(
@@ -233,9 +231,7 @@ class TestParser(testcase.IDLTestcase):
         types:
             foo:
                 - bar
-            """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-            multiple=True)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, multiple=True)
 
         # test map instead of scalar
         self.assert_parse_fail(
@@ -244,9 +240,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description:
                     foo: bar
-            """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-            multiple=True)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, multiple=True)
 
         # test missing bson_serialization_type field
         self.assert_parse_fail(
@@ -723,9 +717,7 @@ class TestParser(testcase.IDLTestcase):
             textwrap.dedent("""
         enums:
             - foo:
-            """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-            multiple=True)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, multiple=True)
 
         # test list instead of scalar
         self.assert_parse_fail(
@@ -733,9 +725,7 @@ class TestParser(testcase.IDLTestcase):
         enums:
             foo:
                 - bar
-            """),
-            idl.errors.ERROR_ID_IS_NODE_TYPE,
-            multiple=True)
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, multiple=True)
 
         # test missing type field
         self.assert_parse_fail(

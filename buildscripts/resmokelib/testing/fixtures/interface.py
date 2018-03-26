@@ -16,7 +16,6 @@ from ... import logging
 from ... import utils
 from ...utils import registry
 
-
 _FIXTURES = {}
 
 
@@ -145,8 +144,7 @@ class Fixture(object):
             kwargs["connect"] = True
 
         return pymongo.MongoClient(host=self.get_driver_connection_url(),
-                                   read_preference=read_preference,
-                                   **kwargs)
+                                   read_preference=read_preference, **kwargs)
 
     def __str__(self):
         return "%s (Job #%d)" % (self.__class__.__name__, self.job_num)

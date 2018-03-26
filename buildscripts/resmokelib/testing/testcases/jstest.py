@@ -24,11 +24,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self,
-                 logger,
-                 js_filename,
-                 shell_executable=None,
-                 shell_options=None):
+    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
         """
         Initializes the _SingleJSTestCase with the JS file to run.
         """
@@ -114,17 +110,13 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         data_dir_prefix = utils.default_if_none(config.DBPATH_PREFIX,
                                                 global_vars.get("MongoRunner.dataDir"))
         data_dir_prefix = utils.default_if_none(data_dir_prefix, config.DEFAULT_DBPATH_PREFIX)
-        return os.path.join(data_dir_prefix,
-                            "job%d" % self.fixture.job_num,
+        return os.path.join(data_dir_prefix, "job%d" % self.fixture.job_num,
                             config.MONGO_RUNNER_SUBDIR)
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger,
-            executable=self.shell_executable,
-            filename=self.js_filename,
-            connection_string=self.fixture.get_driver_connection_url(),
-            **self.shell_options)
+            self.logger, executable=self.shell_executable, filename=self.js_filename,
+            connection_string=self.fixture.get_driver_connection_url(), **self.shell_options)
 
 
 class JSTestCase(interface.ProcessTestCase):
@@ -151,11 +143,7 @@ class JSTestCase(interface.ProcessTestCase):
 
     DEFAULT_CLIENT_NUM = 1
 
-    def __init__(self,
-                 logger,
-                 js_filename,
-                 shell_executable=None,
-                 shell_options=None):
+    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
         """
         Initializes the JSTestCase with the JS file to run.
         """
@@ -204,10 +192,8 @@ class JSTestCase(interface.ProcessTestCase):
         """
 
         shell_options = self._get_shell_options_for_thread(thread_id)
-        test_case = _SingleJSTestCase(logger,
-                                      self.test_case_template.js_filename,
-                                      self.test_case_template.shell_executable,
-                                      shell_options)
+        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
+                                      self.test_case_template.shell_executable, shell_options)
 
         test_case.configure(self.fixture)
         return test_case
@@ -253,9 +239,8 @@ class JSTestCase(interface.ProcessTestCase):
                 if thread.exc_info is not None:
                     if not isinstance(thread.exc_info[1], self.failureException):
                         self.logger.error(
-                            "Encountered an error inside thread %d running jstest %s.",
-                            thread_id, self.basename(),
-                            exc_info=thread.exc_info)
+                            "Encountered an error inside thread %d running jstest %s.", thread_id,
+                            self.basename(), exc_info=thread.exc_info)
                     raise thread.exc_info
 
     def run_test(self):

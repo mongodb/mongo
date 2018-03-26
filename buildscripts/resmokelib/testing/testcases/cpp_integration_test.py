@@ -16,10 +16,7 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "cpp_integration_test"
 
-    def __init__(self,
-                 logger,
-                 program_executable,
-                 program_options=None):
+    def __init__(self, logger, program_executable, program_options=None):
         """
         Initializes the CPPIntegrationTestCase with the executable to run.
         """
@@ -35,6 +32,5 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
 
     def _make_process(self):
-        return core.programs.generic_program(self.logger,
-                                             [self.program_executable],
+        return core.programs.generic_program(self.logger, [self.program_executable],
                                              **self.program_options)

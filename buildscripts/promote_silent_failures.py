@@ -15,7 +15,6 @@ import optparse
 import os
 import sys
 
-
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,12 +30,10 @@ def main():
 
     usage = "usage: %prog [options] report.json"
     parser = optparse.OptionParser(usage=usage)
-    parser.add_option("-o", "--output-file",
-                      dest="outfile",
-                      default="-",
-                      help="If '-', then the report file is written to stdout."
-                           " Any other value is treated as the output file name. By default,"
-                           " output is written to stdout.")
+    parser.add_option("-o", "--output-file", dest="outfile", default="-",
+                      help=("If '-', then the report file is written to stdout."
+                            " Any other value is treated as the output file name. By default,"
+                            " output is written to stdout."))
 
     (options, args) = parser.parse_args()
 
@@ -63,6 +60,7 @@ def main():
             json.dump(result_report, fp)
     else:
         print(json.dumps(result_report))
+
 
 if __name__ == "__main__":
     main()

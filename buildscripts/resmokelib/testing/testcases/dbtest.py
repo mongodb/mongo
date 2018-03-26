@@ -21,11 +21,7 @@ class DBTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "db_test"
 
-    def __init__(self,
-                 logger,
-                 dbtest_suite,
-                 dbtest_executable=None,
-                 dbtest_options=None):
+    def __init__(self, logger, dbtest_suite, dbtest_executable=None, dbtest_options=None):
         """
         Initializes the DBTestCase with the dbtest suite to run.
         """
@@ -62,10 +58,8 @@ class DBTestCase(interface.ProcessTestCase):
         shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
-        return core.programs.dbtest_program(self.logger,
-                                            executable=self.dbtest_executable,
-                                            suites=[self.dbtest_suite],
-                                            **self.dbtest_options)
+        return core.programs.dbtest_program(self.logger, executable=self.dbtest_executable,
+                                            suites=[self.dbtest_suite], **self.dbtest_options)
 
     @staticmethod
     def _get_dbpath_prefix():

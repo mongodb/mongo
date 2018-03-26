@@ -1,5 +1,4 @@
 #!/usr/bin/env python2
-
 """ This program stamps the shared scons directory with a timestamp so we can
     determine the last prune time and run the prune script on a schedule.
     It is meant to be invoked from the shell:
@@ -76,12 +75,14 @@ def check_last_prune_time(args):
     # A 0 return code signals our Evergreen task that we should run the prune script.
     # Otherwise, return 1 and skip pruning.
     if diff.total_seconds() > seconds_since_last_prune:
-        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune."
-              .format(diff.total_seconds(), diff.total_seconds()/60/60))
+        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune.".format(
+            diff.total_seconds(),
+            diff.total_seconds() / 60 / 60))
         sys.exit(0)
     else:
-        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune."
-              .format(diff.total_seconds(), diff.total_seconds()/60/60))
+        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune.".format(
+            diff.total_seconds(),
+            diff.total_seconds() / 60 / 60))
         sys.exit(1)
 
 

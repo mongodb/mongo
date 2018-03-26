@@ -27,13 +27,8 @@ class MongoDFixture(interface.Fixture):
 
     AWAIT_READY_TIMEOUT_SECS = 300
 
-    def __init__(self,
-                 logger,
-                 job_num,
-                 mongod_executable=None,
-                 mongod_options=None,
-                 dbpath_prefix=None,
-                 preserve_dbpath=False):
+    def __init__(self, logger, job_num, mongod_executable=None, mongod_options=None,
+                 dbpath_prefix=None, preserve_dbpath=False):
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
@@ -49,8 +44,7 @@ class MongoDFixture(interface.Fixture):
         # The dbpath in mongod_options takes precedence over other settings to make it easier for
         # users to specify a dbpath containing data to test against.
         if "dbpath" not in self.mongod_options:
-            self.mongod_options["dbpath"] = os.path.join(
-                self._dbpath_prefix, config.FIXTURE_SUBDIR)
+            self.mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, config.FIXTURE_SUBDIR)
         self._dbpath = self.mongod_options["dbpath"]
 
         self.mongod = None
@@ -70,8 +64,7 @@ class MongoDFixture(interface.Fixture):
             self.mongod_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongod_options["port"]
 
-        mongod = core.programs.mongod_program(self.logger,
-                                              executable=self.mongod_executable,
+        mongod = core.programs.mongod_program(self.logger, executable=self.mongod_executable,
                                               **self.mongod_options)
         try:
             self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())

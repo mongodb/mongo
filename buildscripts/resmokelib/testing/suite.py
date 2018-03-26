@@ -105,15 +105,19 @@ class Suite(object):
 
         if self.options.include_tags is not None:
             if "include_tags" in selector:
-                selector["include_tags"] = {"$allOf": [
-                    selector["include_tags"],
-                    self.options.include_tags,
-                ]}
+                selector["include_tags"] = {
+                    "$allOf": [
+                        selector["include_tags"],
+                        self.options.include_tags,
+                    ]
+                }
             elif "exclude_tags" in selector:
-                selector["exclude_tags"] = {"$anyOf": [
-                    selector["exclude_tags"],
-                    {"$not": self.options.include_tags},
-                ]}
+                selector["exclude_tags"] = {
+                    "$anyOf": [
+                        selector["exclude_tags"],
+                        {"$not": self.options.include_tags},
+                    ]
+                }
             else:
                 selector["include_tags"] = self.options.include_tags
 
@@ -267,11 +271,8 @@ class Suite(object):
         for iteration in xrange(num_iterations):
             # Summarize each execution as a bulleted list of results.
             bulleter_sb = []
-            summary = self._summarize_report(
-                reports[iteration],
-                start_times[iteration],
-                end_times[iteration],
-                bulleter_sb)
+            summary = self._summarize_report(reports[iteration], start_times[iteration],
+                                             end_times[iteration], bulleter_sb)
             combined_summary = _summary.combine(combined_summary, summary)
 
             for (i, line) in enumerate(bulleter_sb):
@@ -288,10 +289,8 @@ class Suite(object):
         string builder 'sb'.
         """
 
-        return self._summarize_report(self._reports[iteration],
-                                      self._test_start_times[iteration],
-                                      self._test_end_times[iteration],
-                                      sb)
+        return self._summarize_report(self._reports[iteration], self._test_start_times[iteration],
+                                      self._test_end_times[iteration], sb)
 
     def _summarize_report(self, report, start_time, end_time, sb):
         """
@@ -335,8 +334,8 @@ class Suite(object):
     @staticmethod
     def log_summaries(logger, suites, time_taken):
         sb = []
-        sb.append("Summary of all suites: %d suites ran in %0.2f seconds"
-                  % (len(suites), time_taken))
+        sb.append("Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites),
+                                                                             time_taken))
         for suite in suites:
             suite_sb = []
             suite.summarize(suite_sb)

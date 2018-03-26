@@ -12,7 +12,6 @@ import unittest
 from ... import logging
 from ...utils import registry
 
-
 _TEST_CASES = {}
 
 
@@ -139,8 +138,8 @@ class ProcessTestCase(TestCase):  # pylint: disable=abstract-method
         except self.failureException:
             raise
         except:
-            self.logger.exception("Encountered an error running %s %s",
-                                  self.test_kind, self.basename())
+            self.logger.exception("Encountered an error running %s %s", self.test_kind,
+                                  self.basename())
             raise
 
     def as_command(self):

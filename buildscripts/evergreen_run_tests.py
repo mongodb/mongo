@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 Command line utility for executing MongoDB tests in Evergreen.
 """
@@ -17,7 +16,6 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts import resmoke
 from buildscripts import resmokelib
 
-
 _TagInfo = collections.namedtuple("_TagInfo", ["tag_name", "evergreen_aware", "suite_options"])
 
 
@@ -27,23 +25,18 @@ class Main(resmoke.Main):
     additional options for running unreliable tests in Evergreen.
     """
 
-    UNRELIABLE_TAG = _TagInfo(tag_name="unreliable",
-                              evergreen_aware=True,
+    UNRELIABLE_TAG = _TagInfo(tag_name="unreliable", evergreen_aware=True,
                               suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(
                                   report_failure_status="silentfail"))
 
     RESOURCE_INTENSIVE_TAG = _TagInfo(
-        tag_name="resource_intensive",
-        evergreen_aware=False,
+        tag_name="resource_intensive", evergreen_aware=False,
         suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(num_jobs=1))
 
     RETRY_ON_FAILURE_TAG = _TagInfo(
-        tag_name="retry_on_failure",
-        evergreen_aware=True,
+        tag_name="retry_on_failure", evergreen_aware=True,
         suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(
-            fail_fast=False,
-            num_repeats=2,
-            report_failure_status="silentfail"))
+            fail_fast=False, num_repeats=2, report_failure_status="silentfail"))
 
     def _make_evergreen_aware_tags(self, tag_name):
         """
@@ -61,11 +54,11 @@ class Main(resmoke.Main):
                 if resmokelib.config.EVERGREEN_DISTRO_ID is not None:
                     tags_format.append("{tag_name}|{task_name}|{variant_name}|{distro_id}")
 
-        return [tag.format(tag_name=tag_name,
-                           task_name=resmokelib.config.EVERGREEN_TASK_NAME,
-                           variant_name=resmokelib.config.EVERGREEN_VARIANT_NAME,
-                           distro_id=resmokelib.config.EVERGREEN_DISTRO_ID)
-                for tag in tags_format]
+        return [
+            tag.format(tag_name=tag_name, task_name=resmokelib.config.EVERGREEN_TASK_NAME,
+                       variant_name=resmokelib.config.EVERGREEN_VARIANT_NAME,
+                       distro_id=resmokelib.config.EVERGREEN_DISTRO_ID) for tag in tags_format
+        ]
 
     @classmethod
     def _make_tag_combinations(cls):
@@ -77,31 +70,28 @@ class Main(resmoke.Main):
         combinations = []
 
         if resmokelib.config.EVERGREEN_PATCH_BUILD:
-            combinations.append((
-                "unreliable and resource intensive",
-                ((cls.UNRELIABLE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, True))))
-            combinations.append((
-                "unreliable and not resource intensive",
-                ((cls.UNRELIABLE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, False))))
-            combinations.append((
-                "reliable and resource intensive",
-                ((cls.UNRELIABLE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG, True))))
-            combinations.append((
-                "reliable and not resource intensive",
-                ((cls.UNRELIABLE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG, False))))
+            combinations.append(("unreliable and resource intensive",
+                                 ((cls.UNRELIABLE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, True))))
+            combinations.append(("unreliable and not resource intensive",
+                                 ((cls.UNRELIABLE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, False))))
+            combinations.append(("reliable and resource intensive",
+                                 ((cls.UNRELIABLE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG, True))))
+            combinations.append(("reliable and not resource intensive",
+                                 ((cls.UNRELIABLE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG,
+                                                                False))))
         else:
-            combinations.append((
-                "retry on failure and resource intensive",
-                ((cls.RETRY_ON_FAILURE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, True))))
-            combinations.append((
-                "retry on failure and not resource intensive",
-                ((cls.RETRY_ON_FAILURE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, False))))
-            combinations.append((
-                "run once and resource intensive",
-                ((cls.RETRY_ON_FAILURE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG, True))))
-            combinations.append((
-                "run once and not resource intensive",
-                ((cls.RETRY_ON_FAILURE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG, False))))
+            combinations.append(("retry on failure and resource intensive",
+                                 ((cls.RETRY_ON_FAILURE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG,
+                                                                     True))))
+            combinations.append(("retry on failure and not resource intensive",
+                                 ((cls.RETRY_ON_FAILURE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG,
+                                                                     False))))
+            combinations.append(("run once and resource intensive",
+                                 ((cls.RETRY_ON_FAILURE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG,
+                                                                      True))))
+            combinations.append(("run once and not resource intensive",
+                                 ((cls.RETRY_ON_FAILURE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG,
+                                                                      False))))
 
         return combinations
 

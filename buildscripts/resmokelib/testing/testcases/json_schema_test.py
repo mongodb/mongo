@@ -15,21 +15,13 @@ class JSONSchemaTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = "json_schema_test"
 
-    def __init__(self,
-                 logger,
-                 json_filename,
-                 shell_executable=None,
-                 shell_options=None):
+    def __init__(self, logger, json_filename, shell_executable=None, shell_options=None):
         """Initializes the JSONSchemaTestCase with the JSON test file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self,
-            logger,
-            "JSON Schema test",
-            json_filename,
+            self, logger, "JSON Schema test", json_filename,
             test_runner_file="jstests/libs/json_schema_test_runner.js",
-            shell_executable=shell_executable,
-            shell_options=shell_options)
+            shell_executable=shell_executable, shell_options=shell_options)
 
     @property
     def json_filename(self):

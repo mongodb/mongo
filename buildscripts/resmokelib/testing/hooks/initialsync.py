@@ -68,15 +68,12 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
         # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
         if self._hook.tests_run >= self._hook.n:
-            self.logger.info(
-                "%d tests have been run against the fixture, waiting for initial sync"
-                " node to go into SECONDARY state",
-                self._hook.tests_run)
+            self.logger.info("%d tests have been run against the fixture, waiting for initial sync"
+                             " node to go into SECONDARY state", self._hook.tests_run)
             self._hook.tests_run = 0
 
-            cmd = bson.SON([("replSetTest", 1),
-                            ("waitForMemberState", 2),
-                            ("timeoutMillis", 20 * 60 * 1000)])
+            cmd = bson.SON([("replSetTest", 1), ("waitForMemberState", 2), ("timeoutMillis",
+                                                                            20 * 60 * 1000)])
             sync_node_conn.admin.command(cmd)
 
         # Check if the initial sync node is in SECONDARY state. If it's been 'n' tests, then it
@@ -90,11 +87,9 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                     self.logger.exception("{0} failed: {1}".format(self._hook.description, msg))
                     raise errors.TestFailure(msg)
 
-                self.logger.info(
-                    "Initial sync node is in state %d, not state SECONDARY (2)."
-                    " Skipping BackgroundInitialSync hook for %s",
-                    state,
-                    self._base_test_name)
+                self.logger.info("Initial sync node is in state %d, not state SECONDARY (2)."
+                                 " Skipping BackgroundInitialSync hook for %s", state,
+                                 self._base_test_name)
 
                 # If we have not restarted initial sync since the last time we ran the data
                 # validation, restart initial sync with a 20% probability.
@@ -175,8 +170,8 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
     JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
 
     def __init__(self, logger, test_name, description, base_test_name, hook):
-        jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description,
-                                          base_test_name, hook, self.JS_FILENAME)
+        jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
+                                          hook, self.JS_FILENAME)
 
     def run_test(self):
         sync_node = self.fixture.get_initial_sync_node()
@@ -190,9 +185,8 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
         # Do initial sync round.
         self.logger.info("Waiting for initial sync node to go into SECONDARY state")
-        cmd = bson.SON([("replSetTest", 1),
-                        ("waitForMemberState", 2),
-                        ("timeoutMillis", 20 * 60 * 1000)])
+        cmd = bson.SON([("replSetTest", 1), ("waitForMemberState", 2), ("timeoutMillis",
+                                                                        20 * 60 * 1000)])
         sync_node_conn.admin.command(cmd)
 
         # Run data validation and dbhash checking.

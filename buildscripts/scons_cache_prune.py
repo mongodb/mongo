@@ -18,7 +18,7 @@ import shutil
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("scons.cache.prune.lru")
 
-GIGBYTES = 1024*1024*1024
+GIGBYTES = 1024 * 1024 * 1024
 
 cache_item = collections.namedtuple("CacheContents", ["path", "time", "size"])
 
@@ -40,8 +40,7 @@ def collect_cache_contents(cache_path):
                                    "The cache may be currupt.".format(file_path))
                     continue
 
-                item = cache_item(path=file_path,
-                                  time=os.stat(file_path).st_atime,
+                item = cache_item(path=file_path, time=os.stat(file_path).st_atime,
                                   size=os.stat(file_path).st_size)
 
                 total += item.size
@@ -104,8 +103,7 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
 def main():
     parser = argparse.ArgumentParser(description="SCons cache pruning tool")
 
-    parser.add_argument("--cache-dir", "-d", default=None,
-                        help="path to the cache directory.")
+    parser.add_argument("--cache-dir", "-d", default=None, help="path to the cache directory.")
     parser.add_argument("--cache-size", "-s", default=200, type=int,
                         help="maximum size of cache in GB.")
     parser.add_argument("--prune-ratio", "-p", default=0.8, type=float,
@@ -119,13 +117,13 @@ def main():
         logger.error("must specify a valid cache path, [{0}]".format(args.cache_dir))
         exit(1)
 
-    ok = prune_cache(cache_path=args.cache_dir,
-                     cache_size_gb=args.cache_size,
+    ok = prune_cache(cache_path=args.cache_dir, cache_size_gb=args.cache_size,
                      clean_ratio=args.prune_ratio)
 
     if not ok:
         logger.error("encountered error cleaning the cache. exiting.")
         exit(1)
+
 
 if __name__ == "__main__":
     main()

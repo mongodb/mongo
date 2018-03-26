@@ -62,6 +62,7 @@ class DumpGlobalServiceContext(gdb.Command):
     def invoke(self, arg, _from_tty):
         gdb.execute("print *('mongo::(anonymous namespace)::globalServiceContext')")
 
+
 # Register command
 DumpGlobalServiceContext()
 
@@ -92,6 +93,7 @@ class MongoDBDumpLocks(gdb.Command):
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 
+
 # Register command
 MongoDBDumpLocks()
 
@@ -112,6 +114,7 @@ class BtIfActive(gdb.Command):
             print("Thread is idle at " + idle_location.string())
         else:
             gdb.execute("bt")
+
 
 # Register command
 BtIfActive()
@@ -204,6 +207,7 @@ class MongoDBUniqueStack(gdb.Command):
             print(stack['output'])
             print()  # leave extra blank line after each thread stack
 
+
 # Register command
 MongoDBUniqueStack()
 
@@ -262,6 +266,7 @@ class MongoDBHelp(gdb.Command):
         print("Command - Description")
         for key in mongo_commands:
             print("%s - %s" % (key, mongo_commands[key]))
+
 
 # Register command
 MongoDBHelp()

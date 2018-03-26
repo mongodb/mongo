@@ -68,8 +68,7 @@ class CombineBenchmarkResults(interface.Hook):
 
         for name, report in self.benchmark_reports.items():
             test_report = {
-                "name": name,
-                "results": report.generate_perf_plugin_dict(),
+                "name": name, "results": report.generate_perf_plugin_dict(),
                 "context": report.context._asdict()
             }
 
@@ -124,11 +123,7 @@ class _BenchmarkThreadsReport(object):
     }
     """
     CONTEXT_FIELDS = [
-        "date",
-        "cpu_scaling_enabled",
-        "num_cpus",
-        "mhz_per_cpu",
-        "library_build_type"
+        "date", "cpu_scaling_enabled", "num_cpus", "mhz_per_cpu", "library_build_type"
     ]
     Context = collections.namedtuple("Context", CONTEXT_FIELDS)
 
@@ -163,8 +158,8 @@ class _BenchmarkThreadsReport(object):
 
         res = {}
         for thread_count, reports in self.thread_benchmark_map.items():
-            if (thread_count.endswith("median") or thread_count.endswith("mean") or
-                    thread_count.endswith("stddev")):
+            if (thread_count.endswith("median") or thread_count.endswith("mean")
+                    or thread_count.endswith("stddev")):
                 # We don't use Benchmark's included statistics for now because they clutter up the
                 # graph.
                 continue

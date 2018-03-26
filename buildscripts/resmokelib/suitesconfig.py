@@ -71,9 +71,9 @@ def get_suites(suite_files, test_files):
     if test_files:
         # Do not change the execution order of the tests passed as args, unless a tag option is
         # specified. If an option is specified, then sort the tests for consistent execution order.
-        _config.ORDER_TESTS_BY_NAME = any(tag_filter is not None for
-                                          tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS,
-                                                         _config.INCLUDE_WITH_ANY_TAGS))
+        _config.ORDER_TESTS_BY_NAME = any(
+            tag_filter is not None
+            for tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS, _config.INCLUDE_WITH_ANY_TAGS))
         # Build configuration for list of files to run.
         suite_roots = _make_suite_roots(test_files)
 
@@ -109,6 +109,6 @@ def _get_yaml_config(kind, pathname):
         pathname = resmokeconfig.NAMED_SUITES[pathname]  # Expand 'pathname' to full path.
 
     if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
-        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'"
-                                        % (kind, pathname))
+        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'" % (kind,
+                                                                                     pathname))
     return utils.load_yaml_file(pathname)

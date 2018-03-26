@@ -14,7 +14,9 @@ import yaml
 def _represent_dict_order(self, data):
     return self.represent_mapping("tag:yaml.org,2002:map", data.items())
 
+
 yaml.add_representer(collections.OrderedDict, _represent_dict_order)
+
 # End setup
 
 
@@ -108,11 +110,8 @@ class TagsConfig(object):
         """
         with open(filename, "w") as fstream:
             if preamble:
-                print(textwrap.fill(preamble,
-                                    width=100,
-                                    initial_indent="# ",
-                                    subsequent_indent="# "),
-                      file=fstream)
+                print(textwrap.fill(preamble, width=100, initial_indent="# ",
+                                    subsequent_indent="# "), file=fstream)
 
             # We use yaml.safe_dump() in order avoid having strings being written to the file as
             # "!!python/unicode ..." and instead have them written as plain 'str' instances.
@@ -138,4 +137,3 @@ def setdefault(doc, key, default):
     else:
         doc[key] = default
         return default
-

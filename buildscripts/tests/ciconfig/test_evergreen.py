@@ -8,7 +8,6 @@ import unittest
 
 import buildscripts.ciconfig.evergreen as _evergreen
 
-
 TEST_FILE_PATH = os.path.join(os.path.dirname(__file__), "evergreen.yml")
 
 
@@ -68,15 +67,12 @@ class TestTask(unittest.TestCase):
 
     def test_from_dict(self):
         task_dict = {
-            "name": "compile",
-            "depends_on": [],
-            "commands": [
-                {"func": "fetch source"},
-                {"func": "run a task that passes"},
-                {"func": "run a function with an arg",
-                 "vars": {"foobar": "TESTING: ONE"}},
-                {"func": "run a function with an arg",
-                 "vars": {"foobar": "TESTING: TWO"}}]}
+            "name":
+                "compile", "depends_on": [],
+            "commands": [{"func": "fetch source"}, {"func": "run a task that passes"},
+                         {"func": "run a function with an arg", "vars": {"foobar": "TESTING: ONE"}},
+                         {"func": "run a function with an arg", "vars": {"foobar": "TESTING: TWO"}}]
+        }
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("compile", task.name)
@@ -85,10 +81,12 @@ class TestTask(unittest.TestCase):
 
     def test_resmoke_args(self):
         task_dict = {
-            "name": "jsCore",
-            "commands": [
-                {"func": "run tests",
-                 "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}}]}
+            "name":
+                "jsCore", "commands": [{
+                    "func": "run tests",
+                    "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+                }]
+        }
         task = _evergreen.Task(task_dict)
 
         self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
@@ -172,8 +170,9 @@ class TestVariant(unittest.TestCase):
     def test_variant_tasks(self):
         variant_ubuntu = self.conf.get_variant("ubuntu")
         self.assertEqual(5, len(variant_ubuntu.tasks))
-        for task_name in ["compile", "passing_test", "failing_test",
-                          "timeout_test", "resmoke_task"]:
+        for task_name in [
+                "compile", "passing_test", "failing_test", "timeout_test", "resmoke_task"
+        ]:
             task = variant_ubuntu.get_task(task_name)
             self.assertIsNotNone(task)
             self.assertEqual(variant_ubuntu, task.variant)
@@ -193,6 +192,7 @@ class TestVariant(unittest.TestCase):
         resmoke_task = variant_debian.get_task("resmoke_task")
         self.assertEqual("--suites=somesuite --storageEngine=mmapv1",
                          resmoke_task.combined_resmoke_args)
+
 
 if __name__ == "__main__":
     unittest.main()

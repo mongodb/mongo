@@ -1,4 +1,3 @@
-
 """Unit tests for the buildscripts.ciconfig.tags module."""
 from __future__ import absolute_import
 
@@ -6,7 +5,6 @@ import os
 import unittest
 
 import buildscripts.ciconfig.tags as _tags
-
 
 TEST_FILE_PATH = os.path.join(os.path.dirname(__file__), "tags.yml")
 
@@ -158,6 +156,7 @@ class TestTagsConfig(unittest.TestCase):
 
         def custom_cmp(tag_a, tag_b):
             return cmp(tag_a.split("|"), tag_b.split("|"))
+
         conf = _tags.TagsConfig.from_file(TEST_FILE_PATH, cmp_func=custom_cmp)
         tags = conf.get_tags(test_kind, test_pattern)
 

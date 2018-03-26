@@ -20,18 +20,13 @@ _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 if _IS_WINDOWS:
     import ctypes
 
-UploadArgs = collections.namedtuple(
-    "UploadArgs",
-    ["archival_file",
-     "display_name",
-     "local_file",
-     "content_type",
-     "s3_bucket",
-     "s3_path",
-     "delete_file"])
+UploadArgs = collections.namedtuple("UploadArgs", [
+    "archival_file", "display_name", "local_file", "content_type", "s3_bucket", "s3_path",
+    "delete_file"
+])
 
-ArchiveArgs = collections.namedtuple(
-    "ArchiveArgs", ["archival_file", "display_name", "remote_file"])
+ArchiveArgs = collections.namedtuple("ArchiveArgs",
+                                     ["archival_file", "display_name", "remote_file"])
 
 
 def file_list_size(files):
@@ -97,11 +92,7 @@ def remove_file(file_name):
 class Archival(object):
     """ Class to support file archival to S3."""
 
-    def __init__(self,
-                 logger,
-                 archival_json_file="archive.json",
-                 limit_size_mb=0,
-                 limit_files=0,
+    def __init__(self, logger, archival_json_file="archive.json", limit_size_mb=0, limit_files=0,
                  s3_client=None):
         """ Archival init method. """
 
@@ -118,10 +109,9 @@ class Archival(object):
 
         # Start the worker thread to update the 'archival_json_file'.
         self._archive_file_queue = Queue.Queue()
-        self._archive_file_worker = threading.Thread(
-            target=self._update_archive_file_wkr,
-            args=(self._archive_file_queue, logger),
-            name="archive_file_worker")
+        self._archive_file_worker = threading.Thread(target=self._update_archive_file_wkr,
+                                                     args=(self._archive_file_queue,
+                                                           logger), name="archive_file_worker")
         self._archive_file_worker.setDaemon(True)
         self._archive_file_worker.start()
         if not s3_client:
@@ -131,10 +121,9 @@ class Archival(object):
 
         # Start the worker thread which uploads the archive.
         self._upload_queue = Queue.Queue()
-        self._upload_worker = threading.Thread(
-            target=self._upload_to_s3_wkr,
-            args=(self._upload_queue, self._archive_file_queue, logger, self.s3_client),
-            name="upload_worker")
+        self._upload_worker = threading.Thread(target=self._upload_to_s3_wkr,
+                                               args=(self._upload_queue, self._archive_file_queue,
+                                                     logger, self.s3_client), name="upload_worker")
         self._upload_worker.setDaemon(True)
         self._upload_worker.start()
 
@@ -167,11 +156,8 @@ class Archival(object):
                 status = 1
                 message = "Files not archived, {} file limit reached".format(self.limit_files)
             else:
-                status, message, file_size_mb = self._archive_files(
-                    display_name,
-                    input_files,
-                    s3_bucket,
-                    s3_path)
+                status, message, file_size_mb = self._archive_files(display_name, input_files,
+                                                                    s3_bucket, s3_path)
 
                 if status == 0:
                     self.num_files += 1
@@ -191,12 +177,11 @@ class Archival(object):
                 queue.task_done()
                 break
             archival_record = {
-                "name": archive_args.display_name,
-                "link": archive_args.remote_file,
+                "name": archive_args.display_name, "link": archive_args.remote_file,
                 "visibility": "private"
             }
-            logger.debug(
-                "Updating archive file %s with %s", archive_args.archival_file, archival_record)
+            logger.debug("Updating archive file %s with %s", archive_args.archival_file,
+                         archival_record)
             archival_json.append(archival_record)
             with open(archive_args.archival_file, "w") as archival_fh:
                 json.dump(archival_json, archival_fh)
@@ -213,21 +198,15 @@ class Archival(object):
                 archive_file_queue.put(None)
                 break
             extra_args = {"ContentType": upload_args.content_type, "ACL": "public-read"}
-            logger.debug("Uploading to S3 %s to bucket %s path %s",
-                         upload_args.local_file,
-                         upload_args.s3_bucket,
-                         upload_args.s3_path)
+            logger.debug("Uploading to S3 %s to bucket %s path %s", upload_args.local_file,
+                         upload_args.s3_bucket, upload_args.s3_path)
             upload_completed = False
             try:
-                s3_client.upload_file(upload_args.local_file,
-                                      upload_args.s3_bucket,
-                                      upload_args.s3_path,
-                                      ExtraArgs=extra_args)
+                s3_client.upload_file(upload_args.local_file, upload_args.s3_bucket,
+                                      upload_args.s3_path, ExtraArgs=extra_args)
                 upload_completed = True
                 logger.debug("Upload to S3 completed for %s to bucket %s path %s",
-                             upload_args.local_file,
-                             upload_args.s3_bucket,
-                             upload_args.s3_path)
+                             upload_args.local_file, upload_args.s3_bucket, upload_args.s3_path)
             except Exception as err:
                 logger.exception("Upload to S3 error %s", err)
 
@@ -236,11 +215,11 @@ class Archival(object):
                 if status:
                     logger.error("Upload to S3 delete file error %s", message)
 
-            remote_file = "https://s3.amazonaws.com/{}/{}".format(
-                upload_args.s3_bucket, upload_args.s3_path)
+            remote_file = "https://s3.amazonaws.com/{}/{}".format(upload_args.s3_bucket,
+                                                                  upload_args.s3_path)
             if upload_completed:
-                archive_file_queue.put(ArchiveArgs(
-                    upload_args.archival_file, upload_args.display_name, remote_file))
+                archive_file_queue.put(
+                    ArchiveArgs(upload_args.archival_file, upload_args.display_name, remote_file))
 
             queue.task_done()
 
@@ -288,14 +267,9 @@ class Archival(object):
 
         # Round up the size of the archive.
         size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))
-        self._upload_queue.put(UploadArgs(
-            self.archival_json_file,
-            display_name,
-            temp_file,
-            "application/x-gzip",
-            s3_bucket,
-            s3_path,
-            True))
+        self._upload_queue.put(
+            UploadArgs(self.archival_json_file, display_name, temp_file, "application/x-gzip",
+                       s3_bucket, s3_path, True))
 
         return status, message, size_mb
 

@@ -18,7 +18,6 @@ class TestFixture(unittest.TestCase):
 
 
 class TestFixtureTeardownHandler(unittest.TestCase):
-
     def test_teardown_ok(self):
         handler = interface.FixtureTeardownHandler(logging.getLogger("handler_unittests"))
         # Before any teardown.

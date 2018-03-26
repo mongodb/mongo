@@ -35,8 +35,8 @@ class IDLBoundSpec(object):
     def __init__(self, spec, error_collection):
         # type: (IDLAST, errors.ParserErrorCollection) -> None
         """Must specify either an IDL document or errors, not both."""
-        assert (spec is None and error_collection is not None) or (spec is not None and
-                                                                   error_collection is None)
+        assert (spec is None and error_collection is not None) or (spec is not None
+                                                                   and error_collection is None)
         self.spec = spec
         self.errors = error_collection
 

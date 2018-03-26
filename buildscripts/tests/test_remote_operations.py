@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Unit test for buildscripts/remote_operations.py.
 
    Note - Tests require sshd to be enabled on localhost with paswordless login
@@ -22,8 +21,8 @@ class RemoteOperationsTestCase(unittest.TestCase):
         self.temp_remote_dir = tempfile.mkdtemp()
         self.rop = rop.RemoteOperations(user_host="localhost")
         self.rop_use_shell = rop.RemoteOperations(user_host="localhost", use_shell=True)
-        self.rop_sh_shell_binary = rop.RemoteOperations(
-            user_host="localhost", shell_binary="/bin/sh")
+        self.rop_sh_shell_binary = rop.RemoteOperations(user_host="localhost",
+                                                        shell_binary="/bin/sh")
         self.rop_ssh_opts = rop.RemoteOperations(
             user_host="localhost",
             ssh_connection_options="-v -o ConnectTimeout=10 -o ConnectionAttempts=10")
@@ -63,8 +62,8 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
         # Valid host with invalid ssh options
         ssh_connection_options = "-o invalid"
-        remote_op = rop.RemoteOperations(
-            user_host="localhost", ssh_connection_options=ssh_connection_options)
+        remote_op = rop.RemoteOperations(user_host="localhost",
+                                         ssh_connection_options=ssh_connection_options)
         ret, buff = remote_op.access_info()
         self.assertFalse(remote_op.access_established())
         self.assertNotEqual(0, ret)
@@ -79,8 +78,8 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
         # Valid host with valid ssh options
         ssh_connection_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
-        remote_op = rop.RemoteOperations(
-            user_host="localhost", ssh_connection_options=ssh_connection_options)
+        remote_op = rop.RemoteOperations(user_host="localhost",
+                                         ssh_connection_options=ssh_connection_options)
         ret, buff = remote_op.access_info()
         self.assertTrue(remote_op.access_established())
         self.assertEqual(0, ret)
@@ -95,10 +94,9 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
         ssh_connection_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
         ssh_options = "-t"
-        remote_op = rop.RemoteOperations(
-            user_host="localhost",
-            ssh_connection_options=ssh_connection_options,
-            ssh_options=ssh_options)
+        remote_op = rop.RemoteOperations(user_host="localhost",
+                                         ssh_connection_options=ssh_connection_options,
+                                         ssh_options=ssh_options)
         ret, buff = remote_op.access_info()
         self.assertTrue(remote_op.access_established())
         self.assertEqual(0, ret)
@@ -176,17 +174,13 @@ class RemoteOperationShell(RemoteOperationsTestCase):
         self.assertIsNotNone(buff)
 
         # Command with directory and pipe
-        ret, buff = self.rop.shell(
-            "touch {dir}/{file}; ls {dir} | grep {file}".format(
-                file=time.time(),
-                dir="/tmp"))
+        ret, buff = self.rop.shell("touch {dir}/{file}; ls {dir} | grep {file}".format(
+            file=time.time(), dir="/tmp"))
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
-        ret, buff = self.rop_use_shell.shell(
-            "touch {dir}/{file}; ls {dir} | grep {file}".format(
-                file=time.time(),
-                dir="/tmp"))
+        ret, buff = self.rop_use_shell.shell("touch {dir}/{file}; ls {dir} | grep {file}".format(
+            file=time.time(), dir="/tmp"))
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 

@@ -266,10 +266,8 @@ class _CppTypeView(CppTypeBase):
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
-        return common.template_args(
-            '${member_name} = ${value};',
-            member_name=member_name,
-            value=self.get_transform_to_storage_type("value"))
+        return common.template_args('${member_name} = ${value};', member_name=member_name,
+                                    value=self.get_transform_to_storage_type("value"))
 
     def get_transform_to_getter_type(self, expression):
         # type: (unicode) -> Optional[unicode]
@@ -279,7 +277,8 @@ class _CppTypeView(CppTypeBase):
         # type: (unicode) -> Optional[unicode]
         return common.template_args(
             '${expression}.toString()',
-            expression=expression, )
+            expression=expression,
+        )
 
 
 class _CppTypeVector(CppTypeBase):
@@ -325,10 +324,8 @@ class _CppTypeVector(CppTypeBase):
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
-        return common.template_args(
-            '${member_name} = ${value};',
-            member_name=member_name,
-            value=self.get_transform_to_storage_type("value"))
+        return common.template_args('${member_name} = ${value};', member_name=member_name,
+                                    value=self.get_transform_to_storage_type("value"))
 
     def get_transform_to_getter_type(self, expression):
         # type: (unicode) -> Optional[unicode]
@@ -432,8 +429,8 @@ class _CppTypeArray(_CppTypeDelegating):
         # type: (unicode) -> unicode
         convert = self.get_transform_to_storage_type("value")
         if convert:
-            return common.template_args(
-                '${member_name} = ${convert};', member_name=member_name, convert=convert)
+            return common.template_args('${member_name} = ${convert};', member_name=member_name,
+                                        convert=convert)
         else:
             return self._base.get_setter_body(member_name)
 
@@ -442,7 +439,8 @@ class _CppTypeArray(_CppTypeDelegating):
         if self._base.get_storage_type() != self._base.get_getter_setter_type():
             return common.template_args(
                 'transformVector(${expression})',
-                expression=expression, )
+                expression=expression,
+            )
         else:
             return None
 
@@ -451,7 +449,8 @@ class _CppTypeArray(_CppTypeDelegating):
         if self._base.get_storage_type() != self._base.get_getter_setter_type():
             return common.template_args(
                 'transformVector(${expression})',
-                expression=expression, )
+                expression=expression,
+            )
         else:
             return None
 
@@ -497,15 +496,12 @@ class _CppTypeOptional(_CppTypeDelegating):
                 } else {
                     return boost::none;
                 }
-                """),
-                member_name=member_name,
-                convert=convert)
+                """), member_name=member_name, convert=convert)
         elif self.is_view_type():
             # For optionals around view types, do an explicit construction
-            return common.template_args(
-                'return ${param_type}{${member_name}};',
-                param_type=self.get_getter_setter_type(),
-                member_name=member_name)
+            return common.template_args('return ${param_type}{${member_name}};',
+                                        param_type=self.get_getter_setter_type(),
+                                        member_name=member_name)
         else:
             return common.template_args('return ${member_name};', member_name=member_name)
 
@@ -520,9 +516,7 @@ class _CppTypeOptional(_CppTypeDelegating):
                             } else {
                                 ${member_name} = boost::none;
                             }
-                            """),
-                member_name=member_name,
-                convert=convert)
+                            """), member_name=member_name, convert=convert)
         else:
             return self._base.get_setter_body(member_name)
 
@@ -590,11 +584,11 @@ def _call_method_or_global_function(expression, method_name):
     """
     short_method_name = writer.get_method_name(method_name)
     if writer.is_function(method_name):
-        return common.template_args(
-            '${method_name}(${expression})', expression=expression, method_name=short_method_name)
+        return common.template_args('${method_name}(${expression})', expression=expression,
+                                    method_name=short_method_name)
 
-    return common.template_args(
-        '${expression}.${method_name}()', expression=expression, method_name=short_method_name)
+    return common.template_args('${expression}.${method_name}()', expression=expression,
+                                method_name=short_method_name)
 
 
 class _CommonBsonCppTypeBase(BsonCppTypeBase):
@@ -607,10 +601,9 @@ class _CommonBsonCppTypeBase(BsonCppTypeBase):
 
     def gen_deserializer_expression(self, indented_writer, object_instance):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
-        return common.template_args(
-            '${object_instance}.${method_name}()',
-            object_instance=object_instance,
-            method_name=self._deserialize_method_name)
+        return common.template_args('${object_instance}.${method_name}()',
+                                    object_instance=object_instance,
+                                    method_name=self._deserialize_method_name)
 
     def has_serializer(self):
         # type: () -> bool
@@ -633,9 +626,8 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
         if self._field.deserializer:
             # Call a method like: Class::method(const BSONObj& value)
             indented_writer.write_line(
-                common.template_args(
-                    'const BSONObj localObject = ${object_instance}.Obj();',
-                    object_instance=object_instance))
+                common.template_args('const BSONObj localObject = ${object_instance}.Obj();',
+                                     object_instance=object_instance))
             return "localObject"
 
         else:
@@ -650,10 +642,8 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
         method_name = writer.get_method_name(self._field.serializer)
         indented_writer.write_line(
-            common.template_args(
-                'const BSONObj localObject = ${expression}.${method_name}();',
-                expression=expression,
-                method_name=method_name))
+            common.template_args('const BSONObj localObject = ${expression}.${method_name}();',
+                                 expression=expression, method_name=method_name))
         return "localObject"
 
 
@@ -667,11 +657,11 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
     def gen_deserializer_expression(self, indented_writer, object_instance):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
         if self._field.bindata_subtype == 'uuid':
-            return common.template_args(
-                '${object_instance}.uuid()', object_instance=object_instance)
+            return common.template_args('${object_instance}.uuid()',
+                                        object_instance=object_instance)
         else:
-            return common.template_args(
-                '${object_instance}._binDataVector()', object_instance=object_instance)
+            return common.template_args('${object_instance}._binDataVector()',
+                                        object_instance=object_instance)
 
     def has_serializer(self):
         # type: () -> bool
@@ -682,14 +672,12 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
         if self._field.serializer:
             method_name = writer.get_method_name(self._field.serializer)
             indented_writer.write_line(
-                common.template_args(
-                    'ConstDataRange tempCDR = ${expression}.${method_name}();',
-                    expression=expression,
-                    method_name=method_name))
+                common.template_args('ConstDataRange tempCDR = ${expression}.${method_name}();',
+                                     expression=expression, method_name=method_name))
         else:
             indented_writer.write_line(
-                common.template_args(
-                    'ConstDataRange tempCDR = makeCDR(${expression});', expression=expression))
+                common.template_args('ConstDataRange tempCDR = makeCDR(${expression});',
+                                     expression=expression))
 
         return common.template_args(
             'BSONBinData(tempCDR.data(), tempCDR.length(), ${bindata_subtype})',

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Script to retrieve the etc/test_lifecycle.yml tag file from the metadata repository that
 corresponds to the current repository.
 
@@ -25,7 +24,6 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from buildscripts import git
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,8 +75,8 @@ class MetadataRepository(object):
 
     def get_lifecycle_file_content(self, metadata_revision):
         """Return the content of the test lifecycle file as it was at the given revision."""
-        return self._repository.git_cat_file(["blob", "%s:%s" % (metadata_revision,
-                                                                 self._lifecycle_file)])
+        return self._repository.git_cat_file(
+            ["blob", "%s:%s" % (metadata_revision, self._lifecycle_file)])
 
 
 def _clone_repository(url, branch):
@@ -116,8 +114,8 @@ def fetch_test_lifecycle(metadata_repo_url, references_file, lifecycle_file, pro
         project: the Evergreen project name.
         revision: the current repository revision.
     """
-    metadata_repo = MetadataRepository(_clone_repository(metadata_repo_url, project),
-                                       references_file, lifecycle_file)
+    metadata_repo = MetadataRepository(
+        _clone_repository(metadata_repo_url, project), references_file, lifecycle_file)
     mongo_repo = git.Repository(os.getcwd())
     metadata_revision = _get_metadata_revision(metadata_repo, mongo_repo, project, revision)
     if metadata_revision:
@@ -133,49 +131,39 @@ def main():
     Utility to fetch the etc/test_lifecycle.yml file corresponding to a given revision from
     the mongo-test-metadata repository.
     """
-    parser = optparse.OptionParser(description=textwrap.dedent(main.__doc__),
-                                   usage="Usage: %prog [options] evergreen-project")
+    parser = optparse.OptionParser(
+        description=textwrap.dedent(main.__doc__), usage="Usage: %prog [options] evergreen-project")
 
-    parser.add_option("--revision", dest="revision",
-                      metavar="<revision>",
-                      default="HEAD",
+    parser.add_option("--revision", dest="revision", metavar="<revision>", default="HEAD",
                       help=("The project revision for which to retrieve the test lifecycle tags"
                             " file."))
 
-    parser.add_option("--metadataRepo", dest="metadata_repo_url",
-                      metavar="<metadata-repo-url>",
+    parser.add_option("--metadataRepo", dest="metadata_repo_url", metavar="<metadata-repo-url>",
                       default="git@github.com:mongodb/mongo-test-metadata.git",
                       help=("The URL to the metadata repository that contains the test lifecycle"
                             " tags file."))
 
-    parser.add_option("--lifecycleFile", dest="lifecycle_file",
-                      metavar="<lifecycle-file>",
+    parser.add_option("--lifecycleFile", dest="lifecycle_file", metavar="<lifecycle-file>",
                       default="etc/test_lifecycle.yml",
                       help=("The path to the test lifecycle tags file, relative to the root of the"
                             " metadata repository. Defaults to '%default'."))
 
-    parser.add_option("--referencesFile", dest="references_file",
-                      metavar="<references-file>",
+    parser.add_option("--referencesFile", dest="references_file", metavar="<references-file>",
                       default="references.yml",
                       help=("The path to the metadata references file, relative to the root of the"
                             " metadata repository. Defaults to '%default'."))
 
-    parser.add_option("--destinationFile", dest="destination_file",
-                      metavar="<destination-file>",
+    parser.add_option("--destinationFile", dest="destination_file", metavar="<destination-file>",
                       default="etc/test_lifecycle.yml",
                       help=("The path where the lifecycle file should be available when this script"
                             " completes successfully. This path is absolute or relative to the"
                             " current working directory. Defaults to '%default'."))
 
-    parser.add_option("--logLevel", dest="log_level",
-                      metavar="<log-level>",
-                      choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-                      default="INFO",
+    parser.add_option("--logLevel", dest="log_level", metavar="<log-level>",
+                      choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO",
                       help="The log level: DEBUG, INFO, WARNING or ERROR. Defaults to '%default'.")
 
-    parser.add_option("--logFile", dest="log_file",
-                      metavar="<log-file>",
-                      default=None,
+    parser.add_option("--logFile", dest="log_file", metavar="<log-file>", default=None,
                       help=("The destination file for the logs. If not set the script will log to"
                             " the standard output"))
 
@@ -187,14 +175,12 @@ def main():
         parser.error("Must specify an Evergreen project")
     evergreen_project = args[0]
 
-    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s",
-                        level=options.log_level, filename=options.log_file)
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=options.log_level,
+                        filename=options.log_file)
 
     lifecycle_file_content = fetch_test_lifecycle(options.metadata_repo_url,
-                                                  options.references_file,
-                                                  options.lifecycle_file,
-                                                  evergreen_project,
-                                                  options.revision)
+                                                  options.references_file, options.lifecycle_file,
+                                                  evergreen_project, options.revision)
     if not lifecycle_file_content:
         LOGGER.error("Failed to fetch the test lifecycle tag file.")
         sys.exit(1)

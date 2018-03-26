@@ -113,8 +113,8 @@ class TestReport(unittest.TestResult):
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        test_logger = self.job_logger.new_test_logger(test.short_name(), test.basename(),
-                                                      command, test.logger)
+        test_logger = self.job_logger.new_test_logger(test.short_name(), test.basename(), command,
+                                                      test.logger)
         test_info.url_endpoint = test_logger.url_endpoint
 
         test.override_logger(test_logger)

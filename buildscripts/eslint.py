@@ -52,10 +52,12 @@ ESLINT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/eslin
 # Path in the tarball to the ESLint binary.
 ESLINT_SOURCE_TAR_BASE = string.Template(ESLINT_PROGNAME + "-$platform-$arch")
 
+
 def callo(args):
     """Call a program, and capture its output
     """
     return subprocess.check_output(args)
+
 
 def extract_eslint(tar_path, target_file):
     tarfp = tarfile.open(tar_path)
@@ -63,6 +65,7 @@ def extract_eslint(tar_path, target_file):
         if name == target_file:
             tarfp.extract(name)
     tarfp.close()
+
 
 def get_eslint_from_cache(dest_file, platform, arch):
     """Get ESLint binary from mongodb's cache
@@ -79,8 +82,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
     temp_tar_file = os.path.join(dest_dir, "temp.tar.gz")
 
     # Download the file
-    print("Downloading ESLint %s from %s, saving to %s" % (ESLINT_VERSION,
-                                                           url, temp_tar_file))
+    print("Downloading ESLint %s from %s, saving to %s" % (ESLINT_VERSION, url, temp_tar_file))
     urllib.urlretrieve(url, temp_tar_file)
 
     eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
@@ -91,6 +93,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
 class ESLint(object):
     """Class encapsulates finding a suitable copy of ESLint, and linting an individual file
     """
+
     def __init__(self, path, cache_dir):
         eslint_progname = ESLINT_PROGNAME
 
@@ -155,8 +158,8 @@ class ESLint(object):
             return True
 
         if warn:
-            print("WARNING: eslint found in path, but incorrect version found at " +
-                  self.path + " with version: " + esl_version)
+            print("WARNING: eslint found in path, but incorrect version found at " + self.path +
+                  " with version: " + esl_version)
         return False
 
     def _lint(self, file_name, print_diff):
@@ -189,16 +192,19 @@ class ESLint(object):
         """
         return not subprocess.call([self.path, "--fix", file_name])
 
+
 def is_interesting_file(file_name):
     """"Return true if this file should be checked
     """
     return ((file_name.startswith("src/mongo") or file_name.startswith("jstests"))
             and file_name.endswith(".js"))
 
+
 def _get_build_dir():
     """Get the location of the scons build directory in case we need to download ESLint
     """
     return os.path.join(git.get_base_dir(), "build")
+
 
 def _lint_files(eslint, files):
     """Lint a list of files with ESLint
@@ -214,6 +220,7 @@ def _lint_files(eslint, files):
 
     return True
 
+
 def lint_patch(eslint, infile):
     """Lint patch command entry point
     """
@@ -223,6 +230,7 @@ def lint_patch(eslint, infile):
     if files:
         return _lint_files(eslint, files)
     return True
+
 
 def lint(eslint, dirmode, glob):
     """Lint files command entry point
@@ -236,6 +244,7 @@ def lint(eslint, dirmode, glob):
 
     return True
 
+
 def _autofix_files(eslint, files):
     """Auto-fix the specified files with ESLint.
     """
@@ -246,6 +255,7 @@ def _autofix_files(eslint, files):
     if not autofix_clean:
         print("ERROR: failed to auto-fix files")
         return False
+
 
 def autofix_func(eslint, dirmode, glob):
     """Auto-fix files command entry point
@@ -268,11 +278,16 @@ def main():
                   "provided patch file (for upload.py). "\
                   "fix runs ESLint with --fix on provided patterns "\
                   "or files under jstests/ and src/mongo."
-    epilog ="*Unless you specify -d a separate ESLint process will be launched for every file"
+    epilog = "*Unless you specify -d a separate ESLint process will be launched for every file"
     parser = OptionParser()
     parser = OptionParser(usage=usage, description=description, epilog=epilog)
-    parser.add_option("-e", "--eslint", type="string", dest="eslint",
-                      help="Fully qualified path to eslint executable",)
+    parser.add_option(
+        "-e",
+        "--eslint",
+        type="string",
+        dest="eslint",
+        help="Fully qualified path to eslint executable",
+    )
     parser.add_option("-d", "--dirmode", action="store_true", default=True, dest="dirmode",
                       help="Considers the glob patterns as directories and runs ESLint process " \
                            "against each pattern",)
@@ -301,5 +316,7 @@ def main():
         parser.print_help()
 
     sys.exit(0 if success else 1)
+
+
 if __name__ == "__main__":
     main()

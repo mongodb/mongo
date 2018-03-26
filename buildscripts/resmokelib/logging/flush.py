@@ -11,7 +11,6 @@ import time
 
 from ..utils import scheduler
 
-
 _FLUSH_THREAD_LOCK = threading.Lock()
 _FLUSH_THREAD = None
 

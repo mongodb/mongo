@@ -2848,6 +2848,8 @@ tasks:
           set -o verbose
 
           ${activate_virtualenv}
+          # TODO: Remove once the linters have been updated on the variants.
+          pip install -r buildscripts/requirements.txt
           ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template

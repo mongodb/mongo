@@ -12,7 +12,6 @@ from __future__ import absolute_import
 import Queue
 import time
 
-
 # Exception that is raised when get_nowait() is called on an empty Queue.
 Empty = Queue.Empty
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 '''Helper script for constructing an archive (zip or tar) from a list of files.
 
 The output format (tar, tgz, zip) is determined from the file name, unless the user specifies
@@ -35,6 +34,7 @@ import zipfile
 import tempfile
 from subprocess import (Popen, PIPE, STDOUT)
 
+
 def main(argv):
     args = []
     for arg in argv[1:]:
@@ -54,6 +54,7 @@ def main(argv):
     else:
         raise ValueError('Unsupported archive format "%s"' % opts.archive_format)
 
+
 def delete_directory(dir):
     '''Recursively deletes a directory and its contents.
     '''
@@ -61,6 +62,7 @@ def delete_directory(dir):
         shutil.rmtree(dir)
     except Exception:
         pass
+
 
 def make_tar_archive(opts):
     '''Given the parsed options, generates the 'opt.output_filename'
@@ -81,10 +83,7 @@ def make_tar_archive(opts):
         tar_options += "z"
 
     # clean and create a temp directory to copy files to
-    enclosing_archive_directory = tempfile.mkdtemp(
-        prefix='archive_',
-        dir=os.path.abspath('build')
-    )
+    enclosing_archive_directory = tempfile.mkdtemp(prefix='archive_', dir=os.path.abspath('build'))
     output_tarfile = os.path.join(os.getcwd(), opts.output_filename)
 
     tar_command = ["tar", tar_options, output_tarfile]
@@ -111,6 +110,7 @@ def make_tar_archive(opts):
     # delete temp directory
     delete_directory(enclosing_archive_directory)
 
+
 def make_zip_archive(opts):
     '''Given the parsed options, generates the 'opt.output_filename'
     zipfile containing all the files in 'opt.input_filename' renamed
@@ -122,8 +122,8 @@ def make_zip_archive(opts):
     archive = open_zip_archive_for_write(opts.output_filename)
     try:
         for input_filename in opts.input_filenames:
-            archive.add(input_filename, arcname=get_preferred_filename(input_filename,
-            opts.transformations))
+            archive.add(input_filename, arcname=get_preferred_filename(
+                input_filename, opts.transformations))
     finally:
         archive.close()
 
@@ -132,10 +132,10 @@ def parse_options(args):
     parser = optparse.OptionParser()
     parser.add_option('-o', dest='output_filename', default=None,
                       help='Name of the archive to output.', metavar='FILE')
-    parser.add_option('--format', dest='archive_format', default=None,
-                      choices=('zip', 'tar', 'tgz'),
-                      help='Format of archive to create.  '
-                      'If omitted, use the suffix of the output filename to decide.')
+    parser.add_option('--format', dest='archive_format', default=None, choices=('zip', 'tar',
+                                                                                'tgz'),
+                      help=('Format of archive to create.  '
+                            'If omitted, use the suffix of the output filename to decide.'))
     parser.add_option('--transform', action='append', dest='transformations', default=[])
 
     (opts, input_filenames) = parser.parse_args(args)
@@ -158,27 +158,32 @@ def parse_options(args):
         elif opts.output_filename.endswith('.tar'):
             opts.archive_format = 'tar'
         else:
-            parser.error('Could not deduce archive format from output filename "%s"' %
-                         opts.output_filename)
+            parser.error(
+                'Could not deduce archive format from output filename "%s"' % opts.output_filename)
 
     try:
         opts.transformations = [
             xform.replace(os.path.altsep or os.path.sep, os.path.sep).split('=', 1)
-            for xform in opts.transformations]
+            for xform in opts.transformations
+        ]
     except Exception, e:
         parser.error(e)
 
     return opts
 
+
 def open_zip_archive_for_write(filename):
     '''Open a zip archive for writing and return it.
     '''
+
     # Infuriatingly, Zipfile calls the "add" method "write", but they're otherwise identical,
     # for our purposes.  WrappedZipFile is a minimal adapter class.
     class WrappedZipFile(zipfile.ZipFile):
         def add(self, filename, arcname):
             return self.write(filename, arcname)
+
     return WrappedZipFile(filename, 'w', zipfile.ZIP_DEFLATED)
+
 
 def get_preferred_filename(input_filename, transformations):
     '''Does a prefix subsitution on 'input_filename' for the
@@ -191,6 +196,7 @@ def get_preferred_filename(input_filename, transformations):
         if input_filename_lower.startswith(match_lower):
             return replace + input_filename[len(match):]
     return input_filename
+
 
 if __name__ == '__main__':
     main(sys.argv)

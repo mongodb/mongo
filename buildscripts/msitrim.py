@@ -1,14 +1,15 @@
 """Script to fix up our MSI files """
 
-import argparse;
+import argparse
 import msilib
-import shutil;
+import shutil
 
 parser = argparse.ArgumentParser(description='Trim MSI.')
 parser.add_argument('file', type=argparse.FileType('r'), help='file to trim')
 parser.add_argument('out', type=argparse.FileType('w'), help='file to output to')
 
 args = parser.parse_args()
+
 
 def exec_delete(query):
     view = db.OpenView(query)
@@ -33,11 +34,19 @@ print "Trimming MSI"
 
 db = msilib.OpenDatabase(args.file.name, msilib.MSIDBOPEN_DIRECT)
 
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'")
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'")
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'")
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'")
+exec_delete(
+    "select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'"
+)
+exec_delete(
+    "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'"
+)
+exec_delete(
+    "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'"
+)
+exec_delete(
+    "select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'"
+)
 
 db.Commit()
 
-shutil.copyfile(args.file.name, args.out.name);
+shutil.copyfile(args.file.name, args.out.name)

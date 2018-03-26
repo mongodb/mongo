@@ -8,53 +8,42 @@ import buildscripts.fetch_test_lifecycle as fetch
 
 class TestFetchTestLifecycle(unittest.TestCase):
     def test_get_metadata_revision(self):
-        metadata_repo = MockMetadataRepository([("metadata_revision_05", "mongo_revision_06"),
-                                                ("metadata_revision_04", "mongo_revision_06"),
-                                                ("metadata_revision_03", "mongo_revision_02"),
-                                                ("metadata_revision_02", "mongo_revision_02"),
-                                                ("metadata_revision_01", None)])
+        metadata_repo = MockMetadataRepository(
+            [("metadata_revision_05", "mongo_revision_06"),
+             ("metadata_revision_04", "mongo_revision_06"), ("metadata_revision_03",
+                                                             "mongo_revision_02"),
+             ("metadata_revision_02", "mongo_revision_02"), ("metadata_revision_01", None)])
 
-        mongo_repo = MockMongoRepository(["mongo_revision_07",
-                                          "mongo_revision_06",
-                                          "mongo_revision_05",
-                                          "mongo_revision_04",
-                                          "mongo_revision_03",
-                                          "mongo_revision_02",
-                                          "mongo_revision_01"])
+        mongo_repo = MockMongoRepository([
+            "mongo_revision_07", "mongo_revision_06", "mongo_revision_05", "mongo_revision_04",
+            "mongo_revision_03", "mongo_revision_02", "mongo_revision_01"
+        ])
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_07",
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_07",
                                       "metadata_revision_05")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_06",
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_06",
                                       "metadata_revision_05")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_05",
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_05",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_04",
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_04",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_03",
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_03",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_02",
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_02",
                                       "metadata_revision_03")
 
-        self._check_metadata_revision(metadata_repo, mongo_repo,
-                                      "mongo_revision_01",
-                                      None)
+        self._check_metadata_revision(metadata_repo, mongo_repo, "mongo_revision_01", None)
 
     def _check_metadata_revision(self, metadata_repo, mongo_repo, mongo_revision,
                                  expected_metadata_revision):
-            metadata_revision = fetch._get_metadata_revision(metadata_repo, mongo_repo, "project",
-                                                             mongo_revision)
-            self.assertEqual(expected_metadata_revision, metadata_revision)
+        metadata_revision = fetch._get_metadata_revision(metadata_repo, mongo_repo, "project",
+                                                         mongo_revision)
+        self.assertEqual(expected_metadata_revision, metadata_revision)
 
 
 class MockMongoRepository(object):
@@ -62,8 +51,8 @@ class MockMongoRepository(object):
         self.revisions = revisions
 
     def is_ancestor(self, parent, child):
-        return (parent in self.revisions and child in self.revisions and
-                self.revisions.index(parent) >= self.revisions.index(child))
+        return (parent in self.revisions and child in self.revisions
+                and self.revisions.index(parent) >= self.revisions.index(child))
 
 
 class MockMetadataRepository(object):

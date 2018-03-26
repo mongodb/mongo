@@ -23,6 +23,7 @@ import os
 import subprocess
 import sys
 
+
 def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hint=None):
     """Given a trace_doc in MongoDB stack dump format, returns a list of symbolized stack frames.
     """
@@ -36,7 +37,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
         """Makes a map from binary load address to description of library from the somap, which is
         a list of dictionaries describing individual loaded libraries.
         """
-        return { so_entry["b"] : so_entry for so_entry in somap_list if so_entry.has_key("b") }
+        return {so_entry["b"]: so_entry for so_entry in somap_list if so_entry.has_key("b")}
 
     base_addr_map = make_base_addr_map(trace_doc["processInfo"]["somap"])
 
@@ -57,21 +58,17 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
         # address of instructions that cause signals (such as segfaults and divide-by-zero) which
         # are already correct, but there doesn't seem to be a reliable way to detect that case.
         addr -= 1
-        frames.append(dict(path=dbg_path_resolver.get_dbg_file(soinfo),
-                           buildId=soinfo.get("buildId", None),
-                           offset=frame["o"],
-                           addr=addr,
-                           symbol=frame.get("s", None)))
+        frames.append(
+            dict(
+                path=dbg_path_resolver.get_dbg_file(soinfo), buildId=soinfo.get("buildId", None),
+                offset=frame["o"], addr=addr, symbol=frame.get("s", None)))
 
     symbolizer_args = [symbolizer_path]
     for dh in dsym_hint:
-        symbolizer_args.append("-dsym-hint=%s" %dh)
-    symbolizer_process = subprocess.Popen(
-        args=symbolizer_args,
-        close_fds=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=open("/dev/null"))
+        symbolizer_args.append("-dsym-hint=%s" % dh)
+    symbolizer_process = subprocess.Popen(args=symbolizer_args, close_fds=True,
+                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                          stderr=open("/dev/null"))
 
     def extract_symbols(stdin):
         """Extracts symbol information from the output of llvm-symbolizer.
@@ -93,7 +90,7 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
             if line == "\n":
                 break
             if step == 0:
-                result.append({"fn" : line.strip()})
+                result.append({"fn": line.strip()})
                 step = 1
             else:
                 file_name, line, column = line.strip().rsplit(':', 3)
@@ -111,12 +108,14 @@ def symbolize_frames(trace_doc, dbg_path_resolver, symbolizer_path=None, dsym_hi
     symbolizer_process.wait()
     return frames
 
+
 class path_dbg_file_resolver(object):
     def __init__(self, bin_path_guess):
         self._bin_path_guess = bin_path_guess
 
     def get_dbg_file(self, soinfo):
         return soinfo.get("path", self._bin_path_guess)
+
 
 class s3_buildid_dbg_file_resolver(object):
     def __init__(self, cache_dir, s3_bucket):
@@ -134,7 +133,7 @@ class s3_buildid_dbg_file_resolver(object):
                 self._get_from_s3(buildId)
             except:
                 ex = sys.exc_info()[0]
-                sys.stderr.write("Failed to find debug symbols for %s in s3: %s\n" %(buildId, ex))
+                sys.stderr.write("Failed to find debug symbols for %s in s3: %s\n" % (buildId, ex))
                 return None
         if not os.path.exists(buildIdPath):
             return None
@@ -142,9 +141,10 @@ class s3_buildid_dbg_file_resolver(object):
 
     def _get_from_s3(self, buildId):
         subprocess.check_call(
-            ['wget', 'https://s3.amazonaws.com/%s/%s.debug.gz' % (self._s3_bucket, buildId)],
-            cwd=self._cache_dir)
+            ['wget', 'https://s3.amazonaws.com/%s/%s.debug.gz' %
+             (self._s3_bucket, buildId)], cwd=self._cache_dir)
         subprocess.check_call(['gunzip', buildId + ".debug.gz"], cwd=self._cache_dir)
+
 
 def classic_output(frames, outfile, **kwargs):
     for frame in frames:
@@ -154,6 +154,7 @@ def classic_output(frames, outfile, **kwargs):
                 outfile.write(" %(file)s:%(line)s:%(column)s: %(fn)s\n" % sframe)
         else:
             outfile.write(" %(path)s!!!\n" % symbinfo)
+
 
 def main(argv):
     parser = optparse.OptionParser()
@@ -173,7 +174,6 @@ def main(argv):
         sys.stderr.write("Invalid output-format argument: %s\n" % options.output_format)
         sys.exit(1)
 
-
     # Skip over everything before the first '{' since it is likely to be log line prefixes.
     # Additionally, using raw_decode() to ignore extra data after the closing '}' to allow maximal
     # sloppiness in copy-pasting input.
@@ -182,11 +182,10 @@ def main(argv):
     trace_doc = json.JSONDecoder().raw_decode(trace_doc)[0]
 
     resolver = resolver_constructor(*args[1:])
-    frames = symbolize_frames(trace_doc,
-                              resolver,
-                              symbolizer_path=options.symbolizer_path,
+    frames = symbolize_frames(trace_doc, resolver, symbolizer_path=options.symbolizer_path,
                               dsym_hint=options.dsym_hint)
     output_fn(frames, sys.stdout, indent=2)
+
 
 if __name__ == '__main__':
     main(sys.argv)

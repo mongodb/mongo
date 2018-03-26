@@ -24,11 +24,8 @@ class ContinuousStepdown(interface.Hook):
     DESCRIPTION = ("Continuous stepdown (steps down the primary of replica sets at regular"
                    " intervals)")
 
-    def __init__(self, hook_logger, fixture,
-                 config_stepdown=True,
-                 shard_stepdown=True,
-                 stepdown_duration_secs=10,
-                 stepdown_interval_ms=8000):
+    def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
+                 stepdown_duration_secs=10, stepdown_interval_ms=8000):
         """Initializes the ContinuousStepdown.
 
         Args:
@@ -39,8 +36,7 @@ class ContinuousStepdown(interface.Hook):
             stepdown_duration_secs: the number of seconds to step down the primary.
             stepdown_interval_ms: the number of milliseconds between stepdowns.
         """
-        interface.Hook.__init__(self, hook_logger, fixture,
-                                ContinuousStepdown.DESCRIPTION)
+        interface.Hook.__init__(self, hook_logger, fixture, ContinuousStepdown.DESCRIPTION)
 
         self._fixture = fixture
         self._config_stepdown = config_stepdown
@@ -190,17 +186,18 @@ class _StepdownThread(threading.Thread):
             # We'll try again after self._stepdown_interval_secs seconds.
             return
 
-        self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
-                         primary.port, rs_fixture.replset_name)
+        self.logger.info("Stepping down the primary on port %d of replica set '%s'.", primary.port,
+                         rs_fixture.replset_name)
 
         secondaries = rs_fixture.get_secondaries()
 
         try:
             client = primary.mongo_client()
-            client.admin.command(bson.SON([
-                ("replSetStepDown", self._stepdown_duration_secs),
-                ("force", True),
-            ]))
+            client.admin.command(
+                bson.SON([
+                    ("replSetStepDown", self._stepdown_duration_secs),
+                    ("force", True),
+                ]))
         except pymongo.errors.AutoReconnect:
             # AutoReconnect exceptions are expected as connections are closed during stepdown.
             pass

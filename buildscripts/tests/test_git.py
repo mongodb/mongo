@@ -9,7 +9,6 @@ import buildscripts.git as _git
 
 
 class TestRepository(unittest.TestCase):
-
     def setUp(self):
         self.subprocess = MockSubprocess()
         _git.subprocess = self.subprocess

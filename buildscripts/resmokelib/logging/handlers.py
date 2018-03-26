@@ -225,12 +225,8 @@ class HTTPHandler(object):
                     # that defined InsecureRequestWarning.
                     pass
 
-            response = requests.post(url,
-                                     data=data,
-                                     headers=headers,
-                                     timeout=timeout_secs,
-                                     auth=self.auth_handler,
-                                     verify=should_validate_certificates)
+            response = requests.post(url, data=data, headers=headers, timeout=timeout_secs,
+                                     auth=self.auth_handler, verify=should_validate_certificates)
 
         response.raise_for_status()
 

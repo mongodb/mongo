@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 Command line utility for executing MongoDB tests of all kinds.
 """
@@ -70,8 +69,7 @@ def _execute_suite(suite):
         archive = resmokelib.utils.archival.Archival(
             archival_json_file=resmokelib.config.ARCHIVE_FILE,
             limit_size_mb=resmokelib.config.ARCHIVE_LIMIT_MB,
-            limit_files=resmokelib.config.ARCHIVE_LIMIT_TESTS,
-            logger=logger)
+            limit_files=resmokelib.config.ARCHIVE_LIMIT_TESTS, logger=logger)
 
     executor_config = suite.get_executor_config()
     executor = resmokelib.testing.executor.TestSuiteExecutor(
@@ -88,8 +86,8 @@ def _execute_suite(suite):
         suite.return_code = 74  # Exit code for IOError on POSIX systems.
         return True
     except:
-        logger.exception("Encountered an error when running %ss of suite %s.",
-                         suite.test_kind, suite.get_display_name())
+        logger.exception("Encountered an error when running %ss of suite %s.", suite.test_kind,
+                         suite.get_display_name())
         suite.return_code = 2
         return False
     finally:
@@ -169,8 +167,7 @@ class Main(object):
         """
 
         return resmokelib.suitesconfig.get_suites(
-            suite_files=self.__values.suite_files.split(","),
-            test_files=self.__args)
+            suite_files=self.__values.suite_files.split(","), test_files=self.__args)
 
     def run(self):
         """
@@ -209,8 +206,8 @@ class Main(object):
             suites_by_test = find_suites_by_test(suites)
             for test in sorted(suites_by_test):
                 suite_names = suites_by_test[test]
-                resmoke_logger.info("%s will be run by the following suite(s): %s",
-                                    test, suite_names)
+                resmoke_logger.info("%s will be run by the following suite(s): %s", test,
+                                    suite_names)
             sys.exit(0)
 
         try:
@@ -222,8 +219,8 @@ class Main(object):
                 suite.record_suite_end()
 
                 resmoke_logger.info("=" * 80)
-                resmoke_logger.info("Summary of %s suite: %s",
-                                    suite.get_display_name(), _summarize_suite(suite))
+                resmoke_logger.info("Summary of %s suite: %s", suite.get_display_name(),
+                                    _summarize_suite(suite))
 
                 if interrupted or (suite.options.fail_fast and suite.return_code != 0):
                     time_taken = time.time() - self.__start_time

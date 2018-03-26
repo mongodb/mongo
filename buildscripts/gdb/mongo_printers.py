@@ -51,6 +51,7 @@ class StatusPrinter(object):
 
 class StatusWithPrinter:
     """Pretty-printer for mongo::StatusWith<>"""
+
     def __init__(self, val):
         self.val = val
 
@@ -190,8 +191,7 @@ class DecorablePrinter:
         return 'map'
 
     def to_string(self):
-        return "Decorable<%s> with %s elems " % (self.val.type.template_argument(0),
-                                                 self.count)
+        return "Decorable<%s> with %s elems " % (self.val.type.template_argument(0), self.count)
 
     def children(self):
         decorationData = get_unique_ptr(self.val["_decorations"]["_decorationData"])
@@ -205,7 +205,7 @@ class DecorablePrinter:
             # TODO: abstract out navigating a std::function
             type_name = str(descriptor["constructor"]["_M_functor"]["_M_unused"]["_M_object"])
             type_name = type_name[0:len(type_name) - 1]
-            type_name = type_name[0: type_name.rindex(">")]
+            type_name = type_name[0:type_name.rindex(">")]
             type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
 
             # If the type is a pointer type, strip the * at the end.
@@ -287,8 +287,8 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
         if index == -1 or index + 1 == len(lookup_tag):
             for printer in self.subprinters:
                 if printer.enabled and (
-                   (printer.is_template and lookup_tag.find(printer.prefix) == 0) or
-                   (not printer.is_template and lookup_tag == printer.prefix)):
+                    (printer.is_template and lookup_tag.find(printer.prefix) == 0) or
+                    (not printer.is_template and lookup_tag == printer.prefix)):
                     return printer.printer(val)
 
         return None
@@ -301,8 +301,10 @@ def build_pretty_printer():
     pp.add('Status', 'mongo::Status', False, StatusPrinter)
     pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)
     pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
-    pp.add('UnorderedFastKeyTable', 'mongo::UnorderedFastKeyTable', True, UnorderedFastKeyTablePrinter)
+    pp.add('UnorderedFastKeyTable', 'mongo::UnorderedFastKeyTable', True,
+           UnorderedFastKeyTablePrinter)
     return pp
+
 
 ###################################################################################################
 #
@@ -311,9 +313,6 @@ def build_pretty_printer():
 ###################################################################################################
 
 # Register pretty-printers, replace existing mongo printers
-gdb.printing.register_pretty_printer(
-    gdb.current_objfile(),
-    build_pretty_printer(),
-    True)
+gdb.printing.register_pretty_printer(gdb.current_objfile(), build_pretty_printer(), True)
 
 print("MongoDB GDB pretty-printers loaded")

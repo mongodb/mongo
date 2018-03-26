@@ -66,7 +66,6 @@ def register(logger, suites, start_time):
 
         testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
-
     # On Windows spawn a thread to wait on an event object for signal to dump stacks. For Cygwin
     # platforms, we use a signal handler since it supports POSIX signals.
     if _is_windows:
@@ -77,10 +76,8 @@ def register(logger, suites, start_time):
             security_attributes = None
             manual_reset = False
             initial_state = False
-            task_timeout_handle = win32event.CreateEvent(security_attributes,
-                                                         manual_reset,
-                                                         initial_state,
-                                                         event_name)
+            task_timeout_handle = win32event.CreateEvent(security_attributes, manual_reset,
+                                                         initial_state, event_name)
         except win32event.error as err:
             logger.error("Exception from win32event.CreateEvent with error: %s" % err)
             return

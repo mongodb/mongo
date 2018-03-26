@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 Command line utility for determining what jstests have been added or modified
 """
@@ -19,13 +18,11 @@ import sys
 import urlparse
 import yaml
 
-
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from buildscripts import resmokelib
 from buildscripts.ciconfig import evergreen
-
 
 API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
 
@@ -43,12 +40,12 @@ def parse_command_line():
                       help="The base commit to compare to for determining changes.")
 
     parser.add_option("--buildVariant", dest="buildvariant",
-                      help="The buildvariant the tasks will execute on. \
-                            Required when generating the JSON file with test executor information")
+                      help=("The buildvariant the tasks will execute on. Required when"
+                            " generating the JSON file with test executor information"))
 
     parser.add_option("--checkEvergreen", dest="check_evergreen", action="store_true",
-                      help="Checks Evergreen for the last commit that was scheduled. \
-                            This way all the tests that haven't been burned in will be run.")
+                      help=("Checks Evergreen for the last commit that was scheduled."
+                            " This way all the tests that haven't been burned in will be run."))
 
     parser.add_option("--noExec", dest="no_exec", action="store_true",
                       help="Do not run resmoke loop on new tests.")
@@ -64,18 +61,10 @@ def parse_command_line():
 
     # The executor_file and suite_files defaults are required to make the
     # suite resolver work correctly.
-    parser.set_defaults(base_commit=None,
-                        branch="master",
-                        buildvariant=None,
-                        check_evergreen=False,
-                        evergreen_file="etc/evergreen.yml",
-                        selector_file="etc/burn_in_tests.yml",
-                        max_revisions=25,
-                        no_exec=False,
-                        executor_file=None,
-                        report_file="report.json",
-                        suite_files="with_server",
-                        test_list_file=None,
+    parser.set_defaults(base_commit=None, branch="master", buildvariant=None, check_evergreen=False,
+                        evergreen_file="etc/evergreen.yml", selector_file="etc/burn_in_tests.yml",
+                        max_revisions=25, no_exec=False, executor_file=None,
+                        report_file="report.json", suite_files="with_server", test_list_file=None,
                         test_list_outfile=None)
 
     # This disables argument parsing on the first unrecognized parameter. This allows us to pass
@@ -96,7 +85,8 @@ def read_evg_config():
     file_list = [
         "./.evergreen.yml",
         os.path.expanduser("~/.evergreen.yml"),
-        os.path.expanduser("~/cli_bin/.evergreen.yml")]
+        os.path.expanduser("~/cli_bin/.evergreen.yml")
+    ]
 
     for filename in file_list:
         if os.path.isfile(filename):
@@ -153,8 +143,8 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
         # The current commit will be activated in Evergreen; we use --skip to start at the
         # previous commit when trying to find the most recent preceding commit that has been
         # activated.
-        revs_to_check = callo(["git", "rev-list", base_commit,
-                               "--max-count=200", "--skip=1"]).splitlines()
+        revs_to_check = callo(["git", "rev-list", base_commit, "--max-count=200",
+                               "--skip=1"]).splitlines()
         last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
         if last_activated is None:
             # When the current commit is the first time 'buildvariant' has run, there won't be a
@@ -210,8 +200,8 @@ def find_exclude_tests(selector_file):
     try:
         js_test = yml['selector']['js_test']
     except KeyError:
-        raise Exception("The selector file " + selector_file +
-                        " is missing the 'selector.js_test' key")
+        raise Exception(
+            "The selector file " + selector_file + " is missing the 'selector.js_test' key")
 
     return (resmokelib.utils.default_if_none(js_test.get("exclude_suites"), []),
             resmokelib.utils.default_if_none(js_test.get("exclude_tasks"), []),
@@ -299,10 +289,7 @@ def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
         for task_name, task_arg in variant_task_args.items():
             # Find the resmoke_args for matching suite names.
             if re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg):
-                tasks_to_run[task_name] = {
-                    "resmoke_args": task_arg,
-                    "tests": suites[suite]
-                }
+                tasks_to_run[task_name] = {"resmoke_args": task_arg, "tests": suites[suite]}
 
     return tasks_to_run
 
@@ -371,11 +358,8 @@ def main():
                   "\t", "\n\t".join(sorted(evergreen_conf.variant_names))
             sys.exit(1)
 
-        changed_tests = find_changed_tests(values.branch,
-                                           values.base_commit,
-                                           values.max_revisions,
-                                           values.buildvariant,
-                                           values.check_evergreen)
+        changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions,
+                                           values.buildvariant, values.check_evergreen)
         exclude_suites, exclude_tasks, exclude_tests = find_exclude_tests(values.selector_file)
         changed_tests = filter_tests(changed_tests, exclude_tests)
         # If there are no changed tests, exit cleanly.
@@ -385,12 +369,9 @@ def main():
                 _write_report_file({}, values.test_list_outfile)
             sys.exit(0)
         suites = resmokelib.suitesconfig.get_suites(
-            suite_files=values.suite_files.split(","),
-            test_files=changed_tests)
+            suite_files=values.suite_files.split(","), test_files=changed_tests)
         tests_by_executor = create_executor_list(suites, exclude_suites)
-        tests_by_task = create_task_list(evergreen_conf,
-                                         values.buildvariant,
-                                         tests_by_executor,
+        tests_by_task = create_task_list(evergreen_conf, values.buildvariant, tests_by_executor,
                                          exclude_tasks)
         if values.test_list_outfile is not None:
             _write_report_file(tests_by_task, values.test_list_outfile)

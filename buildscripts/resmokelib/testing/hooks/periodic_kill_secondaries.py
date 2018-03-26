@@ -91,12 +91,11 @@ class PeriodicKillSecondaries(interface.Hook):
         # applying any oplog entries while the test is running.
         client = secondary.mongo_client()
         try:
-            client.admin.command(bson.SON([
-                ("configureFailPoint", "rsSyncApplyStop"),
-                ("mode", "alwaysOn")]))
+            client.admin.command(
+                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "alwaysOn")]))
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception(
-                "Unable to disable oplog application on the mongod on port %d", secondary.port)
+            self.logger.exception("Unable to disable oplog application on the mongod on port %d",
+                                  secondary.port)
             raise errors.ServerFailure(
                 "Unable to disable oplog application on the mongod on port {}: {}".format(
                     secondary.port, err.args[0]))
@@ -106,13 +105,11 @@ class PeriodicKillSecondaries(interface.Hook):
         # oplog entries.
         client = secondary.mongo_client()
         try:
-            client.admin.command(bson.SON([
-                ("configureFailPoint", "rsSyncApplyStop"),
-                ("mode", "off")]))
+            client.admin.command(
+                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "off")]))
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception(
-                "Unable to re-enable oplog application on the mongod on port %d",
-                secondary.port)
+            self.logger.exception("Unable to re-enable oplog application on the mongod on port %d",
+                                  secondary.port)
             raise errors.ServerFailure(
                 "Unable to re-enable oplog application on the mongod on port {}: {}".format(
                     secondary.port, err.args[0]))
@@ -120,8 +117,8 @@ class PeriodicKillSecondaries(interface.Hook):
 
 class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     def __init__(self, logger, test_name, description, base_test_name, hook, test_report):
-        interface.DynamicTestCase.__init__(self, logger, test_name, description,
-                                           base_test_name, hook)
+        interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
+                                           hook)
         self._test_report = test_report
 
     def run_test(self):
@@ -243,10 +240,11 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             client = secondary.mongo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
-            self.logger.info("minValid: {}, oTAP: {}".format(minvalid_doc, oplog_truncate_after_doc))
+            self.logger.info("minValid: {}, oTAP: {}".format(minvalid_doc,
+                                                             oplog_truncate_after_doc))
 
-            latest_oplog_doc = client.local["oplog.rs"].find_one(
-                sort=[("$natural", pymongo.DESCENDING)])
+            latest_oplog_doc = client.local["oplog.rs"].find_one(sort=[("$natural",
+                                                                        pymongo.DESCENDING)])
 
             null_ts = bson.Timestamp(0, 0)
 
@@ -255,8 +253,8 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             if latest_oplog_doc is not None:
                 latest_oplog_entry_ts = latest_oplog_doc.get("ts")
                 if latest_oplog_entry_ts is None:
-                    raise errors.ServerFailure("Latest oplog entry had no 'ts' field: {}".format(
-                        latest_oplog_doc))
+                    raise errors.ServerFailure(
+                        "Latest oplog entry had no 'ts' field: {}".format(latest_oplog_doc))
 
             # The "oplogTruncateAfterPoint" document may not exist at startup. If so, we default
             # it to null.
@@ -310,9 +308,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     raise errors.ServerFailure(
                         "The condition minValid <= oplogTruncateAfterPoint ({} <= {}) doesn't"
                         " hold: minValid document={}, oplogTruncateAfterPoint document={},"
-                        " latest oplog entry={}".format(
-                            minvalid_ts, oplog_truncate_after_ts, minvalid_doc,
-                            oplog_truncate_after_doc, latest_oplog_doc))
+                        " latest oplog entry={}".format(minvalid_ts, oplog_truncate_after_ts,
+                                                        minvalid_doc, oplog_truncate_after_doc,
+                                                        latest_oplog_doc))
 
                 # minvalid <= latest oplog entry
                 # "minValid" is set to the end of a batch after the batch is written to the oplog.
@@ -321,8 +319,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     raise errors.ServerFailure(
                         "The condition minValid <= top of oplog ({} <= {}) doesn't"
                         " hold: minValid document={}, latest oplog entry={}".format(
-                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc,
-                            latest_oplog_doc))
+                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc, latest_oplog_doc))
 
             try:
                 secondary.teardown()
@@ -346,15 +343,16 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     def _await_secondary_state(self, secondary):
         client = secondary.mongo_client()
         try:
-            client.admin.command(bson.SON([
-                ("replSetTest", 1),
-                ("waitForMemberState", 2),  # 2 = SECONDARY
-                ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)]))
+            client.admin.command(
+                bson.SON([
+                    ("replSetTest", 1),
+                    ("waitForMemberState", 2),  # 2 = SECONDARY
+                    ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)
+                ]))
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "mongod on port %d failed to reach state SECONDARY after %d seconds",
-                secondary.port,
-                fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
+                secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
             raise errors.ServerFailure(
                 "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
                     secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))

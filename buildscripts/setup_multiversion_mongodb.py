@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Install multiple versions of MongoDB on a machine."""
 
 from __future__ import print_function
@@ -22,6 +21,7 @@ import zipfile
 
 import requests
 import requests.exceptions
+
 
 def dump_stacks(_signal_num, _frame):
     """Dump stacks when SIGUSR1 is received."""
@@ -102,8 +102,8 @@ def download_file(url, file_name, download_retries=5):
                 download_retries -= 1
                 if download_retries == 0:
                     raise Exception("Downloaded file size ({} bytes) doesn't match content length"
-                                    "({} bytes) for URL {}".format(
-                                        file_size, url_content_length, url))
+                                    "({} bytes) for URL {}".format(file_size, url_content_length,
+                                                                   url))
                 continue
 
         return True
@@ -114,13 +114,7 @@ def download_file(url, file_name, download_retries=5):
 class MultiVersionDownloader(object):
     """Class to support multiversion downloads."""
 
-    def __init__(self,
-                 install_dir,
-                 link_dir,
-                 edition,
-                 platform,
-                 architecture,
-                 use_latest=False):
+    def __init__(self, install_dir, link_dir, edition, platform, architecture, use_latest=False):
         self.install_dir = install_dir
         self.link_dir = link_dir
         self.edition = edition.lower()
@@ -174,12 +168,12 @@ class MultiVersionDownloader(object):
             for download in json_version["downloads"]:
                 if "target" not in download or "edition" not in download:
                     continue
-                if (download["target"].lower() == self.platform and
-                    download["arch"].lower() == self.architecture and
-                    download["edition"].lower() == self.edition):
+                if (download["target"].lower() == self.platform
+                        and download["arch"].lower() == self.architecture
+                        and download["edition"].lower() == self.edition):
                     links[version] = download["archive"]["url"]
-                elif (download["target"].lower() == generic_target and
-                      download["edition"].lower() == "base"):
+                elif (download["target"].lower() == generic_target
+                      and download["edition"].lower() == "base"):
                     generic_links[version] = download["archive"]["url"]
 
         return links, generic_links
@@ -247,8 +241,8 @@ class MultiVersionDownloader(object):
         # of the 'extract_dir' cannot be derived from the URL, since it contains the githash.
         already_downloaded = os.path.isdir(os.path.join(self.install_dir, extract_dir))
         if already_downloaded:
-            print("Skipping download for version {} ({}) since the dest already exists '{}'"
-                  .format(version, full_version, extract_dir))
+            print("Skipping download for version {} ({}) since the dest already exists '{}'".format(
+                version, full_version, extract_dir))
             return None
         else:
             temp_file = tempfile.mktemp(suffix=file_suffix)
@@ -352,6 +346,7 @@ class MultiVersionDownloader(object):
                         flags = 1 if os.path.isdir(source) else 0
                         if csl(link_name, source.replace("/", "\\"), flags) == 0:
                             raise ctypes.WinError()
+
                     os.symlink = symlink_ms
                 os.symlink(executable, executable_link)
             except OSError as exc:
@@ -400,59 +395,37 @@ Note: If "rc" is included in the version name, we'll use the exact rc, otherwise
 we'll pull the highest non-rc version compatible with the version specified.
 """)
 
-    parser.add_option("-i", "--installDir",
-                      dest="install_dir",
-                      help="Directory to install the download archive. [REQUIRED]",
-                      default=None)
-    parser.add_option("-l", "--linkDir",
-                      dest="link_dir",
-                      help="Directory to contain links to all binaries for each version in"
-                           " the install directory. [REQUIRED]",
-                      default=None)
+    parser.add_option("-i", "--installDir", dest="install_dir",
+                      help="Directory to install the download archive. [REQUIRED]", default=None)
+    parser.add_option("-l", "--linkDir", dest="link_dir",
+                      help=("Directory to contain links to all binaries for each version in"
+                            " the install directory. [REQUIRED]"), default=None)
     editions = ["base", "enterprise", "targeted"]
-    parser.add_option("-e", "--edition",
-                      dest="edition",
-                      choices=editions,
-                      help="Edition of the build to download, choose from {}, [default:"
-                           " '%default'].".format(editions),
-                      default="base")
-    parser.add_option("-p", "--platform",
-                      dest="platform",
-                      help="Platform to download [REQUIRED]. Examples include: 'linux',"
-                           " 'osx', 'rhel62', 'windows'.",
-                      default=None)
-    parser.add_option("-a", "--architecture",
-                      dest="architecture",
-                      help="Architecture to download, [default: '%default']. Examples include:"
-                           " 'arm64', 'ppc64le', 's390x' and 'x86_64'.",
-                      default="x86_64")
-    parser.add_option("-u", "--useLatest",
-                      dest="use_latest",
-                      action="store_true",
-                      help="If specified, the latest (nightly) version will be downloaded,"
-                           " if it exists, for the version specified. For example, if specifying"
-                           " version 3.2 for download, the nightly version for 3.2 will be"
-                           " downloaded if it exists, otherwise the 'highest' version will be"
-                           " downloaded, i.e., '3.2.17'",
-                      default=False)
+    parser.add_option("-e", "--edition", dest="edition", choices=editions,
+                      help=("Edition of the build to download, choose from {}, [default:"
+                            " '%default'].".format(editions)), default="base")
+    parser.add_option("-p", "--platform", dest="platform",
+                      help=("Platform to download [REQUIRED]. Examples include: 'linux',"
+                            " 'osx', 'rhel62', 'windows'."), default=None)
+    parser.add_option("-a", "--architecture", dest="architecture",
+                      help=("Architecture to download, [default: '%default']. Examples include:"
+                            " 'arm64', 'ppc64le', 's390x' and 'x86_64'."), default="x86_64")
+    parser.add_option("-u", "--useLatest", dest="use_latest", action="store_true",
+                      help=("If specified, the latest (nightly) version will be downloaded,"
+                            " if it exists, for the version specified. For example, if specifying"
+                            " version 3.2 for download, the nightly version for 3.2 will be"
+                            " downloaded if it exists, otherwise the 'highest' version will be"
+                            " downloaded, i.e., '3.2.17'"), default=False)
 
     options, versions = parser.parse_args()
 
     # Check for required options.
-    if (not versions or
-        not options.install_dir or
-        not options.link_dir or
-        not options.platform):
+    if (not versions or not options.install_dir or not options.link_dir or not options.platform):
         parser.print_help()
         parser.exit(1)
 
-    downloader = MultiVersionDownloader(
-        options.install_dir,
-        options.link_dir,
-        options.edition,
-        options.platform,
-        options.architecture,
-        options.use_latest)
+    downloader = MultiVersionDownloader(options.install_dir, options.link_dir, options.edition,
+                                        options.platform, options.architecture, options.use_latest)
 
     for version in versions:
         downloader.download_install(version)

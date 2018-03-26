@@ -57,9 +57,9 @@ def get_py_linter(linter_filter):
 def is_interesting_file(file_name):
     # type: (str) -> bool
     """"Return true if this file should be checked."""
-    return file_name.endswith(".py") and (file_name.startswith("buildscripts/idl") or
-                                          file_name.startswith("buildscripts/linter") or
-                                          file_name.startswith("buildscripts/pylinters.py"))
+    return file_name.endswith(".py") and (file_name.startswith("buildscripts/idl")
+                                          or file_name.startswith("buildscripts/linter")
+                                          or file_name.startswith("buildscripts/pylinters.py"))
 
 
 def _get_build_dir():
@@ -161,14 +161,12 @@ def main():
     dest_prefix = "linter_"
     for linter1 in linters:
         msg = 'Path to linter %s' % (linter1.cmd_name)
-        parser.add_argument(
-            '--' + linter1.cmd_name, type=str, help=msg, dest=dest_prefix + linter1.cmd_name)
+        parser.add_argument('--' + linter1.cmd_name, type=str, help=msg,
+                            dest=dest_prefix + linter1.cmd_name)
 
-    parser.add_argument(
-        '--linters',
-        type=str,
-        help="Comma separated list of filters to use, defaults to 'all'",
-        default="all")
+    parser.add_argument('--linters', type=str,
+                        help="Comma separated list of filters to use, defaults to 'all'",
+                        default="all")
 
     parser.add_argument('-v', "--verbose", action='store_true', help="Enable verbose logging")
 

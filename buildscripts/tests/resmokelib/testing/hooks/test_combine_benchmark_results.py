@@ -11,61 +11,35 @@ import buildscripts.resmokelib.config as _config
 import buildscripts.resmokelib.testing.hooks.combine_benchmark_results as cbr
 
 _BM_CONTEXT = {
-    "date": "2018/01/30-18:40:25",
-    "num_cpus": 40,
-    "mhz_per_cpu": 4999,
-    "cpu_scaling_enabled": False,
-    "library_build_type": "debug"
+    "date": "2018/01/30-18:40:25", "num_cpus": 40, "mhz_per_cpu": 4999,
+    "cpu_scaling_enabled": False, "library_build_type": "debug"
 }
 
 _BM_REPORT = {
-    "name": "BM_Name1",
-    "iterations": 1000,
-    "real_time": 1202,
-    "cpu_time": 1303,
-    "bytes_per_second": 1404,
-    "items_per_second": 1505,
-    "custom_counter_1": 1606
+    "name": "BM_Name1", "iterations": 1000, "real_time": 1202, "cpu_time": 1303,
+    "bytes_per_second": 1404, "items_per_second": 1505, "custom_counter_1": 1606
 }
 
 _BM_MEAN_REPORT = {
-    "name": "BM_Name1_mean",
-    "iterations": 1000,
-    "real_time": 1200,
-    "cpu_time": 1300,
-    "bytes_per_second": 1400,
-    "items_per_second": 1500,
-    "custom_counter_1": 1600
+    "name": "BM_Name1_mean", "iterations": 1000, "real_time": 1200, "cpu_time": 1300,
+    "bytes_per_second": 1400, "items_per_second": 1500, "custom_counter_1": 1600
 }
 
 _BM_MULTITHREAD_REPORT = {
-    "name": "BM_Name2/threads:10",
-    "iterations": 100,
-    "real_time": 202,
-    "cpu_time": 303,
-    "bytes_per_second": 404,
-    "items_per_second": 505,
-    "custom_counter_1": 606
+    "name": "BM_Name2/threads:10", "iterations": 100, "real_time": 202, "cpu_time": 303,
+    "bytes_per_second": 404, "items_per_second": 505, "custom_counter_1": 606
 }
 
 _BM_MULTITHREAD_MEDIAN_REPORT = {
-    "name": "BM_Name2/threads:10_median",
-    "iterations": 100,
-    "real_time": 200,
-    "cpu_time": 300,
-    "bytes_per_second": 400,
-    "items_per_second": 500,
-    "custom_counter_1": 600
+    "name": "BM_Name2/threads:10_median", "iterations": 100, "real_time": 200, "cpu_time": 300,
+    "bytes_per_second": 400, "items_per_second": 500, "custom_counter_1": 600
 }
 
 _BM_FULL_REPORT = {
-    "context": _BM_CONTEXT,
-    "benchmarks": [
-        _BM_REPORT,
-        _BM_MEAN_REPORT,
-        _BM_MULTITHREAD_REPORT,
-        _BM_MULTITHREAD_MEDIAN_REPORT
-    ]
+    "context":
+        _BM_CONTEXT, "benchmarks": [
+            _BM_REPORT, _BM_MEAN_REPORT, _BM_MULTITHREAD_REPORT, _BM_MULTITHREAD_MEDIAN_REPORT
+        ]
 }
 
 # 12/31/2999 @ 11:59pm (UTC)
@@ -91,7 +65,6 @@ class CombineBenchmarkResultsFixture(unittest.TestCase):
 
 
 class TestCombineBenchmarkResults(CombineBenchmarkResultsFixture):
-
     def test_generate_reports(self):
         report = self.cbr_hook._generate_perf_plugin_report()
 
@@ -105,7 +78,6 @@ class TestCombineBenchmarkResults(CombineBenchmarkResultsFixture):
 
 
 class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
-
     def test_thread_from_name(self):
         thread = self.bm_threads_report._thread_from_name("BM_Name/arg name:100/threads:10")
         self.assertEqual(thread, "10")

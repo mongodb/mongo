@@ -16,10 +16,7 @@ class CPPUnitTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "cpp_unit_test"
 
-    def __init__(self,
-                 logger,
-                 program_executable,
-                 program_options=None):
+    def __init__(self, logger, program_executable, program_options=None):
         """
         Initializes the CPPUnitTestCase with the executable to run.
         """
@@ -30,6 +27,4 @@ class CPPUnitTestCase(interface.ProcessTestCase):
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
     def _make_process(self):
-        return core.process.Process(self.logger,
-                                    [self.program_executable],
-                                    **self.program_options)
+        return core.process.Process(self.logger, [self.program_executable], **self.program_options)

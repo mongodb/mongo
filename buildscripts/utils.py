@@ -18,15 +18,10 @@ def getAllSourceFiles(arr=None, prefix="."):
         return arr
 
     for x in os.listdir(prefix):
-        if (x.startswith(".")
-            or x.startswith("pcre-")
-            or x.startswith("32bit")
-            or x.startswith("mongodb-")
-            or x.startswith("debian")
-            or x.startswith("mongo-cxx-driver")
-            or x.startswith("sqlite")
-            or "gotools" in x
-            or x.find("mozjs") != -1):
+        if (x.startswith(".") or x.startswith("pcre-") or x.startswith("32bit")
+                or x.startswith("mongodb-") or x.startswith("debian")
+                or x.startswith("mongo-cxx-driver") or x.startswith("sqlite") or "gotools" in x
+                or x.find("mozjs") != -1):
             continue
 
         def isFollowableDir(prefix, full):
@@ -58,14 +53,14 @@ def getGitBranch():
     if not version.startswith("ref: "):
         return version
     version = version.split("/")
-    version = version[len(version)-1]
+    version = version[len(version) - 1]
     return version
 
 
 def getGitBranchString(prefix="", postfix=""):
     t = re.compile("[/\\\]").split(os.getcwd())
-    if len(t) > 2 and t[len(t)-1] == "mongo":
-        par = t[len(t)-2]
+    if len(t) > 2 and t[len(t) - 1] == "mongo":
+        par = t[len(t) - 2]
         m = re.compile(".*_([vV]\d+\.\d+)$").match(par)
         if m is not None:
             return prefix + m.group(1).lower() + postfix
@@ -94,12 +89,8 @@ def getGitVersion():
 
 def getGitDescribe():
     with open(os.devnull, "r+") as devnull:
-        proc = subprocess.Popen(
-            "git describe",
-            stdout=subprocess.PIPE,
-            stderr=devnull,
-            stdin=devnull,
-            shell=True)
+        proc = subprocess.Popen("git describe", stdout=subprocess.PIPE, stderr=devnull,
+                                stdin=devnull, shell=True)
         return proc.communicate()[0].strip()
 
 
@@ -139,12 +130,11 @@ def find_python(min_version=(2, 5)):
         pass
 
     version = re.compile(r"[Pp]ython ([\d\.]+)", re.MULTILINE)
-    binaries = (
-        "python27", "python2.7", "python26", "python2.6", "python25", "python2.5", "python")
+    binaries = ("python27", "python2.7", "python26", "python2.6", "python25", "python2.5", "python")
     for binary in binaries:
         try:
-            out, err = subprocess.Popen(
-                [binary, "-V"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            out, err = subprocess.Popen([binary, "-V"], stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE).communicate()
             for stream in (out, err):
                 match = version.search(stream)
                 if match:
@@ -154,8 +144,8 @@ def find_python(min_version=(2, 5)):
         except:
             pass
 
-    raise Exception(
-        "could not find suitable Python (version >= %s)" % ".".join(str(v) for v in min_version))
+    raise Exception("could not find suitable Python (version >= %s)" % ".".join(
+        str(v) for v in min_version))
 
 
 # unicode is a pain. some strings cannot be unicode()'d
@@ -166,5 +156,6 @@ def find_python(min_version=(2, 5)):
 def replace_with_repr(unicode_error):
     offender = unicode_error.object[unicode_error.start:unicode_error.end]
     return (unicode(repr(offender).strip("'").strip('"')), unicode_error.end)
+
 
 codecs.register_error("repr", replace_with_repr)

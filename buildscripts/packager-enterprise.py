@@ -42,15 +42,15 @@ import time
 import urlparse
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES=["x86_64", "ppc64le", "s390x", "arm64"]
+ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
+DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon"]
 
 
 class EnterpriseSpec(packager.Spec):
     def suffix(self):
-        return "-enterprise" if int(self.ver.split(".")[1])%2==0 else "-enterprise-unstable"
+        return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
 
 
 class EnterpriseDistro(packager.Distro):
@@ -92,16 +92,20 @@ class EnterpriseDistro(packager.Distro):
         repo_directory = ""
 
         if spec.is_pre_release():
-          repo_directory = "testing"
+            repo_directory = "testing"
         else:
-          repo_directory = spec.branch()
+            repo_directory = spec.branch()
 
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(), self.archname(arch))
+            return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (
+                self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(),
+                self.archname(arch))
         elif re.search("(redhat|fedora|centos|amazon)", self.n):
-            return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+            return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
+                self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         elif re.search("(suse)", self.n):
-            return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+            return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
+                self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -111,79 +115,82 @@ class EnterpriseDistro(packager.Distro):
         """
         if arch == "ppc64le":
             if self.n == 'ubuntu':
-                return [ "ubuntu1604" ]
+                return ["ubuntu1604"]
             if self.n == 'redhat':
-                return [ "rhel71" ]
+                return ["rhel71"]
             else:
                 return []
         if arch == "s390x":
             if self.n == 'redhat':
-                return [ "rhel67", "rhel72" ]
+                return ["rhel67", "rhel72"]
             if self.n == 'suse':
-                return [ "suse11", "suse12" ]
+                return ["suse11", "suse12"]
             if self.n == 'ubuntu':
-                return [ "ubuntu1604" ]
+                return ["ubuntu1604"]
             else:
                 return []
         if arch == "arm64":
             if self.n == 'ubuntu':
-                return [ "ubuntu1604" ]
+                return ["ubuntu1604"]
             else:
                 return []
 
         if re.search("(redhat|fedora|centos)", self.n):
-            return [ "rhel70", "rhel62", "rhel57" ]
+            return ["rhel70", "rhel62", "rhel57"]
         else:
             return super(EnterpriseDistro, self).build_os(arch)
 
+
 def main(argv):
 
-    distros=[EnterpriseDistro(distro) for distro in DISTROS]
+    distros = [EnterpriseDistro(distro) for distro in DISTROS]
 
     args = packager.get_args(distros, ARCH_CHOICES)
 
     spec = EnterpriseSpec(args.server_version, args.metadata_gitspec, args.release_number)
 
-    oldcwd=os.getcwd()
-    srcdir=oldcwd+"/../"
+    oldcwd = os.getcwd()
+    srcdir = oldcwd + "/../"
 
     # Where to do all of our work. Use a randomly-created directory if one
     # is not passed in.
     prefix = args.prefix
     if prefix is None:
-      prefix=tempfile.mkdtemp()
+        prefix = tempfile.mkdtemp()
 
     print "Working in directory %s" % prefix
 
     os.chdir(prefix)
     try:
-      made_pkg = False
-      # Build a package for each distro/spec/arch tuple, and
-      # accumulate the repository-layout directories.
-      for (distro, arch) in packager.crossproduct(distros, args.arches):
+        made_pkg = False
+        # Build a package for each distro/spec/arch tuple, and
+        # accumulate the repository-layout directories.
+        for (distro, arch) in packager.crossproduct(distros, args.arches):
 
-          for build_os in distro.build_os(arch):
-            if build_os in args.distros or not args.distros:
+            for build_os in distro.build_os(arch):
+                if build_os in args.distros or not args.distros:
 
-              filename = tarfile(build_os, arch, spec)
-              packager.ensure_dir(filename)
-              shutil.copyfile(args.tarball, filename)
+                    filename = tarfile(build_os, arch, spec)
+                    packager.ensure_dir(filename)
+                    shutil.copyfile(args.tarball, filename)
 
-              repo = make_package(distro, build_os, arch, spec, srcdir)
-              make_repo(repo, distro, build_os, spec)
+                    repo = make_package(distro, build_os, arch, spec, srcdir)
+                    make_repo(repo, distro, build_os, spec)
 
-              made_pkg = True
+                    made_pkg = True
 
-      if not made_pkg:
-          raise Exception("No valid combination of distro and arch selected")
+        if not made_pkg:
+            raise Exception("No valid combination of distro and arch selected")
 
     finally:
         os.chdir(oldcwd)
+
 
 def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for
     this package"""
     return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
+
 
 def setupdir(distro, build_os, arch, spec):
     # The setupdir will be a directory containing all inputs to the
@@ -192,11 +199,13 @@ def setupdir(distro, build_os, arch, spec):
     # the following format string is unclear, an example setupdir
     # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
     # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
-    return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(), spec.suffix(), spec.pversion(distro))
+    return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(),
+                                      spec.suffix(), spec.pversion(distro))
+
 
 def unpack_binaries_into(build_os, arch, spec, where):
     """Unpack the tarfile for (build_os, arch, spec) into directory where."""
-    rootdir=os.getcwd()
+    rootdir = os.getcwd()
     packager.ensure_dir(where)
     # Note: POSIX tar doesn't require support for gtar's "-C" option,
     # and Python's tarfile module prior to Python 2.7 doesn't have the
@@ -204,23 +213,24 @@ def unpack_binaries_into(build_os, arch, spec, where):
     # thing and chdir into where and run tar there.
     os.chdir(where)
     try:
-	packager.sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec)])
-    	release_dir = glob('mongodb-linux-*')[0]
+        packager.sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
+        release_dir = glob('mongodb-linux-*')[0]
         for releasefile in "bin", "snmp", "LICENSE.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
     except Exception:
-        exc=sys.exc_value
+        exc = sys.exc_value
         os.chdir(rootdir)
         raise exc
     os.chdir(rootdir)
+
 
 def make_package(distro, build_os, arch, spec, srcdir):
     """Construct the package for (arch, distro, spec), getting
     packaging files from srcdir and any user-specified suffix from
     suffixes"""
 
-    sdir=setupdir(distro, build_os, arch, spec)
+    sdir = setupdir(distro, build_os, arch, spec)
     packager.ensure_dir(sdir)
     # Note that the RPM packages get their man pages from the debian
     # directory, so the debian directory is needed in all cases (and
@@ -228,7 +238,11 @@ def make_package(distro, build_os, arch, spec, srcdir):
     for pkgdir in ["debian", "rpm"]:
         print "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
-        packager.sysassert(["sh", "-c", "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" % (srcdir, spec.metadata_gitspec(), pkgdir, sdir)])
+        packager.sysassert([
+            "sh", "-c",
+            "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" %
+            (srcdir, spec.metadata_gitspec(), pkgdir, sdir)
+        ])
     # Splat the binaries and snmp files under sdir.  The "build" stages of the
     # packaging infrastructure will move the files to wherever they
     # need to go.
@@ -236,8 +250,9 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # Remove the mongoreplay binary due to libpcap dynamic
     # linkage.
     if os.path.exists(sdir + "bin/mongoreplay"):
-      os.unlink(sdir + "bin/mongoreplay")
+        os.unlink(sdir + "bin/mongoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
+
 
 def make_repo(repodir, distro, build_os, spec):
     if re.search("(debian|ubuntu)", repodir):
@@ -247,26 +262,30 @@ def make_repo(repodir, distro, build_os, spec):
     else:
         raise Exception("BUG: unsupported platform?")
 
+
 def make_deb_repo(repo, distro, build_os, spec):
     # Note: the Debian repository Packages files must be generated
     # very carefully in order to be usable.
-    oldpwd=os.getcwd()
-    os.chdir(repo+"../../../../../../")
+    oldpwd = os.getcwd()
+    os.chdir(repo + "../../../../../../")
     try:
-        dirs=set([os.path.dirname(deb)[2:] for deb in packager.backtick(["find", ".", "-name", "*.deb"]).split()])
+        dirs = set([
+            os.path.dirname(deb)[2:]
+            for deb in packager.backtick(["find", ".", "-name", "*.deb"]).split()
+        ])
         for d in dirs:
-            s=packager.backtick(["dpkg-scanpackages", d, "/dev/null"])
-            with open(d+"/Packages", "w") as f:
+            s = packager.backtick(["dpkg-scanpackages", d, "/dev/null"])
+            with open(d + "/Packages", "w") as f:
                 f.write(s)
-            b=packager.backtick(["gzip", "-9c", d+"/Packages"])
-            with open(d+"/Packages.gz", "wb") as f:
+            b = packager.backtick(["gzip", "-9c", d + "/Packages"])
+            with open(d + "/Packages.gz", "wb") as f:
                 f.write(b)
     finally:
         os.chdir(oldpwd)
     # Notes: the Release{,.gpg} files must live in a special place,
     # and must be created after all the Packages.gz files have been
     # done.
-    s="""Origin: mongodb
+    s = """Origin: mongodb
 Label: mongodb
 Suite: %s
 Codename: %s/mongodb-enterprise
@@ -274,13 +293,13 @@ Architectures: amd64 ppc64el s390x arm64
 Components: %s
 Description: MongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
-    if os.path.exists(repo+"../../Release"):
-        os.unlink(repo+"../../Release")
-    if os.path.exists(repo+"../../Release.gpg"):
-        os.unlink(repo+"../../Release.gpg")
-    oldpwd=os.getcwd()
-    os.chdir(repo+"../../")
-    s2=packager.backtick(["apt-ftparchive", "release", "."])
+    if os.path.exists(repo + "../../Release"):
+        os.unlink(repo + "../../Release")
+    if os.path.exists(repo + "../../Release.gpg"):
+        os.unlink(repo + "../../Release.gpg")
+    oldpwd = os.getcwd()
+    os.chdir(repo + "../../")
+    s2 = packager.backtick(["apt-ftparchive", "release", "."])
     try:
         with open("Release", 'w') as f:
             f.write(s)
@@ -296,20 +315,20 @@ def move_repos_into_place(src, dst):
     # one.  This feels like a lot of hooey for something so trivial.
 
     # First, make a crispy fresh new directory to put the stuff in.
-    i=0
+    i = 0
     while True:
-        date_suffix=time.strftime("%Y-%m-%d")
-        dname=dst+".%s.%d" % (date_suffix, i)
+        date_suffix = time.strftime("%Y-%m-%d")
+        dname = dst + ".%s.%d" % (date_suffix, i)
         try:
             os.mkdir(dname)
             break
         except OSError:
-            exc=sys.exc_value
+            exc = sys.exc_value
             if exc.errno == errno.EEXIST:
                 pass
             else:
                 raise exc
-        i=i+1
+        i = i + 1
 
     # Put the stuff in our new directory.
     for r in os.listdir(src):
@@ -317,40 +336,41 @@ def move_repos_into_place(src, dst):
 
     # Make a symlink to the new directory; the symlink will be renamed
     # to dst shortly.
-    i=0
+    i = 0
     while True:
-        tmpnam=dst+".TMP.%d" % i
+        tmpnam = dst + ".TMP.%d" % i
         try:
             os.symlink(dname, tmpnam)
             break
-        except OSError: # as exc: # Python >2.5
-            exc=sys.exc_value
+        except OSError:  # as exc: # Python >2.5
+            exc = sys.exc_value
             if exc.errno == errno.EEXIST:
                 pass
             else:
                 raise exc
-        i=i+1
+        i = i + 1
 
     # Make a symlink to the old directory; this symlink will be
     # renamed shortly, too.
-    oldnam=None
+    oldnam = None
     if os.path.exists(dst):
-       i=0
-       while True:
-           oldnam=dst+".old.%d" % i
-           try:
-               os.symlink(os.readlink(dst), oldnam)
-               break
-           except OSError: # as exc: # Python >2.5
-               exc=sys.exc_value
-               if exc.errno == errno.EEXIST:
-                   pass
-               else:
-                   raise exc
+        i = 0
+        while True:
+            oldnam = dst + ".old.%d" % i
+            try:
+                os.symlink(os.readlink(dst), oldnam)
+                break
+            except OSError:  # as exc: # Python >2.5
+                exc = sys.exc_value
+                if exc.errno == errno.EEXIST:
+                    pass
+                else:
+                    raise exc
 
     os.rename(tmpnam, dst)
     if oldnam:
-        os.rename(oldnam, dst+".old")
+        os.rename(oldnam, dst + ".old")
+
 
 if __name__ == "__main__":
     main(sys.argv)

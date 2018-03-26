@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Hang Analyzer
 
 A prototype hang analyzer for Evergreen integration to help investigate test timeouts
@@ -33,7 +32,6 @@ _is_windows = (sys.platform == "win32")
 if _is_windows:
     import win32event
     import win32api
-
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -99,7 +97,6 @@ def get_process_logger(debugger_output, pid, process_name):
 
 
 class WindowsDumper(object):
-
     def __find_debugger(self, logger, debugger):
         """Finds the installed debugger"""
         # We are looking for c:\Program Files (x86)\Windows Kits\8.1\Debuggers\x64
@@ -115,7 +112,7 @@ class WindowsDumper(object):
         for i in range(0, 2):
             pathToTest = os.path.join(rootDir, "Windows Kits", "8." + str(i), "Debuggers", "x64")
             logger.info("Checking for debugger in %s" % pathToTest)
-            if(os.path.exists(pathToTest)):
+            if (os.path.exists(pathToTest)):
                 return os.path.join(pathToTest, debugger)
 
         return None
@@ -129,15 +126,12 @@ class WindowsDumper(object):
             root_logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (dbg,
-                                                                            process_name,
-                                                                            pid))
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (dbg, process_name, pid))
 
         dump_command = ""
         if take_dump:
             # Dump to file, dump_<process name>.<pid>.mdmp
-            dump_file = "dump_%s.%d.%s" % (os.path.splitext(process_name)[0],
-                                           pid,
+            dump_file = "dump_%s.%d.%s" % (os.path.splitext(process_name)[0], pid,
                                            self.get_dump_ext())
             dump_command = ".dump /ma %s" % dump_file
             root_logger.info("Dumping core to %s" % dump_file)
@@ -146,14 +140,14 @@ class WindowsDumper(object):
             ".symfix",  # Fixup symbol path
             ".symopt +0x10",  # Enable line loading (off by default in CDB, on by default in WinDBG)
             ".reload",  # Reload symbols
-            "!peb",     # Dump current exe, & environment variables
-            "lm",       # Dump loaded modules
+            "!peb",  # Dump current exe, & environment variables
+            "lm",  # Dump loaded modules
             dump_command,
             "!uniqstack -pn",  # Dump All unique Threads with function arguments
-            "!cs -l",   # Dump all locked critical sections
+            "!cs -l",  # Dump all locked critical sections
             ".detach",  # Detach
-            "q"         # Quit
-            ]
+            "q"  # Quit
+        ]
 
         call([dbg, '-c', ";".join(cmds), '-p', str(pid)], logger)
 
@@ -164,7 +158,6 @@ class WindowsDumper(object):
 
 
 class WindowsProcessList(object):
-
     def __find_ps(self):
         """Finds tasklist """
         return os.path.join(os.environ["WINDIR"], "system32", "tasklist.exe")
@@ -187,7 +180,6 @@ class WindowsProcessList(object):
 
 # LLDB dumper is for MacOS X
 class LLDBDumper(object):
-
     def __find_debugger(self, debugger):
         """Finds the installed debugger"""
         return find_program(debugger, ['/usr/bin'])
@@ -200,9 +192,7 @@ class LLDBDumper(object):
             root_logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (dbg,
-                                                                            process_name,
-                                                                            pid))
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (dbg, process_name, pid))
 
         lldb_version = callo([dbg, "--version"], logger)
 
@@ -236,7 +226,7 @@ class LLDBDumper(object):
             dump_command,
             "settings set interpreter.prompt-on-quit false",
             "quit",
-            ]
+        ]
 
         tf = tempfile.NamedTemporaryFile()
 
@@ -257,7 +247,6 @@ class LLDBDumper(object):
 
 
 class DarwinProcessList(object):
-
     def __find_ps(self):
         """Finds ps"""
         return find_program('ps', ['/bin'])
@@ -280,7 +269,6 @@ class DarwinProcessList(object):
 
 # GDB dumper is for Linux & Solaris
 class GDBDumper(object):
-
     def __find_debugger(self, debugger):
         """Finds the installed debugger"""
         return find_program(debugger, ['/opt/mongodbtoolchain/gdb/bin', '/usr/bin'])
@@ -293,9 +281,7 @@ class GDBDumper(object):
             logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (dbg,
-                                                                            process_name,
-                                                                            pid))
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (dbg, process_name, pid))
 
         dump_command = ""
         if take_dump:
@@ -348,26 +334,23 @@ class GDBDumper(object):
                 'set logging on',
                 'thread apply all bt',
                 'set logging off',
-                ]
+            ]
 
         cmds = [
             "set interactive-mode off",
-            "set print thread-events off",  # Python calls to gdb.parse_and_eval may cause threads
-                                            # to start and finish. This suppresses those messages
-                                            # from appearing in the return output.
-            "file %s" % process_name,       # Solaris must load the process to read the symbols.
+            "set print thread-events off",  # Suppress GDB messages of threads starting/finishing.
+            "file %s" % process_name,  # Solaris must load the process to read the symbols.
             "attach %d" % pid,
             "info sharedlibrary",
-            "info threads",                 # Dump a simple list of commands to get the thread name
+            "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
-            ] + raw_stacks_commands + [
+        ] + raw_stacks_commands + [
             source_mongo,
             source_mongo_printers,
             source_mongo_lock,
             mongodb_uniqstack,
-            "set scheduler-locking on",     # Lock the scheduler, before running any of the
-                                            # following commands, which executes code in the
-                                            # attached process.
+            # Lock the scheduler, before running commands, which execute code in the attached process.
+            "set scheduler-locking on",
             dump_command,
             mongodb_dump_locks,
             mongodb_show_locks,
@@ -375,11 +358,10 @@ class GDBDumper(object):
             mongodb_javascript_stack,
             "set confirm off",
             "quit",
-            ]
+        ]
 
         call([dbg, "--quiet", "--nx"] +
-             list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
-             logger)
+             list(itertools.chain.from_iterable([['-ex', b] for b in cmds])), logger)
 
         root_logger.info("Done analyzing %s process with PID %d" % (process_name, pid))
 
@@ -396,7 +378,6 @@ class GDBDumper(object):
 
 
 class LinuxProcessList(object):
-
     def __find_ps(self):
         """Finds ps"""
         return find_program('ps', ['/bin', '/usr/bin'])
@@ -420,7 +401,6 @@ class LinuxProcessList(object):
 
 
 class SolarisProcessList(object):
-
     def __find_ps(self):
         """Finds ps"""
         return find_program('ps', ['/bin', '/usr/bin'])
@@ -443,7 +423,6 @@ class SolarisProcessList(object):
 
 # jstack is a JDK utility
 class JstackDumper(object):
-
     def __find_debugger(self, debugger):
         """Finds the installed jstack debugger"""
         return find_program(debugger, ['/usr/bin'])
@@ -457,8 +436,7 @@ class JstackDumper(object):
             logger.warning("Debugger %s not found, skipping dumping of %d" % (debugger, pid))
             return
 
-        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (jstack,
-                                                                            process_name,
+        root_logger.info("Debugger %s, analyzing %s process with PID %d" % (jstack, process_name,
                                                                             pid))
 
         call([jstack, "-l", str(pid)], logger)
@@ -468,7 +446,6 @@ class JstackDumper(object):
 
 # jstack is a JDK utility
 class JstackWindowsDumper(object):
-
     def dump_info(self, root_logger, logger, pid, process_name):
         """Dump java thread stack traces to the logger"""
 
@@ -520,9 +497,7 @@ def signal_event_object(logger, pid):
     try:
         desired_access = win32event.EVENT_MODIFY_STATE
         inherit_handle = False
-        task_timeout_handle = win32event.OpenEvent(desired_access,
-                                                   inherit_handle,
-                                                   event_name)
+        task_timeout_handle = win32event.OpenEvent(desired_access, inherit_handle, event_name)
     except win32event.error as err:
         logger.info("Exception from win32event.OpenEvent with error: %s" % err)
         return
@@ -555,8 +530,7 @@ def signal_process(logger, pid, signalnum):
 def pname_match(match_type, pname, interesting_processes):
     pname = os.path.splitext(pname)[0]
     for ip in interesting_processes:
-        if (match_type == 'exact' and pname == ip or
-           match_type == 'contains' and ip in pname):
+        if (match_type == 'exact' and pname == ip or match_type == 'contains' and ip in pname):
             return True
     return False
 
@@ -601,46 +575,32 @@ def main():
     process_ids = []
 
     parser = OptionParser(description=__doc__)
-    parser.add_option('-m', '--process-match',
-                      dest='process_match',
-                      choices=['contains', 'exact'],
+    parser.add_option('-m', '--process-match', dest='process_match', choices=['contains', 'exact'],
                       default='contains',
-                      help="Type of match for process names (-p & -g), specify 'contains', or"
-                           " 'exact'. Note that the process name match performs the following"
-                           " conversions: change all process names to lowecase, strip off the file"
-                           " extension, like '.exe' on Windows. Default is 'contains'.")
-    parser.add_option('-p', '--process-names',
-                      dest='process_names',
+                      help=("Type of match for process names (-p & -g), specify 'contains', or"
+                            " 'exact'. Note that the process name match performs the following"
+                            " conversions: change all process names to lowecase, strip off the file"
+                            " extension, like '.exe' on Windows. Default is 'contains'."))
+    parser.add_option('-p', '--process-names', dest='process_names',
                       help='Comma separated list of process names to analyze')
-    parser.add_option('-g', '--go-process-names',
-                      dest='go_process_names',
+    parser.add_option('-g', '--go-process-names', dest='go_process_names',
                       help='Comma separated list of go process names to analyze')
-    parser.add_option('-d', '--process-ids',
-                      dest='process_ids',
-                      default=None,
+    parser.add_option('-d', '--process-ids', dest='process_ids', default=None,
                       help='Comma separated list of process ids (PID) to analyze, overrides -p &'
-                           ' -g')
-    parser.add_option('-c', '--dump-core',
-                      dest='dump_core',
-                      action="store_true",
-                      default=False,
+                      ' -g')
+    parser.add_option('-c', '--dump-core', dest='dump_core', action="store_true", default=False,
                       help='Dump core file for each analyzed process')
-    parser.add_option('-s', '--max-core-dumps-size',
-                      dest='max_core_dumps_size',
-                      default=10000,
+    parser.add_option('-s', '--max-core-dumps-size', dest='max_core_dumps_size', default=10000,
                       help='Maximum total size of core dumps to keep in megabytes')
-    parser.add_option('-o', '--debugger-output',
-                      dest='debugger_output',
-                      action="append",
-                      choices=['file', 'stdout'],
-                      default=None,
-                      help="If 'stdout', then the debugger's output is written to the Python"
-                           " process's stdout. If 'file', then the debugger's output is written"
-                           " to a file named debugger_<process>_<pid>.log for each process it"
-                           " attaches to. This option can be specified multiple times on the"
-                           " command line to have the debugger's output written to multiple"
-                           " locations. By default, the debugger's output is written only to the"
-                           " Python process's stdout.")
+    parser.add_option('-o', '--debugger-output', dest='debugger_output', action="append",
+                      choices=['file', 'stdout'], default=None,
+                      help=("If 'stdout', then the debugger's output is written to the Python"
+                            " process's stdout. If 'file', then the debugger's output is written"
+                            " to a file named debugger_<process>_<pid>.log for each process it"
+                            " attaches to. This option can be specified multiple times on the"
+                            " command line to have the debugger's output written to multiple"
+                            " locations. By default, the debugger's output is written only to the"
+                            " Python process's stdout."))
 
     (options, args) = parser.parse_args()
 
@@ -680,12 +640,12 @@ def main():
         running_pids = set([pid for (pid, pname) in all_processes])
         missing_pids = set(process_ids) - running_pids
         if missing_pids:
-            root_logger.warning("The following requested process ids are not running %s" %
-                                list(missing_pids))
+            root_logger.warning(
+                "The following requested process ids are not running %s" % list(missing_pids))
     else:
         processes = [(pid, pname) for (pid, pname) in all_processes
-                     if pname_match(options.process_match, pname, interesting_processes) and
-                     pid != os.getpid()]
+                     if pname_match(options.process_match, pname, interesting_processes)
+                     and pid != os.getpid()]
 
     root_logger.info("Found %d interesting processes %s" % (len(processes), processes))
 
@@ -708,16 +668,12 @@ def main():
     trapped_exceptions = []
 
     # Dump all processes, except python & java.
-    for (pid, process_name) in [(p, pn) for (p, pn) in processes
-                                if not re.match("^(java|python)", pn)]:
+    for (pid,
+         process_name) in [(p, pn) for (p, pn) in processes if not re.match("^(java|python)", pn)]:
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         try:
-            dbg.dump_info(
-                root_logger,
-                process_logger,
-                pid,
-                process_name,
-                options.dump_core and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
+            dbg.dump_info(root_logger, process_logger, pid, process_name, options.dump_core
+                          and check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
         except Exception as err:
             root_logger.info("Error encountered when invoking debugger %s" % err)
             trapped_exceptions.append(traceback.format_exc())
@@ -736,8 +692,8 @@ def main():
     # TerminateProcess.
     # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn in go_processes]:
-        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" %
-                         (process_name, pid))
+        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" % (process_name,
+                                                                                  pid))
         signal_process(root_logger, pid, signal.SIGABRT)
 
     root_logger.info("Done analyzing all processes for hangs")
@@ -746,6 +702,7 @@ def main():
         root_logger.info(exception)
     if trapped_exceptions:
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

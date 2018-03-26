@@ -5,7 +5,6 @@ JavaScript file.
 
 from __future__ import absolute_import
 
-
 from . import interface
 from ..testcases import jstest
 from ...utils import registry
@@ -38,10 +37,11 @@ class JSHook(interface.Hook):
 
 class DynamicJSTestCase(interface.DynamicTestCase):
     """A dynamic TestCase that runs a JavaScript file."""
-    def __init__(self, logger, test_name, description, base_test_name, hook,
-                 js_filename, shell_options=None):
-        interface.DynamicTestCase.__init__(self, logger, test_name, description,
-                                           base_test_name, hook)
+
+    def __init__(self, logger, test_name, description, base_test_name, hook, js_filename,
+                 shell_options=None):
+        interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
+                                           hook)
         self._js_test = jstest.JSTestCase(logger, js_filename, shell_options=shell_options)
 
     def override_logger(self, new_logger):

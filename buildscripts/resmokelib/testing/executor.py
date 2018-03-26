@@ -30,14 +30,8 @@ class TestSuiteExecutor(object):
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
-    def __init__(self,
-                 exec_logger,
-                 suite,
-                 config=None,
-                 fixture=None,
-                 hooks=None,
-                 archive_instance=None,
-                 archive=None):
+    def __init__(self, exec_logger, suite, config=None, fixture=None, hooks=None,
+                 archive_instance=None, archive=None):
         """
         Initializes the TestSuiteExecutor with the test suite to run.
         """
@@ -55,8 +49,8 @@ class TestSuiteExecutor(object):
 
         self.archival = None
         if archive_instance:
-            self.archival = archival.HookTestArchival(
-                suite, self.hooks_config, archive_instance, archive)
+            self.archival = archival.HookTestArchival(suite, self.hooks_config, archive_instance,
+                                                      archive)
 
         self._suite = suite
 
@@ -147,8 +141,7 @@ class TestSuiteExecutor(object):
             try:
                 job.fixture.setup()
             except:
-                self.logger.exception(
-                    "Encountered an error while setting up %s.", job.fixture)
+                self.logger.exception("Encountered an error while setting up %s.", job.fixture)
                 return False
 
         # Once they have all been started, wait for them to become available.
@@ -156,8 +149,8 @@ class TestSuiteExecutor(object):
             try:
                 job.fixture.await_ready()
             except:
-                self.logger.exception(
-                    "Encountered an error while waiting for %s to be ready", job.fixture)
+                self.logger.exception("Encountered an error while waiting for %s to be ready",
+                                      job.fixture)
                 return False
         return True
 
@@ -177,8 +170,7 @@ class TestSuiteExecutor(object):
         try:
             # Run each Job instance in its own thread.
             for job in self._jobs:
-                t = threading.Thread(target=job,
-                                     args=(test_queue, interrupt_flag),
+                t = threading.Thread(target=job, args=(test_queue, interrupt_flag),
                                      kwargs=dict(teardown_flag=teardown_flag))
                 # Do not wait for tests to finish executing if interrupted by the user.
                 t.daemon = True
@@ -258,10 +250,7 @@ class TestSuiteExecutor(object):
             hook_class = hook_config.pop("class")
 
             hook_logger = self.logger.new_hook_logger(hook_class, fixture.logger)
-            hook = _hooks.make_hook(hook_class,
-                                    hook_logger,
-                                    fixture,
-                                    **hook_config)
+            hook = _hooks.make_hook(hook_class, hook_logger, fixture, **hook_config)
             hooks.append(hook)
 
         return hooks
@@ -278,12 +267,7 @@ class TestSuiteExecutor(object):
 
         report = _report.TestReport(job_logger, self._suite.options)
 
-        return _job.Job(job_logger,
-                        fixture,
-                        hooks,
-                        report,
-                        self.archival,
-                        self._suite.options)
+        return _job.Job(job_logger, fixture, hooks, report, self.archival, self._suite.options)
 
     def _make_test_queue(self):
         """
@@ -297,10 +281,8 @@ class TestSuiteExecutor(object):
         # Put all the test cases in a queue.
         queue = _queue.Queue()
         for test_name in self._suite.tests:
-            test_case = testcases.make_test_case(self._suite.test_kind,
-                                                 test_queue_logger,
-                                                 test_name,
-                                                 **self.test_config)
+            test_case = testcases.make_test_case(self._suite.test_kind, test_queue_logger,
+                                                 test_name, **self.test_config)
             queue.put(test_case)
 
         # Add sentinel value for each job to indicate when there are no more items to process.

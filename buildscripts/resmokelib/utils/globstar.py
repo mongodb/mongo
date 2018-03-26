@@ -9,7 +9,6 @@ import os
 import os.path
 import re
 
-
 _GLOBSTAR = "**"
 _CONTAINS_GLOB_PATTERN = re.compile("[*?[]")
 

@@ -33,4 +33,5 @@ def _get_named_suites():
 
     return named_suites
 
+
 NAMED_SUITES = _get_named_suites()

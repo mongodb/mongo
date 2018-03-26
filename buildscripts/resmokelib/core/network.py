@@ -49,7 +49,7 @@ class PortAllocator(object):
     """
 
     # A PortAllocator will not return any port greater than this number.
-    MAX_PORT = 2 ** 16 - 1
+    MAX_PORT = 2**16 - 1
 
     # Each job gets a contiguous range of _PORTS_PER_JOB ports, with job 0 getting the first block
     # of ports, job 1 getting the second block, and so on.
@@ -83,8 +83,8 @@ class PortAllocator(object):
 
             if next_port >= start_port + cls._PORTS_PER_FIXTURE:
                 raise errors.PortAllocationError(
-                    "Fixture has requested more than the %d ports reserved per fixture"
-                    % cls._PORTS_PER_FIXTURE)
+                    "Fixture has requested more than the %d ports reserved per fixture" %
+                    cls._PORTS_PER_FIXTURE)
 
             return next_port
 

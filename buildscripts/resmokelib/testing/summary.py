@@ -6,10 +6,9 @@ from __future__ import absolute_import
 
 import collections
 
-
-
-Summary = collections.namedtuple("Summary", ["num_run", "time_taken", "num_succeeded",
-                                             "num_skipped", "num_failed", "num_errored"])
+Summary = collections.namedtuple(
+    "Summary",
+    ["num_run", "time_taken", "num_succeeded", "num_skipped", "num_failed", "num_errored"])
 
 
 def combine(summary1, summary2):

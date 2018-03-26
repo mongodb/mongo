@@ -21,18 +21,17 @@ if os.name == "posix" and sys.version_info[0] == 2:
         import warnings
         warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
                        " available. When using the subprocess module, a child process may trigger"
-                       " an invalid free(). See SERVER-22219 for more details."),
-                      RuntimeWarning)
+                       " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
         import subprocess
 else:
     import subprocess
-
 
 LOGGER = logging.getLogger(__name__)
 
 
 class Repository(object):
     """Represent a local git repository."""
+
     def __init__(self, directory):
         self.directory = directory
 
@@ -94,8 +93,7 @@ class Repository(object):
 
     def get_origin_url(self):
         """Return the URL of the origin repository."""
-        return self._callgito(
-            "config", ["--local", "--get", "remote.origin.url"]).rstrip()
+        return self._callgito("config", ["--local", "--get", "remote.origin.url"]).rstrip()
 
     def get_branch_name(self):
         """
@@ -126,8 +124,7 @@ class Repository(object):
         """Return True if the specified parent hash an ancestor of child hash."""
         # If the common point between parent_revision and child_revision is
         # parent_revision, then parent_revision is an ancestor of child_revision.
-        merge_base = self._callgito("merge-base", [parent_revision,
-                                                   child_revision]).rstrip()
+        merge_base = self._callgito("merge-base", [parent_revision, child_revision]).rstrip()
         return parent_revision == merge_base
 
     def is_commit(self, revision):
@@ -253,8 +250,9 @@ class GitException(Exception):
             element) that were run, if any.
         stderr: the error output of the git command.
     """
-    def __init__(self, message, returncode=None, cmd=None, process_args=None,
-                 stdout=None, stderr=None):
+
+    def __init__(self, message, returncode=None, cmd=None, process_args=None, stdout=None,
+                 stderr=None):
         Exception.__init__(self, message)
         self.returncode = returncode
         self.cmd = cmd
@@ -284,7 +282,6 @@ class GitCommandResult(object):
     def check_returncode(self):
         """Raise GitException if the exit code is non-zero."""
         if self.returncode:
-            raise GitException(
-                "Command '{0}' failed with code '{1}'".format(" ".join(self.process_args),
-                                                              self.returncode),
-                self.returncode, self.cmd, self.process_args, self.stdout, self.stderr)
+            raise GitException("Command '{0}' failed with code '{1}'".format(
+                " ".join(self.process_args), self.returncode), self.returncode, self.cmd,
+                               self.process_args, self.stdout, self.stderr)

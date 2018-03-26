@@ -138,27 +138,26 @@ def parse_command_line():
                       help=("Enables or disables preallocation of journal files for all mongod"
                             " processes. Defaults to %default."))
 
-    parser.add_option("--shellConnString", dest="shell_conn_string",
-                      metavar="CONN_STRING",
+    parser.add_option("--shellConnString", dest="shell_conn_string", metavar="CONN_STRING",
                       help="Overrides the default fixture and connect to an existing MongoDB"
-                           " cluster instead. This is useful for connecting to a MongoDB"
-                           " deployment started outside of resmoke.py including one running in a"
-                           " debugger.")
+                      " cluster instead. This is useful for connecting to a MongoDB"
+                      " deployment started outside of resmoke.py including one running in a"
+                      " debugger.")
 
     parser.add_option("--shellPort", dest="shell_port", metavar="PORT",
                       help="Convenience form of --shellConnString for connecting to an"
-                           " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
-                           " This is useful for connecting to a server running in a debugger.")
+                      " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
+                      " This is useful for connecting to a server running in a debugger.")
 
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
                       help="Repeats the given suite(s) N times, or until one fails.")
 
     parser.add_option("--reportFailureStatus", type="choice", action="store",
-                      dest="report_failure_status", choices=("fail", "silentfail"),
-                      metavar="STATUS",
+                      dest="report_failure_status", choices=("fail",
+                                                             "silentfail"), metavar="STATUS",
                       help="Controls if the test failure status should be reported as failed"
-                           " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
-                           " never be silently ignored. Defaults to STATUS=%default.")
+                      " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
+                      " never be silently ignored. Defaults to STATUS=%default.")
 
     parser.add_option("--reportFile", dest="report_file", metavar="REPORT",
                       help="Writes a JSON file with test status and timing information.")
@@ -201,7 +200,7 @@ def parse_command_line():
 
     parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size_gb",
                       metavar="CONFIG", help="Sets the storage engine cache size configuration"
-                                             " setting for all mongod's.")
+                      " setting for all mongod's.")
 
     parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
                       help="A YAML file that associates tests and tags.")
@@ -217,11 +216,10 @@ def parse_command_line():
 
     parser.add_option("--executor", dest="executor_file",
                       help="OBSOLETE: Superceded by --suites; specify --suites=SUITE path/to/test"
-                           " to run a particular test under a particular suite configuration.")
+                      " to run a particular test under a particular suite configuration.")
 
     evergreen_options = optparse.OptionGroup(
-        parser,
-        title="Evergreen options",
+        parser, title="Evergreen options",
         description=("Options used to propagate information about the Evergreen task running this"
                      " script."))
     parser.add_option_group(evergreen_options)
@@ -247,8 +245,7 @@ def parse_command_line():
                                        " patch build."))
 
     evergreen_options.add_option("--projectName", dest="project_name", metavar="PROJECT_NAME",
-                                 help=("Sets the name of the Evergreen project running the tests."
-                                       ))
+                                 help=("Sets the name of the Evergreen project running the tests."))
 
     evergreen_options.add_option("--revisionOrderId", dest="revision_order_id",
                                  metavar="REVISION_ORDER_ID",
@@ -267,11 +264,8 @@ def parse_command_line():
     evergreen_options.add_option("--versionId", dest="version_id", metavar="VERSION_ID",
                                  help="Sets the version ID of the task.")
 
-    benchmark_options = optparse.OptionGroup(
-        parser,
-        title="Benchmark test options",
-        description="Options for running Benchmark tests"
-    )
+    benchmark_options = optparse.OptionGroup(parser, title="Benchmark test options",
+                                             description="Options for running Benchmark tests")
 
     parser.add_option_group(benchmark_options)
 
@@ -280,8 +274,7 @@ def parse_command_line():
                                  help="Regex to filter benchmark tests to run.")
 
     benchmark_options.add_option("--benchmarkListTests", dest="benchmark_list_tests",
-                                 action="store_true",
-                                 metavar="BENCHMARK_LIST_TESTS",
+                                 action="store_true", metavar="BENCHMARK_LIST_TESTS",
                                  help="Lists all benchmark test configurations in each test file.")
 
     benchmark_min_time_help = (
@@ -297,16 +290,10 @@ def parse_command_line():
         "runs; use --benchmarkMinTimeSecs if you'd like to run a test for a longer or shorter "
         "duration.")
     benchmark_options.add_option("--benchmarkRepetitions", type="int", dest="benchmark_repetitions",
-                                 metavar="BENCHMARK_REPETITIONS",
-                                 help=benchmark_repetitions_help)
+                                 metavar="BENCHMARK_REPETITIONS", help=benchmark_repetitions_help)
 
-    parser.set_defaults(logger_file="console",
-                        dry_run="off",
-                        find_suites=False,
-                        list_suites=False,
-                        suite_files="with_server",
-                        prealloc_journal="off",
-                        shuffle="auto",
+    parser.set_defaults(logger_file="console", dry_run="off", find_suites=False, list_suites=False,
+                        suite_files="with_server", prealloc_journal="off", shuffle="auto",
                         stagger_jobs="off")
 
     options, args = parser.parse_args()
@@ -326,8 +313,8 @@ def validate_options(parser, options, args):
 
     if options.executor_file:
         parser.error("--executor is superseded by --suites; specify --suites={} {} to run the"
-                     " test(s) under those suite configuration(s)"
-                     .format(options.executor_file, " ".join(args)))
+                     " test(s) under those suite configuration(s)".format(
+                         options.executor_file, " ".join(args)))
 
 
 def validate_benchmark_options():
@@ -347,9 +334,7 @@ def validate_benchmark_options():
         raise optparse.OptionValueError(
             "--jobs=%d cannot be used for benchmark tests. Parallel jobs affect CPU cache access "
             "patterns and cause additional context switching, which lead to inaccurate benchmark "
-            "results. Please use --jobs=1"
-            % _config.JOBS
-        )
+            "results. Please use --jobs=1" % _config.JOBS)
 
 
 def get_logging_config(values):

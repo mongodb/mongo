@@ -110,8 +110,8 @@ class Job(object):
                     test.shortDescription())
                 self.report.setFailure(test, return_code=2)
                 # Always fail fast if the fixture fails.
-                raise errors.StopExecution("%s not running after %s" %
-                                           (self.fixture, test.shortDescription()))
+                raise errors.StopExecution("%s not running after %s" % (self.fixture,
+                                                                        test.shortDescription()))
         finally:
             success = self.report._find_test_info(test).status == "pass"
             if self.archival:

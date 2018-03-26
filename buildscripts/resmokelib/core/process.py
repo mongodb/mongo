@@ -29,8 +29,7 @@ if os.name == "posix" and sys.version_info[0] == 2:
         import warnings
         warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
                        " available. When using the subprocess module, a child process may trigger"
-                       " an invalid free(). See SERVER-22219 for more details."),
-                      RuntimeWarning)
+                       " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
         import subprocess
 else:
     import subprocess
@@ -74,8 +73,7 @@ if sys.platform == "win32":
                 win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
 
         # Update the limits of the job object.
-        win32job.SetInformationJobObject(job_object,
-                                         win32job.JobObjectExtendedLimitInformation,
+        win32job.SetInformationJobObject(job_object, win32job.JobObjectExtendedLimitInformation,
                                          job_info)
 
         return job_object
@@ -138,13 +136,9 @@ class Process(object):
         close_fds = (sys.platform != "win32")
 
         with _POPEN_LOCK:
-            self._process = subprocess.Popen(self.args,
-                                             bufsize=buffer_size,
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE,
-                                             close_fds=close_fds,
-                                             env=self.env,
-                                             creationflags=creation_flags)
+            self._process = subprocess.Popen(self.args, bufsize=buffer_size, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, close_fds=close_fds,
+                                             env=self.env, creationflags=creation_flags)
             self.pid = self._process.pid
 
         self._stdout_pipe = pipe.LoggerPipe(self.logger, logging.INFO, self._process.stdout)
@@ -173,16 +167,15 @@ class Process(object):
                 mongo_signal_handle = None
                 try:
                     mongo_signal_handle = win32event.OpenEvent(
-                        win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" +
-                        str(self._process.pid))
+                        win32event.EVENT_MODIFY_STATE, False,
+                        "Global\\Mongo_" + str(self._process.pid))
 
                     if not mongo_signal_handle:
                         # The process has already died.
                         return
                     win32event.SetEvent(mongo_signal_handle)
                     # Wait 60 seconds for the program to exit.
-                    status = win32event.WaitForSingleObject(
-                        self._process._handle, 60 * 1000)
+                    status = win32event.WaitForSingleObject(self._process._handle, 60 * 1000)
                     if status == win32event.WAIT_OBJECT_0:
                         return
                 except win32process.error as err:
