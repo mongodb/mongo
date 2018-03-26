@@ -62,7 +62,6 @@ struct SSLParams {
     struct CertificateSelector {
         std::string subject;
         std::vector<uint8_t> thumbprint;
-        std::vector<uint8_t> serial;
     };
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
     CertificateSelector sslCertificateSelector;         // --sslCertificateSelector

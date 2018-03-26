@@ -71,7 +71,6 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                                 StringData value) {
     selector->subject.clear();
     selector->thumbprint.clear();
-    selector->serial.clear();
 
     const auto delim = value.find('=');
     if (delim == std::string::npos) {
@@ -86,7 +85,7 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
         return Status::OK();
     }
 
-    if ((key != "thumbprint") && (key != "serial")) {
+    if (key != "thumbprint") {
         return {ErrorCodes::BadValue,
                 str::stream() << "Unknown certificate selector property for '" << name << "': '"
                               << key
@@ -100,12 +99,7 @@ Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                               << swHex.getStatus().reason()};
     }
 
-    if (key == "thumbprint") {
-        selector->thumbprint = std::move(swHex.getValue());
-    } else {
-        invariant(key == "serial");
-        selector->serial = std::move(swHex.getValue());
-    }
+    selector->thumbprint = std::move(swHex.getValue());
 
     return Status::OK();
 }
@@ -441,18 +435,23 @@ Status storeSSLServerOptions(const moe::Environment& params) {
 
     int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
-        if (sslGlobalParams.sslPEMKeyFile.size() == 0) {
-            return Status(ErrorCodes::BadValue, "need sslPEMKeyFile when SSL is enabled");
+        bool usingCertifiateSelectors = params.count("net.ssl.certificateSelector");
+        if (sslGlobalParams.sslPEMKeyFile.size() == 0 && !usingCertifiateSelectors) {
+            return Status(ErrorCodes::BadValue,
+                          "need sslPEMKeyFileor certificateSelector when SSL is enabled");
         }
         if (!sslGlobalParams.sslCRLFile.empty() && sslGlobalParams.sslCAFile.empty()) {
             return Status(ErrorCodes::BadValue, "need sslCAFile with sslCRLFile");
         }
+
         std::string sslCANotFoundError(
             "No SSL certificate validation can be performed since"
             " no CA file has been provided; please specify an"
             " sslCAFile parameter");
 
-        if (sslGlobalParams.sslCAFile.empty() &&
+        // When using cetificate selectors, we use the local system certificate store for verifying
+        // X.509 certificates for auth instead of relying on a CA file.
+        if (sslGlobalParams.sslCAFile.empty() && !usingCertifiateSelectors &&
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
             return Status(ErrorCodes::BadValue, sslCANotFoundError);
         }
@@ -461,6 +460,10 @@ Status storeSSLServerOptions(const moe::Environment& params) {
                sslGlobalParams.sslCAFile.size() || sslGlobalParams.sslCRLFile.size() ||
                sslGlobalParams.sslCipherConfig.size() ||
                sslGlobalParams.sslDisabledProtocols.size() ||
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+               params.count("net.ssl.certificateSelector") ||
+               params.count("net.ssl.clusterCertificateSelector") ||
+#endif
                sslGlobalParams.sslWeakCertificateValidation) {
         return Status(ErrorCodes::BadValue,
                       "need to enable SSL via the sslMode flag when "
