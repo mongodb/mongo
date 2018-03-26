@@ -134,7 +134,9 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 }
 
 /**
- * Sets the Client's LastOp to the system OpTime if needed.
+ * Sets the Client's LastOp to the system OpTime if needed. This is especially helpful for
+ * adjusting the client opTime for cases when batched write performed multiple writes, but
+ * when the last write was a no-op (which will not advance the client opTime).
  */
 class LastOpFixer {
 public:
