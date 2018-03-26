@@ -2228,6 +2228,8 @@ var ReplSetTest = function(opts) {
         self.ports = existingNodes.map(node => node.split(':')[1]);
         self.nodes = existingNodes.map(node => new Mongo(node));
         self.waitForKeys = false;
+        self.host = existingNodes[0].split(':')[0];
+        self.name = conf._id;
     }
 
     if (typeof opts === 'string' || opts instanceof String) {
