@@ -1330,11 +1330,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
             opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
     }
 
-    size_t plannerOptions = QueryPlannerParams::IS_COUNT;
-    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, request.getNs().ns())) {
-        plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
-    }
-
+    const size_t plannerOptions = QueryPlannerParams::IS_COUNT;
     StatusWith<PrepareExecutionResult> executionResult =
         prepareExecution(opCtx, collection, ws.get(), std::move(cq), plannerOptions);
     if (!executionResult.isOK()) {
