@@ -69,6 +69,8 @@ namespace {
 // Unix Epoch (and thereby Date_t) is relative to Jan 1, 1970 00:00:00 GMT
 static const ::CFAbsoluteTime k20010101_000000_GMT = 978307200;
 
+::CFStringRef kMongoDBRolesOID = nullptr;
+
 StatusWith<std::string> toString(::CFStringRef str) {
     const auto len =
         ::CFStringGetMaximumSizeForEncoding(::CFStringGetLength(str), ::kCFStringEncodingUTF8);
@@ -187,11 +189,6 @@ void uassertOSStatusOK(::OSStatus status, SocketErrorKind kind) {
     throwSocketError(kind, swMsg.getValue());
 }
 
-StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(::SecCertificateRef peer) {
-    // TODO: ASN.1 parsing
-    return stdx::unordered_set<RoleName>();
-}
-
 bool isUnixDomainSocket(const std::string& hostname) {
     return end(hostname) != std::find(begin(hostname), end(hostname), '/');
 }
@@ -220,6 +217,14 @@ struct CFTypeMap<::CFStringRef> {
     }
 };
 constexpr StringData CFTypeMap<::CFStringRef>::typeName;
+template <>
+struct CFTypeMap<::CFDataRef> {
+    static constexpr StringData typeName = "data"_sd;
+    static ::CFTypeID type() {
+        return ::CFDataGetTypeID();
+    }
+};
+constexpr StringData CFTypeMap<::CFDataRef>::typeName;
 template <>
 struct CFTypeMap<::CFNumberRef> {
     static constexpr StringData typeName = "number"_sd;
@@ -363,6 +368,52 @@ StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
     }
 
     return Date_t::fromMillisSinceEpoch((k20010101_000000_GMT + dateval) * 1000);
+}
+
+StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(::CFDictionaryRef dict) {
+    if (!::CFDictionaryContainsKey(dict, kMongoDBRolesOID)) {
+        return stdx::unordered_set<RoleName>();
+    }
+
+    auto swRolesKey = extractDictionaryValue<::CFDictionaryRef>(dict, kMongoDBRolesOID);
+    if (!swRolesKey.isOK()) {
+        return swRolesKey.getStatus();
+    }
+    auto swRolesList =
+        extractDictionaryValue<::CFArrayRef>(swRolesKey.getValue(), ::kSecPropertyKeyValue);
+    if (!swRolesList.isOK()) {
+        return swRolesList.getStatus();
+    }
+    auto rolesList = swRolesList.getValue();
+    const auto count = ::CFArrayGetCount(rolesList);
+    for (::CFIndex i = 0; i < count; ++i) {
+        auto elemval = ::CFArrayGetValueAtIndex(rolesList, i);
+        invariant(elemval);
+        if (::CFGetTypeID(elemval) != ::CFDictionaryGetTypeID()) {
+            return {ErrorCodes::InvalidSSLConfiguration,
+                    "Invalid list element in Certificate Roles OID"};
+        }
+
+        auto elem = reinterpret_cast<::CFDictionaryRef>(elemval);
+        auto swType = extractDictionaryValue<::CFStringRef>(elem, ::kSecPropertyKeyType);
+        if (!swType.isOK()) {
+            return swType.getStatus();
+        }
+        if (::CFStringCompare(swType.getValue(), ::kSecPropertyTypeData, 0)) {
+            // Non data, ignore.
+            continue;
+        }
+        auto swData = extractDictionaryValue<::CFDataRef>(elem, ::kSecPropertyKeyValue);
+        if (!swData.isOK()) {
+            return swData.getStatus();
+        }
+        ConstDataRange rolesData(
+            reinterpret_cast<const char*>(::CFDataGetBytePtr(swData.getValue())),
+            ::CFDataGetLength(swData.getValue()));
+        return parsePeerRoles(rolesData);
+    }
+
+    return {ErrorCodes::InvalidSSLConfiguration, "Unable to extract role data from certificate"};
 }
 
 StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionaryRef dict) {
@@ -1027,9 +1078,12 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     }
 
     CFUniquePtr<::CFMutableArrayRef> oids(
-        ::CFArrayCreateMutable(nullptr, 2, &::kCFTypeArrayCallBacks));
+        ::CFArrayCreateMutable(nullptr, remoteHost.empty() ? 3 : 2, &::kCFTypeArrayCallBacks));
     ::CFArrayAppendValue(oids.get(), ::kSecOIDX509V1SubjectName);
     ::CFArrayAppendValue(oids.get(), ::kSecOIDSubjectAltName);
+    if (remoteHost.empty()) {
+        ::CFArrayAppendValue(oids.get(), kMongoDBRolesOID);
+    }
 
     ::CFErrorRef err = nullptr;
     CFUniquePtr<::CFDictionaryRef> cfdict(::SecCertificateCopyValues(cert, oids.get(), &err));
@@ -1049,7 +1103,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     if (remoteHost.empty()) {
         // If this is an SSL server context (on a mongod/mongos)
         // parse any client roles out of the client certificate.
-        auto swPeerCertificateRoles = parsePeerRoles(cert);
+        auto swPeerCertificateRoles = parsePeerRoles(cfdict.get());
         if (!swPeerCertificateRoles.isOK()) {
             return swPeerCertificateRoles.getStatus();
         }
@@ -1153,6 +1207,9 @@ std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
 }
 
 MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
+    kMongoDBRolesOID = ::CFStringCreateWithCString(
+        nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
+
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerApple(sslGlobalParams, isSSLServer);
