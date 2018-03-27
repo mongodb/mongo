@@ -41,44 +41,67 @@
     const forRestart = false;
     rst.stopSet(signal, forRestart, {skipValidation: true});
 
-    //
-    // Test that stashed transaction resources are destroyed at stepdown.
-    //
+    function testStepdown(stepdownFunc) {
+        rst = new ReplSetTest({nodes: 2});
+        rst.startSet();
+        rst.initiate();
 
-    rst = new ReplSetTest({nodes: 2});
-    rst.startSet();
-    rst.initiate();
+        const primary = rst.getPrimary();
+        const primaryDB = primary.getDB(dbName);
 
-    const primary = rst.getPrimary();
-    primaryDB = primary.getDB(dbName);
+        const session = primaryDB.getMongo().startSession();
+        const sessionDB = session.getDatabase(dbName);
 
-    session = primaryDB.getMongo().startSession();
-    sessionDB = session.getDatabase(dbName);
+        for (let i = 0; i < 4; i++) {
+            assert.commandWorked(sessionDB.coll.insert({_id: i}, {writeConcern: {w: "majority"}}));
+        }
 
-    for (let i = 0; i < 4; i++) {
-        assert.commandWorked(sessionDB.coll.insert({_id: i}, {writeConcern: {w: "majority"}}));
+        // Create a snapshot read cursor.
+        const res = assert.commandWorked(sessionDB.runCommand({
+            find: collName,
+            batchSize: 2,
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(0),
+            startTransaction: true,
+            autocommit: false
+        }));
+        assert(res.hasOwnProperty("cursor"), tojson(res));
+        assert(res.cursor.hasOwnProperty("id"), tojson(res));
+        const cursorId = res.cursor.id;
+
+        // It should be possible to step down the primary without hanging.
+        stepdownFunc(rst);
+        rst.waitForState(primary, ReplSetTest.State.SECONDARY);
+
+        // Perform a getMore using the previous transaction's open cursorId. We expect to receive
+        // CursorNotFound if the cursor was properly closed on step down.
+        assert.commandFailedWithCode(sessionDB.runCommand({
+            getMore: cursorId,
+            collection: collName,
+        }),
+                                     ErrorCodes.CursorNotFound);
+        rst.stopSet();
     }
 
-    // Create a snapshot read cursor.
-    const res = assert.commandWorked(sessionDB.runCommand({
-        find: collName,
-        batchSize: 2,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(0)
-    }));
-    assert(res.hasOwnProperty("cursor"), tojson(res));
-    assert(res.cursor.hasOwnProperty("id"), tojson(res));
+    //
+    // Test that stashed transaction resources are destroyed at stepdown triggered by
+    // replSetStepDown.
+    //
+    function replSetStepDown(replSetTest) {
+        assert.throws(function() {
+            replSetTest.getPrimary().adminCommand({replSetStepDown: 60, force: true});
+        });
+    }
+    testStepdown(replSetStepDown);
 
-    // It should be possible to step down the primary without hanging.
-    assert.throws(function() {
-        primary.adminCommand({replSetStepDown: 60, force: true});
-    });
-    rst.waitForState(primary, ReplSetTest.State.SECONDARY);
-
-    // TODO SERVER-33690: Destroying stashed transaction resources should kill the cursor, so this
-    // getMore should fail with CursorNotFound.
-    assert.commandFailedWithCode(
-        sessionDB.runCommand({getMore: res.cursor.id, collection: collName}), 50740);
-
-    rst.stopSet();
+    //
+    // Test that stashed transaction resources are destroyed at stepdown triggered by loss of
+    // quorum.
+    //
+    function stepDownOnLossOfQuorum(replSetTest) {
+        const secondary = rst.getSecondary();
+        const secondaryId = rst.getNodeId(secondary);
+        rst.stop(secondaryId);
+    }
+    testStepdown(stepDownOnLossOfQuorum);
 })();

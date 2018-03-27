@@ -529,7 +529,6 @@ Status runAggregate(OperationContext* opCtx,
         const bool keepCursor =
             handleCursorCommand(opCtx, origNss, pin.getCursor(), request, result);
         if (keepCursor) {
-            opCtx->setStashedCursor();
             cursorFreer.Dismiss();
         }
     }

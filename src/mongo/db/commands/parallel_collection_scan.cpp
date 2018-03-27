@@ -174,7 +174,6 @@ public:
             bucketsBuilder.append(threadResult.obj());
         }
         result.appendArray("cursors", bucketsBuilder.obj());
-        opCtx->setStashedCursor();
 
         return true;
     }

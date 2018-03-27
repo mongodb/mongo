@@ -81,6 +81,7 @@ public:
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* opCtx);
+    virtual void killAllTransactionCursors(OperationContext* opCtx);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();

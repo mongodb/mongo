@@ -411,20 +411,6 @@ public:
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
-    /**
-     * Indicate that the current network operation will leave an open client cursor on completion.
-     */
-    void setStashedCursor() {
-        _hasStashedCursor = true;
-    }
-
-    /**
-     * Returns whether the current network operation will leave an open client cursor on completion.
-     */
-    bool hasStashedCursor() {
-        return _hasStashedCursor;
-    }
-
 private:
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
@@ -509,10 +495,6 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
-
-    // When true, the cursor used by this operation will be stashed for use by a subsequent network
-    // operation.
-    bool _hasStashedCursor = false;
 };
 
 namespace repl {

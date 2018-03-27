@@ -217,10 +217,6 @@ public:
                    const GetMoreRequest& request,
                    const BSONObj& cmdObj,
                    BSONObjBuilder& result) {
-        // If we return early without freeing the cursor, indicate we have a stashed cursor, so that
-        // transaction state is stashed.
-        ScopeGuard stashedCursorIndicator = MakeGuard(&OperationContext::setStashedCursor, opCtx);
-
         auto curOp = CurOp::get(opCtx);
         curOp->debug().cursorid = request.cursorid;
 
@@ -355,10 +351,8 @@ public:
             return CommandHelpers::appendCommandStatus(result, status);
         }
 
-        // On early return, get rid of the cursor. We should no longer indicate we have a stashed
-        // cursor on early return.
+        // On early return, get rid of the cursor.
         ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &ccPin.getValue());
-        stashedCursorIndicator.Dismiss();
 
         const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
         opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(cursor->getReadConcernLevel(),
@@ -472,8 +466,6 @@ public:
 
             cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
             cursor->incPos(numResults);
-
-            opCtx->setStashedCursor();
         } else {
             curOp->debug().cursorExhausted = true;
         }

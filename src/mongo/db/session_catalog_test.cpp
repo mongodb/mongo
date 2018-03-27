@@ -200,9 +200,9 @@ TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
             DirectClientSetter inDirectClient(opCtx());
             OperationContextSession innerScopedSession(opCtx(), true, boost::none, boost::none);
 
-            // Indicate that there is a stashed cursor. If we were not in a nested session, this
-            // would ensure that stashing is not a noop.
-            opCtx()->setStashedCursor();
+            // Report to Session that there is a stashed cursor. If we were not in a nested session,
+            // this would ensure that stashing is not a noop.
+            Session::registerCursorExistsFunction([](LogicalSessionId, TxnNumber) { return true; });
 
             OperationContextSession::get(opCtx())->stashTransactionResources(opCtx());
 

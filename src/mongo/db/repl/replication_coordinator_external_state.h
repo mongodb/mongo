@@ -210,9 +210,14 @@ public:
 
     /**
      * Kills all operations that have a Client that is associated with an incoming user
-     * connection.  Used during stepdown.
+     * connection. Also kills stashed transaction resources. Used during stepdown.
      */
     virtual void killAllUserOperations(OperationContext* opCtx) = 0;
+
+    /**
+     * Kills all transaction owned client cursors. Used during stepdown.
+     */
+    virtual void killAllTransactionCursors(OperationContext* opCtx) = 0;
 
     /**
      * Resets any active sharding metadata on this server and stops any sharding-related threads

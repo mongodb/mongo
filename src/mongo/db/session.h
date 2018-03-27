@@ -62,6 +62,12 @@ class Session {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
+    struct TransactionState {
+        static const OperationContext::Decoration<TransactionState> get;
+
+        bool requiresIXReadUpgrade = false;
+    };
+
     /**
      * Holds state for a snapshot read or multi-statement transaction in between network operations.
      */
@@ -100,6 +106,9 @@ public:
     };
 
     using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
+    using CursorKillFunction =
+        std::function<size_t(OperationContext*, LogicalSessionId, TxnNumber)>;
+    using CursorExistsFunction = std::function<bool(LogicalSessionId, TxnNumber)>;
 
     static const BSONObj kDeadEndSentinel;
 
@@ -239,6 +248,20 @@ public:
     void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
 
     /**
+     * Registers a function that will be used to kill client cursors on transaction commit or abort.
+     * TODO SERVER-34395: Move cursor kill function into Session instead of registering.
+     */
+    static void registerCursorKillFunction(CursorKillFunction cursorKillFunc) {
+        _cursorKillFunction = cursorKillFunc;
+    }
+
+    // TODO SERVER-34113: Remove the "cursor exists" mechanism from both Session and CursorManager
+    // once snapshot reads outside of multi-statement transcactions are no longer supported.
+    static void registerCursorExistsFunction(CursorExistsFunction cursorExistsFunc) {
+        _cursorExistsFunction = cursorExistsFunc;
+    }
+
+    /**
      * Commits the transaction, including committing the write unit of work and updating
      * transaction state.
      */
@@ -247,13 +270,13 @@ public:
     /**
      * Aborts the transaction outside the transaction, releasing transaction resources.
      */
-    void abortArbitraryTransaction();
+    void abortArbitraryTransaction(OperationContext* opCtx, bool shouldKillClientCursors);
 
     /**
      * Same as abortArbitraryTransaction, except only executes if _transactionExpireDate indicates
      * that the transaction has expired.
      */
-    void abortArbitraryTransactionIfExpired();
+    void abortArbitraryTransactionIfExpired(OperationContext* opCtx);
 
     /*
      * Aborts the transaction inside the transaction, releasing transaction resources.
@@ -261,6 +284,11 @@ public:
      * transaction resources.
      */
     void abortActiveTransaction(OperationContext* opCtx);
+
+    /**
+     * Kills any open client cursors associated with the current transaction.
+     */
+    void killTransactionCursors(OperationContext* opCtx);
 
     bool getAutocommit() const {
         return _autocommit;
@@ -347,12 +375,23 @@ public:
         const repl::OplogEntry& entry);
 
 private:
+    // Holds function to be used to kill client cursors.
+    static CursorKillFunction _cursorKillFunction;
+    // Holds function which determines whether the CursorManager has client cursor references for a
+    // given transaction.
+    static CursorExistsFunction _cursorExistsFunction;
+
     void _beginOrContinueTxn(WithLock,
+                             OperationContext* opCtx,
                              TxnNumber txnNumber,
                              boost::optional<bool> autocommit,
-                             boost::optional<bool> startTransaction);
+                             boost::optional<bool> startTransaction,
+                             bool* canKillCursors);
 
-    void _beginOrContinueTxnOnMigration(WithLock, TxnNumber txnNumber);
+    void _beginOrContinueTxnOnMigration(WithLock,
+                                        OperationContext* opCtx,
+                                        TxnNumber txnNumber,
+                                        bool* canKillCursors);
 
     // Checks if there is a conflicting operation on the current Session
     void _checkValid(WithLock) const;
@@ -361,7 +400,10 @@ private:
     // we don't start a txn that is too old.
     void _checkTxnValid(WithLock, TxnNumber txnNumber) const;
 
-    void _setActiveTxn(WithLock, TxnNumber txnNumber);
+    void _setActiveTxn(WithLock,
+                       OperationContext* opCtx,
+                       TxnNumber txnNumber,
+                       bool* canKillCursors);
 
     void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber, bool checkAbort) const;
 
@@ -379,10 +421,12 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
-    void _abortArbitraryTransaction(WithLock);
+    void _abortArbitraryTransaction(WithLock, OperationContext* opCtx, bool* canKillCursors);
 
     // Releases stashed transaction resources to abort the transaction.
-    void _abortTransaction(WithLock);
+    // 'canKillCursors' is an output parameter, which when set to true indicates that transaction
+    // client cursors may be killed.
+    void _abortTransaction(WithLock, OperationContext* opCtx, bool* canKillCursors);
 
     // Committing a transaction first changes its state to "Committing" and writes to the oplog,
     // then it changes the state to "Committed".
@@ -397,6 +441,10 @@ private:
     // outside of session checkout. They can safely skip the committing transactions.
     // 3) Migration. Should be able to skip committing transactions.
     void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
+
+    void _killTransactionCursors(OperationContext* opCtx,
+                                 LogicalSessionId lsid,
+                                 TxnNumber txnNumber);
 
     const LogicalSessionId _sessionId;
 

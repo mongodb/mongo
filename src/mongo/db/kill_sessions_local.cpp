@@ -51,10 +51,19 @@ void killSessionsLocalKillCursors(OperationContext* opCtx, const SessionKiller::
 }  // namespace
 
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher) {
+                                       const SessionKiller::Matcher& matcher,
+                                       bool shouldKillClientCursors) {
+    SessionCatalog::get(opCtx)->scanSessions(
+        opCtx, matcher, [shouldKillClientCursors](OperationContext* opCtx, Session* session) {
+            session->abortArbitraryTransaction(opCtx, shouldKillClientCursors);
+        });
+}
+
+void killSessionsLocalKillTransactionCursors(OperationContext* opCtx,
+                                             const SessionKiller::Matcher& matcher) {
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcher, [](OperationContext* opCtx, Session* session) {
-            session->abortArbitraryTransaction();
+            session->killTransactionCursors(opCtx);
         });
 }
 
@@ -72,7 +81,7 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
-            session->abortArbitraryTransactionIfExpired();
+            session->abortArbitraryTransactionIfExpired(opCtx);
         });
 }
 
