@@ -1,6 +1,4 @@
-"""
-Module to hold the logger instances themselves.
-"""
+"""Module to hold the logger instances themselves."""
 
 from __future__ import absolute_import
 
@@ -20,17 +18,21 @@ EXECUTOR_LOGGER = None
 
 
 def _build_logger_server(logging_config):
-    """Create and return a new BuildloggerServer if "buildlogger" is configured as
-    one of the handler class in the configuration, return None otherwise.
+    """Create and return a new BuildloggerServer.
+
+    This occurs if "buildlogger" is configured as one of the handler class in the configuration,
+    return None otherwise.
     """
     for logger_name in (FIXTURE_LOGGER_NAME, TESTS_LOGGER_NAME):
         logger_info = logging_config[logger_name]
         for handler_info in logger_info["handlers"]:
             if handler_info["class"] == "buildlogger":
                 return buildlogger.BuildloggerServer()
+    return None
 
 
 def configure_loggers(logging_config):
+    """Configure the loggers."""
     buildlogger.BUILDLOGGER_FALLBACK = BaseLogger("buildlogger")
     # The 'buildlogger' prefix is not added to the fallback logger since the prefix of the original
     # logger will be there as part of the logged message.
@@ -39,7 +41,7 @@ def configure_loggers(logging_config):
     build_logger_server = _build_logger_server(logging_config)
     fixture_logger = FixtureRootLogger(logging_config, build_logger_server)
     tests_logger = TestsRootLogger(logging_config, build_logger_server)
-    global EXECUTOR_LOGGER
+    global EXECUTOR_LOGGER  # pylint: disable=global-statement
     EXECUTOR_LOGGER = ExecutorRootLogger(logging_config, build_logger_server, fixture_logger,
                                          tests_logger)
 
@@ -68,7 +70,7 @@ class BaseLogger(logging.Logger):
 
     @property
     def build_logger_server(self):
-        """The configured BuildloggerServer instance, or None."""
+        """Get the configured BuildloggerServer instance, or None."""
         if self._build_logger_server:
             return self._build_logger_server
         elif self.parent:
@@ -78,7 +80,7 @@ class BaseLogger(logging.Logger):
 
     @property
     def logging_config(self):
-        """The logging configuration."""
+        """Get the logging configuration."""
         if self._logging_config:
             return self._logging_config
         elif self.parent:
@@ -88,6 +90,7 @@ class BaseLogger(logging.Logger):
 
     @staticmethod
     def get_formatter(logger_info):
+        """Return formatter."""
         log_format = logger_info.get("format", _DEFAULT_FORMAT)
         return formatters.ISO8601Formatter(fmt=log_format)
 
@@ -107,7 +110,7 @@ class RootLogger(BaseLogger):
 
     def _configure(self):
         if self.name not in self.logging_config:
-            raise ValueError("Logging configuration should contain the %s component", self.name)
+            raise ValueError("Logging configuration should contain the %s component" % self.name)
         logger_info = self.logging_config[self.name]
         formatter = self.get_formatter(logger_info)
 
@@ -158,6 +161,8 @@ class ExecutorRootLogger(RootLogger):
 
 
 class JobLogger(BaseLogger):
+    """JobLogger class."""
+
     def __init__(self, test_kind, job_num, parent, fixture_root_logger):
         """Initialize a JobLogger.
 
@@ -200,7 +205,10 @@ class JobLogger(BaseLogger):
 
 
 class TestLogger(BaseLogger):
-    def __init__(self, test_name, parent, build_id=None, test_id=None, url=None):
+    """TestLogger class."""
+
+    def __init__(  # pylint: disable=too-many-arguments
+            self, test_name, parent, build_id=None, test_id=None, url=None):
         """Initialize a TestLogger.
 
         :param test_name: the test name.
@@ -245,6 +253,8 @@ class FixtureRootLogger(RootLogger):
 
 
 class FixtureLogger(BaseLogger):
+    """FixtureLogger class."""
+
     def __init__(self, fixture_class, job_num, build_id, fixture_root_logger):
         """Initialize a FixtureLogger.
 
@@ -277,6 +287,8 @@ class FixtureLogger(BaseLogger):
 
 
 class FixtureNodeLogger(BaseLogger):
+    """FixtureNodeLogger class."""
+
     def __init__(self, fixture_class, job_num, node_name, fixture_logger):
         """Initialize a FixtureNodeLogger.
 
@@ -310,6 +322,8 @@ class TestsRootLogger(RootLogger):
 
 
 class TestQueueLogger(BaseLogger):
+    """TestQueueLogger class."""
+
     def __init__(self, test_kind, tests_root_logger):
         """Initialize a TestQueueLogger.
 
@@ -320,6 +334,8 @@ class TestQueueLogger(BaseLogger):
 
 
 class HookLogger(BaseLogger):
+    """HookLogger class."""
+
     def __init__(self, hook_class, fixture_logger, tests_root_logger):
         """Initialize a HookLogger.
 
@@ -337,9 +353,7 @@ class HookLogger(BaseLogger):
 
 
 def _fallback_buildlogger_handler(include_logger_name=True):
-    """
-    Returns a handler that writes to stderr.
-    """
+    """Return a handler that writes to stderr."""
     if include_logger_name:
         log_format = "[fallback] [%(name)s] %(message)s"
     else:
@@ -353,10 +367,7 @@ def _fallback_buildlogger_handler(include_logger_name=True):
 
 
 def _get_buildlogger_handler_info(logger_info):
-    """
-    Returns the buildlogger handler information if it exists, and None
-    otherwise.
-    """
+    """Return the buildlogger handler information if it exists, and None otherwise."""
     for handler_info in logger_info["handlers"]:
         handler_info = handler_info.copy()
         if handler_info.pop("class") == "buildlogger":

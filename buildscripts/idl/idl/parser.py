@@ -22,9 +22,9 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import io
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 import yaml
 from yaml import nodes
-from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
 from . import common
 from . import cpp_types
@@ -65,7 +65,7 @@ def _generic_parser(
         syntax_node_name,  # type: unicode
         syntax_node,  # type: Any
         mapping_rules  # type: Dict[unicode, _RuleDesc]
-):
+):  # type: (...) -> None
     # pylint: disable=too-many-branches
     field_name_set = set()  # type: Set[str]
 
@@ -129,7 +129,7 @@ def _parse_mapping(
         node,  # type: Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]
         syntax_node_name,  # type: unicode
         func  # type: Callable[[errors.ParserContext,syntax.IDLSpec,unicode,Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]], None]
-):
+):  # type: (...) -> None
     """Parse a top-level mapping section in the IDL file."""
     if not ctxt.is_mapping_node(node, syntax_node_name):
         return
@@ -542,10 +542,10 @@ def _parse(stream, error_file_name):
 
     if ctxt.errors.has_errors():
         return syntax.IDLParsedSpec(None, ctxt.errors)
-    else:
-        _propagate_globals(spec)
 
-        return syntax.IDLParsedSpec(spec, None)
+    _propagate_globals(spec)
+
+    return syntax.IDLParsedSpec(spec, None)
 
 
 class ImportResolverBase(object):
@@ -625,7 +625,7 @@ def parse(stream, input_file_name, resolver):
             return parsed_doc
 
         # We need to generate includes for imported IDL files which have structs
-        if base_file_name == input_file_name and len(parsed_doc.spec.symbols.structs):
+        if base_file_name == input_file_name and parsed_doc.spec.symbols.structs:
             needs_include.append(imported_file_name)
 
         # Add other imported files to the list of files to parse

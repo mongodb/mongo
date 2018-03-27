@@ -108,7 +108,7 @@ class ParserError(common.SourceLocation):
 
     def __init__(self, error_id, msg, file_name, line, column):
         # type: (unicode, unicode, unicode, int, int) -> None
-        """"Construct a parser error with source location information."""
+        """Construct a parser error with source location information."""
         # pylint: disable=too-many-arguments
         self.error_id = error_id
         self.msg = msg
@@ -116,8 +116,7 @@ class ParserError(common.SourceLocation):
 
     def __str__(self):
         # type: () -> str
-        """
-        Return a formatted error.
+        """Return a formatted error.
 
         Example error message:
         test.idl: (17, 4): ID0008: Unknown IDL node 'cpp_namespac' for YAML entity 'global'.
@@ -128,11 +127,11 @@ class ParserError(common.SourceLocation):
 
 
 class ParserErrorCollection(object):
-    """A collection of parser errors with source context information."""
+    """Collection of parser errors with source context information."""
 
     def __init__(self):
         # type: () -> None
-        """Default constructor."""
+        """Initialize ParserErrorCollection."""
         self._errors = []  # type: List[ParserError]
 
     def add(self, location, error_id, msg):
@@ -310,9 +309,8 @@ class ParserContext(object):
         assert self.is_scalar_sequence_or_scalar_node(node, "unknown")
         if node.id == "scalar":
             return [node.value]
-        else:
-            # Unzip the list of ScalarNode
-            return [v.value for v in node.value]
+        # Unzip the list of ScalarNode
+        return [v.value for v in node.value]
 
     def add_duplicate_error(self, node, node_name):
         # type: (yaml.nodes.Node, unicode) -> None

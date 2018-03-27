@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Unit tests for the resmokelib.testing.hooks.combine_benchmark_results module."""
 
 from __future__ import absolute_import
 
@@ -8,6 +9,8 @@ import unittest
 import mock
 
 import buildscripts.resmokelib.testing.hooks.combine_benchmark_results as cbr
+
+# pylint: disable=missing-docstring,protected-access
 
 _BM_CONTEXT = {
     "date": "2018/01/30-18:40:25", "num_cpus": 40, "mhz_per_cpu": 4999,
@@ -26,8 +29,7 @@ _BM_REPORT_2 = {
 
 _BM_MEAN_REPORT = {
     "name": "BM_Name1/arg1/arg with space_mean", "iterations": 1000, "real_time": 1200,
-    "cpu_time": 1300,
-    "bytes_per_second": 1400, "items_per_second": 1500, "custom_counter_1": 1600
+    "cpu_time": 1300, "bytes_per_second": 1400, "items_per_second": 1500, "custom_counter_1": 1600
 }
 
 _BM_MULTITHREAD_REPORT = {
@@ -41,9 +43,11 @@ _BM_MULTITHREAD_MEDIAN_REPORT = {
 }
 
 _BM_FULL_REPORT = {
-    "context": _BM_CONTEXT,
-    "benchmarks": [_BM_REPORT_1, _BM_REPORT_2, _BM_MEAN_REPORT, _BM_MULTITHREAD_REPORT,
-                   _BM_MULTITHREAD_MEDIAN_REPORT]
+    "context":
+        _BM_CONTEXT, "benchmarks": [
+            _BM_REPORT_1, _BM_REPORT_2, _BM_MEAN_REPORT, _BM_MULTITHREAD_REPORT,
+            _BM_MULTITHREAD_MEDIAN_REPORT
+        ]
 }
 
 # 12/31/2999 @ 11:59pm (UTC)
@@ -58,7 +62,7 @@ class CombineBenchmarkResultsFixture(unittest.TestCase):
     # Mock the hook's parent class because we're testing only functionality of this hook and
     # not anything related to or inherit from the parent class.
     @mock.patch("buildscripts.resmokelib.testing.hooks.interface.Hook", autospec=True)
-    def setUp(self, MockHook):
+    def setUp(self, MockHook):  # pylint: disable=arguments-differ,unused-argument
         self.bm_threads_report = cbr._BenchmarkThreadsReport(_BM_CONTEXT)
 
         self.cbr_hook = cbr.CombineBenchmarkResults(None, None)
@@ -118,8 +122,7 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
         # Also test add_report() in the process.
         self.bm_threads_report.add_report(
             self.bm_threads_report.parse_bm_name(_BM_MULTITHREAD_REPORT["name"]),
-            _BM_MULTITHREAD_REPORT
-        )
+            _BM_MULTITHREAD_REPORT)
 
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 
@@ -135,14 +138,10 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
 
     def test_generate_single_thread_perf_plugin_dict(self):
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_1["name"]),
-            _BM_REPORT_1
-        )
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_1["name"]), _BM_REPORT_1)
 
         self.bm_threads_report.add_report(
-            self.bm_threads_report.parse_bm_name(_BM_REPORT_2["name"]),
-            _BM_REPORT_2
-        )
+            self.bm_threads_report.parse_bm_name(_BM_REPORT_2["name"]), _BM_REPORT_2)
 
         self.assertEqual(len(self.bm_threads_report.thread_benchmark_map.keys()), 1)
 

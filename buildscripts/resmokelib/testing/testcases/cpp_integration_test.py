@@ -1,6 +1,4 @@
-"""
-unittest.TestCase for C++ integration tests.
-"""
+"""The unittest.TestCase for C++ integration tests."""
 
 from __future__ import absolute_import
 
@@ -10,16 +8,12 @@ from ... import utils
 
 
 class CPPIntegrationTestCase(interface.ProcessTestCase):
-    """
-    A C++ integration test to execute.
-    """
+    """A C++ integration test to execute."""
 
     REGISTERED_NAME = "cpp_integration_test"
 
     def __init__(self, logger, program_executable, program_options=None):
-        """
-        Initializes the CPPIntegrationTestCase with the executable to run.
-        """
+        """Initialize the CPPIntegrationTestCase with the executable to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "C++ integration test", program_executable)
 
@@ -27,6 +21,7 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
+        """Configure the test case."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         self.program_options["connectionString"] = self.fixture.get_internal_connection_string()

@@ -1,6 +1,4 @@
-"""
-Extension to the logging package to support buildlogger.
-"""
+"""Extension to the logging package to support buildlogger."""
 
 from __future__ import absolute_import
 

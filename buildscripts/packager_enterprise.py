@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Packager Enterprise module."""
 
 # This program makes Debian and RPM repositories for MongoDB, by
 # downloading our tarballs of statically linked executables and
@@ -26,20 +27,16 @@
 # apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core libsnmp15
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
-import argparse
 import errno
-import getopt
 from glob import glob
-import packager
 import os
 import re
 import shutil
-import stat
-import subprocess
 import sys
 import tempfile
 import time
-import urlparse
+
+import packager  # pylint: disable=relative-import
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES = ["x86_64", "ppc64le", "s390x", "arm64"]
@@ -49,20 +46,26 @@ DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
 
 
 class EnterpriseSpec(packager.Spec):
+    """EnterpriseSpec class."""
+
     def suffix(self):
+        """Suffix."""
         return "-enterprise" if int(self.ver.split(".")[1]) % 2 == 0 else "-enterprise-unstable"
 
 
 class EnterpriseDistro(packager.Distro):
-    def repodir(self, arch, build_os, spec):
-        """Return the directory where we'll place the package files for
-        (distro, distro_version) in that distro's preferred repository
+    """EnterpriseDistro class."""
+
+    def repodir(self, arch, build_os, spec):  # noqa: D406,D407,D412,D413
+        """Return the directory where we'll place the package files.
+
+        This is for (distro, distro_version) in that distro's preferred repository
         layout (as distinct from where that distro's packaging building
         tools place the package files).
 
-        Packages will go into repos corresponding to the major release 
-        series (2.5, 2.6, 2.7, 2.8, etc.) except for RC's and nightlies 
-        which will go into special separate "testing" directories 
+        Packages will go into repos corresponding to the major release
+        series (2.5, 2.6, 2.7, 2.8, etc.) except for RC's and nightlies
+        which will go into special separate "testing" directories
 
         Examples:
 
@@ -86,7 +89,6 @@ class EnterpriseDistro(packager.Distro):
 
         repo/zypper/suse/11/mongodb-enterprise/testing/x86_64
         repo/zypper/suse/11/mongodb-enterprise/testing/i386
-
         """
 
         repo_directory = ""
@@ -96,52 +98,53 @@ class EnterpriseDistro(packager.Distro):
         else:
             repo_directory = spec.branch()
 
-        if re.search("^(debian|ubuntu)", self.n):
+        if re.search("^(debian|ubuntu)", self.dname):
             return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (
-                self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(),
+                self.dname, self.repo_os_version(build_os), repo_directory, self.repo_component(),
                 self.archname(arch))
-        elif re.search("(redhat|fedora|centos|amazon)", self.n):
+        elif re.search("(redhat|fedora|centos|amazon)", self.dname):
             return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
-                self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
-        elif re.search("(suse)", self.n):
+                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+        elif re.search("(suse)", self.dname):
             return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (
-                self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+                self.dname, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def build_os(self, arch):
-        """Return the build os label in the binary package to download ("rhel57", "rhel62", "rhel67" and "rhel70"
-        for redhat, the others are delegated to the super class
+    def build_os(self, arch):  # pylint: disable=too-many-branches
+        """Return the build os label in the binary package to download.
+
+        The labels "rhel57", "rhel62", "rhel67" and "rhel70" are for redhat,
+        the others are delegated to the super class.
         """
+        # pylint: disable=too-many-return-statements
         if arch == "ppc64le":
-            if self.n == 'ubuntu':
+            if self.dname == 'ubuntu':
                 return ["ubuntu1604"]
-            if self.n == 'redhat':
+            if self.dname == 'redhat':
                 return ["rhel71"]
-            else:
-                return []
+            return []
         if arch == "s390x":
-            if self.n == 'redhat':
+            if self.dname == 'redhat':
                 return ["rhel67", "rhel72"]
-            if self.n == 'suse':
+            if self.dname == 'suse':
                 return ["suse11", "suse12"]
-            if self.n == 'ubuntu':
+            if self.dname == 'ubuntu':
                 return ["ubuntu1604"]
-            else:
-                return []
+            return []
         if arch == "arm64":
-            if self.n == 'ubuntu':
+            if self.dname == 'ubuntu':
                 return ["ubuntu1604"]
-            else:
-                return []
+            return []
 
-        if re.search("(redhat|fedora|centos)", self.n):
+        if re.search("(redhat|fedora|centos)", self.dname):
             return ["rhel70", "rhel62", "rhel57"]
-        else:
-            return super(EnterpriseDistro, self).build_os(arch)
+        return super(EnterpriseDistro, self).build_os(arch)
+        # pylint: enable=too-many-return-statements
 
 
-def main(argv):
+def main():
+    """Execute Main program."""
 
     distros = [EnterpriseDistro(distro) for distro in DISTROS]
 
@@ -175,7 +178,7 @@ def main(argv):
                     shutil.copyfile(args.tarball, filename)
 
                     repo = make_package(distro, build_os, arch, spec, srcdir)
-                    make_repo(repo, distro, build_os, spec)
+                    make_repo(repo, distro, build_os)
 
                     made_pkg = True
 
@@ -187,15 +190,15 @@ def main(argv):
 
 
 def tarfile(build_os, arch, spec):
-    """Return the location where we store the downloaded tarball for
-    this package"""
+    """Return the location where we store the downloaded tarball for this package."""
     return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
 
 
 def setupdir(distro, build_os, arch, spec):
+    """Return the setup directory name."""
     # The setupdir will be a directory containing all inputs to the
     # distro's packaging tools (e.g., package metadata files, init
-    # scripts, etc), along with the already-built binaries).  In case
+    # scripts, etc, along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
     # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
     # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
@@ -226,9 +229,10 @@ def unpack_binaries_into(build_os, arch, spec, where):
 
 
 def make_package(distro, build_os, arch, spec, srcdir):
-    """Construct the package for (arch, distro, spec), getting
-    packaging files from srcdir and any user-specified suffix from
-    suffixes"""
+    """Construct the package for (arch, distro, spec).
+
+    Get the packaging files from srcdir and any user-specified suffix from suffixes.
+    """
 
     sdir = setupdir(distro, build_os, arch, spec)
     packager.ensure_dir(sdir)
@@ -254,16 +258,18 @@ def make_package(distro, build_os, arch, spec, srcdir):
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 
-def make_repo(repodir, distro, build_os, spec):
+def make_repo(repodir, distro, build_os):
+    """Make the repo."""
     if re.search("(debian|ubuntu)", repodir):
-        make_deb_repo(repodir, distro, build_os, spec)
+        make_deb_repo(repodir, distro, build_os)
     elif re.search("(suse|centos|redhat|fedora|amazon)", repodir):
         packager.make_rpm_repo(repodir)
     else:
         raise Exception("BUG: unsupported platform?")
 
 
-def make_deb_repo(repo, distro, build_os, spec):
+def make_deb_repo(repo, distro, build_os):
+    """Make the Debian repo."""
     # Note: the Debian repository Packages files must be generated
     # very carefully in order to be usable.
     oldpwd = os.getcwd()
@@ -273,19 +279,19 @@ def make_deb_repo(repo, distro, build_os, spec):
             os.path.dirname(deb)[2:]
             for deb in packager.backtick(["find", ".", "-name", "*.deb"]).split()
         ])
-        for d in dirs:
-            s = packager.backtick(["dpkg-scanpackages", d, "/dev/null"])
-            with open(d + "/Packages", "w") as f:
-                f.write(s)
-            b = packager.backtick(["gzip", "-9c", d + "/Packages"])
-            with open(d + "/Packages.gz", "wb") as f:
-                f.write(b)
+        for directory in dirs:
+            st = packager.backtick(["dpkg-scanpackages", directory, "/dev/null"])
+            with open(directory + "/Packages", "w") as fh:
+                fh.wmake_deb_reporite(st)
+            bt = packager.backtick(["gzip", "-9c", directory + "/Packages"])
+            with open(directory + "/Packages.gz", "wb") as fh:
+                fh.write(bt)
     finally:
         os.chdir(oldpwd)
     # Notes: the Release{,.gpg} files must live in a special place,
     # and must be created after all the Packages.gz files have been
     # done.
-    s = """Origin: mongodb
+    s1 = """Origin: mongodb
 Label: mongodb
 Suite: %s
 Codename: %s/mongodb-enterprise
@@ -301,24 +307,25 @@ Description: MongoDB packages
     os.chdir(repo + "../../")
     s2 = packager.backtick(["apt-ftparchive", "release", "."])
     try:
-        with open("Release", 'w') as f:
-            f.write(s)
-            f.write(s2)
+        with open("Release", 'w') as fh:
+            fh.write(s1)
+            fh.write(s2)
     finally:
         os.chdir(oldpwd)
 
 
-def move_repos_into_place(src, dst):
+def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
+    """Move the repos into place."""
     # Find all the stuff in src/*, move it to a freshly-created
     # directory beside dst, then play some games with symlinks so that
     # dst is a name the new stuff and dst+".old" names the previous
     # one.  This feels like a lot of hooey for something so trivial.
 
     # First, make a crispy fresh new directory to put the stuff in.
-    i = 0
+    idx = 0
     while True:
         date_suffix = time.strftime("%Y-%m-%d")
-        dname = dst + ".%s.%d" % (date_suffix, i)
+        dname = dst + ".%s.%d" % (date_suffix, idx)
         try:
             os.mkdir(dname)
             break
@@ -328,17 +335,17 @@ def move_repos_into_place(src, dst):
                 pass
             else:
                 raise exc
-        i = i + 1
+        idx = idx + 1
 
     # Put the stuff in our new directory.
-    for r in os.listdir(src):
-        packager.sysassert(["cp", "-rv", src + "/" + r, dname])
+    for src_file in os.listdir(src):
+        packager.sysassert(["cp", "-rv", src + "/" + src_file, dname])
 
     # Make a symlink to the new directory; the symlink will be renamed
     # to dst shortly.
-    i = 0
+    idx = 0
     while True:
-        tmpnam = dst + ".TMP.%d" % i
+        tmpnam = dst + ".TMP.%d" % idx
         try:
             os.symlink(dname, tmpnam)
             break
@@ -348,15 +355,15 @@ def move_repos_into_place(src, dst):
                 pass
             else:
                 raise exc
-        i = i + 1
+        idx = idx + 1
 
     # Make a symlink to the old directory; this symlink will be
     # renamed shortly, too.
     oldnam = None
     if os.path.exists(dst):
-        i = 0
+        idx = 0
         while True:
-            oldnam = dst + ".old.%d" % i
+            oldnam = dst + ".old.%d" % idx
             try:
                 os.symlink(os.readlink(dst), oldnam)
                 break
@@ -373,4 +380,4 @@ def move_repos_into_place(src, dst):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()

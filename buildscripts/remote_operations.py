@@ -21,7 +21,7 @@ if os.name == "posix" and sys.version_info[0] == 2:
         warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
                        " available. When using the subprocess module, a child process may trigger"
                        " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
-        import subprocess
+        import subprocess  # type: ignore
 else:
     import subprocess
 
@@ -42,7 +42,7 @@ _SSH_CONNECTION_ERRORS = [
 
 
 def posix_path(path):
-    """ Returns posix path, used on Windows since scp requires posix style paths. """
+    """Return posix path, used on Windows since scp requires posix style paths."""
     # If path is already quoted, we need to remove the quotes before calling
     path_quote = "\'" if path.startswith("\'") else ""
     path_quote = "\"" if path.startswith("\"") else path_quote
@@ -54,11 +54,13 @@ def posix_path(path):
     return "{quote}{path}{quote}".format(quote=path_quote, path=new_path)
 
 
-class RemoteOperations(object):
+class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
     """Class to support remote operations."""
 
-    def __init__(self, user_host, ssh_connection_options=None, ssh_options=None, scp_options=None,
-                 retries=0, retry_sleep=0, debug=False, shell_binary="/bin/bash", use_shell=False):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, user_host, ssh_connection_options=None, ssh_options=None, scp_options=None,
+            retries=0, retry_sleep=0, debug=False, shell_binary="/bin/bash", use_shell=False):
+        """Initialize RemoteOperations."""
 
         self.user_host = user_host
         self.ssh_connection_options = ssh_connection_options if ssh_connection_options else ""
@@ -85,7 +87,7 @@ class RemoteOperations(object):
         return process.poll(), buff_stdout
 
     def _remote_access(self):
-        """ This will check if a remote session is possible. """
+        """Check if a remote session is possible."""
         cmd = "ssh {} {} {} date".format(self.ssh_connection_options, self.ssh_options,
                                          self.user_host)
         attempt_num = 0
@@ -108,19 +110,20 @@ class RemoteOperations(object):
         return self._call(cmd)
 
     def access_established(self):
-        """ Returns True if initial access was establsished. """
+        """Return True if initial access was establsished."""
         return not self._access_code
 
     def access_info(self):
-        """ Returns return code and output buffer from initial access attempt(s). """
+        """Return the return code and output buffer from initial access attempt(s)."""
         return self._access_code, self._access_buff
 
-    def operation(self, operation_type, operation_param, operation_dir=None):
-        """ Main entry for remote operations. Returns (code, output).
+    def operation(  # pylint: disable=too-many-branches
+            self, operation_type, operation_param, operation_dir=None):
+        """Execute Main entry for remote operations. Returns (code, output).
 
-            'operation_type' supports remote shell and copy operations.
-            'operation_param' can either be a list or string of commands or files.
-            'operation_dir' is '.' if unspecified for 'copy_*'.
+        'operation_type' supports remote shell and copy operations.
+        'operation_param' can either be a list or string of commands or files.
+        'operation_dir' is '.' if unspecified for 'copy_*'.
         """
 
         if not self.access_established():
@@ -195,23 +198,23 @@ class RemoteOperations(object):
         return final_ret, buff
 
     def shell(self, operation_param, operation_dir=None):
-        """ Helper for remote shell operations. """
+        """Provide helper for remote shell operations."""
         return self.operation(operation_type="shell", operation_param=operation_param,
                               operation_dir=operation_dir)
 
     def copy_to(self, operation_param, operation_dir=None):
-        """ Helper for remote copy_to operations. """
+        """Provide helper for remote copy_to operations."""
         return self.operation(operation_type="copy_to", operation_param=operation_param,
                               operation_dir=operation_dir)
 
     def copy_from(self, operation_param, operation_dir=None):
-        """ Helper for remote copy_from operations. """
+        """Provide helper for remote copy_from operations."""
         return self.operation(operation_type="copy_from", operation_param=operation_param,
                               operation_dir=operation_dir)
 
 
-def main():
-    """ Main program. """
+def main():  # pylint: disable=too-many-branches,too-many-statements
+    """Execute Main program."""
 
     parser = optparse.OptionParser(description=__doc__)
     control_options = optparse.OptionGroup(parser, "Control options")
@@ -336,10 +339,10 @@ def main():
         user_host=options.user_host, ssh_connection_options=ssh_connection_options,
         ssh_options=ssh_options, scp_options=scp_options, retries=options.retries,
         retry_sleep=options.retry_sleep, debug=options.debug)
-    ret_code, buffer = remote_op.operation(options.operation, operation_param, operation_dir)
+    ret_code, buff = remote_op.operation(options.operation, operation_param, operation_dir)
     if options.verbose:
         print("Return code: {} for command {}".format(ret_code, sys.argv))
-        print(buffer)
+        print(buff)
 
     sys.exit(ret_code)
 

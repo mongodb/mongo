@@ -10,6 +10,8 @@ import buildscripts.resmokelib.utils.globstar as globstar
 import buildscripts.resmokelib.config
 import buildscripts.resmokeconfig
 
+# pylint: disable=missing-docstring,protected-access
+
 
 class TestExpressions(unittest.TestCase):
     """Unit tests for the tag matching expressions."""
@@ -119,7 +121,7 @@ class MockTestFileExplorer(object):
         self.binary = "dbtest"
         self.jstest_tag_file = {"dir/subdir1/test11.js": "tagA", "dir/subdir3/a/test3a1.js": "tagB"}
 
-    def is_glob_pattern(self, pattern):
+    def is_glob_pattern(self, pattern):  # pylint: disable=no-self-use
         return globstar.is_glob_pattern(pattern)
 
     def iglob(self, pattern):
@@ -132,21 +134,22 @@ class MockTestFileExplorer(object):
     def jstest_tags(self, file_path):
         return self.tags.get(file_path, [])
 
-    def read_root_file(self, root_file_path):
+    def read_root_file(self, root_file_path):  # pylint: disable=no-self-use,unused-argument
         return ["build/testA", "build/testB"]
 
-    def fnmatchcase(self, name, pattern):
+    def fnmatchcase(self, name, pattern):  # pylint: disable=no-self-use
         return fnmatch.fnmatchcase(name, pattern)
 
     def isfile(self, path):
         return path in self.files
 
-    def list_dbtests(self, binary):
+    def list_dbtests(self, binary):  # pylint: disable=no-self-use,unused-argument
         return ["dbtestA", "dbtestB", "dbtestC"]
 
     def parse_tag_file(self, test_kind):
         if test_kind == "js_test":
             return self.jstest_tag_file
+        return None
 
 
 class TestTestList(unittest.TestCase):

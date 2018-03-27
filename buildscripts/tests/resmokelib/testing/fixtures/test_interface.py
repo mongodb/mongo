@@ -5,9 +5,11 @@ import unittest
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface
 
+# pylint: disable=missing-docstring,protected-access
+
 
 class TestFixture(unittest.TestCase):
-    def test_teardown_ok(self):
+    def test_teardown_ok(self):  # pylint: disable=no-self-use
         raising_fixture = UnitTestFixture(should_raise=False)
         raising_fixture.teardown()
 
@@ -41,7 +43,7 @@ class TestFixtureTeardownHandler(unittest.TestCase):
         self.assertEqual(expected_msg, handler.get_error_message())
 
 
-class UnitTestFixture(interface.Fixture):
+class UnitTestFixture(interface.Fixture):  # pylint: disable=abstract-method
     ERROR_MESSAGE = "Failed"
 
     def __init__(self, should_raise=False):

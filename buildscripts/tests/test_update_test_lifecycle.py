@@ -9,9 +9,11 @@ import copy
 import datetime
 import unittest
 
-from buildscripts import test_failures
+from buildscripts import lifecycle_test_failures as test_failures
 from buildscripts import update_test_lifecycle
 from buildscripts.ciconfig import tags as ci_tags
+
+# pylint: disable=invalid-name,missing-docstring,protected-access,too-many-lines
 
 
 class TestValidateConfig(unittest.TestCase):
@@ -321,7 +323,7 @@ class TestValidateConfig(unittest.TestCase):
             update_test_lifecycle.validate_config(config)
 
 
-class TestUpdateTags(unittest.TestCase):
+class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """
     Tests for the update_tags() function.
     """

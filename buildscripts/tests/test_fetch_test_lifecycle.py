@@ -5,6 +5,8 @@ import unittest
 
 import buildscripts.fetch_test_lifecycle as fetch
 
+# pylint: disable=missing-docstring,protected-access
+
 
 class TestFetchTestLifecycle(unittest.TestCase):
     def test_get_metadata_revision(self):
@@ -62,7 +64,7 @@ class MockMetadataRepository(object):
     def list_revisions(self):
         return [r[0] for r in self.references_revisions]
 
-    def get_reference(self, revision, project):
+    def get_reference(self, revision, project):  # pylint: disable=unused-argument
         for (metadata_revision, mongo_revision) in self.references_revisions:
             if metadata_revision == revision:
                 return mongo_revision

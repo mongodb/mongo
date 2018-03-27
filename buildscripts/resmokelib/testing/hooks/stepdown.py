@@ -1,6 +1,4 @@
-"""
-Testing hook that periodically makes the primary of a replica set step down.
-"""
+"""Test hook that periodically makes the primary of a replica set step down."""
 from __future__ import absolute_import
 
 import collections
@@ -18,15 +16,15 @@ from buildscripts.resmokelib.testing.fixtures import shardedcluster
 
 
 class ContinuousStepdown(interface.Hook):
-    """The ContinuousStepdown hook regularly connects to replica sets and sends a replSetStepDown
-    command.
-    """
+    """Regularly connect to replica sets and send a replSetStepDown command."""
+
     DESCRIPTION = ("Continuous stepdown (steps down the primary of replica sets at regular"
                    " intervals)")
 
-    def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-                 stepdown_duration_secs=10, stepdown_interval_ms=8000):
-        """Initializes the ContinuousStepdown.
+    def __init__(  # pylint: disable=too-many-arguments
+            self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
+            stepdown_duration_secs=10, stepdown_interval_ms=8000):
+        """Initialize the ContinuousStepdown.
 
         Args:
             hook_logger: the logger instance for this hook.
@@ -48,6 +46,7 @@ class ContinuousStepdown(interface.Hook):
         self._stepdown_thread = None
 
     def before_suite(self, test_report):
+        """Before suite."""
         if not self._rs_fixtures:
             self._add_fixture(self._fixture)
         self._stepdown_thread = _StepdownThread(self.logger, self._rs_fixtures,
@@ -57,15 +56,18 @@ class ContinuousStepdown(interface.Hook):
         self._stepdown_thread.start()
 
     def after_suite(self, test_report):
+        """After suite."""
         self.logger.info("Stopping the stepdown thread.")
         self._stepdown_thread.stop()
 
     def before_test(self, test, test_report):
+        """Before test."""
         self._check_thread()
         self.logger.info("Resuming the stepdown thread.")
         self._stepdown_thread.resume()
 
     def after_test(self, test, test_report):
+        """After test."""
         self._check_thread()
         self.logger.info("Pausing the stepdown thread.")
         self._stepdown_thread.pause()
@@ -92,8 +94,11 @@ class ContinuousStepdown(interface.Hook):
                 self._add_fixture(fixture.configsvr)
 
 
-class _StepdownThread(threading.Thread):
+class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
+    """_StepdownThread class."""
+
     def __init__(self, logger, rs_fixtures, stepdown_interval_secs, stepdown_duration_secs):
+        """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
         self.logger = logger
@@ -114,6 +119,7 @@ class _StepdownThread(threading.Thread):
         self._step_up_stats = collections.Counter()
 
     def run(self):
+        """Execute the thread."""
         if not self._rs_fixtures:
             self.logger.warning("No replica set on which to run stepdowns.")
             return
@@ -135,7 +141,7 @@ class _StepdownThread(threading.Thread):
             self._wait(wait_secs)
 
     def stop(self):
-        """Stops the thread."""
+        """Stop the thread."""
         self._is_stopped_evt.set()
         # Unpause to allow the thread to finish.
         self.resume()
@@ -145,7 +151,7 @@ class _StepdownThread(threading.Thread):
         return self._is_stopped_evt.is_set()
 
     def pause(self):
-        """Pauses the thread."""
+        """Pause the thread."""
         self._is_resumed_evt.clear()
         # Wait until we are no longer executing stepdowns.
         self._is_idle_evt.wait()
@@ -153,7 +159,7 @@ class _StepdownThread(threading.Thread):
         self._await_primaries()
 
     def resume(self):
-        """Resumes the thread."""
+        """Resume the thread."""
         self._is_resumed_evt.set()
 
         self.logger.info(

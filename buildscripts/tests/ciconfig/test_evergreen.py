@@ -8,6 +8,8 @@ import unittest
 
 import buildscripts.ciconfig.evergreen as _evergreen
 
+# pylint: disable=missing-docstring,protected-access
+
 TEST_FILE_PATH = os.path.join(os.path.dirname(__file__), "evergreen.yml")
 
 

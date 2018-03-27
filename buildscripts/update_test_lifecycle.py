@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Test Failures
+"""Test Failures module.
 
 Update etc/test_lifecycle.yml to tag unreliable tests based on historic failure rates.
 """
@@ -26,14 +26,18 @@ import yaml
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# pylint: disable=wrong-import-position
 from buildscripts import git
 from buildscripts import jiraclient
 from buildscripts import resmokelib
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.utils import globstar
-from buildscripts import test_failures as tf
+from buildscripts import lifecycle_test_failures as tf
 from buildscripts.ciconfig import evergreen as ci_evergreen
 from buildscripts.ciconfig import tags as ci_tags
+# pylint: enable=wrong-import-position
+
+# pylint: disable=too-many-lines
 
 LOGGER = logging.getLogger(__name__)
 
@@ -126,10 +130,10 @@ def create_batch_groups(test_groups, batch_size):
 class TestHistorySource(object):
     """A class used to parallelize requests to buildscripts.test_failures.TestHistory."""
 
-    def __init__(self, project, variants, distros, start_revision, end_revision,
-                 thread_pool_size=DEFAULT_NUM_THREADS):
-        """
-        Initializes the TestHistorySource.
+    def __init__(  # pylint: disable=too-many-arguments
+            self, project, variants, distros, start_revision, end_revision,
+            thread_pool_size=DEFAULT_NUM_THREADS):
+        """Initialize the TestHistorySource.
 
         Args:
             project: the Evergreen project name.
@@ -147,7 +151,7 @@ class TestHistorySource(object):
         self._thread_pool = multiprocessing.dummy.Pool(thread_pool_size)
 
     def get_history_data(self, tests, tasks):
-        """Retrieves the history data for the given tests and tasks.
+        """Retrieve the history data for the given tests and tasks.
 
         The requests for each task will be parallelized using the internal thread pool.
         """
@@ -173,7 +177,7 @@ def callo(args):
 
 
 def git_commit_range_since(since):
-    """Returns first and last commit in 'since' period specified.
+    """Return first and last commit in 'since' period specified.
 
     Specify 'since' as any acceptable period for git log --since.
     The period can be specified as '4.weeks' or '3.days'.
@@ -184,7 +188,7 @@ def git_commit_range_since(since):
 
 
 def git_commit_prior(revision):
-    """Returns commit revision prior to one specified."""
+    """Return commit revision prior to one specified."""
     git_format = "git log -2 {revision} --pretty=format:%H"
     git_command = git_format.format(revision=revision)
     commits = callo(git_command.split()).split("\n")
@@ -223,7 +227,7 @@ def check_days(name, days):
 
 
 def unreliable_tag(task, variant, distro):
-    """Returns the unreliable tag."""
+    """Return the unreliable tag."""
 
     for (component_name, component_value) in (("task", task), ("variant", variant), ("distro",
                                                                                      distro)):
@@ -238,8 +242,9 @@ def unreliable_tag(task, variant, distro):
     return "unreliable|{}|{}|{}".format(task, variant, distro)
 
 
-def update_lifecycle(lifecycle_tags_file, report, method_test, add_tags, fail_rate, min_run):
-    """Updates the lifecycle object based on the test_method.
+def update_lifecycle(  # pylint: disable=too-many-arguments
+        lifecycle_tags_file, report, method_test, add_tags, fail_rate, min_run):
+    """Update the lifecycle object based on the test_method.
 
     The test_method checks unreliable or reliable fail_rates.
     """
@@ -254,16 +259,12 @@ def update_lifecycle(lifecycle_tags_file, report, method_test, add_tags, fail_ra
 
 
 def compare_tags(tag_a, tag_b):
-    """Compare two tags and return 1, -1 or 0 if 'tag_a' is superior, inferior or
-    equal to 'tag_b'.
-    """
+    """Return 1, -1 or 0 if 'tag_a' is superior, inferior or equal to 'tag_b'."""
     return cmp(tag_a.split("|"), tag_b.split("|"))
 
 
-def validate_config(config):
-    """
-    Raises a TypeError or ValueError exception if 'config' isn't a valid model.
-    """
+def validate_config(config):  # pylint: disable=too-many-branches
+    """Raise a TypeError or ValueError exception if 'config' isn't a valid model."""
 
     for (name, fail_rates) in (("test", config.test_fail_rates), ("task", config.task_fail_rates),
                                ("variant", config.variant_fail_rates), ("distro",
@@ -315,10 +316,9 @@ def validate_config(config):
 
 
 def _test_combination_from_entry(entry, components):
-    """Creates a test combination tuple from a tf._ReportEntry and target components.
+    """Create a test combination tuple from a tf._ReportEntry and target components.
 
-    Returns:
-        A tuple containing the entry fields specified in components.
+    Return a tuple containing the entry fields specified in components.
     """
     combination = []
     for component in components:
@@ -327,10 +327,9 @@ def _test_combination_from_entry(entry, components):
 
 
 def _test_combination_from_tag(test, tag):
-    """Creates a test combination tuple from a test name and a tag.
+    """Create a test combination tuple from a test name and a tag.
 
-    Returns:
-        A tuple containing the test name and the components found in the tag.
+    Return a tuple containing the test name and the components found in the tag.
     """
     combination = [test]
     for element in _split_tag(tag):
@@ -339,20 +338,24 @@ def _test_combination_from_tag(test, tag):
     return tuple(combination)
 
 
-def update_tags(lifecycle_tags, config, report, tests):
-    """
-    Updates the tags in 'lifecycle_tags' based on the historical test failures of tests 'tests'
+def update_tags(lifecycle_tags, config, report, tests):  # pylint: disable=too-many-locals
+    """Update the tags in 'lifecycle_tags'.
+
+    This is based on the historical test failures of tests 'tests'
     mentioned in 'report' according to the model described by 'config'.
     """
 
     # We initialize 'grouped_entries' to make PyLint not complain about 'grouped_entries' being used
     # before assignment.
     grouped_entries = None
-    for (i, (components, rates)) in enumerate(
-        ((tf.Report.TEST_TASK_VARIANT_DISTRO,
-          config.distro_fail_rates), (tf.Report.TEST_TASK_VARIANT, config.variant_fail_rates),
-         (tf.Report.TEST_TASK, config.task_fail_rates), (tf.Report.TEST, config.test_fail_rates))):
-        if i > 0:
+    # yapf: disable
+    for (idx, (components, rates)) in enumerate(
+            ((tf.Report.TEST_TASK_VARIANT_DISTRO, config.distro_fail_rates),
+             (tf.Report.TEST_TASK_VARIANT, config.variant_fail_rates),
+             (tf.Report.TEST_TASK, config.task_fail_rates),
+             (tf.Report.TEST, config.test_fail_rates))):
+        # yapf: enable
+        if idx > 0:
             report = tf.Report(grouped_entries)
 
         # We reassign the value of 'grouped_entries' to take advantage of how data that is on
@@ -403,7 +406,8 @@ def update_tags(lifecycle_tags, config, report, tests):
         update_lifecycle(lifecycle_tags, reliable_summaries, reliable_test, False, rates.acceptable,
                          config.reliable_min_runs)
 
-        def should_be_removed(test, tag):
+        def should_be_removed(test, tag, components, reliable_combinations):
+            """Return True if 'combination' shoud be removed."""
             combination = _test_combination_from_tag(test, tag)
             if len(combination) != len(components):
                 # The tag is not for these components.
@@ -414,7 +418,7 @@ def update_tags(lifecycle_tags, config, report, tests):
         for test in tests:
             tags = lifecycle_tags.lifecycle.get_tags("js_test", test)
             for tag in tags[:]:
-                if should_be_removed(test, tag):
+                if should_be_removed(test, tag, components, reliable_combinations):
                     LOGGER.info("Removing tag '%s' of test '%s' because the combination did not run"
                                 " during the reliable period", tag, test)
                     lifecycle_tags.remove_tag("js_test", test, tag, failure_rate=0)
@@ -484,9 +488,7 @@ def _config_as_options(config):
 
 
 class TagsConfigWithChangelog(object):
-    """A wrapper around TagsConfig that can perform updates on a tags file and record the
-    modifications made.
-    """
+    """A wrapper around TagsConfig to update a tags file and record the modifications made."""
 
     def __init__(self, lifecycle):
         """Initialize the TagsConfigWithChangelog with the lifecycle TagsConfig."""
@@ -539,17 +541,22 @@ class TagsConfigWithChangelog(object):
 
 
 class JiraIssueCreator(object):
+    """JiraIssueCreator class."""
+
     _LABEL = "test-lifecycle"
     _PROJECT = "TIGBOT"
     _MAX_DESCRIPTION_SIZE = 32767
 
-    def __init__(self, server=None, username=None, password=None, access_token=None,
-                 access_token_secret=None, consumer_key=None, key_cert=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, server=None, username=None, password=None, access_token=None,
+            access_token_secret=None, consumer_key=None, key_cert=None):
+        """Initialize JiraIssueCreator."""
         self._client = jiraclient.JiraClient(
             server=server, username=username, password=password, access_token=access_token,
             access_token_secret=access_token_secret, consumer_key=consumer_key, key_cert=key_cert)
 
-    def create_issue(self, evg_project, mongo_revision, model_config, added, removed, cleaned_up):
+    def create_issue(  # pylint: disable=too-many-arguments
+            self, evg_project, mongo_revision, model_config, added, removed, cleaned_up):
         """Create a JIRA issue for the test lifecycle tag update."""
         summary = self._get_jira_summary(evg_project)
         description = self._get_jira_description(evg_project, mongo_revision, model_config, added,
@@ -587,7 +594,8 @@ class JiraIssueCreator(object):
         return desc
 
     @staticmethod
-    def _get_jira_description(project, mongo_revision, model_config, added, removed, cleaned_up):
+    def _get_jira_description(  # pylint: disable=too-many-arguments
+            project, mongo_revision, model_config, added, removed, cleaned_up):
         mono = JiraIssueCreator._monospace
         config_desc = _config_as_options(model_config)
         added_desc = JiraIssueCreator._make_updated_tags_description(added)
@@ -624,8 +632,7 @@ class JiraIssueCreator(object):
                     tags_lines.append("--- {0} ({1:.2f})".format(mono(tag), coefficient))
         if tags_lines:
             return "\n".join(tags_lines)
-        else:
-            return "_None_"
+        return "_None_"
 
     @staticmethod
     def _make_tags_cleaned_up_description(cleaned_up):
@@ -645,15 +652,16 @@ class JiraIssueCreator(object):
                         tags_cleaned_up_lines.append("--- {0}".format(mono(tag)))
         if tags_cleaned_up_lines:
             return "\n".join(tags_cleaned_up_lines)
-        else:
-            return "_None_"
+        return "_None_"
 
 
-class LifecycleTagsFile(object):
+class LifecycleTagsFile(object):  # pylint: disable=too-many-instance-attributes
     """Represent a test lifecycle tags file that can be written and committed."""
 
-    def __init__(self, project, lifecycle_file, metadata_repo_url=None, references_file=None,
-                 jira_issue_creator=None, git_info=None, model_config=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, project, lifecycle_file, metadata_repo_url=None, references_file=None,
+            jira_issue_creator=None, git_info=None,
+            model_config=None):  # noqa: D214,D401,D405,D406,D407,D411,D413
         """Initalize the LifecycleTagsFile.
 
         Arguments:
@@ -815,9 +823,8 @@ class LifecycleTagsFile(object):
         if pushed:
             self.jira_issue_creator.close_fix_issue(issue_key)
             return True
-        else:
-            self.jira_issue_creator.close_wontfix_issue(issue_key)
-            return False
+        self.jira_issue_creator.close_wontfix_issue(issue_key)
+        return False
 
 
 def make_lifecycle_tags_file(options, model_config):
@@ -842,10 +849,10 @@ def make_lifecycle_tags_file(options, model_config):
     return lifecycle_tags_file
 
 
-def main():
-    """
-    Utility for updating a resmoke.py tag file based on computing test failure rates from the
-    Evergreen API.
+def main():  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+    """Exexcute utility to update a resmoke.py tag file.
+
+    This is based on computing test failure rates from the Evergreen API.
     """
 
     parser = optparse.OptionParser(
@@ -1058,10 +1065,11 @@ def main():
     distros = options.distros.split(",") if options.distros else []
 
     config = Config(
-        test_fail_rates=Rates(*options.test_fail_rates), task_fail_rates=Rates(
-            *options.task_fail_rates), variant_fail_rates=Rates(
-                *options.variant_fail_rates), distro_fail_rates=Rates(
-                    *options.distro_fail_rates), reliable_min_runs=options.reliable_test_min_runs,
+        test_fail_rates=Rates(*options.test_fail_rates),
+        task_fail_rates=Rates(*options.task_fail_rates),
+        variant_fail_rates=Rates(*options.variant_fail_rates),
+        distro_fail_rates=Rates(*options.distro_fail_rates),
+        reliable_min_runs=options.reliable_test_min_runs,
         reliable_time_period=datetime.timedelta(days=options.reliable_days),
         unreliable_min_runs=options.unreliable_test_min_runs,
         unreliable_time_period=datetime.timedelta(days=options.unreliable_days))

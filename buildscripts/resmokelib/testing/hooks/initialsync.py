@@ -1,6 +1,4 @@
-"""
-Testing hook for verifying correctness of initial sync.
-"""
+"""Test hook for verifying correctness of initial sync."""
 
 from __future__ import absolute_import
 
@@ -18,7 +16,8 @@ from ... import errors
 
 
 class BackgroundInitialSync(interface.Hook):
-    """
+    """BackgroundInitialSync class.
+
     After every test, this hook checks if a background node has finished initial sync and if so,
     validates it, tears it down, and restarts it.
 
@@ -33,6 +32,7 @@ class BackgroundInitialSync(interface.Hook):
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N, shell_options=None):
+        """Initialize BackgroundInitialSync."""
         if not isinstance(fixture, replicaset.ReplicaSetFixture):
             raise ValueError("`fixture` must be an instance of ReplicaSetFixture, not {}".format(
                 fixture.__class__.__name__))
@@ -40,12 +40,13 @@ class BackgroundInitialSync(interface.Hook):
         description = "Background Initial Sync"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.n = n
+        self.n = n  # pylint: disable=invalid-name
         self.tests_run = 0
         self.random_restarts = 0
         self._shell_options = shell_options
 
     def after_test(self, test, test_report):
+        """After test execution."""
         self.tests_run += 1
 
         hook_test_case = BackgroundInitialSyncTestCase.create_after_test(
@@ -55,14 +56,18 @@ class BackgroundInitialSync(interface.Hook):
 
 
 class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
+    """BackgroundInitialSyncTestCase class."""
 
     JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
 
-    def __init__(self, logger, test_name, description, base_test_name, hook, shell_options=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, test_name, description, base_test_name, hook, shell_options=None):
+        """Initialize BackgroundInitialSyncTestCase."""
         jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
                                           hook, self.JS_FILENAME, shell_options)
 
     def run_test(self):
+        """Execute test hook."""
         sync_node = self.fixture.get_initial_sync_node()
         sync_node_conn = sync_node.mongo_client()
 
@@ -96,7 +101,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
                 if self._hook.random_restarts < 1 and random.random() < 0.2:
                     self.logger.info(
                         "randomly restarting initial sync in the middle of initial sync")
-                    self.__restart_init_sync(sync_node, sync_node_conn)
+                    self.__restart_init_sync(sync_node)
                     self._hook.random_restarts += 1
                 return
         except pymongo.errors.OperationFailure:
@@ -112,10 +117,10 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
         # Run data validation and dbhash checking.
         self._js_test.run_test()
 
-        self.__restart_init_sync(sync_node, sync_node_conn)
+        self.__restart_init_sync(sync_node)
 
     # Restarts initial sync by shutting down the node, clearing its data, and restarting it.
-    def __restart_init_sync(self, sync_node, sync_node_conn):
+    def __restart_init_sync(self, sync_node):
         # Tear down and restart the initial sync node to start initial sync again.
         sync_node.teardown()
 
@@ -125,7 +130,8 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
 
 class IntermediateInitialSync(interface.Hook):
-    """
+    """IntermediateInitialSync class.
+
     This hook accepts a parameter 'n' that specifies a number of tests after which it will start up
     a node to initial sync, wait for replication to finish, and then validate the data.
 
@@ -135,6 +141,7 @@ class IntermediateInitialSync(interface.Hook):
     DEFAULT_N = cleanup.CleanEveryN.DEFAULT_N
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N):
+        """Initialize IntermediateInitialSync."""
         if not isinstance(fixture, replicaset.ReplicaSetFixture):
             raise ValueError("`fixture` must be an instance of ReplicaSetFixture, not {}".format(
                 fixture.__class__.__name__))
@@ -142,7 +149,7 @@ class IntermediateInitialSync(interface.Hook):
         description = "Intermediate Initial Sync"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
-        self.n = n
+        self.n = n  # pylint: disable=invalid-name
         self.tests_run = 0
 
     def _should_run_after_test(self):
@@ -156,6 +163,7 @@ class IntermediateInitialSync(interface.Hook):
         return True
 
     def after_test(self, test, test_report):
+        """After test execution."""
         if not self._should_run_after_test():
             return
 
@@ -166,14 +174,18 @@ class IntermediateInitialSync(interface.Hook):
 
 
 class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
+    """IntermediateInitialSyncTestCase class."""
 
     JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
 
-    def __init__(self, logger, test_name, description, base_test_name, hook):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, test_name, description, base_test_name, hook):
+        """Initialize IntermediateInitialSyncTestCase."""
         jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
                                           hook, self.JS_FILENAME)
 
     def run_test(self):
+        """Execute test hook."""
         sync_node = self.fixture.get_initial_sync_node()
         sync_node_conn = sync_node.mongo_client()
 

@@ -1,6 +1,4 @@
-"""
-Holder for summary information about a test suite.
-"""
+"""Holder for summary information about a test suite."""
 
 from __future__ import absolute_import
 
@@ -12,9 +10,7 @@ Summary = collections.namedtuple(
 
 
 def combine(summary1, summary2):
-    """
-    Returns a summary representing the sum of 'summary1' and 'summary2'.
-    """
+    """Return a summary representing the sum of 'summary1' and 'summary2'."""
     args = []
     for i in xrange(len(Summary._fields)):
         args.append(summary1[i] + summary2[i])

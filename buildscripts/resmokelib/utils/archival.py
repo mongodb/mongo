@@ -1,6 +1,4 @@
-"""
-Archival utility.
-"""
+"""Archival utility."""
 
 from __future__ import absolute_import
 
@@ -30,7 +28,7 @@ ArchiveArgs = collections.namedtuple("ArchiveArgs",
 
 
 def file_list_size(files):
-    """ Return size (in bytes) of all 'files' and their subdirectories. """
+    """Return size (in bytes) of all 'files' and their subdirectories."""
     if isinstance(files, str):
         files = [files]
     file_bytes = 0
@@ -45,7 +43,7 @@ def file_list_size(files):
 
 
 def directory_size(directory):
-    """ Return size (in bytes) of files in 'directory' tree. """
+    """Return size (in bytes) of files in 'directory' tree."""
     dir_bytes = 0
     for root_dir, _, files in os.walk(unicode(directory)):
         for name in files:
@@ -62,20 +60,19 @@ def directory_size(directory):
 
 
 def free_space(path):
-    """ Return file system free space (in bytes) for 'path'. """
+    """Return file system free space (in bytes) for 'path'."""
     if _IS_WINDOWS:
         dirname = os.path.dirname(path)
         free_bytes = ctypes.c_ulonglong(0)
         ctypes.windll.kernel32.GetDiskFreeSpaceExW(
             ctypes.c_wchar_p(dirname), None, None, ctypes.pointer(free_bytes))
         return free_bytes.value
-    else:
-        stat = os.statvfs(path)
-        return stat.f_bavail * stat.f_bsize
+    stat = os.statvfs(path)
+    return stat.f_bavail * stat.f_bsize
 
 
 def remove_file(file_name):
-    """ Attempts to remove file. Returns status and message. """
+    """Attempt to remove file. Return status and message."""
     try:
         # File descriptors, on Windows, are inherited by all subprocesses and file removal may fail
         # because the file is still open.
@@ -83,18 +80,19 @@ def remove_file(file_name):
         os.remove(file_name)
         status = 0
         message = "Successfully deleted file {}".format(file_name)
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-except
         status = 1
         message = "Error deleting file {}: {}".format(file_name, err)
     return status, message
 
 
-class Archival(object):
-    """ Class to support file archival to S3."""
+class Archival(object):  # pylint: disable=too-many-instance-attributes
+    """Class to support file archival to S3."""
 
-    def __init__(self, logger, archival_json_file="archive.json", limit_size_mb=0, limit_files=0,
-                 s3_client=None):
-        """ Archival init method. """
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, archival_json_file="archive.json", limit_size_mb=0, limit_files=0,
+            s3_client=None):
+        """Initialize Archival."""
 
         self.archival_json_file = archival_json_file
         self.limit_size_mb = limit_size_mb
@@ -134,14 +132,13 @@ class Archival(object):
         return boto3.client("s3")
 
     def archive_files_to_s3(self, display_name, input_files, s3_bucket, s3_path):
-        """
-        Archive 'input_files' to 's3_bucket' and 's3_path'.
+        """Archive 'input_files' to 's3_bucket' and 's3_path'.
 
         Archive is not done if user specified limits are reached. The size limit is
         enforced after it has been exceeded, since it can only be calculated after the
         tar/gzip has been done.
 
-        Returns status and message, where message contains information if status is non-0.
+        Return status and message, where message contains information if status is non-0.
         """
 
         start_time = time.time()
@@ -168,7 +165,7 @@ class Archival(object):
 
     @staticmethod
     def _update_archive_file_wkr(queue, logger):
-        """ Worker thread: Update the archival JSON file from 'queue'. """
+        """Worker thread: Update the archival JSON file from 'queue'."""
         archival_json = []
         while True:
             archive_args = queue.get()
@@ -189,7 +186,7 @@ class Archival(object):
 
     @staticmethod
     def _upload_to_s3_wkr(queue, archive_file_queue, logger, s3_client):
-        """" Worker thread: Upload to S3 from 'queue', dispatch to 'archive_file_queue'. """
+        """Worker thread: Upload to S3 from 'queue', dispatch to 'archive_file_queue'."""
         while True:
             upload_args = queue.get()
             # Exit worker thread when sentinel is received.
@@ -207,7 +204,7 @@ class Archival(object):
                 upload_completed = True
                 logger.debug("Upload to S3 completed for %s to bucket %s path %s",
                              upload_args.local_file, upload_args.s3_bucket, upload_args.s3_path)
-            except Exception as err:
+            except Exception as err:  # pylint: disable=broad-except
                 logger.exception("Upload to S3 error %s", err)
 
             if upload_args.delete_file:
@@ -274,6 +271,7 @@ class Archival(object):
         return status, message, size_mb
 
     def check_thread(self, thread, expected_alive):
+        """Check if the thread is still active."""
         if thread.isAlive() and not expected_alive:
             self.logger.warning(
                 "The %s thread did not complete, some files might not have been uploaded"
@@ -284,7 +282,7 @@ class Archival(object):
                 " to S3 or archived to %s.", thread.name, self.archival_json_file)
 
     def exit(self, timeout=30):
-        """ Waits for worker threads to finish. """
+        """Wait for worker threads to finish."""
         # Put sentinel on upload queue to trigger worker thread exit.
         self._upload_queue.put(None)
         self.check_thread(self._upload_worker, True)
@@ -300,9 +298,9 @@ class Archival(object):
                          self.archive_time, self.num_files, self.size_mb)
 
     def files_archived_num(self):
-        """ Returns the number of the archived files. """
+        """Return the number of the archived files."""
         return self.num_files
 
     def files_archived_size_mb(self):
-        """ Returns the size of the archived files. """
+        """Return the size of the archived files."""
         return self.size_mb

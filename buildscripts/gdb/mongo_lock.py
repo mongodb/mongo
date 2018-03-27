@@ -1,19 +1,26 @@
+"""Mongo lock module."""
+
 from __future__ import print_function
+
+import re
+import sys
 
 import gdb
 import gdb.printing
-import re
-import sys
+import mongo
 
 if sys.version_info[0] >= 3:
     # GDB only permits converting a gdb.Value instance to its numerical address when using the
     # long() constructor in Python 2 and not when using the int() constructor. We define the
     # 'long' class as an alias for the 'int' class in Python 3 for compatibility.
-    long = int
+    long = int  # pylint: disable=redefined-builtin,invalid-name
 
 
 class Thread(object):
+    """Thread class."""
+
     def __init__(self, thread_id, lwpid):
+        """Initialize Thread."""
         self.thread_id = thread_id
         self.lwpid = lwpid
 
@@ -29,11 +36,15 @@ class Thread(object):
         return "Thread 0x{:012x} (LWP {})".format(self.thread_id, self.lwpid)
 
     def key(self):
+        """Return thread key."""
         return "Thread 0x{:012x}".format(self.thread_id)
 
 
 class Lock(object):
+    """Lock class."""
+
     def __init__(self, addr, resource):
+        """Initialize Lock."""
         self.addr = addr
         self.resource = resource
 
@@ -49,35 +60,45 @@ class Lock(object):
         return "Lock 0x{:012x} ({})".format(self.addr, self.resource)
 
     def key(self):
+        """Return lock key."""
         return "Lock 0x{:012x}".format(self.addr)
 
 
 class Graph(object):
-    # The Graph is a dict with the following structure:
-    #   {'node_key': {'node': {id: val}, 'next_nodes': [node_key_1, ...]}}
-    # Example graph:
-    #   {
-    #    'Lock 1': {'node': {1: 'MongoDB lock'}, 'next_nodes': ['Thread 1']},
-    #    'Lock 2': {'node': {2: 'MongoDB lock'}, 'next_nodes': ['Thread 2']},
-    #    'Thread 1': {'node': {1: 123}, 'next_nodes': ['Lock 2']},
-    #    'Thread 2': {'node': {2: 456}, 'next_nodes': ['Lock 1']}
-    #   }
+    """Graph class.
+
+    The Graph is a dict with the following structure:
+      {'node_key': {'node': {id: val}, 'next_nodes': [node_key_1, ...]}}
+    Example graph:
+      {
+       'Lock 1': {'node': {1: 'MongoDB lock'}, 'next_nodes': ['Thread 1']},
+       'Lock 2': {'node': {2: 'MongoDB lock'}, 'next_nodes': ['Thread 2']},
+       'Thread 1': {'node': {1: 123}, 'next_nodes': ['Lock 2']},
+       'Thread 2': {'node': {2: 456}, 'next_nodes': ['Lock 1']}
+      }
+    """
+
     def __init__(self):
+        """Initialize Graph."""
         self.nodes = {}
 
     def is_empty(self):
+        """Return True if graph is empty."""
         return not bool(self.nodes)
 
     def add_node(self, node):
+        """Add node to graph."""
         if not self.find_node(node):
             self.nodes[node.key()] = {'node': node, 'next_nodes': []}
 
     def find_node(self, node):
+        """Find node in graph."""
         if node.key() in self.nodes:
             return self.nodes[node.key()]
         return None
 
     def find_from_node(self, from_node):
+        """Find from node."""
         for node_key in self.nodes:
             node = self.nodes[node_key]
             for next_node in node['next_nodes']:
@@ -86,6 +107,7 @@ class Graph(object):
         return None
 
     def remove_nodes_without_edge(self):
+        """Remove nodes without edge."""
         # Rebuild graph by removing any nodes which do not have any incoming or outgoing edges.
         temp_nodes = {}
         for node_key in self.nodes:
@@ -95,28 +117,31 @@ class Graph(object):
         self.nodes = temp_nodes
 
     def add_edge(self, from_node, to_node):
-        f = self.find_node(from_node)
-        if f is None:
+        """Add edge."""
+        f_node = self.find_node(from_node)
+        if f_node is None:
             self.add_node(from_node)
-            f = self.nodes[from_node.key()]
+            f_node = self.nodes[from_node.key()]
 
-        t = self.find_node(to_node)
-        if t is None:
+        t_node = self.find_node(to_node)
+        if t_node is None:
             self.add_node(to_node)
-            t = self.nodes[to_node.key()]
+            t_node = self.nodes[to_node.key()]
 
-        for n in f['next_nodes']:
-            if n == to_node.key():
+        for n_node in f_node['next_nodes']:
+            if n_node == to_node.key():
                 return
         self.nodes[from_node.key()]['next_nodes'].append(to_node.key())
 
     def print(self):
+        """Print graph."""
         for node_key in self.nodes:
             print("Node", self.nodes[node_key]['node'])
-            for to in self.nodes[node_key]['next_nodes']:
-                print(" ->", to)
+            for to_node in self.nodes[node_key]['next_nodes']:
+                print(" ->", to_node)
 
     def to_graph(self, nodes=None, message=None):
+        """Return the 'to_graph'."""
         sb = []
         sb.append('# Legend:')
         sb.append('#    Thread 1 -> Lock 1 indicates Thread 1 is waiting on Lock 1')
@@ -136,12 +161,14 @@ class Graph(object):
         sb.append("}")
         return "\n".join(sb)
 
-    def depth_first_search(self, node_key, nodes_visited, nodes_in_cycle=[]):
-        """
+    def depth_first_search(self, node_key, nodes_visited, nodes_in_cycle=None):
+        """Perform depth first search and return the list of nodes in the cycle or None.
+
         The nodes_visited is a set of nodes which indicates it has been visited.
         The node_in_cycle is a list of nodes in the potential cycle.
-        Returns the list of nodes in the cycle or None.
         """
+        if nodes_in_cycle is None:
+            nodes_in_cycle = []
         nodes_visited.add(node_key)
         nodes_in_cycle.append(node_key)
         for node in self.nodes[node_key]['next_nodes']:
@@ -158,9 +185,7 @@ class Graph(object):
         return None
 
     def detect_cycle(self):
-        """
-        If a cycle is detected, returns a list of nodes in the cycle or None.
-        """
+        """If a cycle is detected, returns a list of nodes in the cycle or None."""
         nodes_visited = set()
         for node in self.nodes:
             if node not in nodes_visited:
@@ -171,6 +196,7 @@ class Graph(object):
 
 
 def find_lwpid(thread_dict, search_thread_id):
+    """Find lwpid."""
     for (lwpid, thread_id) in thread_dict.items():
         if thread_id == search_thread_id:
             return lwpid
@@ -178,6 +204,7 @@ def find_lwpid(thread_dict, search_thread_id):
 
 
 def find_func_block(block):
+    """Find func block."""
     while block:
         if block.function:
             return block
@@ -186,6 +213,7 @@ def find_func_block(block):
 
 
 def find_frame(function_name_pattern):
+    """Find frame."""
     frame = gdb.newest_frame()
     while frame:
         block = None
@@ -207,6 +235,7 @@ def find_frame(function_name_pattern):
 
 
 def find_mutex_holder(graph, thread_dict, show):
+    """Find mutex holder."""
     frame = find_frame(r'std::mutex::lock\(\)')
     if frame is None:
         return
@@ -241,6 +270,7 @@ def find_mutex_holder(graph, thread_dict, show):
 
 
 def find_lock_manager_holders(graph, thread_dict, show):
+    """Find lock manager holders."""
     frame = find_frame(r'mongo::LockerImpl\<.*\>::')
     if not frame:
         return
@@ -253,8 +283,8 @@ def find_lock_manager_holders(graph, thread_dict, show):
     lock_head = gdb.parse_and_eval(
         "mongo::getGlobalLockManager()->_getBucket(resId)->findOrInsert(resId)")
 
-    grantedList = lock_head.dereference()["grantedList"]
-    lock_request_ptr = grantedList["_front"]
+    granted_list = lock_head.dereference()["grantedList"]
+    lock_request_ptr = granted_list["_front"]
     while lock_request_ptr:
         lock_request = lock_request_ptr.dereference()
         locker_ptr = lock_request["locker"]
@@ -274,6 +304,7 @@ def find_lock_manager_holders(graph, thread_dict, show):
 
 
 def get_locks(graph, thread_dict, show=False):
+    """Get locks."""
     for thread in gdb.selected_inferior().threads():
         try:
             if not thread.is_valid():
@@ -285,7 +316,8 @@ def get_locks(graph, thread_dict, show=False):
             print("Ignoring GDB error '%s' in get_locks" % str(err))
 
 
-def get_threads_info(graph=None):
+def get_threads_info():
+    """Get threads info."""
     thread_dict = {}
     for thread in gdb.selected_inferior().threads():
         try:
@@ -295,7 +327,7 @@ def get_threads_info(graph=None):
             # PTID is a tuple: Process ID (PID), Lightweight Process ID (LWPID), Thread ID (TID)
             (_, lwpid, _) = thread.ptid
             thread_num = thread.num
-            thread_id = get_thread_id()
+            thread_id = mongo.get_thread_id()
             if not thread_id:
                 print("Unable to retrieve thread_info for thread %d" % thread_num)
                 continue
@@ -307,16 +339,19 @@ def get_threads_info(graph=None):
 
 
 class MongoDBShowLocks(gdb.Command):
-    """Show MongoDB locks & pthread mutexes"""
+    """Show MongoDB locks & pthread mutexes."""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-show-locks", gdb.COMMAND_DATA)
+        """Initialize MongoDBShowLocks."""
+        mongo.register_mongo_command(self, "mongodb-show-locks", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):
+    def invoke(self, *_):
+        """Invoke mongodb_show_locks."""
         self.mongodb_show_locks()
 
-    def mongodb_show_locks(self):
-        """GDB in-process python supplement"""
+    @staticmethod
+    def mongodb_show_locks():
+        """GDB in-process python supplement."""
         try:
             thread_dict = get_threads_info()
             get_locks(graph=None, thread_dict=thread_dict, show=True)
@@ -324,24 +359,27 @@ class MongoDBShowLocks(gdb.Command):
             print("Ignoring GDB error '%s' in mongodb_show_locks" % str(err))
 
 
-MongoDBShowLocks()
+mongo.MongoDBShowLocks()  # type: ignore
 
 
 class MongoDBWaitsForGraph(gdb.Command):
-    """Create MongoDB WaitsFor lock graph [graph_file]"""
+    """Create MongoDB WaitsFor lock graph [graph_file]."""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
+        """Initialize MongoDBWaitsForGraph."""
+        mongo.register_mongo_command(self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):
+    def invoke(self, arg, *_):
+        """Invoke mongodb_waitsfor_graph."""
         self.mongodb_waitsfor_graph(arg)
 
-    def mongodb_waitsfor_graph(self, file=None):
-        """GDB in-process python supplement"""
+    @staticmethod
+    def mongodb_waitsfor_graph(graph_file=None):
+        """GDB in-process python supplement."""
 
         graph = Graph()
         try:
-            thread_dict = get_threads_info(graph=graph)
+            thread_dict = get_threads_info()
             get_locks(graph=graph, thread_dict=thread_dict, show=False)
             graph.remove_nodes_without_edge()
             if graph.is_empty():
@@ -351,10 +389,10 @@ class MongoDBWaitsForGraph(gdb.Command):
             cycle_nodes = graph.detect_cycle()
             if cycle_nodes:
                 cycle_message = "# Cycle detected in the graph nodes %s" % cycle_nodes
-            if file:
-                print("Saving digraph to %s" % file)
-                with open(file, 'w') as f:
-                    f.write(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
+            if graph_file:
+                print("Saving digraph to %s" % graph_file)
+                with open(graph_file, 'w') as fh:
+                    fh.write(graph.to_graph(nodes=cycle_nodes, message=cycle_message))
                 print(cycle_message.split("# ")[1])
             else:
                 print(graph.to_graph(nodes=cycle_nodes, message=cycle_message))

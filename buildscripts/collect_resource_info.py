@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-"""
-Collect system resource information on processes running in Evergreen on a given interval.
-"""
+"""Collect system resource information on processes running in Evergreen on a given interval."""
 
 from __future__ import absolute_import
 from __future__ import print_function
@@ -19,10 +17,11 @@ import requests
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import utils  # pylint: disable=wrong-import-position
 
 
 def main():
+    """Main."""
     usage = "usage: %prog [options]"
     parser = optparse.OptionParser(description=__doc__, usage=usage)
     parser.add_option("-i", "--interval", dest="interval", default=5, type="int",

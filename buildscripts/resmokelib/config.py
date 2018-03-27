@@ -1,6 +1,4 @@
-"""
-Configuration options for resmoke.py.
-"""
+"""Configuration options for resmoke.py."""
 
 from __future__ import absolute_import
 
@@ -113,19 +111,16 @@ _SuiteOptions = collections.namedtuple("_SuiteOptions", [
 
 
 class SuiteOptions(_SuiteOptions):
-    """
-    A class for representing top-level options to resmoke.py that can also be set at the
-    suite-level.
-    """
+    """Represent top-level options to resmoke.py that can also be set at the suite-level."""
 
     INHERIT = object()
     ALL_INHERITED = None
 
     @classmethod
     def combine(cls, *suite_options_list):
-        """
-        Returns a SuiteOptions instance representing the combination of all SuiteOptions in
-        'suite_options_list'.
+        """Return SuiteOptions instance.
+
+        This object represents the combination of all SuiteOptions in 'suite_options_list'.
         """
 
         combined_options = cls.ALL_INHERITED._asdict()
@@ -158,8 +153,9 @@ class SuiteOptions(_SuiteOptions):
         return cls(**combined_options)
 
     def resolve(self):
-        """
-        Returns a SuiteOptions instance representing the options overridden at the suite-level and
+        """Return a SuiteOptions instance.
+
+        This represents the options overridden at the suite-level and
         the inherited options from the top-level.
         """
 
@@ -183,8 +179,8 @@ class SuiteOptions(_SuiteOptions):
         return SuiteOptions(**options)
 
 
-SuiteOptions.ALL_INHERITED = SuiteOptions(**dict(
-    zip(SuiteOptions._fields, itertools.repeat(SuiteOptions.INHERIT))))
+SuiteOptions.ALL_INHERITED = SuiteOptions(  # type: ignore
+    **dict(zip(SuiteOptions._fields, itertools.repeat(SuiteOptions.INHERIT))))
 
 ##
 # Variables that are set by the user at the command line or with --options.

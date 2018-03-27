@@ -1,6 +1,4 @@
-"""
-Manages interactions with the report.json file.
-"""
+"""Manage interactions with the report.json file."""
 
 from __future__ import absolute_import
 
@@ -11,10 +9,7 @@ from .testing import report as _report
 
 
 def write(suites):
-    """
-    Writes the combined report of all executions if --reportFile was
-    specified on the command line.
-    """
+    """Write the combined report of all executions if --reportFile was specified."""
 
     if config.REPORT_FILE is None:
         return

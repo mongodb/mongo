@@ -1,15 +1,23 @@
+"""Lint module."""
+
+from __future__ import print_function
+
 import sys
 import codecs
 
-import cpplint
-import utils
+import buildscripts.cpplint as cpplint
+import buildscripts.utils as utils
 
 
-class CheckForConfigH:
+class CheckForConfigH(object):
+    """CheckForConfigH class."""
+
     def __init__(self):
+        """Initialize CheckForConfigH."""
         self.found_configh = False
 
     def __call__(self, filename, clean_lines, line_num, error):
+        """Check for a config file."""
         if self.found_configh:
             return
 
@@ -21,7 +29,8 @@ class CheckForConfigH:
                   'MONGO_CONFIG define used without prior inclusion of config.h.')
 
 
-def run_lint(paths, nudgeOn=False):
+def run_lint(paths, nudge_on=False):
+    """Run lint."""
     # errors are as of 10/14
     # idea is not to let it any new type of error
     # as we knock one out, we should remove line
@@ -70,25 +79,26 @@ def run_lint(paths, nudgeOn=False):
     nudge.append('-whitespace/tab')  # errors found: 233
 
     filters = later + never
-    if not nudgeOn:
+    if not nudge_on:
         filters = filters + nudge
 
-    sourceFiles = []
-    for x in paths:
-        utils.getAllSourceFiles(sourceFiles, x)
+    source_files = []
+    for path in paths:
+        utils.get_all_source_files(source_files, path)
 
-    args = ["--linelength=100", "--filter=" + ",".join(filters), "--counting=detailed"
-            ] + sourceFiles
+    args = \
+        ["--linelength=100", "--filter=" + ",".join(filters), "--counting=detailed"] + source_files
     filenames = cpplint.ParseArguments(args)
 
-    def _ourIsTestFilename(fn):
-        if fn.find("dbtests") >= 0:
+    def _our_is_test_filename(file_name):
+        if file_name.find("dbtests") >= 0:
             return True
-        if fn.endswith("_test.cpp"):
+        if file_name.endswith("_test.cpp"):
             return True
         return False
 
-    cpplint._IsTestFilename = _ourIsTestFilename
+    # pylint: disable=protected-access
+    cpplint._IsTestFilename = _our_is_test_filename
 
     # Change stderr to write with replacement characters so we don't die
     # if we try to print something containing non-ASCII characters.
@@ -102,9 +112,12 @@ def run_lint(paths, nudgeOn=False):
     cpplint._cpplint_state.PrintErrorCounts()
 
     return cpplint._cpplint_state.error_count == 0
+    # pylint: enable=protected-access
 
 
-if __name__ == "__main__":
+def main():
+    """Execute Main program."""
+
     paths = []
     nudge = False
 
@@ -119,8 +132,12 @@ if __name__ == "__main__":
                 sys.exit(-1)
         paths.append(arg)
 
-    if len(paths) == 0:
+    if not paths:
         paths.append("src/mongo/")
 
     if not run_lint(paths, nudge):
         sys.exit(-1)
+
+
+if __name__ == "__main__":
+    main()

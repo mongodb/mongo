@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-"""
-Command line utility for executing MongoDB tests in Evergreen.
-"""
+"""Command line utility for executing MongoDB tests in Evergreen."""
 
 from __future__ import absolute_import
 
@@ -13,34 +11,42 @@ import sys
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts import resmoke
-from buildscripts import resmokelib
+from buildscripts import resmoke  # pylint: disable=wrong-import-position
+from buildscripts import resmokelib  # pylint: disable=wrong-import-position
 
 _TagInfo = collections.namedtuple("_TagInfo", ["tag_name", "evergreen_aware", "suite_options"])
 
 
 class Main(resmoke.Main):
-    """
+    """Execute Main class.
+
     A class for executing potentially multiple resmoke.py test suites in a way that handles
     additional options for running unreliable tests in Evergreen.
     """
 
-    UNRELIABLE_TAG = _TagInfo(tag_name="unreliable", evergreen_aware=True,
-                              suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(
-                                  report_failure_status="silentfail"))
+    UNRELIABLE_TAG = _TagInfo(
+        tag_name="unreliable",
+        evergreen_aware=True,
+        suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
+            report_failure_status="silentfail"))
 
     RESOURCE_INTENSIVE_TAG = _TagInfo(
-        tag_name="resource_intensive", evergreen_aware=False,
-        suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(num_jobs=1))
+        tag_name="resource_intensive",
+        evergreen_aware=False,
+        suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
+            num_jobs=1))
 
     RETRY_ON_FAILURE_TAG = _TagInfo(
-        tag_name="retry_on_failure", evergreen_aware=True,
-        suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(
+        tag_name="retry_on_failure",
+        evergreen_aware=True,
+        suite_options=resmokelib.config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
             fail_fast=False, num_repeats=2, report_failure_status="silentfail"))
 
-    def _make_evergreen_aware_tags(self, tag_name):
-        """
-        Returns a list of resmoke.py tags for task, variant, and distro combinations in Evergreen.
+    @staticmethod
+    def _make_evergreen_aware_tags(tag_name):
+        """Return a list of resmoke.py tags.
+
+        This list is for task, variant, and distro combinations in Evergreen.
         """
 
         tags_format = ["{tag_name}"]
@@ -62,9 +68,10 @@ class Main(resmoke.Main):
 
     @classmethod
     def _make_tag_combinations(cls):
-        """
-        Returns a list of (tag, enabled) pairs representing all possible combinations of all
-        possible pairings of whether the tags are enabled or disabled together.
+        """Return a list of (tag, enabled) pairs.
+
+        These pairs represent all possible combinations of all possible pairings
+        of whether the tags are enabled or disabled together.
         """
 
         combinations = []
@@ -96,8 +103,7 @@ class Main(resmoke.Main):
         return combinations
 
     def _get_suites(self):
-        """
-        Returns a list of resmokelib.testing.suite.Suite instances to execute.
+        """Return a list of resmokelib.testing.suite.Suite instances to execute.
 
         For every resmokelib.testing.suite.Suite instance returned by resmoke.Main._get_suites(),
         multiple copies of that test suite are run using different resmokelib.config.SuiteOptions()

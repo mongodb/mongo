@@ -7,7 +7,9 @@ from __future__ import absolute_import
 import datetime
 import unittest
 
-from buildscripts import test_failures
+from buildscripts import lifecycle_test_failures as test_failures
+
+# pylint: disable=invalid-name,missing-docstring,protected-access
 
 
 class TestReportEntry(unittest.TestCase):

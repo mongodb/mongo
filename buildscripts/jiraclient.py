@@ -7,13 +7,15 @@ import jira
 
 class JiraClient(object):
     """A client for JIRA."""
+
     CLOSE_TRANSITION_NAME = "Close Issue"
     RESOLVE_TRANSITION_NAME = "Resolve Issue"
     FIXED_RESOLUTION_NAME = "Fixed"
     WONT_FIX_RESOLUTION_NAME = "Won't Fix"
 
-    def __init__(self, server, username=None, password=None, access_token=None,
-                 access_token_secret=None, consumer_key=None, key_cert=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, server, username=None, password=None, access_token=None, access_token_secret=None,
+            consumer_key=None, key_cert=None):
         """Initialize the JiraClient with the server URL and user credentials."""
         opts = {"server": server, "verify": True}
         basic_auth = None

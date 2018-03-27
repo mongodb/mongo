@@ -1,24 +1,24 @@
-"""GDB Pretty-printers for MongoDB
-"""
+"""GDB Pretty-printers for MongoDB."""
 from __future__ import print_function
 
-import gdb.printing
 import struct
 import sys
+
+import gdb.printing
 
 try:
     import bson
     import bson.json_util
     import collections
     from bson.codec_options import CodecOptions
-except ImportError as e:
+except ImportError as err:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None
 
 
 def get_unique_ptr(obj):
-    """Read the value of a libstdc++ std::unique_ptr"""
+    """Read the value of a libstdc++ std::unique_ptr."""
     return obj["_M_t"]['_M_head_impl']
 
 
@@ -30,13 +30,14 @@ def get_unique_ptr(obj):
 
 
 class StatusPrinter(object):
-    """Pretty-printer for mongo::Status"""
-    OK = 0  # ErrorCodes::OK
+    """Pretty-printer for mongo::Status."""
 
     def __init__(self, val):
+        """Initialize StatusPrinter."""
         self.val = val
 
     def to_string(self):
+        """Return status for printing."""
         if not self.val['_error']:
             return 'Status::OK()'
 
@@ -49,13 +50,15 @@ class StatusPrinter(object):
         return 'Status(%s, %s)' % (code, reason)
 
 
-class StatusWithPrinter:
-    """Pretty-printer for mongo::StatusWith<>"""
+class StatusWithPrinter(object):
+    """Pretty-printer for mongo::StatusWith<>."""
 
     def __init__(self, val):
+        """Initialize StatusWithPrinter."""
         self.val = val
 
     def to_string(self):
+        """Return status for printing."""
         if not self.val['_status']['_error']:
             return 'StatusWith(OK, %s)' % (self.val['_t'])
 
@@ -69,27 +72,31 @@ class StatusWithPrinter:
         return 'StatusWith(%s, %s)' % (code, reason)
 
 
-class StringDataPrinter:
-    """Pretty-printer for mongo::StringData"""
+class StringDataPrinter(object):
+    """Pretty-printer for mongo::StringData."""
 
     def __init__(self, val):
+        """Initialize StringDataPrinter."""
         self.val = val
 
-    def display_hint(self):
+    @staticmethod
+    def display_hint():
+        """Display hint."""
         return 'string'
 
     def to_string(self):
+        """Return data for printing."""
         size = self.val["_size"]
         if size == -1:
             return self.val['_data'].lazy_string()
-        else:
-            return self.val['_data'].lazy_string(length=size)
+        return self.val['_data'].lazy_string(length=size)
 
 
-class BSONObjPrinter:
-    """Pretty-printer for mongo::BSONObj"""
+class BSONObjPrinter(object):
+    """Pretty-printer for mongo::BSONObj."""
 
     def __init__(self, val):
+        """Initialize BSONObjPrinter."""
         self.val = val
         self.ptr = self.val['_objdata'].cast(gdb.lookup_type('void').pointer())
         # Handle the endianness of the BSON object size, which is represented as a 32-bit integer
@@ -101,10 +108,13 @@ class BSONObjPrinter:
         else:
             self.size = struct.unpack('<I', inferior.read_memory(self.ptr, 4))[0]
 
-    def display_hint(self):
+    @staticmethod
+    def display_hint():
+        """Display hint."""
         return 'map'
 
     def children(self):
+        """Children."""
         # Do not decode a BSONObj with an invalid size.
         if not bson or self.size < 5 or self.size > 17 * 1024 * 1024:
             return
@@ -114,11 +124,12 @@ class BSONObjPrinter:
         options = CodecOptions(document_class=collections.OrderedDict)
         bsondoc = bson.BSON.decode(buf, codec_options=options)
 
-        for k, v in bsondoc.items():
-            yield 'key', k
-            yield 'value', bson.json_util.dumps(v)
+        for key, val in bsondoc.items():
+            yield 'key', key
+            yield 'value', bson.json_util.dumps(val)
 
     def to_string(self):
+        """Return BSONObj for printing."""
         # The value has been optimized out.
         if self.size == -1:
             return "BSONObj @ %s" % (self.ptr)
@@ -132,29 +143,33 @@ class BSONObjPrinter:
 
         if size == 5:
             return "%s empty BSONObj @ %s" % (ownership, self.ptr)
-        else:
-            return "%s BSONObj %s bytes @ %s" % (ownership, size, self.ptr)
+        return "%s BSONObj %s bytes @ %s" % (ownership, size, self.ptr)
 
 
-class UnorderedFastKeyTablePrinter:
-    """Pretty-printer for mongo::UnorderedFastKeyTable<>"""
+class UnorderedFastKeyTablePrinter(object):
+    """Pretty-printer for mongo::UnorderedFastKeyTable<>."""
 
     def __init__(self, val):
+        """Initialize UnorderedFastKeyTablePrinter."""
         self.val = val
 
         # Get the value_type by doing a type lookup
-        valueTypeName = val.type.strip_typedefs().name + "::value_type"
-        valueType = gdb.lookup_type(valueTypeName).target()
-        self.valueTypePtr = valueType.pointer()
+        value_type_name = val.type.strip_typedefs().name + "::value_type"
+        value_type = gdb.lookup_type(value_type_name).target()
+        self.value_type_ptr = value_type.pointer()
 
-    def display_hint(self):
+    @staticmethod
+    def display_hint():
+        """Display hint."""
         return 'map'
 
     def to_string(self):
+        """Return UnorderedFastKeyTablePrinter for printing."""
         return "UnorderedFastKeyTablePrinter<%s> with %s elems " % (
             self.val.type.template_argument(0), self.val["_size"])
 
     def children(self):
+        """Children."""
         cap = self.val["_area"]["_hashMask"] + 1
         it = get_unique_ptr(self.val["_area"]["_entries"])
         end = it + cap
@@ -168,16 +183,17 @@ class UnorderedFastKeyTablePrinter:
             if not elt['_used']:
                 continue
 
-            value = elt['_data']["__data"].cast(self.valueTypePtr).dereference()
+            value = elt['_data']["__data"].cast(self.value_type_ptr).dereference()
 
             yield ('key', value['first'])
             yield ('value', value['second'])
 
 
-class DecorablePrinter:
-    """Pretty-printer for mongo::Decorable<>"""
+class DecorablePrinter(object):
+    """Pretty-printer for mongo::Decorable<>."""
 
     def __init__(self, val):
+        """Initialize DecorablePrinter."""
         self.val = val
 
         decl_vector = val["_decorations"]["_registry"]["_decorationInfo"]
@@ -187,14 +203,18 @@ class DecorablePrinter:
         decinfo_t = gdb.lookup_type('mongo::DecorationRegistry::DecorationInfo')
         self.count = int((int(finish) - int(self.start)) / decinfo_t.sizeof)
 
-    def display_hint(self):
+    @staticmethod
+    def display_hint():
+        """Display hint."""
         return 'map'
 
     def to_string(self):
+        """Return Decorable for printing."""
         return "Decorable<%s> with %s elems " % (self.val.type.template_argument(0), self.count)
 
     def children(self):
-        decorationData = get_unique_ptr(self.val["_decorations"]["_decorationData"])
+        """Children."""
+        decoration_data = get_unique_ptr(self.val["_decorations"]["_decorationData"])
 
         for index in range(self.count):
             descriptor = self.start[index]
@@ -215,19 +235,20 @@ class DecorablePrinter:
 
             # Cast the raw char[] into the actual object that is stored there.
             type_t = gdb.lookup_type(type_name)
-            obj = decorationData[dindex].cast(type_t)
+            obj = decoration_data[dindex].cast(type_t)
 
             yield ('key', "%d:%s:%s" % (index, obj.address, type_name))
             yield ('value', obj)
 
 
 def find_match_brackets(search, opening='<', closing='>'):
-    """Returns the index of the closing bracket that matches the first opening bracket.
-       Returns -1 if no last matching bracket is found, i.e. not a template.
+    """Return the index of the closing bracket that matches the first opening bracket.
 
-       Example:
-         'Foo<T>::iterator<U>''
-         returns 5
+    Return -1 if no last matching bracket is found, i.e. not a template.
+
+    Example:
+        'Foo<T>::iterator<U>''
+        returns 5
     """
     index = search.find(opening)
     if index == -1:
@@ -237,11 +258,11 @@ def find_match_brackets(search, opening='<', closing='>'):
     count = 1
     str_len = len(search)
     for index in range(start, str_len):
-        c = search[index]
+        char = search[index]
 
-        if c == opening:
+        if char == opening:
             count += 1
-        elif c == closing:
+        elif char == closing:
             count -= 1
 
         if count == 0:
@@ -251,9 +272,10 @@ def find_match_brackets(search, opening='<', closing='>'):
 
 
 class MongoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
-    """Sub pretty printer managed by the pretty-printer collection"""
+    """Sub pretty printer managed by the pretty-printer collection."""
 
     def __init__(self, name, prefix, is_template, printer):
+        """Initialize MongoSubPrettyPrinter."""
         super(MongoSubPrettyPrinter, self).__init__(name)
         self.prefix = prefix
         self.printer = printer
@@ -262,16 +284,20 @@ class MongoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
 
 class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
     """MongoDB-specific printer printer collection that ignores subtypes.
+
     It will match 'HashTable<T> but not 'HashTable<T>::iterator' when asked for 'HashTable'.
     """
 
     def __init__(self):
+        """Initialize MongoPrettyPrinterCollection."""
         super(MongoPrettyPrinterCollection, self).__init__("mongo", [])
 
     def add(self, name, prefix, is_template, printer):
+        """Add a subprinter."""
         self.subprinters.append(MongoSubPrettyPrinter(name, prefix, is_template, printer))
 
     def __call__(self, val):
+        """Return matched printer type."""
 
         # Get the type name.
         lookup_tag = gdb.types.get_basic_type(val.type).tag
@@ -286,15 +312,18 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
         # We do not want HashTable<T>::iterator as an example, just HashTable<T>
         if index == -1 or index + 1 == len(lookup_tag):
             for printer in self.subprinters:
-                if printer.enabled and (
-                    (printer.is_template and lookup_tag.find(printer.prefix) == 0) or
-                    (not printer.is_template and lookup_tag == printer.prefix)):
-                    return printer.printer(val)
+                if not printer.enabled:
+                    continue
+                if ((not printer.is_template or lookup_tag.find(printer.prefix) != 0)
+                        and (printer.is_template or lookup_tag != printer.prefix)):
+                    continue
+                return printer.printer(val)
 
         return None
 
 
 def build_pretty_printer():
+    """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
     pp.add('BSONObj', 'mongo::BSONObj', False, BSONObjPrinter)
     pp.add('Decorable', 'mongo::Decorable', True, DecorablePrinter)

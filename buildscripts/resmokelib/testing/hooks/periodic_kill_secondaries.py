@@ -1,7 +1,4 @@
-"""
-Testing hook for verifying correctness of a secondary's behavior during
-an unclean shutdown.
-"""
+"""Test hook for verifying correctness of secondary's behavior during an unclean shutdown."""
 
 from __future__ import absolute_import
 
@@ -20,15 +17,16 @@ from ... import errors
 
 
 class PeriodicKillSecondaries(interface.Hook):
-    """
-    Periodically kills the secondaries in a replica set and verifies
-    that they can reach the SECONDARY state without having connectivity
+    """Periodically kills the secondaries in a replica set.
+
+    Also verifies that the secondaries can reach the SECONDARY state without having connectivity
     to the primary after an unclean shutdown.
     """
 
     DEFAULT_PERIOD_SECS = 30
 
     def __init__(self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS):
+        """Initialize PeriodicKillSecondaries."""
         if not isinstance(rs_fixture, replicaset.ReplicaSetFixture):
             raise TypeError("{} either does not support replication or does not support writing to"
                             " its oplog early".format(rs_fixture.__class__.__name__))
@@ -46,6 +44,7 @@ class PeriodicKillSecondaries(interface.Hook):
         self._last_test = None
 
     def after_suite(self, test_report):
+        """Run after suite."""
         if self._start_time is not None:
             # Ensure that we test killing the secondary and having it reach state SECONDARY after
             # being restarted at least once when running the suite.
@@ -54,6 +53,7 @@ class PeriodicKillSecondaries(interface.Hook):
             self._run(test_report)
 
     def before_test(self, test, test_report):
+        """Run before test."""
         if self._start_time is not None:
             # The "rsSyncApplyStop" failpoint is already enabled.
             return
@@ -66,6 +66,7 @@ class PeriodicKillSecondaries(interface.Hook):
         self._start_time = time.time()
 
     def after_test(self, test, test_report):
+        """Run after test."""
         self._last_test = test
 
         # Kill the secondaries and verify that they can reach the SECONDARY state if the specified
@@ -116,12 +117,17 @@ class PeriodicKillSecondaries(interface.Hook):
 
 
 class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
-    def __init__(self, logger, test_name, description, base_test_name, hook, test_report):
+    """PeriodicKillSecondariesTestCase class."""
+
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, test_name, description, base_test_name, hook, test_report):
+        """Initialize PeriodicKillSecondariesTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
         self._test_report = test_report
 
     def run_test(self):
+        """Run the test."""
         self._kill_secondaries()
         self._check_secondaries_and_restart_fixture()
 
@@ -143,7 +149,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         for secondary in self.fixture.get_secondaries():
             # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
             # oplog entries.
-            self._hook._disable_rssyncapplystop(secondary)
+            self._hook._disable_rssyncapplystop(secondary)  # pylint: disable=protected-access
 
             # Wait a little bit for the secondary to start apply oplog entries so that we are more
             # likely to kill the mongod process while it is partway into applying a batch.
@@ -229,7 +235,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         self.fixture.setup()
         self.fixture.await_ready()
 
-    def _check_invariants_as_standalone(self, secondary):
+    def _check_invariants_as_standalone(self, secondary):  # pylint: disable=too-many-branches
         # We remove the --replSet option in order to start the node as a standalone.
         replset_name = secondary.mongod_options.pop("replSet")
 

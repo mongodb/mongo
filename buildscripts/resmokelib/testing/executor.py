@@ -1,6 +1,4 @@
-"""
-Driver of the test execution framework.
-"""
+"""Driver of the test execution framework."""
 
 from __future__ import absolute_import
 
@@ -21,8 +19,7 @@ from ..utils import queue as _queue
 
 
 class TestSuiteExecutor(object):
-    """
-    Executes a test suite.
+    """Execute a test suite.
 
     Responsible for setting up and tearing down the fixtures that the
     tests execute against.
@@ -30,11 +27,10 @@ class TestSuiteExecutor(object):
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
-    def __init__(self, exec_logger, suite, config=None, fixture=None, hooks=None,
-                 archive_instance=None, archive=None):
-        """
-        Initializes the TestSuiteExecutor with the test suite to run.
-        """
+    def __init__(  # pylint: disable=too-many-arguments
+            self, exec_logger, suite, config=None, fixture=None, hooks=None, archive_instance=None,
+            archive=None):
+        """Initialize the TestSuiteExecutor with the test suite to run."""
         self.logger = exec_logger
 
         if _config.SHELL_CONN_STRING is not None:
@@ -69,8 +65,7 @@ class TestSuiteExecutor(object):
         self._jobs = [self._make_job(job_num) for job_num in xrange(jobs_to_start)]
 
     def run(self):
-        """
-        Executes the test suite.
+        """Execute the test suite.
 
         Any exceptions that occur during setting up or tearing down a
         fixture are propagated.
@@ -128,9 +123,7 @@ class TestSuiteExecutor(object):
             self._suite.return_code = return_code
 
     def _setup_fixtures(self):
-        """
-        Sets up a fixture for each job.
-        """
+        """Set up a fixture for each job."""
 
         # We reset the internal state of the PortAllocator before calling job.fixture.setup() so
         # that ports used by the fixture during a test suite run earlier can be reused during this
@@ -140,7 +133,7 @@ class TestSuiteExecutor(object):
         for job in self._jobs:
             try:
                 job.fixture.setup()
-            except:
+            except:  # pylint: disable=bare-except
                 self.logger.exception("Encountered an error while setting up %s.", job.fixture)
                 return False
 
@@ -148,16 +141,14 @@ class TestSuiteExecutor(object):
         for job in self._jobs:
             try:
                 job.fixture.await_ready()
-            except:
+            except:  # pylint: disable=bare-except
                 self.logger.exception("Encountered an error while waiting for %s to be ready",
                                       job.fixture)
                 return False
         return True
 
     def _run_tests(self, test_queue, teardown_flag):
-        """
-        Starts a thread for each Job instance and blocks until all of
-        the tests are run.
+        """Start a thread for each Job instance and block until all of the tests are run.
 
         Returns a (combined report, user interrupted) pair, where the
         report contains the status and timing information of tests run
@@ -170,12 +161,12 @@ class TestSuiteExecutor(object):
         try:
             # Run each Job instance in its own thread.
             for job in self._jobs:
-                t = threading.Thread(target=job, args=(test_queue, interrupt_flag),
-                                     kwargs=dict(teardown_flag=teardown_flag))
+                thr = threading.Thread(target=job, args=(test_queue, interrupt_flag),
+                                       kwargs=dict(teardown_flag=teardown_flag))
                 # Do not wait for tests to finish executing if interrupted by the user.
-                t.daemon = True
-                t.start()
-                threads.append(t)
+                thr.daemon = True
+                thr.start()
+                threads.append(thr)
                 # SERVER-24729 Need to stagger when jobs start to reduce I/O load if there
                 # are many of them.  Both the 5 and the 10 are arbitrary.
                 # Currently only enabled on Evergreen.
@@ -192,8 +183,8 @@ class TestSuiteExecutor(object):
             user_interrupted = True
         else:
             # Only wait for all the Job instances if not interrupted by the user.
-            for t in threads:
-                t.join()
+            for thr in threads:
+                thr.join()
 
         reports = [job.report for job in self._jobs]
         combined_report = _report.TestReport.combine(*reports)
@@ -204,8 +195,7 @@ class TestSuiteExecutor(object):
         return (combined_report, user_interrupted)
 
     def _teardown_fixtures(self):
-        """
-        Tears down all of the fixtures.
+        """Tear down all of the fixtures.
 
         Returns true if all fixtures were torn down successfully, and
         false otherwise.
@@ -217,15 +207,13 @@ class TestSuiteExecutor(object):
             except errors.ServerFailure as err:
                 self.logger.warn("Teardown of %s was not successful: %s", job.fixture, err)
                 success = False
-            except:
+            except:  # pylint: disable=bare-except
                 self.logger.exception("Encountered an error while tearing down %s.", job.fixture)
                 success = False
         return success
 
     def _make_fixture(self, job_num, job_logger):
-        """
-        Creates a fixture for a job.
-        """
+        """Create a fixture for a job."""
 
         fixture_config = {}
         fixture_class = fixtures.NOOP_FIXTURE_CLASS
@@ -238,10 +226,8 @@ class TestSuiteExecutor(object):
 
         return fixtures.make_fixture(fixture_class, fixture_logger, job_num, **fixture_config)
 
-    def _make_hooks(self, job_num, fixture):
-        """
-        Creates the hooks for the job's fixture.
-        """
+    def _make_hooks(self, fixture):
+        """Create the hooks for the job's fixture."""
 
         hooks = []
 
@@ -256,22 +242,18 @@ class TestSuiteExecutor(object):
         return hooks
 
     def _make_job(self, job_num):
-        """
-        Returns a Job instance with its own fixture, hooks, and test
-        report.
-        """
+        """Return a Job instance with its own fixture, hooks, and test report."""
         job_logger = self.logger.new_job_logger(self._suite.test_kind, job_num)
 
         fixture = self._make_fixture(job_num, job_logger)
-        hooks = self._make_hooks(job_num, fixture)
+        hooks = self._make_hooks(fixture)
 
         report = _report.TestReport(job_logger, self._suite.options)
 
         return _job.Job(job_logger, fixture, hooks, report, self.archival, self._suite.options)
 
     def _make_test_queue(self):
-        """
-        Returns a queue of TestCase instances.
+        """Return a queue of TestCase instances.
 
         Use a multi-consumer queue instead of a unittest.TestSuite so
         that the test cases can be dispatched to multiple threads.

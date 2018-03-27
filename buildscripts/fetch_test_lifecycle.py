@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-"""Script to retrieve the etc/test_lifecycle.yml tag file from the metadata repository that
-corresponds to the current repository.
+"""Retrieve the etc/test_lifecycle.yml tag file from the metadata repository.
+
+This is performed for the current repository.
 
 Usage:
     python buildscsripts/fetch_test_lifecycle.py evergreen-project revision
@@ -13,7 +14,6 @@ import logging
 import optparse
 import os
 import posixpath
-import shutil
 import sys
 import textwrap
 
@@ -23,7 +23,7 @@ import yaml
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts import git
+from buildscripts import git  # pylint: disable=wrong-import-position
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,8 +31,9 @@ LOGGER = logging.getLogger(__name__)
 class MetadataRepository(object):
     """Represent the metadata repository containing the test lifecycle tags file."""
 
-    def __init__(self, repository, references_file, lifecycle_file):
-        """Initlialize the MetadataRepository.
+    def __init__(self, repository, references_file,
+                 lifecycle_file):  # noqa: D214,D405,D406,D407,D411,D413
+        """Initialize the MetadataRepository.
 
         Args:
             repository: the git.Repository object for the repository.
@@ -47,13 +48,13 @@ class MetadataRepository(object):
         # The path to the lifecycle file, absolute or relative to the current working directory.
         self.lifecycle_path = os.path.join(repository.directory, lifecycle_file)
 
-    def list_revisions(self):
+    def list_revisions(self):  # noqa: D406,D407,D413
         """List the revisions from the HEAD of this repository.
 
         Returns:
             A list of str containing the git hashes for all the revisions from the newest (HEAD)
             to the oldest.
-            """
+        """
         return self._repository.git_rev_list(["HEAD", "--", self._lifecycle_file]).splitlines()
 
     def _get_references_content(self, revision):
@@ -62,13 +63,15 @@ class MetadataRepository(object):
         return references_content
 
     def get_reference(self, metadata_revision, project):
-        """Retrieve the reference revision (a revision of the project 'project') associated with
-         the test lifecycle file present in the metadata repository at revision 'metadata_revision'.
+        """Retrieve the reference revision (a revision of the project 'project').
 
-         Args:
-             metadata_revision: a revision (git hash) of this repository.
-             project: an Evergreen project name (e.g. mongodb-mongo-master).
-         """
+        The revision is associated with the test lifecycle file present in the metadata repository
+        at revision 'metadata_revision'.
+
+        Args:
+            metadata_revision: a revision (git hash) of this repository.
+            project: an Evergreen project name (e.g. mongodb-mongo-master).
+        """
         references_content = self._get_references_content(metadata_revision)
         references = yaml.safe_load(references_content)
         return references.get("test-lifecycle", {}).get(project)
@@ -100,9 +103,9 @@ def _get_metadata_revision(metadata_repo, mongo_repo, project, revision):
     return None
 
 
-def fetch_test_lifecycle(metadata_repo_url, references_file, lifecycle_file, project, revision):
-    """Fetch the test lifecycle file that corresponds to the given revision of the repository this
-    script is called from.
+def fetch_test_lifecycle(metadata_repo_url, references_file, lifecycle_file, project,
+                         revision):  # noqa: D214,D405,D406,D407,D411,D413
+    """Fetch the test lifecycle file for the revision in the repository this script is invoked.
 
     Args:
         metadata_repo_url: the git repository URL for the metadata repository containing the test
@@ -127,7 +130,8 @@ def fetch_test_lifecycle(metadata_repo_url, references_file, lifecycle_file, pro
 
 
 def main():
-    """
+    """Execute Main program.
+
     Utility to fetch the etc/test_lifecycle.yml file corresponding to a given revision from
     the mongo-test-metadata repository.
     """

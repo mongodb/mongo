@@ -1,6 +1,4 @@
-"""
-Enables supports for archiving tests or hooks.
-"""
+"""Enable support for archiving tests or hooks."""
 
 from __future__ import absolute_import
 
@@ -13,11 +11,10 @@ from ..utils import globstar
 
 
 class HookTestArchival(object):
-    """
-    Archives hooks and tests to S3.
-    """
+    """Archive hooks and tests to S3."""
 
     def __init__(self, suite, hooks, archive_instance, archive_config):
+        """Initialize HookTestArchival."""
         self.archive_instance = archive_instance
         archive_config = utils.default_if_none(archive_config, {})
 
@@ -45,11 +42,11 @@ class HookTestArchival(object):
         self._lock = threading.Lock()
 
     def _should_archive(self, success):
-        """ Return True if failed test or 'on_success' is True. """
+        """Return True if failed test or 'on_success' is True."""
         return not success or self.on_success
 
     def _archive_hook(self, logger, hook, test, success):
-        """ Helper to archive hooks. """
+        """Provide helper to archive hooks."""
         hook_match = hook.REGISTERED_NAME in self.hooks
         if not hook_match or not self._should_archive(success):
             return
@@ -58,7 +55,7 @@ class HookTestArchival(object):
         self._archive_hook_or_test(logger, test_name, test)
 
     def _archive_test(self, logger, test, success):
-        """ Helper to archive tests. """
+        """Provide helper to archive tests."""
         test_name = test.test_name
         test_match = False
         for arch_test in self.tests:
@@ -72,7 +69,7 @@ class HookTestArchival(object):
         self._archive_hook_or_test(logger, test_name, test)
 
     def archive(self, logger, test, success, hook=None):
-        """ Archives data files for hooks or tests. """
+        """Archive data files for hooks or tests."""
         if not config.ARCHIVE_FILE or not self.archive_instance:
             return
         if hook:
@@ -81,7 +78,7 @@ class HookTestArchival(object):
             self._archive_test(logger, test, success)
 
     def _archive_hook_or_test(self, logger, test_name, test):
-        """ Trigger archive of data files for a test or hook. """
+        """Trigger archive of data files for a test or hook."""
 
         with self._lock:
             # Test repeat number is how many times the particular test has been archived.

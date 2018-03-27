@@ -12,7 +12,8 @@ from buildscripts.resmokelib.testing.hooks import interface
 
 
 class CombineBenchmarkResults(interface.Hook):
-    """
+    """CombineBenchmarkResults class.
+
     The CombineBenchmarkResults hook combines test results from
     individual benchmark files to a single file. This is useful for
     generating the json file to feed into the Evergreen performance
@@ -22,6 +23,7 @@ class CombineBenchmarkResults(interface.Hook):
     DESCRIPTION = "Combine JSON results from individual benchmarks"
 
     def __init__(self, hook_logger, fixture):
+        """Initialize CombineBenchmarkResults."""
         interface.Hook.__init__(self, hook_logger, fixture, CombineBenchmarkResults.DESCRIPTION)
         self.report_file = _config.PERF_REPORT_FILE
 
@@ -35,27 +37,30 @@ class CombineBenchmarkResults(interface.Hook):
     def _strftime(time):
         return time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def after_test(self, test_case, test_report):
+    def after_test(self, test, test_report):
+        """Update test report."""
         if self.report_file is None:
             return
 
-        bm_report_path = test_case.report_name()
+        bm_report_path = test.report_name()
 
         with open(bm_report_path, "r") as report_file:
             report_dict = json.load(report_file)
             self._parse_report(report_dict)
 
     def before_suite(self, test_report):
+        """Set suite start time."""
         self.create_time = datetime.datetime.now()
 
     def after_suite(self, test_report):
+        """Update test report."""
         if self.report_file is None:
             return
 
         self.end_time = datetime.datetime.now()
         report = self._generate_perf_plugin_report()
-        with open(self.report_file, "w") as f:
-            json.dump(report, f)
+        with open(self.report_file, "w") as fh:
+            json.dump(report, fh)
 
     def _generate_perf_plugin_report(self):
         """Format the data to look like a perf plugin report."""
@@ -68,8 +73,7 @@ class CombineBenchmarkResults(interface.Hook):
 
         for name, report in self.benchmark_reports.items():
             test_report = {
-                "name": name,
-                "context": report.context._asdict(),
+                "name": name, "context": report.context._asdict(),
                 "results": report.generate_perf_plugin_dict()
             }
 
@@ -93,15 +97,13 @@ class CombineBenchmarkResults(interface.Hook):
 
 
 # Capture information from a Benchmark name in a logical format.
-_BenchmarkName = collections.namedtuple("_BenchmarkName", [
-    "base_name",
-    "thread_count",
-    "statistic_type"
-]);
+_BenchmarkName = collections.namedtuple("_BenchmarkName",
+                                        ["base_name", "thread_count", "statistic_type"])
 
 
 class _BenchmarkThreadsReport(object):
-    """
+    """_BenchmarkThreadsReport class.
+
     Class representation of a report for all thread levels of a single
     benchmark test. Each report is designed to correspond to one graph
     in the Evergreen perf plugin.
@@ -127,10 +129,11 @@ class _BenchmarkThreadsReport(object):
       ]
     }
     """
+
     CONTEXT_FIELDS = [
         "date", "cpu_scaling_enabled", "num_cpus", "mhz_per_cpu", "library_build_type"
     ]
-    Context = collections.namedtuple("Context", CONTEXT_FIELDS)
+    Context = collections.namedtuple("Context", CONTEXT_FIELDS)  # type: ignore
 
     def __init__(self, context_dict):
         self.context = self.Context(**context_dict)
@@ -139,11 +142,11 @@ class _BenchmarkThreadsReport(object):
         self.thread_benchmark_map = collections.defaultdict(list)
 
     def add_report(self, bm_name_obj, report):
+        """Add to report."""
         self.thread_benchmark_map[bm_name_obj.thread_count].append(report)
 
     def generate_perf_plugin_dict(self):
-        """
-        Generate perf plugin data points of the following format:
+        """Generate perf plugin data points of the following format.
 
         "1": {
           "error_values": [

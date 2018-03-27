@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Bypass compile and fetch binaries."""
 
 from __future__ import absolute_import
 from __future__ import print_function
@@ -7,15 +8,16 @@ import argparse
 import json
 import os
 import re
-import shutil
 import sys
 import tarfile
 
 import urllib
+# pylint: disable=ungrouped-imports
 try:
     from urlparse import urlparse
 except ImportError:
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse  # type: ignore
+# pylint: enable=ungrouped-imports
 
 import requests
 import yaml
@@ -24,6 +26,7 @@ _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
 
 
 def executable_name(pathname):
+    """Return the executable name."""
     # Ensure that executable files on Windows have a ".exe" extension.
     if _IS_WINDOWS and os.path.splitext(pathname)[1] != ".exe":
         return "{}.exe".format(pathname)
@@ -31,6 +34,7 @@ def executable_name(pathname):
 
 
 def archive_name(archive):
+    """Return the archive name."""
     # Ensure the right archive extension is used for Windows.
     if _IS_WINDOWS:
         return "{}.zip".format(archive)
@@ -38,6 +42,7 @@ def archive_name(archive):
 
 
 def requests_get_json(url):
+    """Return the JSON response."""
     response = requests.get(url)
     response.raise_for_status()
 
@@ -49,9 +54,9 @@ def requests_get_json(url):
 
 
 def read_evg_config():
-    """
-    Attempts to parse the Evergreen configuration from its home location.
-    Returns None if the configuration file wasn't found.
+    """Attempt to parse the Evergreen configuration from its home location.
+
+    Return None if the configuration file wasn't found.
     """
     evg_file = os.path.expanduser("~/.evergreen.yml")
     if os.path.isfile(evg_file):
@@ -62,18 +67,14 @@ def read_evg_config():
 
 
 def write_out_bypass_compile_expansions(patch_file, **expansions):
-    """
-    Write out the macro expansions to given file.
-    """
+    """Write out the macro expansions to given file."""
     with open(patch_file, "w") as out_file:
         print("Saving compile bypass expansions to {0}: ({1})".format(patch_file, expansions))
         yaml.safe_dump(expansions, out_file, default_flow_style=False)
 
 
 def write_out_artifacts(json_file, artifacts):
-    """
-    Write out the JSON file with URLs of artifacts to given file.
-    """
+    """Write out the JSON file with URLs of artifacts to given file."""
     with open(json_file, "w") as out_file:
         print("Generating artifacts.json from pre-existing artifacts {0}".format(
             json.dumps(artifacts, indent=4)))
@@ -81,6 +82,7 @@ def write_out_artifacts(json_file, artifacts):
 
 
 def generate_bypass_expansions(project, build_variant, revision, build_id):
+    """Perform the generate bypass expansions."""
     expansions = {}
     # With compile bypass we need to update the URL to point to the correct name of the base commit
     # binaries.
@@ -103,8 +105,7 @@ def generate_bypass_expansions(project, build_variant, revision, build_id):
 
 
 def should_bypass_compile():
-    """
-    Based on the modified patch files determine whether the compile stage should be bypassed.
+    """Determine whether the compile stage should be bypassed based on the modified patch files.
 
     We use lists of files and directories to more precisely control which modified patch files will
     lead to compile bypass.
@@ -133,7 +134,7 @@ def should_bypass_compile():
         "buildscripts/make_archive.py",
         "buildscripts/moduleconfig.py",
         "buildscripts/msitrim.py",
-        "buildscripts/packager-enterprise.py",
+        "buildscripts/packager_enterprise.py",
         "buildscripts/packager.py",
         "buildscripts/scons.py",
         "buildscripts/utils.py",
@@ -171,6 +172,7 @@ def should_bypass_compile():
 
 
 def parse_args():
+    """Parse the program arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True,
                         help="The Evergreen project. e.g mongodb-mongo-master")
@@ -192,8 +194,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    """
+def main():  # pylint: disable=too-many-locals,too-many-statements
+    """Execute Main entry.
+
     From the /rest/v1/projects/{project}/revisions/{revision} endpoint find an existing build id
     to generate the compile task id to use for retrieving artifacts when bypassing compile.
 
@@ -225,6 +228,7 @@ def main():
         # Evergreen only contain "_". Replace the hyphens before searching for the build.
         prefix = prefix.replace("-", "_")
         build_id_pattern = re.compile(prefix)
+        build_id = None
         for build_id in revisions["builds"]:
             # Find a suitable build_id
             match = build_id_pattern.search(build_id)

@@ -117,10 +117,6 @@ class _EnumTypeInt(EnumTypeInfoBase):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, idl_enum):
-        # type: (Union[syntax.Enum,ast.Enum]) -> None
-        super(_EnumTypeInt, self).__init__(idl_enum)
-
     def get_cpp_type_name(self):
         # type: () -> unicode
         return common.title_case(self._enum.name)
@@ -195,10 +191,6 @@ class _EnumTypeString(EnumTypeInfoBase):
     """Type information for string enumerations."""
 
     __metaclass__ = ABCMeta
-
-    def __init__(self, idl_enum):
-        # type: (Union[syntax.Enum,ast.Enum]) -> None
-        super(_EnumTypeString, self).__init__(idl_enum)
 
     def get_cpp_type_name(self):
         # type: () -> unicode

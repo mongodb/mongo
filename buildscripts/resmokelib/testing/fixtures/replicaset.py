@@ -1,6 +1,4 @@
-"""
-Replica set fixture for executing JSTests against.
-"""
+"""Replica set fixture for executing JSTests against."""
 
 from __future__ import absolute_import
 
@@ -17,19 +15,19 @@ from ... import errors
 from ... import utils
 
 
-class ReplicaSetFixture(interface.ReplFixture):
-    """
-    Fixture which provides JSTests with a replica set to run against.
-    """
+class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes
+    """Fixture which provides JSTests with a replica set to run against."""
 
     # Error response codes copied from mongo/base/error_codes.err.
     _NODE_NOT_FOUND = 74
 
-    def __init__(self, logger, job_num, mongod_executable=None, mongod_options=None,
-                 dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
-                 start_initial_sync_node=False, write_concern_majority_journal_default=None,
-                 auth_options=None, replset_config_options=None, voting_secondaries=None,
-                 all_nodes_electable=False, use_replica_set_connection_string=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, job_num, mongod_executable=None, mongod_options=None, dbpath_prefix=None,
+            preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
+            write_concern_majority_journal_default=None, auth_options=None,
+            replset_config_options=None, voting_secondaries=None, all_nodes_electable=False,
+            use_replica_set_connection_string=None):
+        """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
@@ -71,7 +69,8 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
 
-    def setup(self):
+    def setup(self):  # pylint: disable=too-many-branches,too-many-statements
+        """Set up the replica set."""
         self.replset_name = self.mongod_options.get("replSet", "rs")
 
         if not self.nodes:
@@ -113,7 +112,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                 "hidden": 1, "votes": 0
             })
 
-        config = {"_id": self.replset_name}
+        repl_config = {"_id": self.replset_name}
         client = self.nodes[0].mongo_client()
 
         if self.auth_options is not None:
@@ -127,33 +126,33 @@ class ReplicaSetFixture(interface.ReplFixture):
             return
 
         if self.write_concern_majority_journal_default is not None:
-            config[
+            repl_config[
                 "writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
         else:
             server_status = client.admin.command({"serverStatus": 1})
             cmd_line_opts = client.admin.command({"getCmdLineOpts": 1})
             if not (server_status["storageEngine"]["persistent"] and cmd_line_opts["parsed"].get(
                     "storage", {}).get("journal", {}).get("enabled", True)):
-                config["writeConcernMajorityJournalDefault"] = False
+                repl_config["writeConcernMajorityJournalDefault"] = False
 
         if self.replset_config_options.get("configsvr", False):
-            config["configsvr"] = True
+            repl_config["configsvr"] = True
         if self.replset_config_options.get("settings"):
             replset_settings = self.replset_config_options["settings"]
-            config["settings"] = replset_settings
+            repl_config["settings"] = replset_settings
 
         # If secondaries vote, all nodes are not electable, and no election timeout was specified,
         # increase the election timeout to 24 hours to prevent elections.
         if self.voting_secondaries and not self.all_nodes_electable:
-            config.setdefault("settings", {})
-            if "electionTimeoutMillis" not in config["settings"]:
-                config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
+            repl_config.setdefault("settings", {})
+            if "electionTimeoutMillis" not in repl_config["settings"]:
+                repl_config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
 
         # Start up a single node replica set then reconfigure to the correct size (if the config
         # contains more than 1 node), so the primary is elected more quickly.
-        config["members"] = [members[0]]
-        self.logger.info("Issuing replSetInitiate command: %s", config)
-        self._configure_repl_set(client, {"replSetInitiate": config})
+        repl_config["members"] = [members[0]]
+        self.logger.info("Issuing replSetInitiate command: %s", repl_config)
+        self._configure_repl_set(client, {"replSetInitiate": repl_config})
         self._await_primary()
 
         if self.nodes[1:]:
@@ -161,10 +160,10 @@ class ReplicaSetFixture(interface.ReplFixture):
             # command.
             for node in self.nodes[1:]:
                 node.await_ready()
-            config["version"] = 2
-            config["members"] = members
-            self.logger.info("Issuing replSetReconfig command: %s", config)
-            self._configure_repl_set(client, {"replSetReconfig": config})
+            repl_config["version"] = 2
+            repl_config["members"] = members
+            self.logger.info("Issuing replSetReconfig command: %s", repl_config)
+            self._configure_repl_set(client, {"replSetReconfig": repl_config})
             self._await_secondaries()
 
     def _configure_repl_set(self, client, cmd_obj):
@@ -194,6 +193,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                 time.sleep(5)  # Wait a little bit before trying again.
 
     def await_ready(self):
+        """Wait for replica set tpo be ready."""
         self._await_primary()
         self._await_secondaries()
 
@@ -254,6 +254,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             raise errors.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
+        """Return True if all nodes in the replica set are running."""
         running = all(node.is_running() for node in self.nodes)
 
         if self.initial_sync_node:
@@ -261,7 +262,8 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         return running
 
-    def get_primary(self, timeout_secs=30):
+    def get_primary(self, timeout_secs=30):  # pylint: disable=arguments-differ
+        """Return the primary from a replica set."""
         if not self.all_nodes_electable:
             # The primary is always the first element of the 'nodes' list because all other members
             # of the replica set are configured with priority=0.
@@ -299,17 +301,16 @@ class ReplicaSetFixture(interface.ReplFixture):
             raise errors.ServerFailure(msg)
 
     def get_secondaries(self):
+        """Return a list of secondaries from the replica set."""
         primary = self.get_primary()
         return [node for node in self.nodes if node.port != primary.port]
 
     def get_initial_sync_node(self):
+        """Return initila sync node from the replica set."""
         return self.initial_sync_node
 
     def _new_mongod(self, index, replset_name):
-        """
-        Returns a standalone.MongoDFixture configured to be used as a
-        replica-set member of 'replset_name'.
-        """
+        """Return a standalone.MongoDFixture configured to be used as replica-set member."""
 
         mongod_logger = self._get_logger_for_mongod(index)
         mongod_options = self.mongod_options.copy()
@@ -321,9 +322,9 @@ class ReplicaSetFixture(interface.ReplFixture):
             mongod_options=mongod_options, preserve_dbpath=self.preserve_dbpath)
 
     def _get_logger_for_mongod(self, index):
-        """
-        Returns a new logging.Logger instance for use as the primary, secondary, or initial
-        sync member of a replica-set.
+        """Return a new logging.Logger instance.
+
+        The instance is used as the primary, secondary, or initial sync member of a replica-set.
         """
 
         if index == self.initial_sync_node_idx:
@@ -339,6 +340,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         return self.logger.new_fixture_node_logger(node_name)
 
     def get_internal_connection_string(self):
+        """Return the internal connection string."""
         if self.replset_name is None:
             raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
@@ -348,6 +350,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         return self.replset_name + "/" + ",".join(conn_strs)
 
     def get_driver_connection_url(self):
+        """Return the driver connection URL."""
         if self.replset_name is None:
             raise ValueError("Must call setup() before calling get_driver_connection_url()")
 

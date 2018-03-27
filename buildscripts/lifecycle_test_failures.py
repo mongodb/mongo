@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-"""
-Utility for computing test failure rates from the Evergreen API.
-"""
+"""Utility for computing test failure rates from the Evergreen API."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,7 +19,7 @@ import warnings
 try:
     from urlparse import urlparse
 except ImportError:
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse  # type: ignore
 
 import requests
 import requests.exceptions
@@ -47,18 +45,17 @@ _ReportEntry = collections.namedtuple("_ReportEntry", [
 
 
 class Wildcard(object):
-    """
-    A class for representing there are multiple values associated with a particular component.
-    """
+    """Class for representing there are multiple values associated with a particular component."""
 
     def __init__(self, kind):
+        """Initialize Wildcard."""
         self._kind = kind
 
     def __eq__(self, other):
         if not isinstance(other, Wildcard):
             return NotImplemented
 
-        return self._kind == other._kind
+        return self._kind == other._kind  # pylint: disable=protected-access
 
     def __ne__(self, other):
         return not self == other
@@ -71,9 +68,7 @@ class Wildcard(object):
 
 
 class ReportEntry(_ReportEntry):
-    """
-    Holds information about Evergreen test executions.
-    """
+    """Information about Evergreen test executions."""
 
     _MULTIPLE_TESTS = Wildcard("tests")
     _MULTIPLE_TASKS = Wildcard("tasks")
@@ -85,8 +80,7 @@ class ReportEntry(_ReportEntry):
 
     @property
     def fail_rate(self):
-        """
-        Returns the fraction of test failures to total number of test executions.
+        """Get the fraction of test failures to total number of test executions.
 
         If a test hasn't been run at all, then we still say it has a failure rate of 0% for
         convenience when applying thresholds.
@@ -97,9 +91,9 @@ class ReportEntry(_ReportEntry):
         return self.num_fail / (self.num_pass + self.num_fail)
 
     def period_start_date(self, start_date, period_size):
-        """
-        Returns a datetime.date() instance corresponding to the beginning of the time period
-        containing 'self.start_date'.
+        """Return a datetime.date() instance for the period start date.
+
+        The result corresponds to the beginning of the time period containing 'self.start_date'.
         """
 
         if not isinstance(start_date, datetime.date):
@@ -118,9 +112,10 @@ class ReportEntry(_ReportEntry):
         return self.start_date - datetime.timedelta(days=start_day_offset)
 
     def week_start_date(self, start_day_of_week):
-        """
-        Returns a datetime.date() instance corresponding to the beginning of the week containing
-        'self.start_date'. The first day of the week can be specified as the strings "Sunday" or
+        """Return a datetime.date() instance of the week's start date.
+
+        The result corresponds to the beginning of the week containing 'self.start_date'.
+        The first day of the week can be specified as the strings "Sunday" or
         "Monday", as well as an arbitrary datetime.date() instance.
         """
 
@@ -144,9 +139,9 @@ class ReportEntry(_ReportEntry):
 
     @classmethod
     def sum(cls, entries):
-        """
-        Returns a single ReportEntry() instance corresponding to all test executions represented by
-        'entries'.
+        """Return a single ReportEntry() instance.
+
+        The result corresponds to all test executions represented by 'entries'.
         """
 
         test = set()
@@ -179,9 +174,7 @@ class ReportEntry(_ReportEntry):
 
 
 class Report(object):
-    """
-    A class for generating summarizations about Evergreen test executions.
-    """
+    """Class for generating summarizations about Evergreen test executions."""
 
     TEST = ("test", )
     TEST_TASK = ("test", "task")
@@ -196,9 +189,7 @@ class Report(object):
     FIRST_DAY = "first-day"
 
     def __init__(self, entries):
-        """
-        Initializes the Report instance.
-        """
+        """Initialize the Report instance."""
 
         if not isinstance(entries, list):
             # It is possible that 'entries' is a generator function, so we convert it to a list in
@@ -215,16 +206,15 @@ class Report(object):
 
     @property
     def raw_data(self):
-        """
-        Returns a copy of the list of ReportEntry instances underlying the report.
-        """
+        """Get a copy of the list of ReportEntry instances underlying the report."""
 
         return self._entries[:]
 
-    def summarize_by(self, components, time_period=None, start_day_of_week=FIRST_DAY):
-        """
-        Returns a list of ReportEntry instances grouped by
+    def summarize_by(  # pylint: disable=too-many-branches,too-many-locals
+            self, components, time_period=None, start_day_of_week=FIRST_DAY):
+        """Return a list of ReportEntry instances grouped by the following.
 
+        Grouping:
             'components' if 'time_period' is None,
 
             'components' followed by Entry.start_date if 'time_period' is "daily",
@@ -272,9 +262,9 @@ class Report(object):
                              " instance"))
 
         def key_func(entry):
-            """
-            Assigns a key for sorting and grouping ReportEntry instances based on the combination of
-            options summarize_by() was called with.
+            """Assign a key for sorting and grouping ReportEntry instances.
+
+            The result is based on the combination of options summarize_by() was called with.
             """
 
             return [func(entry) for func in group_by]
@@ -303,18 +293,17 @@ class Report(object):
 
 
 class Missing(object):
-    """
-    A class for representing the value associated with a particular component is unknown.
-    """
+    """Class for representing the value associated with a particular component is unknown."""
 
     def __init__(self, kind):
+        """Initialize Missing."""
         self._kind = kind
 
     def __eq__(self, other):
         if not isinstance(other, Missing):
             return NotImplemented
 
-        return self._kind == other._kind
+        return self._kind == other._kind  # pylint: disable=protected-access
 
     def __ne__(self, other):
         return not self == other
@@ -327,9 +316,7 @@ class Missing(object):
 
 
 class TestHistory(object):
-    """
-    A class for interacting with the /test_history Evergreen API endpoint.
-    """
+    """Class for interacting with the /test_history Evergreen API endpoint."""
 
     DEFAULT_API_SERVER = "https://evergreen.mongodb.com"
     DEFAULT_PROJECT = "mongodb-mongo-master"
@@ -345,11 +332,10 @@ class TestHistory(object):
 
     _MISSING_DISTRO = Missing("distro")
 
-    def __init__(self, api_server=DEFAULT_API_SERVER, project=DEFAULT_PROJECT, tests=None,
-                 tasks=None, variants=None, distros=None):
-        """
-        Initializes the TestHistory instance with the list of tests, tasks, variants, and distros
-        specified.
+    def __init__(  # pylint: disable=too-many-arguments
+            self, api_server=DEFAULT_API_SERVER, project=DEFAULT_PROJECT, tests=None, tasks=None,
+            variants=None, distros=None):
+        """Initialize the TestHistory instance with the list of tests, tasks, variants, and distros.
 
         The list of tests specified are augmented to ensure that failures on both POSIX and Windows
         platforms are returned by the Evergreen API.
@@ -374,9 +360,10 @@ class TestHistory(object):
     def get_history_by_revision(self, start_revision, end_revision,
                                 test_statuses=DEFAULT_TEST_STATUSES,
                                 task_statuses=DEFAULT_TASK_STATUSES):
-        """
-        Returns a list of ReportEntry instances corresponding to each individual test execution
-        between 'start_revision' and 'end_revision'.
+        """Return a list of ReportEntry instances.
+
+        The result corresponds to each individual test execution between 'start_revision' and
+        'end_revision'.
 
         Only tests with status 'test_statuses' are included in the result. Similarly, only tests
         with status 'task_statuses' are included in the result. By default, both passing and failing
@@ -408,13 +395,14 @@ class TestHistory(object):
 
     def get_history_by_date(self, start_date, end_date, test_statuses=DEFAULT_TEST_STATUSES,
                             task_statuses=DEFAULT_TASK_STATUSES):
-        """
-        Returns a list of ReportEntry instances corresponding to each individual test execution
-        between 'start_date' and 'end_date'.
+        """Return a list of ReportEntry instances.
+
+        The result corresponds to each individual test execution between 'start_date' and
+        'end_date'.
 
         Only tests with status 'test_statuses' are included in the result. Similarly, only tests
-        with status 'task_statuses' are included in the result. By default, both passing and failing
-        test executions are returned.
+        with status 'task_statuses' are included in the result. By default, both passing and
+        failing test executions are returned.
         """
 
         warnings.warn(
@@ -431,8 +419,8 @@ class TestHistory(object):
         history_data = set()
 
         # Since the API limits the results, with each invocation being distinct, we can simulate
-        # pagination by making subsequent requests using "afterDate" and being careful to filter out
-        # duplicate test results.
+        # pagination by making subsequent requests using "afterDate" and being careful to filter
+        # out duplicate test results.
         while True:
             params["afterDate"] = start_time
 
@@ -453,8 +441,7 @@ class TestHistory(object):
         return list(history_data)
 
     def _get_history(self, params):
-        """
-        Calls the test_history API endpoint with the given parameters and returns the JSON result.
+        """Call the test_history API endpoint with the given parameters and return the JSON result.
 
         The API calls will be retried on HTTP and connection errors.
         """
@@ -496,9 +483,7 @@ class TestHistory(object):
             raise JSONResponseError(err)
 
     def _process_test_result(self, test_result):
-        """
-        Returns a ReportEntry() tuple representing the 'test_result' dictionary.
-        """
+        """Return a ReportEntry() tuple representing the 'test_result' dictionary."""
 
         # For individual test executions, we intentionally use the "start_time" of the test as both
         # its 'start_date' and 'end_date' to avoid complicating how the test history is potentially
@@ -516,7 +501,8 @@ class TestHistory(object):
 
     @staticmethod
     def _normalize_test_file(test_file):
-        """
+        """Return normalized test_file name.
+
         If 'test_file' represents a Windows-style path, then it is converted to a POSIX-style path
         with
 
@@ -536,8 +522,7 @@ class TestHistory(object):
         return test_file
 
     def _denormalize_test_file(self, test_file):
-        """
-        Returns a list containing 'test_file' as both a POSIX-style path and a Windows-style path.
+        """Return a list containing 'test_file' as both a POSIX-style and a Windows-style path.
 
         The conversion process may involving replacing forward slashes (/) as the path separator
         with backslashes (\\), as well as adding a ".exe" extension if 'test_file' has no file
@@ -555,9 +540,7 @@ class TestHistory(object):
         return [test_file]
 
     def _history_request_params(self, test_statuses, task_statuses):
-        """
-        Returns the query parameters for /test_history GET request as a dictionary.
-        """
+        """Return the query parameters for /test_history GET request as a dictionary."""
 
         return {
             "distros": ",".join(self._distros),
@@ -571,8 +554,7 @@ class TestHistory(object):
 
 
 def _parse_date(date_str):
-    """
-    Returns a datetime.date instance representing the specified yyyy-mm-dd date string.
+    """Return a datetime.date instance representing the specified yyyy-mm-dd date string.
 
     Note that any time component of 'date_str', including the timezone, is ignored.
     """
@@ -584,16 +566,16 @@ def _parse_date(date_str):
 class JSONResponseError(Exception):
     """An exception raised when failing to decode the JSON from an Evergreen response."""
 
-    def __init__(self, cause):
-        """Initializes the JSONResponseError with the exception raised by the requests library
-        when decoding the response."""
+    def __init__(self, cause):  # pylint: disable=super-init-not-called
+        """Initialize the JSONResponseError.
+
+        It it set with the exception raised by the requests library when decoding the response.
+        """
         self.cause = cause
 
 
 def main():
-    """
-    Utility computing test failure rates from the Evergreen API.
-    """
+    """Execute computing test failure rates from the Evergreen API."""
 
     parser = optparse.OptionParser(description=main.__doc__,
                                    usage="Usage: %prog [options] [test1 test2 ...]")
@@ -695,7 +677,7 @@ def main():
 
     def read_evg_config():
         """
-        Attempts to parse the user's or system's Evergreen configuration from its known locations.
+        Attempt to parse the user's or system's Evergreen configuration from its known locations.
 
         Returns None if the configuration file wasn't found anywhere.
         """

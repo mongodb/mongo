@@ -1,5 +1,4 @@
-"""
-Utility functions to create MongoDB processes.
+"""Utility functions to create MongoDB processes.
 
 Handles all the nitty-gritty parameter conversion.
 """
@@ -16,11 +15,9 @@ from .. import config
 from .. import utils
 
 
-def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
-    """
-    Returns a Process instance that starts a mongod executable with
-    arguments constructed from 'kwargs'.
-    """
+def mongod_program(  # pylint: disable=too-many-branches
+        logger, executable=None, process_kwargs=None, **kwargs):
+    """Return a Process instance that starts mongod arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
     args = [executable]
@@ -117,10 +114,7 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
 
 
 def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
-    """
-    Returns a Process instance that starts a mongos executable with
-    arguments constructed from 'kwargs'.
-    """
+    """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
     args = [executable]
@@ -143,11 +137,12 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     return _process.Process(logger, args, **process_kwargs)
 
 
-def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,
-                        process_kwargs=None, **kwargs):
-    """
-    Returns a Process instance that starts a mongo shell with the given connection string and
-    arguments constructed from 'kwargs'.
+def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+        logger, executable=None, connection_string=None, filename=None, process_kwargs=None,
+        **kwargs):
+    """Return a Process instance that starts a mongo shell.
+
+    The shell is started with the given connection string and arguments constructed from 'kwargs'.
     """
     connection_string = utils.default_if_none(config.SHELL_CONN_STRING, connection_string)
 
@@ -256,8 +251,7 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
 
 
 def _format_shell_vars(sb, path, value):
-    """
-    Formats 'value' in a way that can be passed to --eval.
+    """Format 'value' in a way that can be passed to --eval.
 
     If 'value' is a dictionary, then it is unrolled into the creation of
     a new JSON object with properties assigned for each key of the
@@ -277,10 +271,7 @@ def _format_shell_vars(sb, path, value):
 
 
 def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **kwargs):
-    """
-    Returns a Process instance that starts a dbtest executable with
-    arguments constructed from 'kwargs'.
-    """
+    """Return a Process instance that starts a dbtest with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_DBTEST_EXECUTABLE)
     args = [executable]
@@ -295,10 +286,11 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
 
 
 def generic_program(logger, args, process_kwargs=None, **kwargs):
-    """
-    Returns a Process instance that starts an arbitrary executable with
-    arguments constructed from 'kwargs'. The args parameter is an array
-    of strings containing the command to execute.
+    """Return a Process instance that starts an arbitrary executable.
+
+    The executable arguments are constructed from 'kwargs'.
+
+    The args parameter is an array of strings containing the command to execute.
     """
 
     if not utils.is_string_list(args):
@@ -311,9 +303,9 @@ def generic_program(logger, args, process_kwargs=None, **kwargs):
 
 
 def _format_test_data_set_parameters(set_parameters):
-    """
-    Converts key-value pairs from 'set_parameters' into the comma
-    delimited list format expected by the parser in servers.js.
+    """Convert key-value pairs from 'set_parameters' into a comma delimited list format.
+
+    The format is used by the parser in servers.js.
 
     WARNING: the parsing logic in servers.js is very primitive.
     Non-scalar options such as logComponentVerbosity will not work
@@ -332,9 +324,9 @@ def _format_test_data_set_parameters(set_parameters):
 
 
 def _apply_set_parameters(args, set_parameter):
-    """
-    Converts key-value pairs from 'kwargs' into --setParameter key=value
-    arguments to an executable and appends them to 'args'.
+    """Convert key-value pairs from 'kwargs' into --setParameter key=value arguments.
+
+    This result is appended to 'args'.
     """
 
     for param_name in set_parameter:
@@ -347,10 +339,9 @@ def _apply_set_parameters(args, set_parameter):
 
 
 def _apply_kwargs(args, kwargs):
-    """
-    Converts key-value pairs from 'kwargs' into --key value arguments
-    to an executable and appends them to 'args'.
+    """Convert key-value pairs from 'kwargs' into --key value arguments.
 
+    This result is appended to 'args'.
     A --flag without a value is represented with the empty string.
     """
 
@@ -363,9 +354,7 @@ def _apply_kwargs(args, kwargs):
 
 
 def _set_keyfile_permissions(opts):
-    """
-    Change the permissions of keyfiles in 'opts' to 600, i.e. only the
-    user can read and write the file.
+    """Change the permissions of keyfiles in 'opts' to 600, (only user can read and write the file).
 
     This necessary to avoid having the mongod/mongos fail to start up
     because "permissions on the keyfiles are too open".

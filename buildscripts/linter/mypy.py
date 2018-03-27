@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import os
 from typing import List
 
 from . import base
@@ -13,7 +14,9 @@ class MypyLinter(base.LinterBase):
     def __init__(self):
         # type: () -> None
         """Create a mypy linter."""
-        super(MypyLinter, self).__init__("mypy", "mypy 0.501")
+        # User can override the location of mypy from an environment variable.
+
+        super(MypyLinter, self).__init__("mypy", "mypy 0.580", os.getenv("MYPY"))
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]
@@ -23,17 +26,7 @@ class MypyLinter(base.LinterBase):
     def get_lint_cmd_args(self, file_name):
         # type: (str) -> List[str]
         """Get the command to run a linter."""
-        # -py2 - Check Python 2 code for type annotations in comments
-        # --disallow-untyped-defs - Error if any code is missing type annotations
-        # --ignore-missing-imports - Do not error if imports are not found. This can be a problem
-        # with standalone scripts and relative imports. This will limit effectiveness but avoids
-        # mypy complaining about running code.
-        # --follow-imports=silent - Do not error on imported files since all imported files may not
-        # be mypy clean
-        return [
-            "--py2", "--disallow-untyped-defs", "--ignore-missing-imports",
-            "--follow-imports=silent", file_name
-        ]
+        return [file_name]
 
     def ignore_interpreter(self):
         # type: () -> bool

@@ -649,11 +649,11 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
                                                            chained_struct.name)
 
     if not syntax_symbol:
-        return None
+        return
 
     if not isinstance(syntax_symbol, syntax.Struct) or isinstance(syntax_symbol, syntax.Command):
         ctxt.add_chained_struct_not_found_error(ast_struct, chained_struct.name)
-        return None
+        return
 
     struct = cast(syntax.Struct, syntax_symbol)
 
@@ -808,5 +808,5 @@ def bind(parsed_spec):
 
     if ctxt.errors.has_errors():
         return ast.IDLBoundSpec(None, ctxt.errors)
-    else:
-        return ast.IDLBoundSpec(bound_spec, None)
+
+    return ast.IDLBoundSpec(bound_spec, None)

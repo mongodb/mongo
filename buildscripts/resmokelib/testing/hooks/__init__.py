@@ -12,4 +12,4 @@ from ...utils import autoloader as _autoloader
 
 # We dynamically load all modules in the hooks/ package so that any Hook classes declared
 # within them are automatically registered.
-_autoloader.load_all_modules(name=__name__, path=__path__)
+_autoloader.load_all_modules(name=__name__, path=__path__)  # type: ignore

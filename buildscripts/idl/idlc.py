@@ -26,7 +26,7 @@ import idl.compiler
 
 def main():
     # type: () -> None
-    """Main Entry point."""
+    """Execute Main Entry point."""
     parser = argparse.ArgumentParser(description='MongoDB IDL Compiler.')
 
     parser.add_argument('file', type=str, help="IDL input file")

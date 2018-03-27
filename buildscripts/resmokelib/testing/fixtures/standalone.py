@@ -1,6 +1,4 @@
-"""
-Standalone mongod fixture for executing JSTests against.
-"""
+"""Standalone mongod fixture for executing JSTests against."""
 
 from __future__ import absolute_import
 
@@ -20,15 +18,14 @@ from ... import utils
 
 
 class MongoDFixture(interface.Fixture):
-    """
-    Fixture which provides JSTests with a standalone mongod to run
-    against.
-    """
+    """Fixture which provides JSTests with a standalone mongod to run against."""
 
     AWAIT_READY_TIMEOUT_SECS = 300
 
-    def __init__(self, logger, job_num, mongod_executable=None, mongod_options=None,
-                 dbpath_prefix=None, preserve_dbpath=False):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, job_num, mongod_executable=None, mongod_options=None, dbpath_prefix=None,
+            preserve_dbpath=False):
+        """Initialize MongoDFixture with different options for the mongod process."""
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
@@ -51,6 +48,7 @@ class MongoDFixture(interface.Fixture):
         self.port = None
 
     def setup(self):
+        """Set up the mongod."""
         if not self.preserve_dbpath:
             shutil.rmtree(self._dbpath, ignore_errors=True)
 
@@ -78,6 +76,7 @@ class MongoDFixture(interface.Fixture):
         self.mongod = mongod
 
     def await_ready(self):
+        """Block until the fixture can be used for testing."""
         deadline = time.time() + MongoDFixture.AWAIT_READY_TIMEOUT_SECS
 
         # Wait until the mongod is accepting connections. The retry logic is necessary to support
@@ -134,17 +133,20 @@ class MongoDFixture(interface.Fixture):
                     self.port, self.mongod.pid, exit_code))
 
     def is_running(self):
+        """Return true if the mongod is still operating."""
         return self.mongod is not None and self.mongod.poll() is None
 
     def get_dbpath_prefix(self):
-        """ Returns the _dbpath, as this is the root of the data directory. """
+        """Return the _dbpath, as this is the root of the data directory."""
         return self._dbpath
 
     def get_internal_connection_string(self):
+        """Return the internal connection string."""
         if self.mongod is None:
             raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
         return "localhost:%d" % self.port
 
     def get_driver_connection_url(self):
+        """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string()

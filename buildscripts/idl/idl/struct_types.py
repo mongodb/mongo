@@ -315,22 +315,6 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
             common.title_case(self._struct.cpp_name), 'toBSON',
             ['const BSONObj& commandPassthroughFields'], 'BSONObj', const=True)
 
-    def get_deserializer_static_method(self):
-        # type: () -> MethodInfo
-        return super(_IgnoredCommandTypeInfo, self).get_deserializer_static_method()
-
-    def get_deserializer_method(self):
-        # type: () -> MethodInfo
-        return super(_IgnoredCommandTypeInfo, self).get_deserializer_method()
-
-    def gen_getter_method(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        super(_IgnoredCommandTypeInfo, self).gen_getter_method(indented_writer)
-
-    def gen_member(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        super(_IgnoredCommandTypeInfo, self).gen_member(indented_writer)
-
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line('builder->append("%s", 1);' % (self._command.name))
@@ -464,7 +448,6 @@ def get_struct_info(struct):
             return _IgnoredCommandTypeInfo(struct)
         elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
             return _CommandWithNamespaceTypeInfo(struct)
-        else:
-            return _CommandFromType(struct)
+        return _CommandFromType(struct)
 
     return _StructTypeInfo(struct)

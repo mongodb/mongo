@@ -26,7 +26,7 @@ MongoDB SConscript files do.
 from __future__ import print_function
 
 __all__ = ('discover_modules', 'discover_module_directories', 'configure_modules',
-           'register_module_test')
+           'register_module_test')  # pylint: disable=undefined-all-variable
 
 import imp
 import inspect
@@ -34,9 +34,9 @@ import os
 
 
 def discover_modules(module_root, allowed_modules):
-    """Scans module_root for subdirectories that look like MongoDB modules.
+    """Scan module_root for subdirectories that look like MongoDB modules.
 
-    Returns a list of imported build.py module objects.
+    Return a list of imported build.py module objects.
     """
     found_modules = []
 
@@ -74,9 +74,9 @@ def discover_modules(module_root, allowed_modules):
 
 
 def discover_module_directories(module_root, allowed_modules):
-    """Scans module_root for subdirectories that look like MongoDB modules.
+    """Scan module_root for subdirectories that look like MongoDB modules.
 
-    Returns a list of directory names.
+    Return a list of directory names.
     """
     if not os.path.isdir(module_root):
         return []
@@ -105,23 +105,23 @@ def discover_module_directories(module_root, allowed_modules):
 
 
 def configure_modules(modules, conf):
-    """ Run the configure() function in the build.py python modules for each module in "modules"
-    (as created by discover_modules).
+    """Run the configure() function in the build.py python modules for each module in "modules".
+
+    The modules were created by discover_modules.
 
     The configure() function should prepare the Mongo build system for building the module.
     """
     for module in modules:
         name = module.name
         print("configuring module: %s" % (name))
-
-        root = os.path.dirname(module.__file__)
         module.configure(conf, conf.env)
 
 
 def get_module_sconscripts(modules):
+    """Return all modules' sconscripts."""
     sconscripts = []
-    for m in modules:
-        module_dir_path = __get_src_relative_path(os.path.join(os.path.dirname(m.__file__)))
+    for mod in modules:
+        module_dir_path = __get_src_relative_path(os.path.join(os.path.dirname(mod.__file__)))
         sconscripts.append(os.path.join(module_dir_path, 'SConscript'))
     return sconscripts
 
@@ -142,8 +142,9 @@ def __get_src_relative_path(path):
 
 
 def __get_module_path(module_frame_depth):
-    """Return the path to the MongoDB module whose build.py is executing "module_frame_depth" frames
-    above this function, relative to the "src" directory.
+    """Return the path to the MongoDB module whose build.py is executing "module_frame_depth" frames.
+
+    This is above this function, relative to the "src" directory.
     """
     module_filename = inspect.stack()[module_frame_depth + 1][1]
     return os.path.dirname(__get_src_relative_path(module_filename))
@@ -185,8 +186,9 @@ def get_current_module_build_path():
 
 
 def get_current_module_libdep_name(libdep_rel_path):
-    """Return a $BUILD_DIR relative path to a "libdep_rel_path", where "libdep_rel_path"
-    is specified relative to the MongoDB module's build.py file.
+    """Return a $BUILD_DIR relative path to a "libdep_rel_path".
+
+    The "libdep_rel_path" is relative to the MongoDB module's build.py file.
 
     May only meaningfully be called from within build.py
     """

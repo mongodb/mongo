@@ -14,6 +14,8 @@ import unittest
 
 from buildscripts import remote_operations as rop
 
+# pylint: disable=invalid-name,missing-docstring,protected-access
+
 
 class RemoteOperationsTestCase(unittest.TestCase):
     def setUp(self):
@@ -104,7 +106,7 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
 
 class RemoteOperationShell(RemoteOperationsTestCase):
-    def runTest(self):
+    def runTest(self):  # pylint: disable=too-many-statements
 
         # Shell connect
         ret, buff = self.rop.shell("uname")
@@ -186,7 +188,7 @@ class RemoteOperationShell(RemoteOperationsTestCase):
 
 
 class RemoteOperationCopyTo(RemoteOperationsTestCase):
-    def runTest(self):
+    def runTest(self):  # pylint: disable=too-many-statements
 
         # Copy to remote
         l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
@@ -305,7 +307,7 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
 
 
 class RemoteOperationCopyFrom(RemoteOperationsTestCase):
-    def runTest(self):
+    def runTest(self):  # pylint: disable=too-many-statements
 
         # Copy from remote
         r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]

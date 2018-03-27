@@ -1,6 +1,4 @@
-"""
-Parser for command line arguments.
-"""
+"""Parser for command line arguments."""
 
 from __future__ import absolute_import
 
@@ -15,10 +13,8 @@ from . import utils
 from .. import resmokeconfig
 
 
-def parse_command_line():
-    """
-    Parses the command line arguments passed to resmoke.py.
-    """
+def parse_command_line():  # pylint: disable=too-many-statements
+    """Parse the command line arguments passed to resmoke.py."""
 
     parser = optparse.OptionParser()
 
@@ -304,9 +300,7 @@ def parse_command_line():
 
 
 def validate_options(parser, options, args):
-    """
-    Do preliminary validation on the options and error on any invalid options.
-    """
+    """Do preliminary validation on the options and error on any invalid options."""
 
     if options.shell_port is not None and options.shell_conn_string is not None:
         parser.error("Cannot specify both `shellPort` and `shellConnString`")
@@ -318,9 +312,7 @@ def validate_options(parser, options, args):
 
 
 def validate_benchmark_options():
-    """
-    Some options are incompatible with benchmark test suites, we error out early if any of
-    these options are specified.
+    """Error out early if any options are incompatible with benchmark test suites.
 
     :return: None
     """
@@ -338,10 +330,12 @@ def validate_benchmark_options():
 
 
 def get_logging_config(values):
+    """Return logging config values."""
     return _get_logging_config(values.logger_file)
 
 
-def update_config_vars(values):
+def update_config_vars(values):  # pylint: disable=too-many-statements
+    """Update config vars."""
     config = _config.DEFAULTS.copy()
 
     # Override `config` with values from command line arguments.
@@ -436,10 +430,7 @@ def update_config_vars(values):
 
 
 def _get_logging_config(pathname):
-    """
-    Attempts to read a YAML configuration from 'pathname' that describes
-    how resmoke.py should log the tests and fixtures.
-    """
+    """Read YAML configuration from 'pathname' how to log tests and fixtures."""
 
     # Named loggers are specified as the basename of the file, without the .yml extension.
     if not utils.is_yaml_file(pathname) and not os.path.dirname(pathname):
@@ -454,17 +445,14 @@ def _get_logging_config(pathname):
 
 
 def _expand_user(pathname):
-    """
-    Wrapper around os.path.expanduser() to do nothing when given None.
-    """
+    """Provide wrapper around os.path.expanduser() to do nothing when given None."""
     if pathname is None:
         return None
     return os.path.expanduser(pathname)
 
 
 def _tags_from_list(tags_list):
-    """
-    Returns the list of tags from a list of tag parameter values.
+    """Return the list of tags from a list of tag parameter values.
 
     Each parameter value in the list may be a list of comma separated tags, with empty strings
     ignored.

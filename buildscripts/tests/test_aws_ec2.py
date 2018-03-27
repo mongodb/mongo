@@ -7,11 +7,13 @@ import unittest
 
 from buildscripts import aws_ec2
 
+# pylint: disable=invalid-name,missing-docstring,protected-access
+
 _AMI = "ami-ed6bec86"
 _INSTANCE_TYPE = "t1.micro"
 
 
-class AwsEc2TestCase(unittest.TestCase):
+class AwsEc2TestCase(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
     def setUp(self):
         self.aws_ec2 = aws_ec2.AwsEc2()
         self.launched_instances = []

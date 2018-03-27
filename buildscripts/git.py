@@ -22,17 +22,18 @@ if os.name == "posix" and sys.version_info[0] == 2:
         warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
                        " available. When using the subprocess module, a child process may trigger"
                        " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
-        import subprocess
+        import subprocess  # type: ignore
 else:
     import subprocess
 
 LOGGER = logging.getLogger(__name__)
 
 
-class Repository(object):
+class Repository(object):  # pylint: disable=too-many-public-methods
     """Represent a local git repository."""
 
     def __init__(self, directory):
+        """Initialize Repository."""
         self.directory = directory
 
     def git_add(self, args):
@@ -173,7 +174,8 @@ class Repository(object):
     def clone(url, directory, branch=None, depth=None):
         """Clone the repository designed by 'url' into 'directory'.
 
-        Return a Repository instance."""
+        Return a Repository instance.
+        """
         params = ["git", "clone"]
         if branch:
             params += ["--branch", branch]
@@ -188,7 +190,8 @@ class Repository(object):
     def get_base_directory(directory=None):
         """Return the base directory of the repository the given directory belongs to.
 
-        If no directory is specified, then the current working directory is used."""
+        If no directory is specified, then the current working directory is used.
+        """
         if directory is not None:
             params = ["git", "-C", directory]
         else:
@@ -221,8 +224,7 @@ class Repository(object):
         return result.returncode
 
     def _run_cmd(self, cmd, args):
-        """Run the git command and return a GitCommandResult instance.
-        """
+        """Run the git command and return a GitCommandResult instance."""
 
         params = ["git", cmd] + args
         return self._run_process(cmd, params, cwd=self.directory)
@@ -251,8 +253,9 @@ class GitException(Exception):
         stderr: the error output of the git command.
     """
 
-    def __init__(self, message, returncode=None, cmd=None, process_args=None, stdout=None,
-                 stderr=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, message, returncode=None, cmd=None, process_args=None, stdout=None, stderr=None):
+        """Initialize GitException."""
         Exception.__init__(self, message)
         self.returncode = returncode
         self.cmd = cmd
@@ -272,7 +275,9 @@ class GitCommandResult(object):
         stderr: the error output of the command.
     """
 
-    def __init__(self, cmd, process_args, returncode, stdout=None, stderr=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, cmd, process_args, returncode, stdout=None, stderr=None):
+        """Initialize GitCommandResult."""
         self.cmd = cmd
         self.process_args = process_args
         self.returncode = returncode

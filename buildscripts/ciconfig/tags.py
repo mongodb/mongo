@@ -119,21 +119,23 @@ class TagsConfig(object):
 
 
 def getdefault(doc, key, default):
-    """Return the value in 'doc' with key 'key' if it is present and not None, returns
-    the specified default value otherwise."""
+    """Return the value in 'doc' with key 'key' if present and not None.
+
+    Return the specified default value otherwise.
+    """
     value = doc.get(key)
     if value is not None:
         return value
-    else:
-        return default
+    return default
 
 
 def setdefault(doc, key, default):
-    """Return the value in 'doc' with key 'key' if it is present and not None, sets the value
-    to default and return it otherwise."""
+    """Return the value in 'doc' with key 'key' if present and not None.
+
+    Otherwise set the value to default and return it.
+    """
     value = doc.setdefault(key, default)
     if value is not None:
         return value
-    else:
-        doc[key] = default
-        return default
+    doc[key] = default
+    return default

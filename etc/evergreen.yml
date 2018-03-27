@@ -681,11 +681,15 @@ functions:
           set -o verbose
 
           python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
+          python3_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python3})
           if [ "Windows_NT" = "$OS" ]; then
             python_loc=$(cygpath -w $python_loc)
+            python3_loc=$(cygpath -w c:/python/Python36/python.exe)
           fi
           # Set up virtualenv in ${workdir}
           virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
+          # Add virtualenv for python3 in ${workdir}
+          virtualenv --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
 
   "run tests" :
     - command: expansions.update
@@ -1190,7 +1194,7 @@ functions:
 
           if [ ! -z "${virtualenv_requirements}" ]; then
             ${activate_virtualenv}
-            pip install ${virtualenv_requirements}
+            pip install -r pytests/requirements.txt
           fi
 
     - command: shell.exec
@@ -1495,7 +1499,8 @@ functions:
 
           set -o errexit
           ${activate_virtualenv}
-          pip install boto3==1.5.27
+          pip install -r buildscripts/requirements.txt
+          pip install -r pytests/requirements.txt
 
           if [ ! -z "${subnet_id}" ]; then
             subnet_id="-n ${subnet_id}"
@@ -2015,7 +2020,29 @@ functions:
           else
             python=${python|/opt/mongodbtoolchain/v2/bin/python2}
           fi
-          echo "python set to $(which python)"
+          echo "python set to $(which $python)"
+      - key: activate_virtualenv_3
+        value: |
+          # check if virtualenv for python3 is set up
+          if [ -d "${workdir}/venv_3" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              # Need to quote the path on Windows to preserve the separator.
+              . "${workdir}/venv_3/Scripts/activate" 2> /tmp/activate_error.log
+            else
+              . ${workdir}/venv_3/bin/activate 2> /tmp/activate_error.log
+            fi
+            if [ $? -ne 0 ]; then
+              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+            fi
+            python=python
+          else
+            if [ "Windows_NT" = "$OS" ]; then
+              python=/cygdrive/c/python/Python36/python
+            else
+              python=${python3|/opt/mongodbtoolchain/v2/bin/python3}
+            fi
+          fi
+          echo "python set to $(which $python)"
       - key: posix_workdir
         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
@@ -2969,10 +2996,19 @@ tasks:
           set -o errexit
           set -o verbose
 
+          ### TODO: Remove python3 when mypy 0.580 is installed in the toolchain.
+          # Since mypy requires python3, we need to activate the venv_3
+          ${activate_virtualenv_3}
+          pip install -r buildscripts/requirements.txt
+          updated_mypy=$(which mypy)
+          deactivate
+          ###
           ${activate_virtualenv}
           # TODO: Remove once the linters have been updated on the variants.
           pip install -r buildscripts/requirements.txt
-          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+          # The linters require the modules be installed.
+          pip install -r pytests/requirements.txt
+          MYPY=$updated_mypy ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
   name: burn_in_tests
@@ -5618,7 +5654,7 @@ buildvariants:
     max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: enterprise
@@ -5740,7 +5776,7 @@ buildvariants:
     num_jobs_available: 2
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: ppc64le
     packager_distro: ubuntu1604
     repo_edition: enterprise
@@ -6092,7 +6128,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: amazon2
     repo_edition: enterprise
@@ -7185,7 +7221,7 @@ buildvariants:
     multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: rhel62
     repo_edition: enterprise
@@ -7503,7 +7539,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: rhel70
     repo_edition: enterprise
@@ -7768,7 +7804,7 @@ buildvariants:
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: ppc64le
     packager_distro: rhel71
     push_path: linux
@@ -7874,7 +7910,7 @@ buildvariants:
     num_jobs_available: 2
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: s390x
     packager_distro: rhel72
     push_path: linux
@@ -7980,7 +8016,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: s390x
     packager_distro: rhel67
     push_path: linux
@@ -8084,7 +8120,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: ubuntu1404
     repo_edition: enterprise
@@ -8162,7 +8198,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: ubuntu1604
     repo_edition: enterprise
@@ -8247,7 +8283,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: suse12
     repo_edition: enterprise
@@ -8304,7 +8340,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: enterprise
@@ -8498,7 +8534,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: debian71
     repo_edition: enterprise
@@ -8554,7 +8590,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: debian81
     repo_edition: enterprise
@@ -8785,7 +8821,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: enterprise
@@ -9920,7 +9956,7 @@ buildvariants:
     multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: rhel62
     repo_edition: enterprise

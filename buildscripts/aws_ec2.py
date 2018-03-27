@@ -25,6 +25,7 @@ class AwsEc2(object):
     ])
 
     def __init__(self):
+        """Initialize AwsEc2."""
         try:
             self.connection = boto3.resource("ec2")
         except botocore.exceptions.BotoCoreError:
@@ -36,7 +37,9 @@ class AwsEc2(object):
     @staticmethod
     def wait_for_state(instance, state, wait_time_secs=0, show_progress=False):
         """Wait up to 'wait_time_secs' for instance to be in 'state'.
-           Return 0 if 'state' reached, 1 otherwise."""
+
+        Return 0 if 'state' reached, 1 otherwise.
+        """
         if show_progress:
             print("Waiting for instance {} to reach '{}' state".format(instance, state), end="",
                   file=sys.stdout)
@@ -72,7 +75,7 @@ class AwsEc2(object):
         return 0 if reached_state else 1
 
     def control_instance(self, mode, image_id, wait_time_secs=0, show_progress=False):
-        """Controls an AMI instance. Returns 0 & status information, if successful."""
+        """Control an AMI instance. Returns 0 & status information, if successful."""
         if mode not in _MODES:
             raise ValueError("Invalid mode '{}' specified, choose from {}.".format(mode, _MODES))
 
@@ -119,7 +122,7 @@ class AwsEc2(object):
         return ret, status
 
     def tag_instance(self, image_id, tags):
-        """Tags an AMI instance. """
+        """Tag an AMI instance."""
         if tags:
             # It's possible that ClientError code InvalidInstanceID.NotFound could be returned,
             # even if the 'image_id' exists. We will retry up to 5 times, with increasing wait,
@@ -135,12 +138,14 @@ class AwsEc2(object):
                 time.sleep(i + 1)
             instance.create_tags(Tags=tags)
 
-    def launch_instance(self, ami, instance_type, block_devices=None, key_name=None,
-                        security_group_ids=None, security_groups=None, subnet_id=None, tags=None,
-                        wait_time_secs=0, show_progress=False, **kwargs):
-        """Launches and tags an AMI instance.
+    def launch_instance(  # pylint: disable=too-many-arguments,too-many-locals
+            self, ami, instance_type, block_devices=None, key_name=None, security_group_ids=None,
+            security_groups=None, subnet_id=None, tags=None, wait_time_secs=0, show_progress=False,
+            **kwargs):
+        """Launch and tag an AMI instance.
 
-           Returns the tuple (0, status_information), if successful."""
+        Return the tuple (0, status_information), if successful.
+        """
 
         bdms = []
         if block_devices is None:
@@ -177,8 +182,8 @@ class AwsEc2(object):
         return self.control_instance("status", instance.instance_id)
 
 
-def main():
-    """Main program."""
+def main():  # pylint: disable=too-many-locals,too-many-statements
+    """Execute Main program."""
 
     required_create_options = ["ami", "key_name"]
 
@@ -242,9 +247,7 @@ def main():
                             " bracketed YAML - i.e. JSON with support for single quoted"
                             " and unquoted keys. Example, '{DryRun: True}'"))
 
-    status_options.add_option("--yamlFile",
-                              dest="yaml_file",
-                              default=None,
+    status_options.add_option("--yamlFile", dest="yaml_file", default=None,
                               help="Save the status into the specified YAML file.")
 
     parser.add_option_group(control_options)
@@ -308,6 +311,7 @@ def main():
             yaml.safe_dump(status_dict, ystream)
 
     print(yaml.safe_dump(status_dict))
+
 
 if __name__ == "__main__":
     main()

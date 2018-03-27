@@ -155,10 +155,6 @@ class CppTypeBase(object):
 class _CppTypeBasic(CppTypeBase):
     """Default class for C++ Type information. Does not handle view types."""
 
-    def __init__(self, field):
-        # type: (ast.Field) -> None
-        super(_CppTypeBasic, self).__init__(field)
-
     def get_type_name(self):
         # type: () -> unicode
         if self._field.struct_type:
@@ -284,10 +280,6 @@ class _CppTypeView(CppTypeBase):
 class _CppTypeVector(CppTypeBase):
     """Base type for C++ Std::Vector Types information."""
 
-    def __init__(self, field):
-        # type: (ast.Field) -> None
-        super(_CppTypeVector, self).__init__(field)
-
     def get_type_name(self):
         # type: () -> unicode
         return 'std::vector<std::uint8_t>'
@@ -395,10 +387,6 @@ class _CppTypeDelegating(CppTypeBase):
 class _CppTypeArray(_CppTypeDelegating):
     """C++ Array type for wrapping a base C++ Type information."""
 
-    def __init__(self, base, field):
-        # type: (CppTypeBase, ast.Field) -> None
-        super(_CppTypeArray, self).__init__(base, field)
-
     def get_storage_type(self):
         # type: () -> unicode
         return _qualify_array_type(self._base.get_storage_type())
@@ -422,8 +410,7 @@ class _CppTypeArray(_CppTypeDelegating):
         convert = self.get_transform_to_getter_type(member_name)
         if convert:
             return common.template_args('return ${convert};', convert=convert)
-        else:
-            return self._base.get_getter_body(member_name)
+        return self._base.get_getter_body(member_name)
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
@@ -431,8 +418,7 @@ class _CppTypeArray(_CppTypeDelegating):
         if convert:
             return common.template_args('${member_name} = ${convert};', member_name=member_name,
                                         convert=convert)
-        else:
-            return self._base.get_setter_body(member_name)
+        return self._base.get_setter_body(member_name)
 
     def get_transform_to_getter_type(self, expression):
         # type: (unicode) -> Optional[unicode]
@@ -441,8 +427,7 @@ class _CppTypeArray(_CppTypeDelegating):
                 'transformVector(${expression})',
                 expression=expression,
             )
-        else:
-            return None
+        return None
 
     def get_transform_to_storage_type(self, expression):
         # type: (unicode) -> Optional[unicode]
@@ -451,16 +436,11 @@ class _CppTypeArray(_CppTypeDelegating):
                 'transformVector(${expression})',
                 expression=expression,
             )
-        else:
-            return None
+        return None
 
 
 class _CppTypeOptional(_CppTypeDelegating):
     """Base type for Optional C++ Type information which wraps C++ types."""
-
-    def __init__(self, base, field):
-        # type: (CppTypeBase, ast.Field) -> None
-        super(_CppTypeOptional, self).__init__(base, field)
 
     def get_storage_type(self):
         # type: () -> unicode
@@ -502,8 +482,7 @@ class _CppTypeOptional(_CppTypeDelegating):
             return common.template_args('return ${param_type}{${member_name}};',
                                         param_type=self.get_getter_setter_type(),
                                         member_name=member_name)
-        else:
-            return common.template_args('return ${member_name};', member_name=member_name)
+        return common.template_args('return ${member_name};', member_name=member_name)
 
     def get_setter_body(self, member_name):
         # type: (unicode) -> unicode
@@ -517,13 +496,11 @@ class _CppTypeOptional(_CppTypeDelegating):
                                 ${member_name} = boost::none;
                             }
                             """), member_name=member_name, convert=convert)
-        else:
-            return self._base.get_setter_body(member_name)
+        return self._base.get_setter_body(member_name)
 
 
 def get_cpp_type(field):
     # type: (ast.Field) -> CppTypeBase
-    # pylint: disable=redefined-variable-type
     """Get the C++ Type information for the given field."""
 
     cpp_type_info = None  # type: Any
@@ -533,7 +510,7 @@ def get_cpp_type(field):
     elif field.cpp_type == 'std::vector<std::uint8_t>':
         cpp_type_info = _CppTypeVector(field)
     else:
-        cpp_type_info = _CppTypeBasic(field)  # pylint: disable=redefined-variable-type
+        cpp_type_info = _CppTypeBasic(field)
 
     if field.array:
         cpp_type_info = _CppTypeArray(cpp_type_info, field)
@@ -617,10 +594,6 @@ class _CommonBsonCppTypeBase(BsonCppTypeBase):
 class _ObjectBsonCppTypeBase(BsonCppTypeBase):
     """Custom C++ support for object BSON types."""
 
-    def __init__(self, field):
-        # type: (ast.Field) -> None
-        super(_ObjectBsonCppTypeBase, self).__init__(field)
-
     def gen_deserializer_expression(self, indented_writer, object_instance):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
         if self._field.deserializer:
@@ -630,9 +603,8 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
                                      object_instance=object_instance))
             return "localObject"
 
-        else:
-            # Just pass the BSONObj through without trying to parse it.
-            return common.template_args('${object_instance}.Obj()', object_instance=object_instance)
+        # Just pass the BSONObj through without trying to parse it.
+        return common.template_args('${object_instance}.Obj()', object_instance=object_instance)
 
     def has_serializer(self):
         # type: () -> bool
@@ -650,18 +622,13 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
 class _BinDataBsonCppTypeBase(BsonCppTypeBase):
     """Custom C++ support for all binData BSON types."""
 
-    def __init__(self, field):
-        # type: (ast.Field) -> None
-        super(_BinDataBsonCppTypeBase, self).__init__(field)
-
     def gen_deserializer_expression(self, indented_writer, object_instance):
         # type: (writer.IndentedTextWriter, unicode) -> unicode
         if self._field.bindata_subtype == 'uuid':
             return common.template_args('${object_instance}.uuid()',
                                         object_instance=object_instance)
-        else:
-            return common.template_args('${object_instance}._binDataVector()',
-                                        object_instance=object_instance)
+        return common.template_args('${object_instance}._binDataVector()',
+                                    object_instance=object_instance)
 
     def has_serializer(self):
         # type: () -> bool

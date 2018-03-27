@@ -1,6 +1,8 @@
 #!/USSR/bin/python
 # encoding: utf-8
 """
+Prune the scons cache.
+
 This script, borrowed from some waf code, with a stand alone interface, provides a way to
 remove files from the cache on an LRU (least recently used) basis to prevent the scons cache
 from outgrowing the storage capacity.
@@ -16,14 +18,15 @@ import os
 import shutil
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("scons.cache.prune.lru")
+LOGGER = logging.getLogger("scons.cache.prune.lru")  # type: ignore
 
 GIGBYTES = 1024 * 1024 * 1024
 
-cache_item = collections.namedtuple("CacheContents", ["path", "time", "size"])
+CacheItem = collections.namedtuple("CacheContents", ["path", "time", "size"])
 
 
 def collect_cache_contents(cache_path):
+    """Collect the cache contents."""
     # map folder names to timestamps
     contents = []
     total = 0
@@ -36,12 +39,12 @@ def collect_cache_contents(cache_path):
             for file_name in os.listdir(path):
                 file_path = os.path.join(path, file_name)
                 if os.path.isdir(file_path):
-                    logger.warning("cache item {0} is a directory and not a file. "
-                                   "The cache may be currupt.".format(file_path))
+                    LOGGER.warning("cache item %s is a directory and not a file. "
+                                   "The cache may be corrupt.", file_path)
                     continue
 
-                item = cache_item(path=file_path, time=os.stat(file_path).st_atime,
-                                  size=os.stat(file_path).st_size)
+                item = CacheItem(path=file_path, time=os.stat(file_path).st_atime,
+                                 size=os.stat(file_path).st_size)
 
                 total += item.size
 
@@ -51,6 +54,7 @@ def collect_cache_contents(cache_path):
 
 
 def prune_cache(cache_path, cache_size_gb, clean_ratio):
+    """Prune the cache."""
     # This function is taken as is from waf, with the interface cleaned up and some minor
     # stylistic changes.
 
@@ -58,10 +62,10 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
 
     (total_size, contents) = collect_cache_contents(cache_path)
 
-    logger.info("cache size {0}, quota {1}".format(total_size, cache_size))
+    LOGGER.info("cache size %d, quota %d", total_size, cache_size)
 
     if total_size >= cache_size:
-        logger.info("trimming the cache since {0} > {0}".format(total_size, cache_size))
+        LOGGER.info("trimming the cache since %d > %d", total_size, cache_size)
 
         # make a list to sort the folders' by timestamp
         contents.sort(key=lambda x: x.time, reverse=True)  # sort by timestamp
@@ -69,9 +73,9 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
         # now that the contents of things to delete is sorted by timestamp in reverse order, we
         # just delete things until the total_size falls below the target cache size ratio.
         while total_size >= cache_size * clean_ratio:
-            if len(contents) == 0:
+            if not contents:
                 shutil.rmtree(cache_path)
-                logger.error("cache size is over quota, and there are no files in "
+                LOGGER.error("cache size is over quota, and there are no files in "
                              "the queue to delete. Removed the entire cache.")
                 return False
 
@@ -80,27 +84,27 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
             to_remove = cache_item.path + ".del"
             try:
                 os.rename(cache_item.path, to_remove)
-            except:
+            except Exception:  # pylint: disable=broad-except
                 # another process may have already cleared the file.
                 pass
             else:
                 try:
                     os.remove(to_remove)
-                    logger.info("removed file from cache: {0}".format(cache_item.path))
+                    LOGGER.info("removed file from cache: %s", cache_item.path)
                     total_size -= cache_item.size
-                except Exception as e:
+                except Exception as err:  # pylint: disable=broad-except
                     # this should not happen, but who knows?
-                    logger.error("error [{0}, {1}] removing file '{2}', "
-                                 "please report this error".format(e, type(e), to_remove))
+                    LOGGER.error("error [%s, %s] removing file '%s', "
+                                 "please report this error", err, type(err), to_remove)
 
-        logger.info("total cache size at the end of pruning: {0}".format(total_size))
+        LOGGER.info("total cache size at the end of pruning: %d", total_size)
         return True
-    else:
-        logger.info("cache size ({0}) is currently within boundaries".format(total_size))
-        return True
+    LOGGER.info("cache size (%d) is currently within boundaries", total_size)
+    return True
 
 
 def main():
+    """Execute Main entry."""
     parser = argparse.ArgumentParser(description="SCons cache pruning tool")
 
     parser.add_argument("--cache-dir", "-d", default=None, help="path to the cache directory.")
@@ -114,14 +118,14 @@ def main():
     args = parser.parse_args()
 
     if args.cache_dir is None or not os.path.isdir(args.cache_dir):
-        logger.error("must specify a valid cache path, [{0}]".format(args.cache_dir))
+        LOGGER.error("must specify a valid cache path, [%s]", args.cache_dir)
         exit(1)
 
     ok = prune_cache(cache_path=args.cache_dir, cache_size_gb=args.cache_size,
                      clean_ratio=args.prune_ratio)
 
     if not ok:
-        logger.error("encountered error cleaning the cache. exiting.")
+        LOGGER.error("encountered error cleaning the cache. exiting.")
         exit(1)
 
 

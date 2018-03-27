@@ -23,7 +23,7 @@ import requests
 import requests.exceptions
 
 
-def dump_stacks(_signal_num, _frame):
+def dump_stacks(_signal_num, _frame):  # pylint: disable=unused-argument
     """Dump stacks when SIGUSR1 is received."""
     print("======================================")
     print("DUMPING STACKS due to SIGUSR1 signal")
@@ -32,19 +32,21 @@ def dump_stacks(_signal_num, _frame):
 
     print("Total Threads: {:d}".format(len(threads)))
 
-    for tid, stack in sys._current_frames().items():
+    for tid, stack in sys._current_frames().items():  # pylint: disable=protected-access
         print("Thread {:d}".format(tid))
         print("".join(traceback.format_stack(stack)))
     print("======================================")
 
 
 def get_version_parts(version, for_sorting=False):
-    """Returns a list containing the components of the version string
-    as numeric values. This function can be used for numeric sorting
-    of version strings such as '2.6.0-rc1' and '2.4.0' when the
-    'for_sorting' parameter is specified as true."""
+    """Return a list containing the components of the version string as numeric values.
 
-    RC_OFFSET = -100
+    This function can be used for numeric sorting
+    of version strings such as '2.6.0-rc1' and '2.4.0' when the
+    'for_sorting' parameter is specified as true.
+    """
+
+    rc_offset = -100
     version_parts = re.split(r"\.|-", version)
 
     if version_parts[-1] == "pre":
@@ -56,7 +58,7 @@ def get_version_parts(version, for_sorting=False):
         # RC versions are weighted down to allow future RCs and general
         # releases to be sorted in ascending order (e.g., 2.6.0-rc1,
         # 2.6.0-rc2, 2.6.0).
-        version_parts[-1] = int(version_parts[-1][2:]) + RC_OFFSET
+        version_parts[-1] = int(version_parts[-1][2:]) + rc_offset
     elif version_parts[0].startswith("v") and version_parts[-1] == "latest":
         version_parts[0] = version_parts[0][1:]
         # The "<branchname>-latest" versions are weighted the highest when a particular major
@@ -73,7 +75,7 @@ def get_version_parts(version, for_sorting=False):
 
 
 def download_file(url, file_name, download_retries=5):
-    """Returns True if download was successful. Raises error if download fails."""
+    """Return True if download was successful. Raises error if download fails."""
 
     while download_retries > 0:
 
@@ -111,10 +113,12 @@ def download_file(url, file_name, download_retries=5):
     raise Exception("Unknown download problem for {} to file {}".format(url, file_name))
 
 
-class MultiVersionDownloader(object):
+class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attributes
     """Class to support multiversion downloads."""
 
-    def __init__(self, install_dir, link_dir, edition, platform, architecture, use_latest=False):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, install_dir, link_dir, edition, platform, architecture, use_latest=False):
+        """Initialize MultiVersionDownloader."""
         self.install_dir = install_dir
         self.link_dir = link_dir
         self.edition = edition.lower()
@@ -128,27 +132,27 @@ class MultiVersionDownloader(object):
 
     @property
     def generic_links(self):
-        """Returns a list of generic links."""
+        """Get a list of generic links."""
         if self._generic_links is None:
             self._links, self._generic_links = self.download_links()
         return self._generic_links
 
     @property
     def links(self):
-        """Returns a list of links."""
+        """Get a list of links."""
         if self._links is None:
             self._links, self._generic_links = self.download_links()
         return self._links
 
     @staticmethod
     def is_major_minor_version(version):
-        """Returns True if the version is specified as M.m."""
+        """Return True if the version is specified as M.m."""
         if re.match(r"^\d+?\.\d+?$", version) is None:
             return False
         return True
 
     def download_links(self):
-        """Returns the download and generic download links."""
+        """Return the download and generic download links."""
         temp_file = tempfile.mktemp()
         download_file("https://downloads.mongodb.org/full.json", temp_file)
         with open(temp_file) as file_handle:
@@ -179,15 +183,17 @@ class MultiVersionDownloader(object):
         return links, generic_links
 
     def download_install(self, version):
-        """Downloads and installs the version specified."""
-        download_file = self.download_version(version)
-        if download_file:
-            installed_dir = self.uncompress_download(download_file)
+        """Download and install the version specified."""
+        dl_file = self.download_version(version)
+        if dl_file:
+            installed_dir = self.uncompress_download(dl_file)
             self.symlink_version(version, installed_dir)
 
-    def download_version(self, version):
-        """Downloads the version specified and returns file location.
-           If no download occurs, file location is None."""
+    def download_version(self, version):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+        """Download the version specified and return file location.
+
+        If no download occurs, file location is None.
+        """
 
         try:
             os.makedirs(self.install_dir)
@@ -215,7 +221,7 @@ class MultiVersionDownloader(object):
                         continue
                 urls.append((link_version, link_url))
 
-        if len(urls) == 0:
+        if not urls:
             print("Cannot find a link for version {}, versions {} found.".format(
                 version, self.links), file=sys.stderr)
             for ver, generic_url in self.generic_links.iteritems():
@@ -224,7 +230,7 @@ class MultiVersionDownloader(object):
                     if "-" in version and ver != version:
                         continue
                     urls.append((ver, generic_url))
-            if len(urls) == 0:
+            if not urls:
                 raise Exception(
                     "No fall-back generic link available or version {}.".format(version))
             else:
@@ -262,7 +268,6 @@ class MultiVersionDownloader(object):
                     latest_downloaded = True
                 except requests.exceptions.HTTPError:
                     print("Failed to download {}".format(latest_url))
-                    pass
 
             if not latest_downloaded:
                 print("Downloading data for version {} ({})...".format(version, full_version))
@@ -270,16 +275,16 @@ class MultiVersionDownloader(object):
                 download_file(url, temp_file)
         return temp_file
 
-    def uncompress_download(self, download_file):
-        """Downloads the version specified and returns root of ."""
+    def uncompress_download(self, dl_file):
+        """Download the version specified and return root of extracted directory."""
 
         print("Uncompressing data to {}...".format(self.install_dir))
         first_file = ""
         temp_dir = tempfile.mkdtemp()
-        _, file_suffix = os.path.splitext(download_file)
+        _, file_suffix = os.path.splitext(dl_file)
         if file_suffix == ".zip":
             # Support .zip downloads, used for Windows binaries.
-            with zipfile.ZipFile(download_file) as zip_handle:
+            with zipfile.ZipFile(dl_file) as zip_handle:
                 # Use the name of the root directory in the archive as the name of the directory
                 # to extract the binaries into inside 'self.install_dir'. The name of the root
                 # directory nearly always matches the parsed URL text, with the exception of
@@ -288,7 +293,7 @@ class MultiVersionDownloader(object):
                 zip_handle.extractall(temp_dir)
         elif file_suffix == ".tgz":
             # Support .tgz downloads, used for Linux binaries.
-            with contextlib.closing(tarfile.open(download_file, "r:gz")) as tar_handle:
+            with contextlib.closing(tarfile.open(dl_file, "r:gz")) as tar_handle:
                 # Use the name of the root directory in the archive as the name of the directory
                 # to extract the binaries into inside 'self.install_dir'. The name of the root
                 # directory nearly always matches the parsed URL text, with the exception of
@@ -313,12 +318,12 @@ class MultiVersionDownloader(object):
             shutil.move(temp_install_dir, self.install_dir)
 
         shutil.rmtree(temp_dir)
-        os.remove(download_file)
+        os.remove(dl_file)
 
         return os.path.abspath(os.path.join(self.install_dir, extract_dir))
 
     def symlink_version(self, version, installed_dir):
-        """Symlinks the binaries in the 'installed_dir' to the 'link_dir.'"""
+        """Symlink the binaries in the 'installed_dir' to the 'link_dir'."""
         try:
             os.makedirs(self.link_dir)
         except OSError as exc:
@@ -338,7 +343,7 @@ class MultiVersionDownloader(object):
                 if os.name == "nt":
                     # os.symlink is not supported on Windows, use a direct method instead.
                     def symlink_ms(source, link_name):
-                        """Provides symlink for Windows."""
+                        """Provide symlink for Windows."""
                         import ctypes
                         csl = ctypes.windll.kernel32.CreateSymbolicLinkW
                         csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
@@ -357,7 +362,7 @@ class MultiVersionDownloader(object):
 
 
 def main():
-    """Main program."""
+    """Execute Main program."""
 
     # Listen for SIGUSR1 and dump stack if received.
     try:
@@ -420,7 +425,7 @@ we'll pull the highest non-rc version compatible with the version specified.
     options, versions = parser.parse_args()
 
     # Check for required options.
-    if (not versions or not options.install_dir or not options.link_dir or not options.platform):
+    if not versions or not options.install_dir or not options.link_dir or not options.platform:
         parser.print_help()
         parser.exit(1)
 

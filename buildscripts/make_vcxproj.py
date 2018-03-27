@@ -1,16 +1,17 @@
-# Generate vcxproj and vcxproj.filters files for browsing code in Visual Studio 2015.
-# To build mongodb, you must use scons. You can use this project to navigate code during debugging.
-#
-#  HOW TO USE
-#
-#  First, you need a compile_commands.json file, to generate run the following command:
-#    scons compiledb
-#
-#  Next, run the following command
-#    python buildscripts/make_vcxproj.py FILE_NAME
-#
-#   where FILE_NAME is the of the file to generate e.g., "mongod"
-#
+"""Generate vcxproj and vcxproj.filters files for browsing code in Visual Studio 2015.
+
+To build mongodb, you must use scons. You can use this project to navigate code during debugging.
+
+ HOW TO USE
+
+ First, you need a compile_commands.json file, to generate run the following command:
+   scons compiledb
+
+ Next, run the following command
+   python buildscripts/make_vcxproj.py FILE_NAME
+
+  where FILE_NAME is the of the file to generate e.g., "mongod"
+"""
 
 import json
 import os
@@ -35,7 +36,7 @@ VCXPROJ_FOOTER = r"""
 
 
 def get_defines(args):
-    """Parse a compiler argument list looking for defines"""
+    """Parse a compiler argument list looking for defines."""
     ret = set()
     for arg in args:
         if arg.startswith('/D'):
@@ -44,7 +45,7 @@ def get_defines(args):
 
 
 def get_includes(args):
-    """Parse a compiler argument list  looking for includes"""
+    """Parse a compiler argument list  looking for includes."""
     ret = set()
     for arg in args:
         if arg.startswith('/I'):
@@ -52,10 +53,11 @@ def get_includes(args):
     return ret
 
 
-class ProjFileGenerator(object):
-    """Generate a .vcxproj and .vcxprof.filters file"""
+class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
+    """Generate a .vcxproj and .vcxprof.filters file."""
 
     def __init__(self, target):
+        """Initialize ProjFileGenerator."""
         # we handle DEBUG in the vcxproj header:
         self.common_defines = set()
         self.common_defines.add("DEBUG")
@@ -84,8 +86,8 @@ class ProjFileGenerator(object):
             self.vcxproj.write(header_str)
 
         common_defines = self.all_defines
-        for c in self.compiles:
-            common_defines = common_defines.intersection(c['defines'])
+        for comp in self.compiles:
+            common_defines = common_defines.intersection(comp['defines'])
 
         self.vcxproj.write("<!-- common_defines -->\n")
         self.vcxproj.write("<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>" +
@@ -95,7 +97,7 @@ class ProjFileGenerator(object):
         self.vcxproj.write("  <ItemGroup>\n")
         for command in self.compiles:
             defines = command["defines"].difference(common_defines)
-            if len(defines) > 0:
+            if defines:
                 self.vcxproj.write(
                     "    <ClCompile Include=\"" + command["file"] + "\"><PreprocessorDefinitions>" +
                     ';'.join(defines) + ";%(PreprocessorDefinitions)" +
@@ -118,12 +120,12 @@ class ProjFileGenerator(object):
         self.filters.close()
 
     def parse_line(self, line):
-        """Parse a build line"""
+        """Parse a build line."""
         if line.startswith("cl"):
             self.__parse_cl_line(line[3:])
 
     def __parse_cl_line(self, line):
-        """Parse a compiler line"""
+        """Parse a compiler line."""
         # Get the file we are compilong
         file_name = re.search(r"/c ([\w\\.-]+) ", line).group(1)
 
@@ -146,16 +148,17 @@ class ProjFileGenerator(object):
 
         self.compiles.append({"file": file_name, "defines": file_defines})
 
-    def __is_header(self, name):
-        """Is this a header file?"""
+    @staticmethod
+    def __is_header(name):
+        """Return True if this a header file."""
         headers = [".h", ".hpp", ".hh", ".hxx"]
         for header in headers:
             if name.endswith(header):
                 return True
         return False
 
-    def __write_filters(self):
-        """Generate the vcxproj.filters file"""
+    def __write_filters(self):  # pylint: disable=too-many-branches
+        """Generate the vcxproj.filters file."""
         # 1. get a list of directories for all the files
         # 2. get all the headers in each of these dirs
         # 3. Output these lists of files to vcxproj and vcxproj.headers
@@ -191,7 +194,7 @@ class ProjFileGenerator(object):
         for directory in dirs:
             if os.path.exists(directory):
                 for file_name in os.listdir(directory):
-                    if "SConstruct" == file_name or "SConscript" in file_name:
+                    if file_name == "SConstruct" or "SConscript" in file_name:
                         scons_files.add(directory + "\\" + file_name)
         scons_files.add("SConstruct")
 
@@ -244,6 +247,7 @@ class ProjFileGenerator(object):
 
 
 def main():
+    """Execute Main program."""
     if len(sys.argv) != 2:
         print r"Usage: python buildscripts\make_vcxproj.py FILE_NAME"
         return

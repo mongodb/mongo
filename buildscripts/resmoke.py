@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-"""
-Command line utility for executing MongoDB tests of all kinds.
-"""
+"""Command line utility for executing MongoDB tests of all kinds."""
 
 from __future__ import absolute_import
 
@@ -14,14 +12,13 @@ import time
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts import resmokelib
+from buildscripts import resmokelib  # pylint: disable=wrong-import-position
 
 
-def _execute_suite(suite):
-    """
-    Executes the test suite, failing fast if requested.
+def _execute_suite(suite):  # pylint: disable=too-many-branches,too-many-return-statements
+    """Execute the test suite, failing fast if requested.
 
-    Returns true if the execution of the suite was interrupted by the
+    Return true if the execution of the suite was interrupted by the
     user, and false otherwise.
     """
 
@@ -36,7 +33,7 @@ def _execute_suite(suite):
     if resmokelib.config.DRY_RUN == "tests":
         sb = []
         sb.append("Tests that would be run in suite %s:" % suite.get_display_name())
-        if len(suite.tests) > 0:
+        if suite.tests:
             for test in suite.tests:
                 sb.append(test)
         else:
@@ -44,7 +41,7 @@ def _execute_suite(suite):
         logger.info("\n".join(sb))
         sb = []
         sb.append("Tests that would be excluded from suite %s:" % suite.get_display_name())
-        if len(suite.excluded) > 0:
+        if suite.excluded:
             for test in suite.excluded:
                 sb.append(test)
         else:
@@ -56,7 +53,7 @@ def _execute_suite(suite):
         suite.return_code = 0
         return False
 
-    if len(suite.tests) == 0:
+    if not suite.tests:
         logger.info("Skipping %ss, no tests to run", suite.test_kind)
 
         # Set a successful return code on the test suite because we want to output the tests
@@ -85,7 +82,7 @@ def _execute_suite(suite):
     except IOError:
         suite.return_code = 74  # Exit code for IOError on POSIX systems.
         return True
-    except:
+    except:  # pylint: disable=bare-except
         logger.exception("Encountered an error when running %ss of suite %s.", suite.test_kind,
                          suite.get_display_name())
         suite.return_code = 2
@@ -93,6 +90,7 @@ def _execute_suite(suite):
     finally:
         if archive:
             archive.exit()
+    return True
 
 
 def _log_summary(logger, suites, time_taken):
@@ -107,8 +105,7 @@ def _summarize_suite(suite):
 
 
 def _dump_suite_config(suite, logging_config):
-    """
-    Returns a string that represents the YAML configuration of a suite.
+    """Return a string that represents the YAML configuration of a suite.
 
     TODO: include the "options" key in the result
     """
@@ -126,9 +123,9 @@ def _dump_suite_config(suite, logging_config):
 
 
 def find_suites_by_test(suites):
-    """
-    Looks up what other resmoke suites run the tests specified in the suites
-    parameter. Returns a dict keyed by test name, value is array of suite names.
+    """Look up what other resmoke suites run the tests specified in the suites parameter.
+
+    Return a dict keyed by test name, value is array of suite names.
     """
 
     memberships = {}
@@ -146,14 +143,10 @@ def _list_suites_and_exit(logger, exit_code=0):
 
 
 class Main(object):
-    """
-    A class for executing potentially multiple resmoke.py test suites.
-    """
+    """A class for executing potentially multiple resmoke.py test suites."""
 
     def __init__(self):
-        """
-        Initializes the Main instance by parsing the command line arguments.
-        """
+        """Initialize the Main instance by parsing the command line arguments."""
 
         self.__start_time = time.time()
 
@@ -162,17 +155,13 @@ class Main(object):
         self.__args = args
 
     def _get_suites(self):
-        """
-        Returns a list of resmokelib.testing.suite.Suite instances to execute.
-        """
+        """Return a list of resmokelib.testing.suite.Suite instances to execute."""
 
         return resmokelib.suitesconfig.get_suites(
             suite_files=self.__values.suite_files.split(","), test_files=self.__args)
 
     def run(self):
-        """
-        Executes the list of resmokelib.testing.suite.Suite instances returned by _get_suites().
-        """
+        """Execute the list of resmokelib.testing.suite.Suite instances."""
 
         logging_config = resmokelib.parser.get_logging_config(self.__values)
         resmokelib.logging.loggers.configure_loggers(logging_config)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""
-A script that provides:
+"""Clang format script that provides the following.
+
 1. Ability to grab binaries where possible from LLVM.
 2. Ability to download binaries from MongoDB cache for clang-format.
 3. Validates clang-format is the right version.
@@ -21,7 +21,7 @@ import tarfile
 import tempfile
 import threading
 import urllib2
-from distutils import spawn
+from distutils import spawn  # pylint: disable=no-name-in-module
 from optparse import OptionParser
 from multiprocessing import cpu_count
 
@@ -29,8 +29,8 @@ from multiprocessing import cpu_count
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-from buildscripts.linter import git
-from buildscripts.linter import parallel
+from buildscripts.linter import git  # pylint: disable=wrong-import-position
+from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
 
 ##############################################################################
 #
@@ -58,18 +58,17 @@ CLANG_FORMAT_SOURCE_TAR_BASE = string.Template(
 
 ##############################################################################
 def callo(args):
-    """Call a program, and capture its output
-    """
+    """Call a program, and capture its output."""
     return subprocess.check_output(args)
 
 
 def get_tar_path(version, tar_path):
-    """ Get the path to clang-format in the llvm tarball
-    """
+    """Return the path to clang-format in the llvm tarball."""
     return CLANG_FORMAT_SOURCE_TAR_BASE.substitute(version=version, tar_path=tar_path)
 
 
 def extract_clang_format(tar_path):
+    """Extract the clang_format tar file."""
     # Extract just the clang-format binary
     # On OSX, we shell out to tar because tarfile doesn't support xz compression
     if sys.platform == 'darwin':
@@ -85,9 +84,7 @@ def extract_clang_format(tar_path):
 
 
 def get_clang_format_from_cache_and_extract(url, tarball_ext):
-    """Get clang-format from mongodb's cache
-    and extract the tarball
-    """
+    """Get clang-format from mongodb's cache and extract the tarball."""
     dest_dir = tempfile.gettempdir()
     temp_tar_file = os.path.join(dest_dir, "temp.tar" + tarball_ext)
 
@@ -100,8 +97,8 @@ def get_clang_format_from_cache_and_extract(url, tarball_ext):
     for attempt in range(num_tries):
         try:
             resp = urllib2.urlopen(url)
-            with open(temp_tar_file, 'wb') as f:
-                f.write(resp.read())
+            with open(temp_tar_file, 'wb') as fh:
+                fh.write(resp.read())
             break
         except urllib2.URLError:
             if attempt == num_tries - 1:
@@ -112,9 +109,7 @@ def get_clang_format_from_cache_and_extract(url, tarball_ext):
 
 
 def get_clang_format_from_darwin_cache(dest_file):
-    """Download clang-format from llvm.org, unpack the tarball,
-    and put clang-format in the specified place
-    """
+    """Download clang-format from llvm.org, unpack the tarball to dest_file."""
     get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_DARWIN_CACHE, ".xz")
 
     # Destination Path
@@ -122,8 +117,7 @@ def get_clang_format_from_darwin_cache(dest_file):
 
 
 def get_clang_format_from_linux_cache(dest_file):
-    """Get clang-format from mongodb's cache
-    """
+    """Get clang-format from mongodb's cache."""
     get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_LINUX_CACHE, ".gz")
 
     # Destination Path
@@ -131,11 +125,10 @@ def get_clang_format_from_linux_cache(dest_file):
 
 
 class ClangFormat(object):
-    """Class encapsulates finding a suitable copy of clang-format,
-    and linting/formating an individual file
-    """
+    """ClangFormat class."""
 
-    def __init__(self, path, cache_dir):
+    def __init__(self, path, cache_dir):  # pylint: disable=too-many-branches
+        """Initialize ClangFormat."""
         self.path = None
         clang_format_progname_ext = ""
 
@@ -167,7 +160,7 @@ class ClangFormat(object):
             ]
 
             if sys.platform == "win32":
-                for i in range(len(programs)):
+                for i, _ in enumerate(programs):
                     programs[i] += '.exe'
 
             for program in programs:
@@ -222,8 +215,7 @@ class ClangFormat(object):
         self.print_lock = threading.Lock()
 
     def _validate_version(self):
-        """Validate clang-format is the expected version
-        """
+        """Validate clang-format is the expected version."""
         cf_version = callo([self.path, "--version"])
 
         if CLANG_FORMAT_VERSION in cf_version:
@@ -235,8 +227,7 @@ class ClangFormat(object):
         return False
 
     def _lint(self, file_name, print_diff):
-        """Check the specified file has the correct format
-        """
+        """Check the specified file has the correct format."""
         with open(file_name, 'rb') as original_text:
             original_file = original_text.read()
 
@@ -262,13 +253,11 @@ class ClangFormat(object):
         return True
 
     def lint(self, file_name):
-        """Check the specified file has the correct format
-        """
+        """Check the specified file has the correct format."""
         return self._lint(file_name, print_diff=True)
 
     def format(self, file_name):
-        """Update the format of the specified file
-        """
+        """Update the format of the specified file."""
         if self._lint(file_name, print_diff=False):
             return True
 
@@ -285,32 +274,28 @@ class ClangFormat(object):
         return formatted
 
 
-files_re = re.compile('\\.(h|hpp|ipp|cpp|js)$')
+FILES_RE = re.compile('\\.(h|hpp|ipp|cpp|js)$')
 
 
 def is_interesting_file(file_name):
-    """"Return true if this file should be checked
-    """
+    """Return true if this file should be checked."""
     return ((file_name.startswith("jstests") or file_name.startswith("src"))
             and not file_name.startswith("src/third_party/")
-            and not file_name.startswith("src/mongo/gotools/")) and files_re.search(file_name)
+            and not file_name.startswith("src/mongo/gotools/")) and FILES_RE.search(file_name)
 
 
 def get_list_from_lines(lines):
-    """"Convert a string containing a series of lines into a list of strings
-    """
+    """Convert a string containing a series of lines into a list of strings."""
     return [line.rstrip() for line in lines.splitlines()]
 
 
 def _get_build_dir():
-    """Get the location of the scons' build directory in case we need to download clang-format
-    """
+    """Return the location of the scons' build directory."""
     return os.path.join(git.get_base_dir(), "build")
 
 
 def _lint_files(clang_format, files):
-    """Lint a list of files with clang-format
-    """
+    """Lint a list of files with clang-format."""
     clang_format = ClangFormat(clang_format, _get_build_dir())
 
     lint_clean = parallel.parallel_process([os.path.abspath(f) for f in files], clang_format.lint)
@@ -321,8 +306,7 @@ def _lint_files(clang_format, files):
 
 
 def lint_patch(clang_format, infile):
-    """Lint patch command entry point
-    """
+    """Lint patch command entry point."""
     files = git.get_files_to_check_from_patch(infile, is_interesting_file)
 
     # Patch may have files that we do not want to check which is fine
@@ -331,8 +315,7 @@ def lint_patch(clang_format, infile):
 
 
 def lint(clang_format):
-    """Lint files command entry point
-    """
+    """Lint files command entry point."""
     files = git.get_files_to_check([], is_interesting_file)
 
     _lint_files(clang_format, files)
@@ -341,8 +324,7 @@ def lint(clang_format):
 
 
 def lint_all(clang_format):
-    """Lint files command entry point based on working tree
-    """
+    """Lint files command entry point based on working tree."""
     files = git.get_files_to_check_working_tree(is_interesting_file)
 
     _lint_files(clang_format, files)
@@ -351,8 +333,7 @@ def lint_all(clang_format):
 
 
 def _format_files(clang_format, files):
-    """Format a list of files with clang-format
-    """
+    """Format a list of files with clang-format."""
     clang_format = ClangFormat(clang_format, _get_build_dir())
 
     format_clean = parallel.parallel_process([os.path.abspath(f) for f in files],
@@ -364,16 +345,15 @@ def _format_files(clang_format, files):
 
 
 def format_func(clang_format):
-    """Format files command entry point
-    """
+    """Format files command entry point."""
     files = git.get_files_to_check([], is_interesting_file)
 
     _format_files(clang_format, files)
 
 
-def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reformat):
-    """Reformat a branch made before a clang-format run
-    """
+def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+        clang_format, commit_prior_to_reformat, commit_after_reformat):
+    """Reformat a branch made before a clang-format run."""
     clang_format = ClangFormat(clang_format, _get_build_dir())
 
     if os.getcwd() != git.get_base_dir():
@@ -515,16 +495,14 @@ def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reforma
 
 
 def usage():
-    """Print usage
-    """
+    """Print usage."""
     print(
         "clang-format.py supports 5 commands [ lint, lint-all, lint-patch, format, reformat-branch]."
     )
 
 
 def main():
-    """Main entry point
-    """
+    """Execute Main entry point."""
     parser = OptionParser()
     parser.add_option("-c", "--clang-format", type="string", dest="clang_format")
 

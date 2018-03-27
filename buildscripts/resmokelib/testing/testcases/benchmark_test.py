@@ -1,6 +1,4 @@
-"""
-unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark.
-"""
+"""The unittest.TestCase for tests using a MongoDB vendored version of Google Benchmark."""
 
 from __future__ import absolute_import
 
@@ -12,23 +10,22 @@ from buildscripts.resmokelib.testing.testcases import interface
 
 
 class BenchmarkTestCase(interface.ProcessTestCase):
-    """
-    A Benchmark test to execute.
-    """
+    """A Benchmark test to execute."""
 
     REGISTERED_NAME = "benchmark_test"
 
     def __init__(self, logger, program_executable, program_options=None):
-        """
-        Initializes the BenchmarkTestCase with the executable to run.
-        """
+        """Initialize the BenchmarkTestCase with the executable to run."""
+
         interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executable)
         parser.validate_benchmark_options()
 
         self.bm_executable = program_executable
         self.suite_bm_options = program_options
+        self.bm_options = {}
 
     def configure(self, fixture, *args, **kwargs):
+        """Configure BenchmarkTestCase."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # 1. Set the default benchmark options, including the out file path, which is based on the
@@ -65,6 +62,7 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         self.bm_options = bm_options
 
     def report_name(self):
+        """Return report name."""
         return self.bm_executable + ".json"
 
     def _make_process(self):

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""
-Converts silent test failures into non-silent failures.
+"""Convert silent test failures into non-silent failures.
 
 Any test files with at least 2 executions in the report.json file that have a "silentfail" status,
 this script will change the outputted report to have a "fail" status instead.
@@ -22,11 +21,13 @@ if __name__ == "__main__" and __package__ is None:
 
 
 def read_json_file(json_file):
+    """Return contents of a JSON file."""
     with open(json_file) as json_data:
         return json.load(json_data)
 
 
 def main():
+    """Execute Main program."""
 
     usage = "usage: %prog [options] report.json"
     parser = optparse.OptionParser(usage=usage)

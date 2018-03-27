@@ -1,6 +1,4 @@
-"""
-Sharded cluster fixture for executing JSTests against.
-"""
+"""Sharded cluster fixture for executing JSTests against."""
 
 from __future__ import absolute_import
 
@@ -20,24 +18,19 @@ from ... import utils
 from ...utils import registry
 
 
-class ShardedClusterFixture(interface.Fixture):
-    """
-    Fixture which provides JSTests with a sharded cluster to run
-    against.
-    """
+class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
+    """Fixture which provides JSTests with a sharded cluster to run against."""
 
     _CONFIGSVR_REPLSET_NAME = "config-rs"
     _SHARD_REPLSET_NAME_PREFIX = "shard-rs"
 
-    def __init__(self, logger, job_num, mongos_executable=None, mongos_options=None,
-                 mongod_executable=None, mongod_options=None, dbpath_prefix=None,
-                 preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=None,
-                 separate_configsvr=True, enable_sharding=None, enable_balancer=True,
-                 auth_options=None, configsvr_options=None, shard_options=None):
-        """
-        Initializes ShardedClusterFixture with the different options to
-        the mongod and mongos processes.
-        """
+    def __init__(  # pylint: disable=too-many-arguments,too-many-locals
+            self, logger, job_num, mongos_executable=None, mongos_options=None,
+            mongod_executable=None, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
+            num_shards=1, num_rs_nodes_per_shard=None, separate_configsvr=True,
+            enable_sharding=None, enable_balancer=True, auth_options=None, configsvr_options=None,
+            shard_options=None):
+        """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
@@ -65,6 +58,7 @@ class ShardedClusterFixture(interface.Fixture):
         self.shards = []
 
     def setup(self):
+        """Set up the sharded cluster."""
         if self.separate_configsvr:
             if self.configsvr is None:
                 self.configsvr = self._new_configsvr()
@@ -87,6 +81,7 @@ class ShardedClusterFixture(interface.Fixture):
             shard.setup()
 
     def await_ready(self):
+        """Block until the fixture can be used for testing."""
         # Wait for the config server
         if self.configsvr is not None:
             self.configsvr.await_ready()
@@ -130,9 +125,7 @@ class ShardedClusterFixture(interface.Fixture):
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
 
     def _do_teardown(self):
-        """
-        Shuts down the sharded cluster.
-        """
+        """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
 
         running_at_start = self.is_running()
@@ -158,28 +151,24 @@ class ShardedClusterFixture(interface.Fixture):
             raise errors.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
-        """
-        Returns true if the config server, all shards, and the mongos
-        are all still operating, and false otherwise.
-        """
+        """Return true if the all nodes in the cluster are all still operating."""
         return (self.configsvr is not None and self.configsvr.is_running()
                 and all(shard.is_running() for shard in self.shards) and self.mongos is not None
                 and self.mongos.is_running())
 
     def get_internal_connection_string(self):
+        """Return the internal connection string."""
         if self.mongos is None:
             raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
         return self.mongos.get_internal_connection_string()
 
     def get_driver_connection_url(self):
+        """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string()
 
     def _new_configsvr(self):
-        """
-        Returns a replicaset.ReplicaSetFixture configured to be used as
-        the config server of a sharded cluster.
-        """
+        """Return a replicaset.ReplicaSetFixture configured as the config server."""
 
         mongod_logger = self.logger.new_fixture_node_logger("configsvr")
 
@@ -207,10 +196,7 @@ class ShardedClusterFixture(interface.Fixture):
             **configsvr_options)
 
     def _new_rs_shard(self, index, num_rs_nodes_per_shard):
-        """
-        Returns a replicaset.ReplicaSetFixture configured to be used as a
-        shard in a sharded cluster.
-        """
+        """Return a replicaset.ReplicaSetFixture configured as a shard in a sharded cluster."""
 
         mongod_logger = self.logger.new_fixture_node_logger("shard{}".format(index))
 
@@ -236,10 +222,7 @@ class ShardedClusterFixture(interface.Fixture):
             replset_config_options=replset_config_options, **shard_options)
 
     def _new_standalone_shard(self, index):
-        """
-        Returns a standalone.MongoDFixture configured to be used as a
-        shard in a sharded cluster.
-        """
+        """Return a standalone.MongoDFixture configured as a shard in a sharded cluster."""
 
         mongod_logger = self.logger.new_fixture_node_logger("shard{}".format(index))
 
@@ -258,10 +241,7 @@ class ShardedClusterFixture(interface.Fixture):
             mongod_options=mongod_options, preserve_dbpath=preserve_dbpath, **shard_options)
 
     def _new_mongos(self):
-        """
-        Returns a _MongoSFixture configured to be used as the mongos for
-        a sharded cluster.
-        """
+        """Return a _MongoSFixture configured to be used as the mongos for a sharded cluster."""
 
         mongos_logger = self.logger.new_fixture_node_logger("mongos")
 
@@ -277,11 +257,9 @@ class ShardedClusterFixture(interface.Fixture):
 
     def _add_shard(self, client, shard):
         """
-        Add the specified program as a shard by executing the addShard
-        command.
+        Add the specified program as a shard by executing the addShard command.
 
-        See https://docs.mongodb.org/manual/reference/command/addShard
-        for more details.
+        See https://docs.mongodb.org/manual/reference/command/addShard for more details.
         """
 
         connection_string = shard.get_internal_connection_string()
@@ -290,13 +268,12 @@ class ShardedClusterFixture(interface.Fixture):
 
 
 class _MongoSFixture(interface.Fixture):
-    """
-    Fixture which provides JSTests with a mongos to connect to.
-    """
+    """Fixture which provides JSTests with a mongos to connect to."""
 
-    REGISTERED_NAME = registry.LEAVE_UNREGISTERED
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
     def __init__(self, logger, job_num, mongos_executable=None, mongos_options=None):
+        """Initialize _MongoSFixture."""
 
         interface.Fixture.__init__(self, logger, job_num)
 
@@ -309,6 +286,7 @@ class _MongoSFixture(interface.Fixture):
         self.port = None
 
     def setup(self):
+        """Set up the sharded cluster."""
         if "port" not in self.mongos_options:
             self.mongos_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongos_options["port"]
@@ -327,6 +305,7 @@ class _MongoSFixture(interface.Fixture):
         self.mongos = mongos
 
     def await_ready(self):
+        """Block until the fixture can be used for testing."""
         deadline = time.time() + standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS
 
         # Wait until the mongos is accepting connections. The retry logic is necessary to support
@@ -383,13 +362,16 @@ class _MongoSFixture(interface.Fixture):
                     self.port, self.mongos.pid, exit_code))
 
     def is_running(self):
+        """Return true if the cluster is still operating."""
         return self.mongos is not None and self.mongos.poll() is None
 
     def get_internal_connection_string(self):
+        """Return the internal connection string."""
         if self.mongos is None:
             raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
         return "localhost:%d" % self.port
 
     def get_driver_connection_url(self):
+        """Return the driver connection URL."""
         return "mongodb://" + self.get_internal_connection_string()

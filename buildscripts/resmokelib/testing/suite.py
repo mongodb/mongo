@@ -1,7 +1,4 @@
-"""
-Holder for the (test kind, list of tests) pair with additional metadata about when and how they
-execute.
-"""
+"""Holder for the (test kind, list of tests) pair with additional metadata their execution."""
 
 from __future__ import absolute_import
 
@@ -16,9 +13,10 @@ from .. import selector as _selector
 
 
 def synchronized(method):
-    """Decorator to enfore instance lock ownership when calling the method."""
+    """Provide decorator to enfore instance lock ownership when calling the method."""
 
     def synced(self, *args, **kwargs):
+        """Sync an instance lock."""
         lock = getattr(self, "_lock")
         with lock:
             return method(self, *args, **kwargs)
@@ -26,15 +24,11 @@ def synchronized(method):
     return synced
 
 
-class Suite(object):
-    """
-    A suite of tests of a particular kind (e.g. C++ unit tests, dbtests, jstests).
-    """
+class Suite(object):  # pylint: disable=too-many-instance-attributes
+    """A suite of tests of a particular kind (e.g. C++ unit tests, dbtests, jstests)."""
 
     def __init__(self, suite_name, suite_config, suite_options=_config.SuiteOptions.ALL_INHERITED):
-        """
-        Initializes the suite with the specified name and configuration.
-        """
+        """Initialize the suite with the specified name and configuration."""
         self._lock = threading.RLock()
 
         self._suite_name = suite_name
@@ -58,10 +52,7 @@ class Suite(object):
         self._partial_reports = None
 
     def _get_tests_for_kind(self, test_kind):
-        """
-        Returns the tests to run based on the 'test_kind'-specific
-        filtering policy.
-        """
+        """Return the tests to run based on the 'test_kind'-specific filtering policy."""
         test_info = self.get_selector_config()
 
         # The mongos_test doesn't have to filter anything, the test_info is just the arguments to
@@ -79,15 +70,11 @@ class Suite(object):
         return tests, excluded
 
     def get_name(self):
-        """
-        Returns the name of the test suite.
-        """
+        """Return the name of the test suite."""
         return self._suite_name
 
     def get_display_name(self):
-        """
-        Returns the name of the test suite with a unique identifier for its SuiteOptions.
-        """
+        """Return the name of the test suite with a unique identifier for its SuiteOptions."""
 
         if self.options.description is None:
             return self.get_name()
@@ -95,9 +82,7 @@ class Suite(object):
         return "{} ({})".format(self.get_name(), self.options.description)
 
     def get_selector_config(self):
-        """
-        Returns the "selector" section of the YAML configuration.
-        """
+        """Return the "selector" section of the YAML configuration."""
 
         if "selector" not in self._suite_config:
             return {}
@@ -124,75 +109,62 @@ class Suite(object):
         return selector
 
     def get_executor_config(self):
-        """
-        Returns the "executor" section of the YAML configuration.
-        """
+        """Return the "executor" section of the YAML configuration."""
         return self._suite_config["executor"]
 
     def get_test_kind_config(self):
-        """
-        Returns the "test_kind" section of the YAML configuration.
-        """
+        """Return the "test_kind" section of the YAML configuration."""
         return self._suite_config["test_kind"]
 
     @property
     def options(self):
+        """Get the options."""
         return self._suite_options.resolve()
 
     def with_options(self, suite_options):
-        """
-        Returns a Suite instance with the specified resmokelib.config.SuiteOptions.
-        """
+        """Return a Suite instance with the specified resmokelib.config.SuiteOptions."""
 
         return Suite(self._suite_name, self._suite_config, suite_options)
 
     @synchronized
     def record_suite_start(self):
-        """
-        Records the start time of the suite.
-        """
+        """Record the start time of the suite."""
         self._suite_start_time = time.time()
 
     @synchronized
     def record_suite_end(self):
-        """
-        Records the end time of the suite.
-        """
+        """Record the end time of the suite."""
         self._suite_end_time = time.time()
 
     @synchronized
     def record_test_start(self, partial_reports):
-        """
-        Records the start time of an execution and stores the
-        TestReports for currently running jobs.
+        """Record the start time of an execution.
+
+        The result is stored in the TestReports for currently running jobs.
         """
         self._test_start_times.append(time.time())
         self._partial_reports = partial_reports
 
     @synchronized
     def record_test_end(self, report):
-        """
-        Records the end time of an execution.
-        """
+        """Record the end time of an execution."""
         self._test_end_times.append(time.time())
         self._reports.append(report)
         self._partial_reports = None
 
     @synchronized
     def get_active_report(self):
-        """
-        Returns the partial report of the currently running execution, if there is one.
-        """
+        """Return the partial report of the currently running execution, if there is one."""
         if not self._partial_reports:
             return None
         return _report.TestReport.combine(*self._partial_reports)
 
     @synchronized
     def get_reports(self):
-        """
-        Returns the list of reports. If there's an execution currently
-        in progress, then a report for the partial results is included
-        in the returned list.
+        """Return the list of reports.
+
+        If there's an execution currently in progress, then a report for the partial results
+        is included in the returned list.
         """
 
         if self._partial_reports is not None:
@@ -202,9 +174,7 @@ class Suite(object):
 
     @synchronized
     def summarize(self, sb):
-        """
-        Appends a summary of the suite onto the string builder 'sb'.
-        """
+        """Append a summary of the suite onto the string builder 'sb'."""
         if not self._reports and not self._partial_reports:
             sb.append("No tests ran.")
             summary = _summary.Summary(0, 0.0, 0, 0, 0, 0)
@@ -234,9 +204,9 @@ class Suite(object):
 
     @synchronized
     def summarize_latest(self, sb):
-        """
-        Returns a summary of the latest execution of the suite and appends a
-        summary of that execution onto the string builder 'sb'.
+        """Return a summary of the latest execution of the suite.
+
+        Also append a summary of that execution onto the string builder 'sb'.
 
         If there's an execution currently in progress, then the partial
         summary of that execution is appended to 'sb'.
@@ -251,10 +221,10 @@ class Suite(object):
         return self._summarize_report(active_report, self._test_start_times[-1], end_time, sb)
 
     def _summarize_repeated(self, sb):
-        """
-        Returns the summary information of all executions and appends
-        each execution's summary onto the string builder 'sb'. Also
-        appends information of how many repetitions there were.
+        """Return the summary information of all executions.
+
+        Also append each execution's summary onto the string builder 'sb' and
+        information of how many repetitions there were.
         """
 
         reports = self.get_reports()  # Also includes the combined partial reports.
@@ -283,21 +253,19 @@ class Suite(object):
         return combined_summary
 
     def _summarize_execution(self, iteration, sb):
-        """
-        Returns the summary information of the execution given by
-        'iteration' and appends a summary of that execution onto the
-        string builder 'sb'.
+        """Return the summary information of the execution given by 'iteration'.
+
+        Also append a summary of that execution onto the string builder 'sb'.
         """
 
         return self._summarize_report(self._reports[iteration], self._test_start_times[iteration],
                                       self._test_end_times[iteration], sb)
 
     def _summarize_report(self, report, start_time, end_time, sb):
-        """
-        Returns the summary information of the execution given by
-        'report' that started at 'start_time' and finished at
-        'end_time', and appends a summary of that execution onto the
-        string builder 'sb'.
+        """Return the summary information of the execution.
+
+        The summary is for 'report' that started at 'start_time' and finished at 'end_time'.
+         Also append a summary of that execution onto the string builder 'sb'.
         """
 
         time_taken = end_time - start_time
@@ -333,6 +301,7 @@ class Suite(object):
 
     @staticmethod
     def log_summaries(logger, suites, time_taken):
+        """Log summary of all suites."""
         sb = []
         sb.append("Summary of all suites: %d suites ran in %0.2f seconds" % (len(suites),
                                                                              time_taken))
