@@ -655,10 +655,14 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
 
     const auto mps = getMultiPlanStage(exec->getRootStage());
-    int i = static_cast<size_t>(mps->originalWinningPlanIdx());
-    if (i >= 0) {
+    int originaWinningPlanIdx = static_cast<size_t>(mps->originalWinningPlanIdx());
+
+    if (originaWinningPlanIdx > -1) {
         plannerBob.append("backupPlanUsed", true);
+    } else {
+        plannerBob.append("backupPlanUsed", false);
     }
+    
     plannerBob.append("namespace", exec->nss().ns());
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet'
@@ -703,11 +707,13 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     }
     allPlansBob.doneFast();
 
-    // Generate array of original winning plan
-    BSONObjBuilder originalWinningPlanBob(plannerBob.subobjStart("originalWinningPlan"));
-    const auto originalWinnerStats = getOriginalWinningPlanStatsTree(exec);
-    statsToBSON(*originalWinnerStats.get(), &originalWinningPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
-    originalWinningPlanBob.doneFast();
+    if (originaWinningPlanIdx > -1) {
+        // Generate array of original winning plan
+        BSONObjBuilder originalWinningPlanBob(plannerBob.subobjStart("originalWinningPlan"));
+        const auto originalWinnerStats = getOriginalWinningPlanStatsTree(exec);
+        statsToBSON(*originalWinnerStats.get(), &originalWinningPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
+        originalWinningPlanBob.doneFast();
+    }
 
     plannerBob.doneFast();
 }
