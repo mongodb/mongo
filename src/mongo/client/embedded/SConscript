@@ -77,6 +77,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/standalone',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
     ],
 )
 
@@ -97,7 +98,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/repair_database_and_check_version',
-        '$BUILD_DIR/mongo/db/repl/replication_info',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/startup_warnings_mongod',
         '$BUILD_DIR/mongo/db/storage/mobile/storage_mobile',
