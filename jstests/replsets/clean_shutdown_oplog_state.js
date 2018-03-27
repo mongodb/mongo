@@ -3,13 +3,7 @@
 // present without this test failing. In particular if the rst.stop(1) doesn't execute mid-batch,
 // it isn't fully exercising the code. However, if the test fails there is definitely a bug.
 //
-// SERVER-33525: Adding `requires_mmapv1`. This test shuts down MongoD while replicating and
-// brings it back up as a standalone. Then it asserts the documents in the collection exactly
-// match the entries in the oplog. With RTT, this assertion will only hold if the commit point is
-// also advancing at the same pace. However, there may be other, softer assertions this test can
-// make instead going forward.
-//
-// @tags: [requires_persistence, requires_mmapv1]
+// @tags: [requires_persistence]
 (function() {
     "use strict";
 
@@ -63,6 +57,12 @@
     var options = slave.savedOptions;
     options.noCleanData = true;
     delete options.replSet;
+
+    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+    if (storageEngine === "wiredTiger") {
+        options.recoverFromOplogAsStandalone = "";
+    }
+
     var conn = MongoRunner.runMongod(options);
     assert.neq(null, conn, "secondary failed to start");
 
@@ -88,7 +88,9 @@
     try {
         assert.eq(collDoc._id, oplogDoc.o._id);
         assert(!('begin' in minValidDoc), 'begin in minValidDoc');
-        assert.eq(minValidDoc.ts, oplogDoc.ts);
+        if (storageEngine !== "wiredTiger") {
+            assert.eq(minValidDoc.ts, oplogDoc.ts);
+        }
         assert.eq(oplogTruncateAfterPointDoc.oplogTruncateAfterPoint, Timestamp());
     } catch (e) {
         // TODO remove once SERVER-25777 is resolved.

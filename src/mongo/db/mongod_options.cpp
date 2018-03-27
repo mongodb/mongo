@@ -364,6 +364,15 @@ Status addMongodOptions(moe::OptionSection* options) {
         "size to use (in MB) for replication op log. default is 5% of disk space "
         "(i.e. large is good)");
 
+    replication_options
+        .addOptionChaining("replication.recoverFromOplogAsStandalone",
+                           "recoverFromOplogAsStandalone",
+                           moe::Switch,
+                           "specifies that a standalone should execute replication recovery")
+        .hidden()
+        .incompatibleWith("replication.replSet")
+        .incompatibleWith("replication.replSetName");
+
     rs_options
         .addOptionChaining("replication.replSet",
                            "replSet",
@@ -1062,6 +1071,11 @@ Status storeMongodOptions(const moe::Environment& params) {
         replSettings.setOplogSizeBytes(x * 1024 * 1024);
         invariant(replSettings.getOplogSizeBytes() > 0);
     }
+    if (params.count("replication.recoverFromOplogAsStandalone")) {
+        replSettings.setShouldRecoverFromOplogAsStandalone(
+            params["replication.recoverFromOplogAsStandalone"].as<bool>());
+    }
+
     if (params.count("cacheSize")) {
         long x = params["cacheSize"].as<long>();
         if (x <= 0) {

@@ -125,7 +125,6 @@ MONGO_INITIALIZER(periodicNoopIntervalSecs)(InitializerContext*) {
     return Status::OK();
 }
 
-
 /**
  * Allows non-local writes despite _canAcceptNonlocalWrites being false on a single OperationContext
  * while in scope.
@@ -738,11 +737,34 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     if (!isReplEnabled()) {
+        if (_settings.getShouldRecoverFromOplogAsStandalone()) {
+            if (!_storage->supportsRecoverToStableTimestamp(opCtx->getServiceContext())) {
+                severe() << "Cannot use 'recoverFromOplogAsStandalone' with a storage engine that "
+                            "does not support recover to stable timestamp.";
+                fassertFailedNoTrace(50805);
+            }
+            auto recoveryTS = _storage->getRecoveryTimestamp(opCtx->getServiceContext());
+            if (!recoveryTS || recoveryTS->isNull()) {
+                severe()
+                    << "Cannot use 'recoverFromOplogAsStandalone' without a stable checkpoint.";
+                fassertFailedNoTrace(50806);
+            }
+
+            // We pass in "none" for the stable timestamp so that recoverFromOplog asks storage
+            // for the recoveryTimestamp just like on replica set recovery.
+            const auto stableTimestamp = boost::none;
+            _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
+            warning() << "Setting mongod to readOnly mode as a result of specifying "
+                         "'recoverFromOplogAsStandalone'.";
+            storageGlobalParams.readOnly = true;
+        }
+
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _setConfigState_inlock(kConfigReplicationDisabled);
         return;
     }
     invariant(_settings.usingReplSets());
+    invariant(!_settings.getShouldRecoverFromOplogAsStandalone());
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);

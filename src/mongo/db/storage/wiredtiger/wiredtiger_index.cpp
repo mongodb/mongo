@@ -222,8 +222,9 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
        << "formatVersion=" << keyStringVersion << ',' << "infoObj=" << desc.infoObj().jsonString()
        << "),";
 
-    if (WiredTigerUtil::useTableLogging(NamespaceString(desc.parentNS()),
-                                        getGlobalReplSettings().usingReplSets())) {
+    bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
+        getGlobalReplSettings().getShouldRecoverFromOplogAsStandalone();
+    if (WiredTigerUtil::useTableLogging(NamespaceString(desc.parentNS()), replicatedWrites)) {
         ss << "log=(enabled=true)";
     } else {
         ss << "log=(enabled=false)";
@@ -272,11 +273,12 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
         version.getValue() == kKeyStringV1Version ? KeyString::Version::V1 : KeyString::Version::V0;
 
     if (!isReadOnly) {
+        bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
+            getGlobalReplSettings().getShouldRecoverFromOplogAsStandalone();
         uassertStatusOK(WiredTigerUtil::setTableLogging(
             ctx,
             uri,
-            WiredTigerUtil::useTableLogging(NamespaceString(desc->parentNS()),
-                                            getGlobalReplSettings().usingReplSets())));
+            WiredTigerUtil::useTableLogging(NamespaceString(desc->parentNS()), replicatedWrites)));
     }
 }
 

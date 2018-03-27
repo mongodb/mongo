@@ -595,8 +595,9 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     }
     ss << ")";
 
-    if (WiredTigerUtil::useTableLogging(NamespaceString(ns),
-                                        getGlobalReplSettings().usingReplSets())) {
+    bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
+        getGlobalReplSettings().getShouldRecoverFromOplogAsStandalone();
+    if (WiredTigerUtil::useTableLogging(NamespaceString(ns), replicatedWrites)) {
         ss << ",log=(enabled=true)";
     } else {
         ss << ",log=(enabled=false)";
@@ -647,11 +648,10 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     }
 
     if (!params.isReadOnly) {
+        bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
+            getGlobalReplSettings().getShouldRecoverFromOplogAsStandalone();
         uassertStatusOK(WiredTigerUtil::setTableLogging(
-            ctx,
-            _uri,
-            WiredTigerUtil::useTableLogging(NamespaceString(ns()),
-                                            getGlobalReplSettings().usingReplSets())));
+            ctx, _uri, WiredTigerUtil::useTableLogging(NamespaceString(ns()), replicatedWrites)));
     }
 
     if (_isOplog) {

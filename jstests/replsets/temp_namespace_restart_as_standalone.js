@@ -2,11 +2,7 @@
  * Tests that temporary collections are not dropped when a member of a replica set is started up as
  * a stand-alone mongod, i.e. without the --replSet parameter.
  *
- * This test restarts a node as a standalone. With RTT, standalones start up at a time in the past
- * since they do not perform replication recovery, so we must only run it with
- * mmapv1. SERVER-34070 will make this feasible to test again on RTT storage engines.
- *
- * @tags: [requires_persistence, requires_mmapv1]
+ * @tags: [requires_persistence]
  */
 (function() {
     var rst = new ReplSetTest({nodes: 2});
@@ -59,7 +55,13 @@
     var secondaryNodeId = rst.getNodeId(secondaryDB.getMongo());
     rst.stop(secondaryNodeId);
 
-    secondaryConn = MongoRunner.runMongod({dbpath: secondaryConn.dbpath, noCleanData: true});
+    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
+    if (storageEngine === "wiredTiger") {
+        secondaryConn = MongoRunner.runMongod(
+            {dbpath: secondaryConn.dbpath, noCleanData: true, recoverFromOplogAsStandalone: ""});
+    } else {
+        secondaryConn = MongoRunner.runMongod({dbpath: secondaryConn.dbpath, noCleanData: true});
+    }
     assert.neq(null, secondaryConn, "secondary failed to start up as a stand-alone mongod");
     secondaryDB = secondaryConn.getDB("test");
 

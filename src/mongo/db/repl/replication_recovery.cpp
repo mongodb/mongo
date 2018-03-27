@@ -84,7 +84,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
         topOfOplogSW.getStatus() == ErrorCodes::NamespaceNotFound) {
         // Oplog is empty. There are no oplog entries to apply, so we exit recovery and go into
         // initial sync.
-        log() << "No oplog entries to apply for recovery. Oplog is empty. Entering initial sync.";
+        log() << "No oplog entries to apply for recovery. Oplog is empty.";
         return;
     }
     fassert(40290, topOfOplogSW);

@@ -60,6 +60,10 @@ std::string ReplSettings::getReplSetString() const {
     return _replSetString;
 }
 
+bool ReplSettings::getShouldRecoverFromOplogAsStandalone() const {
+    return _shouldRecoverFromOplogAsStandalone;
+}
+
 ReplSettings::IndexPrefetchConfig ReplSettings::getPrefetchIndexMode() const {
     return _prefetchIndexMode;
 }
@@ -78,6 +82,10 @@ void ReplSettings::setOplogSizeBytes(long long oplogSizeBytes) {
 
 void ReplSettings::setReplSetString(std::string replSetString) {
     _replSetString = replSetString;
+}
+
+void ReplSettings::setShouldRecoverFromOplogAsStandalone(bool shouldRecover) {
+    _shouldRecoverFromOplogAsStandalone = shouldRecover;
 }
 
 void ReplSettings::setPrefetchIndexMode(std::string prefetchIndexModeString) {
