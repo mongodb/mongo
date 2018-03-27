@@ -440,6 +440,14 @@ public:
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
                 if (!collection && args.isUpsert()) {
+                    auto session = OperationContextSession::get(opCtx);
+                    auto inTransaction =
+                        session && session->inSnapshotReadOrMultiDocumentTransaction();
+                    uassert(ErrorCodes::NamespaceNotFound,
+                            str::stream() << "Cannot create namespace " << nsString.ns()
+                                          << " in multi-document transaction.",
+                            !inTransaction);
+
                     // Release the collection lock and reacquire a lock on the database in exclusive
                     // mode in order to create the collection
                     collLock.reset();

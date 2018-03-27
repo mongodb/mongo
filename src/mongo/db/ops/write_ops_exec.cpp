@@ -182,6 +182,13 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    auto session = OperationContextSession::get(opCtx);
+    auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Cannot create namespace " << ns.ns()
+                          << " in multi-document transaction.",
+            !inTransaction);
+
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
         assertCanWrite_inlock(opCtx, ns);
