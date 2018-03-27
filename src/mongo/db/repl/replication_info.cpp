@@ -35,7 +35,6 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/is_master_base.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -69,6 +68,12 @@ using std::string;
 using std::stringstream;
 
 namespace repl {
+
+namespace {
+
+MONGO_FP_DECLARE(impersonateFullyUpgradedFutureVersion);
+
+}  // namespace
 
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
@@ -202,14 +207,182 @@ public:
     }
 } oplogInfoServerStatus;
 
-class CmdIsMasterRepl : public CmdIsMasterBase<CmdIsMasterRepl> {
+class CmdIsMaster : public BasicCommand {
 public:
-    void addSpecializedReply(OperationContext* opCtx,
-                             const BSONObj& cmdObj,
-                             BSONObjBuilder& result) {
+    bool requiresAuth() const override {
+        return false;
+    }
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+    std::string help() const override {
+        return "Check if this server is primary for a replica set\n"
+               "{ isMaster : 1 }";
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) const {}  // No auth required
+    CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
+    virtual bool run(OperationContext* opCtx,
+                     const string&,
+                     const BSONObj& cmdObj,
+                     BSONObjBuilder& result) {
+        /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
+           authenticated.
+        */
+        if (cmdObj["forShell"].trueValue()) {
+            LastError::get(opCtx->getClient()).disable();
+        }
+
+        transport::Session::TagMask sessionTagsToSet = 0;
+        transport::Session::TagMask sessionTagsToUnset = 0;
+
+        // Tag connections to avoid closing them on stepdown.
+        auto hangUpElement = cmdObj["hangUpOnStepDown"];
+        if (!hangUpElement.eoo() && !hangUpElement.trueValue()) {
+            sessionTagsToSet |= transport::Session::kKeepOpen;
+        }
+
+        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
+        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
+        if (!seenIsMaster) {
+            clientMetadataIsMasterState.setSeenIsMaster();
+        }
+
+        BSONElement element = cmdObj[kMetadataDocumentName];
+        if (!element.eoo()) {
+            if (seenIsMaster) {
+                return CommandHelpers::appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::ClientMetadataCannotBeMutated,
+                           "The client metadata document may only be sent in the first isMaster"));
+            }
+
+            auto swParseClientMetadata = ClientMetadata::parse(element);
+
+            if (!swParseClientMetadata.getStatus().isOK()) {
+                return CommandHelpers::appendCommandStatus(result,
+                                                           swParseClientMetadata.getStatus());
+            }
+
+            invariant(swParseClientMetadata.getValue());
+
+            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
+
+            clientMetadataIsMasterState.setClientMetadata(
+                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
+        }
+
+        // Parse the optional 'internalClient' field. This is provided by incoming connections from
+        // mongod and mongos.
+        auto internalClientElement = cmdObj["internalClient"];
+        if (internalClientElement) {
+            sessionTagsToSet |= transport::Session::kInternalClient;
+
+            uassert(ErrorCodes::TypeMismatch,
+                    str::stream() << "'internalClient' must be of type Object, but was of type "
+                                  << typeName(internalClientElement.type()),
+                    internalClientElement.type() == BSONType::Object);
+
+            bool foundMaxWireVersion = false;
+            for (auto&& elem : internalClientElement.Obj()) {
+                auto fieldName = elem.fieldNameStringData();
+                if (fieldName == "minWireVersion") {
+                    // We do not currently use 'internalClient.minWireVersion'.
+                    continue;
+                } else if (fieldName == "maxWireVersion") {
+                    foundMaxWireVersion = true;
+
+                    uassert(ErrorCodes::TypeMismatch,
+                            str::stream() << "'maxWireVersion' field of 'internalClient' must be "
+                                             "of type int, but was of type "
+                                          << typeName(elem.type()),
+                            elem.type() == BSONType::NumberInt);
+
+                    // All incoming connections from mongod/mongos of earlier versions should be
+                    // closed if the featureCompatibilityVersion is bumped to 3.6.
+                    if (elem.numberInt() >=
+                        WireSpec::instance().incomingInternalClient.maxWireVersion) {
+                        sessionTagsToSet |=
+                            transport::Session::kLatestVersionInternalClientKeepOpen;
+                    } else {
+                        sessionTagsToUnset |=
+                            transport::Session::kLatestVersionInternalClientKeepOpen;
+                    }
+                } else {
+                    uasserted(ErrorCodes::BadValue,
+                              str::stream() << "Unrecognized field of 'internalClient': '"
+                                            << fieldName
+                                            << "'");
+                }
+            }
+
+            uassert(ErrorCodes::BadValue,
+                    "Missing required field 'maxWireVersion' of 'internalClient'",
+                    foundMaxWireVersion);
+        } else {
+            sessionTagsToUnset |= (transport::Session::kInternalClient |
+                                   transport::Session::kLatestVersionInternalClientKeepOpen);
+            sessionTagsToSet |= transport::Session::kExternalClientKeepOpen;
+        }
+
+        auto session = opCtx->getClient()->session();
+        if (session) {
+            session->mutateTags(
+                [sessionTagsToSet, sessionTagsToUnset](transport::Session::TagMask originalTags) {
+                    // After a mongos sends the initial "isMaster" command with its mongos client
+                    // information, it sometimes sends another "isMaster" command that is forwarded
+                    // from its client. Once kInternalClient has been set, we assume that any future
+                    // "isMaster" commands are forwarded in this manner, and we do not update the
+                    // session tags.
+                    if ((originalTags & transport::Session::kInternalClient) == 0) {
+                        return (originalTags | sessionTagsToSet) & ~sessionTagsToUnset;
+                    } else {
+                        return originalTags;
+                    }
+                });
+        }
+
         appendReplicationInfo(opCtx, result, 0);
 
-        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            const int configServerModeNumber = 2;
+            result.append("configsvr", configServerModeNumber);
+        }
+
+        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+        result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
+        result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
+        result.appendDate("localTime", jsTime());
+
+        if (localLogicalSessionTimeoutMinutes != localLogicalSessionTimeoutMinutesDisabledValue)
+            result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
+
+        if (MONGO_FAIL_POINT(impersonateFullyUpgradedFutureVersion)) {
+            result.append("minWireVersion", WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING);
+            result.append("maxWireVersion", WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING);
+        } else if (internalClientElement) {
+            result.append("minWireVersion",
+                          WireSpec::instance().incomingInternalClient.minWireVersion);
+            result.append("maxWireVersion",
+                          WireSpec::instance().incomingInternalClient.maxWireVersion);
+        } else {
+            result.append("minWireVersion",
+                          WireSpec::instance().incomingExternalClient.minWireVersion);
+            result.append("maxWireVersion",
+                          WireSpec::instance().incomingExternalClient.maxWireVersion);
+        }
+
+        result.append("readOnly", storageGlobalParams.readOnly);
+
+        const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
+                                                  "automationServiceDescriptor",
+                                                  static_cast<ServerParameter*>(nullptr));
+        if (parameter)
+            parameter->append(opCtx, result, "automationServiceDescriptor");
 
         if (opCtx->getClient()->session()) {
             MessageCompressorManager::forSession(opCtx->getClient()->session())
@@ -218,9 +391,10 @@ public:
 
         auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
         saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
-    }
 
-} isMasterRepl;
+        return true;
+    }
+} cmdismaster;
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 

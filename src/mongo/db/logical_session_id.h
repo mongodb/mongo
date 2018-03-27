@@ -52,6 +52,7 @@ class BSONObjBuilder;
 class OperationContext;
 
 const Minutes kLogicalSessionDefaultTimeout = Minutes(30);
+constexpr int localLogicalSessionTimeoutMinutesDisabledValue = -1;
 extern int localLogicalSessionTimeoutMinutes;
 
 inline bool operator==(const LogicalSessionId& lhs, const LogicalSessionId& rhs) {
