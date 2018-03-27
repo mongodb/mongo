@@ -223,12 +223,6 @@ public:
     void unstashTransactionResources(OperationContext* opCtx);
 
     /**
-     * If there is transaction in progress with transaction number 'txnNumber' and _autocommit=true,
-     * aborts the transaction.
-     */
-    void abortIfSnapshotRead(TxnNumber txnNumber);
-
-    /**
      * Commits the transaction, including committing the write unit of work and updating
      * transaction state.
      */

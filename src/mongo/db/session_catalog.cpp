@@ -156,28 +156,6 @@ ScopedSession SessionCatalog::getOrCreateSession(OperationContext* opCtx,
     return ss;
 }
 
-boost::optional<ScopedSession> SessionCatalog::getSession(OperationContext* opCtx,
-                                                          const LogicalSessionId& lsid) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!OperationContextSession::get(opCtx));
-
-    boost::optional<ScopedSession> ss;
-    {
-        stdx::unique_lock<stdx::mutex> ul(_mutex);
-        auto sri = _getSessionRuntimeInfo(ul, opCtx, lsid);
-        if (sri) {
-            ss = ScopedSession(sri);
-        }
-    }
-
-    // Perform the refresh outside of the mutex.
-    if (ss) {
-        (*ss)->refreshFromStorageIfNeeded(opCtx);
-    }
-
-    return ss;
-}
-
 void SessionCatalog::invalidateSessions(OperationContext* opCtx,
                                         boost::optional<BSONObj> singleSessionDoc) {
     uassert(40528,
@@ -239,18 +217,6 @@ std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getOrCreate
     auto it = _txnTable.find(lsid);
     if (it == _txnTable.end()) {
         it = _txnTable.emplace(lsid, std::make_shared<SessionRuntimeInfo>(lsid)).first;
-    }
-
-    return it->second;
-}
-
-std::shared_ptr<SessionCatalog::SessionRuntimeInfo> SessionCatalog::_getSessionRuntimeInfo(
-    WithLock, OperationContext* opCtx, const LogicalSessionId& lsid) {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-
-    auto it = _txnTable.find(lsid);
-    if (it == _txnTable.end()) {
-        return nullptr;
     }
 
     return it->second;

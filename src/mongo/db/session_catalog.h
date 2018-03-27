@@ -106,18 +106,6 @@ public:
     ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
-     * Returns a reference to the specified cached session if it exists, regardless of whether it is
-     * checked-out or not. The returned session is not returned checked-out and is allowed to be
-     * checked-out concurrently.
-     *
-     * The intended usage for this method is to allow cursor destruction that may abort the
-     * transaction to run in parallel with operations for the same session without blocking it.
-     * Because of this, it may not be used from operations which run on a session.
-     */
-    boost::optional<ScopedSession> getSession(OperationContext* opCtx,
-                                              const LogicalSessionId& lsid);
-
-    /**
      * Callback to be invoked when it is suspected that the on-disk session contents might not be in
      * sync with what is in the sessions cache.
      *
@@ -167,15 +155,6 @@ private:
      */
     std::shared_ptr<SessionRuntimeInfo> _getOrCreateSessionRuntimeInfo(
         WithLock, OperationContext* opCtx, const LogicalSessionId& lsid);
-
-    /**
-     * May release and re-acquire it zero or more times before returning. The returned
-     * 'SessionRuntimeInfo' is guaranteed to be linked on the catalog's _txnTable as long as the
-     * lock is held. If the requested 'SessionRuntimeInfo' does not exist, returns nullptr.
-     */
-    std::shared_ptr<SessionRuntimeInfo> _getSessionRuntimeInfo(WithLock,
-                                                               OperationContext* opCtx,
-                                                               const LogicalSessionId& lsid);
 
     /**
      * Makes a session, previously checked out through 'checkoutSession', available again.

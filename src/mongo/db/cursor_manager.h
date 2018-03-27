@@ -132,12 +132,9 @@ public:
     /**
      * Destroys cursors that have been inactive for too long.
      *
-     * Returns the number of cursors that were timed out. If any of the cursors were running in
-     * transactions, appends those transaction IDs to 'txnsToAbort'.
+     * Returns the number of cursors that were timed out.
      */
-    std::size_t timeoutCursors(OperationContext* opCtx,
-                               Date_t now,
-                               std::vector<std::pair<LogicalSessionId, TxnNumber>>* txnsToAbort);
+    std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
      * Register an executor so that it can be notified of deletions, invalidations, collection
@@ -177,8 +174,7 @@ public:
 
     /**
      * Returns an OK status if the cursor was successfully killed, meaning either:
-     * (1) The cursor was erased from the cursor registry. In this case, we also return the
-     * transaction ID of the transaction the cursor belonged to (if it exists).
+     * (1) The cursor was erased from the cursor registry
      * (2) The cursor's operation was interrupted, and the cursor will be cleaned up when the
      * operation next checks for interruption.
      * Case (2) will only occur if the cursor is pinned.
@@ -188,8 +184,7 @@ public:
      *
      * If 'shouldAudit' is true, will perform audit logging.
      */
-    StatusWith<boost::optional<std::pair<LogicalSessionId, TxnNumber>>> killCursor(
-        OperationContext* opCtx, CursorId id, bool shouldAudit);
+    Status killCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
 
     /**
      * Returns an OK status if we're authorized to erase the cursor. Otherwise, returns

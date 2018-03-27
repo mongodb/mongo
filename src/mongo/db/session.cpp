@@ -671,13 +671,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
     }
 }
 
-void Session::abortIfSnapshotRead(TxnNumber txnNumber) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (_activeTxnNumber == txnNumber && _autocommit) {
-        _abortTransaction(lg);
-    }
-}
-
 void Session::abortArbitraryTransaction() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _abortTransaction(lock);
