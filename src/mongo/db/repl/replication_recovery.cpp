@@ -62,6 +62,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
         // Clear the truncateAfterPoint so that we don't truncate the next batch of oplog entries
         // erroneously.
         _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, {});
+        opCtx->recoveryUnit()->waitUntilDurable();
     }
 
     auto topOfOplogSW = _getTopOfOplog(opCtx);
@@ -264,7 +265,6 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
             if (count != 1) {
                 invariant(!oldestIDToDelete.isNull());
                 oplogCollection->cappedTruncateAfter(opCtx, oldestIDToDelete, /*inclusive=*/true);
-                opCtx->recoveryUnit()->waitUntilDurable();
             }
             return;
         }
