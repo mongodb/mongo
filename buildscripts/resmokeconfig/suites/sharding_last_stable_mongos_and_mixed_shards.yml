@@ -132,6 +132,8 @@ selector:
   - jstests/sharding/max_time_ms_sharded.js
   # Requires killOp to work for local operations on mongos, introduced in v4.0.
   - jstests/sharding/killop.js
+  # New 4.0 feature
+  - jstests/sharding/snapshot_aggregate_mongos.js
 
 executor:
   config:

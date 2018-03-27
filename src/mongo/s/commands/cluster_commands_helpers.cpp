@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
+
 #include "mongo/s/commands/cluster_commands_helpers.h"
 
 #include "mongo/db/commands.h"
@@ -533,6 +535,7 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
             cmdAtClusterTimeBob.append(el);
         }
     }
+
     return cmdAtClusterTimeBob.obj();
 }
 

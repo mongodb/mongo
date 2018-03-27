@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
@@ -193,9 +194,11 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
 }
 
 BSONObj createCommandForTargetedShards(
+    OperationContext* opCtx,
     const AggregationRequest& request,
     const BSONObj originalCmdObj,
-    const std::unique_ptr<Pipeline, PipelineDeleter>& pipelineForTargetedShards) {
+    const std::unique_ptr<Pipeline, PipelineDeleter>& pipelineForTargetedShards,
+    LogicalTime atClusterTime) {
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
     targetedCmd[AggregationRequest::kFromMongosName] = Value(true);
@@ -223,8 +226,19 @@ BSONObj createCommandForTargetedShards(
         targetedCmd.reset(wrapAggAsExplain(targetedCmd.freeze(), *explainVerbosity));
     }
 
+    if (opCtx->getTxnNumber()) {
+        invariant(!targetedCmd.hasField(OperationSessionInfo::kTxnNumberFieldName));
+        targetedCmd[OperationSessionInfo::kTxnNumberFieldName] =
+            Value(static_cast<long long>(*opCtx->getTxnNumber()));
+    }
+
+    // TODO: SERVER-34078
+    BSONObj cmdObj = (atClusterTime != LogicalTime::kUninitialized)
+        ? appendAtClusterTime(targetedCmd.freeze().toBson(), atClusterTime)
+        : targetedCmd.freeze().toBson();
+
     // agg creates temp collection and should handle implicit create separately.
-    return appendAllowImplicitCreate(targetedCmd.freeze().toBson(), true);
+    return appendAllowImplicitCreate(cmdObj, true);
 }
 
 BSONObj createCommandForMergingShard(
@@ -248,6 +262,16 @@ BSONObj createCommandForMergingShard(
 
     // agg creates temp collection and should handle implicit create separately.
     return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
+}
+
+/**
+ * Verifies that the shardIds are the same as they were atClusterTime using versioned table.
+ * TODO: SERVER-33767
+ */
+bool verifyTargetedShardsAtClusterTime(OperationContext* opCtx,
+                                       const std::set<ShardId>& shardIds,
+                                       LogicalTime atClusterTime) {
+    return true;
 }
 
 std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
@@ -313,6 +337,9 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
         // If any shard returned a stale shardVersion error, invalidate the routing table cache.
         // This will cause the cache to be refreshed the next time it is accessed.
         Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*routingInfo));
+        throw;
+    } catch (const ExceptionForCat<ErrorCategory::SnapshotError>&) {
+        // If any shard returned a snapshot error, recompute the atClusterTime.
         throw;
     }
 }
@@ -398,6 +425,20 @@ DispatchShardPipelineResults dispatchShardPipeline(
                 "cluster mid-operation",
                 shardIds.size() > 0);
 
+        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        bool isSnapshotRead(readConcernArgs.getLevel() ==
+                            repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        LogicalTime atClusterTime;
+        // TODO: SERVER-34074
+        if (isSnapshotRead) {
+            atClusterTime = computeAtClusterTimeForShards(opCtx, shardIds);
+            bool isSameShardIds = verifyTargetedShardsAtClusterTime(opCtx, shardIds, atClusterTime);
+            if (!isSameShardIds) {  // use the current clusterTime if chunks moved
+                atClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+            }
+        }
+
         // Don't need to split the pipeline if we are only targeting a single shard, unless:
         // - There is a stage that needs to be run on the primary shard and the single target shard
         //   is not the primary.
@@ -418,8 +459,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
         }
 
         // Generate the command object for the targeted shards.
-        targetedCommand =
-            createCommandForTargetedShards(aggRequest, originalCmdObj, pipelineForTargetedShards);
+        targetedCommand = createCommandForTargetedShards(
+            opCtx, aggRequest, originalCmdObj, pipelineForTargetedShards, atClusterTime);
 
         // Refresh the shard registry if we're targeting all shards.  We need the shard registry
         // to be at least as current as the logical time used when creating the command for
@@ -469,6 +510,11 @@ DispatchShardPipelineResults dispatchShardPipeline(
             }
         } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>& ex) {
             LOG(1) << "got stale shardVersion error " << redact(ex) << " while dispatching "
+                   << redact(targetedCommand) << " after " << (numAttempts + 1)
+                   << " dispatch attempts";
+            continue;  // Try again if allowed.
+        } catch (const ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
+            LOG(1) << "got snapshot error " << redact(ex) << " while dispatching "
                    << redact(targetedCommand) << " after " << (numAttempts + 1)
                    << " dispatch attempts";
             continue;  // Try again if allowed.
@@ -651,12 +697,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const AggregationRequest& request,
                                       BSONObj cmdObj,
                                       BSONObjBuilder* result) {
-    // TODO SERVER-33683 allowing an aggregation within a transaction can lead to a deadlock in the
-    // SessionCatalog when a pipeline with a $mergeCursors sends a getMore to itself.
-    uassert(50732,
-            "Cannot specify a transaction number in combination with an aggregation on mongos",
-            !opCtx->getTxnNumber());
-
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     auto executionNsRoutingInfoStatus =
@@ -835,6 +875,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return getStatusFromCommandResult(result->asTempObj());
     }
 
+    // TODO SERVER-33683 allowing an aggregation within a transaction can lead to a deadlock in the
+    // SessionCatalog when a pipeline with a $mergeCursors sends a getMore to itself.
+    uassert(50732,
+            "Cannot specify a transaction number in combination with an aggregation on mongos when "
+            "merigng on a shard",
+            !opCtx->getTxnNumber());
     ShardId mergingShardId =
         pickMergingShard(opCtx, dispatchResults, executionNsRoutingInfo.primaryId());
 
@@ -894,10 +940,23 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
     auto shard = std::move(swShard.getValue());
 
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    bool isSnapshotRead(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+    LogicalTime atClusterTime;
+    // TODO: SERVER-34074
+    if (isSnapshotRead) {
+        std::set<ShardId> shardIds = {shardId};
+        atClusterTime = computeAtClusterTimeForShards(opCtx, shardIds);
+        bool isSameShardIds = verifyTargetedShardsAtClusterTime(opCtx, shardIds, atClusterTime);
+        if (!isSameShardIds) {  // use the current clusterTime if chunks moved
+            atClusterTime = LogicalClock::get(opCtx)->getClusterTime();
+        }
+    }
+
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
     cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
-        createCommandForTargetedShards(aggRequest, cmdObj, nullptr));
+        createCommandForTargetedShards(opCtx, aggRequest, cmdObj, nullptr, atClusterTime));
 
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
         opCtx,
@@ -910,6 +969,9 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
         uassertStatusOK(
             cmdResponse.commandStatus.withContext("command failed because of stale config"));
+    } else if (ErrorCodes::isSnapshotError(cmdResponse.commandStatus.code())) {
+        uassertStatusOK(cmdResponse.commandStatus.withContext(
+            "command failed because can not establish a snapshot"));
     }
 
     BSONObj result;

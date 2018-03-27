@@ -130,9 +130,14 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             request.opCtx->getLogicalSessionId()->serialize(&subbob);
         }
 
+        // TODO SERVER-33991.
+        if (request.opCtx->getTxnNumber() && request.cmdObj.hasField("getMore") &&
+            !request.cmdObj.hasField(OperationSessionInfo::kTxnNumberFieldName)) {
+            bob.append(OperationSessionInfo::kTxnNumberFieldName, *(request.opCtx->getTxnNumber()));
+        }
+
         newRequest->cmdObj = bob.obj();
     }
-
     std::shared_ptr<OperationTimeTracker> timeTracker = OperationTimeTracker::get(request.opCtx);
 
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());

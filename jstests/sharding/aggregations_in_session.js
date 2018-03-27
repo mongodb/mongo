@@ -29,11 +29,8 @@
             .toArray());
     assert.eq(mongosColl.aggregate([{$sort: {_id: 1}}, {$out: "testing"}]).itcount(), 0);
 
-    // Test that running an aggregation within a transaction against mongos will error.
-    assert.commandFailedWithCode(
-        mongosColl.getDB().runCommand(
-            {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, txnNumber: NumberLong(1)}),
-        50732);
+    assert.commandWorked(mongosColl.getDB().runCommand(
+        {aggregate: mongosColl.getName(), pipeline: [], cursor: {}, txnNumber: NumberLong(1)}));
 
     st.stop();
 }());
