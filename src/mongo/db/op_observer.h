@@ -276,6 +276,9 @@ public:
         // True if the shard identity document was rolled back.
         bool shardIdentityRolledBack = false;
 
+        // True if the config.version document was rolled back.
+        bool configServerConfigVersionRolledBack = false;
+
         // Maps command names to a count of the number of those commands that are being rolled back.
         StringMap<std::uint32_t> rollbackCommandCounts;
     };

@@ -125,7 +125,7 @@ public:
 
     void onTransactionAbort(OperationContext* opCtx) override {}
 
-    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) {}
+    void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo);
 };
 
 }  // namespace mongo

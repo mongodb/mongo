@@ -42,6 +42,7 @@
 #include "mongo/db/repl/rollback_test_fixture.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -273,6 +274,7 @@ void RollbackImplTest::setUp() {
                                                        _listener.get());
 
     createOplog(_opCtx.get());
+    serverGlobalParams.clusterRole = ClusterRole::None;
 }
 
 void RollbackImplTest::tearDown() {
@@ -1525,7 +1527,6 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsShardIdentityRollback) {
     ASSERT(_rbInfo.shardIdentityRolledBack);
 }
 
-
 TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackForNormalDocument) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     const auto nss = NamespaceString::kServerConfigurationNamespace;
@@ -1541,6 +1542,58 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackFo
                                2);
     ASSERT_OK(rollbackOps({deleteOp}));
     ASSERT_FALSE(_rbInfo.shardIdentityRolledBack);
+}
+
+TEST_F(RollbackImplObserverInfoTest, RollbackRecordsConfigVersionRollback) {
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    const auto uuid = UUID::gen();
+    const auto nss = VersionType::ConfigNS;
+    const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+    auto insertOp = makeCRUDOp(OpTypeEnum::kInsert,
+                               Timestamp(2, 2),
+                               uuid,
+                               nss.ns(),
+                               BSON("_id"
+                                    << "a"),
+                               boost::none,
+                               2);
+
+    ASSERT_OK(rollbackOps({insertOp}));
+    ASSERT(_rbInfo.configServerConfigVersionRolledBack);
+}
+
+TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackForShardServer) {
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    const auto uuid = UUID::gen();
+    const auto nss = VersionType::ConfigNS;
+    const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+    auto insertOp = makeCRUDOp(OpTypeEnum::kInsert,
+                               Timestamp(2, 2),
+                               uuid,
+                               nss.ns(),
+                               BSON("_id"
+                                    << "a"),
+                               boost::none,
+                               2);
+    ASSERT_OK(rollbackOps({insertOp}));
+    ASSERT_FALSE(_rbInfo.configServerConfigVersionRolledBack);
+}
+
+TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordConfigVersionRollbackForNonInsert) {
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    const auto uuid = UUID::gen();
+    const auto nss = VersionType::ConfigNS;
+    const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
+    auto deleteOp = makeCRUDOp(OpTypeEnum::kDelete,
+                               Timestamp(2, 2),
+                               uuid,
+                               nss.ns(),
+                               BSON("_id"
+                                    << "a"),
+                               boost::none,
+                               2);
+    ASSERT_OK(rollbackOps({deleteOp}));
+    ASSERT_FALSE(_rbInfo.configServerConfigVersionRolledBack);
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackRecordsInsertOpsInUUIDToIdMap) {

@@ -52,6 +52,7 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/s/catalog/type_config_version.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -448,14 +449,21 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
     }
 
     if (opType == OpTypeEnum::kInsert) {
-        // Check if the creation of the shard identity document is being rolled back.
         auto idVal = oplogEntry.getObject().getStringField("_id");
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
             opNss == NamespaceString::kServerConfigurationNamespace &&
             idVal == ShardIdentityType::IdName) {
+            // Check if the creation of the shard identity document is being rolled back.
             _observerInfo.shardIdentityRolledBack = true;
             warning() << "Shard identity document rollback detected. oplog op: "
-                      << oplogEntry.toBSON();
+                      << redact(oplogEntry.toBSON());
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+                   opNss == VersionType::ConfigNS) {
+            // Check if the creation of the config server config version document is being rolled
+            // back.
+            _observerInfo.configServerConfigVersionRolledBack = true;
+            warning() << "Config version document rollback detected. oplog op: "
+                      << redact(oplogEntry.toBSON());
         }
     }
 

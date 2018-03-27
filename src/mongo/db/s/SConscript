@@ -66,6 +66,17 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='config_server_op_observer_test',
+    source=[
+        'config_server_op_observer_test.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_runtime_d',
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+    ]
+)
+
 env.Library(
     target='migration_types',
     source=[
