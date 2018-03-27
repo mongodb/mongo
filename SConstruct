@@ -2888,9 +2888,7 @@ def doConfigure(myenv):
 
     ssl_provider = get_option("ssl-provider")
     if ssl_provider == 'auto':
-        # TODO: When native platforms are implemented, make them the default
-        #if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
-        if conf.env.TargetOSIs('windows'):
+        if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
             ssl_provider = 'native'
         else:
             ssl_provider = 'openssl'
@@ -2925,6 +2923,7 @@ def doConfigure(myenv):
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
+        print("Using SSL Provider: {0}".format(ssl_provider))
     else:
         ssl_provider = "none"
 

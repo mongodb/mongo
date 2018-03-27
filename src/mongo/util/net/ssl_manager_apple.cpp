@@ -844,6 +844,57 @@ StatusWith<CFUniquePtr<::CFArrayRef>> copyMatchingCertificate(
     return CFUniquePtr<::CFArrayRef>(cfresult.release());
 }
 
+
+std::string explainTrustFailure(::SecTrustRef trust, ::SecTrustResultType result) {
+    const auto ret = [result](auto reason) -> std::string {
+        auto ss = str::stream();
+        if (result == ::kSecTrustResultDeny) {
+            ss << "Certificate trust denied";
+        } else if (result == ::kSecTrustResultRecoverableTrustFailure) {
+            ss << "Certificate trust failure";
+        } else if (result == ::kSecTrustResultFatalTrustFailure) {
+            ss << "Certificate trust fatal failure";
+        } else {
+            static_assert(std::is_signed<uint>::value ==
+                              std::is_signed<::SecTrustResultType>::value,
+                          "Must cast status to same signedness");
+            static_assert(sizeof(uint) >= sizeof(::SecTrustResultType),
+                          "Must cast result to same or wider type");
+            ss << "Certificate trust failure #" << static_cast<uint>(result);
+        }
+        ss << ": " << reason;
+        return ss;
+    };
+
+    CFUniquePtr<::CFArrayRef> cfprops(::SecTrustCopyProperties(trust));
+    if (!cfprops) {
+        return ret("Unable to retreive cause for trust failure");
+    }
+
+    const auto count = ::CFArrayGetCount(cfprops.get());
+    for (::CFIndex i = 0; i < count; ++i) {
+        auto elem = ::CFArrayGetValueAtIndex(cfprops.get(), i);
+        if (::CFGetTypeID(elem) != ::CFDictionaryGetTypeID()) {
+            return ret("Unable to parse cause for trust failure");
+        }
+        auto dict = static_cast<::CFDictionaryRef>(elem);
+        auto reason = ::CFDictionaryGetValue(dict, ::kSecPropertyTypeError);
+        if (!reason) {
+            continue;
+        }
+        if (::CFGetTypeID(reason) != ::CFStringGetTypeID()) {
+            return ret("Unable to parse trust failure error");
+        }
+        auto swReason = toString(static_cast<::CFStringRef>(reason));
+        if (!swReason.isOK()) {
+            return ret("Unable to express trust failure error");
+        }
+        return ret(swReason.getValue());
+    }
+
+    return ret("No trust failure reason available");
+}
+
 }  // namespace
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1206,21 +1257,9 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
     auto result = ::kSecTrustResultInvalid;
     uassertOSStatusOK(::SecTrustEvaluate(cftrust.get(), &result), ErrorCodes::SSLHandshakeFailed);
     if ((result != ::kSecTrustResultProceed) && (result != ::kSecTrustResultUnspecified)) {
-        if (result == ::kSecTrustResultDeny) {
-            return badCert("Certificate trust denied", _allowInvalidCertificates);
-        } else if (result == ::kSecTrustResultRecoverableTrustFailure) {
-            return badCert("Certificate trust failed (recoverably)", _allowInvalidCertificates);
-        } else if (result == ::kSecTrustResultFatalTrustFailure) {
-            return badCert("Certificate trust failure", _allowInvalidCertificates);
-        } else {
-            static_assert(std::is_signed<uint>::value ==
-                              std::is_signed<::SecTrustResultType>::value,
-                          "Must cast status to same signedness");
-            static_assert(sizeof(uint) >= sizeof(::SecTrustResultType),
-                          "Must cast result to same or wider type");
-            return badCert(str::stream() << "Unknown cause: " << static_cast<uint>(result),
-                           _allowInvalidCertificates);
-        }
+        const bool proceed = _allowInvalidCertificates ||
+            (_allowInvalidHostnames && (result == ::kSecTrustResultRecoverableTrustFailure));
+        return badCert(explainTrustFailure(cftrust.get(), result), proceed);
     }
 
     auto cert = ::SecTrustGetCertificateAtIndex(cftrust.get(), 0);

@@ -6928,7 +6928,8 @@ buildvariants:
   - name: replica_sets
   - name: tool
 
-- name: enterprise-osx-1010
+- &enterprise-osx-1010-template
+  name: enterprise-osx-1010
   display_name: Enterprise OS X 10.10
   modules:
   - enterprise
@@ -6973,6 +6974,24 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
+
+- <<: *enterprise-osx-1010-template
+  name: enterprise-osx-1010-openssl
+  display_name: Enterprise OS X 10.10 OpenSSL
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    push_path: osx
+    push_bucket: downloads.10gen.com
+    push_name: osx
+    push_arch: x86_64-enterprise
+    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
+    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    num_jobs_available: 1
+    build_mongoreplay: true
+    multiversion_platform: osx
+    multiversion_edition: enterprise
 
 
 ###########################################
