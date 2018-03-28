@@ -27,8 +27,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-#define LOG_FOR_ROLLBACK(level) \
-    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationRollback)
+#define LOG_FOR_RECOVERY(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 
@@ -53,6 +53,7 @@ using std::vector;
 
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
+const auto kCatalogLogLevel = logger::LogSeverity::Debug(2);
 }
 
 class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
@@ -116,7 +117,10 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
     _catalogRecordStore = _engine->getGroupedRecordStore(
         opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
-    LOG_FOR_ROLLBACK(2) << "loadCatalog:" << _dumpCatalog(opCtx);
+    if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
+        LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
+        _dumpCatalog(opCtx);
+    }
 
     _catalog.reset(new KVCatalog(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
@@ -178,7 +182,10 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
     dassert(opCtx->lockState()->isLocked());
-    LOG_FOR_ROLLBACK(2) << "closeCatalog:" << _dumpCatalog(opCtx);
+    if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
+        LOG_FOR_RECOVERY(kCatalogLogLevel) << "loadCatalog:";
+        _dumpCatalog(opCtx);
+    }
 
     stdx::lock_guard<stdx::mutex> lock(_dbsLock);
     for (auto entry : _dbs) {
@@ -224,7 +231,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         engineIdents.erase(catalogInfo);
     }
 
-    LOG_FOR_ROLLBACK(2) << "Reconciling collection and index idents.";
+    LOG_FOR_RECOVERY(2) << "Reconciling collection and index idents.";
     std::set<std::string> catalogIdents;
     {
         std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
@@ -625,18 +632,18 @@ Timestamp KVStorageEngine::getAllCommittedTimestamp(OperationContext* opCtx) con
     return _engine->getAllCommittedTimestamp(opCtx);
 }
 
-std::string KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
-    StringBuilder builder;
+void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
     auto catalogRs = _catalogRecordStore.get();
     auto cursor = catalogRs->getCursor(opCtx);
     boost::optional<Record> rec = cursor->next();
     while (rec) {
-        builder << "\n\tId: " << rec->id << " Value: " << rec->data.toBson();
+        // This should only be called by a parent that's done an appropriate `shouldLog` check. Do
+        // not duplicate the log level policy.
+        LOG_FOR_RECOVERY(kCatalogLogLevel) << "\tId: " << rec->id
+                                           << " Value: " << rec->data.toBson();
         rec = cursor->next();
     }
     opCtx->recoveryUnit()->abandonSnapshot();
-
-    return builder.str();
 }
 
 }  // namespace mongo

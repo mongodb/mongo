@@ -1025,6 +1025,7 @@ functions:
                         --ssh-private-key ~/.ssh/id_rsa_lxc               \
                         --clock-skew faketime                             \
                         --libfaketime-path /opt/mongodb/libfaketime.so.1  \
+                        --mongod-conf mongod_verbose.conf                 \
                         ${jepsen_key_time_limit}                          \
                         ${jepsen_protocol_version}                        \
                         ${jepsen_read_concern}                            \

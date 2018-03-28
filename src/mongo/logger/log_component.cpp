@@ -77,6 +77,7 @@ LogComponent LogComponent::parent() const {
             DECLARE_LOG_COMPONENT_PARENT(kBridge, kNetwork);
             DECLARE_LOG_COMPONENT_PARENT(kReplicationHeartbeats, kReplication);
             DECLARE_LOG_COMPONENT_PARENT(kReplicationRollback, kReplication);
+            DECLARE_LOG_COMPONENT_PARENT(kStorageRecovery, kStorage);
         case kNumLogComponents:
             return kNumLogComponents;
         default:
@@ -115,6 +116,8 @@ StringData LogComponent::toStringData() const {
             return "sharding"_sd;
         case kStorage:
             return "storage"_sd;
+        case kStorageRecovery:
+            return "recovery"_sd;
         case kJournal:
             return "journal"_sd;
         case kWrite:
@@ -191,6 +194,8 @@ StringData LogComponent::getNameForLog() const {
             return "SHARDING"_sd;
         case kStorage:
             return "STORAGE "_sd;
+        case kStorageRecovery:
+            return "RECOVERY"_sd;
         case kJournal:
             return "JOURNAL "_sd;
         case kWrite:

@@ -101,7 +101,14 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * three-node replica set running with the latest version.
      */
     function performStandardSetup() {
-        let replSet = new ReplSetTest({name, nodes: 3, useBridge: true});
+        let nodeOptions = {};
+        if (TestData.logComponentVerbosity) {
+            nodeOptions["setParameter"] = {
+                "logComponentVerbosity": tojsononeline(TestData.logComponentVerbosity)
+            };
+        }
+
+        let replSet = new ReplSetTest({name, nodes: 3, useBridge: true, nodeOptions: nodeOptions});
         replSet.startSet();
 
         const nodes = replSet.nodeList();

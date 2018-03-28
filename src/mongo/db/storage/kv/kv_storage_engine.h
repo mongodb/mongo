@@ -179,7 +179,7 @@ private:
                                          CollIter begin,
                                          CollIter end);
 
-    std::string _dumpCatalog(OperationContext* opCtx);
+    void _dumpCatalog(OperationContext* opCtx);
 
     class RemoveDBChange;
 

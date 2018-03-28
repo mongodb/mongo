@@ -11,3 +11,11 @@ executor:
     shell_options:
       nodb: ''
       readMode: commands
+      global_vars:
+        TestData:
+          logComponentVerbosity:
+            replication:
+              heartbeats: 2
+              rollback: 2
+            storage:
+              recovery: 2

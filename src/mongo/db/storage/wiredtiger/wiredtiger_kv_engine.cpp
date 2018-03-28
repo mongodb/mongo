@@ -30,6 +30,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define LOG_FOR_RECOVERY(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 #define LOG_FOR_ROLLBACK(level) \
     MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationRollback)
 
@@ -187,12 +189,14 @@ public:
                     WT_SESSION* s = session->getSession();
                     invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
                 } else if (stableTimestamp < initialDataTimestamp) {
-                    LOG(2) << "Stable timestamp is behind the initial data timestamp, skipping "
-                              "a checkpoint. StableTimestamp: "
-                           << stableTimestamp.toString()
-                           << " InitialDataTimestamp: " << initialDataTimestamp.toString();
+                    LOG_FOR_RECOVERY(2)
+                        << "Stable timestamp is behind the initial data timestamp, skipping "
+                           "a checkpoint. StableTimestamp: "
+                        << stableTimestamp.toString()
+                        << " InitialDataTimestamp: " << initialDataTimestamp.toString();
                 } else {
-                    LOG(2) << "Performing stable checkpoint. StableTimestamp: " << stableTimestamp;
+                    LOG_FOR_RECOVERY(2) << "Performing stable checkpoint. StableTimestamp: "
+                                        << stableTimestamp;
 
                     // This is the smallest possible value that WT will take a stable checkpoint
                     // at.
@@ -434,7 +438,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         std::uint64_t tmp;
         fassert(50758, parseNumberFromStringWithBase(buf, 16, &tmp));
         _recoveryTimestamp = Timestamp(tmp);
-        LOG(2) << "WiredTiger recoveryTimestamp. Ts: " << _recoveryTimestamp;
+        LOG_FOR_RECOVERY(2) << "WiredTiger recoveryTimestamp. Ts: " << _recoveryTimestamp;
     }
 
     // Invalid argument (EINVAL) is usually caused by invalid configuration string.
@@ -516,9 +520,10 @@ void WiredTigerKVEngine::cleanShutdown() {
         _journalFlusher->shutdown();
     if (_checkpointThread) {
         _checkpointThread->shutdown();
-        LOG(2) << "Shutdown timestamps. StableTimestamp: "
-               << _checkpointThread->getStableTimestamp()
-               << " Initial data timestamp: " << _checkpointThread->getInitialDataTimestamp();
+        LOG_FOR_RECOVERY(2) << "Shutdown timestamps. StableTimestamp: "
+                            << _checkpointThread->getStableTimestamp()
+                            << " Initial data timestamp: "
+                            << _checkpointThread->getInitialDataTimestamp();
     }
 
     _sizeStorer.reset();
