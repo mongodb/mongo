@@ -356,8 +356,9 @@ mongod = env.Program(
         'mongodmain',
     ],
     INSTALL_ALIAS=[
-        'servers',
         'core',
+        'default',
+        'servers',
     ],
 )
 

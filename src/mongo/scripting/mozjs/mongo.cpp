@@ -37,6 +37,7 @@
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"

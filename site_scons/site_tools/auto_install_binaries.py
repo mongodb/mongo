@@ -26,8 +26,21 @@ def generate(env):
         for s in map(env.Entry, env.Flatten(source)):
             setattr(s.attributes, "aib_install_actions", actions)
 
-        tags = kwargs.get('INSTALL_ALIAS', [])
-        if tags:
+        # Get the tags. If no tags were set, or a non-falsish thing
+        # was set then interpret that as a request for normal
+        # tagging. Auto include the 'all' tag, and generate
+        # aliases. If the user explicitly set the INSTALL_ALIAS to
+        # something falsy, interpret that as meaning no tags at all,
+        # so that we have a way to exempt targets from auto
+        # installation.
+        tags = kwargs.get('INSTALL_ALIAS', None)
+        if tags is None or tags:
+            tags = set(tags or [])
+            tags.add('all')
+            if 'default' in tags:
+                tags.remove('default')
+                env.Alias('install', actions)
+                env.Default('install')
             env.Alias(['install-' + tag for tag in tags], actions)
 
         return actions
@@ -64,6 +77,8 @@ def generate(env):
         install_sources = node.sources
         for install_source in install_sources:
             is_executor = install_source.get_executor()
+            if not is_executor:
+                continue
             is_targets = is_executor.get_all_targets()
             for is_target in (is_targets or []):
                 grandchildren = is_target.children()

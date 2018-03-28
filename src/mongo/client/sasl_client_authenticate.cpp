@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -42,23 +43,6 @@ void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
                                const HostAndPort& hostname,
                                const BSONObj& saslParameters,
                                auth::AuthCompletionHandler handler) = nullptr;
-
-const char* const saslStartCommandName = "saslStart";
-const char* const saslContinueCommandName = "saslContinue";
-const char* const saslCommandAutoAuthorizeFieldName = "autoAuthorize";
-const char* const saslCommandConversationIdFieldName = "conversationId";
-const char* const saslCommandDoneFieldName = "done";
-const char* const saslCommandMechanismFieldName = "mechanism";
-const char* const saslCommandMechanismListFieldName = "supportedMechanisms";
-const char* const saslCommandPasswordFieldName = "pwd";
-const char* const saslCommandPayloadFieldName = "payload";
-const char* const saslCommandUserDBFieldName = "db";
-const char* const saslCommandUserFieldName = "user";
-const char* const saslCommandServiceHostnameFieldName = "serviceHostname";
-const char* const saslCommandServiceNameFieldName = "serviceName";
-const char* const saslCommandDigestPasswordFieldName = "digestPassword";
-const char* const saslDefaultDBName = "$external";
-const char* const saslDefaultServiceName = "mongodb";
 
 Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type) {
     BSONElement payloadElement;

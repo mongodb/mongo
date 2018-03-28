@@ -58,7 +58,6 @@
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/commands/shutdown.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -104,41 +103,6 @@ using std::stringstream;
 using std::unique_ptr;
 
 namespace {
-
-class CmdShutdownMongoD : public CmdShutdown {
-public:
-    std::string help() const override {
-        return "shutdown the database.  must be ran against admin db and "
-               "either (1) ran from localhost or (2) authenticated. If "
-               "this is a primary in a replica set and there is no member "
-               "within 10 seconds of its optime, it will not shutdown "
-               "without force : true.  You can also specify timeoutSecs : "
-               "N to wait N seconds for other members to catch up.";
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-
-        long long timeoutSecs = 10;
-        if (cmdObj.hasField("timeoutSecs")) {
-            timeoutSecs = cmdObj["timeoutSecs"].numberLong();
-        }
-
-        Status status = repl::ReplicationCoordinator::get(opCtx)->stepDown(
-            opCtx, force, Seconds(timeoutSecs), Seconds(120));
-        if (!status.isOK() && status.code() != ErrorCodes::NotMaster) {  // ignore not master
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
-        // Never returns
-        shutdownHelper(cmdObj);
-        return true;
-    }
-
-} cmdShutdownMongoD;
 
 class CmdDropDatabase : public BasicCommand {
 public:

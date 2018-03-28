@@ -127,7 +127,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/executor/remote_command',
         'sasl_client'
-    ]
+    ],
 )
 
 env.CppUnitTest(

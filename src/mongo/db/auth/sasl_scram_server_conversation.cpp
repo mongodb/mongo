@@ -344,6 +344,9 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
     return std::make_tuple(false, sb.str());
 }
 
+template class SaslSCRAMServerMechanism<SCRAMSHA1Policy>;
+template class SaslSCRAMServerMechanism<SCRAMSHA256Policy>;
+
 MONGO_INITIALIZER_WITH_PREREQUISITES(SASLSCRAMServerMechanism,
                                      ("CreateSASLServerMechanismRegistry"))
 (::mongo::InitializerContext* context) {

@@ -43,7 +43,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"

@@ -104,13 +104,17 @@ env.Library(
     ]
 )
 
-env.Library('authcommon',
-            ['internal_user_auth.cpp'],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-                '$BUILD_DIR/mongo/bson/util/bson_extract',
-            ])
+env.Library(
+    target='authcommon',
+    source=[
+        'internal_user_auth.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
+)
 
 env.Library('authorization_manager_global',
             [

@@ -18,7 +18,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version_parser',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -1463,7 +1463,7 @@ env.Library(
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version_parser',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
     ]
 )
 

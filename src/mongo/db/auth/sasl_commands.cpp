@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"

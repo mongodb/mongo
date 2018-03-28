@@ -40,7 +40,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/memory.h"

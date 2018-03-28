@@ -30,39 +30,19 @@
 
 #include "mongo/platform/basic.h"
 
-#include <time.h>
-
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/dbclient_rs.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/background.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/db.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/scripting/engine.h"
-#include "mongo/util/exit.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/md5.hpp"
-#include "mongo/util/net/sock.h"
-#include "mongo/util/ntservice.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/version.h"
+
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace mongo {
 namespace {
@@ -135,89 +115,6 @@ public:
         return true;
     }
 } pingCmd;
-
-class FeaturesCmd : public BasicCommand {
-public:
-    FeaturesCmd() : BasicCommand("features") {}
-    std::string help() const override {
-        return "return build level feature settings";
-    }
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool run(OperationContext* opCtx,
-                     const string& ns,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        if (getGlobalScriptEngine()) {
-            BSONObjBuilder bb(result.subobjStart("js"));
-            result.append("utf8", getGlobalScriptEngine()->utf8Ok());
-            bb.done();
-        }
-        if (cmdObj["oidReset"].trueValue()) {
-            result.append("oidMachineOld", OID::getMachineId());
-            OID::regenMachineId();
-        }
-        result.append("oidMachine", OID::getMachineId());
-        return true;
-    }
-
-} featuresCmd;
-
-class HostInfoCmd : public BasicCommand {
-public:
-    HostInfoCmd() : BasicCommand("hostInfo") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "returns information about the daemon's host";
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::hostInfo);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        ProcessInfo p;
-        BSONObjBuilder bSys, bOs;
-
-        bSys.appendDate("currentTime", jsTime());
-        bSys.append("hostname", prettyHostName());
-        bSys.append("cpuAddrSize", p.getAddrSize());
-        bSys.append("memSizeMB", static_cast<unsigned>(p.getMemSizeMB()));
-        bSys.append("numCores", p.getNumCores());
-        bSys.append("cpuArch", p.getArch());
-        bSys.append("numaEnabled", p.hasNumaEnabled());
-        bOs.append("type", p.getOsType());
-        bOs.append("name", p.getOsName());
-        bOs.append("version", p.getOsVersion());
-
-        result.append(StringData("system"), bSys.obj());
-        result.append(StringData("os"), bOs.obj());
-        p.appendSystemDetails(result);
-
-        return true;
-    }
-
-} hostInfoCmd;
 
 class LogRotateCmd : public BasicCommand {
 public:
@@ -460,47 +357,5 @@ public:
     }
 
 } cmdGetCmdLineOpts;
-
-MONGO_FP_DECLARE(crashOnShutdown);
-int* volatile illegalAddress;  // NOLINT - used for fail point only
-
 }  // namespace
-
-void CmdShutdown::addRequiredPrivileges(const std::string& dbname,
-                                        const BSONObj& cmdObj,
-                                        std::vector<Privilege>* out) const {
-    ActionSet actions;
-    actions.addAction(ActionType::shutdown);
-    out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-}
-
-void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
-    MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
-        const std::string crashHow = crashBlock.getData()["how"].str();
-        if (crashHow == "fault") {
-            ++*illegalAddress;
-        }
-        ::abort();
-    }
-
-    log() << "terminating, shutdown command received " << cmdObj;
-
-#if defined(_WIN32)
-    // Signal the ServiceMain thread to shutdown.
-    if (ntservice::shouldStartService()) {
-        shutdownNoTerminate();
-
-        // Client expects us to abruptly close the socket as part of exiting
-        // so this function is not allowed to return.
-        // The ServiceMain thread will quit for us so just sleep until it does.
-        while (true)
-            sleepsecs(60);  // Loop forever
-    } else
-#endif
-    {
-        exitCleanly(EXIT_CLEAN);  // this never returns
-        invariant(false);
-    }
-}
-
 }  // namespace mongo

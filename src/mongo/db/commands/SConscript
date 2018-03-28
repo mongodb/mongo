@@ -54,9 +54,10 @@ env.Library(
 )
 
 env.Library(
-    target="feature_compatibility_version_parser",
+    target="feature_compatibility_parsers",
     source=[
         "feature_compatibility_version_parser.cpp",
+        "feature_compatibility_version_command_parser.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -82,8 +83,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/logger/parse_log_component_settings',
-        '$BUILD_DIR/mongo/scripting/scripting_common',
-        '$BUILD_DIR/mongo/util/ntservice',
     ],
 )
 
@@ -96,7 +95,7 @@ env.Library(
         "conn_pool_sync.cpp",
         "connection_status.cpp",
         "end_sessions_command.cpp",
-        "feature_compatibility_version_command_parser.cpp",
+        "generic_servers.cpp",
         "isself.cpp",
         "kill_all_sessions_by_pattern_command.cpp",
         "kill_all_sessions_command.cpp",
@@ -124,8 +123,10 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/sharding_legacy_api',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/scripting/scripting_common',
+        '$BUILD_DIR/mongo/util/ntservice',
         'core',
-        'feature_compatibility_version_parser',
+        'feature_compatibility_parsers',
     ]
 )
 
@@ -149,7 +150,7 @@ env.Library(
         "feature_compatibility_version.cpp",
     ],
     LIBDEPS=[
-        'feature_compatibility_version_parser',
+        'feature_compatibility_parsers',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands',
@@ -260,6 +261,7 @@ env.Library(
         "resize_oplog.cpp",
         "restart_catalog_command.cpp",
         "set_feature_compatibility_version_command.cpp",
+        "shutdown_d.cpp",
         "snapshot_management.cpp",
         "test_commands.cpp",
         "top_command.cpp",

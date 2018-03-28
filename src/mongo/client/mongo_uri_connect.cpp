@@ -35,7 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
 

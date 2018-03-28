@@ -32,6 +32,7 @@ env.Library(
         "ssl_manager.cpp",
         'ssl_manager_%s.cpp' % (ssl_provider),
         "ssl_options.cpp",
+        "ssl_parameters.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -40,6 +41,7 @@ env.Library(
         'host',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/util/background_job',
