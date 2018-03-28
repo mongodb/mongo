@@ -271,28 +271,6 @@ BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj) {
     return cmdObjWithWriteConcern.obj();
 }
 
-namespace {
-const stdx::unordered_set<std::string> userManagementCommands{"createUser",
-                                                              "updateUser",
-                                                              "dropUser",
-                                                              "dropAllUsersFromDatabase",
-                                                              "grantRolesToUser",
-                                                              "revokeRolesFromUser",
-                                                              "createRole",
-                                                              "updateRole",
-                                                              "dropRole",
-                                                              "dropAllRolesFromDatabase",
-                                                              "grantPrivilegesToRole",
-                                                              "revokePrivilegesFromRole",
-                                                              "grantRolesToRole",
-                                                              "revokeRolesFromRole",
-                                                              "_mergeAuthzCollections"};
-}  // namespace
-
-bool CommandHelpers::isUserManagementCommand(const std::string& name) {
-    return userManagementCommands.count(name);
-}
-
 BSONObj CommandHelpers::filterCommandRequestForPassthrough(const BSONObj& cmdObj) {
     BSONObjIterator cmdIter(cmdObj);
     BSONObjBuilder bob;

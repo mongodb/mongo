@@ -71,7 +71,7 @@ public:
     }
 
     void waitForWriteConcern(OperationContext* opCtx,
-                             const std::string& commandName,
+                             const CommandInvocation* invocation,
                              const repl::OpTime& lastOpBeforeRun,
                              BSONObjBuilder commandResponseBuilder) const override {
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -91,7 +91,7 @@ public:
 
         // SERVER-22421: This code is to ensure error response backwards compatibility with the
         // user management commands. This can be removed in 3.6.
-        if (!waitForWCStatus.isOK() && CommandHelpers::isUserManagementCommand(commandName)) {
+        if (!waitForWCStatus.isOK() && invocation->definition()->isUserManagementCommand()) {
             BSONObj temp = commandResponseBuilder.asTempObj().copy();
             commandResponseBuilder.resetToEmpty();
             CommandHelpers::appendCommandStatus(commandResponseBuilder, waitForWCStatus);

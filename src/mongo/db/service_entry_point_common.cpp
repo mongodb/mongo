@@ -465,8 +465,7 @@ bool runCommandImpl(OperationContext* opCtx,
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
         opCtx->setWriteConcern(wcResult);
         ON_BLOCK_EXIT([&] {
-            behaviors.waitForWriteConcern(
-                opCtx, invocation->definition()->getName(), lastOpBeforeRun, crb.getBodyBuilder());
+            behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, crb.getBodyBuilder());
         });
         invokeInTransaction(opCtx, invocation, &crb);
 

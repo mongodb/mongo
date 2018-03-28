@@ -90,10 +90,10 @@ public:
                             const CommandInvocation*,
                             const OpMsgRequest&) const override {}
 
-    void waitForWriteConcern(OperationContext* opCtx,
-                             const std::string& commandName,
-                             const repl::OpTime& lastOpBeforeRun,
-                             BSONObjBuilder commandResponseBuilder) const override {}
+    void waitForWriteConcern(OperationContext*,
+                             const CommandInvocation*,
+                             const repl::OpTime&,
+                             BSONObjBuilder) const override {}
 
     void waitForLinearizableReadConcern(OperationContext*) const override {}
 

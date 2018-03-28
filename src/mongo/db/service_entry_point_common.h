@@ -64,7 +64,7 @@ struct ServiceEntryPointCommon {
                                         const CommandInvocation* invocation,
                                         const OpMsgRequest& request) const = 0;
         virtual void waitForWriteConcern(OperationContext* opCtx,
-                                         const std::string& commandName,
+                                         const CommandInvocation* invocation,
                                          const repl::OpTime& lastOpBeforeRun,
                                          BSONObjBuilder commandResponseBuilder) const = 0;
 

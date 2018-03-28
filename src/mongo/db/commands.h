@@ -146,11 +146,6 @@ struct CommandHelpers {
     }
 
     /**
-     * This function checks if a command is a user management command by name.
-     */
-    static bool isUserManagementCommand(const std::string& name);
-
-    /**
      * Rewrites cmdObj into a format safe to blindly forward to shards.
      *
      * This performs 2 transformations:
@@ -256,6 +251,14 @@ public:
      */
     virtual std::size_t reserveBytesForReply() const {
         return 0u;
+    }
+
+    /**
+     * Return true for "user management commands", a distinction that affects
+     * backward compatible output formatting.
+     */
+    virtual bool isUserManagementCommand() const {
+        return false;
     }
 
     /**
