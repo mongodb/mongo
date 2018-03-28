@@ -195,9 +195,7 @@
         spherical: true,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
+        stmtId: NumberInt(0)
     }));
 
     jsTestLog("Check that geoSearch accepts a statement ID");
@@ -225,9 +223,7 @@
         },
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
+        stmtId: NumberInt(0)
     }));
 
     jsTestLog("Check that insert accepts a statement ID");

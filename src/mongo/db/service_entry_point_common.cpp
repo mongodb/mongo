@@ -130,6 +130,23 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},
                                                  {"update", 1}};
 
+// The command names that are allowed in a multi-document transaction.
+const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
+                                        {"aggregate", 1},
+                                        {"commitTransaction", 1},
+                                        {"count", 1},
+                                        {"delete", 1},
+                                        {"distinct", 1},
+                                        {"doTxn", 1},
+                                        {"find", 1},
+                                        {"findandmodify", 1},
+                                        {"findAndModify", 1},
+                                        {"geoSearch", 1},
+                                        {"getMore", 1},
+                                        {"insert", 1},
+                                        {"prepareTransaction", 1},
+                                        {"update", 1}};
+
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
                                       CurOp* curop,
@@ -556,11 +573,37 @@ void execCommandDatabase(OperationContext* opCtx,
             }
         }
 
+        uassert(50767,
+                str::stream() << "Cannot run '" << command->getName()
+                              << "' in a multi-document transaction.",
+                !autocommitVal ||
+                    txnCmdWhitelist.find(command->getName()) != txnCmdWhitelist.cend());
+
+        // Reject commands with 'txnNumber' that do not check out the Session, since no retryable
+        // writes or transaction machinery will be used to execute commands that do not check out
+        // the Session. Do not check this if we are in DBDirectClient because the outer command is
+        // responsible for checking out the Session.
+        if (!opCtx->getClient()->isInDirectClient()) {
+            uassert(50768,
+                    str::stream() << "It is illegal to provide a txnNumber for command "
+                                  << command->getName(),
+                    shouldCheckoutSession || !opCtx->getTxnNumber());
+        }
+
         // This constructor will check out the session and start a transaction, if necessary. It
         // handles the appropriate state management for both multi-statement transactions and
         // retryable writes.
         OperationContextSession sessionTxnState(
             opCtx, shouldCheckoutSession, autocommitVal, startMultiDocTxn);
+
+        // If we are in a multi-document transaction, ensure the command is allowed in this context.
+        // We do not check this in DBDirectClient, since 'aggregate' is allowed in transactions, but
+        // 'geoNear' is not, and 'aggregate' can run 'geoNear' in DBDirectClient.
+        if (!opCtx->getClient()->isInDirectClient()) {
+            auto session = OperationContextSession::get(opCtx);
+            invariant(!session || !session->inMultiDocumentTransaction() ||
+                      txnCmdWhitelist.find(command->getName()) != txnCmdWhitelist.cend());
+        }
 
         const auto dbname = request.getDatabase().toString();
         uassert(

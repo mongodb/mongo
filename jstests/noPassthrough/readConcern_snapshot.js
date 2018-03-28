@@ -267,8 +267,7 @@
     assert.commandFailedWithCode(sessionDb.runCommand({
         createIndexes: collName,
         indexes: [{key: {a: 1}, name: "a_1"}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
+        readConcern: {level: "snapshot"}
     }),
                                  ErrorCodes.InvalidOptions);
 
