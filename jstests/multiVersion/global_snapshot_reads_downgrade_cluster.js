@@ -13,81 +13,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     load("jstests/libs/feature_compatibility_version.js");
     load("jstests/multiVersion/libs/multi_rs.js");
     load("jstests/multiVersion/libs/multi_cluster.js");
+    load("jstests/multiVersion/libs/global_snapshot_reads_helpers.js");
 
-    const conn = MongoRunner.runMongod();
-    const supportsSnapshotReadConcern =
-        conn.getDB("test").serverStatus().storageEngine.supportsSnapshotReadConcern;
-    MongoRunner.stopMongod(conn);
-
-    if (!supportsSnapshotReadConcern) {
+    if (!supportsSnapshotReadConcern()) {
         jsTestLog("Skipping test since storage engine doesn't support snapshot read concern.");
         return;
-    }
-
-    let txnNumber = 0;  // Global counter used and incremented for all snapshot reads.
-
-    /**
-     * Runs the given command on the given database, asserting the command failed or succeeded
-     * depending on the value of expectSuccess.
-     */
-    function runCommandAndVerifyResponse(sessionDb, cmdObj, expectSuccess, expectedCode) {
-        const res = sessionDb.runCommand(cmdObj);
-
-        if (expectSuccess) {
-            // A snapshot read may fail with SnapshotTooOld in 4.0. This is acceptable for this
-            // test, since it does not verify the ability to consistently establish a snapshot, only
-            // that attempts to establish one aren't rejected.
-            if (!res.ok) {
-                assert.eq(ErrorCodes.SnapshotTooOld, res.code);
-                return;
-            }
-
-            assert.commandWorked(res, "expected command to succeed, cmd: " + tojson(cmdObj));
-        } else {
-            assert.commandFailedWithCode(res,
-                                         expectedCode,
-                                         "command did not fail with expected error code, cmd: " +
-                                             tojson(cmdObj) + ", expectedCode: " +
-                                             tojson(expectedCode));
-        }
-    }
-
-    /**
-     * Runs reads with snapshot readConcern against mongos, expecting they either fail or succeed
-     * depending on the expectSuccess parameter.
-     */
-    function verifyGlobalSnapshotReads(conn, expectSuccess, expectedCode) {
-        const session = conn.startSession({causalConsistency: false});
-
-        // Unsharded collection.
-        const unshardedDb = session.getDatabase("unshardedDb");
-        runCommandAndVerifyResponse(unshardedDb,
-                                    {
-                                      find: "unsharded",
-                                      readConcern: {level: "snapshot"},
-                                      txnNumber: NumberLong(txnNumber++)
-                                    },
-                                    expectSuccess,
-                                    expectedCode);
-
-        // Sharded collection, one shard.
-        const shardedDb = session.getDatabase("shardedDb");
-        runCommandAndVerifyResponse(shardedDb,
-                                    {
-                                      find: "sharded",
-                                      filter: {x: 1},
-                                      readConcern: {level: "snapshot"},
-                                      txnNumber: NumberLong(txnNumber++)
-                                    },
-                                    expectSuccess,
-                                    expectedCode);
-
-        // Sharded collection, all shards.
-        runCommandAndVerifyResponse(
-            shardedDb,
-            {find: "sharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)},
-            expectSuccess,
-            expectedCode);
     }
 
     // Start a cluster with two shards and two mongos at the latest version.
