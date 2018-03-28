@@ -2,7 +2,6 @@
 // @tags: [uses_transactions]
 (function() {
     "use strict";
-    load('jstests/libs/uuid_util.js');
 
     const dbName = "test";
     const collName = "multi_statement_transaction";
@@ -61,12 +60,6 @@
     assert.eq({_id: "insert-1"}, testColl.findOne({_id: "insert-1"}));
     assert.eq({_id: "insert-2"}, testColl.findOne({_id: "insert-2"}));
 
-    // Oplog has the "applyOps" entry that includes two insert ops.
-    const insertOps = [
-        {op: 'i', ns: testColl.getFullName(), o: {_id: "insert-1"}},
-        {op: 'i', ns: testColl.getFullName(), o: {_id: "insert-2"}},
-    ];
-
     jsTest.log("Update documents in a transaction");
 
     testColl.remove({}, {writeConcern: {w: "majority"}});
@@ -101,13 +94,6 @@
     // Read with default read concern sees the commmitted transaction.
     assert.eq({_id: "update-1", a: 2}, testColl.findOne({_id: "update-1"}));
     assert.eq({_id: "update-2", a: 1}, testColl.findOne({_id: "update-2"}));
-
-    // Oplog has the "applyOps" entry that includes two update ops.
-    const updateOps = [
-        {op: 'u', ns: testColl.getFullName(), o: {$v: 1, $set: {a: 1}}, o2: {_id: "update-1"}},
-        {op: 'u', ns: testColl.getFullName(), o: {$v: 1, $set: {a: 2}}, o2: {_id: "update-1"}},
-        {op: 'u', ns: testColl.getFullName(), o: {$v: 1, $set: {a: 1}}, o2: {_id: "update-2"}},
-    ];
 
     jsTest.log("Insert, update and read documents in a transaction");
 
@@ -153,14 +139,6 @@
     // Read with default read concern sees the commmitted transaction.
     assert.eq({_id: "doc-1", a: 1}, testColl.findOne({_id: "doc-1"}));
     assert.eq({_id: "doc-2", a: 1}, testColl.findOne({_id: "doc-2"}));
-
-    // Oplog has the "applyOps" entry that includes two update ops.
-    const insertUpdateOps = [
-        {op: 'i', ns: testColl.getFullName(), o: {_id: "doc-1"}},
-        {op: 'i', ns: testColl.getFullName(), o: {_id: "doc-2"}},
-        {op: 'u', ns: testColl.getFullName(), o: {$v: 1, $set: {a: 1}}, o2: {_id: "doc-1"}},
-        {op: 'u', ns: testColl.getFullName(), o: {$v: 1, $set: {a: 1}}, o2: {_id: "doc-2"}},
-    ];
 
     jsTest.log("Insert and delete documents in a transaction");
 
