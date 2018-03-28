@@ -247,7 +247,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
         LOG(5) << "Winner has blocking stage, looking for backup plan...";
-               
+
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
             if (!_candidates[ix].solution->hasBlockingStage) {
                 LOG(5) << "Candidate " << ix << " is backup child";

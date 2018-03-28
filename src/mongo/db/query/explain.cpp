@@ -662,7 +662,7 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     } else {
         plannerBob.append("backupPlanUsed", false);
     }
-    
+
     plannerBob.append("namespace", exec->nss().ns());
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet'
@@ -711,7 +711,9 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
         // Generate array of original winning plan
         BSONObjBuilder originalWinningPlanBob(plannerBob.subobjStart("originalWinningPlan"));
         const auto originalWinnerStats = getOriginalWinningPlanStatsTree(exec);
-        statsToBSON(*originalWinnerStats.get(), &originalWinningPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
+        statsToBSON(*originalWinnerStats.get(),
+                    &originalWinningPlanBob,
+                    ExplainOptions::Verbosity::kQueryPlanner);
         originalWinningPlanBob.doneFast();
     }
 
