@@ -773,7 +773,7 @@ struct __wt_page {
 
 /*
  * WT_PAGE_DELETED --
- *	Related information for fast-delete, on-disk pages.
+ *	Related information for truncated pages.
  */
 struct __wt_page_deleted {
 	volatile uint64_t txnid;		/* Transaction ID */
@@ -997,7 +997,7 @@ struct __wt_update {
 						   finalized prepare */
 #define	WT_UPDATE_STATE_LOCKED		1	/* locked */
 #define	WT_UPDATE_STATE_PREPARED	2	/* prepared */
-	uint8_t state;			/* state (one byte : conserve memory) */
+	volatile uint8_t state;
 
 	/* If the update includes a complete value. */
 #define	WT_UPDATE_DATA_VALUE(upd)					\

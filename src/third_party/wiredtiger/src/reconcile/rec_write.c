@@ -1341,12 +1341,14 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * started.  The global commit point can move forward during
 		 * reconciliation so we use a cached copy to avoid races when a
 		 * concurrent transaction commits or rolls back while we are
-		 * examining its updates.
+		 * examining its updates. As prepared transaction id's are
+		 * globally visible, need to check the update state as well.
 		 */
 		if (F_ISSET(r, WT_REC_EVICT) &&
+		    (upd->state != WT_UPDATE_STATE_READY ||
 		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    WT_TXNID_LE(r->last_running, txnid) :
-		    !__txn_visible_id(session, txnid))) {
+		    !__txn_visible_id(session, txnid)))) {
 			uncommitted = r->update_uncommitted = true;
 			continue;
 		}
@@ -1783,12 +1785,12 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * If called during checkpoint, the child is being
 			 * considered by the eviction server or the child is a
-			 * fast-delete page being read.  The eviction may have
+			 * truncated page being read.  The eviction may have
 			 * started before the checkpoint and so we must wait
 			 * for the eviction to be resolved.  I suspect we could
-			 * handle fast-delete reads, but we can't distinguish
-			 * between the two and fast-delete reads aren't expected
-			 * to be common.
+			 * handle reads of truncated pages, but we can't
+			 * distinguish between the two and reads of truncated
+			 * pages aren't expected to be common.
 			 */
 			break;
 
@@ -5630,8 +5632,7 @@ build:
 				if (key_onpage_ovfl) {
 					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
-					key_onpage_ovfl = false;
-					WT_NOT_READ(key_onpage_ovfl);
+					WT_NOT_READ(key_onpage_ovfl, false);
 				}
 
 				/*

@@ -124,22 +124,36 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	bool clean_page, inmem_split, tree_dead;
 
 	conn = S2C(session);
-
-	/* Enter the eviction generation. */
-	__wt_session_gen_enter(session, WT_GEN_EVICT);
-
 	page = ref->page;
-	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 
 	__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
+	/* Enter the eviction generation. */
+	__wt_session_gen_enter(session, WT_GEN_EVICT);
+
 	/*
-	 * Get exclusive access to the page and review it for conditions that
-	 * would block our eviction of the page.  If the check fails (for
-	 * example, we find a page with active children), we're done.  We have
-	 * to make this check for clean pages, too: while unlikely eviction
-	 * would choose an internal page with children, it's not disallowed.
+	 * Get exclusive access to the page if our caller doesn't have the tree
+	 * locked down.
+	 */
+	if (!closing) {
+		WT_ERR(__evict_exclusive(session, ref));
+
+		/*
+		 * Now the page is locked, remove it from the LRU eviction
+		 * queue.  We have to do this before freeing the page memory or
+		 * otherwise touching the reference because eviction paths
+		 * assume a non-NULL reference on the queue is pointing at
+		 * valid memory.
+		 */
+		__wt_evict_list_clear_page(session, ref);
+	}
+
+	/*
+	 * Review the page for conditions that would block its eviction. If the
+	 * check fails (for example, we find a page with active children), quit.
+	 * Make this check for clean pages, too: while unlikely eviction would
+	 * choose an internal page with children, it's not disallowed.
 	 */
 	WT_ERR(__evict_review(session, ref, closing, &inmem_split));
 
@@ -178,6 +192,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	}
 
 	/* Update the reference and discard the page. */
+	tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
 	if (__wt_ref_is_root(ref))
 		__wt_ref_out(session, ref);
 	else if ((clean_page && !F_ISSET(conn, WT_CONN_IN_MEMORY)) || tree_dead)
@@ -275,12 +290,11 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_DECL_RET;
 
 	/*
-	 * Discard the page and update the reference structure; if the page has
-	 * an address, it's a disk page; if it has no address, it's a deleted
-	 * page re-instantiated (for example, by searching) and never written.
-	 *
-	 * If evicting a WT_REF_LIMBO reference, we get to here and transition
-	 * back to WT_REF_LOOKASIDE.
+	 * Discard the page and update the reference structure. If evicting a
+	 * WT_REF_LIMBO page, transition back to WT_REF_LOOKASIDE. Otherwise,
+	 * a page with a disk address is an on-disk page, and a page without
+	 * a disk address is a re-instantiated deleted page (for example, by
+	 * searching), that was never subsequently written.
 	 */
 	__wt_ref_out(session, ref);
 	if (!closing && ref->page_las != NULL &&
@@ -417,7 +431,18 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 	WT_INTL_FOREACH_BEGIN(session, parent->page, child) {
 		switch (child->state) {
 		case WT_REF_DISK:		/* On-disk */
-		case WT_REF_DELETED:		/* On-disk, deleted */
+			break;
+		case WT_REF_DELETED:		/* Deleted */
+			/*
+			 * If the page was part of a truncate, transaction
+			 * rollback might switch this page into its previous
+			 * state at any time, so the delete must be resolved.
+			 * We don't have to lock the page, as no thread of
+			 * control can be running below our locked internal
+			 * page.
+			 */
+			if (__wt_btree_truncate_active(session, child))
+				return (EBUSY);
 			break;
 		default:
 			return (EBUSY);
@@ -446,29 +471,10 @@ __evict_review(
 	*inmem_splitp = false;
 
 	conn = S2C(session);
+	page = ref->page;
 	flags = WT_REC_EVICT;
 	if (!WT_SESSION_IS_CHECKPOINT(session))
 		LF_SET(WT_REC_VISIBLE_ALL);
-
-	/*
-	 * Get exclusive access to the page if our caller doesn't have the tree
-	 * locked down.
-	 */
-	if (!closing) {
-		WT_RET(__evict_exclusive(session, ref));
-
-		/*
-		 * Now the page is locked, remove it from the LRU eviction
-		 * queue.  We have to do this before freeing the page memory or
-		 * otherwise touching the reference because eviction paths
-		 * assume a non-NULL reference on the queue is pointing at
-		 * valid memory.
-		 */
-		__wt_evict_list_clear_page(session, ref);
-	}
-
-	/* Now that we have exclusive access, review the page. */
-	page = ref->page;
 
 	/*
 	 * Fail if an internal has active children, the children must be evicted

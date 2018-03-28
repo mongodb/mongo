@@ -311,6 +311,20 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __cursor_kv_return --
+ *      Return a page referenced key/value pair to the application.
+ */
+static inline int
+__cursor_kv_return(
+    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+{
+	WT_RET(__wt_key_return(session, cbt));
+	WT_RET(__wt_value_return(session, cbt, upd));
+
+	return (0);
+}
+
+/*
  * __cursor_func_init --
  *	Cursor call setup.
  */

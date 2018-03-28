@@ -74,6 +74,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 		    &rollback_timestamp, las_timestamp.data) < 0) {
 			WT_ERR(cursor->remove(cursor));
 			++remove_cnt;
+			WT_STAT_CONN_INCR(session, txn_rollback_las_removed);
 		} else
 			++las_total;
 	}
@@ -111,6 +112,7 @@ __txn_abort_newer_update(WT_SESSION_IMPL *session,
 		if (__wt_timestamp_cmp(
 		    rollback_timestamp, &next_upd->timestamp) < 0) {
 			next_upd->txnid = WT_TXN_ABORTED;
+			WT_STAT_CONN_INCR(session, txn_rollback_upd_aborted);
 			__wt_timestamp_set_zero(&next_upd->timestamp);
 
 			/*
@@ -425,6 +427,7 @@ __wt_txn_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
+	WT_STAT_CONN_INCR(session, txn_rollback_to_stable);
 	/*
 	 * Mark that a rollback operation is in progress and wait for eviction
 	 * to drain.  This is necessary because lookaside eviction uses

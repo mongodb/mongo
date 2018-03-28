@@ -598,8 +598,7 @@ __log_file_server(void *arg)
 					continue;
 				WT_ERR(__wt_fsync(session, log->log_fh, true));
 				__wt_spin_lock(session, &log->log_sync_lock);
-				locked = true;
-				WT_NOT_READ(locked);
+				WT_NOT_READ(locked, true);
 				/*
 				 * The sync LSN could have advanced while we
 				 * were writing to disk.
@@ -950,7 +949,7 @@ __log_server(void *arg)
 					if (ret == EACCES &&
 					    retry < WT_RETRY_MAX) {
 						retry++;
-						ret = 0;
+						WT_NOT_READ(ret, 0);
 					} else {
 						/*
 						 * Return the error if there is

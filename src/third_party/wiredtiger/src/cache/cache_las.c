@@ -993,7 +993,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 #else
 	wt_timestamp_t *val_ts;
 #endif
-	uint64_t cnt, decrement_cnt, las_counter, las_pageid, txnid;
+	uint64_t cnt, decrement_cnt, las_counter, las_pageid, saved_pageid;
+	uint64_t las_txnid;
 	uint32_t las_id, session_flags;
 	uint8_t upd_type;
 	int notused;
@@ -1007,6 +1008,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	local_txn = locked = false;
 
 	WT_RET(__wt_scr_alloc(session, 0, &saved_key));
+	saved_pageid = 0;
 
 	/*
 	 * Allocate a cursor and wrap all the updates in a transaction.
@@ -1059,6 +1061,20 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 
 	/* Walk the file. */
 	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ERR(cursor->get_key(cursor,
+		    &las_pageid, &las_id, &las_counter, &las_key));
+
+		/*
+		 * If we have switched to a different page, clear the saved key.
+		 * Otherwise, sweep could incorrectly remove records after
+		 * seeing a birthmark for a key in one block if the same key is
+		 * at the beginning of the next block.  See WT-3982 for details.
+		 */
+		if (las_pageid != saved_pageid) {
+			saved_key->size = 0;
+			saved_pageid = las_pageid;
+		}
+
 		/*
 		 * Stop if the cache is stuck: we are ignoring the cache size
 		 * while scanning the lookaside table, so we're making things
@@ -1075,9 +1091,6 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			--cnt;
 		else if (saved_key->size == 0)
 			break;
-
-		WT_ERR(cursor->get_key(cursor,
-		    &las_pageid, &las_id, &las_counter, &las_key));
 
 		/*
 		 * If the entry belongs to a dropped tree, discard it.
@@ -1102,7 +1115,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * now no longer needed.
 		 */
 		WT_ERR(cursor->get_value(cursor,
-		    &txnid, &las_timestamp, &upd_type, &las_value));
+		    &las_txnid, &las_timestamp, &upd_type, &las_value));
 #ifdef HAVE_TIMESTAMPS
 		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
 		memcpy(&timestamp, las_timestamp.data, las_timestamp.size);
@@ -1116,7 +1129,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * If it is visible then perform additional checks to see
 		 * whether it has aged out of a live file.
 		 */
-		if (!__wt_txn_visible_all(session, txnid, val_ts)) {
+		if (!__wt_txn_visible_all(session, las_txnid, val_ts)) {
 			saved_key->size = 0;
 			continue;
 		}

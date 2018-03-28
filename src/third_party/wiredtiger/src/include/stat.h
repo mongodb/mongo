@@ -627,6 +627,9 @@ struct __wt_connection_stats {
 	int64_t txn_read_queue_head;
 	int64_t txn_read_queue_inserts;
 	int64_t txn_read_queue_len;
+	int64_t txn_rollback_to_stable;
+	int64_t txn_rollback_upd_aborted;
+	int64_t txn_rollback_las_removed;
 	int64_t txn_set_ts;
 	int64_t txn_set_ts_commit;
 	int64_t txn_set_ts_commit_upd;

@@ -748,6 +748,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_DECL_TIMESTAMP(ckpt_tmp_ts)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
@@ -899,6 +900,15 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * checkpointing the metadata since we know that all files in the
 	 * checkpoint are now in a consistent state.
 	 */
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * Record the timestamp from the transaction if we were successful.
+	 * Store it in a temp variable now because it will be invalidated during
+	 * commit but we don't want to set it until we know the checkpoint
+	 * is successful.
+	 */
+	__wt_timestamp_set(&ckpt_tmp_ts, &txn->read_timestamp);
+#endif
 	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*
@@ -942,8 +952,13 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	txn_global->checkpoint_state.pinned_id = WT_TXN_NONE;
 
-	if (full)
+	if (full) {
 		__checkpoint_stats(session);
+#ifdef HAVE_TIMESTAMPS
+		__wt_timestamp_set(
+		    &conn->txn_global.last_ckpt_timestamp, &ckpt_tmp_ts);
+#endif
+	}
 
 err:	/*
 	 * Reset the timer so that next checkpoint tracks the progress only if

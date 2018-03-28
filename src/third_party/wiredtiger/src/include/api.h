@@ -68,6 +68,7 @@
 		if ((ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY &&			\
+		    (ret) != WT_PREPARE_CONFLICT &&			\
 		    F_ISSET(&(s)->txn, WT_TXN_RUNNING))			\
 			F_SET(&(s)->txn, WT_TXN_ERROR);			\
 		/*							\
@@ -237,6 +238,8 @@
 	JOINABLE_CURSOR_CALL_CHECK(cur)
 
 #define	CURSOR_UPDATE_API_END(s, ret)					\
+	if ((ret) == WT_PREPARE_CONFLICT)				\
+		(ret) = WT_ROLLBACK;					\
 	TXN_API_END(s, ret)
 
 #define	ASYNCOP_API_CALL(conn, s, n)					\

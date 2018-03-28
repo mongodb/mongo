@@ -302,6 +302,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_UPDATE *upd;
 	wt_off_t size;
 	uint64_t n, skip;
+	bool valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -421,7 +422,8 @@ random_page_entry:
 	 * the next entry, if that doesn't work, move to the previous entry.
 	 */
 	WT_ERR(__wt_row_random_leaf(session, cbt));
-	if (__wt_cursor_valid(cbt, &upd)) {
+	WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
+	if (valid) {
 		WT_ERR(__wt_key_return(session, cbt));
 		WT_ERR(__wt_value_return(session, cbt, upd));
 	} else {

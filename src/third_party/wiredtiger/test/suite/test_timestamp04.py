@@ -32,6 +32,7 @@
 
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wiredtiger import stat
 from wtscenario import make_scenarios
 
 def timestamp_str(t):
@@ -98,7 +99,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
 
     def ConnectionOpen(self, cacheSize):
         self.home = '.'
-        conn_params = 'create,' + \
+        conn_params = 'create,statistics=(fast),' + \
             cacheSize + ',error_prefix="%s" %s' % (self.shortid(), self.conn_config)
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
@@ -164,6 +165,12 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         stable_ts = timestamp_str(key_range / 2)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
         self.conn.rollback_to_stable()
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        calls = stat_cursor[stat.conn.txn_rollback_to_stable][2]
+        upd_aborted = stat_cursor[stat.conn.txn_rollback_upd_aborted][2]
+        stat_cursor.close()
+        self.assertEqual(calls, 1)
+        self.assertTrue(upd_aborted >= key_range/2)
 
         # Check that we see the inserted value (i.e. 1) for all the keys in
         # non-timestamp tables.
@@ -224,9 +231,20 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         # Scenario: 4
         # Advance the stable_timestamp by a quarter range and rollback.
         # Three-fourths of the later timestamps will be rolled back.
-        stable_ts = timestamp_str(key_range + key_range / 4)
+        rolled_range = key_range + key_range / 4
+        stable_ts = timestamp_str(rolled_range)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
         self.conn.rollback_to_stable()
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        calls = stat_cursor[stat.conn.txn_rollback_to_stable][2]
+        upd_aborted = stat_cursor[stat.conn.txn_rollback_upd_aborted][2]
+        stat_cursor.close()
+        self.assertEqual(calls, 2)
+        #
+        # We rolled back half on the earlier call and now three-quarters on
+        # this call, which is one and one quarter of all keys rolled back.
+        #
+        self.assertTrue(upd_aborted >= rolled_range)
 
         # Check that we see the updated value (i.e. 2) for all the keys in
         # non-timestamped tables.

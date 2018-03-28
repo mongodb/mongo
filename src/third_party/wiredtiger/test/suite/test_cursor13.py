@@ -509,7 +509,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
         swept = end_sweep_stats[3] - begin_sweep_stats[3]
 
         # Although this is subject to tuning parameters, we know that
-        # in an active sesssion, we'll sweep through minimum of 1% of
+        # in an active session, we'll sweep through minimum of 1% of
         # the cached cursors per second.  We've set this test to run
         # 5 rounds. In 2 of the 5 rounds (sandwiched between the others),
         # some of the uris are allowed to close. So during the 'closing rounds'

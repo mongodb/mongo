@@ -42,7 +42,8 @@ proto()
 		-e x \
 	    -e '}' \
 	    -e '# Add the warn_unused_result attribute to any external' \
-	    -e '# functions that return an int.' \
+	    -e '# functions that return a boolean or an int.' \
+	    -e '/^extern bool /s/$/ WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))/' \
 	    -e '/^extern int /s/$/ WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))/' \
 	    -e 's/$/;/' \
 	    -e p < $1

@@ -593,7 +593,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		if (clsm->chunks != NULL && ngood < clsm->nchunks) {
 			close_range_start = ngood;
 			close_range_end = clsm->nchunks;
-		} else if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0 ) {
+		} else if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && nupdates > 0) {
 			close_range_start = 0;
 			close_range_end = WT_MIN(nchunks, clsm->nchunks);
 			if (close_range_end > nupdates)
