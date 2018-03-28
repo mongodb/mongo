@@ -66,6 +66,11 @@ RollbackImpl::Listener kNoopListener;
 // stable timestamp.
 constexpr bool createRollbackFilesDefault = true;
 MONGO_EXPORT_SERVER_PARAMETER(createRollbackDataFiles, bool, createRollbackFilesDefault);
+
+// The name of the insert, update and delete commands as found in oplog command entries.
+constexpr auto kInsertCmdName = "insert"_sd;
+constexpr auto kUpdateCmdName = "update"_sd;
+constexpr auto kDeleteCmdName = "delete"_sd;
 }  // namespace
 
 constexpr const char* RollbackImpl::kRollbackRemoveSaverType;
@@ -113,6 +118,8 @@ RollbackImpl::~RollbackImpl() {
 }
 
 Status RollbackImpl::runRollback(OperationContext* opCtx) {
+    _rollbackStats.startTime = opCtx->getServiceContext()->getFastClockSource()->now();
+
     auto status = _transitionToRollback(opCtx);
     if (!status.isOK()) {
         return status;
@@ -122,6 +129,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // After successfully transitioning to the ROLLBACK state, we must always transition back to
     // SECONDARY, even if we fail at any point during the rollback process.
     ON_BLOCK_EXIT([this, opCtx] { _transitionFromRollbackToSecondary(opCtx); });
+    ON_BLOCK_EXIT([this, opCtx] { _summarizeRollback(opCtx); });
 
     // Wait for all background index builds to complete before starting the rollback process.
     status = _awaitBgIndexCompletion(opCtx);
@@ -130,11 +138,27 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onBgIndexesComplete();
 
+    // Save the latest optime on the branch of history being rolled back (for informational
+    // purposes).
+    {
+        auto localOplogIter = _localOplog->makeIterator();
+        const auto topOfOplog = localOplogIter->next();
+        if (topOfOplog.isOK()) {
+            const auto lastEntryBSON = topOfOplog.getValue().first;
+            const auto lastEntryOptime = OpTime::parseFromOplogEntry(lastEntryBSON);
+            if (lastEntryOptime.isOK()) {
+                _rollbackStats.lastLocalOptime = std::move(lastEntryOptime.getValue());
+            }
+        }
+    }
+
     auto commonPointSW = _findCommonPoint(opCtx);
     if (!commonPointSW.isOK()) {
         return commonPointSW.getStatus();
     }
-    _listener->onCommonPointFound(commonPointSW.getValue().first.getTimestamp());
+    const auto commonPoint = commonPointSW.getValue().first;
+    _rollbackStats.commonPoint = commonPoint;
+    _listener->onCommonPointFound(commonPoint.getTimestamp());
 
     // Increment the Rollback ID of this node. The Rollback ID is a natural number that it is
     // incremented by 1 every time a rollback occurs. Note that the Rollback ID must be incremented
@@ -143,6 +167,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     if (!status.isOK()) {
         return status;
     }
+    _rollbackStats.rollbackId = _replicationProcess->getRollbackID();
 
     // Write a rollback file for each namespace that has documents that would be deleted by
     // rollback.
@@ -156,7 +181,15 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     if (!stableTimestampSW.isOK()) {
         return stableTimestampSW.getStatus();
     }
+    _rollbackStats.stableTimestamp = stableTimestampSW.getValue();
     _listener->onRecoverToStableTimestamp(stableTimestampSW.getValue());
+
+    // Log the total number of insert and update operations that have been rolled back as a result
+    // of recovering to the stable timestamp.
+    log() << "Rollback reverted " << _observerInfo.rollbackCommandCounts[kInsertCmdName]
+          << " insert operations, " << _observerInfo.rollbackCommandCounts[kUpdateCmdName]
+          << " update operations and " << _observerInfo.rollbackCommandCounts[kDeleteCmdName]
+          << " delete operations.";
 
     // During replication recovery, we truncate all oplog entries with timestamps greater than or
     // equal to the oplog truncate after point. As a result, we must find the oplog entry after
@@ -176,6 +209,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // Note that storage engine timestamp recovery only restores the database *data* to a stable
     // timestamp, but does not revert the oplog, which must be done as part of the rollback process.
     _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, truncatePoint);
+    _rollbackStats.truncateTimestamp = truncatePoint;
     _listener->onSetOplogTruncateAfterPoint(truncatePoint);
 
     // Align the drop pending reaper state with what's on disk. Oplog recovery depends on those
@@ -194,12 +228,13 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     // oplog, which should now be at the common point.
     _replicationCoordinator->resetLastOpTimesFromOplog(
         opCtx, ReplicationCoordinator::DataConsistency::Consistent);
-
     status = _triggerOpObserver(opCtx);
     if (!status.isOK()) {
         return status;
     }
     _listener->onRollbackOpObserver(_observerInfo);
+
+    log() << "Rollback complete";
 
     return Status::OK();
 }
@@ -350,6 +385,8 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
  * structures.
  */
 Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
+    ++_observerInfo.numberOfEntriesObserved;
+
     NamespaceString opNss = oplogEntry.getNamespace();
     OpTypeEnum opType = oplogEntry.getOpType();
 
@@ -396,13 +433,17 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
     // a rollback file.
     if (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate) {
         const auto uuid = oplogEntry.getUuid();
-        dassert(uuid);
+        invariant(uuid,
+                  str::stream() << "Oplog entry to roll back is unexpectedly missing a UUID: "
+                                << redact(oplogEntry.toBSON()));
         const auto idElem = oplogEntry.getIdElement();
         if (!idElem.eoo()) {
             // We call BSONElement::wrap() on each _id element to create a new BSONObj with an owned
             // buffer, as the underlying storage may be gone when we access this map to write
             // rollback files.
             _observerInfo.rollbackDeletedIdsMap[uuid.get()].insert(idElem.wrap());
+            const auto cmdName = opType == OpTypeEnum::kInsert ? kInsertCmdName : kUpdateCmdName;
+            ++_observerInfo.rollbackCommandCounts[cmdName];
         }
     }
 
@@ -416,6 +457,14 @@ Status RollbackImpl::_processRollbackOp(const OplogEntry& oplogEntry) {
             warning() << "Shard identity document rollback detected. oplog op: "
                       << oplogEntry.toBSON();
         }
+    }
+
+    // Keep count of major commands that will be rolled back.
+    if (opType == OpTypeEnum::kCommand) {
+        ++_observerInfo.rollbackCommandCounts[oplogEntry.getObject().firstElementFieldName()];
+    }
+    if (opType == OpTypeEnum::kDelete) {
+        ++_observerInfo.rollbackCommandCounts[kDeleteCmdName];
     }
 
     return Status::OK();
@@ -549,7 +598,32 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
                                                   const SimpleBSONObjUnorderedSet& idSet) {
     Helpers::RemoveSaver removeSaver(kRollbackRemoveSaverType, nss.ns(), kRollbackRemoveSaverWhy);
     log() << "Preparing to write deleted documents to a rollback file for collection " << nss.ns()
-          << " with uuid " << uuid.toString() << " to " << removeSaver.fileName();
+          << " with uuid " << uuid.toString() << " to " << removeSaver.file().generic_string();
+
+    // The RemoveSaver will save the data files in a directory structure similar to the following:
+    //
+    //     rollback
+    //     ├── db.collection
+    //     │   └── removed.2018-03-20T20-23-01.21.bson
+    //     ├── otherdb.othercollection
+    //     │   ├── removed.2018-03-20T20-23-01.18.bson
+    //     │   └── removed.2018-03-20T20-23-01.19.bson
+    //
+    // If this is the first data directory created, we save the full directory path in
+    // _rollbackStats. Otherwise, we store the longest common prefix of the two directories.
+    const auto& newDirectoryPath = removeSaver.root().generic_string();
+    if (!_rollbackStats.rollbackDataFileDirectory) {
+        _rollbackStats.rollbackDataFileDirectory = newDirectoryPath;
+    } else {
+        const auto& existingDirectoryPath = *_rollbackStats.rollbackDataFileDirectory;
+        const auto& prefixEnd = std::mismatch(newDirectoryPath.begin(),
+                                              newDirectoryPath.end(),
+                                              existingDirectoryPath.begin(),
+                                              existingDirectoryPath.end())
+                                    .first;
+        _rollbackStats.rollbackDataFileDirectory = std::string(newDirectoryPath.begin(), prefixEnd);
+    }
+
     for (auto&& id : idSet) {
         // StorageInterface::findById() does not respect the collation, but because we are using
         // exact _id fields recorded in the oplog, we can get away with binary string
@@ -632,5 +706,46 @@ void RollbackImpl::_resetDropPendingState(OperationContext* opCtx) {
     }
 }
 
+void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
+    log() << "Rollback summary:";
+    log() << "\tstart time: " << _rollbackStats.startTime;
+    log() << "\tend time: " << opCtx->getServiceContext()->getFastClockSource()->now();
+    log() << "\tsync source: " << _remoteOplog->toString();
+    log() << "\trollback data file directory: "
+          << _rollbackStats.rollbackDataFileDirectory.value_or("none; no files written");
+    if (_rollbackStats.rollbackId) {
+        log() << "\trollback id: " << *_rollbackStats.rollbackId;
+    }
+    if (_rollbackStats.lastLocalOptime) {
+        log() << "\tlast optime on branch of history rolled back: "
+              << *_rollbackStats.lastLocalOptime;
+    }
+    if (_rollbackStats.commonPoint) {
+        log() << "\tcommon point: " << *_rollbackStats.commonPoint;
+    }
+    if (_rollbackStats.truncateTimestamp) {
+        log() << "\ttruncate timestamp: " << *_rollbackStats.truncateTimestamp;
+    }
+    if (_rollbackStats.stableTimestamp) {
+        log() << "\tstable timestamp: " << *_rollbackStats.stableTimestamp;
+    }
+    log() << "\tshard identity rolled back: " << std::boolalpha
+          << _observerInfo.shardIdentityRolledBack;
+    log() << "\taffected sessions: " << (_observerInfo.rollbackSessionIds.empty() ? "none" : "");
+    for (const auto& sessionId : _observerInfo.rollbackSessionIds) {
+        log() << "\t\t" << sessionId;
+    }
+    log() << "\taffected namespaces: " << (_observerInfo.rollbackNamespaces.empty() ? "none" : "");
+    for (const auto& nss : _observerInfo.rollbackNamespaces) {
+        log() << "\t\t" << nss.ns();
+    }
+    log() << "\tcounts of interesting commands rolled back: "
+          << (_observerInfo.rollbackCommandCounts.empty() ? "none" : "");
+    for (const auto& entry : _observerInfo.rollbackCommandCounts) {
+        log() << "\t\t" << entry.first << ": " << entry.second;
+    }
+    log() << "\ttotal number of entries rolled back (including no-ops): "
+          << _observerInfo.numberOfEntriesObserved;
+}
 }  // namespace repl
 }  // namespace mongo
