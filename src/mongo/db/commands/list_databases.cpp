@@ -114,7 +114,7 @@ public:
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         {
-            Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::max());
+            Lock::GlobalLock lk(opCtx, MODE_IS);
             storageEngine->listDatabases(&dbNames);
         }
 

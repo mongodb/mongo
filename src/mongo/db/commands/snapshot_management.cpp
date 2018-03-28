@@ -77,7 +77,7 @@ public:
                                                        {ErrorCodes::CommandNotSupported, ""});
         }
 
-        Lock::GlobalLock lk(opCtx, MODE_IX, Date_t::max());
+        Lock::GlobalLock lk(opCtx, MODE_IX);
 
         const auto name =
             repl::ReplicationCoordinator::get(opCtx)->getMinimumVisibleSnapshot(opCtx);
@@ -123,7 +123,7 @@ public:
                                                        {ErrorCodes::CommandNotSupported, ""});
         }
 
-        Lock::GlobalLock lk(opCtx, MODE_IX, Date_t::max());
+        Lock::GlobalLock lk(opCtx, MODE_IX);
         auto timestamp = Timestamp(cmdObj.firstElement().Long());
         snapshotManager->setCommittedSnapshot(timestamp);
         return true;

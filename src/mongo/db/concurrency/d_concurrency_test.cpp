@@ -440,21 +440,27 @@ TEST_F(DConcurrencyTestFixture,
 TEST_F(DConcurrencyTestFixture, GlobalLockS_Timeout) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
-    Lock::GlobalLock globalWrite(clients[0].second.get(), MODE_X, Date_t::now());
+    Lock::GlobalLock globalWrite(
+        clients[0].second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(globalWrite.isLocked());
 
-    Lock::GlobalLock globalReadTry(
-        clients[1].second.get(), MODE_S, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock globalReadTry(clients[1].second.get(),
+                                   MODE_S,
+                                   Date_t::now() + Milliseconds(1),
+                                   Lock::InterruptBehavior::kThrow);
     ASSERT(!globalReadTry.isLocked());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockX_Timeout) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
-    Lock::GlobalLock globalWrite(clients[0].second.get(), MODE_X, Date_t::now());
+    Lock::GlobalLock globalWrite(
+        clients[0].second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(globalWrite.isLocked());
 
-    Lock::GlobalLock globalWriteTry(
-        clients[1].second.get(), MODE_X, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock globalWriteTry(clients[1].second.get(),
+                                    MODE_X,
+                                    Date_t::now() + Milliseconds(1),
+                                    Lock::InterruptBehavior::kThrow);
     ASSERT(!globalWriteTry.isLocked());
 }
 
@@ -464,7 +470,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockXSetsGlobalLockTakenOnOperationContext
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
 
     {
-        Lock::GlobalLock globalWrite(opCtx, MODE_X, Date_t::now());
+        Lock::GlobalLock globalWrite(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
     ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
@@ -475,7 +481,8 @@ TEST_F(DConcurrencyTestFixture, GlobalLockIXSetsGlobalLockTakenOnOperationContex
     auto opCtx = clients[0].second.get();
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
     {
-        Lock::GlobalLock globalWrite(opCtx, MODE_IX, Date_t::now());
+        Lock::GlobalLock globalWrite(
+            opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalWrite.isLocked());
     }
     ASSERT_TRUE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
@@ -486,7 +493,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockSDoesNotSetGlobalLockTakenOnOperationC
     auto opCtx = clients[0].second.get();
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
     {
-        Lock::GlobalLock globalRead(opCtx, MODE_S, Date_t::now());
+        Lock::GlobalLock globalRead(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
@@ -497,7 +504,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockISDoesNotSetGlobalLockTakenOnOperation
     auto opCtx = clients[0].second.get();
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
     {
-        Lock::GlobalLock globalRead(opCtx, MODE_IS, Date_t::now());
+        Lock::GlobalLock globalRead(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(globalRead.isLocked());
     }
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
@@ -525,13 +532,15 @@ TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalLockTakenWhenLockAcqu
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
     // Take a global lock so that the next one times out.
-    Lock::GlobalLock globalWrite0(clients[0].second.get(), MODE_X, Date_t::now());
+    Lock::GlobalLock globalWrite0(
+        clients[0].second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(globalWrite0.isLocked());
 
     auto opCtx = clients[1].second.get();
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
     {
-        Lock::GlobalLock globalWrite1(opCtx, MODE_X, Date_t::now() + Milliseconds(1));
+        Lock::GlobalLock globalWrite1(
+            opCtx, MODE_X, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kThrow);
         ASSERT_FALSE(globalWrite1.isLocked());
     }
     ASSERT_FALSE(GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken());
@@ -541,8 +550,10 @@ TEST_F(DConcurrencyTestFixture, GlobalLockS_NoTimeoutDueToGlobalLockS) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
     Lock::GlobalRead globalRead(clients[0].second.get());
-    Lock::GlobalLock globalReadTry(
-        clients[1].second.get(), MODE_S, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock globalReadTry(clients[1].second.get(),
+                                   MODE_S,
+                                   Date_t::now() + Milliseconds(1),
+                                   Lock::InterruptBehavior::kThrow);
 
     ASSERT(globalReadTry.isLocked());
 }
@@ -551,8 +562,10 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_TimeoutDueToGlobalLockS) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
     Lock::GlobalRead globalRead(clients[0].second.get());
-    Lock::GlobalLock globalWriteTry(
-        clients[1].second.get(), MODE_X, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock globalWriteTry(clients[1].second.get(),
+                                    MODE_X,
+                                    Date_t::now() + Milliseconds(1),
+                                    Lock::InterruptBehavior::kThrow);
 
     ASSERT(!globalWriteTry.isLocked());
 }
@@ -561,8 +574,10 @@ TEST_F(DConcurrencyTestFixture, GlobalLockS_TimeoutDueToGlobalLockX) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
     Lock::GlobalWrite globalWrite(clients[0].second.get());
-    Lock::GlobalLock globalReadTry(
-        clients[1].second.get(), MODE_S, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock globalReadTry(clients[1].second.get(),
+                                   MODE_S,
+                                   Date_t::now() + Milliseconds(1),
+                                   Lock::InterruptBehavior::kThrow);
 
     ASSERT(!globalReadTry.isLocked());
 }
@@ -571,8 +586,10 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_TimeoutDueToGlobalLockX) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
     Lock::GlobalWrite globalWrite(clients[0].second.get());
-    Lock::GlobalLock globalWriteTry(
-        clients[1].second.get(), MODE_X, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock globalWriteTry(clients[1].second.get(),
+                                    MODE_X,
+                                    Date_t::now() + Milliseconds(1),
+                                    Lock::InterruptBehavior::kThrow);
 
     ASSERT(!globalWriteTry.isLocked());
 }
@@ -614,11 +631,11 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
 
     // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
     // to acquire a conflicting lock.
-    Lock::GlobalLock GlobalLock(opCtx1, MODE_X, Date_t::max());
+    Lock::GlobalLock GlobalLock(opCtx1, MODE_X);
 
     auto result = runTaskAndKill(opCtx2, [&]() {
         // Killing the lock wait should throw an exception.
-        Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
+        Lock::GlobalLock g(opCtx2, MODE_S);
     });
 
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
@@ -632,16 +649,83 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleMMAP) {
 
     // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
     // to acquire a conflicting lock.
-    Lock::GlobalLock GlobalLock(opCtx1, MODE_X, Date_t::max());
+    Lock::GlobalLock GlobalLock(opCtx1, MODE_X);
 
     // This thread attemps to acquire a conflicting lock, which will block until the first
     // unlocks.
     auto result = runTaskAndKill(opCtx2, [&]() {
         // Killing the lock wait should throw an exception.
-        Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
+        Lock::GlobalLock g(opCtx2, MODE_S);
     });
 
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitNotInterruptedWithLeaveUnlockedBehavior) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::GlobalLock g1(opCtx1, MODE_X);
+    // Acquire this later to confirm that it stays unlocked.
+    boost::optional<Lock::GlobalLock> g2 = boost::none;
+
+    // Killing the lock wait should not interrupt it, but rather leave it lock unlocked.
+    auto result = runTaskAndKill(opCtx2, [&]() {
+        g2.emplace(opCtx2, MODE_S, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
+    });
+    ASSERT(g1.isLocked());
+    ASSERT(g2 != boost::none);
+    ASSERT(!g2->isLocked());
+
+    // Should not throw an exception.
+    result.get();
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockEnqueueOnlyNotInterruptedWithLeaveUnlockedBehavior) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+
+    // Kill the operation before acquiring the uncontested lock.
+    {
+        stdx::lock_guard<Client> clientLock(*opCtx1->getClient());
+        opCtx1->markKilled();
+    }
+    // This should not throw or acquire the lock.
+    Lock::GlobalLock g1(opCtx1,
+                        MODE_S,
+                        Date_t::max(),
+                        Lock::InterruptBehavior::kLeaveUnlocked,
+                        Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!g1.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitForLockUntilNotInterruptedWithLeaveUnlockedBehavior) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::GlobalLock g1(opCtx1, MODE_X);
+    // Enqueue now so waitForLockUntil can be interrupted.
+    Lock::GlobalLock g2(opCtx2,
+                        MODE_S,
+                        Date_t::max(),
+                        Lock::InterruptBehavior::kLeaveUnlocked,
+                        Lock::GlobalLock::EnqueueOnly());
+
+    ASSERT(g1.isLocked());
+    ASSERT(!g2.isLocked());
+
+    // Killing the lock wait should not interrupt it, but rather leave it lock unlocked.
+    auto result = runTaskAndKill(opCtx2, [&]() { g2.waitForLockUntil(Date_t::max()); });
+
+    ASSERT(!g2.isLocked());
+    // Should not throw an exception.
+    result.get();
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptible) {
@@ -668,13 +752,13 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptibleWithLockGuard) {
     auto opCtx2 = clients[1].second.get();
     // The main thread takes an exclusive lock, causing the spawned thread wait when it attempts to
     // acquire a conflicting lock.
-    boost::optional<Lock::GlobalLock> globalLock = Lock::GlobalLock(opCtx1, MODE_X, Date_t::max());
+    boost::optional<Lock::GlobalLock> globalLock = Lock::GlobalLock(opCtx1, MODE_X);
 
     // Killing the lock wait should not interrupt it.
     auto result = runTaskAndKill(opCtx2,
                                  [&]() {
                                      UninterruptibleLockGuard noInterrupt(opCtx2->lockState());
-                                     Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
+                                     Lock::GlobalLock g(opCtx2, MODE_S);
                                  },
                                  [&]() { globalLock.reset(); });
     // Should not throw an exception.
@@ -1055,12 +1139,13 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
 
     do {
         // Test that throttling will correctly handle timeouts.
-        Lock::GlobalRead R1(opctx1, Date_t::now());
+        Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(R1.isLocked());
 
         Date_t t1 = Date_t::now();
         {
-            Lock::GlobalRead R2(opctx2, Date_t::now() + timeoutMillis);
+            Lock::GlobalRead R2(
+                opctx2, Date_t::now() + timeoutMillis, Lock::InterruptBehavior::kThrow);
             ASSERT(!R2.isLocked());
         }
         Date_t t2 = Date_t::now();
@@ -1086,10 +1171,10 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
     opctx1->lockState()->setShouldAcquireTicket(false);
 
     // Both locks should be acquired immediately because there is no throttling.
-    Lock::GlobalRead R1(opctx1, Date_t::now());
+    Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R1.isLocked());
 
-    Lock::GlobalRead R2(opctx2, Date_t::now());
+    Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R2.isLocked());
 }
 
@@ -1100,12 +1185,12 @@ TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
     // Limit the locker to 1 ticket at a time.
     UseGlobalThrottling throttle(opctx1, 1);
 
-    Lock::GlobalRead R1(opctx1, Date_t::now());
+    Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R1.isLocked());
 
     {
         // A second Locker should not be able to acquire a ticket.
-        Lock::GlobalRead R2(opctx2, Date_t::now());
+        Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(!R2.isLocked());
     }
 
@@ -1113,7 +1198,7 @@ TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
 
     {
         // Now a second Locker can acquire a ticket.
-        Lock::GlobalRead R2(opctx2, Date_t::now());
+        Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(R2.isLocked());
     }
 
@@ -1121,7 +1206,7 @@ TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
 
     {
         // Now a second Locker cannot acquire a ticket.
-        Lock::GlobalRead R2(opctx2, Date_t::now());
+        Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(!R2.isLocked());
     }
 }
@@ -1130,7 +1215,7 @@ TEST_F(DConcurrencyTestFixture, LockerWithReleasedTicketCanBeUnlocked) {
     auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opctx1 = clientOpctxPairs[0].second.get();
 
-    Lock::GlobalRead R1(opctx1, Date_t::now());
+    Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R1.isLocked());
 
     opctx1->lockState()->releaseTicket();
@@ -1143,7 +1228,7 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanBeInterrupted) {
     UseGlobalThrottling throttle(opctx1, 0);
 
     // This thread should block because it cannot acquire a ticket.
-    auto result = runTaskAndKill(opctx1, [&] { Lock::GlobalRead R2(opctx1, Date_t::max()); });
+    auto result = runTaskAndKill(opctx1, [&] { Lock::GlobalRead R2(opctx1); });
 
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
@@ -1155,19 +1240,19 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
     // Limit the locker to 1 ticket at a time.
     UseGlobalThrottling throttle(opctx1, 1);
 
-    Lock::GlobalRead R1(opctx1, Date_t::now());
+    Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R1.isLocked());
 
     {
         // A second Locker should not be able to acquire a ticket.
-        Lock::GlobalRead R2(opctx2, Date_t::now());
+        Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(!R2.isLocked());
     }
 
     opctx1->lockState()->releaseTicket();
 
     // Now a second Locker can acquire a ticket.
-    Lock::GlobalRead R2(opctx2, Date_t::now());
+    Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(R2.isLocked());
 
     // This thread should block because it cannot acquire a ticket.
@@ -1184,22 +1269,25 @@ TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextThrowsEvenWhenUnco
 
     boost::optional<Lock::GlobalRead> globalReadLock;
     ASSERT_THROWS_CODE(
-        globalReadLock.emplace(opCtx, Date_t::now()), AssertionException, ErrorCodes::Interrupted);
+        globalReadLock.emplace(opCtx, Date_t::now(), Lock::InterruptBehavior::kThrow),
+        AssertionException,
+        ErrorCodes::Interrupted);
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextThrowsEvenAcquiringRecursively) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
     auto opCtx = clients[0].second.get();
 
-    Lock::GlobalWrite globalWriteLock(opCtx, Date_t::now());
+    Lock::GlobalWrite globalWriteLock(opCtx, Date_t::now(), Lock::InterruptBehavior::kThrow);
 
     opCtx->markKilled();
 
     {
         boost::optional<Lock::GlobalWrite> recursiveGlobalWriteLock;
-        ASSERT_THROWS_CODE(recursiveGlobalWriteLock.emplace(opCtx, Date_t::now()),
-                           AssertionException,
-                           ErrorCodes::Interrupted);
+        ASSERT_THROWS_CODE(
+            recursiveGlobalWriteLock.emplace(opCtx, Date_t::now(), Lock::InterruptBehavior::kThrow),
+            AssertionException,
+            ErrorCodes::Interrupted);
     }
 }
 
@@ -1210,7 +1298,8 @@ TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextRespectsUninterrup
     opCtx->markKilled();
 
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    Lock::GlobalRead globalReadLock(opCtx, Date_t::now());  // Does not throw.
+    Lock::GlobalRead globalReadLock(
+        opCtx, Date_t::now(), Lock::InterruptBehavior::kThrow);  // Does not throw.
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockInInterruptedContextThrowsEvenWhenUncontested) {
@@ -1275,7 +1364,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeoutDueToGlobalLock) {
 
     const Milliseconds timeoutMillis = Milliseconds(1500);
 
-    Lock::GlobalLock G1(opctx1, MODE_X, Date_t::max());
+    Lock::GlobalLock G1(opctx1, MODE_X);
     ASSERT(G1.isLocked());
 
     Date_t t1 = Date_t::now();
@@ -1317,11 +1406,15 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
     // Build a queue of MODE_S <- MODE_X <- MODE_IS, with MODE_S granted.
     Lock::GlobalRead lockS(opctx1);
     ASSERT(lockS.isLocked());
-    Lock::GlobalLock lockX(opctx2, MODE_X, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock lockX(opctx2,
+                           MODE_X,
+                           Date_t::max(),
+                           Lock::InterruptBehavior::kThrow,
+                           Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockX.isLocked());
 
     // A MODE_IS should be granted due to compatibleFirst policy.
-    Lock::GlobalLock lockIS(opctx3, MODE_IS, Date_t::now());
+    Lock::GlobalLock lockIS(opctx3, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(lockIS.isLocked());
 
     lockX.waitForLockUntil(Date_t::now());
@@ -1341,11 +1434,23 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
     lockX.emplace(opctx1);
     ASSERT(lockX->isLocked());
     boost::optional<Lock::GlobalLock> lockS;
-    lockS.emplace(opctx2, MODE_S, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    lockS.emplace(opctx2,
+                  MODE_S,
+                  Date_t::max(),
+                  Lock::InterruptBehavior::kThrow,
+                  Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockS->isLocked());
-    Lock::GlobalLock lockIX(opctx3, MODE_IX, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock lockIX(opctx3,
+                            MODE_IX,
+                            Date_t::max(),
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockIX.isLocked());
-    Lock::GlobalLock lockIS(opctx4, MODE_IS, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock lockIS(opctx4,
+                            MODE_IS,
+                            Date_t::max(),
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockIS.isLocked());
 
 
@@ -1378,17 +1483,33 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
     ASSERT(lockXgranted->isLocked());
 
     boost::optional<Lock::GlobalLock> lockX;
-    lockX.emplace(opctx3, MODE_X, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    lockX.emplace(opctx3,
+                  MODE_X,
+                  Date_t::max(),
+                  Lock::InterruptBehavior::kThrow,
+                  Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockX->isLocked());
 
     // Now request MODE_S: it will be first in the pending list due to EnqueueAtFront policy.
     boost::optional<Lock::GlobalLock> lockS;
-    lockS.emplace(opctx2, MODE_S, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    lockS.emplace(opctx2,
+                  MODE_S,
+                  Date_t::max(),
+                  Lock::InterruptBehavior::kThrow,
+                  Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockS->isLocked());
 
-    Lock::GlobalLock lockIX(opctx4, MODE_IX, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock lockIX(opctx4,
+                            MODE_IX,
+                            Date_t::max(),
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockIX.isLocked());
-    Lock::GlobalLock lockIS(opctx5, MODE_IS, Date_t::max(), Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock lockIS(opctx5,
+                            MODE_IS,
+                            Date_t::max(),
+                            Lock::InterruptBehavior::kThrow,
+                            Lock::GlobalLock::EnqueueOnly());
     ASSERT(!lockIS.isLocked());
 
 
@@ -1437,7 +1558,8 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
         OperationContext* opCtx = clientOpctxPairs[0].second.get();
         for (int iters = 0; (t.micros() < endTime); iters++) {
             busyWait(0, iters % 20);
-            Lock::GlobalRead readLock(opCtx, Date_t::now() + Milliseconds(iters % 2));
+            Lock::GlobalRead readLock(
+                opCtx, Date_t::now() + Milliseconds(iters % 2), Lock::InterruptBehavior::kThrow);
             if (!readLock.isLocked()) {
                 timeoutCount[0]++;
                 continue;
@@ -1470,6 +1592,7 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
                         lock.emplace(opCtx,
                                      iters % 20 ? MODE_IS : MODE_S,
                                      Date_t::now(),
+                                     Lock::InterruptBehavior::kThrow,
                                      Lock::GlobalLock::EnqueueOnly());
                         // If thread 0 is holding the MODE_S lock while we tried to acquire a
                         // MODE_IS or MODE_S lock, the CompatibleFirst policy guarantees success.
@@ -1480,18 +1603,25 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
                     }
                     case 5:
                         busyWait(threadId, iters % 150);
-                        lock.emplace(opCtx, MODE_X, Date_t::now() + Milliseconds(iters % 2));
+                        lock.emplace(opCtx,
+                                     MODE_X,
+                                     Date_t::now() + Milliseconds(iters % 2),
+                                     Lock::InterruptBehavior::kThrow);
                         busyWait(threadId, iters % 10);
                         break;
                     case 6:
                         lock.emplace(opCtx,
                                      iters % 25 ? MODE_IX : MODE_S,
-                                     Date_t::now() + Milliseconds(iters % 2));
+                                     Date_t::now() + Milliseconds(iters % 2),
+                                     Lock::InterruptBehavior::kThrow);
                         busyWait(threadId, iters % 100);
                         break;
                     case 7:
                         busyWait(threadId, iters % 100);
-                        lock.emplace(opCtx, iters % 20 ? MODE_IS : MODE_X, Date_t::now());
+                        lock.emplace(opCtx,
+                                     iters % 20 ? MODE_IS : MODE_X,
+                                     Date_t::now(),
+                                     Lock::InterruptBehavior::kThrow);
                         break;
                     default:
                         MONGO_UNREACHABLE;
@@ -1534,12 +1664,12 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnit
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     {
-        Lock::GlobalLock gw1(opCtx, MODE_IS, Date_t::now());
+        Lock::GlobalLock gw1(opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(gw1.isLocked());
         ASSERT(recovUnitBorrowed->activeTransaction);
 
         {
-            Lock::GlobalLock gw2(opCtx, MODE_S, Date_t::now());
+            Lock::GlobalLock gw2(opCtx, MODE_S, Date_t::now(), Lock::InterruptBehavior::kThrow);
             ASSERT(gw2.isLocked());
             ASSERT(recovUnitBorrowed->activeTransaction);
         }
@@ -1560,12 +1690,12 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
     opCtx->lockState()->beginWriteUnitOfWork();
 
     {
-        Lock::GlobalLock gw1(opCtx, MODE_IX, Date_t::now());
+        Lock::GlobalLock gw1(opCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(gw1.isLocked());
         ASSERT(recovUnitBorrowed->activeTransaction);
 
         {
-            Lock::GlobalLock gw2(opCtx, MODE_X, Date_t::now());
+            Lock::GlobalLock gw2(opCtx, MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
             ASSERT(gw2.isLocked());
             ASSERT(recovUnitBorrowed->activeTransaction);
         }

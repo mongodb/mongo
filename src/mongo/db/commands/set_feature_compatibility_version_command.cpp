@@ -167,7 +167,7 @@ public:
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before upgrade procedures begin right after
                 //     this.
-                Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
+                Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
             // Upgrade shards before config finishes its upgrade.
@@ -249,7 +249,7 @@ public:
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before downgrade procedures begin right after
                 //     this.
-                Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
+                Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
             // Downgrade shards before config finishes its downgrade.

@@ -627,7 +627,7 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
 
     // Take a lock. This is expected in order to stash resources.
-    Lock::GlobalRead lk(opCtx(), Date_t::now());
+    Lock::GlobalRead lk(opCtx(), Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(lk.isLocked());
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
@@ -679,7 +679,7 @@ TEST_F(SessionTest, ReportStashedResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
 
     // Take a lock. This is expected in order to stash resources.
-    Lock::GlobalRead lk(opCtx(), Date_t::now());
+    Lock::GlobalRead lk(opCtx(), Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(lk.isLocked());
 
     // Build a BSONObj containing the details which we expect to see reported when we call
@@ -762,7 +762,7 @@ TEST_F(SessionTest, AutocommitRequiredOnEveryTxnOp) {
     // We must have stashed transaction resources to do a second operation on the transaction.
     session.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
 
     // Autocommit should be set to false
@@ -864,7 +864,7 @@ TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
     session.addTransactionOperation(opCtx(), operation);
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
     // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
 
     // Check the transaction operations before re-opening the transaction.
@@ -891,7 +891,7 @@ TEST_F(SessionTest, AbortClearsStoredStatements) {
     session.addTransactionOperation(opCtx(), operation);
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
     // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
     session.abortArbitraryTransaction(opCtx(), kKillCursors);
     ASSERT_TRUE(session.transactionOperationsForTest().empty());
@@ -913,7 +913,7 @@ TEST_F(SessionTest, EmptyTransactionCommit) {
     session.beginOrContinueTxn(opCtx(), txnNum, false, true);
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
-    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now());
+    Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
     session.commitTransaction(opCtx());
     session.stashTransactionResources(opCtx());
     ASSERT_TRUE(session.transactionIsCommitted());
@@ -934,7 +934,7 @@ TEST_F(SessionTest, EmptyTransactionAbort) {
     session.beginOrContinueTxn(opCtx(), txnNum, false, true);
     session.unstashTransactionResources(opCtx(), "abortTransaction");
     // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     session.stashTransactionResources(opCtx());
     session.abortArbitraryTransaction(opCtx(), kKillCursors);
     ASSERT_TRUE(session.transactionIsAborted());
@@ -975,7 +975,7 @@ TEST_F(SessionTest, ConcurrencyOfUnstashAndMigration) {
 
     session.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
-    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     session.addTransactionOperation(opCtx(), operation);
     session.stashTransactionResources(opCtx());

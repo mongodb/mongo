@@ -136,18 +136,23 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
-Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, Date_t deadline)
-    : GlobalLock(opCtx, lockMode, deadline, EnqueueOnly()) {
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
+                             LockMode lockMode,
+                             Date_t deadline,
+                             InterruptBehavior behavior)
+    : GlobalLock(opCtx, lockMode, deadline, behavior, EnqueueOnly()) {
     waitForLockUntil(deadline);
 }
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
                              Date_t deadline,
+                             InterruptBehavior behavior,
                              EnqueueOnly enqueueOnly)
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode),
+      _interruptBehavior(behavior),
       _isOutermostLock(!opCtx->lockState()->isLocked()) {
     _enqueue(lockMode, deadline);
 }
@@ -156,26 +161,40 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
     : _opCtx(otherLock._opCtx),
       _result(otherLock._result),
       _pbwm(std::move(otherLock._pbwm)),
+      _interruptBehavior(otherLock._interruptBehavior),
       _isOutermostLock(otherLock._isOutermostLock) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
     otherLock._result = LOCK_INVALID;
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
-    if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-        _pbwm.lock(MODE_IS);
-    }
+    try {
+        if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+            _pbwm.lock(MODE_IS);
+        }
 
-    _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
+        _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        // The kLeaveUnlocked behavior suppresses this exception.
+        if (_interruptBehavior == InterruptBehavior::kThrow)
+            throw;
+    }
 }
 
 void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
-    if (_result == LOCK_WAITING) {
-        _result = _opCtx->lockState()->lockGlobalComplete(_opCtx, deadline);
-    }
+    try {
+        if (_result == LOCK_WAITING) {
+            _result = _opCtx->lockState()->lockGlobalComplete(_opCtx, deadline);
+        }
 
-    if (_result != LOCK_OK && _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-        _pbwm.unlock();
+        if (_result != LOCK_OK &&
+            _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
+            _pbwm.unlock();
+        }
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        // The kLeaveUnlocked behavior suppresses this exception.
+        if (_interruptBehavior == InterruptBehavior::kThrow)
+            throw;
     }
 
     if (_opCtx->lockState()->isWriteLocked()) {
@@ -193,7 +212,8 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Date
       _opCtx(opCtx),
       _result(LOCK_INVALID),
       _mode(mode),
-      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, deadline) {
+      _globalLock(
+          opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, deadline, InterruptBehavior::kThrow) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
     if (!_globalLock.isLocked())

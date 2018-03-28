@@ -82,7 +82,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadline) {
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
-    Lock::GlobalLock gLock1(client1.second.get(), MODE_X, Date_t::now());
+    Lock::GlobalLock gLock1(
+        client1.second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(gLock1.isLocked());
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs); },
@@ -150,7 +151,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
-    Lock::GlobalLock gLock1(client1.second.get(), MODE_X, Date_t::now());
+    Lock::GlobalLock gLock1(
+        client1.second.get(), MODE_X, Date_t::now(), Lock::InterruptBehavior::kThrow);
     ASSERT(client1.second->lockState()->isLocked());
     failsWithLockTimeout(
         [&] {

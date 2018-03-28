@@ -561,7 +561,7 @@ void addCollectionUUIDs(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
     StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
     {
-        Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::max());
+        Lock::GlobalLock lk(opCtx, MODE_IS);
         storageEngine->listDatabases(&dbNames);
     }
 

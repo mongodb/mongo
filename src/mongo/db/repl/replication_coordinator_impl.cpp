@@ -1606,8 +1606,11 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         return {ErrorCodes::NotMaster, "not primary so can't step down"};
     }
 
-    auto globalLock = stdx::make_unique<Lock::GlobalLock>(
-        opCtx, MODE_X, stepDownUntil, Lock::GlobalLock::EnqueueOnly());
+    auto globalLock = stdx::make_unique<Lock::GlobalLock>(opCtx,
+                                                          MODE_X,
+                                                          stepDownUntil,
+                                                          Lock::InterruptBehavior::kThrow,
+                                                          Lock::GlobalLock::EnqueueOnly());
 
     // We've requested the global exclusive lock which will stop new operations from coming in,
     // but existing operations could take a long time to finish, so kill all user operations
@@ -1718,7 +1721,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 // to acquire it now.  For the same reason, we also disable lock acquisition
                 // interruption, to guarantee that we get the lock eventually.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                globalLock.reset(new Lock::GlobalLock(opCtx, MODE_X, Date_t::max()));
+                globalLock.reset(new Lock::GlobalLock(opCtx, MODE_X));
                 invariant(globalLock->isLocked());
                 lk.lock();
             });

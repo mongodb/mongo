@@ -167,6 +167,15 @@ public:
     };
 
     /**
+     * The interrupt behavior is used to tell a lock how to handle an interrupted lock acquisition.
+     */
+    enum class InterruptBehavior {
+        kThrow,         // Throw the interruption exception.
+        kLeaveUnlocked  // Suppress the exception, but leave unlocked such that a call to isLocked()
+                        // returns false.
+    };
+
+    /**
      * Global lock.
      *
      * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
@@ -180,7 +189,21 @@ public:
     public:
         class EnqueueOnly {};
 
-        GlobalLock(OperationContext* opCtx, LockMode lockMode, Date_t deadline);
+        /**
+         * A GlobalLock without a deadline defaults to Date_t::max() and an InterruptBehavior of
+         * kThrow.
+         */
+        GlobalLock(OperationContext* opCtx, LockMode lockMode)
+            : GlobalLock(opCtx, lockMode, Date_t::max(), InterruptBehavior::kThrow) {}
+
+        /**
+         * A GlobalLock with a deadline requires the interrupt behavior to be explicitly defined.
+         */
+        GlobalLock(OperationContext* opCtx,
+                   LockMode lockMode,
+                   Date_t deadline,
+                   InterruptBehavior behavior);
+
         GlobalLock(GlobalLock&&);
 
         /**
@@ -193,6 +216,7 @@ public:
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
                    Date_t deadline,
+                   InterruptBehavior behavior,
                    EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
@@ -226,6 +250,7 @@ public:
         OperationContext* const _opCtx;
         LockResult _result;
         ResourceLock _pbwm;
+        InterruptBehavior _interruptBehavior;
         const bool _isOutermostLock;
     };
 
@@ -238,8 +263,10 @@ public:
      */
     class GlobalWrite : public GlobalLock {
     public:
-        explicit GlobalWrite(OperationContext* opCtx, Date_t deadline = Date_t::max())
-            : GlobalLock(opCtx, MODE_X, deadline) {
+        explicit GlobalWrite(OperationContext* opCtx)
+            : GlobalWrite(opCtx, Date_t::max(), InterruptBehavior::kThrow) {}
+        explicit GlobalWrite(OperationContext* opCtx, Date_t deadline, InterruptBehavior behavior)
+            : GlobalLock(opCtx, MODE_X, deadline, behavior) {
             if (isLocked()) {
                 opCtx->lockState()->lockMMAPV1Flush();
             }
@@ -255,8 +282,10 @@ public:
      */
     class GlobalRead : public GlobalLock {
     public:
-        explicit GlobalRead(OperationContext* opCtx, Date_t deadline = Date_t::max())
-            : GlobalLock(opCtx, MODE_S, deadline) {
+        explicit GlobalRead(OperationContext* opCtx)
+            : GlobalRead(opCtx, Date_t::max(), InterruptBehavior::kThrow) {}
+        explicit GlobalRead(OperationContext* opCtx, Date_t deadline, InterruptBehavior behavior)
+            : GlobalLock(opCtx, MODE_S, deadline, behavior) {
             if (isLocked()) {
                 opCtx->lockState()->lockMMAPV1Flush();
             }
