@@ -32,6 +32,14 @@
         "parallelCollectionScan",
     ]);
 
+    const kCommandsOnlySupportingReadConcernSnapshot = new Set([
+        "delete",
+        "findAndModify",
+        "findandmodify",
+        "insert",
+        "update",
+    ]);
+
     const kCommandsSupportingWriteConcern = new Set([
         "_configsvrAddShard",
         "_configsvrAddShardToZone",
@@ -148,6 +156,11 @@
         } else if (OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
             // A writeConcern can only be used with non-inline output.
             shouldForceWriteConcern = false;
+        }
+
+        if (kCommandsOnlySupportingReadConcernSnapshot.has(commandName) &&
+            kDefaultReadConcern.level === "snapshot") {
+            shouldForceReadConcern = true;
         }
 
         const inWrappedForm = commandObj !== commandObjUnwrapped;
