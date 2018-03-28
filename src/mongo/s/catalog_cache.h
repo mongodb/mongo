@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
@@ -167,14 +168,8 @@ private:
      * Cache entry describing a database.
      */
     struct DatabaseInfoEntry {
-        ShardId primaryShardId;
-
-        bool shardingEnabled;
-
         StringMap<CollectionRoutingInfoEntry> collections;
-
-        // Optional while featureCompatibilityVersion 3.6 is supported.
-        boost::optional<DatabaseVersion> databaseVersion;
+        DatabaseType dbt;
     };
 
     using DatabaseInfoMap = StringMap<std::shared_ptr<DatabaseInfoEntry>>;
@@ -256,16 +251,13 @@ public:
     };
 
     bool shardingEnabled() const;
-
     boost::optional<DatabaseVersion> databaseVersion() const;
 
 private:
     friend class CatalogCache;
+    CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard);
 
-    CachedDatabaseInfo(std::shared_ptr<CatalogCache::DatabaseInfoEntry> db,
-                       std::shared_ptr<Shard> primaryShard);
-
-    std::shared_ptr<CatalogCache::DatabaseInfoEntry> _db;
+    DatabaseType _dbt;
     std::shared_ptr<Shard> _primaryShard;
 };
 

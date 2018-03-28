@@ -123,8 +123,8 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
     try {
         auto dbEntry = _getDatabase(opCtx, dbName);
         auto primaryShard = uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId));
-        return {CachedDatabaseInfo(std::move(dbEntry), std::move(primaryShard))};
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()));
+        return {CachedDatabaseInfo(dbEntry->dbt, std::move(primaryShard))};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -158,9 +158,9 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
         if (it == collections.end()) {
             return {CachedCollectionRoutingInfo(
                 nss,
-                {dbEntry,
-                 uassertStatusOK(
-                     Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId))},
+                {dbEntry->dbt,
+                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                     opCtx, dbEntry->dbt.getPrimary()))},
                 nullptr)};
         }
 
@@ -206,9 +206,9 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
 
         return {CachedCollectionRoutingInfo(
             nss,
-            {dbEntry,
+            {dbEntry->dbt,
              uassertStatusOK(
-                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId))},
+                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()))},
             std::move(cm))};
     }
 }
@@ -347,11 +347,8 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
         collectionEntries[coll.getNs().ns()].needsRefresh = true;
     }
 
-    return _databases[dbName] =
-               std::make_shared<DatabaseInfoEntry>(DatabaseInfoEntry{dbDesc.getPrimary(),
-                                                                     dbDesc.getSharded(),
-                                                                     std::move(collectionEntries),
-                                                                     dbDesc.getVersion()});
+    return _databases[dbName] = std::make_shared<DatabaseInfoEntry>(
+               DatabaseInfoEntry{std::move(collectionEntries), std::move(dbDesc)});
 }
 
 void CatalogCache::_scheduleCollectionRefresh(
@@ -487,20 +484,19 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
     builder->append("countFailedRefreshes", countFailedRefreshes.load());
 }
 
-CachedDatabaseInfo::CachedDatabaseInfo(std::shared_ptr<CatalogCache::DatabaseInfoEntry> db,
-                                       std::shared_ptr<Shard> primaryShard)
-    : _db(std::move(db)), _primaryShard(std::move(primaryShard)) {}
+CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard)
+    : _dbt(std::move(dbt)), _primaryShard(std::move(primaryShard)) {}
 
 const ShardId& CachedDatabaseInfo::primaryId() const {
-    return _db->primaryShardId;
+    return _dbt.getPrimary();
 }
 
 bool CachedDatabaseInfo::shardingEnabled() const {
-    return _db->shardingEnabled;
+    return _dbt.getSharded();
 }
 
 boost::optional<DatabaseVersion> CachedDatabaseInfo::databaseVersion() const {
-    return _db->databaseVersion;
+    return _dbt.getVersion();
 }
 
 CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(NamespaceString nss,
