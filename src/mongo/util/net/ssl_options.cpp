@@ -383,6 +383,15 @@ Status storeSSLServerOptions(const moe::Environment& params) {
 
         // Map the tokens to their enum values, and push them onto the list of disabled protocols.
         for (const std::string& token : tokens) {
+            if (token == "none") {
+                // Allow overriding the default behavior below of implicitly disabling TLS 1.0.
+                if (tokens.size() != 1) {
+                    return {ErrorCodes::BadValue,
+                            "'none' may not be specified with other values to disabledProtocols"};
+                }
+                break;
+            }
+
             auto mappedToken = validConfigs.find(token);
             if (mappedToken != validConfigs.end()) {
                 sslGlobalParams.sslDisabledProtocols.push_back(mappedToken->second);
@@ -391,6 +400,20 @@ Status storeSSLServerOptions(const moe::Environment& params) {
                               "Unrecognized disabledProtocols '" + token + "'");
             }
         }
+
+#if !defined(__APPLE__) && ((MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
+                            (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
+    } else {
+        /* Disable TLS 1.0 by default on non-Apple platforms
+         * except on mongod/mongos which were built with an
+         * old version of OpenSSL (pre 1.0.0l)
+         * which does not support TLS 1.1 or later.
+         * TL;DR - Pretty much any Linux/Windows build.
+         */
+        log() << "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "
+                 "specify --sslDisabledProtocols 'none'";
+        sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_0);
+#endif
     }
 
     if (params.count("net.ssl.weakCertificateValidation")) {
@@ -438,7 +461,7 @@ Status storeSSLServerOptions(const moe::Environment& params) {
         bool usingCertifiateSelectors = params.count("net.ssl.certificateSelector");
         if (sslGlobalParams.sslPEMKeyFile.size() == 0 && !usingCertifiateSelectors) {
             return Status(ErrorCodes::BadValue,
-                          "need sslPEMKeyFileor certificateSelector when SSL is enabled");
+                          "need sslPEMKeyFile or certificateSelector when SSL is enabled");
         }
         if (!sslGlobalParams.sslCRLFile.empty() && sslGlobalParams.sslCAFile.empty()) {
             return Status(ErrorCodes::BadValue, "need sslCAFile with sslCRLFile");
@@ -459,7 +482,7 @@ Status storeSSLServerOptions(const moe::Environment& params) {
                sslGlobalParams.sslClusterFile.size() || sslGlobalParams.sslClusterPassword.size() ||
                sslGlobalParams.sslCAFile.size() || sslGlobalParams.sslCRLFile.size() ||
                sslGlobalParams.sslCipherConfig.size() ||
-               sslGlobalParams.sslDisabledProtocols.size() ||
+               params.count("net.ssl.disabledProtocols") ||
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
                params.count("net.ssl.certificateSelector") ||
                params.count("net.ssl.clusterCertificateSelector") ||

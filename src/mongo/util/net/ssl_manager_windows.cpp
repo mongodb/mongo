@@ -1267,6 +1267,10 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }
 
     cred->grbitEnabledProtocols = supportedProtocols;
+    if (supportedProtocols == 0) {
+        return {ErrorCodes::InvalidSSLConfiguration,
+                "All supported TLS protocols have been disabled."};
+    }
 
     if (!params.sslCipherConfig.empty()) {
         warning()
