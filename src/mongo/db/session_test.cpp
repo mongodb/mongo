@@ -38,9 +38,11 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace {
@@ -617,6 +619,77 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT_EQUALS(originalLocker, opCtx()->lockState());
     ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
     ASSERT(opCtx()->getWriteUnitOfWork());
+
+    // Commit the transaction. This allows us to release locks.
+    session.commitTransaction(opCtx());
+}
+
+TEST_F(SessionTest, ReportStashedResources) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 20;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+
+    ASSERT(opCtx()->lockState());
+    ASSERT(opCtx()->recoveryUnit());
+
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    // Perform initial unstash which sets up a WriteUnitOfWork.
+    session.unstashTransactionResources(opCtx());
+    ASSERT(opCtx()->getWriteUnitOfWork());
+
+    // Take a lock. This is expected in order to stash resources.
+    Lock::GlobalRead lk(opCtx(), Date_t::now());
+    ASSERT(lk.isLocked());
+
+    // Build a BSONObj containing the details which we expect to see reported when we call
+    // Session::reportStashedState.
+    const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
+    ASSERT(lockerInfo);
+
+    auto reportBuilder =
+        std::move(BSONObjBuilder() << "host" << getHostNameCachedAndPort() << "desc"
+                                   << "inactive transaction"
+                                   << "lsid"
+                                   << sessionId.toBSON()
+                                   << "txnNumber"
+                                   << txnNum
+                                   << "waitingForLock"
+                                   << false
+                                   << "active"
+                                   << false);
+    fillLockerInfo(*lockerInfo, reportBuilder);
+
+    // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
+    opCtx()->setStashedCursor();
+    session.stashTransactionResources(opCtx());
+    ASSERT(!opCtx()->getWriteUnitOfWork());
+
+    // Verify that the Session's report of its own stashed state aligns with our expectations.
+    ASSERT_BSONOBJ_EQ(session.reportStashedState(), reportBuilder.obj());
+
+    // Unset the read concern on the OperationContext. This is needed to unstash.
+    repl::ReadConcernArgs::get(opCtx()) = repl::ReadConcernArgs();
+
+    // Unstash the stashed resources. This restores the original Locker and RecoveryUnit to the
+    // OperationContext.
+    session.unstashTransactionResources(opCtx());
+    ASSERT(opCtx()->getWriteUnitOfWork());
+
+    // With the resources unstashed, verify that the Session reports an empty stashed state.
+    ASSERT(session.reportStashedState().isEmpty());
 
     // Commit the transaction. This allows us to release locks.
     session.commitTransaction(opCtx());

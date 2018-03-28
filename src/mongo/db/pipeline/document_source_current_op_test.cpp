@@ -67,6 +67,7 @@ public:
 
     std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
                                        CurrentOpConnectionsMode connMode,
+                                       CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode) const {
         return _ops;

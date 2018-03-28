@@ -37,6 +37,7 @@ namespace mongo {
 namespace {
 const StringData kAllUsersFieldName = "allUsers"_sd;
 const StringData kIdleConnectionsFieldName = "idleConnections"_sd;
+const StringData kIdleSessionsFieldName = "idleSessions"_sd;
 const StringData kLocalOpsFieldName = "localOps"_sd;
 const StringData kTruncateOpsFieldName = "truncateOps"_sd;
 
@@ -108,8 +109,11 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_ops.empty()) {
-        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(
-            pExpCtx->opCtx, _includeIdleConnections, _includeOpsFromAllUsers, _truncateOps);
+        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(pExpCtx->opCtx,
+                                                             _includeIdleConnections,
+                                                             _includeIdleSessions,
+                                                             _includeOpsFromAllUsers,
+                                                             _truncateOps);
 
         _opsIter = _ops.begin();
 
@@ -180,6 +184,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
             nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
 
     ConnMode includeIdleConnections = ConnMode::kExcludeIdle;
+    SessionMode includeIdleSessions = SessionMode::kIncludeIdle;
     UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers;
     LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode truncateOps = TruncationMode::kNoTruncation;
@@ -195,6 +200,15 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                     elem.type() == BSONType::Bool);
             includeIdleConnections =
                 (elem.boolean() ? ConnMode::kIncludeIdle : ConnMode::kExcludeIdle);
+        } else if (fieldName == kIdleSessionsFieldName) {
+            uassert(
+                ErrorCodes::FailedToParse,
+                str::stream() << "The 'idleSessions' parameter of the $currentOp stage must be a "
+                                 "boolean value, but found: "
+                              << typeName(elem.type()),
+                elem.type() == BSONType::Bool);
+            includeIdleSessions =
+                (elem.boolean() ? SessionMode::kIncludeIdle : SessionMode::kExcludeIdle);
         } else if (fieldName == kAllUsersFieldName) {
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << "The 'allUsers' parameter of the $currentOp stage must be a "
@@ -226,18 +240,27 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
         }
     }
 
-    return new DocumentSourceCurrentOp(
-        pExpCtx, includeIdleConnections, includeOpsFromAllUsers, showLocalOpsOnMongoS, truncateOps);
+    return new DocumentSourceCurrentOp(pExpCtx,
+                                       includeIdleConnections,
+                                       includeIdleSessions,
+                                       includeOpsFromAllUsers,
+                                       showLocalOpsOnMongoS,
+                                       truncateOps);
 }
 
 intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     ConnMode includeIdleConnections,
+    SessionMode includeIdleSessions,
     UserMode includeOpsFromAllUsers,
     LocalOpsMode showLocalOpsOnMongoS,
     TruncationMode truncateOps) {
-    return new DocumentSourceCurrentOp(
-        pExpCtx, includeIdleConnections, includeOpsFromAllUsers, showLocalOpsOnMongoS, truncateOps);
+    return new DocumentSourceCurrentOp(pExpCtx,
+                                       includeIdleConnections,
+                                       includeIdleSessions,
+                                       includeOpsFromAllUsers,
+                                       showLocalOpsOnMongoS,
+                                       truncateOps);
 }
 
 Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -245,6 +268,8 @@ Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosi
         {getSourceName(),
          Document{{kIdleConnectionsFieldName,
                    _includeIdleConnections == ConnMode::kIncludeIdle ? Value(true) : Value()},
+                  {kIdleSessionsFieldName,
+                   _includeIdleSessions == SessionMode::kExcludeIdle ? Value(false) : Value()},
                   {kAllUsersFieldName,
                    _includeOpsFromAllUsers == UserMode::kIncludeAll ? Value(true) : Value()},
                   {kLocalOpsFieldName,

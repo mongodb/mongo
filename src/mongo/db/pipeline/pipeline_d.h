@@ -115,6 +115,10 @@ public:
                                           Client* client,
                                           CurrentOpTruncateMode truncateOps) const final;
 
+        void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                              CurrentOpUserMode userMode,
+                                              std::vector<BSONObj>* ops) const final;
+
     private:
         /**
          * Looks up the collection default collator for the collection given by 'collectionUUID'. A

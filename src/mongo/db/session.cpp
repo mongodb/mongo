@@ -44,12 +44,14 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/retryable_writes_stats.h"
+#include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace {
@@ -803,6 +805,32 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     committed = true;
     lk.lock();
     _txnState = MultiDocumentTransactionState::kCommitted;
+}
+
+BSONObj Session::reportStashedState() const {
+    BSONObjBuilder builder;
+    reportStashedState(&builder);
+    return builder.obj();
+}
+
+void Session::reportStashedState(BSONObjBuilder* builder) const {
+    stdx::lock_guard<stdx::mutex> ls(_mutex);
+
+    if (_txnResourceStash && _txnResourceStash->locker()) {
+        if (auto lockerInfo = _txnResourceStash->locker()->getLockerInfo()) {
+            invariant(_activeTxnNumber != kUninitializedTxnNumber);
+            builder->append("host", getHostNameCachedAndPort());
+            builder->append("desc", "inactive transaction");
+            {
+                BSONObjBuilder lsid(builder->subobjStart("lsid"));
+                getSessionId().serialize(&lsid);
+            }
+            builder->append("txnNumber", _activeTxnNumber);
+            builder->append("waitingForLock", false);
+            builder->append("active", false);
+            fillLockerInfo(*lockerInfo, *builder);
+        }
+    }
 }
 
 void Session::_checkValid(WithLock) const {

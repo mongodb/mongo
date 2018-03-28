@@ -120,6 +120,20 @@ KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
     return kasbp;
 }
 
+KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationContext* opCtx) {
+    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+    KillAllSessionsByPatternSet patterns;
+
+    for (auto it = authSession->getAuthenticatedUserNames(); it.more(); it.next()) {
+        if (auto user = authSession->lookupUser(*it)) {
+            KillAllSessionsByPattern pattern;
+            pattern.setUid(user->getDigest());
+            patterns.emplace(std::move(pattern));
+        }
+    }
+    return patterns;
+}
+
 KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
                                                       const LogicalSessionId& lsid) {
     KillAllSessionsByPattern kasbp = makeKillAllSessionsByPattern(opCtx);

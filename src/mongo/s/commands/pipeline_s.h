@@ -139,6 +139,13 @@ public:
         BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                           Client* client,
                                           CurrentOpTruncateMode truncateOps) const final;
+
+        void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                              CurrentOpUserMode userMode,
+                                              std::vector<BSONObj>* ops) const final {
+            // This implementation is a no-op, since mongoS does not maintain a SessionCatalog or
+            // hold stashed locks for idle sessions.
+        }
     };
 
 private:

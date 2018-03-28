@@ -77,6 +77,13 @@ public:
         TxnResources& operator=(TxnResources&&) = default;
 
         /**
+         * Returns a const pointer to the stashed lock state, or nullptr if no stashed locks exist.
+         */
+        const Locker* locker() const {
+            return _locker.get();
+        }
+
+        /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          */
         void release(OperationContext* opCtx);
@@ -299,6 +306,18 @@ public:
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _activeTxnNumber;
     }
+
+    /**
+     * If this session is holding stashed locks in _txnResourceStash, reports the current state of
+     * the session using the provided builder. Locks the session object's mutex while running.
+     */
+    void reportStashedState(BSONObjBuilder* builder) const;
+
+    /**
+     * Convenience method which creates and populates a BSONObj containing the stashed state.
+     * Returns an empty BSONObj if this session has no stashed resources.
+     */
+    BSONObj reportStashedState() const;
 
     /**
      * Scan through the list of operations and add new oplog entries for updating

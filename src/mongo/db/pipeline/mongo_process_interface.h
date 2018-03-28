@@ -63,6 +63,7 @@ public:
     enum class CurrentOpUserMode { kIncludeAll, kExcludeOthers };
     enum class CurrentOpTruncateMode { kNoTruncation, kTruncateOps };
     enum class CurrentOpLocalOpsMode { kLocalMongosOps, kRemoteShardOps };
+    enum class CurrentOpSessionsMode { kIncludeIdle, kExcludeIdle };
 
     struct MakePipelineOptions {
         MakePipelineOptions(){};
@@ -172,6 +173,7 @@ public:
      */
     virtual std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
                                                CurrentOpConnectionsMode connMode,
+                                               CurrentOpSessionsMode sessionMode,
                                                CurrentOpUserMode userMode,
                                                CurrentOpTruncateMode) const = 0;
 

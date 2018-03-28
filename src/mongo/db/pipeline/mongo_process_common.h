@@ -45,6 +45,7 @@ public:
 
     std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
                                        CurrentOpConnectionsMode connMode,
+                                       CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode) const final;
 
@@ -57,6 +58,14 @@ protected:
     virtual BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                               Client* client,
                                               CurrentOpTruncateMode truncateOps) const = 0;
+
+    /**
+     * Iterates through all entries in the local SessionCatalog, and adds an entry to the 'ops'
+     * vector for each idle session that has stashed its transaction locks while sleeping.
+     */
+    virtual void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                                  CurrentOpUserMode userMode,
+                                                  std::vector<BSONObj>* ops) const = 0;
 };
 
 }  // namespace mongo

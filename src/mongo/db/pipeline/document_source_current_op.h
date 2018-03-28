@@ -37,6 +37,7 @@ public:
     using TruncationMode = MongoProcessInterface::CurrentOpTruncateMode;
     using ConnMode = MongoProcessInterface::CurrentOpConnectionsMode;
     using LocalOpsMode = MongoProcessInterface::CurrentOpLocalOpsMode;
+    using SessionMode = MongoProcessInterface::CurrentOpSessionsMode;
     using UserMode = MongoProcessInterface::CurrentOpUserMode;
 
     static constexpr StringData kStageName = "$currentOp"_sd;
@@ -95,6 +96,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
+        SessionMode includeIdleSessions = SessionMode::kIncludeIdle,
         UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
         LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
         TruncationMode truncateOps = TruncationMode::kNoTruncation);
@@ -125,17 +127,20 @@ public:
 
 private:
     DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                            ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
-                            UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
-                            LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
-                            TruncationMode truncateOps = TruncationMode::kNoTruncation)
+                            ConnMode includeIdleConnections,
+                            SessionMode includeIdleSessions,
+                            UserMode includeOpsFromAllUsers,
+                            LocalOpsMode showLocalOpsOnMongoS,
+                            TruncationMode truncateOps)
         : DocumentSource(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
+          _includeIdleSessions(includeIdleSessions),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
           _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _truncateOps(truncateOps) {}
 
     ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
+    SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;
     UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
     LocalOpsMode _showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
     TruncationMode _truncateOps = TruncationMode::kNoTruncation;

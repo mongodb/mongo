@@ -40,6 +40,7 @@ namespace mongo {
 
 std::vector<BSONObj> MongoProcessCommon::getCurrentOps(OperationContext* opCtx,
                                                        CurrentOpConnectionsMode connMode,
+                                                       CurrentOpSessionsMode sessionMode,
                                                        CurrentOpUserMode userMode,
                                                        CurrentOpTruncateMode truncateMode) const {
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
@@ -66,6 +67,11 @@ std::vector<BSONObj> MongoProcessCommon::getCurrentOps(OperationContext* opCtx,
 
         // Delegate to the mongoD- or mongoS-specific implementation of _reportCurrentOpForClient.
         ops.emplace_back(_reportCurrentOpForClient(opCtx, client, truncateMode));
+    }
+
+    // If we need to report on idle Sessions, defer to the mongoD or mongoS implementations.
+    if (sessionMode == CurrentOpSessionsMode::kIncludeIdle) {
+        _reportCurrentOpsForIdleSessions(opCtx, userMode, &ops);
     }
 
     return ops;

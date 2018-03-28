@@ -260,9 +260,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
             infoBuilder->append("killPending", true);
         }
 
-        if (clientOpCtx->getLogicalSessionId()) {
+        if (auto lsid = clientOpCtx->getLogicalSessionId()) {
             BSONObjBuilder bob(infoBuilder->subobjStart("lsid"));
-            clientOpCtx->getLogicalSessionId()->serialize(&bob);
+            lsid->serialize(&bob);
+        }
+
+        if (auto txnNumber = clientOpCtx->getTxnNumber()) {
+            infoBuilder->append("txnNumber", *txnNumber);
         }
 
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);

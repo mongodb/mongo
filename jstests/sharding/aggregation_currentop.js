@@ -54,6 +54,7 @@
     let clusterTestDB = mongosConn.getDB(jsTestName());
     let clusterAdminDB = mongosConn.getDB("admin");
     shardConn.waitForClusterTime(60);
+    let shardTestDB = shardConn.getDB(jsTestName());
     let shardAdminDB = shardConn.getDB("admin");
 
     function createUsers(conn) {
@@ -70,11 +71,14 @@
             privileges: [{resource: {cluster: true}, actions: ["inprog"]}]
         }));
 
-        assert.commandWorked(
-            adminDB.runCommand({createUser: "user_inprog", pwd: "pwd", roles: ["role_inprog"]}));
+        assert.commandWorked(adminDB.runCommand({
+            createUser: "user_inprog",
+            pwd: "pwd",
+            roles: ["readWriteAnyDatabase", "role_inprog"]
+        }));
 
         assert.commandWorked(adminDB.runCommand(
-            {createUser: "user_no_inprog", pwd: "pwd", roles: ["readAnyDatabase"]}));
+            {createUser: "user_no_inprog", pwd: "pwd", roles: ["readWriteAnyDatabase"]}));
     }
 
     // Create necessary users at both cluster and shard-local level.
@@ -115,6 +119,7 @@
         shardRS = st.rs0;
         clusterTestDB = mongosConn.getDB(jsTestName());
         clusterAdminDB = mongosConn.getDB("admin");
+        shardTestDB = shardConn.getDB(jsTestName());
         shardAdminDB = shardConn.getDB("admin");
     }
 
@@ -602,6 +607,95 @@
     runLocalOpsTests(shardConn);
 
     //
+    // Stashed transactions tests.
+    //
+
+    // Test that $currentOp will display stashed transaction locks if 'idleSessions' is true, and
+    // will only permit a user to view other users' sessions if the caller possesses the 'inprog'
+    // privilege and 'allUsers' is true.
+    const userNames = ["user_inprog", "admin", "user_no_inprog"];
+    const sessionDBs = [];
+    const sessions = [];
+
+    // Returns a set of predicates that filter $currentOp for all stashed transactions.
+    function sessionFilter() {
+        return {
+            active: false,
+            opid: {$exists: false},
+            desc: "inactive transaction",
+            "lsid.id": {$in: sessions.map((session) => session.getSessionId().id)},
+            txnNumber: {$gte: 0, $lt: sessions.length}
+        };
+    }
+
+    for (let i in userNames) {
+        shardAdminDB.logout();
+        assert(shardAdminDB.auth(userNames[i], "pwd"));
+
+        // Create a session for this user.
+        const session = shardAdminDB.getMongo().startSession();
+
+        // For each session, start but do not complete a transaction.
+        const sessionDB = session.getDatabase(shardTestDB.getName());
+        assert.commandWorked(sessionDB.runCommand({
+            insert: "test",
+            documents: [{_id: `txn-insert-${userNames[i]}-${i}`}],
+            readConcern: {level: "snapshot"},
+            txnNumber: NumberLong(i),
+            startTransaction: true,
+            autocommit: false
+        }));
+        sessionDBs.push(sessionDB);
+        sessions.push(session);
+
+        // Use $currentOp to confirm that the incomplete transactions have stashed their locks while
+        // inactive, and that each user can only view their own sessions with 'allUsers:false'.
+        assert.eq(shardAdminDB
+                      .aggregate([
+                          {$currentOp: {allUsers: false, idleSessions: true}},
+                          {$match: sessionFilter()}
+                      ])
+                      .itcount(),
+                  1);
+    }
+
+    // Log in as 'user_no_inprog' to verify that the user cannot view other users' sessions via
+    // 'allUsers:true'.
+    shardAdminDB.logout();
+    assert(shardAdminDB.auth("user_no_inprog", "pwd"));
+
+    assert.commandFailedWithCode(shardAdminDB.runCommand({
+        aggregate: 1,
+        cursor: {},
+        pipeline: [{$currentOp: {allUsers: true, idleSessions: true}}, {$match: sessionFilter()}]
+    }),
+                                 ErrorCodes.Unauthorized);
+
+    // Log in as 'user_inprog' to confirm that a user with the 'inprog' privilege can see all three
+    // stashed transactions with 'allUsers:true'.
+    shardAdminDB.logout();
+    assert(shardAdminDB.auth("user_inprog", "pwd"));
+
+    assert.eq(
+        shardAdminDB
+            .aggregate(
+                [{$currentOp: {allUsers: true, idleSessions: true}}, {$match: sessionFilter()}])
+            .itcount(),
+        3);
+
+    // Allow all transactions to complete and close the associated sessions.
+    for (let i in userNames) {
+        assert(shardAdminDB.auth(userNames[i], "pwd"));
+        assert.commandWorked(sessionDBs[i].adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(i),
+            autocommit: false,
+            writeConcern: {w: 'majority'}
+        }));
+        sessions[i].endSession();
+    }
+
+    //
     // No-auth tests.
     //
 
@@ -655,6 +749,7 @@
 
     // Take the replica set out of the cluster.
     shardConn = restartReplSet(st.rs0, {shardsvr: null});
+    shardTestDB = shardConn.getDB(jsTestName());
     shardAdminDB = shardConn.getDB("admin");
 
     // Test that the host field is present and the shard field is absent when run on mongoD.

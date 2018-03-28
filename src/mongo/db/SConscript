@@ -606,6 +606,7 @@ env.Library(
         env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'catalog/collection',
         'catalog/database',
@@ -636,6 +637,7 @@ env.CppUnitTest(
         'catalog/database_holder_mock',
         'catalog_raii',
         'service_context_noop_init',
+        'stats/fill_locker_info',
     ],
 )
 

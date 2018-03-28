@@ -51,6 +51,7 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/kill_sessions.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -72,6 +73,7 @@
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/stats/top.h"
@@ -823,12 +825,35 @@ BSONObj PipelineD::MongoDInterface::_reportCurrentOpForClient(
 
     // Append lock stats before returning.
     if (auto clientOpCtx = client->getOperationContext()) {
-        Locker::LockerInfo lockerInfo;
-        clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
-        fillLockerInfo(lockerInfo, builder);
+        if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo()) {
+            fillLockerInfo(*lockerInfo, builder);
+        }
     }
 
     return builder.obj();
+}
+
+void PipelineD::MongoDInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                                                  CurrentOpUserMode userMode,
+                                                                  std::vector<BSONObj>* ops) const {
+    auto sessionCatalog = SessionCatalog::get(opCtx);
+
+    // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers to
+    // create a pattern that will match against all authenticated usernames for the current client.
+    // If the user is listing ops for all users, we create an empty pattern; constructing an
+    // instance of SessionKiller::Matcher with this empty pattern will return all sessions.
+    auto sessionFilter = (userMode == CurrentOpUserMode::kExcludeOthers
+                              ? makeSessionFilterForAuthenticatedUsers(opCtx)
+                              : KillAllSessionsByPatternSet{{}});
+
+    sessionCatalog->scanSessions(opCtx,
+                                 {std::move(sessionFilter)},
+                                 [&](OperationContext* opCtx, Session* session) {
+                                     auto op = session->reportStashedState();
+                                     if (!op.isEmpty()) {
+                                         ops->emplace_back(op);
+                                     }
+                                 });
 }
 
 std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(
