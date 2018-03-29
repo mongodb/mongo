@@ -48,11 +48,15 @@ public:
      */
     using GetConnectionFn = stdx::function<DBClientBase*()>;
 
-    OplogInterfaceRemote(GetConnectionFn getConnection, const std::string& collectionName);
+    OplogInterfaceRemote(HostAndPort hostAndPort,
+                         GetConnectionFn getConnection,
+                         const std::string& collectionName);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+    HostAndPort hostAndPort() const override;
 
 private:
+    HostAndPort _hostAndPort;
     GetConnectionFn _getConnection;
     std::string _collectionName;
 };

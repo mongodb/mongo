@@ -35,6 +35,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 namespace repl {
@@ -97,6 +98,10 @@ std::string OplogInterfaceLocal::toString() const {
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {
     return std::unique_ptr<OplogInterface::Iterator>(
         new OplogIteratorLocal(_opCtx, _collectionName));
+}
+
+HostAndPort OplogInterfaceLocal::hostAndPort() const {
+    return {getHostNameCached(), serverGlobalParams.port};
 }
 
 }  // namespace repl

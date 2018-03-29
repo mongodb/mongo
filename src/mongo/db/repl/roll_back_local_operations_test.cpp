@@ -58,6 +58,9 @@ TEST(RollBackLocalOperationsTest, InvalidLocalOplogIterator) {
         std::unique_ptr<Iterator> makeIterator() const override {
             return std::unique_ptr<Iterator>();
         }
+        HostAndPort hostAndPort() const override {
+            return {};
+        }
     } invalidOplog;
     ASSERT_THROWS_CODE(
         RollBackLocalOperations(invalidOplog, [](const BSONObj&) { return Status::OK(); }),

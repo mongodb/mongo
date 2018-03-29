@@ -647,7 +647,8 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     StorageInterface* storageInterface,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
 
-    OplogInterfaceRemote remoteOplog(getConnection, NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceRemote remoteOplog(
+        source, getConnection, NamespaceString::kRsOplogNamespace.ns());
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
