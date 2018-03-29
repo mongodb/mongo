@@ -10,7 +10,7 @@ import os.path
 from . import jsfile
 
 
-class CheckReplOplogs(jsfile.JSHook):
+class CheckReplOplogs(jsfile.DataConsistencyHook):
     """
     Checks that local.oplog.rs matches on the primary and secondaries.
     """

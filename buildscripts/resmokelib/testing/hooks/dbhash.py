@@ -9,7 +9,7 @@ import os.path
 from . import jsfile
 
 
-class CheckReplDBHash(jsfile.JSHook):
+class CheckReplDBHash(jsfile.DataConsistencyHook):
     """
     Checks that the dbhashes of all non-local databases and non-replicated system collections
     match on the primary and secondaries.

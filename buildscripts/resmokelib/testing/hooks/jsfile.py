@@ -7,10 +7,13 @@ from __future__ import absolute_import
 
 from . import interface
 from ..testcases import jstest
+from ... import errors
 from ...utils import registry
 
 
 class JSHook(interface.Hook):
+    """A hook with a static JavaScript file to execute."""
+
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
@@ -21,7 +24,7 @@ class JSHook(interface.Hook):
     def _should_run_after_test(self):  # pylint: disable=no-self-use
         """
         Callback that can be overrided by subclasses to indicate if the JavaScript file should be
-         executed after the current test.
+        executed after the current test.
         """
         return True
 
@@ -33,6 +36,23 @@ class JSHook(interface.Hook):
             self.logger.test_case_logger, test, self, self._js_filename, self._shell_options)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
+
+
+class DataConsistencyHook(JSHook):
+    """
+    A hook for running a static JavaScript file that checks data consistency of the server.
+
+    If the mongo shell process running the JavaScript file exits with a non-zero return code, then
+    an errors.ServerFailure exception is raised to cause resmoke.py's test execution to stop.
+    """
+
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED
+
+    def after_test(self, test, test_report):
+        try:
+            JSHook.after_test(self, test, test_report)
+        except errors.TestFailure as err:
+            raise errors.ServerFailure(err.args[0])
 
 
 class DynamicJSTestCase(interface.DynamicTestCase):

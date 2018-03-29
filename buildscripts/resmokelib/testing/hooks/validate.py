@@ -10,7 +10,7 @@ import os.path
 from . import jsfile
 
 
-class ValidateCollections(jsfile.JSHook):
+class ValidateCollections(jsfile.DataConsistencyHook):
     """
     Runs full validation on all collections in all databases on every stand-alone
     node, primary replica-set node, or primary shard node.
