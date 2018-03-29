@@ -376,38 +376,10 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
         ExceptionFor<ErrorCodes::InvalidNamespace>);
 }
 
-TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullOperationContext) {
-    auto writerPool = SyncTail::makeWriterPool();
-    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    SyncTail syncTail(nullptr, noopApplyOperationFn, writerPool.get());
-    auto status = syncTail.multiApply(nullptr, {op}).getStatus();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "invalid operation context");
-}
-
-TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullWriterPool) {
-    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    SyncTail syncTail(nullptr, noopApplyOperationFn, nullptr);
-    auto status = syncTail.multiApply(_opCtx.get(), {op}).getStatus();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "invalid worker pool");
-}
-
-TEST_F(SyncTailTest, MultiApplyReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
+DEATH_TEST_F(SyncTailTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
     auto writerPool = SyncTail::makeWriterPool();
     SyncTail syncTail(nullptr, noopApplyOperationFn, writerPool.get());
-    auto status = syncTail.multiApply(_opCtx.get(), {}).getStatus();
-    ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "no operations provided to multiApply");
-}
-
-TEST_F(SyncTailTest, MultiApplyReturnsBadValueOnNullApplyOperation) {
-    auto writerPool = SyncTail::makeWriterPool();
-    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL});
-    SyncTail syncTail(nullptr, {}, writerPool.get());
-    auto status = syncTail.multiApply(_opCtx.get(), {op}).getStatus();
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "invalid apply operation function");
+    syncTail.multiApply(_opCtx.get(), {}).getStatus().ignore();
 }
 
 bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,

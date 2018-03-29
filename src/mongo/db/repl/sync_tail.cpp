@@ -1303,21 +1303,7 @@ Status multiInitialSyncApply(OperationContext* opCtx,
 }
 
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
-    if (!opCtx) {
-        return {ErrorCodes::BadValue, "invalid operation context"};
-    }
-
-    if (!_writerPool) {
-        return {ErrorCodes::BadValue, "invalid worker pool"};
-    }
-
-    if (ops.empty()) {
-        return {ErrorCodes::EmptyArrayOperation, "no operations provided to multiApply"};
-    }
-
-    if (!_applyFunc) {
-        return {ErrorCodes::BadValue, "invalid apply operation function"};
-    }
+    invariant(!ops.empty());
 
     if (isMMAPV1()) {
         // Use a ThreadPool to prefetch all the operations in a batch.
