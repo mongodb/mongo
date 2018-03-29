@@ -220,6 +220,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.append(ChunkType::min(), controlChunk->getMin());
         n.append(ChunkType::max(), controlChunk->getMax());
         n.append(ChunkType::shard(), fromShard);
+        controlChunk->addHistoryToBSON(n);
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
