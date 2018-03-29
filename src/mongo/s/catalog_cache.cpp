@@ -123,47 +123,51 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
     try {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-        auto itDbEntry = _databases.find(dbName);
-        if (itDbEntry != _databases.end()) {
-            const auto& dbEntry = itDbEntry->second;
-            auto primaryShard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()));
-            return {CachedDatabaseInfo(dbEntry->dbt, std::move(primaryShard))};
+        auto& dbEntry = _databases[dbName];
+        if (!dbEntry) {
+            dbEntry = std::make_shared<DatabaseInfoEntry>();
         }
 
-        const auto catalogClient = Grid::get(opCtx)->catalogClient();
+        if (dbEntry->needsRefresh) {
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
-        const auto dbNameCopy = dbName.toString();
+            const auto dbNameCopy = dbName.toString();
 
-        // Load the database entry
-        const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(
-            opCtx, dbNameCopy, repl::ReadConcernLevel::kMajorityReadConcern));
-        const auto& dbDesc = opTimeWithDb.value;
+            // Load the database entry
+            const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(
+                opCtx, dbNameCopy, repl::ReadConcernLevel::kMajorityReadConcern));
+            const auto& dbDesc = opTimeWithDb.value;
 
-        const auto refreshCallbackFn = [](OperationContext* opCtx, StatusWith<DatabaseType>) {};
-        _cacheLoader.getDatabase(dbName, refreshCallbackFn);
+            if (!dbEntry->dbt) {
+                // If this is the first time we are loading info for this database, also load the
+                // sharded collections.
+                // TODO (SERVER-34061): Stop loading sharded collections here.
+                repl::OpTime collLoadConfigOptime;
+                const std::vector<CollectionType> collections = uassertStatusOK(
+                    catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
 
-        const auto& dbEntry = (_databases[dbName] = std::make_shared<DatabaseInfoEntry>(
-                                   DatabaseInfoEntry{std::move(dbDesc)}));
+                const auto refreshCallbackFn = [](OperationContext* opCtx,
+                                                  StatusWith<DatabaseType>) {};
+                _cacheLoader.getDatabase(dbName, refreshCallbackFn);
 
-        // Load the sharded collections entries
-        // TODO (SERVER-34061): Stop loading sharded collections when loading a database entry.
-        repl::OpTime collLoadConfigOptime;
-        const std::vector<CollectionType> collections = uassertStatusOK(
-            catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
-
-        CollectionInfoMap collectionEntries;
-        for (const auto& coll : collections) {
-            if (coll.getDropped()) {
-                continue;
+                CollectionInfoMap collectionEntries;
+                for (const auto& coll : collections) {
+                    if (coll.getDropped()) {
+                        continue;
+                    }
+                    collectionEntries[coll.getNs().ns()] =
+                        std::make_shared<CollectionRoutingInfoEntry>();
+                }
+                _collectionsByDb[dbName] = std::move(collectionEntries);
             }
-            collectionEntries[coll.getNs().ns()] = std::make_shared<CollectionRoutingInfoEntry>();
+
+            dbEntry->needsRefresh = false;
+            dbEntry->dbt = std::move(dbDesc);
         }
-        _collectionsByDb[dbName] = std::move(collectionEntries);
 
         auto primaryShard = uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()));
-        return {CachedDatabaseInfo(dbEntry->dbt, std::move(primaryShard))};
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt->getPrimary()));
+        return {CachedDatabaseInfo(*dbEntry->dbt, std::move(primaryShard))};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -242,6 +246,12 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
     }
 }
 
+StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
+                                                                    StringData dbName) {
+    invalidateDatabaseEntry(dbName);
+    return getDatabase(opCtx, dbName);
+}
+
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     invalidateShardedCollection(nss);
@@ -297,6 +307,16 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvali
         // longer valid, so trigger a refresh.
         itColl->second->needsRefresh = true;
     }
+}
+
+void CatalogCache::invalidateDatabaseEntry(const StringData dbName) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    auto itDbEntry = _databases.find(dbName);
+    if (itDbEntry == _databases.end()) {
+        // The database was dropped.
+        return;
+    }
+    itDbEntry->second->needsRefresh = true;
 }
 
 void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {

@@ -97,6 +97,12 @@ public:
                                                                      const NamespaceString& nss);
 
     /**
+     * Same as getDatbase above, but in addition forces the database entry to be refreshed.
+     */
+    StatusWith<CachedDatabaseInfo> getDatabaseWithRefresh(OperationContext* opCtx,
+                                                          StringData dbName);
+
+    /**
      * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
      */
     StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
@@ -116,6 +122,12 @@ public:
      * refreshed already.
      */
     void onStaleConfigError(CachedCollectionRoutingInfo&&);
+
+    /**
+     * Non-blocking method, which indiscriminately causes the database entry for the specified
+     * database to be refreshed the next time getDatabase is called.
+     */
+    void invalidateDatabaseEntry(const StringData dbName);
 
     /**
      * Non-blocking method, which indiscriminately causes the routing table for the specified
@@ -165,7 +177,12 @@ private:
      * Cache entry describing a database.
      */
     struct DatabaseInfoEntry {
-        DatabaseType dbt;
+        // Specifies whether this cache entry needs a refresh (in which case 'dbt' will either be
+        // unset if the cache entry has never been loaded, or should not be relied on).
+        bool needsRefresh{true};
+
+        // Contains the cached info about the database (only available if needsRefresh is false)
+        boost::optional<DatabaseType> dbt;
     };
 
     /**
