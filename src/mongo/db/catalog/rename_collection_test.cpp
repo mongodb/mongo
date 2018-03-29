@@ -730,7 +730,7 @@ TEST_F(RenameCollectionTest,
 }
 
 TEST_F(RenameCollectionTest,
-       RenameCollectionRetainsDropTargetIfTargetCollectionIsMissingAndDropTargetIsTrue) {
+       RenameCollectionOverridesDropTargetIfTargetCollectionIsMissingAndDropTargetIsTrue) {
     _createCollectionWithUUID(_opCtx.get(), _sourceNss);
     RenameCollectionOptions options;
     options.dropTarget = true;
@@ -741,7 +741,7 @@ TEST_F(RenameCollectionTest,
                                                              << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
-    ASSERT_TRUE(_opObserver->onRenameCollectionDropTarget);
+    ASSERT_FALSE(_opObserver->onRenameCollectionDropTarget);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWritesAreReplicated) {
