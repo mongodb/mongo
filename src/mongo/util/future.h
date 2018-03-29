@@ -652,6 +652,10 @@ public:
     Future(const Future&) = delete;
     Future& operator=(const Future&) = delete;
 
+    /* implicit */ Future(T val) : Future(makeReady(std::move(val))) {}
+    /* implicit */ Future(Status status) : Future(makeReady(std::move(status))) {}
+    /* implicit */ Future(StatusWith<T> sw) : Future(makeReady(std::move(sw))) {}
+
     /**
      * Make a ready Future<T> from a value for cases where you don't need to wait asynchronously.
      *
@@ -1144,7 +1148,8 @@ class MONGO_WARN_UNUSED_RESULT_CLASS future_details::Future<void> {
 public:
     using value_type = void;
 
-    Future() = default;
+    /* implicit */ Future() : Future(makeReady()) {}
+    /* implicit */ Future(Status status) : Future(makeReady(std::move(status))) {}
 
     static Future<void> makeReady() {
         return Future<FakeVoid>::makeReady(FakeVoid{});

@@ -76,17 +76,72 @@ struct TestOptions : public ServiceExecutorAdaptive::Options {
     }
 };
 
+/* This implements the portions of the transport::Reactor based on ASIO, but leaves out
+ * the methods not needed by ServiceExecutors.
+ *
+ * TODO Maybe use TransportLayerASIO's Reactor?
+ */
+class ASIOReactor : public transport::Reactor {
+public:
+    ASIOReactor() : _ioContext() {}
+
+    void run() noexcept final {
+        MONGO_UNREACHABLE;
+    }
+
+    void runFor(Milliseconds time) noexcept final {
+        asio::io_context::work work(_ioContext);
+
+        try {
+            _ioContext.run_for(time.toSystemDuration());
+        } catch (...) {
+            severe() << "Uncaught exception in reactor: " << exceptionToStatus();
+            fassertFailed(50476);
+        }
+    }
+
+    void stop() final {
+        _ioContext.stop();
+    }
+
+    std::unique_ptr<ReactorTimer> makeTimer() final {
+        MONGO_UNREACHABLE;
+    }
+
+    Date_t now() final {
+        MONGO_UNREACHABLE;
+    }
+
+    void schedule(ScheduleMode mode, Task task) final {
+        if (mode == kDispatch) {
+            _ioContext.dispatch(std::move(task));
+        } else {
+            _ioContext.post(std::move(task));
+        }
+    }
+
+    bool onReactorThread() const final {
+        return false;
+    }
+
+    operator asio::io_context&() {
+        return _ioContext;
+    }
+
+private:
+    asio::io_context _ioContext;
+};
+
 class ServiceExecutorAdaptiveFixture : public unittest::Test {
 protected:
     void setUp() override {
         auto scOwned = stdx::make_unique<ServiceContextNoop>();
         setGlobalServiceContext(std::move(scOwned));
-        asioIOCtx = std::make_shared<asio::io_context>();
 
         auto configOwned = stdx::make_unique<TestOptions>();
         executorConfig = configOwned.get();
         executor = stdx::make_unique<ServiceExecutorAdaptive>(
-            getGlobalServiceContext(), asioIOCtx, std::move(configOwned));
+            getGlobalServiceContext(), std::make_shared<ASIOReactor>(), std::move(configOwned));
     }
 
     ServiceExecutorAdaptive::Options* executorConfig;

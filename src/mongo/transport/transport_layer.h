@@ -28,9 +28,12 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/status.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
@@ -38,6 +41,9 @@ namespace mongo {
 namespace transport {
 
 enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
+
+class Reactor;
+using ReactorHandle = std::shared_ptr<Reactor>;
 
 /**
  * The TransportLayer moves Messages between transport::Endpoints and the database.
@@ -69,10 +75,9 @@ public:
                                               ConnectSSLMode sslMode,
                                               Milliseconds timeout) = 0;
 
-    virtual void asyncConnect(HostAndPort peer,
-                              ConnectSSLMode sslMode,
-                              Milliseconds timeout,
-                              std::function<void(StatusWith<SessionHandle>)> callback) = 0;
+    virtual Future<SessionHandle> asyncConnect(HostAndPort peer,
+                                               ConnectSSLMode sslMode,
+                                               const ReactorHandle& reactor) = 0;
 
     /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active
@@ -95,9 +100,79 @@ public:
      */
     virtual Status setup() = 0;
 
+    enum WhichReactor { kIngress, kEgress, kNewReactor };
+    virtual ReactorHandle getReactor(WhichReactor which) = 0;
+
 protected:
     TransportLayer() = default;
 };
+
+class ReactorTimer {
+public:
+    ReactorTimer() = default;
+    ReactorTimer(const ReactorTimer&) = delete;
+    ReactorTimer& operator=(const ReactorTimer&) = delete;
+
+    virtual ~ReactorTimer() = default;
+
+    /*
+     * Cancel any outstanding calls to waitFor/waitUntil. The future will have
+     * an ErrorCodes::CallbackCancelled status.
+     */
+    virtual void cancel() = 0;
+
+    /*
+     * Returns a future that will be filled with Status::OK after the timeout has
+     * ellapsed or has been cancelled.
+     */
+
+    virtual Future<void> waitFor(Milliseconds timeout) = 0;
+    virtual Future<void> waitUntil(Date_t timeout) = 0;
+};
+
+class Reactor {
+public:
+    Reactor(const Reactor&) = delete;
+    Reactor& operator=(const Reactor&) = delete;
+
+    virtual ~Reactor() = default;
+
+    /*
+     * Run the event loop of the reactor until stop() is called.
+     */
+    virtual void run() noexcept = 0;
+    virtual void runFor(Milliseconds time) noexcept = 0;
+    virtual void stop() = 0;
+
+    using Task = stdx::function<void()>;
+
+    enum ScheduleMode { kDispatch, kPost };
+    virtual void schedule(ScheduleMode mode, Task task) = 0;
+
+    template <typename Callback>
+    Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
+        Promise<FutureContinuationResult<Callback>> promise;
+        auto future = promise.getFuture();
+
+        schedule(kPost,
+                 [ cb = std::forward<Callback>(cb), sp = promise.share() ] { sp.setWith(cb); });
+
+        return future;
+    }
+
+    virtual bool onReactorThread() const = 0;
+
+    /*
+     * Makes a timer tied to this reactor's event loop. Timeout callbacks will be
+     * executed in a thread calling run() or runFor().
+     */
+    virtual std::unique_ptr<ReactorTimer> makeTimer() = 0;
+    virtual Date_t now() = 0;
+
+protected:
+    Reactor() = default;
+};
+
 
 }  // namespace transport
 }  // namespace mongo

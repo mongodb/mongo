@@ -60,6 +60,10 @@ inline Status errorCodeToStatus(const std::error_code& ec) {
     if (!ec)
         return Status::OK();
 
+    if (ec == asio::error::operation_aborted) {
+        return {ErrorCodes::CallbackCanceled, "Callback was canceled"};
+    }
+
 #ifdef _WIN32
     if (ec == asio::error::timed_out) {
 #else

@@ -60,14 +60,15 @@ public:
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
                                       Milliseconds timeout) override;
-    void asyncConnect(HostAndPort peer,
-                      ConnectSSLMode sslMode,
-                      Milliseconds timeout,
-                      std::function<void(StatusWith<SessionHandle>)> callback) override;
+    Future<SessionHandle> asyncConnect(HostAndPort peer,
+                                       ConnectSSLMode sslMode,
+                                       const ReactorHandle& reactor) override;
 
     Status start() override;
     void shutdown() override;
     Status setup() override;
+
+    ReactorHandle getReactor(WhichReactor which) override;
 
     // TODO This method is not called anymore, but may be useful to add new TransportLayers
     // to the manager after it's been created.
@@ -84,6 +85,8 @@ public:
      */
     static std::unique_ptr<TransportLayer> createWithConfig(const ServerGlobalParams* config,
                                                             ServiceContext* ctx);
+
+    static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
 
 private:
     template <typename Callable>

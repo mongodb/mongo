@@ -103,6 +103,8 @@ public:
         return Future<void>::makeReady(sinkMessage(message));
     }
 
+    void cancelAsyncOperations() override {}
+
     void setTimeout(boost::optional<Milliseconds>) override {}
 
     bool isConnected() override {

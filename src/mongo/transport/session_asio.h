@@ -101,7 +101,7 @@ public:
     void end() override {
         if (getSocket().is_open()) {
             std::error_code ec;
-            getSocket().cancel();
+            cancelAsyncOperations();
             getSocket().shutdown(GenericSocket::shutdown_both, ec);
             if ((ec) && (ec != asio::error::not_connected)) {
                 error() << "Error shutting down socket: " << ec.message();
@@ -137,6 +137,11 @@ public:
                 invariant(size == size_t(message.size()));
                 networkCounter.hitPhysicalOut(message.size());
             });
+    }
+
+    void cancelAsyncOperations() override {
+        LOG(3) << "Cancelling outstanding I/O operations on connection to " << _remote;
+        getSocket().cancel();
     }
 
     void setTimeout(boost::optional<Milliseconds> timeout) override {
@@ -180,7 +185,7 @@ protected:
     friend class TransportLayerASIO;
 
 #ifdef MONGO_CONFIG_SSL
-    Future<void> handshakeSSLForEgress(HostAndPort target) {
+    Future<void> handshakeSSLForEgress(const HostAndPort& target) {
         if (!_tl->_egressSSLContext) {
             return Future<void>::makeReady(Status(ErrorCodes::SSLHandshakeFailed,
                                                   "SSL requested but SSL support is disabled"));
@@ -197,7 +202,7 @@ protected:
                 return _sslSocket->async_handshake(asio::ssl::stream_base::client, UseFuture{});
             }
         };
-        return doHandshake().then([ this, target = std::move(target) ] {
+        return doHandshake().then([this, target] {
             _ranHandshake = true;
 
             auto sslManager = getSSLManager();
@@ -371,7 +376,13 @@ private:
 #ifdef MONGO_CONFIG_SSL
         _ranHandshake = true;
         if (_sslSocket) {
-            return opportunisticWrite(*_sslSocket, buffers);
+            if (_blockingMode == Async) {
+                // Opportunistic writes are broken for async egress SSL (switching between blocking
+                // and non-blocking mode corrupts the TLS exchange).
+                return asio::async_write(*_sslSocket, buffers, UseFuture{});
+            } else {
+                return opportunisticWrite(*_sslSocket, buffers);
+            }
         }
 #endif
         return opportunisticWrite(_socket, buffers);

@@ -55,6 +55,7 @@
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -155,6 +156,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     // See above.
     preciseClock->advance(Seconds(1));
     service->setPreciseClockSource(std::move(preciseClock));
+
+    service->setTransportLayer(
+        transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer());
 
     repl::ReplicationCoordinator::set(
         service,

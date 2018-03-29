@@ -114,6 +114,13 @@ public:
     virtual Future<void> asyncSinkMessage(Message message) = 0;
 
     /**
+     * Cancel any outstanding async operations. There is no way to cancel synchronous calls.
+     * Futures will finish with an ErrorCodes::CallbackCancelled error if they haven't already
+     * completed.
+     */
+    virtual void cancelAsyncOperations() = 0;
+
+    /**
     * This should only be used to detect when the remote host has disappeared without
     * notice. It does NOT work correctly for ensuring that operations complete or fail
     * by some deadline.

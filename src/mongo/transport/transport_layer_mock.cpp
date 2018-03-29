@@ -68,10 +68,9 @@ StatusWith<SessionHandle> TransportLayerMock::connect(HostAndPort peer,
     MONGO_UNREACHABLE;
 }
 
-void TransportLayerMock::asyncConnect(HostAndPort peer,
-                                      ConnectSSLMode sslMode,
-                                      Milliseconds timeout,
-                                      std::function<void(StatusWith<SessionHandle>)> callback) {
+Future<SessionHandle> TransportLayerMock::asyncConnect(HostAndPort peer,
+                                                       ConnectSSLMode sslMode,
+                                                       const ReactorHandle& reactor) {
     MONGO_UNREACHABLE;
 }
 
@@ -87,6 +86,10 @@ void TransportLayerMock::shutdown() {
     if (!inShutdown()) {
         _shutdown = true;
     }
+}
+
+ReactorHandle TransportLayerMock::getReactor(WhichReactor which) {
+    return nullptr;
 }
 
 bool TransportLayerMock::inShutdown() const {
