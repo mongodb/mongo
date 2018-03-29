@@ -510,13 +510,15 @@ int SSLManagerWindows::SSL_read(SSLConnectionInterface* connInterface, void* buf
                 // 1. fetch some from the network
                 // 2. give it to ASIO
                 // 3. retry
-                int ret =
-                    recv(conn->socket->rawFD(), reinterpret_cast<char*>(buf), num, portRecvFlags);
+                int ret = recv(conn->socket->rawFD(),
+                               conn->_tempBuffer.data(),
+                               conn->_tempBuffer.size(),
+                               portRecvFlags);
                 if (ret == SOCKET_ERROR) {
                     conn->socket->handleRecvError(ret, num);
                 }
 
-                conn->_engine.put_input(asio::const_buffer(buf, ret));
+                conn->_engine.put_input(asio::const_buffer(conn->_tempBuffer.data(), ret));
 
                 continue;
             }

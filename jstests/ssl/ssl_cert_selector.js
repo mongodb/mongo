@@ -14,13 +14,8 @@ requireSSLProvider('windows', function() {
 
         // Import a pfx file since it contains both a cert and private key and is easy to import
         // via command line.
-        runProgram("certutil.exe",
-                   "-importpfx",
-                   "-f",
-                   "-p",
-                   "foo",
-                   "My",
-                   "jstests\\libs\\trusted-client.pfx");
+        runProgram(
+            "certutil.exe", "-importpfx", "-f", "-p", "foo", "jstests\\libs\\trusted-client.pfx");
     }
 
     const conn = MongoRunner.runMongod(
