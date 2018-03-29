@@ -336,6 +336,17 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='chunk_manager_refresh_bm',
+    source=[
+        'chunk_manager_refresh_bm.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_routing_table',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+    ],
+)
+
 env.CppUnitTest(
     target='sharding_routing_table_test',
     source=[

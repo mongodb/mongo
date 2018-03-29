@@ -2908,6 +2908,16 @@ tasks:
       run_multiple_jobs: false
   - func: "send benchmark results"
 
+- <<: *benchmark_template
+  name: benchmarks_sharding
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchmarks_sharding
+      run_multiple_jobs: false
+  - func: "send benchmark results"
+
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify_WT
   commands:
@@ -6126,6 +6136,7 @@ buildvariants:
   - name: audit
   - name: auth_audit
   - name: benchmarks_orphaned
+  - name: benchmarks_sharding
   - name: dbtest
   - name: ese
   - name: external_auth
@@ -6923,6 +6934,9 @@ buildvariants:
   - name: benchmarks_orphaned
     distros:
     - centos6-perf
+  - name: benchmarks_sharding
+    distros:
+    - centos6-perf
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_passthrough
   - name: causally_consistent_jscore_passthrough_auth
@@ -7221,6 +7235,7 @@ buildvariants:
   - name: auth
   - name: auth_audit
   - name: benchmarks_orphaned
+  - name: benchmarks_sharding
   - name: dbtest
   - name: ese
   - name: jsCore
