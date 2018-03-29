@@ -4335,7 +4335,6 @@ buildvariants:
   - enterprise
   - mongo-tools
   run_on:
-  - rhel71-power8-build
   - rhel71-power8-test
   batchtime: 1440 # 1 day
   stepback: false
