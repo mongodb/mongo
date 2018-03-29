@@ -152,10 +152,8 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
 
         stdx::unique_lock<stdx::mutex> ul(_mutex);
 
-        auto& collections = dbEntry->collections;
-
-        auto it = collections.find(nss.ns());
-        if (it == collections.end()) {
+        const auto itDb = _collectionsByDb.find(nss.db());
+        if (itDb == _collectionsByDb.end()) {
             return {CachedCollectionRoutingInfo(
                 nss,
                 {dbEntry->dbt,
@@ -163,15 +161,23 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
                      opCtx, dbEntry->dbt.getPrimary()))},
                 nullptr)};
         }
+        const auto itColl = itDb->second.find(nss.ns());
+        if (itColl == itDb->second.end()) {
+            return {CachedCollectionRoutingInfo(
+                nss,
+                {dbEntry->dbt,
+                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                     opCtx, dbEntry->dbt.getPrimary()))},
+                nullptr)};
+        }
+        auto& collEntry = itColl->second;
 
-        auto& collEntry = it->second;
-
-        if (collEntry.needsRefresh) {
-            auto refreshNotification = collEntry.refreshCompletionNotification;
+        if (collEntry->needsRefresh) {
+            auto refreshNotification = collEntry->refreshCompletionNotification;
             if (!refreshNotification) {
-                refreshNotification = (collEntry.refreshCompletionNotification =
+                refreshNotification = (collEntry->refreshCompletionNotification =
                                            std::make_shared<Notification<Status>>());
-                _scheduleCollectionRefresh(ul, dbEntry, std::move(collEntry.routingInfo), nss, 1);
+                _scheduleCollectionRefresh(ul, collEntry, nss, 1);
             }
 
             // Wait on the notification outside of the mutex
@@ -202,7 +208,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
             continue;
         }
 
-        auto cm = std::make_shared<ChunkManager>(collEntry.routingInfo, atClusterTime);
+        auto cm = std::make_shared<ChunkManager>(collEntry->routingInfo, atClusterTime);
 
         return {CachedCollectionRoutingInfo(
             nss,
@@ -240,60 +246,60 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvali
     auto ccri(ccriToInvalidate);
 
     if (!ccri._cm) {
-        // Here we received a stale config error for a collection which we previously thought was
-        // unsharded.
+        // We received StaleShardVersion for a collection we thought was unsharded. The collection
+        // must have become sharded.
         invalidateShardedCollection(ccri._nss);
         return;
     }
 
-    // Here we received a stale config error for a collection which we previously though was sharded
+    // We received StaleShardVersion for a collection we thought was sharded. Either a migration
+    // occurred to or from a shard we contacted, or the collection was dropped.
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    auto it = _databases.find(ccri._cm->getns().db());
-    if (it == _databases.end()) {
-        // If the database does not exist, the collection must have been dropped so there is
-        // nothing to invalidate. The getCollectionRoutingInfo will handle the reload of the
-        // entire database and its collections.
+    const auto nss = ccri._cm->getns();
+    const auto itDb = _collectionsByDb.find(nss.db());
+    if (itDb == _collectionsByDb.end()) {
+        // The database was dropped.
         return;
     }
 
-    auto& collections = it->second->collections;
-
-    auto itColl = collections.find(ccri._cm->getns().ns());
-    if (itColl == collections.end()) {
-        // If the collection does not exist, this means it must have been dropped since the last
-        // time we retrieved a cache entry for it. Doing nothing in this case will cause the
-        // next call to getCollectionRoutingInfo to return an unsharded collection.
-        return;
-    } else if (itColl->second.needsRefresh) {
+    auto itColl = itDb->second.find(nss.ns());
+    if (itColl == itDb->second.end()) {
+        // The collection was dropped.
+    } else if (itColl->second->needsRefresh) {
         // Refresh has been scheduled for the collection already
         return;
-    } else if (itColl->second.routingInfo->getVersion() == ccri._cm->getVersion()) {
+    } else if (itColl->second->routingInfo->getVersion() == ccri._cm->getVersion()) {
         // If the versions match, the last version of the routing information that we used is no
         // longer valid, so trigger a refresh.
-        itColl->second.needsRefresh = true;
+        itColl->second->needsRefresh = true;
     }
 }
 
 void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    auto it = _databases.find(nss.db());
-    if (it == _databases.end()) {
+    auto itDb = _collectionsByDb.find(nss.db());
+    if (itDb == _collectionsByDb.end()) {
         return;
     }
 
-    it->second->collections[nss.ns()].needsRefresh = true;
+    if (itDb->second.find(nss.ns()) == itDb->second.end()) {
+        itDb->second[nss.ns()] = std::make_shared<CollectionRoutingInfoEntry>();
+    }
+    itDb->second[nss.ns()]->needsRefresh = true;
 }
 
 void CatalogCache::purgeDatabase(StringData dbName) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _databases.erase(dbName);
+    _collectionsByDb.erase(dbName);
 }
 
 void CatalogCache::purgeAllDatabases() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _databases.clear();
+    _collectionsByDb.clear();
 }
 
 void CatalogCache::report(BSONObjBuilder* builder) const {
@@ -304,8 +310,8 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     {
         stdx::lock_guard<stdx::mutex> ul(_mutex);
         numDatabaseEntries = _databases.size();
-        for (const auto& entry : _databases) {
-            numCollectionEntries += entry.second->collections.size();
+        for (const auto& entry : _collectionsByDb) {
+            numCollectionEntries += entry.second.size();
         }
     }
 
@@ -334,29 +340,30 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
     const auto& dbDesc = opTimeWithDb.value;
 
     // Load the sharded collections entries
+    // TODO (SERVER-34061): Stop loading sharded collections when loading a database entry.
     repl::OpTime collLoadConfigOptime;
     const std::vector<CollectionType> collections =
         uassertStatusOK(catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
 
-    StringMap<CollectionRoutingInfoEntry> collectionEntries;
+    CollectionInfoMap collectionEntries;
     for (const auto& coll : collections) {
         if (coll.getDropped()) {
             continue;
         }
-
-        collectionEntries[coll.getNs().ns()].needsRefresh = true;
+        collectionEntries[coll.getNs().ns()] = std::make_shared<CollectionRoutingInfoEntry>();
     }
+    _collectionsByDb[dbName] = std::move(collectionEntries);
 
-    return _databases[dbName] = std::make_shared<DatabaseInfoEntry>(
-               DatabaseInfoEntry{std::move(collectionEntries), std::move(dbDesc)});
+    return _databases[dbName] =
+               std::make_shared<DatabaseInfoEntry>(DatabaseInfoEntry{std::move(dbDesc)});
 }
 
-void CatalogCache::_scheduleCollectionRefresh(
-    WithLock lk,
-    std::shared_ptr<DatabaseInfoEntry> dbEntry,
-    std::shared_ptr<RoutingTableHistory> existingRoutingInfo,
-    NamespaceString const& nss,
-    int refreshAttempt) {
+void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
+                                              std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
+                                              NamespaceString const& nss,
+                                              int refreshAttempt) {
+    const auto existingRoutingInfo = std::move(collEntry->routingInfo);
+
     // If we have an existing chunk manager, the refresh is considered "incremental", regardless of
     // how many chunks are in the differential
     const bool isIncremental(existingRoutingInfo);
@@ -393,30 +400,25 @@ void CatalogCache::_scheduleCollectionRefresh(
     };
 
     // Invoked if getChunksSince resulted in error
-    const auto onRefreshFailed = [ this, dbEntry, nss, refreshAttempt, onRefreshCompleted ](
+    const auto onRefreshFailed = [ this, collEntry, nss, refreshAttempt, onRefreshCompleted ](
         WithLock lk, const Status& status) noexcept {
         onRefreshCompleted(status, nullptr);
-
-        auto& collections = dbEntry->collections;
-        auto it = collections.find(nss.ns());
-        invariant(it != collections.end());
-        auto& collEntry = it->second;
 
         // It is possible that the metadata is being changed concurrently, so retry the
         // refresh again
         if (status == ErrorCodes::ConflictingOperationInProgress &&
             refreshAttempt < kMaxInconsistentRoutingInfoRefreshAttempts) {
-            _scheduleCollectionRefresh(lk, dbEntry, nullptr, nss, refreshAttempt + 1);
+            _scheduleCollectionRefresh(lk, collEntry, nss, refreshAttempt + 1);
         } else {
             // Leave needsRefresh to true so that any subsequent get attempts will kick off
             // another round of refresh
-            collEntry.refreshCompletionNotification->set(status);
-            collEntry.refreshCompletionNotification = nullptr;
+            collEntry->refreshCompletionNotification->set(status);
+            collEntry->refreshCompletionNotification = nullptr;
         }
     };
 
     const auto refreshCallback =
-        [ this, dbEntry, nss, existingRoutingInfo, onRefreshFailed, onRefreshCompleted ](
+        [ this, collEntry, nss, existingRoutingInfo, onRefreshFailed, onRefreshCompleted ](
             OperationContext * opCtx,
             StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
         std::shared_ptr<RoutingTableHistory> newRoutingInfo;
@@ -433,20 +435,21 @@ void CatalogCache::_scheduleCollectionRefresh(
 
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-        auto& collections = dbEntry->collections;
-        auto it = collections.find(nss.ns());
-        invariant(it != collections.end());
-        auto& collEntry = it->second;
-
-        collEntry.needsRefresh = false;
-        collEntry.refreshCompletionNotification->set(Status::OK());
-        collEntry.refreshCompletionNotification = nullptr;
+        collEntry->needsRefresh = false;
+        collEntry->refreshCompletionNotification->set(Status::OK());
+        collEntry->refreshCompletionNotification = nullptr;
 
         if (!newRoutingInfo) {
-            collections.erase(it);
-        } else {
-            collEntry.routingInfo = std::move(newRoutingInfo);
+            // The refresh found that collection was dropped, so remove it from our cache.
+            auto itDb = _collectionsByDb.find(nss.db());
+            if (itDb == _collectionsByDb.end()) {
+                // The entire database was dropped.
+                return;
+            }
+            itDb->second.erase(nss.ns());
+            return;
         }
+        collEntry->routingInfo = std::move(newRoutingInfo);
     };
 
     const ChunkVersion startingCollectionVersion =

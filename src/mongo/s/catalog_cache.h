@@ -168,11 +168,8 @@ private:
      * Cache entry describing a database.
      */
     struct DatabaseInfoEntry {
-        StringMap<CollectionRoutingInfoEntry> collections;
         DatabaseType dbt;
     };
-
-    using DatabaseInfoMap = StringMap<std::shared_ptr<DatabaseInfoEntry>>;
 
     /**
      * Ensures that the specified database is in the cache, loading it if necessary. If the database
@@ -185,8 +182,7 @@ private:
      * namespace must be in the 'needRefresh' state.
      */
     void _scheduleCollectionRefresh(WithLock,
-                                    std::shared_ptr<DatabaseInfoEntry> dbEntry,
-                                    std::shared_ptr<RoutingTableHistory> existingRoutingInfo,
+                                    std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
                                     NamespaceString const& nss,
                                     int refreshAttempt);
 
@@ -232,11 +228,17 @@ private:
 
     } _stats;
 
+    using DatabaseInfoMap = StringMap<std::shared_ptr<DatabaseInfoEntry>>;
+    using CollectionInfoMap = StringMap<std::shared_ptr<CollectionRoutingInfoEntry>>;
+    using CollectionsByDbMap = StringMap<CollectionInfoMap>;
+
     // Mutex to serialize access to the structures below
     mutable stdx::mutex _mutex;
 
     // Map from DB name to the info for that database
     DatabaseInfoMap _databases;
+    // Map from full collection name to the routing info for that collection, grouped by database
+    CollectionsByDbMap _collectionsByDb;
 };
 
 /**
