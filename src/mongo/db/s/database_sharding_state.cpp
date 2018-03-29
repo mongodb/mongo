@@ -95,7 +95,7 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
         // movePrimary critical section to end before returning to the client).
 
         uasserted(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),
-                  "migration critical section active");
+                  "movePrimary critical section active");
     }
 
     uassert(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),

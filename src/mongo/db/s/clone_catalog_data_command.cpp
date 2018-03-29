@@ -117,8 +117,11 @@ public:
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
             opCtx, dbname, repl::ReadConcernLevel::kMajorityReadConcern);
 
+        bool shardedCollectionsExistOnDb = false;
+
         BSONArrayBuilder barr;
         for (const auto& shardedColl : shardedColls) {
+            shardedCollectionsExistOnDb = true;
             barr.append(shardedColl.ns());
         }
 
@@ -131,6 +134,10 @@ public:
         client.runCommand(dbname, cloneCommandBuilder.obj(), cloneResult);
 
         uassertStatusOK(getStatusFromCommandResult(cloneResult));
+
+        result.append("shardedCollectionsExistOnDb", shardedCollectionsExistOnDb);
+
+        result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cloneResult));
 
         return true;
     }

@@ -225,6 +225,12 @@ public:
     StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
                                                               const ShardId& shardId);
 
+    /**
+     * Updates metadata in config.databases collection to show the given primary database on its
+     * new shard.
+     */
+    Status commitMovePrimary(OperationContext* opCtx, const StringData nss, const ShardId& toShard);
+
     //
     // Collection Operations
     //

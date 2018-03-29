@@ -185,4 +185,86 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::getDatabasesForShar
     return dbs;
 }
 
+Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
+                                                 const StringData dbname,
+                                                 const ShardId& toShard) {
+
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    // Must use local read concern because we will perform subsequent writes.
+    auto findResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            DatabaseType::ConfigNS,
+                                            BSON(DatabaseType::name << dbname),
+                                            BSON(DatabaseType::name << -1),
+                                            1));
+
+    const auto databasesVector = std::move(findResponse.docs);
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find max database version for database '" << dbname
+                          << "', but found no databases",
+            !databasesVector.empty());
+
+    const auto dbType = uassertStatusOK(DatabaseType::fromBSON(databasesVector.front()));
+
+    if (dbType.getPrimary() == toShard) {
+        // The primary has already been set to the destination shard. It's likely that there was a
+        // network error and the shard resent the command.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        return Status::OK();
+    }
+
+    auto newDbType = dbType;
+    newDbType.setPrimary(toShard);
+
+    auto currentDatabaseVersion = dbType.getVersion();
+    boost::optional<DatabaseVersion> newDatabaseVersion = boost::none;
+
+    auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
+
+    // Generate the new DatabaseVersion. If the version doesn't exist currently, it's not the
+    // responsibility of movePrimary to create one. It should be done by createDatabase or
+    // setFCV=4.0.
+    if (currentDatabaseVersion) {
+        newDatabaseVersion = Versioning::incrementDatabaseVersion(*currentDatabaseVersion);
+        newDbType.setVersion(*newDatabaseVersion);
+        updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion->toBSON());
+    }
+
+    auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        DatabaseType::ConfigNS,
+        updateQueryBuilder.obj(),
+        newDbType.toBSON(),
+        true,
+        ShardingCatalogClient::kMajorityWriteConcern);
+
+    if (!updateStatus.isOK()) {
+        log() << "error committing movePrimary: " << dbname
+              << causedBy(redact(updateStatus.getStatus()));
+        return updateStatus.getStatus();
+    }
+
+    // If this assertion is tripped, it means that the request sent fine, but no documents were
+    // updated. This is likely because the database version was changed in between the query and
+    // the update, so no documents were found to change. This shouldn't happen however, because we
+    // are holding the dist lock during the movePrimary operation.
+    if (!updateStatus.getValue()) {
+        if (currentDatabaseVersion) {
+            uasserted(ErrorCodes::IncompatibleShardingMetadata,
+                      str::stream() << "Tried to update primary shard for database '" << dbname
+                                    << " with version "
+                                    << currentDatabaseVersion->getLastMod());
+        } else {
+            uasserted(ErrorCodes::IncompatibleShardingMetadata,
+                      str::stream() << "Tried to update primary shard for database '" << dbname
+                                    << " that currently has no version.");
+        }
+    }
+
+    return Status::OK();
+}
+
 }  // namespace mongo

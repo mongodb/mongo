@@ -32,6 +32,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -67,12 +69,8 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
-
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const std::string& dbName_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
 
@@ -87,6 +85,14 @@ public:
                 str::stream() << "commitMovePrimary must be called with majority writeConcern, got "
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+        const auto commitMovePrimaryRequest = ConfigsvrCommitMovePrimary::parse(
+            IDLParserErrorContext("_configSvrCommitMovePrimary"), cmdObj);
+
+        const auto dbname = commitMovePrimaryRequest.get_configsvrCommitMovePrimary();
+
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->commitMovePrimary(
+            opCtx, dbname, commitMovePrimaryRequest.getTo().toString()));
 
         return true;
     }

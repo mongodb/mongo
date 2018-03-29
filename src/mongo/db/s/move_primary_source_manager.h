@@ -52,8 +52,8 @@ class Status;
  *  - Call clone to start and finish cloning of the unsharded collections.
  *  - Call enterCriticalSection to cause the shard to enter in 'read only' mode while the config
  *      server is notified of the new primary.
- *  - Call updatePrimary to indicate the new primary in the config server metadata.
- *  - Call clearStaleCollections to drop now-unused collections (and potentially databases) on the
+ *  - Call commitOnConfig to indicate the new primary in the config server metadata.
+ *  - Call cleanStaleData to drop now-unused collections (and potentially databases) on the
  *      old primary.
  *
  * At any point in time it is safe to let the MovePrimarySourceManager object go out of scope in
@@ -76,8 +76,8 @@ public:
     MovePrimarySourceManager(OperationContext* opCtx,
                              ShardMovePrimary requestArgs,
                              StringData dbname,
-                             std::unique_ptr<Shard> fromShard,
-                             std::unique_ptr<Shard> toShard);
+                             ShardId& fromShard,
+                             ShardId& toShard);
     ~MovePrimarySourceManager();
 
     /**
@@ -105,6 +105,22 @@ public:
     Status enterCriticalSection(OperationContext* opCtx);
 
     /**
+     * Persists the updated DatabaseVersion on the config server and leaves the critical section.
+     *
+     * Expected state: kCriticalSection
+     * Resulting state: kNeedCleanStaleData
+     */
+    Status commitOnConfig(OperationContext* opCtx);
+
+    /**
+     * Clears stale collections (and potentially databases) on the old primary.
+     *
+     * Expected state: kNeedCleanStaleData
+     * Resulting state: kDone
+     */
+    Status cleanStaleData(OperationContext* opCtx);
+
+    /**
      * May be called at any time. Unregisters the movePrimary source manager from the database and
      * logs an error in the change log to indicate that the migration has failed.
      *
@@ -127,8 +143,15 @@ private:
 
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
-    // TODO: Will tweak these as further work on moving movePrimary to shards
-    enum State { kCreated, kCloning, kCloneCompleted, kCriticalSection, kDone };
+    enum State {
+        kCreated,
+        kCloning,
+        kCloneCompleted,
+        kCriticalSection,
+        kCommitted,
+        kNeedCleanStaleData,
+        kDone
+    };
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
@@ -143,10 +166,16 @@ private:
     const StringData _dbname;
 
     // The donor shard
-    const std::unique_ptr<Shard> _fromShard;
+    const ShardId& _fromShard;
 
     // The recipient shard
-    const std::unique_ptr<Shard> _toShard;
+    const ShardId& _toShard;
+
+    // Collections that were cloned to the new primary
+    std::vector<NamespaceString> _clonedColls;
+
+    // Indicates whether sharded collections exist on the old primary.
+    bool _shardedCollectionsExistOnDb;
 
     // Times the entire movePrimary operation
     const Timer _entireOpTimer;
