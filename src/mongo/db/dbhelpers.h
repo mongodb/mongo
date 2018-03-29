@@ -166,21 +166,13 @@ struct Helpers {
          */
         Status goingToDelete(const BSONObj& o);
 
-        /**
-         * A path object describing the directory containing the file with deleted documents.
-         */
-        const auto& root() const& {
-            return _root;
+        std::string directoryName() const {
+            return _root.generic_string();
         }
-        void root() && = delete;
 
-        /**
-         * A path object describing the actual file containing BSON documents.
-         */
-        const auto& file() const& {
-            return _file;
+        std::string fileName() const {
+            return _file.generic_string();
         }
-        void file() && = delete;
 
     private:
         boost::filesystem::path _root;

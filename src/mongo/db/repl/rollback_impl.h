@@ -47,55 +47,6 @@ class ReplicationCoordinator;
 class ReplicationProcess;
 
 /**
- * Tracks statistics about rollback, and is used to generate a summary about what has occurred.
- * Because it is possible for rollback to exit early, fields are initialized to boost::none and are
- * populated with actual values during the rollback process.
- */
-struct RollbackStats {
-    /**
-     * The wall clock time when rollback started.
-     */
-    Date_t startTime;
-
-    /**
-     * The wall clock time when rollback completed, either successfully or unsuccessfully.
-     */
-    Date_t endTime;
-
-    /**
-     * The id number generated for this rollback event.
-     */
-    boost::optional<int> rollbackId;
-
-    /**
-     * The last optime on the branch of history being rolled back.
-     */
-    boost::optional<OpTime> lastLocalOptime;
-
-    /**
-     * The optime of the latest shared oplog entry between this node and the sync source.
-     */
-    boost::optional<OpTime> commonPoint;
-
-    /**
-     * The value of the oplog truncate timestamp. This is the timestamp of the entry immediately
-     * after the common point on the local oplog (that is, on the branch of history being rolled
-     * back).
-     */
-    boost::optional<Timestamp> truncateTimestamp;
-
-    /**
-     * The value of the stable timestamp to which rollback recovered.
-     */
-    boost::optional<Timestamp> stableTimestamp;
-
-    /**
-     * The directory containing rollback data files, if any were written.
-     */
-    boost::optional<std::string> rollbackDataFileDirectory;
-};
-
-/**
  * During steady state replication, it is possible to find the local server in a state where it
  * cannot replicate from a sync source. This can happen if the local server has gone offline and
  * comes back to find a new primary with an inconsistent set of operations in its oplog from the
@@ -384,11 +335,6 @@ private:
     Status _writeRollbackFiles(OperationContext* opCtx);
 
     /**
-     * Logs a summary of what has occurred so far during rollback to the server log.
-     */
-    void _summarizeRollback(OperationContext* opCtx) const;
-
-    /**
      * Aligns the drop pending reaper's state with the catalog.
      */
     void _resetDropPendingState(OperationContext* opCtx);
@@ -420,9 +366,6 @@ private:
     // Contains information about the rollback that will be passed along to the rollback OpObserver
     // method.
     OpObserver::RollbackObserverInfo _observerInfo = {};  // (N)
-
-    // Holds information about this rollback event.
-    RollbackStats _rollbackStats;  // (N)
 };
 
 }  // namespace repl
