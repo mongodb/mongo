@@ -245,6 +245,46 @@ TEST(Future, Fail_getAsync) {
     });
 }
 
+TEST(Future, Success_isReady) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            const auto id = stdx::this_thread::get_id();
+                            while (!fut.isReady()) {
+                            }
+                            std::move(fut).getAsync([&](StatusWith<int> status) {
+                                ASSERT_EQ(stdx::this_thread::get_id(), id);
+                                ASSERT_EQ(status, 1);
+                            });
+
+                        });
+}
+
+TEST(Future, Fail_isReady) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        const auto id = stdx::this_thread::get_id();
+        while (!fut.isReady()) {
+        }
+        std::move(fut).getAsync([&](StatusWith<int> status) {
+            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_NOT_OK(status);
+        });
+
+    });
+}
+
+TEST(Future, isReady_TSAN_OK) {
+    bool done = false;
+    auto fut = async([&] {
+        done = true;
+        return 1;
+    });
+    while (!fut.isReady()) {
+    }
+    // ASSERT(done);  // Data Race! Uncomment to make sure TSAN is working.
+    (void)fut.get();
+    ASSERT(done);
+}
+
 TEST(Future, Success_thenSimple) {
     FUTURE_SUCCESS_TEST([] { return 1; },
                         [](Future<int>&& fut) {
@@ -694,6 +734,43 @@ TEST(Future_Void, Fail_getAsync) {
         });
         ASSERT_EQ(std::move(outsideFut).getNoThrow(), failStatus);
     });
+}
+
+TEST(Future_Void, Success_isReady) {
+    FUTURE_SUCCESS_TEST([] {},
+                        [](Future<void>&& fut) {
+                            const auto id = stdx::this_thread::get_id();
+                            while (!fut.isReady()) {
+                            }
+                            std::move(fut).getAsync([&](Status status) {
+                                ASSERT_EQ(stdx::this_thread::get_id(), id);
+                                ASSERT_OK(status);
+                            });
+
+                        });
+}
+
+TEST(Future_Void, Fail_isReady) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        const auto id = stdx::this_thread::get_id();
+        while (!fut.isReady()) {
+        }
+        std::move(fut).getAsync([&](Status status) {
+            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_NOT_OK(status);
+        });
+
+    });
+}
+
+TEST(Future_Void, isReady_TSAN_OK) {
+    bool done = false;
+    auto fut = async([&] { done = true; });
+    while (!fut.isReady()) {
+    }
+    // ASSERT(done);  // Data Race! Uncomment to make sure TSAN is working.
+    fut.get();
+    ASSERT(done);
 }
 
 TEST(Future_Void, Success_thenSimple) {

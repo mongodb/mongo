@@ -683,6 +683,25 @@ public:
     }
 
     /**
+     * If this returns true, get() is guaranteed not to block and callbacks will be immediately
+     * invoked. You can't assume anything if this returns false since it may be completed
+     * immediately after checking (unless you have independent knowledge that this Future can't
+     * complete in the background).
+     *
+     * Callers must still call get() or similar, even on Future<void>, to ensure that they are
+     * correctly sequenced with the completing task, and to be informed about whether the Promise
+     * completed successfully.
+     *
+     * This is generally only useful as an optimization to avoid prep work, such as setting up
+     * timeouts, that is unnecessary if the Future is ready already.
+     */
+    bool isReady() const {
+        // This can be a relaxed load because callers are not allowed to use it to establish
+        // ordering.
+        return immediate || shared->state.load(std::memory_order_relaxed) == SSBState::kFinished;
+    }
+
+    /**
      * Gets the value out of this Future, blocking until it is ready.
      *
      * get() methods throw on error, while getNoThrow() returns a !OK status.
@@ -1135,6 +1154,10 @@ public:
         if (status.isOK())
             return makeReady();
         return Future<FakeVoid>::makeReady(std::move(status));
+    }
+
+    bool isReady() const {
+        return inner.isReady();
     }
 
     void get() const {
