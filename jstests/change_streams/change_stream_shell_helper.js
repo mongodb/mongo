@@ -1,5 +1,4 @@
-// Test DBCollection.watch() shell helper and its options.
-
+// Test change streams related shell helpers and options passed to them.
 (function() {
     "use strict";
 
@@ -39,6 +38,7 @@
 
     jsTestLog("Testing watch() without options");
     let cursor = coll.watch();
+    let wholeDbCursor = db.watch();
     assert(!cursor.hasNext());
     assert.writeOK(coll.insert({_id: 0, x: 1}));
     assert.soon(() => cursor.hasNext());
@@ -56,18 +56,50 @@
     delete change._id;
     assert.docEq(change, expected);
 
+    // Test that the change stream on the entire databse picks up the change as well.
+    assert.soon(() => wholeDbCursor.hasNext());
+    change = wholeDbCursor.next();
+    assert(!wholeDbCursor.hasNext());
+    assert("_id" in change, "Got unexpected change: " + tojson(change));
+    delete change._id;
+    assert.docEq(change, expected);
+
     jsTestLog("Testing watch() with pipeline");
     cursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
+    wholeDbCursor = db.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
     assert.writeOK(coll.insert({_id: 1, x: 1}));
     checkNextChange(cursor, {docId: 1});
+    checkNextChange(wholeDbCursor, {docId: 1});
 
     jsTestLog("Testing watch() with pipeline and resumeAfter");
     cursor =
         coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
+    wholeDbCursor =
+        db.watch([{$project: {_id: 0, docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
     checkNextChange(cursor, {docId: 1});
+    checkNextChange(wholeDbCursor, {docId: 1});
+
+    jsTestLog("Testing watch() with pipeline and startAtClusterTime");
+    // Store the cluster time of the last insert as the timestamp to start from.
+    const resumeTime = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;
+    cursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],
+                        {startAtClusterTime: {ts: resumeTime}});
+    wholeDbCursor = db.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],
+                             {startAtClusterTime: {ts: resumeTime}});
+    checkNextChange(cursor, {docId: 1});
+    checkNextChange(wholeDbCursor, {docId: 1});
 
     jsTestLog("Testing watch() with updateLookup");
     cursor = coll.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
+    // wholeDbCursor = db.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
+
+    // TODO SERVER-33820 adds supports for 'updateLookup' against an entire database.
+    assert.commandFailedWithCode(db.runCommand({
+        aggregate: 1,
+        pipeline: [{$changeStream: {fullDocument: "updateLookup"}}, {$project: {_id: 0}}],
+        cursor: {}
+    }),
+                                 50761);
     assert.writeOK(coll.update({_id: 0}, {$set: {x: 10}}));
     expected = {
         documentKey: {_id: 0},
@@ -77,6 +109,7 @@
         updateDescription: {removedFields: [], updatedFields: {x: 10}},
     };
     checkNextChange(cursor, expected);
+    // checkNextChange(wholeDbCursor, expected);
 
     jsTestLog("Testing watch() with batchSize");
     // Only test mongod because mongos uses batch size 0 for aggregate commands internally to
@@ -93,6 +126,9 @@
         cursor = coll.watch(
             [{$match: {documentKey: {_id: 1}, operationType: "update"}}, {$project: {_id: 0}}],
             {resumeAfter: resumeToken, batchSize: 2});
+        wholeDbCursor = db.watch(
+            [{$match: {documentKey: {_id: 1}, operationType: "update"}}, {$project: {_id: 0}}],
+            {resumeAfter: resumeToken, batchSize: 2});
 
         // Check the first batch.
         assert.eq(cursor.objsLeftInBatch(), 2);
@@ -103,6 +139,14 @@
         cursor.next();
         assert.eq(cursor.objsLeftInBatch(), 0);
 
+        // Ditto for the whole db change stream.
+        assert.eq(wholeDbCursor.objsLeftInBatch(), 2);
+        assert(wholeDbCursor.hasNext());
+        wholeDbCursor.next();
+        assert(wholeDbCursor.hasNext());
+        wholeDbCursor.next();
+        assert.eq(wholeDbCursor.objsLeftInBatch(), 0);
+
         // Check the batch returned by getMore.
         assert(cursor.hasNext());
         assert.eq(cursor.objsLeftInBatch(), 2);
@@ -112,25 +156,40 @@
         assert.eq(cursor.objsLeftInBatch(), 0);
         // There are more changes coming, just not in the batch.
         assert(cursor.hasNext());
+
+        // Ditto for the whole db change stream.
+        assert(wholeDbCursor.hasNext());
+        assert.eq(wholeDbCursor.objsLeftInBatch(), 2);
+        wholeDbCursor.next();
+        assert(wholeDbCursor.hasNext());
+        wholeDbCursor.next();
+        assert.eq(wholeDbCursor.objsLeftInBatch(), 0);
+        // There are more changes coming, just not in the batch.
+        assert(wholeDbCursor.hasNext());
     }
 
     jsTestLog("Testing watch() with maxAwaitTimeMS");
     cursor = coll.watch([], {maxAwaitTimeMS: 500});
-    testCommandIsCalled(
-        function() {
-            assert(!cursor.hasNext());
-        },
-        function(cmdObj) {
-            assert.eq("getMore",
-                      Object.keys(cmdObj)[0],
-                      "expected getMore command, but was: " + tojson(cmdObj));
-            assert(cmdObj.hasOwnProperty("maxTimeMS"),
-                   "unexpected getMore command: " + tojson(cmdObj));
-            assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
-        });
+    testCommandIsCalled(() => assert(!cursor.hasNext()), (cmdObj) => {
+        assert.eq("getMore",
+                  Object.keys(cmdObj)[0],
+                  "expected getMore command, but was: " + tojson(cmdObj));
+        assert(cmdObj.hasOwnProperty("maxTimeMS"), "unexpected getMore command: " + tojson(cmdObj));
+        assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
+    });
+
+    wholeDbCursor = db.watch([], {maxAwaitTimeMS: 500});
+    testCommandIsCalled(() => assert(!wholeDbCursor.hasNext()), (cmdObj) => {
+        assert.eq("getMore",
+                  Object.keys(cmdObj)[0],
+                  "expected getMore command, but was: " + tojson(cmdObj));
+        assert(cmdObj.hasOwnProperty("maxTimeMS"), "unexpected getMore command: " + tojson(cmdObj));
+        assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
+    });
 
     jsTestLog("Testing the cursor gets closed when the collection gets dropped");
     cursor = coll.watch([{$project: {_id: 0}}]);
+    wholeDbCursor = db.watch([{$project: {_id: 0}}]);
     assert.writeOK(coll.insert({_id: 2, x: 1}));
     expected = {
         documentKey: {_id: 2},
@@ -142,6 +201,13 @@
     assert(!cursor.hasNext());
     assert(!cursor.isClosed());
     assert(!cursor.isExhausted());
+
+    checkNextChange(wholeDbCursor, expected);
+    assert(!wholeDbCursor.hasNext());
+    assert(!wholeDbCursor.isClosed());
+    assert(!wholeDbCursor.isExhausted());
+
+    // Dropping the collection should invalidate any open change streams.
     assertDropCollection(db, coll.getName());
     assert.soon(() => cursor.hasNext());
     assert(cursor.isClosed());
@@ -151,4 +217,13 @@
     assert(!cursor.hasNext());
     assert(cursor.isClosed());
     assert(cursor.isExhausted());
+
+    assert.soon(() => wholeDbCursor.hasNext());
+    assert(wholeDbCursor.isClosed());
+    assert(!wholeDbCursor.isExhausted());
+    expected = {operationType: "invalidate"};
+    checkNextChange(wholeDbCursor, expected);
+    assert(!wholeDbCursor.hasNext());
+    assert(wholeDbCursor.isClosed());
+    assert(wholeDbCursor.isExhausted());
 }());

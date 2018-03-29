@@ -1856,6 +1856,29 @@ var DB;
         return this.getMongo().setLogLevel(logLevel, component, this.getSession());
     };
 
+    DB.prototype.watch = function(pipeline, options) {
+        pipeline = pipeline || [];
+        options = options || {};
+        assert(pipeline instanceof Array, "'pipeline' argument must be an array");
+        assert(options instanceof Object, "'options' argument must be an object");
+
+        let changeStreamStage = {fullDocument: options.fullDocument || "default"};
+        delete options.fullDocument;
+
+        if (options.hasOwnProperty("resumeAfter")) {
+            changeStreamStage.resumeAfter = options.resumeAfter;
+            delete options.resumeAfter;
+        }
+
+        if (options.hasOwnProperty("startAtClusterTime")) {
+            changeStreamStage.startAtClusterTime = options.startAtClusterTime;
+            delete options.startAtClusterTime;
+        }
+
+        pipeline.unshift({$changeStream: changeStreamStage});
+        return this._runAggregate({aggregate: 1, pipeline: pipeline}, options);
+    };
+
     // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the
     // DB's getProperty() handler in C++ takes precedence when a property isn't defined on the DB
     // instance directly. The "hasOwnProperty" property is defined on Object.prototype, so we must
