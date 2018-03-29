@@ -64,12 +64,9 @@ public:
     ~CatalogCache();
 
     /**
-     * Retrieves the cached metadata for the specified database. The returned value is still owned
-     * by the cache and should not be kept elsewhere. I.e., it should only be used as a local
-     * variable. The reason for this is so that if the cache gets invalidated, the caller does not
-     * miss getting the most up-to-date value.
-     *
-     * Returns the database cache entry if the database exists or a failed status otherwise.
+     * Blocking method that ensures the specified database is in the cache, loading it if necessary,
+     * and returns it. If the database was not in cache, all the sharded collections will be in the
+     * 'needsRefresh' state.
      */
     StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
 
@@ -170,12 +167,6 @@ private:
     struct DatabaseInfoEntry {
         DatabaseType dbt;
     };
-
-    /**
-     * Ensures that the specified database is in the cache, loading it if necessary. If the database
-     * was not in cache, all the sharded collections will be in the 'needsRefresh' state.
-     */
-    std::shared_ptr<DatabaseInfoEntry> _getDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
      * Non-blocking call which schedules an asynchronous refresh for the specified namespace. The

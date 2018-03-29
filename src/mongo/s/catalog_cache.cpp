@@ -121,7 +121,42 @@ CatalogCache::~CatalogCache() = default;
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
     try {
-        auto dbEntry = _getDatabase(opCtx, dbName);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+        auto itDbEntry = _databases.find(dbName);
+        if (itDbEntry != _databases.end()) {
+            const auto& dbEntry = itDbEntry->second;
+            auto primaryShard = uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()));
+            return {CachedDatabaseInfo(dbEntry->dbt, std::move(primaryShard))};
+        }
+
+        const auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+        const auto dbNameCopy = dbName.toString();
+
+        // Load the database entry
+        const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(
+            opCtx, dbNameCopy, repl::ReadConcernLevel::kMajorityReadConcern));
+        const auto& dbDesc = opTimeWithDb.value;
+        const auto& dbEntry = (_databases[dbName] = std::make_shared<DatabaseInfoEntry>(
+                                   DatabaseInfoEntry{std::move(dbDesc)}));
+
+        // Load the sharded collections entries
+        // TODO (SERVER-34061): Stop loading sharded collections when loading a database entry.
+        repl::OpTime collLoadConfigOptime;
+        const std::vector<CollectionType> collections = uassertStatusOK(
+            catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
+
+        CollectionInfoMap collectionEntries;
+        for (const auto& coll : collections) {
+            if (coll.getDropped()) {
+                continue;
+            }
+            collectionEntries[coll.getNs().ns()] = std::make_shared<CollectionRoutingInfoEntry>();
+        }
+        _collectionsByDb[dbName] = std::move(collectionEntries);
+
         auto primaryShard = uassertStatusOK(
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()));
         return {CachedDatabaseInfo(dbEntry->dbt, std::move(primaryShard))};
@@ -143,32 +178,21 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, boost::optional<Timestamp> atClusterTime) {
     while (true) {
-        std::shared_ptr<DatabaseInfoEntry> dbEntry;
-        try {
-            dbEntry = _getDatabase(opCtx, nss.db());
-        } catch (const DBException& ex) {
-            return ex.toStatus();
+        const auto swDbInfo = getDatabase(opCtx, nss.db());
+        if (!swDbInfo.isOK()) {
+            return swDbInfo.getStatus();
         }
+        const auto dbInfo = std::move(swDbInfo.getValue());
 
         stdx::unique_lock<stdx::mutex> ul(_mutex);
 
         const auto itDb = _collectionsByDb.find(nss.db());
         if (itDb == _collectionsByDb.end()) {
-            return {CachedCollectionRoutingInfo(
-                nss,
-                {dbEntry->dbt,
-                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-                     opCtx, dbEntry->dbt.getPrimary()))},
-                nullptr)};
+            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr)};
         }
         const auto itColl = itDb->second.find(nss.ns());
         if (itColl == itDb->second.end()) {
-            return {CachedCollectionRoutingInfo(
-                nss,
-                {dbEntry->dbt,
-                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-                     opCtx, dbEntry->dbt.getPrimary()))},
-                nullptr)};
+            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr)};
         }
         auto& collEntry = itColl->second;
 
@@ -210,12 +234,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoA
 
         auto cm = std::make_shared<ChunkManager>(collEntry->routingInfo, atClusterTime);
 
-        return {CachedCollectionRoutingInfo(
-            nss,
-            {dbEntry->dbt,
-             uassertStatusOK(
-                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt.getPrimary()))},
-            std::move(cm))};
+        return {CachedCollectionRoutingInfo(nss, dbInfo, std::move(cm))};
     }
 }
 
@@ -319,43 +338,6 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
     cacheStatsBuilder.append("numCollectionEntries", static_cast<long long>(numCollectionEntries));
 
     _stats.report(&cacheStatsBuilder);
-}
-
-std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(OperationContext* opCtx,
-                                                                            StringData dbName) {
-    stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-    auto it = _databases.find(dbName);
-    if (it != _databases.end()) {
-        return it->second;
-    }
-
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
-    const auto dbNameCopy = dbName.toString();
-
-    // Load the database entry
-    const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(
-        opCtx, dbNameCopy, repl::ReadConcernLevel::kMajorityReadConcern));
-    const auto& dbDesc = opTimeWithDb.value;
-
-    // Load the sharded collections entries
-    // TODO (SERVER-34061): Stop loading sharded collections when loading a database entry.
-    repl::OpTime collLoadConfigOptime;
-    const std::vector<CollectionType> collections =
-        uassertStatusOK(catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
-
-    CollectionInfoMap collectionEntries;
-    for (const auto& coll : collections) {
-        if (coll.getDropped()) {
-            continue;
-        }
-        collectionEntries[coll.getNs().ns()] = std::make_shared<CollectionRoutingInfoEntry>();
-    }
-    _collectionsByDb[dbName] = std::move(collectionEntries);
-
-    return _databases[dbName] =
-               std::make_shared<DatabaseInfoEntry>(DatabaseInfoEntry{std::move(dbDesc)});
 }
 
 void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
