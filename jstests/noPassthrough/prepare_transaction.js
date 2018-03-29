@@ -55,7 +55,6 @@
     // The insert should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the insert is not visible.
     assert.eq(null, testColl.findOne(doc1));
-    txnNumber++;
     res = sessionDB.runCommand({find: collName, filter: doc1, txnNumber: NumberLong(txnNumber)});
     assert.commandWorked(res);
     assert.eq([], res.cursor.firstBatch);
@@ -90,7 +89,6 @@
 
     // The update should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the update is not visible.
-    txnNumber++;
     res = sessionDB.runCommand({find: collName, filter: doc2, txnNumber: NumberLong(txnNumber)});
     assert.commandWorked(res);
     assert.eq([], res.cursor.firstBatch);
@@ -127,7 +125,6 @@
 
     // The delete should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the document is still visible.
-    txnNumber++;
     res = sessionDB.runCommand({find: collName, filter: doc2, txnNumber: NumberLong(txnNumber)});
     assert.commandWorked(res);
     assert.eq([doc2], res.cursor.firstBatch);

@@ -76,9 +76,9 @@
     rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
     // TODO SERVER-33690: Destroying stashed transaction resources should kill the cursor, so this
-    // getMore should fail with CursorNotFound.
-    assert.commandFailedWithCode(
-        sessionDB.runCommand({getMore: res.cursor.id, collection: collName}), 50740);
+    // getMore should fail.
+    assert.commandWorked(sessionDB.runCommand(
+        {getMore: res.cursor.id, collection: collName, txnNumber: NumberLong(0)}));
 
     rst.stopSet();
 })();

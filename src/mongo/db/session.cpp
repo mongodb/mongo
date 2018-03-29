@@ -560,10 +560,17 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     stdx::unique_lock<stdx::mutex> lg(_mutex);
 
-    // Always check '_activeTxnNumber', since it can be modified by migration, which does not check
-    // out the session. We intentionally do not error if _txnState=kAborted, since we expect this
-    // function to be called at the end of the 'abortTransaction' command.
-    _checkIsActiveTransaction(lg, *opCtx->getTxnNumber());
+    if (*opCtx->getTxnNumber() != _activeTxnNumber) {
+        // The session is checked out, so _activeTxnNumber cannot advance due to a user operation.
+        // However, when a chunk is migrated, session and transaction information is copied from the
+        // donor shard to the recipient. This occurs outside of the check-out mechanism and can lead
+        // to a higher _activeTxnNumber during the lifetime of a checkout. If that occurs, we abort
+        // the current transaction. Note that it would indicate a user bug to have a newer
+        // transaction on one shard while an older transaction is still active on another shard.
+        uasserted(ErrorCodes::TransactionAborted,
+                  str::stream() << "Transaction aborted. Active txnNumber is now "
+                                << _activeTxnNumber);
+    }
 
     if (_txnState != MultiDocumentTransactionState::kInProgress &&
         _txnState != MultiDocumentTransactionState::kInSnapshotRead) {
@@ -603,13 +610,20 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
         // it doesn't go away, and then lock the Session owned by that client.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         stdx::lock_guard<stdx::mutex> lg(_mutex);
-
-        // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session
-        // kill and migration, which do not check out the session.
-        _checkIsActiveTransaction(lg, *opCtx->getTxnNumber());
-        uassert(ErrorCodes::TransactionAborted,
-                str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-                _txnState != MultiDocumentTransactionState::kAborted);
+        if (opCtx->getTxnNumber() < _activeTxnNumber) {
+            // The session is checked out, so _activeTxnNumber cannot advance due to a user
+            // operation.
+            // However, when a chunk is migrated, session and transaction information is copied from
+            // the donor shard to the recipient. This occurs outside of the check-out mechanism and
+            // can lead to a higher _activeTxnNumber during the lifetime of a checkout. If that
+            // occurs, we abort the current transaction. Note that it would indicate a user bug to
+            // have a newer transaction on one shard while an older transaction is still active on
+            // another shard.
+            uasserted(ErrorCodes::TransactionAborted,
+                      str::stream() << "Transaction aborted. Active txnNumber is now "
+                                    << _activeTxnNumber);
+            return;
+        }
 
         if (_txnResourceStash) {
             // Transaction resources already exist for this transaction.  Transfer them from the
@@ -648,20 +662,12 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
 
 void Session::abortArbitraryTransaction() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (_txnState == MultiDocumentTransactionState::kInProgress ||
-        _txnState == MultiDocumentTransactionState::kInSnapshotRead) {
-        _abortTransaction(lock);
-    }
+    _abortTransaction(lock);
 }
 
 void Session::abortActiveTransaction(OperationContext* opCtx) {
     stdx::lock_guard<Client> clientLock(*opCtx->getClient());
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    if (_txnState != MultiDocumentTransactionState::kInProgress &&
-        _txnState != MultiDocumentTransactionState::kInSnapshotRead) {
-        return;
-    }
 
     _abortTransaction(lock);
 
@@ -710,45 +716,25 @@ void Session::_setActiveTxn(WithLock wl, TxnNumber txnNumber) {
 void Session::addTransactionOperation(OperationContext* opCtx,
                                       const repl::ReplOperation& operation) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
-    // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber());
-    uassert(ErrorCodes::TransactionAborted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-            _txnState != MultiDocumentTransactionState::kAborted);
-
     invariant(_txnState == MultiDocumentTransactionState::kInProgress);
     invariant(!_autocommit && _activeTxnNumber != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     _transactionOperations.push_back(operation);
 }
 
-std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
-    OperationContext* opCtx) {
+std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
-    // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber());
-    uassert(ErrorCodes::TransactionAborted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-            _txnState != MultiDocumentTransactionState::kAborted);
-
     invariant(!_autocommit);
     return std::move(_transactionOperations);
 }
 
 void Session::commitTransaction(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-
-    // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
-    // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber());
-    uassert(ErrorCodes::TransactionAborted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-            _txnState != MultiDocumentTransactionState::kAborted);
-
+    if (opCtx->getTxnNumber() != _activeTxnNumber) {
+        uasserted(ErrorCodes::TransactionAborted,
+                  str::stream() << "Transaction aborted. Active txnNumber is now "
+                                << _activeTxnNumber);
+    }
     if (_txnState == MultiDocumentTransactionState::kCommitted)
         return;
     _commitTransaction(std::move(lk), opCtx);
@@ -807,7 +793,7 @@ void Session::_checkValid(WithLock) const {
 
 void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const {
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Cannot perform operations on transaction " << txnNumber
+            str::stream() << "Cannot perform retryability check for transaction " << txnNumber
                           << " on session "
                           << getSessionId()
                           << " because a different transaction "
