@@ -110,6 +110,7 @@ public:
     bool onInsertsIsGlobalWriteLockExclusive = false;
 
     bool onRenameCollectionCalled = false;
+    bool onRenameCollectionDropTarget = false;
     repl::OpTime renameOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 
 private:
@@ -179,6 +180,7 @@ repl::OpTime OpObserverMock::onRenameCollection(OperationContext* opCtx,
     OpObserverNoop::onRenameCollection(
         opCtx, fromCollection, toCollection, uuid, dropTarget, dropTargetUUID, stayTemp);
     onRenameCollectionCalled = true;
+    onRenameCollectionDropTarget = dropTarget;
     return {};
 }
 
@@ -675,6 +677,7 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
                                                              << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
+    ASSERT_TRUE(_opObserver->onRenameCollectionDropTarget);
 
     auto renameOpTime = _opObserver->renameOpTime;
     ASSERT_GREATER_THAN(renameOpTime, repl::OpTime());
@@ -684,6 +687,21 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns))
         << "target collection " << _targetNss
         << " not renamed to drop-pending collection after successful rename";
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionRetainsDropTargetIfTargetCollectionIsMissingAndDropTargetIsTrue) {
+    _createCollectionWithUUID(_opCtx.get(), _sourceNss);
+    RenameCollectionOptions options;
+    options.dropTarget = true;
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
+        << "source collection " << _sourceNss << " still exists after successful rename";
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss)) << "target collection " << _targetNss
+                                                             << " missing after successful rename";
+
+    ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
+    ASSERT_TRUE(_opObserver->onRenameCollectionDropTarget);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWritesAreReplicated) {
