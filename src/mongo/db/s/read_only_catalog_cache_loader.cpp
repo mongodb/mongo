@@ -46,4 +46,10 @@ std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(
     return _configServerLoader.getChunksSince(nss, version, callbackFn);
 }
 
+void ReadOnlyCatalogCacheLoader::getDatabase(
+    StringData dbName,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    // stub
+}
+
 }  // namespace mongo

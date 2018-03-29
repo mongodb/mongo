@@ -89,6 +89,10 @@ public:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
 
+    void getDatabase(
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
 
 private:

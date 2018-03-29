@@ -124,6 +124,12 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
     return notify;
 }
 
+void CatalogCacheLoaderMock::getDatabase(
+    StringData dbName,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    // Not implemented
+}
+
 void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(
     StatusWith<CollectionType> statusWithCollectionType) {
     _swCollectionReturnValue = std::move(statusWithCollectionType);

@@ -186,4 +186,10 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
     return notify;
 }
 
+void ConfigServerCatalogCacheLoader::getDatabase(
+    StringData dbName,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    // stub
+}
+
 }  // namespace mongo

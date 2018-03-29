@@ -53,6 +53,10 @@ public:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
 
+    void getDatabase(
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+
 private:
     // Thread pool to be used to perform metadata load
     ThreadPool _threadPool;

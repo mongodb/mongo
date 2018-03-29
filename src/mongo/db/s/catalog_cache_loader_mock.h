@@ -59,6 +59,10 @@ public:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
 
+    void getDatabase(
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+
     /**
      * Sets the mocked collection entry result that getChunksSince will use to construct its return
      * value.
