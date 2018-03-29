@@ -68,8 +68,9 @@ class CombineBenchmarkResults(interface.Hook):
 
         for name, report in self.benchmark_reports.items():
             test_report = {
-                "name": name, "results": report.generate_perf_plugin_dict(),
-                "context": report.context._asdict()
+                "name": name,
+                "context": report.context._asdict(),
+                "results": report.generate_perf_plugin_dict()
             }
 
             perf_report["results"].append(test_report)
@@ -80,19 +81,23 @@ class CombineBenchmarkResults(interface.Hook):
         context = report_dict["context"]
 
         for benchmark_res in report_dict["benchmarks"]:
-            # The group name is the benchmark name minus the thread count and any statistics.
-            # Each group will be shown on a single perf graph.
-            group_name = benchmark_res["name"].rsplit("/", 1)[0]
+            bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res["name"])
 
-            if group_name == benchmark_res["name"] and group_name.count("_") == 2:
-                # When running with only one thread, the thread count is not in the name;
-                # just remove the mean/median/stddev suffix in this case.
-                # With one thread, the group_name looks like: BM_MyTestNameInCamelCase_statistic.
-                group_name = group_name.rsplit("_", 1)[0]
+            # Don't show Benchmark's included statistics to prevent cluttering up the graph.
+            if bm_name_obj.statistic_type is not None:
+                continue
 
-            if group_name not in self.benchmark_reports:
-                self.benchmark_reports[group_name] = _BenchmarkThreadsReport(context)
-            self.benchmark_reports[group_name].add_report(benchmark_res)
+            if bm_name_obj.base_name not in self.benchmark_reports:
+                self.benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
+            self.benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
+
+
+# Capture information from a Benchmark name in a logical format.
+_BenchmarkName = collections.namedtuple("_BenchmarkName", [
+    "base_name",
+    "thread_count",
+    "statistic_type"
+]);
 
 
 class _BenchmarkThreadsReport(object):
@@ -133,9 +138,8 @@ class _BenchmarkThreadsReport(object):
         # list of benchmark runs for each thread.
         self.thread_benchmark_map = collections.defaultdict(list)
 
-    def add_report(self, report):
-        thread_count = self._thread_from_name(report["name"])
-        self.thread_benchmark_map[thread_count].append(report)
+    def add_report(self, bm_name_obj, report):
+        self.thread_benchmark_map[bm_name_obj.thread_count].append(report)
 
     def generate_perf_plugin_dict(self):
         """
@@ -158,12 +162,6 @@ class _BenchmarkThreadsReport(object):
 
         res = {}
         for thread_count, reports in self.thread_benchmark_map.items():
-            if (thread_count.endswith("median") or thread_count.endswith("mean")
-                    or thread_count.endswith("stddev")):
-                # We don't use Benchmark's included statistics for now because they clutter up the
-                # graph.
-                continue
-
             thread_report = {
                 "error_values": [0 for _ in range(len(reports))],
                 "ops_per_sec_values": []  # This is actually storing latency per op, not ops/s
@@ -179,16 +177,36 @@ class _BenchmarkThreadsReport(object):
         return res
 
     @staticmethod
-    def _thread_from_name(name):
-        # Get the thread from a string:
-        # "BM_SetInsert/arg name:1024/threads:10_mean" -> "10_mean"
-        # "BM_SetInsert" -> "1"
-        # "BM_SetInsert_mean" -> "1_mean"
-        thread_section = name.rsplit("/", 1)[-1]
+    def parse_bm_name(name_str):
+        """
+        Split the benchmark name into base_name, thread_count and statistic_type.
+
+        The base name is the benchmark name minus the thread count and any statistics.
+        Testcases of the same group will be shown on a single perf graph.
+
+        name_str look like the following:
+        "BM_SetInsert/arg name:1024/threads:10_mean"
+        "BM_SetInsert/arg 1/arg 2"
+        "BM_SetInsert_mean"
+        """
+
+        base_name = None
+        thread_count = None
+        statistic_type = None
+
+        # Step 1: get the statistic type.
+        if name_str.count("_") == 2:  # There is statistics.
+            statistic_type = name_str.rsplit("_", 1)[-1]
+            # Remove the statistic type suffix from the name.
+            name_str = name_str[:-len(statistic_type) - 1]
+
+        # Step 2: Get the thread count and name.
+        thread_section = name_str.rsplit("/", 1)[-1]
         if thread_section.startswith("threads:"):
-            return thread_section.split(":")[-1]
-        else:
-            if name.count("_") == 2:
-                suffix = name.split("_")[-1]
-                return "1_" + suffix
-            return "1"
+            base_name = name_str.rsplit("/", 1)[0]
+            thread_count = thread_section.split(":")[-1]
+        else:  # There is no explicit thread count, so the thread count is 1.
+            thread_count = "1"
+            base_name = name_str
+
+        return _BenchmarkName(base_name, thread_count, statistic_type)
