@@ -66,13 +66,6 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
                                      "opensslDiffieHellmanParameters",
                                      &sslGlobalParams.sslPEMTempDHParam);
 
-std::string removeFQDNRoot(std::string name) {
-    if (name.back() == '.') {
-        name.pop_back();
-    }
-    return name;
-};
-
 }  // namespace
 
 SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
@@ -468,6 +461,14 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
 
     return roles;
 }
+
+std::string removeFQDNRoot(std::string name) {
+    if (name.back() == '.') {
+        name.pop_back();
+    }
+    return name;
+};
+
 #endif
 
 }  // namespace mongo

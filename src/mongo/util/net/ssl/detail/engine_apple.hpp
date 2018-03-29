@@ -52,7 +52,8 @@ public:
         want_output = 1
     };
 
-    ASIO_DECL explicit engine(context::native_handle_type context);
+    ASIO_DECL explicit engine(context::native_handle_type context,
+                              const std::string& remoteHostName);
 
     ASIO_DECL native_handle_type native_handle() {
         return _ssl.get();
@@ -83,6 +84,9 @@ private:
     static ::OSStatus read_func(::SSLConnectionRef ctx, void* data, size_t* data_len);
     static ::OSStatus write_func(::SSLConnectionRef ctx, const void* data, size_t* data_len);
     want wouldBlock() const;
+
+    // TLS SNI server name
+    std::string _remoteHostName;
 
     apple::CFUniquePtr<native_handle_type> _ssl;
     apple::CFUniquePtr<::CFArrayRef> _certs;

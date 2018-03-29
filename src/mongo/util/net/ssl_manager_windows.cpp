@@ -373,9 +373,7 @@ SSLConnectionWindows::SSLConnectionWindows(SCHANNEL_CRED* cred,
                                            Socket* sock,
                                            const char* initialBytes,
                                            int len)
-    : _cred(cred), socket(sock), _engine(_cred) {
-
-    // TODO: SNI: _engine.set_server_name(undotted.c_str());
+    : _cred(cred), socket(sock), _engine(_cred, removeFQDNRoot(socket->remoteAddr().hostOrIp())) {
 
     _tempBuffer.resize(17 * 1024);
 
@@ -1505,7 +1503,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
     if (remoteHost.empty()) {
         sslCertChainPolicy.dwAuthType = AUTHTYPE_CLIENT;
     } else {
-        serverName = toNativeString(remoteHost.c_str());
+        serverName = toNativeString(removeFQDNRoot(remoteHost).c_str());
         sslCertChainPolicy.pwszServerName = const_cast<wchar_t*>(serverName.c_str());
         sslCertChainPolicy.dwAuthType = AUTHTYPE_SERVER;
     }

@@ -120,7 +120,8 @@ bool verifyConnected(::SSLContextRef ssl, asio::error_code* ec) {
 
 }  // namespace
 
-engine::engine(context::native_handle_type context) {
+engine::engine(context::native_handle_type context, const std::string& remoteHostName)
+    : _remoteHostName(remoteHostName) {
     if (context) {
         if (context->certs) {
             ::CFRetain(context->certs.get());
@@ -182,6 +183,11 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
 
     if (status == ::errSecSuccess) {
         status = ::SSLSetSessionOption(_ssl.get(), ::kSSLSessionOptionBreakOnClientAuth, true);
+    }
+
+    if (!_remoteHostName.empty() && (status == ::errSecSuccess)) {
+        status =
+            ::SSLSetPeerDomainName(_ssl.get(), _remoteHostName.c_str(), _remoteHostName.size());
     }
 
     if (status != ::errSecSuccess) {

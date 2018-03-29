@@ -186,7 +186,8 @@ protected:
                                                   "SSL requested but SSL support is disabled"));
         }
 
-        _sslSocket.emplace(std::move(_socket), *_tl->_egressSSLContext);
+        _sslSocket.emplace(
+            std::move(_socket), *_tl->_egressSSLContext, removeFQDNRoot(target.host()));
         auto doHandshake = [&] {
             if (_blockingMode == Sync) {
                 std::error_code ec;
@@ -446,7 +447,7 @@ private:
                            "SSL handshake received but server is started without SSL support"));
             }
 
-            _sslSocket.emplace(std::move(_socket), *_tl->_ingressSSLContext);
+            _sslSocket.emplace(std::move(_socket), *_tl->_ingressSSLContext, "");
             auto doHandshake = [&] {
                 if (_blockingMode == Sync) {
                     std::error_code ec;

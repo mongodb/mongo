@@ -52,7 +52,7 @@ public:
     };
 
     // Construct a new engine for the specified context.
-    ASIO_DECL explicit engine(SSL_CTX* context);
+    ASIO_DECL explicit engine(SSL_CTX* context, const std::string& remoteHostName);
 
     // Destructor.
     ASIO_DECL ~engine();
@@ -125,6 +125,9 @@ private:
 
     SSL* ssl_;
     BIO* ext_bio_;
+
+    // TLS SNI server name
+    std::string _remoteHostName;
 };
 
 }  // namespace detail

@@ -221,5 +221,10 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
  */
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExtension);
 
+/**
+ * Strip the trailing '.' in FQDN.
+ */
+std::string removeFQDNRoot(std::string name);
+
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

@@ -77,14 +77,6 @@ namespace mongo {
 
 namespace {
 
-std::string removeFQDNRoot(std::string name) {
-    if (name.back() == '.') {
-        name.pop_back();
-    }
-    return name;
-};
-
-
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
 // `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix

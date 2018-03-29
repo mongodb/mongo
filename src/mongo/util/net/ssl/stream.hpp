@@ -94,9 +94,11 @@ public:
      * @param ctx The SSL context to be used for the stream.
      */
     template <typename Arg>
-    stream(Arg&& arg, context& ctx)
+    stream(Arg&& arg, context& ctx, const std::string& remoteHostName)
         : next_layer_(ASIO_MOVE_CAST(Arg)(arg)),
-          core_(ctx.native_handle(), next_layer_.lowest_layer().get_executor().context()) {}
+          core_(ctx.native_handle(),
+                remoteHostName,
+                next_layer_.lowest_layer().get_executor().context()) {}
 #else   // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
     template <typename Arg>
     stream(Arg& arg, context& ctx)

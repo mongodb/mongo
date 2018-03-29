@@ -45,7 +45,7 @@ namespace executor {
 
 AsyncSecureStream::AsyncSecureStream(asio::io_service::strand* strand,
                                      asio::ssl::context* sslContext)
-    : _strand(strand), _stream(_strand->get_io_service(), *sslContext) {}
+    : _strand(strand), _stream(_strand->get_io_service(), *sslContext, "") {}
 
 AsyncSecureStream::~AsyncSecureStream() {
     destroyStream(&_stream.lowest_layer(), _connected);
