@@ -384,7 +384,58 @@ std::shared_ptr<Notification<void>> ShardServerCatalogCacheLoader::getChunksSinc
 void ShardServerCatalogCacheLoader::getDatabase(
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    // stub method
+    long long currentTerm;
+    bool isPrimary;
+
+    {
+        // Take the mutex so that we can discern whether we're primary or secondary and schedule a
+        // task with the corresponding _term value.
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        invariant(_role != ReplicaSetRole::None);
+
+        currentTerm = _term;
+        isPrimary = (_role == ReplicaSetRole::Primary);
+    }
+
+    uassertStatusOK(
+        _threadPool.schedule([ this, dbName, callbackFn, isPrimary, currentTerm ]() noexcept {
+            auto context = _contexts.makeOperationContext(*Client::getCurrent());
+
+            {
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+                // We may have missed an OperationContextGroup interrupt since this operation began
+                // but before the OperationContext was added to the group. So we'll check that
+                // we're still in the same _term.
+                if (_term != currentTerm) {
+                    callbackFn(context.opCtx(),
+                               Status{ErrorCodes::Interrupted,
+                                      "Unable to refresh routing table because replica set state "
+                                      "changed or node is shutting down."});
+                    return;
+                }
+            }
+
+            try {
+                if (isPrimary) {
+                    _schedulePrimaryGetDatabase(context.opCtx(), dbName, currentTerm, callbackFn);
+                }
+            } catch (const DBException& ex) {
+                callbackFn(context.opCtx(), ex.toStatus());
+            }
+        }));
+}
+
+void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
+    OperationContext* opCtx,
+    StringData dbName,
+    long long termScheduled,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+
+    auto remoteRefreshCallbackFn = [](OperationContext* opCtx,
+                                      StatusWith<DatabaseType> swDatabaseType) {};
+
+    _configServerLoader->getDatabase(dbName, remoteRefreshCallbackFn);
 }
 
 void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,

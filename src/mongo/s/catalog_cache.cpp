@@ -139,6 +139,10 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
         const auto opTimeWithDb = uassertStatusOK(catalogClient->getDatabase(
             opCtx, dbNameCopy, repl::ReadConcernLevel::kMajorityReadConcern));
         const auto& dbDesc = opTimeWithDb.value;
+
+        const auto refreshCallbackFn = [](OperationContext* opCtx, StatusWith<DatabaseType>) {};
+        _cacheLoader.getDatabase(dbName, refreshCallbackFn);
+
         const auto& dbEntry = (_databases[dbName] = std::make_shared<DatabaseInfoEntry>(
                                    DatabaseInfoEntry{std::move(dbDesc)}));
 

@@ -25,7 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -34,11 +34,15 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/versioning.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
+MONGO_FP_DECLARE(callShardServerCallbackFn);
 
 namespace {
 
@@ -189,7 +193,17 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
 void ConfigServerCatalogCacheLoader::getDatabase(
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-    // stub
+
+    if (MONGO_FAIL_POINT(callShardServerCallbackFn)) {
+        uassertStatusOK(_threadPool.schedule([ dbName, callbackFn ]() noexcept {
+            auto opCtx = Client::getCurrent()->makeOperationContext();
+
+            const auto dbVersion = Versioning::newDatabaseVersion();
+            DatabaseType dbt(dbName.toString(), ShardId("PrimaryShard"), false, dbVersion);
+
+            callbackFn(opCtx.get(), dbt);
+        }));
+    }
 }
 
 }  // namespace mongo

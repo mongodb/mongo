@@ -253,7 +253,7 @@ private:
      * of the shard's persisted metadata store with the latest updates retrieved from the config
      * server.
      *
-     * Then calls 'callbackFn' with metadata retrived locally from the shard persisted metadata
+     * Then calls 'callbackFn' with metadata retrieved locally from the shard persisted metadata
      * store and any in-memory tasks with terms matching 'currentTerm' enqueued to update that
      * store, GTE to 'catalogCacheSinceVersion'.
      *
@@ -267,6 +267,21 @@ private:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
         std::shared_ptr<Notification<void>> notify);
 
+    /**
+     * Refreshes db version from the config server's metadata store, and schedules maintenance
+     * of the shard's persisted metadata store with the latest updates retrieved from the config
+     * server.
+     *
+     * Then calls 'callbackFn' with metadata retrieved locally from the shard persisted metadata
+     * to update that store.
+     *
+     * Only run on the shard primary.
+     */
+    void _schedulePrimaryGetDatabase(
+        OperationContext* opCtx,
+        StringData dbName,
+        long long termScheduled,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
 
     /**
      * Loads chunk metadata from the shard persisted metadata store and any in-memory tasks with
