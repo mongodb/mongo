@@ -268,6 +268,7 @@ ReplSetConfig _getConfigWithMemberRemoved(const ReplSetConfig& oldConfig,
     BSONObjBuilder newConfigBuilder;
     newConfigBuilder.append("_id", oldConfig.getReplSetName());
     newConfigBuilder.append("version", oldConfig.getConfigVersion());
+    newConfigBuilder.append("protocolVersion", oldConfig.getProtocolVersion());
 
     BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
     for (ReplSetConfig::MemberIterator member = oldConfig.membersBegin();

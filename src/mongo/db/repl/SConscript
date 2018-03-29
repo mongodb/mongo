@@ -753,19 +753,6 @@ env.CppUnitTest('repl_set_heartbeat_response_test',
                 LIBDEPS=['replica_set_messages'])
 
 env.CppUnitTest(
-    target='topology_coordinator_test',
-    source=[
-        'topology_coordinator_test.cpp',
-    ],
-    LIBDEPS=[
-        'topology_coordinator',
-        'replica_set_messages',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-    ],
-)
-
-env.CppUnitTest(
     target='topology_coordinator_v1_test',
     source=[
         'topology_coordinator_v1_test.cpp',

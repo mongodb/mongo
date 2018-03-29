@@ -143,6 +143,8 @@ TEST_F(CheckQuorumForInitiate, ValidSingleNodeSet) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h1"))));
@@ -155,6 +157,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckCanceledByShutdown) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -170,6 +174,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -229,6 +235,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
                                 << "rs0"
                                 << "version"
                                 << 1
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -275,6 +283,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToOneDownNode) {
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
+                                << 1
+                                << "protocolVersion"
                                 << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -342,6 +352,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
                                 << "rs0"
                                 << "version"
                                 << 1
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -403,6 +415,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
+                                << 1
+                                << "protocolVersion"
                                 << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -485,6 +499,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNode) {
                                 << "rs0"
                                 << "version"
                                 << 1
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -551,6 +567,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
                                 << "rs0"
                                 << "version"
                                 << 1
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -612,6 +630,8 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToNodeWithData) {
                                 << "rs0"
                                 << "version"
                                 << 1
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -670,6 +690,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
                                 << "rs0"
                                 << "version"
                                 << 2
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -725,6 +747,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
                                 << "rs0"
                                 << "version"
                                 << 2
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -779,6 +803,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
                                 << "rs0"
                                 << "version"
                                 << 2
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -844,6 +870,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
                                 << "rs0"
                                 << "version"
                                 << 2
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")
@@ -901,6 +929,8 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
                                 << "rs0"
                                 << "version"
                                 << 2
+                                << "protocolVersion"
+                                << 1
                                 << "members"
                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                          << "h1:1")

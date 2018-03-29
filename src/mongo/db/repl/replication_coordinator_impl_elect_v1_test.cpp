@@ -59,6 +59,8 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
                              << "mySet"
                              << "version"
                              << 1
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -1984,6 +1986,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
                             << "mySet"
                             << "version"
                             << 2
+                            << "protocolVersion"
+                            << 1
                             << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
@@ -2022,6 +2026,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
              << "mySet"
              << "version"
              << 4
+             << "protocolVersion"
+             << 1
              << "members"
              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                       << "node1:12345")
@@ -2045,6 +2051,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
                             << "mySet"
                             << "version"
                             << 2
+                            << "protocolVersion"
+                            << 1
                             << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                      << "node1:12345")
@@ -2068,6 +2076,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
              << "mySet"
              << "version"
              << 4
+             << "protocolVersion"
+             << 1
              << "members"
              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                       << "node1:12345")

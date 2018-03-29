@@ -51,6 +51,8 @@ TEST(ValidateConfigForInitiate, VersionMustBe1) {
                                                 << "rs0"
                                                 << "version"
                                                 << 2
+                                                << "protocolVersion"
+                                                << 1
                                                 << "members"
                                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                          << "h1")))));
@@ -63,6 +65,8 @@ TEST(ValidateConfigForInitiate, MustFindSelf) {
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
                                                 << "version"
+                                                << 1
+                                                << "protocolVersion"
                                                 << 1
                                                 << "members"
                                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -97,6 +101,8 @@ TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
                                                 << "rs0"
                                                 << "version"
                                                 << 1
+                                                << "protocolVersion"
+                                                << 1
                                                 << "members"
                                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                          << "h1")
@@ -122,6 +128,8 @@ TEST(ValidateConfigForInitiate, WriteConcernMustBeSatisfiable) {
                                           << "rs0"
                                           << "version"
                                           << 1
+                                          << "protocolVersion"
+                                          << 1
                                           << "members"
                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                    << "h1"))
@@ -144,6 +152,8 @@ TEST(ValidateConfigForInitiate, ArbiterPriorityMustBeZeroOrOne) {
                                          << "rs0"
                                          << "version"
                                          << 1
+                                         << "protocolVersion"
+                                         << 1
                                          << "members"
                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                   << "h1")
@@ -160,6 +170,8 @@ TEST(ValidateConfigForInitiate, ArbiterPriorityMustBeZeroOrOne) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -175,6 +187,8 @@ TEST(ValidateConfigForInitiate, ArbiterPriorityMustBeZeroOrOne) {
     ASSERT_OK(twoConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
+                                        << 1
+                                        << "protocolVersion"
                                         << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -214,6 +228,8 @@ TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -226,6 +242,8 @@ TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
                                         << "rs0"
                                         << "version"
                                         << 3
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -278,6 +296,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -290,6 +310,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
                                         << "rs1"
                                         << "version"
                                         << 3
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -323,6 +345,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -337,6 +361,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
                                         << "rs0"
                                         << "version"
                                         << 3
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -376,6 +402,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -392,6 +420,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
                                         << "rs0"
                                         << "version"
                                         << 3
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -408,6 +438,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
                                                << "rs0"
                                                << "version"
                                                << 2
+                                               << "protocolVersion"
+                                               << 1
                                                << "members"
                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                         << "h1")
@@ -452,6 +484,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -466,6 +500,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
                                         << "rs0"
                                         << "version"
                                         << 3
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -480,6 +516,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
                                                << "rs0"
                                                << "version"
                                                << 2
+                                               << "protocolVersion"
+                                               << 1
                                                << "members"
                                                << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                         << "h1")
@@ -524,6 +562,8 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -542,6 +582,8 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
                                                        << "rs0"
                                                        << "version"
                                                        << 2
+                                                       << "protocolVersion"
+                                                       << 1
                                                        << "members"
                                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                 << "h1")
@@ -565,6 +607,8 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
                                                           << "rs0"
                                                           << "version"
                                                           << 2
+                                                          << "protocolVersion"
+                                                          << 1
                                                           << "members"
                                                           << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                    << "h1")
@@ -594,6 +638,8 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
                                                         << "rs0"
                                                         << "version"
                                                         << 2
+                                                        << "protocolVersion"
+                                                        << 1
                                                         << "members"
                                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                  << "h1")
@@ -616,6 +662,8 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -629,6 +677,8 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -688,6 +738,8 @@ TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -702,6 +754,8 @@ TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
                                          << "rs0"
                                          << "version"
                                          << 2
+                                         << "protocolVersion"
+                                         << 1
                                          << "members"
                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                   << "h1")
@@ -717,6 +771,8 @@ TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -732,6 +788,8 @@ TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -773,6 +831,8 @@ TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -786,6 +846,8 @@ TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h1")
@@ -818,6 +880,8 @@ TEST(ValidateConfigForInitiate, NewConfigInvalid) {
                                                    << "rs0"
                                                    << "version"
                                                    << 2
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                             << "h2")
@@ -841,6 +905,8 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
@@ -850,6 +916,8 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -880,6 +948,8 @@ TEST(ValidateConfigForReconfig, NewConfigWriteConcernNotSatisifiable) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
@@ -888,6 +958,8 @@ TEST(ValidateConfigForReconfig, NewConfigWriteConcernNotSatisifiable) {
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
+                                        << 1
+                                        << "protocolVersion"
                                         << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
@@ -919,6 +991,8 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -941,6 +1015,8 @@ TEST(ValidateConfigForStartUp, NewConfigValid) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2"
@@ -965,6 +1041,8 @@ TEST(ValidateConfigForStartUp, NewConfigWriteConcernNotSatisfiable) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2"))
@@ -987,6 +1065,8 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -1009,6 +1089,8 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -1030,6 +1112,8 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigWriteConcernNotSatisfiable) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -1053,6 +1137,8 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -1065,6 +1151,8 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -1088,6 +1176,8 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
                                         << "rs0"
                                         << "version"
                                         << 1
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")
@@ -1100,6 +1190,8 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
                                         << "rs0"
                                         << "version"
                                         << 2
+                                        << "protocolVersion"
+                                        << 1
                                         << "members"
                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                  << "h3")

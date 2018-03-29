@@ -112,6 +112,7 @@ repl::ReplSetConfig _getConfigWithMemberRemoved(const repl::ReplSetConfig& oldCo
     BSONObjBuilder newConfigBuilder;
     newConfigBuilder.append("_id", oldConfig.getReplSetName());
     newConfigBuilder.append("version", oldConfig.getConfigVersion());
+    newConfigBuilder.append("protocolVersion", oldConfig.getProtocolVersion());
 
     BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
     for (repl::ReplSetConfig::MemberIterator member = oldConfig.membersBegin();
@@ -200,6 +201,7 @@ protected:
         mongo::BSONObjBuilder newConfigBuilder;
         newConfigBuilder.append("_id", oldConfig.getReplSetName());
         newConfigBuilder.append("version", oldConfig.getConfigVersion());
+        newConfigBuilder.append("protocolVersion", oldConfig.getProtocolVersion());
 
         mongo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
 

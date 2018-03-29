@@ -141,6 +141,8 @@ TEST_F(ElectCmdRunnerTest, OneNode) {
                                                          << "rs0"
                                                          << "version"
                                                          << 1
+                                                         << "protocolVersion"
+                                                         << 1
                                                          << "members"
                                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                                   << "h1"))));
@@ -157,6 +159,8 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
     const ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                          << "rs0"
                                                          << "version"
+                                                         << 1
+                                                         << "protocolVersion"
                                                          << 1
                                                          << "members"
                                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -195,6 +199,8 @@ TEST_F(ElectCmdRunnerTest, ShuttingDown) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -293,6 +299,8 @@ protected:
                     << "rs0"
                     << "version"
                     << 1
+                    << "protocolVersion"
+                    << 1
                     << "members"
                     << BSON_ARRAY(BSON("_id" << 0 << "host"
                                              << "host0")
@@ -310,6 +318,8 @@ protected:
         return BSON("_id"
                     << "rs0"
                     << "version"
+                    << 1
+                    << "protocolVersion"
                     << 1
                     << "members"
                     << BSON_ARRAY(BSON("_id" << 0 << "host"

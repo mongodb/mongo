@@ -53,6 +53,7 @@ var TagsTest = function(options) {
         var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
         const replSetConfig = {
             _id: name,
+            protocolVersion: 1,
             members: [
                 {
                   _id: 0,

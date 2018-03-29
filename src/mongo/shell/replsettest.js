@@ -439,10 +439,7 @@ var ReplSetTest = function(opts) {
     this.getReplSetConfig = function() {
         var cfg = {};
         cfg._id = this.name;
-
-        if (this.protocolVersion !== undefined && this.protocolVersion !== null) {
-            cfg.protocolVersion = this.protocolVersion;
-        }
+        cfg.protocolVersion = 1;
 
         cfg.members = [];
 
@@ -467,10 +464,6 @@ var ReplSetTest = function(opts) {
             }
 
             cfg.members.push(member);
-        }
-
-        if (jsTestOptions().forceReplicationProtocolVersion !== undefined) {
-            cfg.protocolVersion = jsTestOptions().forceReplicationProtocolVersion;
         }
 
         if (_configSettings) {
@@ -833,12 +826,12 @@ var ReplSetTest = function(opts) {
     };
 
     this._setDefaultConfigOptions = function(config) {
-        if (jsTestOptions().forceReplicationProtocolVersion !== undefined &&
-            !config.hasOwnProperty("protocolVersion")) {
-            config.protocolVersion = jsTestOptions().forceReplicationProtocolVersion;
-        }
         // Update config for non journaling test variants
         this._updateConfigIfNotDurable(config);
+        // Add protocolVersion if missing
+        if (!config.hasOwnProperty('protocolVersion')) {
+            config['protocolVersion'] = 1;
+        }
     };
 
     /**
@@ -1036,38 +1029,8 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        if (this.protocolVersion === 0 || jsTestOptions().forceReplicationProtocolVersion === 0) {
-            // Ensure the specified node is primary.
-            for (let i = 0; i < this.nodes.length; i++) {
-                let primary = this.getPrimary();
-                if (primary === node) {
-                    break;
-                }
-                try {
-                    // Make sure the nodes do not step back up for 10 minutes.
-                    assert.commandWorked(
-                        primary.adminCommand({replSetStepDown: 10 * 60, force: true}));
-                } catch (ex) {
-                    print("Caught exception while stepping down node '" + tojson(node.host) +
-                          "': " + tojson(ex));
-                }
-                this.awaitReplication();
-                this.awaitNodesAgreeOnAppliedOpTime();
-                this.awaitNodesAgreeOnPrimary();
-            }
-
-            // Reset the rest of the nodes so they can run for election during the test.
-            for (let i = 0; i < this.nodes.length; i++) {
-                // Cannot call replSetFreeze on the primary.
-                if (this.nodes[i] === node) {
-                    continue;
-                }
-                assert.commandWorked(this.nodes[i].adminCommand({replSetFreeze: 0}));
-            }
-        } else {
-            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-            this.awaitNodesAgreeOnPrimary();
-        }
+        assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+        this.awaitNodesAgreeOnPrimary();
         assert.eq(this.getPrimary(), node, node.host + " was not primary after stepUp");
     };
 

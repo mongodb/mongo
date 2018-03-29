@@ -65,6 +65,7 @@ var RenameAcrossDatabasesTest = function(options) {
         const nextVersion = currentConfig.version + 1;
         const replSetConfig = {
             _id: currentConfig._id,
+            protocolVersion: 1,
             members: [
                 {
                   _id: 0,

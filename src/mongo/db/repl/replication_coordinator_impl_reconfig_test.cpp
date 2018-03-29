@@ -118,6 +118,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                              << "mySet"
                              << "version"
                              << 2
+                             << "protocolVersion"
+                             << 1
                              << "invalidlyNamedField"
                              << 3
                              << "members"
@@ -160,6 +162,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                              << "notMySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -198,6 +202,8 @@ TEST_F(ReplCoordTest, NodeReturnsInvalidReplicaSetConfigWhenReconfigReceivedWith
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -237,6 +243,8 @@ TEST_F(ReplCoordTest,
                              << "mySet"
                              << "version"
                              << -3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -278,6 +286,8 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord,
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -393,6 +403,8 @@ TEST_F(ReplCoordTest,
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -430,6 +442,8 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")
@@ -521,6 +535,8 @@ TEST_F(
                          << "mySet"
                          << "version"
                          << 3
+                         << "protocolVersion"
+                         << 1
                          << "members"
                          << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                   << "node1:12345")
@@ -647,6 +663,8 @@ TEST_F(ReplCoordTest, NodeAcceptsConfigFromAReconfigWithForceTrueWhileNotPrimary
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                       << "node1:12345")

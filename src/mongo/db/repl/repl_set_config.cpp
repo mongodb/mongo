@@ -96,20 +96,15 @@ const std::string kCatchUpTakeoverDelayFieldName = "catchUpTakeoverDelayMillis";
 
 }  // namespace
 
-Status ReplSetConfig::initialize(const BSONObj& cfg,
-                                 bool usePV1ByDefault,
-                                 OID defaultReplicaSetId) {
-    return _initialize(cfg, false, usePV1ByDefault, defaultReplicaSetId);
+Status ReplSetConfig::initialize(const BSONObj& cfg, OID defaultReplicaSetId) {
+    return _initialize(cfg, false, defaultReplicaSetId);
 }
 
-Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault) {
-    return _initialize(cfg, true, usePV1ByDefault, OID());
+Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg) {
+    return _initialize(cfg, true, OID());
 }
 
-Status ReplSetConfig::_initialize(const BSONObj& cfg,
-                                  bool forInitiate,
-                                  bool usePV1ByDefault,
-                                  OID defaultReplicaSetId) {
+Status ReplSetConfig::_initialize(const BSONObj& cfg, bool forInitiate, OID defaultReplicaSetId) {
     _isInitialized = false;
     _members.clear();
     Status status =
@@ -175,10 +170,15 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
         if (status != ErrorCodes::NoSuchKey) {
             return status;
         }
-
-        if (usePV1ByDefault) {
+        if (forInitiate) {
+            // Default protocolVersion to 1 when initiating a new set.
             _protocolVersion = 1;
         }
+        // If protocolVersion field is missing but this *isn't* for an initiate, leave
+        // _protocolVersion at it's default of 0 for now.  It will error later on, during
+        // validate().
+        // TODO(spencer): Remove this after 4.0, when we no longer need mixed-version support
+        // with versions that don't always include the protocolVersion field.
     }
 
     //
@@ -186,7 +186,7 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
     //
     status = bsonExtractBooleanFieldWithDefault(cfg,
                                                 kWriteConcernMajorityJournalDefaultFieldName,
-                                                _protocolVersion == 1,
+                                                true,
                                                 &_writeConcernMajorityJournalDefault);
     if (!status.isOK())
         return status;
@@ -549,17 +549,23 @@ Status ReplSetConfig::validate() const {
         }
     }
 
-    if (_protocolVersion != 0 && _protocolVersion != 1) {
+
+    if (_protocolVersion == 0) {
+        return Status(
+            ErrorCodes::BadValue,
+            str::stream()
+                << "Support for replication protocol version 0 was removed in MongoDB 4.0. "
+                << "Downgrade to MongoDB version 3.6 and upgrade your protocol "
+                   "version to 1 before upgrading your MongoDB version");
+    }
+    if (_protocolVersion != 1) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << kProtocolVersionFieldName << " field value of "
-                                    << _protocolVersion
-                                    << " is not 1 or 0");
+                      str::stream() << kProtocolVersionFieldName
+                                    << " of 1 is the only supported value. Found: "
+                                    << _protocolVersion);
     }
 
     if (_configServer) {
-        if (_protocolVersion == 0) {
-            return Status(ErrorCodes::BadValue, "Config servers cannot run in protocolVersion 0");
-        }
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
                           "Arbiters are not allowed in replica set configurations being used for "
@@ -776,21 +782,9 @@ BSONObj ReplSetConfig::toBSON() const {
         configBuilder.append(kConfigServerFieldName, _configServer);
     }
 
-    // Only include writeConcernMajorityJournalDefault if it is not the default version for this
-    // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of ReplSetConfigs.
-    if (_protocolVersion > 0) {
-        configBuilder.append(kProtocolVersionFieldName, _protocolVersion);
-        // Only include writeConcernMajorityJournalDefault if it is not the default version for this
-        // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of
-        // ReplSetConfigs.
-        if (!_writeConcernMajorityJournalDefault) {
-            configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
-                                 _writeConcernMajorityJournalDefault);
-        }
-    } else if (_writeConcernMajorityJournalDefault) {
-        configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
-                             _writeConcernMajorityJournalDefault);
-    }
+    configBuilder.append(kProtocolVersionFieldName, _protocolVersion);
+    configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
+                         _writeConcernMajorityJournalDefault);
 
     BSONArrayBuilder members(configBuilder.subarrayStart(kMembersFieldName));
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {

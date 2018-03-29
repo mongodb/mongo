@@ -72,19 +72,15 @@ public:
 
     /**
      * Initializes this ReplSetConfig from the contents of "cfg".
-     * The default protocol version is 0 to keep backward-compatibility.
-     * If usePV1ByDefault is true, the protocol version will be 1 when it's not specified in "cfg".
      * Sets _replicaSetId to "defaultReplicaSetId" if a replica set ID is not specified in "cfg".
      */
-    Status initialize(const BSONObj& cfg,
-                      bool usePV1ByDefault = false,
-                      OID defaultReplicaSetId = OID());
+    Status initialize(const BSONObj& cfg, OID defaultReplicaSetId = OID());
 
     /**
      * Same as the generic initialize() above except will default "configsvr" setting to the value
      * of serverGlobalParams.configsvr.
      */
-    Status initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault = false);
+    Status initializeForInitiate(const BSONObj& cfg);
 
     /**
      * Returns true if this object has been successfully initialized or copied from
@@ -381,10 +377,7 @@ private:
      * Sets replica set ID to 'defaultReplicaSetId' if forInitiate is false and 'cfg' does not
      * contain an ID.
      */
-    Status _initialize(const BSONObj& cfg,
-                       bool forInitiate,
-                       bool usePV1ByDefault,
-                       OID defaultReplicaSetId);
+    Status _initialize(const BSONObj& cfg, bool forInitiate, OID defaultReplicaSetId);
 
     bool _isInitialized = false;
     long long _version = 1;

@@ -135,12 +135,21 @@ protected:
         return _currentConfig.getMemberAt(getTopoCoord().getCurrentPrimaryIndex()).getHostAndPort();
     }
 
+    BSONObj addProtocolVersion(const BSONObj& configDoc) {
+        if (configDoc.hasField("protocolVersion")) {
+            return configDoc;
+        }
+        BSONObjBuilder builder;
+        builder << "protocolVersion" << 1;
+        builder.appendElementsUnique(configDoc);
+        return builder.obj();
+    }
+
     // Update config and set selfIndex
     // If "now" is passed in, set _now to now+1
     void updateConfig(BSONObj cfg, int selfIndex, Date_t now = Date_t::fromMillisSinceEpoch(-1)) {
         ReplSetConfig config;
-        // Use Protocol version 1 by default.
-        ASSERT_OK(config.initialize(cfg, true));
+        ASSERT_OK(config.initialize(addProtocolVersion(cfg)));
         ASSERT_OK(config.validate());
 
         _selfIndex = selfIndex;
@@ -2094,6 +2103,8 @@ TEST_F(TopoCoordTest, BecomeCandidateWhenReconfigToBeElectableInSingleNodeSet) {
                         << "rs0"
                         << "version"
                         << 1
+                        << "protocolVersion"
+                        << 1
                         << "members"
                         << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                  << "hself"
@@ -2129,6 +2140,8 @@ TEST_F(TopoCoordTest,
     ASSERT_OK(cfg.initialize(BSON("_id"
                                   << "rs0"
                                   << "version"
+                                  << 1
+                                  << "protocolVersion"
                                   << 1
                                   << "members"
                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -2295,6 +2308,8 @@ TEST_F(TopoCoordTest, NodeTransitionsToSecondaryWhenReconfiggingToBeUnelectable)
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version"
+                      << 1
+                      << "protocolVersion"
                       << 1
                       << "members"
                       << BSON_ARRAY(BSON("_id" << 0 << "host"

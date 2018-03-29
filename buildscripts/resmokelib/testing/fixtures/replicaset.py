@@ -112,7 +112,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 "hidden": 1, "votes": 0
             })
 
-        repl_config = {"_id": self.replset_name}
+        repl_config = {"_id": self.replset_name, "protocolVersion": 1}
         client = self.nodes[0].mongo_client()
 
         if self.auth_options is not None:

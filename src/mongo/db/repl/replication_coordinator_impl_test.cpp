@@ -3059,6 +3059,8 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status) {
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                       << "node1:12345"
@@ -3157,6 +3159,8 @@ void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* sta
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                       << "node1:12345")
