@@ -1303,13 +1303,11 @@ Status multiInitialSyncApply(OperationContext* opCtx,
 }
 
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
-    auto workerPool = _writerPool;
-
     if (!opCtx) {
         return {ErrorCodes::BadValue, "invalid operation context"};
     }
 
-    if (!workerPool) {
+    if (!_writerPool) {
         return {ErrorCodes::BadValue, "invalid worker pool"};
     }
 
@@ -1323,7 +1321,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
 
     if (isMMAPV1()) {
         // Use a ThreadPool to prefetch all the operations in a batch.
-        prefetchOps(ops, workerPool);
+        prefetchOps(ops, _writerPool);
     }
 
     auto consistencyMarkers = ReplicationProcess::get(opCtx)->getConsistencyMarkers();
@@ -1340,18 +1338,18 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
                 "attempting to replicate ops while primary"};
     }
 
-    std::vector<WorkerMultikeyPathInfo> multikeyVector(workerPool->getStats().numThreads);
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().numThreads);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
 
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
-        ON_BLOCK_EXIT([&] { workerPool->waitForIdle(); });
+        ON_BLOCK_EXIT([&] { _writerPool->waitForIdle(); });
 
         // Write batch of ops into oplog.
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
-        scheduleWritesToOplog(opCtx, workerPool, ops);
+        scheduleWritesToOplog(opCtx, _writerPool, ops);
 
         // Holds extracted applyOps operations. Keep in scope until all operations in 'ops' and
         // 'applyOpsOperations' have been applied.
@@ -1364,20 +1362,20 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         // oplog.rs collection.
         auto opsWithTxnUpdates = Session::addOpsForReplicatingTxnTable(ops);
 
-        std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getStats().numThreads);
+        std::vector<MultiApplier::OperationPtrs> writerVectors(_writerPool->getStats().numThreads);
         fillWriterVectors(opCtx, &opsWithTxnUpdates, &writerVectors, &applyOpsOperations);
 
         // Wait for writes to finish before applying ops.
-        workerPool->waitForIdle();
+        _writerPool->waitForIdle();
 
         // Reset consistency markers in case the node fails while applying ops.
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
         {
-            std::vector<Status> statusVector(workerPool->getStats().numThreads, Status::OK());
-            applyOps(writerVectors, workerPool, _applyFunc, this, &statusVector, &multikeyVector);
-            workerPool->waitForIdle();
+            std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
+            applyOps(writerVectors, _writerPool, _applyFunc, this, &statusVector, &multikeyVector);
+            _writerPool->waitForIdle();
 
             // If any of the statuses is not ok, return error.
             for (auto it = statusVector.cbegin(); it != statusVector.cend(); ++it) {
