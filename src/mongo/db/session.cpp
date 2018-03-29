@@ -807,6 +807,9 @@ boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
                                                                StmtId stmtId) const {
     _checkValid(wl);
     _checkIsActiveTransaction(wl, txnNumber);
+    // Retries are not detected for multi-document transactions.
+    if (_txnState == MultiDocumentTransactionState::kInProgress)
+        return boost::none;
 
     const auto it = _activeTxnCommittedStatements.find(stmtId);
     if (it == _activeTxnCommittedStatements.end()) {
