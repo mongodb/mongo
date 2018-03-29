@@ -292,28 +292,6 @@ def validate_options(parser, options, args):
                      .format(options.executor_file, " ".join(args)))
 
 
-def validate_benchmark_options():
-    """
-    Some options are incompatible with benchmark test suites, we error out early if any of
-    these options are specified.
-
-    :return: None
-    """
-
-    if _config.REPEAT > 1:
-        raise optparse.OptionValueError(
-            "--repeat cannot be used with benchmark tests. Please use --benchmarkMinTimeSecs to "
-            "increase the runtime of a single benchmark configuration.")
-
-    if _config.JOBS > 1:
-        raise optparse.OptionValueError(
-            "--jobs=%d cannot be used for benchmark tests. Parallel jobs affect CPU cache access "
-            "patterns and cause additional context switching, which lead to inaccurate benchmark "
-            "results. Please use --jobs=1"
-            % _config.JOBS
-        )
-
-
 def get_logging_config(values):
     return _get_logging_config(values.logger_file)
 

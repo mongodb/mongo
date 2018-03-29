@@ -6,9 +6,30 @@ from __future__ import absolute_import
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import core
-from buildscripts.resmokelib import parser
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.testcases import interface
+
+
+def validate_benchmark_options():
+    """
+    Some options are incompatible with benchmark test suites, we error out early if any of
+    these options are specified.
+
+    :return: None
+    """
+
+    if _config.REPEAT > 1:
+        raise optparse.OptionValueError(
+            "--repeat cannot be used with benchmark tests. Please use --benchmarkMinTimeSecs to "
+            "increase the runtime of a single benchmark configuration.")
+
+    if _config.JOBS > 1:
+        raise optparse.OptionValueError(
+            "--jobs=%d cannot be used for benchmark tests. Parallel jobs affect CPU cache access "
+            "patterns and cause additional context switching, which lead to inaccurate benchmark "
+            "results. Please use --jobs=1"
+            % _config.JOBS
+        )
 
 
 class BenchmarkTestCase(interface.TestCase):
@@ -26,13 +47,10 @@ class BenchmarkTestCase(interface.TestCase):
         Initializes the BenchmarkTestCase with the executable to run.
         """
         interface.TestCase.__init__(self, logger, "Benchmark test", program_executable)
-        parser.validate_benchmark_options()
+        validate_benchmark_options()
 
         self.bm_executable = program_executable
         self.suite_bm_options = program_options
-
-    def configure(self, fixture, *args, **kwargs):
-        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # 1. Set the default benchmark options, including the out file path, which is based on the
         #    executable path. Keep the existing extension (if any) to simplify parsing.
