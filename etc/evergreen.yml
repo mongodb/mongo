@@ -1404,9 +1404,11 @@ functions:
 
         for i in {1..3}
         do
-          if ! kitchen verify "${packager_distro}"; then
+          # kitchen commands use regex so 'kitchen verify amazon' matches both amazon and amazon2
+          # that's why we pass $ at the end of "${packager_distro}"
+          if ! kitchen verify "${packager_distro}"\$; then
             verified="false"
-            kitchen destroy "${packager_distro}" || true
+            kitchen destroy "${packager_distro}"\$ || true
             sleep 30
           else
             verified="true"
@@ -1414,7 +1416,7 @@ functions:
           fi
         done
 
-        kitchen destroy "${packager_distro}" || true
+        kitchen destroy "${packager_distro}"\$ || true
         test "$verified" = "true"
 
   "fetch test_lifecycle.yml":
@@ -6006,6 +6008,171 @@ buildvariants:
   - name: compile_all
     distros:
     - linux-64-amzn-build
+  - name: aggregation
+  - name: aggregation_auth
+  - name: auth
+  - name: dbtest
+  - name: disk_wiredtiger
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_write_cmd
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_txns
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
+  - name: parallel
+  - name: parallel_compatibility
+  - name: concurrency
+  - name: concurrency_replication
+  - name: concurrency_sharded
+  - name: concurrency_simultaneous
+  - name: replica_sets
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: slow1
+  - name: serial_run
+  - name: sharded_collections_jscore_passthrough
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharding_jscore_passthrough_wire_ops
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
+- name: enterprise-amazon2
+  display_name: "Enterprise Amazon Linux 2"
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=requires_mmapv1
+      --excludeWithAnyTags=SERVER-34286
+    tooltags: "-tags 'ssl sasl'"
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - amazon2-build
+  - name: compile_all
+    distros:
+    - amazon2-build
+  - name: aggregation_auth
+  - name: aggregation
+  - name: audit
+  - name: auth
+  - name: auth_audit
+  - name: dbtest
+  - name: ese
+  - name: failpoints_auth
+  - name: jsCore
+  - name: jsCore_ese
+  - name: jsCore_auth
+  - name: jsCore_decimal
+  - name: jsCore_txns
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
+  - name: replica_sets_auth
+  - name: replica_sets_ese
+  - name: powercycle
+  - name: sasl
+  - name: sharding_auth
+  - name: sharding_auth_audit
+  - name: sharding_ese
+  - name: slow1
+  - name: serial_run
+  - name: sharded_collections_jscore_passthrough
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharding_jscore_passthrough_wire_ops
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
+- name: amazon2
+  display_name: SSL Amazon Linux 2
+  run_on:
+  - amazon2-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=requires_mmapv1
+      --excludeWithAnyTags=SERVER-34286
+    tooltags: "-tags 'ssl'"
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: amazon
+    multiversion_edition: targeted
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    shared_scons_pruning: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - amazon2-build
+  - name: compile_all
+    distros:
+    - amazon2-build
   - name: aggregation
   - name: aggregation_auth
   - name: auth
