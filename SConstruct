@@ -2889,10 +2889,11 @@ def doConfigure(myenv):
     ssl_provider = get_option("ssl-provider")
     if ssl_provider == 'auto':
         # TODO: When native platforms are implemented, make them the default
-        # if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
-        #     ssl_provider = 'native'
-        # else:
-        ssl_provider = 'openssl'
+        #if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
+        if conf.env.TargetOSIs('windows'):
+            ssl_provider = 'native'
+        else:
+            ssl_provider = 'openssl'
 
     if ssl_provider == 'native':
         if conf.env.TargetOSIs('windows'):
