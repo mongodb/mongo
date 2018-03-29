@@ -50,7 +50,7 @@
     assert.commandFailedWithCode(
         sessionDb.adminCommand(
             {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
-        ErrorCodes.TransactionAborted);
+        ErrorCodes.NoSuchTransaction);
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     jsTest.log("Cannot implicitly create a collection in a transaction using update.");
@@ -86,7 +86,7 @@
     assert.commandFailedWithCode(
         sessionDb.adminCommand(
             {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
-        ErrorCodes.TransactionAborted);
+        ErrorCodes.NoSuchTransaction);
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     // Update without upsert=true succeeds when the collection does not exist.
@@ -140,7 +140,7 @@
     assert.commandFailedWithCode(
         sessionDb.adminCommand(
             {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
-        ErrorCodes.TransactionAborted);
+        ErrorCodes.NoSuchTransaction);
     assert.eq(null, testColl.findOne({_id: "doc"}));
 
     // findAndModify without upsert=true succeeds when the collection does not exist.

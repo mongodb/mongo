@@ -22,16 +22,16 @@ function runCommandAndVerifyResponse(sessionDb, txnNumber, cmdObj, expectSuccess
         // noop writes may advance the majority commit point past the given atClusterTime
         // resulting in a SnapshotTooOld error. Eventually the read should succeed, when all
         // targeted shards are at the same cluster time, so retry until it does.
-        // A snapshot read may also fail with TransactionAborted if it encountered a StaleEpoch
+        // A snapshot read may also fail with NoSuchTransaction if it encountered a StaleEpoch
         // error while it was running.
         assert.soon(() => {
             const res = sessionDb.runCommand(cmdObj);
             if (!res.ok) {
                 assert(res.code === ErrorCodes.SnapshotTooOld ||
-                           res.code === ErrorCodes.TransactionAborted,
-                       "expected command to fail with SnapshotTooOld or TransactionAborted, cmd: " +
+                           res.code === ErrorCodes.NoSuchTransaction,
+                       "expected command to fail with SnapshotTooOld or NoSuchTransaction, cmd: " +
                            tojson(cmdObj) + ", result: " + tojson(res));
-                print("Retrying because of SnapshotTooOld or TransactionAborted error.");
+                print("Retrying because of SnapshotTooOld or NoSuchTransaction error.");
                 txnNumber++;
                 cmdObj.txnNumber = NumberLong(txnNumber);
                 return false;

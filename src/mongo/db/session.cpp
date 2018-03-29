@@ -349,7 +349,7 @@ void Session::onMigrateCompletedOnPrimary(OperationContext* opCtx,
     stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     _checkValid(ul);
-    _checkIsActiveTransaction(ul, txnNumber);
+    _checkIsActiveTransaction(ul, txnNumber, false);
 
     const auto updateRequest =
         _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate);
@@ -378,7 +378,7 @@ void Session::invalidate() {
 repl::OpTime Session::getLastWriteOpTime(TxnNumber txnNumber) const {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _checkValid(lg);
-    _checkIsActiveTransaction(lg, txnNumber);
+    _checkIsActiveTransaction(lg, txnNumber, false);
 
     if (!_lastWrittenSessionRecord || _lastWrittenSessionRecord->getTxnNum() != txnNumber)
         return {};
@@ -578,7 +578,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     // Always check '_activeTxnNumber', since it can be modified by migration, which does not check
     // out the session. We intentionally do not error if _txnState=kAborted, since we expect this
     // function to be called at the end of the 'abortTransaction' command.
-    _checkIsActiveTransaction(lg, *opCtx->getTxnNumber());
+    _checkIsActiveTransaction(lg, *opCtx->getTxnNumber(), false);
 
     if (_txnState != MultiDocumentTransactionState::kInProgress &&
         _txnState != MultiDocumentTransactionState::kInSnapshotRead) {
@@ -621,8 +621,10 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
 
         // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session
         // kill and migration, which do not check out the session.
-        _checkIsActiveTransaction(lg, *opCtx->getTxnNumber());
-        uassert(ErrorCodes::TransactionAborted,
+        _checkIsActiveTransaction(lg, *opCtx->getTxnNumber(), false);
+        // Throw NoSuchTransaction error instead of TransactionAborted error since this is the entry
+        // point of transaction execution.
+        uassert(ErrorCodes::NoSuchTransaction,
                 str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
                 _txnState != MultiDocumentTransactionState::kAborted);
 
@@ -728,10 +730,7 @@ void Session::addTransactionOperation(OperationContext* opCtx,
 
     // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
     // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber());
-    uassert(ErrorCodes::TransactionAborted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-            _txnState != MultiDocumentTransactionState::kAborted);
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
     invariant(_txnState == MultiDocumentTransactionState::kInProgress);
     invariant(!_autocommit && _activeTxnNumber != kUninitializedTxnNumber);
@@ -745,10 +744,7 @@ std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
 
     // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
     // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber());
-    uassert(ErrorCodes::TransactionAborted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-            _txnState != MultiDocumentTransactionState::kAborted);
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
     invariant(!_autocommit);
     return std::move(_transactionOperations);
@@ -759,10 +755,7 @@ void Session::commitTransaction(OperationContext* opCtx) {
 
     // Always check '_activeTxnNumber' and '_txnState', since they can be modified by session kill
     // and migration, which do not check out the session.
-    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber());
-    uassert(ErrorCodes::TransactionAborted,
-            str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
-            _txnState != MultiDocumentTransactionState::kAborted);
+    _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
     if (_txnState == MultiDocumentTransactionState::kCommitted)
         return;
@@ -819,7 +812,7 @@ void Session::_checkValid(WithLock) const {
             _isValid);
 }
 
-void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const {
+void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber, bool checkAbort) const {
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Cannot perform operations on transaction " << txnNumber
                           << " on session "
@@ -828,13 +821,17 @@ void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const {
                           << _activeTxnNumber
                           << " is now active.",
             txnNumber == _activeTxnNumber);
+
+    uassert(ErrorCodes::TransactionAborted,
+            str::stream() << "Transaction " << txnNumber << " has been aborted.",
+            !checkAbort || _txnState != MultiDocumentTransactionState::kAborted);
 }
 
 boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
                                                                TxnNumber txnNumber,
                                                                StmtId stmtId) const {
     _checkValid(wl);
-    _checkIsActiveTransaction(wl, txnNumber);
+    _checkIsActiveTransaction(wl, txnNumber, false);
     // Retries are not detected for multi-document transactions.
     if (_txnState == MultiDocumentTransactionState::kInProgress)
         return boost::none;

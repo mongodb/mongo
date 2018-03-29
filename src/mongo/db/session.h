@@ -334,7 +334,7 @@ private:
 
     void _setActiveTxn(WithLock, TxnNumber txnNumber);
 
-    void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
+    void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber, bool checkAbort) const;
 
     boost::optional<repl::OpTime> _checkStatementExecuted(WithLock,
                                                           TxnNumber txnNumber,

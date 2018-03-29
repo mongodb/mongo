@@ -792,7 +792,7 @@ TEST_F(SessionTest, ConcurrencyOfUnstashAndAbort) {
     // An unstash after an abort should uassert.
     ASSERT_THROWS_CODE(session.unstashTransactionResources(opCtx()),
                        AssertionException,
-                       ErrorCodes::TransactionAborted);
+                       ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(SessionTest, ConcurrencyOfUnstashAndMigration) {
