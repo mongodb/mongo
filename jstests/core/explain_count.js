@@ -15,10 +15,46 @@ function checkCountScanIndexExplain(explain, startKey, endKey, startInclusive, e
 
     assert.eq(countStage.stage, "COUNT_SCAN");
     assert("indexBounds" in countStage);
-    assert.eq(bsonWoCompare(countStage.indexBounds.startKey, startKey), 0);
-    assert.eq(bsonWoCompare(countStage.indexBounds.endKey, endKey), 0);
+    assert.eq(countStage.indexBounds.startKey, startKey);
+    assert.eq(countStage.indexBounds.endKey, endKey);
     assert.eq(countStage.indexBounds.startKeyInclusive, startInclusive);
     assert.eq(countStage.indexBounds.endKeyInclusive, endInclusive);
+}
+
+/**
+ * Ensure that the SHARDING_FILTER's child stage is an IXSCAN (and not a fetch). This is to ensure
+ * sharded clusters can still run the count command with a predicate on indexed fields reasonably
+ * fast. Assumes that the shard key is part of the index.
+ */
+function checkShardingFilterIndexScanExplain(explain, keyName, bounds) {
+    var filterStage = getPlanStage(explain.executionStats.executionStages, "SHARDING_FILTER");
+
+    assert.eq(filterStage.stage, "SHARDING_FILTER");
+    const ixScanStage = filterStage.inputStage;
+    assert.eq(ixScanStage.stage, "IXSCAN");
+    assert("indexBounds" in ixScanStage);
+
+    assert.eq(ixScanStage.indexBounds[keyName].length, 1);
+    const expectedBoundsArr = JSON.parse(ixScanStage.indexBounds[keyName][0]);
+    assert.eq(expectedBoundsArr, bounds);
+}
+
+/**
+ * Check that the explain from a count command run on a collection with a usable index for the
+ * predicate produces a reasonable plan. On sharded collections, we expect to have an IXSCAN
+ * followed by a SHARDING_FILTER. Otherwise, the COUNT_SCAN stage should be used.
+ */
+function checkIndexedCountWithPred(db, explain, keyName, bounds) {
+    assert.eq(bounds.length, 2);
+    if (isMongos(db) && FixtureHelpers.isSharded(db[collName])) {
+        // On sharded collections we have a SHARDING_FILTER with a child that's an IXSCAN.
+        checkShardingFilterIndexScanExplain(explain, keyName, bounds);
+    } else {
+        // On a standalone we just do a COUNT_SCAN over the {a: 1, _id: 1} index.
+        const min = {a: bounds[0], _id: {"$minKey": 1}};
+        const max = {a: bounds[1], _id: {"$maxKey": 1}};
+        checkCountScanIndexExplain(explain, min, max, true, true);
+    }
 }
 
 // Collection does not exist.
@@ -50,7 +86,9 @@ explain = db.runCommand(
 assertExplainCount({explainResults: explain, expectedCount: 0});
 
 // Now add a bit of data to the collection.
-t.ensureIndex({a: 1});
+// On sharded clusters, we'll want the shard key to be indexed, so we make _id part of the index.
+// This means counts will not have to fetch from the document in order to get the shard key.
+t.ensureIndex({a: 1, _id: 1});
 for (var i = 0; i < 10; i++) {
     t.insert({_id: i, a: 1});
 }
@@ -85,21 +123,21 @@ assertExplainCount({explainResults: explain, expectedCount: 3});
 assert.eq(10, db.runCommand({count: collName, query: {a: 1}}).n);
 explain = db.runCommand({explain: {count: collName, query: {a: 1}}, verbosity: "executionStats"});
 assertExplainCount({explainResults: explain, expectedCount: 10});
-checkCountScanIndexExplain(explain, {a: 1}, {a: 1}, true, true);
+checkIndexedCountWithPred(db, explain, "a", [1.0, 1.0]);
 
 // With a query and skip.
 assert.eq(7, db.runCommand({count: collName, query: {a: 1}, skip: 3}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 1}, skip: 3}, verbosity: "executionStats"});
 assertExplainCount({explainResults: explain, expectedCount: 7});
-checkCountScanIndexExplain(explain, {a: 1}, {a: 1}, true, true);
+checkIndexedCountWithPred(db, explain, "a", [1.0, 1.0]);
 
 // With a query and limit.
 assert.eq(3, db.runCommand({count: collName, query: {a: 1}, limit: 3}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 1}, limit: 3}, verbosity: "executionStats"});
 assertExplainCount({explainResults: explain, expectedCount: 3});
-checkCountScanIndexExplain(explain, {a: 1}, {a: 1}, true, true);
+checkIndexedCountWithPred(db, explain, "a", [1.0, 1.0]);
 
 // Insert one more doc for the last few tests.
 t.insert({a: 2});
@@ -109,11 +147,11 @@ assert.eq(0, db.runCommand({count: collName, query: {a: 2}, skip: 2}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 2}, skip: 2}, verbosity: "executionStats"});
 assertExplainCount({explainResults: explain, expectedCount: 0});
-checkCountScanIndexExplain(explain, {a: 2}, {a: 2}, true, true);
+checkIndexedCountWithPred(db, explain, "a", [2, 2]);
 
 // Case where we have a limit, but we don't hit it.
 assert.eq(1, db.runCommand({count: collName, query: {a: 2}, limit: 2}).n);
 explain = db.runCommand(
     {explain: {count: collName, query: {a: 2}, limit: 2}, verbosity: "executionStats"});
 assertExplainCount({explainResults: explain, expectedCount: 1});
-checkCountScanIndexExplain(explain, {a: 2}, {a: 2}, true, true);
+checkIndexedCountWithPred(db, explain, "a", [2, 2]);

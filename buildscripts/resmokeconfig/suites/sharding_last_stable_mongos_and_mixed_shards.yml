@@ -136,6 +136,8 @@ selector:
   - jstests/sharding/killop.js
   # New 4.0 feature
   - jstests/sharding/snapshot_aggregate_mongos.js
+  # Requires count command to be accurate on sharded clusters, introduced in v4.0.
+  - jstests/sharding/accurate_count_with_predicate.js
 
 executor:
   config:
