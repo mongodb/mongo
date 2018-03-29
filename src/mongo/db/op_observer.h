@@ -257,6 +257,9 @@ public:
      * any external subsystems that need to be notified of a rollback occurring.
      */
     struct RollbackObserverInfo {
+        // A count of all oplog entries seen during rollback (even no-op entries).
+        std::uint32_t numberOfEntriesObserved;
+
         // Set of all namespaces from ops being rolled back.
         std::set<NamespaceString> rollbackNamespaces = {};
 
@@ -275,6 +278,9 @@ public:
 
         // True if the config.version document was rolled back.
         bool configServerConfigVersionRolledBack = false;
+
+        // Maps command names to a count of the number of those commands that are being rolled back.
+        StringMap<std::uint32_t> rollbackCommandCounts;
     };
 
     /**
