@@ -33,6 +33,7 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/base/initializer.h"
+#include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_registrar.h"
 #include "mongo/util/log.h"
