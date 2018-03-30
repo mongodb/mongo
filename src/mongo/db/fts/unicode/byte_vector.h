@@ -35,6 +35,8 @@
 #include "mongo/db/fts/unicode/byte_vector_sse2.h"
 #elif defined(__powerpc64__)
 #include "mongo/db/fts/unicode/byte_vector_altivec.h"
+#elif defined(__aarch64__)
+#include "mongo/db/fts/unicode/byte_vector_neon.h"
 #else  // Other platforms go above here.
 #undef MONGO_HAVE_FAST_BYTE_VECTOR
 #endif
