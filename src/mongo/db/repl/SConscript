@@ -1452,6 +1452,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         'collection_cloner',
         'database_cloner',
         'databases_cloner',

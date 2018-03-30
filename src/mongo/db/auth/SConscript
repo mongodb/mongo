@@ -156,6 +156,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/sasl_client',
+        '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',

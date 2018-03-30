@@ -422,6 +422,7 @@ mongos = env.Program(
     LIBDEPS=[
         'db/auth/authmongos',
         'db/commands/server_status',
+        'db/commands/server_status_core',
         'db/curop',
         'db/ftdc/ftdc_mongos',
         'db/logical_time_metadata_hook',

@@ -532,16 +532,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/auth/authcore',
-        '$BUILD_DIR/mongo/db/wire_version',
-        '$BUILD_DIR/mongo/rpc/command_status',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/rpc/rpc',
         'audit',
-        'auth/authcore',
-        'command_can_run_here',
         'commands/server_status_core',
-        'service_context',
     ],
 )
 
@@ -783,9 +778,10 @@ env.Library(
     source=[
         "curop_metrics.cpp",
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
+        "commands/server_status_core",
         "curop",
-    ],
+    ]
 )
 
 env.Library(
@@ -958,6 +954,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         '$BUILD_DIR/third_party/s2/s2',
+        'audit',
         'background',
         'bson/dotted_path_support',
         'catalog/collection',
