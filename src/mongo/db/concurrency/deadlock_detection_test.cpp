@@ -37,8 +37,8 @@ TEST(Deadlock, NoDeadlock) {
     LockerForTests locker1(MODE_IS);
     LockerForTests locker2(MODE_IS);
 
-    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resId, MODE_S));
-    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resId, MODE_S));
+    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(nullptr, resId, MODE_S));
+    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(nullptr, resId, MODE_S));
 
     DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
     ASSERT(!wfg1.check().hasCycle());
@@ -54,14 +54,14 @@ TEST(Deadlock, Simple) {
     LockerForTests locker1(MODE_IX);
     LockerForTests locker2(MODE_IX);
 
-    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resIdA, MODE_X));
-    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resIdB, MODE_X));
+    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(nullptr, resIdA, MODE_X));
+    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(nullptr, resIdB, MODE_X));
 
     // 1 -> 2
-    ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(resIdB, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(nullptr, resIdB, MODE_X));
 
     // 2 -> 1
-    ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(resIdA, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(nullptr, resIdA, MODE_X));
 
     DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
     ASSERT(wfg1.check().hasCycle());
@@ -81,12 +81,12 @@ TEST(Deadlock, SimpleUpgrade) {
     LockerForTests locker2(MODE_IX);
 
     // Both acquire lock in intent mode
-    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resId, MODE_IX));
-    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resId, MODE_IX));
+    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(nullptr, resId, MODE_IX));
+    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(nullptr, resId, MODE_IX));
 
     // Both try to upgrade
-    ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(resId, MODE_X));
-    ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(resId, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(nullptr, resId, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(nullptr, resId, MODE_X));
 
     DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
     ASSERT(wfg1.check().hasCycle());
@@ -107,17 +107,17 @@ TEST(Deadlock, Indirect) {
     LockerForTests locker2(MODE_IX);
     LockerForTests lockerIndirect(MODE_IX);
 
-    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(resIdA, MODE_X));
-    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(resIdB, MODE_X));
+    ASSERT_EQUALS(LOCK_OK, locker1.lockBegin(nullptr, resIdA, MODE_X));
+    ASSERT_EQUALS(LOCK_OK, locker2.lockBegin(nullptr, resIdB, MODE_X));
 
     // 1 -> 2
-    ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(resIdB, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, locker1.lockBegin(nullptr, resIdB, MODE_X));
 
     // 2 -> 1
-    ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(resIdA, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, locker2.lockBegin(nullptr, resIdA, MODE_X));
 
     // 3 -> 2
-    ASSERT_EQUALS(LOCK_WAITING, lockerIndirect.lockBegin(resIdA, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, lockerIndirect.lockBegin(nullptr, resIdA, MODE_X));
 
     DeadlockDetector wfg1(*getGlobalLockManager(), &locker1);
     ASSERT(wfg1.check().hasCycle());
@@ -143,17 +143,17 @@ TEST(Deadlock, IndirectWithUpgrade) {
     LockerForTests writer(MODE_IX);
 
     // This sequence simulates the deadlock which occurs during flush
-    ASSERT_EQUALS(LOCK_OK, writer.lockBegin(resIdFlush, MODE_IX));
-    ASSERT_EQUALS(LOCK_OK, writer.lockBegin(resIdDb, MODE_X));
+    ASSERT_EQUALS(LOCK_OK, writer.lockBegin(nullptr, resIdFlush, MODE_IX));
+    ASSERT_EQUALS(LOCK_OK, writer.lockBegin(nullptr, resIdDb, MODE_X));
 
-    ASSERT_EQUALS(LOCK_OK, reader.lockBegin(resIdFlush, MODE_IS));
+    ASSERT_EQUALS(LOCK_OK, reader.lockBegin(nullptr, resIdFlush, MODE_IS));
 
     // R -> W
-    ASSERT_EQUALS(LOCK_WAITING, reader.lockBegin(resIdDb, MODE_S));
+    ASSERT_EQUALS(LOCK_WAITING, reader.lockBegin(nullptr, resIdDb, MODE_S));
 
     // R -> W
     // F -> W
-    ASSERT_EQUALS(LOCK_WAITING, flush.lockBegin(resIdFlush, MODE_S));
+    ASSERT_EQUALS(LOCK_WAITING, flush.lockBegin(nullptr, resIdFlush, MODE_S));
 
     // W yields its flush lock, so now f is granted in mode S
     //
@@ -164,14 +164,14 @@ TEST(Deadlock, IndirectWithUpgrade) {
     //
     // R -> W
     // F -> R
-    ASSERT_EQUALS(LOCK_WAITING, flush.lockBegin(resIdFlush, MODE_X));
+    ASSERT_EQUALS(LOCK_WAITING, flush.lockBegin(nullptr, resIdFlush, MODE_X));
 
     // W comes back from the commit and tries to re-acquire the flush lock
     //
     // R -> W
     // F -> R
     // W -> F
-    ASSERT_EQUALS(LOCK_WAITING, writer.lockBegin(resIdFlush, MODE_IX));
+    ASSERT_EQUALS(LOCK_WAITING, writer.lockBegin(nullptr, resIdFlush, MODE_IX));
 
     // Run deadlock detection from the point of view of each of the involved lockers
     DeadlockDetector wfgF(*getGlobalLockManager(), &flush);

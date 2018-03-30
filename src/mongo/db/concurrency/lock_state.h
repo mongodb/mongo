@@ -205,10 +205,14 @@ public:
      * In other words for each call to lockBegin, which does not return LOCK_OK, there needs to
      * be a corresponding call to either lockComplete or unlock.
      *
+     * If an operation context is provided that represents an interrupted operation, lockBegin will
+     * throw an exception whenever it would have been possible to grant the lock with LOCK_OK. This
+     * behavior can be disabled with an UninterruptibleLockGuard.
+     *
      * NOTE: These methods are not public and should only be used inside the class
      * implementation and for unit-tests and not called directly.
      */
-    LockResult lockBegin(ResourceId resId, LockMode mode);
+    LockResult lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode);
 
     /**
      * Waits for the completion of a lock, previously requested through lockBegin or

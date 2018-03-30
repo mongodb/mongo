@@ -141,6 +141,9 @@ void NoopWriter::stopWritingPeriodicNoops() {
 }
 
 void NoopWriter::_writeNoop(OperationContext* opCtx) {
+    // Ensure that we don't trigger an exception when attempting to take locks.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
     // Use GlobalLock + lockMMAPV1Flush instead of DBLock to allow return when the lock is not
     // available. It may happen when the primary steps down and a shared global lock is acquired.
     Lock::GlobalLock lock(opCtx, MODE_IX, Date_t::now() + Milliseconds(1));

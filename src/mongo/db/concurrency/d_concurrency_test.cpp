@@ -1176,6 +1176,80 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
 
+TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextThrowsEvenWhenUncontested) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    opCtx->markKilled();
+
+    boost::optional<Lock::GlobalRead> globalReadLock;
+    ASSERT_THROWS_CODE(
+        globalReadLock.emplace(opCtx, Date_t::now()), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextThrowsEvenAcquiringRecursively) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    Lock::GlobalWrite globalWriteLock(opCtx, Date_t::now());
+
+    opCtx->markKilled();
+
+    {
+        boost::optional<Lock::GlobalWrite> recursiveGlobalWriteLock;
+        ASSERT_THROWS_CODE(recursiveGlobalWriteLock.emplace(opCtx, Date_t::now()),
+                           AssertionException,
+                           ErrorCodes::Interrupted);
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextRespectsUninterruptibleGuard) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    opCtx->markKilled();
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    Lock::GlobalRead globalReadLock(opCtx, Date_t::now());  // Does not throw.
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockInInterruptedContextThrowsEvenWhenUncontested) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    opCtx->markKilled();
+
+    boost::optional<Lock::DBLock> dbWriteLock;
+    ASSERT_THROWS_CODE(
+        dbWriteLock.emplace(opCtx, "db", MODE_IX), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockInInterruptedContextThrowsEvenWhenAcquiringRecursively) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    Lock::DBLock dbWriteLock(opCtx, "db", MODE_X);
+
+    opCtx->markKilled();
+
+    {
+        boost::optional<Lock::DBLock> recursiveDBWriteLock;
+        ASSERT_THROWS_CODE(recursiveDBWriteLock.emplace(opCtx, "db", MODE_X),
+                           AssertionException,
+                           ErrorCodes::Interrupted);
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockInInterruptedContextRespectsUninterruptibleGuard) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+
+    opCtx->markKilled();
+
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    Lock::DBLock dbWriteLock(opCtx, "db", MODE_X);  // Does not throw.
+}
+
 TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
     auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opctx1 = clientOpctxPairs[0].second.get();

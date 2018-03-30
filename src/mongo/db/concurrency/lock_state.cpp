@@ -357,7 +357,7 @@ LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(OperationContext* opCtx,
         }
         _modeForTicket = mode;
     }
-    const LockResult result = lockBegin(resourceIdGlobal, mode);
+    const LockResult result = lockBegin(opCtx, resourceIdGlobal, mode);
     if (result == LOCK_OK)
         return LOCK_OK;
 
@@ -479,7 +479,7 @@ template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lock(
     OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
 
-    const LockResult result = lockBegin(resId, mode);
+    const LockResult result = lockBegin(opCtx, resId, mode);
 
     // Fast, uncontended path
     if (result == LOCK_OK)
@@ -723,7 +723,9 @@ void LockerImpl<IsForMMAPV1>::restoreLockState(OperationContext* opCtx,
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
+LockResult LockerImpl<IsForMMAPV1>::lockBegin(OperationContext* opCtx,
+                                              ResourceId resId,
+                                              LockMode mode) {
     dassert(!getWaitingResource().isValid());
 
     LockRequest* request;
@@ -788,6 +790,16 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
     if (result == LOCK_WAITING) {
         globalStats.recordWait(_id, resId, mode);
         _stats.recordWait(resId, mode);
+    } else if (result == LOCK_OK && opCtx && _uninterruptibleLocksRequested == 0) {
+        // Lock acquisitions are not allowed to succeed when opCtx is marked as interrupted, unless
+        // the caller requested an uninterruptible lock.
+        auto interruptStatus = opCtx->checkForInterruptNoAssert();
+        if (!interruptStatus.isOK()) {
+            auto unlockIt = _requests.find(resId);
+            invariant(unlockIt);
+            _unlockImpl(&unlockIt);
+            uassertStatusOK(interruptStatus);
+        }
     }
 
     return result;

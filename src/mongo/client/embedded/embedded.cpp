@@ -145,6 +145,7 @@ void shutdown(ServiceContext* srvContext) {
     // Close all open databases, shutdown storage engine and run all deinitializers.
     auto shutdownOpCtx = serviceContext->makeOperationContext(client);
     {
+        UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());
         Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X, Date_t::max());
         dbHolder().closeAll(shutdownOpCtx.get(), "shutdown");
 

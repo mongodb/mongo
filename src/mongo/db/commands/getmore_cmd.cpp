@@ -290,6 +290,9 @@ public:
 
         // Only used by the failpoints.
         const auto dropAndReaquireReadLock = [&readLock, opCtx, &request]() {
+            // Make sure an interrupted operation does not prevent us from reacquiring the lock.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
             readLock.reset();
             readLock.emplace(opCtx, request.nss);
         };

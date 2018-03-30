@@ -63,7 +63,7 @@ TEST(LockStats, Wait) {
     {
         // This will block
         LockerForTests lockerConflict(MODE_IX);
-        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(resId, MODE_S));
+        ASSERT_EQUALS(LOCK_WAITING, lockerConflict.lockBegin(nullptr, resId, MODE_S));
 
         // Sleep 1 millisecond so the wait time passes
         ASSERT_EQUALS(

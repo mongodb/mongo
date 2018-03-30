@@ -1143,6 +1143,9 @@ DbResponse receivedGetMore(OperationContext* opCtx,
             getMore(opCtx, ns, ntoreturn, cursorid, &exhaust, &isCursorAuthorized);
     } catch (AssertionException& e) {
         if (isCursorAuthorized) {
+            // Make sure that killCursorGlobal does not throw an exception if it is interrupted.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
             // If a cursor with id 'cursorid' was authorized, it may have been advanced
             // before an exception terminated processGetMore.  Erase the ClientCursor
             // because it may now be out of sync with the client's iteration state.

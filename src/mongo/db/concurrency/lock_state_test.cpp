@@ -268,12 +268,12 @@ TEST(LockerImpl, CanceledDeadlockUnblocks) {
     ASSERT(LOCK_OK == locker2.lock(db2, MODE_X));
 
     // Set up locker1 and locker2 for deadlock
-    ASSERT(LOCK_WAITING == locker1.lockBegin(db2, MODE_X));
-    ASSERT(LOCK_WAITING == locker2.lockBegin(db1, MODE_X));
+    ASSERT(LOCK_WAITING == locker1.lockBegin(nullptr, db2, MODE_X));
+    ASSERT(LOCK_WAITING == locker2.lockBegin(nullptr, db1, MODE_X));
 
     // Locker3 blocks behind locker 2
     ASSERT(LOCK_OK == locker3.lockGlobal(MODE_IX));
-    ASSERT(LOCK_WAITING == locker3.lockBegin(db1, MODE_S));
+    ASSERT(LOCK_WAITING == locker3.lockBegin(nullptr, db1, MODE_S));
 
     // Detect deadlock, canceling our request
     ASSERT(
@@ -442,7 +442,7 @@ TEST(LockerImpl, GetLockerInfoShouldReportPendingLocks) {
     DefaultLockerImpl conflictingLocker;
     ASSERT_EQ(LOCK_OK, conflictingLocker.lockGlobal(MODE_IS));
     ASSERT_EQ(LOCK_OK, conflictingLocker.lock(dbId, MODE_IS));
-    ASSERT_EQ(LOCK_WAITING, conflictingLocker.lockBegin(collectionId, MODE_IS));
+    ASSERT_EQ(LOCK_WAITING, conflictingLocker.lockBegin(nullptr, collectionId, MODE_IS));
 
     // Assert the held locks show up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
