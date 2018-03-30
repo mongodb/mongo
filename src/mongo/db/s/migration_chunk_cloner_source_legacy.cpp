@@ -538,6 +538,9 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
     }
 
     if (_deleteNotifyExec) {
+        // Don't allow an Interrupt exception to prevent _deleteNotifyExec from getting cleaned up.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
         AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
         const auto cursorManager =
             autoColl.getCollection() ? autoColl.getCollection()->getCursorManager() : nullptr;

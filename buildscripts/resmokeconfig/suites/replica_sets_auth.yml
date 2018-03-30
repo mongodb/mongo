@@ -11,6 +11,8 @@ selector:
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - jstests/replsets/*[aA]uth*.js
+  # Also skip tests that require a ScopedThread, because ScopedThreads don't inherit credentials.
+  - jstests/replsets/interrupted_batch_insert.js
 
 executor:
   config:
