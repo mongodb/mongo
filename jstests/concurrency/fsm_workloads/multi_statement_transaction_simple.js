@@ -98,6 +98,11 @@ var $config = (function() {
                             assertWhenOwnColl.commandWorked(res, () => tojson(cmd));
                         }
                     }
+
+                    // For the updates, ensure that exactly one document was updated.
+                    if (res.hasOwnProperty("nModified")) {
+                        assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
+                    }
                 }
             } while (hasWriteConflict);
         }
@@ -107,11 +112,12 @@ var $config = (function() {
 
     function setup(db, collName) {
         assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+
+        const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < this.numAccounts; ++i) {
-            const res = db[collName].insert({_id: i, balance: this.initialValue});
-            assertWhenOwnColl.writeOK(res);
-            assertWhenOwnColl.eq(1, res.nInserted);
+            bulk.insert({_id: i, balance: this.initialValue});
         }
+        assertWhenOwnColl.commandWorked(bulk.execute({w: "majority"}));
     }
 
     function teardown(db, collName, cluster) {
