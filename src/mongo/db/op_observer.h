@@ -222,7 +222,6 @@ public:
                                             const NamespaceString& fromCollection,
                                             const NamespaceString& toCollection,
                                             OptionalCollectionUUID uuid,
-                                            bool dropTarget,
                                             OptionalCollectionUUID dropTargetUUID,
                                             bool stayTemp) = 0;
     virtual void onApplyOps(OperationContext* opCtx,

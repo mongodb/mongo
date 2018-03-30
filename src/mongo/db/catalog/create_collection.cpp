@@ -207,7 +207,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    newCollName,
                                                    tmpName,
                                                    futureColl->uuid(),
-                                                   /*dropTarget*/ false,
                                                    /*dropTargetUUID*/ {},
                                                    stayTemp);
                 }
@@ -228,7 +227,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    currentName,
                                                    newCollName,
                                                    uuid,
-                                                   /*dropTarget*/ false,
                                                    /*dropTargetUUID*/ {},
                                                    stayTemp);
 

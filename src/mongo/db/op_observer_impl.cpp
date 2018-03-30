@@ -754,7 +754,6 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                                 const NamespaceString& fromCollection,
                                                 const NamespaceString& toCollection,
                                                 OptionalCollectionUUID uuid,
-                                                bool dropTarget,
                                                 OptionalCollectionUUID dropTargetUUID,
                                                 bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
@@ -766,7 +765,7 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
     } else {
-        builder.append("dropTarget", dropTarget);
+        builder.append("dropTarget", false);
     }
 
     const auto cmdObj = builder.done();

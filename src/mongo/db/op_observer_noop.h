@@ -86,7 +86,6 @@ public:
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     OptionalCollectionUUID uuid,
-                                    bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
                                     bool stayTemp) override {
         return {};
