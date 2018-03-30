@@ -215,22 +215,19 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
 
-    // Create 'renameCollection' command.
-    auto dropTarget = false;
+    auto uuid = CollectionUUID::gen();
+    auto dropTargetUuid = CollectionUUID::gen();
     auto stayTemp = false;
     NamespaceString sourceNss("test.foo");
     NamespaceString targetNss("test.bar");
-    auto renameCmd = BSON(
-        "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp" << stayTemp
-                           << "dropTarget"
-                           << dropTarget);
 
     // Write to the oplog.
     repl::OpTime renameOpTime;
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onRenameCollection(opCtx.get(), sourceNss, targetNss, {}, {}, stayTemp);
+        opObserver.onRenameCollection(
+            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, stayTemp);
         renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
@@ -238,12 +235,43 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     auto oplogEntry = getSingleOplogEntry(opCtx.get());
 
     // Ensure that renameCollection fields were properly added to oplog entry.
+    ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntry["ui"])));
     auto o = oplogEntry.getObjectField("o");
-    auto oExpected = renameCmd;
+    auto oExpected = BSON(
+        "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp" << stayTemp
+                           << "dropTarget"
+                           << dropTargetUuid);
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), renameOpTime);
+}
+
+TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsNull) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    auto uuid = CollectionUUID::gen();
+    auto stayTemp = true;
+    NamespaceString sourceNss("test.foo");
+    NamespaceString targetNss("test.bar");
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onRenameCollection(opCtx.get(), sourceNss, targetNss, uuid, {}, stayTemp);
+        wunit.commit();
+    }
+
+    auto oplogEntry = getSingleOplogEntry(opCtx.get());
+
+    // Ensure that renameCollection fields were properly added to oplog entry.
+    ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntry["ui"])));
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = BSON(
+        "renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp" << stayTemp);
+    ASSERT_BSONOBJ_EQ(oExpected, o);
 }
 
 /**

@@ -764,8 +764,6 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
-    } else {
-        builder.append("dropTarget", false);
     }
 
     const auto cmdObj = builder.done();
