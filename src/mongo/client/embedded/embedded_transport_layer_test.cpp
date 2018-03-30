@@ -63,7 +63,6 @@ protected:
                               globalTempDir->path().c_str()};
         db_handle = libmongodbcapi_db_new(argc, argv, nullptr);
 
-        mongoc_init();
         cd_client = embedded_mongoc_client_new(db_handle);
         mongoc_client_set_error_api(cd_client, 2);
         cd_db = mongoc_client_get_database(cd_client, "test");
@@ -83,7 +82,7 @@ protected:
         if (cd_client) {
             mongoc_client_destroy(cd_client);
         }
-        mongoc_cleanup();
+
         libmongodbcapi_db_destroy(db_handle);
     }
 
@@ -187,6 +186,8 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::serverGlobalParams.noUnixSocket = true;
     ::mongo::unittest::setupTestLogger();
 
+    mongoc_init();
+
     int init = libmongodbcapi_init(nullptr);
     if (init != LIBMONGODB_CAPI_SUCCESS) {
         std::cerr << "libmongodbcapi_init() failed with " << init << std::endl;
@@ -200,6 +201,8 @@ int main(int argc, char** argv, char** envp) {
         std::cerr << "libmongodbcapi_fini() failed with " << fini << std::endl;
         return EXIT_FAILURE;
     }
+
+    mongoc_cleanup();
 
     globalTempDir.reset();
     mongo::quickExit(result);

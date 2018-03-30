@@ -49,7 +49,6 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/kill_sessions_local.h"
-#include "mongo/db/log_process_details.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repair_database_and_check_version.h"
@@ -57,7 +56,6 @@
 #include "mongo/db/service_context_registrar.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
-#include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/ttl.h"
 #include "mongo/logger/log_component.h"
@@ -203,8 +201,6 @@ ServiceContext* initialize(int argc, char* argv[], char** envp) {
 
     DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
-    logProcessDetails();
-
     serviceContext->createLockFile();
 
     serviceContext->setServiceEntryPoint(
@@ -231,8 +227,6 @@ ServiceContext* initialize(int argc, char* argv[], char** envp) {
             }
         }
     }
-
-    logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
 
     {
         std::stringstream ss;
