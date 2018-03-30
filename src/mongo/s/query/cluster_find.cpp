@@ -384,12 +384,9 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     }
 
     if (cursor->isTailableAndAwaitData()) {
-        // A maxTimeMS specified on a tailable, awaitData cursor is special. Instead of imposing a
-        // deadline on the operation, it is used to communicate how long the server should wait for
-        // new results. Here we clear any deadline set during command processing and track the
-        // deadline instead via the 'waitForInsertsDeadline' decoration. This deadline defaults to
-        // 1 second if the user didn't specify a maxTimeMS.
-        opCtx->clearDeadline();
+        // For tailable + awaitData cursors, the request may have indicated a maximum amount of time
+        // to wait for new data. If not, default it to 1 second.  We track the deadline instead via
+        // the 'waitForInsertsDeadline' decoration.
         auto timeout = request.awaitDataTimeout.value_or(Milliseconds{1000});
         awaitDataState(opCtx).waitForInsertsDeadline =
             opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;

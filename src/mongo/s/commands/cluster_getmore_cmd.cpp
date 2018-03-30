@@ -81,6 +81,10 @@ public:
         return "retrieve more documents for a cursor id";
     }
 
+    LogicalOp getLogicalOp() const final {
+        return LogicalOp::opGetMore;
+    }
+
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) const final {

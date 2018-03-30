@@ -384,7 +384,6 @@ public:
             // any leftover time from the maxTimeMS of the operation that spawned this cursor,
             // applying it to this getMore.
             if (cursor->isAwaitData() && !disableAwaitDataFailpointActive) {
-                opCtx->clearDeadline();
                 awaitDataState(opCtx).waitForInsertsDeadline =
                     opCtx->getServiceContext()->getPreciseClockSource()->now() +
                     request.awaitDataTimeout.value_or(Seconds{1});

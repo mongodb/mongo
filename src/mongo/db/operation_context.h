@@ -406,14 +406,6 @@ public:
     }
 
     /**
-     * Reset the deadline for this operation.
-     */
-    void clearDeadline() {
-        _deadline = Date_t::max();
-        _maxTime = computeMaxTimeFromDeadline(_deadline);
-    }
-
-    /**
      * Returns the number of milliseconds remaining for this operation's time limit or
      * Milliseconds::max() if the operation has no time limit.
      */

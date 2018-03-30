@@ -573,7 +573,6 @@ void execCommandDatabase(OperationContext* opCtx,
         BSONElement cmdOptionMaxTimeMSField;
         BSONElement allowImplicitCollectionCreationField;
         BSONElement helpField;
-        BSONElement queryOptionMaxTimeMSField;
 
         StringMap<int> topLevelFields;
         for (auto&& element : request.body) {
@@ -585,7 +584,8 @@ void execCommandDatabase(OperationContext* opCtx,
             } else if (fieldName == CommandHelpers::kHelpFieldName) {
                 helpField = element;
             } else if (fieldName == QueryRequest::queryOptionMaxTimeMS) {
-                queryOptionMaxTimeMSField = element;
+                uasserted(ErrorCodes::InvalidOptions,
+                          "no such command option $maxTimeMs; use maxTimeMS instead");
             }
 
             uassert(ErrorCodes::FailedToParse,
@@ -658,14 +658,16 @@ void execCommandDatabase(OperationContext* opCtx,
             opCounters->gotCommand();
         }
 
-        // Handle command option maxTimeMS.
-        int maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
-
-        uassert(ErrorCodes::InvalidOptions,
-                "no such command option $maxTimeMs; use maxTimeMS instead",
-                queryOptionMaxTimeMSField.eoo());
-
-        if (maxTimeMS > 0) {
+        // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
+        // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
+        // getMore command, where it is used to communicate the maximum time to wait for new inserts
+        // on tailable cursors, not as a deadline for the operation.
+        // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
+        // require introducing a new 'max await time' parameter for getMore, and eventually banning
+        // maxTimeMS altogether on a getMore command.
+        const int maxTimeMS =
+            uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
+        if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
             uassert(40119,
                     "Illegal attempt to set operation deadline within DBDirectClient",
                     !opCtx->getClient()->isInDirectClient());

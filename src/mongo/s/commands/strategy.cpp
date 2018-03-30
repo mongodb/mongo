@@ -280,18 +280,6 @@ void runCommand(OperationContext* opCtx,
                 const OpMsgRequest& request,
                 const NetworkOp opType,
                 BSONObjBuilder&& builder) {
-    // Handle command option maxTimeMS first thing while processing the command so that the
-    // subsequent code has the deadline available
-    uassert(ErrorCodes::InvalidOptions,
-            "no such command option $maxTimeMs; use maxTimeMS instead",
-            request.body[QueryRequest::queryOptionMaxTimeMS].eoo());
-
-    const int maxTimeMS = uassertStatusOK(
-        QueryRequest::parseMaxTimeMS(request.body[QueryRequest::cmdOptionMaxTimeMS]));
-    if (maxTimeMS > 0) {
-        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
-    }
-
     auto const commandName = request.getCommandName();
     auto const command = CommandHelpers::findCommand(commandName);
     if (!command) {
@@ -302,6 +290,24 @@ void runCommand(OperationContext* opCtx,
         globalCommandRegistry()->incrementUnknownCommands();
         return;
     }
+
+    // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
+    // the OperationContext. Be sure to do this as soon as possible so that further processing by
+    // subsequent code has the deadline available. The 'maxTimeMS' option unfortunately has a
+    // different meaning for a getMore command, where it is used to communicate the maximum time to
+    // wait for new inserts on tailable cursors, not as a deadline for the operation.
+    // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
+    // require introducing a new 'max await time' parameter for getMore, and eventually banning
+    // maxTimeMS altogether on a getMore command.
+    uassert(ErrorCodes::InvalidOptions,
+            "no such command option $maxTimeMs; use maxTimeMS instead",
+            request.body[QueryRequest::queryOptionMaxTimeMS].eoo());
+    const int maxTimeMS = uassertStatusOK(
+        QueryRequest::parseMaxTimeMS(request.body[QueryRequest::cmdOptionMaxTimeMS]));
+    if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
+        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
+    }
+    opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
     // Set the logical optype, command object and namespace as soon as we identify the command. If
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
