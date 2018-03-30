@@ -44,6 +44,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
@@ -84,9 +85,9 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
     if (matchType == MatchExpression::EQ) {
         auto eqMatch = checked_cast<const EqualityMatchExpression*>(matcher);
         if (eqMatch->path() == "name") {
-            auto& elem = eqMatch->getData();
-            if (elem.type() == String) {
-                return {vector<StringData>{elem.valueStringData()}};
+            StringData name(eqMatch->getData().valuestrsafe());
+            if (name.size()) {
+                return {vector<StringData>{name}};
             } else {
                 return vector<StringData>();
             }
@@ -96,7 +97,8 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
         if (matchIn->path() == "name" && matchIn->getRegexes().empty()) {
             vector<StringData> exactMatches;
             for (auto&& elem : matchIn->getEqualities()) {
-                if (elem.type() == String) {
+                StringData name(elem.valuestrsafe());
+                if (name.size()) {
                     exactMatches.push_back(elem.valueStringData());
                 }
             }
@@ -152,6 +154,9 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     return b.obj();
 }
 
+/**
+ * Return an object describing the collection. Takes a collection lock if nameOnly is false.
+ */
 BSONObj buildCollectionBson(OperationContext* opCtx,
                             const Collection* collection,
                             bool includePendingDrops,
@@ -182,8 +187,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
         return b.obj();
     }
 
-    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns().toString(), MODE_S));
-
+    Lock::CollectionLock clk(opCtx->lockState(), nss.ns(), MODE_IS);
     CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
@@ -281,7 +285,7 @@ public:
             return CommandHelpers::appendCommandStatus(result, status);
         }
 
-        AutoGetDb autoDb(opCtx, dbname, nameOnly ? MODE_IS : MODE_S);
+        AutoGetDb autoDb(opCtx, dbname, MODE_IS);
 
         Database* db = autoDb.getDb();
 
