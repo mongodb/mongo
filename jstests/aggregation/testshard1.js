@@ -54,7 +54,7 @@ var strings = [
 jsTestLog("Bulk inserting data");
 var nItems = 200000;
 var bulk = db.ts1.initializeUnorderedBulkOp();
-for (i = 1; i <= nItems; ++i) {
+for (i = 0; i < nItems; ++i) {
     bulk.insert({
         _id: i,
         counter: ++count,
