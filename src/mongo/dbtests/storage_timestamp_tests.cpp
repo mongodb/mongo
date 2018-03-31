@@ -1699,14 +1699,30 @@ public:
  * This test asserts that the catalog updates that represent the beginning and end of an index
  * build are timestamped. Additionally, the index will be `multikey` and that catalog update that
  * finishes the index build will also observe the index is multikey.
+ *
+ * Primaries log no-ops when starting an index build to acquire a timestamp. A primary committing
+ * an index build gets timestamped when the `createIndexes` command creates an oplog entry. That
+ * step is mimiced here.
+ *
+ * Secondaries timestamp starting their index build by being in a `TimestampBlock` when the oplog
+ * entry is processed. Secondaries will look at the logical clock when completing the index
+ * build. This is safe so long as completion is not racing with secondary oplog application (i.e:
+ * enforced via the parallel batch writer lock).
  */
-template <bool SimulateBackground>
+template <bool SimulatePrimary>
 class TimestampIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
         // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
         if (mongo::storageGlobalParams.engine != "wiredTiger") {
             return;
+        }
+
+        const bool SimulateSecondary = !SimulatePrimary;
+        if (SimulateSecondary) {
+            // The MemberState is inspected during index builds to use a "ghost" write to timestamp
+            // index completion.
+            ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_SECONDARY}));
         }
 
         auto kvStorageEngine =
@@ -1736,20 +1752,30 @@ public:
         // Build an index on `{a: 1}`. This index will be multikey.
         MultiIndexBlock indexer(_opCtx, autoColl.getCollection());
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
+        BSONObj indexInfoObj;
         {
+            // Primaries do not have a wrapping `TimestampBlock`; secondaries do.
             const Timestamp commitTimestamp =
-                SimulateBackground ? Timestamp::min() : beforeIndexBuild.addTicks(1).asTimestamp();
+                SimulatePrimary ? Timestamp::min() : beforeIndexBuild.addTicks(1).asTimestamp();
             TimestampBlock tsBlock(_opCtx, commitTimestamp);
 
-            ASSERT_OK(indexer
-                          .init({BSON("v" << 2 << "unique" << true << "name"
-                                          << "a_1"
-                                          << "ns"
-                                          << nss.ns()
-                                          << "key"
-                                          << BSON("a" << 1))})
-                          .getStatus());
+            // Secondaries will also be in an `UnreplicatedWritesBlock` that prevents the `logOp`
+            // from making creating an entry.
+            boost::optional<repl::UnreplicatedWritesBlock> unreplicated;
+            if (SimulateSecondary) {
+                unreplicated.emplace(_opCtx);
+            }
+
+            auto swIndexInfoObj = indexer.init({BSON("v" << 2 << "unique" << true << "name"
+                                                         << "a_1"
+                                                         << "ns"
+                                                         << nss.ns()
+                                                         << "key"
+                                                         << BSON("a" << 1))});
+            ASSERT_OK(swIndexInfoObj.getStatus());
+            indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
+
         const LogicalTime afterIndexInit = _clock->reserveTicks(2);
 
         // Inserting all the documents has the side-effect of setting internal state on the index
@@ -1757,12 +1783,16 @@ public:
         ASSERT_OK(indexer.insertAllDocumentsInCollection());
 
         {
-            const Timestamp commitTimestamp =
-                SimulateBackground ? Timestamp::min() : afterIndexInit.addTicks(1).asTimestamp();
-            TimestampBlock tsBlock(_opCtx, commitTimestamp);
-
             WriteUnitOfWork wuow(_opCtx);
+            // Primaries will perform no timestamping in the indexer's commit. Secondaries will
+            // look at the logical clock.
             indexer.commit();
+            if (SimulatePrimary) {
+                // The op observer is not called from the index builder, but rather the
+                // `createIndexes` command.
+                _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    _opCtx, nss, autoColl.getCollection()->uuid(), indexInfoObj, false);
+            }
             wuow.commit();
         }
 
@@ -1825,7 +1855,7 @@ public:
         add<SetMinValidToAtLeast>();
         add<SetMinValidAppliedThrough>();
         add<KVDropDatabase>();
-        // TimestampIndexBuilds<SimulateBackground>
+        // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
     }

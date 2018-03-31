@@ -60,6 +60,8 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 
+#include "mongo/db/op_observer.h"
+
 namespace mongo {
 
 namespace {
@@ -87,8 +89,10 @@ bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) 
         return false;
     }
 
-    // Nodes in `startup` may not have yet initialized the `LogicalClock`.
-    if (replCoord->getMemberState().startup()) {
+    // Nodes in `startup` may not have yet initialized the `LogicalClock`. Primaries do not need
+    // ghost writes.
+    const auto memberState = replCoord->getMemberState();
+    if (memberState.primary() || memberState.startup()) {
         return false;
     }
 
@@ -175,8 +179,6 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
     if (!_needToCleanup || _indexes.empty())
         return;
 
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
-
     while (true) {
         try {
             WriteUnitOfWork wunit(_opCtx);
@@ -186,10 +188,15 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail();
             }
-            if (requiresCommitTimestamp) {
-                fassert(50703,
-                        _opCtx->recoveryUnit()->setTimestamp(
-                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+
+            auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+            if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+                // Primaries must timestamp the failure of an index build (via an op
+                // message). Secondaries may not fail index builds.
+                _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+                    _opCtx,
+                    BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
+                                                            << _collection->ns().ns())));
             }
             wunit.commit();
             return;
@@ -226,8 +233,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const BSONObj& spec) 
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSONObj>& indexSpecs) {
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
-
     WriteUnitOfWork wunit(_opCtx);
 
     invariant(_indexes.empty());
@@ -317,10 +322,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     if (_buildInBackground)
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
-    if (requiresCommitTimestamp) {
-        fassert(50702,
-                _opCtx->recoveryUnit()->setTimestamp(
-                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+    if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+        // Only primaries must timestamp this write. Secondaries run this from within a
+        // `TimestampBlock`
+        _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+            _opCtx, BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
     }
 
     wunit.commit();
@@ -527,8 +534,6 @@ void MultiIndexBlockImpl::abortWithoutCleanup() {
 }
 
 void MultiIndexBlockImpl::commit() {
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
-
     // Do not interfere with writing multikey information when committing index builds.
     auto restartTracker =
         MakeGuard([this] { MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo(); });
@@ -558,7 +563,9 @@ void MultiIndexBlockImpl::commit() {
         }
     }
 
-    if (requiresCommitTimestamp) {
+    if (requiresGhostCommitTimestamp(_opCtx, _collection->ns())) {
+        // Only secondaries must explicitly timestamp index completion. Primaries perform this
+        // write along with an oplog entry.
         fassert(50701,
                 _opCtx->recoveryUnit()->setTimestamp(
                     LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));

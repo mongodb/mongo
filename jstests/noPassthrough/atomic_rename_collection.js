@@ -22,7 +22,9 @@
         {
           source: first.x,
           target: second.x,
-          expectedOplogEntries: 4,
+          // Index builds on primaries now log a no-op when starting, bringing the total count
+          // from 4 to 5.
+          expectedOplogEntries: 5,
         }
     ];
     tests.forEach((test) => {
