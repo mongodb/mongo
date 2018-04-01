@@ -35,7 +35,8 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
-    assert.commandWorked(sessionDb.runCommand({
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         // TODO(russotto): Majority write concern on commit is to avoid a WriteConflictError
@@ -56,7 +57,8 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 0}]);
 
-    assert.commandWorked(sessionDb.runCommand(
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a multiple-result multi-delete.");
@@ -72,7 +74,8 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, []);
 
-    assert.commandWorked(sessionDb.runCommand(
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     // Collection should be empty.

@@ -33,8 +33,9 @@ var $config = (function() {
             });
             cursorId = res.cursor.id;
         }
+        // commitTransaction can only be called on the admin database.
         assertWhenOwnColl.commandWorked(
-            sessionDb.runCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+            sessionDb.adminCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber)}));
         return total;
     }
 
@@ -79,7 +80,12 @@ var $config = (function() {
                 hasWriteConflict = false;
                 for (let cmd of commands) {
                     cmd["txnNumber"] = NumberLong(this.txnNumber);
-                    let res = this.sessionDb.runCommand(cmd);
+                    let res;
+                    if (cmd.hasOwnProperty("commitTransaction")) {
+                        res = this.sessionDb.adminCommand(cmd);
+                    } else {
+                        res = this.sessionDb.runCommand(cmd);
+                    }
                     if (res.ok === 0) {
                         if (res.code === ErrorCodes.WriteConflict) {
                             hasWriteConflict = true;

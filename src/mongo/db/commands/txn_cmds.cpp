@@ -51,6 +51,10 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    virtual bool adminOnly() const {
+        return true;
+    }
+
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
@@ -94,6 +98,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -150,6 +158,10 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

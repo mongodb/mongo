@@ -18,7 +18,6 @@
     const sessionOptions = {causalConsistency: false};
     const session = db.getMongo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
-
     jsTest.log("Insert two documents in a transaction");
 
     assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
@@ -58,8 +57,11 @@
     // Cannot read with default read concern.
     assert.eq(null, testColl.findOne({_id: "insert-2"}));
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), stmtId: NumberInt(stmtId++)}));
+    // commitTransaction can only be run on the admin database.
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+    }));
 
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "insert-1"}, testColl.findOne({_id: "insert-1"}));
@@ -95,8 +97,11 @@
     assert.eq({_id: "update-1", a: 0}, testColl.findOne({_id: "update-1"}));
     assert.eq({_id: "update-2", a: 0}, testColl.findOne({_id: "update-2"}));
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), stmtId: NumberInt(stmtId++)}));
+    // commitTransaction can only be run on the admin database.
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+    }));
     // Read with default read concern sees the commmitted transaction.
     assert.eq({_id: "update-1", a: 2}, testColl.findOne({_id: "update-1"}));
     assert.eq({_id: "update-2", a: 1}, testColl.findOne({_id: "update-2"}));
@@ -143,8 +148,11 @@
     assert.commandWorked(res);
     assert.docEq([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], res.cursor.firstBatch);
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), stmtId: NumberInt(stmtId++)}));
+    // commitTransaction can only be run on the admin database.
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+    }));
     // Read with default read concern sees the commmitted transaction.
     assert.eq({_id: "doc-1", a: 1}, testColl.findOne({_id: "doc-1"}));
     assert.eq({_id: "doc-2", a: 1}, testColl.findOne({_id: "doc-2"}));
@@ -194,8 +202,11 @@
     assert.commandWorked(res);
     assert.docEq([], res.cursor.firstBatch);
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), stmtId: NumberInt(stmtId++)}));
+    // commitTransaction can only be run on the admin database.
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+    }));
     // Read with default read concern sees the commmitted transaction.
     assert.eq(null, testColl.findOne({_id: "doc-1"}));
     assert.eq(null, testColl.findOne({_id: "doc-2"}));

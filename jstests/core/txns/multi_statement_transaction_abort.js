@@ -38,7 +38,8 @@
     // Cannot read with default read concern.
     assert.eq(null, testColl.findOne({_id: "insert-2"}));
 
-    assert.commandWorked(sessionDb.runCommand(
+    // abortTransaction can only be run on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {abortTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
 
     // Read with default read concern cannot see the aborted transaction.
@@ -56,7 +57,8 @@
         txnNumber: NumberLong(txnNumber),
         autocommit: false
     }));
-    assert.commandWorked(sessionDb.runCommand(
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "insert-1"}, testColl.findOne({_id: "insert-1"}));
@@ -64,8 +66,9 @@
 
     jsTest.log("Cannot abort empty transaction because it's not in progress");
     txnNumber++;
+    // abortTransaction can only be called on the admin database.
     assert.commandFailedWithCode(
-        sessionDb.runCommand(
+        sessionDb.adminCommand(
             {abortTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}),
         ErrorCodes.NoSuchTransaction);
 
@@ -89,7 +92,8 @@
     }),
                                  ErrorCodes.DuplicateKey);
     // The error aborts the transaction.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // commitTransaction can only be called on the admin database.
+    assert.commandFailedWithCode(sessionDb.adminCommand({
         commitTransaction: 1,
         writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber)
@@ -130,10 +134,11 @@
     }),
                                  ErrorCodes.WriteConflict);
     // Session 1 isn't affected.
-    assert.commandWorked(sessionDb.runCommand(
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
     // Transaction on session 2 is aborted.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    assert.commandFailedWithCode(sessionDb.adminCommand({
         commitTransaction: 1,
         writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber)
@@ -161,7 +166,8 @@
         txnNumber: NumberLong(txnNumber),
         autocommit: false
     }));
-    assert.commandWorked(sessionDb.runCommand(
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
     // Read with default read concern sees the committed transaction but cannot see the aborted one.
     assert.eq(null, testColl.findOne({_id: "running-txn-1"}));
@@ -197,7 +203,8 @@
     // The cursor has been exhausted.
     assert(newReadResult.hasOwnProperty("cursor"), tojson(newReadResult));
     assert.eq(0, newReadResult.cursor.id, tojson(newReadResult));
-    assert.commandWorked(sessionDb.runCommand(
+    // commitTransaction can only be called on the admin database.
+    assert.commandWorked(sessionDb.adminCommand(
         {commitTransaction: 1, writeConcern: {w: "majority"}, txnNumber: NumberLong(txnNumber)}));
 
     // TODO: SERVER-33690 Test the old cursor has been killed when the transaction is aborted.
