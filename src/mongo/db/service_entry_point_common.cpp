@@ -664,7 +664,12 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        readConcernArgs = uassertStatusOK(_extractReadConcern(invocation.get(), request.body));
+        // TODO(SERVER-34113) replace below txnNumber/logicalSessionId checks with
+        // Session::inMultiDocumentTransaction().
+        if (!opCtx->getClient()->isInDirectClient() || !opCtx->getTxnNumber() ||
+            !opCtx->getLogicalSessionId()) {
+            readConcernArgs = uassertStatusOK(_extractReadConcern(invocation.get(), request.body));
+        }
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
