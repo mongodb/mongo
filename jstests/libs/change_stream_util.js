@@ -205,3 +205,24 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
     }
     assert(false, "expected this to be unreachable");
 };
+
+/**
+ * A set of functions to help validate the behaviour of $changeStreams for a given namespace.
+ */
+function assertChangeStreamNssBehaviour(dbName, collName = "test", assertFunc) {
+    const testDb = db.getSiblingDB(dbName);
+    // Make sure the database exists to ensure we get the right error code.
+    assert.writeOK(testDb.unrelated_collection_to_create_db.insert({}));
+    const res =
+        testDb.runCommand({aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}});
+    return assertFunc(res);
+}
+function assertValidChangeStreamNss(dbName, collName = "test") {
+    const res = assertChangeStreamNssBehaviour(dbName, collName, assert.commandWorked);
+    assert.commandWorked(
+        db.getSiblingDB(dbName).runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+}
+function assertInvalidChangeStreamNss(dbName, collName = "test") {
+    assertChangeStreamNssBehaviour(
+        dbName, collName, (res) => assert.commandFailedWithCode(res, ErrorCodes.InvalidNamespace));
+}

@@ -180,6 +180,9 @@ public:
     bool isSystem() const {
         return coll().startsWith("system.");
     }
+    bool isAdminDB() const {
+        return db() == kAdminDb;
+    }
     bool isLocal() const {
         return db() == "local";
     }

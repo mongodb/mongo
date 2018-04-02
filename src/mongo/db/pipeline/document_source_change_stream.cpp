@@ -308,6 +308,17 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
                                                       elem.embeddedObject());
+
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.db()
+                          << " database",
+            !(expCtx->ns.isAdminDB() || expCtx->ns.isLocal() || expCtx->ns.isConfigDB()));
+
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.ns()
+                          << " collection",
+            !expCtx->ns.isSystem());
+
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
         ResumeTokenData tokenData = token.getData();
