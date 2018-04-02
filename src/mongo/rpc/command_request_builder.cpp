@@ -31,6 +31,7 @@
 #include "mongo/rpc/command_request_builder.h"
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/assert_util.h"
 
@@ -40,7 +41,7 @@ namespace rpc {
 namespace {
 // OP_COMMAND put some generic arguments in the metadata and some in the body.
 bool fieldGoesInMetadata(StringData commandName, StringData field) {
-    if (!CommandHelpers::isGenericArgument(field))
+    if (!isGenericArgument(field))
         return false;  // All non-generic arguments go to the body.
 
     // For some reason this goes in the body only for a single command...

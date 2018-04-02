@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -156,7 +157,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
 
     // Get rid of generic command fields.
     for (const auto& elem : obj) {
-        if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData())) {
+        if (!isGenericArgument(elem.fieldNameStringData())) {
             builder.append(elem);
         }
     }

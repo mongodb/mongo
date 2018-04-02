@@ -1057,7 +1057,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     # should ignore regardless of strict mode.
                     command_predicate = None
                     if isinstance(struct, ast.Command):
-                        command_predicate = "!CommandHelpers::isGenericArgument(fieldName)"
+                        command_predicate = "!mongo::isGenericArgument(fieldName)"
 
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
@@ -1528,6 +1528,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Generate mongo includes third
         header_list = [
             'mongo/bson/bsonobjbuilder.h',
+            'mongo/db/command_generic_argument.h',
             'mongo/db/commands.h',
         ]
         header_list.sort()

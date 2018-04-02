@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -285,18 +286,11 @@ void CommandHelpers::filterCommandRequestForPassthrough(BSONObjIterator* cmdIter
         const auto name = elem.fieldNameStringData();
         if (name == "$readPreference") {
             BSONObjBuilder(requestBuilder->subobjStart("$queryOptions")).append(elem);
-        } else if (!isGenericArgument(name) ||  //
-                   name == "$queryOptions" ||   //
-                   name == "maxTimeMS" ||       //
-                   name == "readConcern" ||     //
-                   name == "writeConcern" ||    //
-                   name == "lsid" ||            //
-                   name == "txnNumber" ||       //
-                   name == "stmtId") {
-            // This is the whitelist of generic arguments that commands can be trusted to blindly
-            // forward to the shards.
-            requestBuilder->append(elem);
+            continue;
         }
+        if (isRequestStripArgument(name))
+            continue;
+        requestBuilder->append(elem);
     }
 }
 
@@ -304,15 +298,8 @@ void CommandHelpers::filterCommandReplyForPassthrough(const BSONObj& cmdObj,
                                                       BSONObjBuilder* output) {
     for (auto elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
-        if (name == "$configServerState" ||  //
-            name == "$gleStats" ||           //
-            name == "$clusterTime" ||        //
-            name == "$oplogQueryData" ||     //
-            name == "$replData" ||           //
-            name == "operationTime" ||
-            name == "lastCommittedOpTime") {
+        if (isReplyStripArgument(name))
             continue;
-        }
         output->append(elem);
     }
 }

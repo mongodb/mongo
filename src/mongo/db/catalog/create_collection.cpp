@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -72,7 +73,7 @@ Status createCollection(OperationContext* opCtx,
     BSONObjBuilder optionsBuilder;
     while (it.more()) {
         const auto elem = it.next();
-        if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData()))
+        if (!isGenericArgument(elem.fieldNameStringData()))
             optionsBuilder.append(elem);
         if (elem.fieldNameStringData() == "viewOn") {
             // Views don't have UUIDs so it should always be parsed for command.

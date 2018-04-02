@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
@@ -91,7 +92,7 @@ Status bsonCheckOnlyHasFieldsForCommand(StringData objectName,
                                         const BSONObj& obj,
                                         const Container& allowedFields) {
     return bsonCheckOnlyHasFieldsImpl(objectName, obj, [&](StringData name) {
-        return CommandHelpers::isGenericArgument(name) ||
+        return isGenericArgument(name) ||
             (std::find(std::begin(allowedFields), std::end(allowedFields), name) !=
              std::end(allowedFields));
     });

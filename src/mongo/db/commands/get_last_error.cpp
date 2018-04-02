@@ -33,6 +33,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_parser.h"
@@ -213,7 +214,7 @@ public:
         BSONObj writeConcernDoc = ([&] {
             BSONObjBuilder bob;
             for (auto&& elem : cmdObj) {
-                if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData()))
+                if (!isGenericArgument(elem.fieldNameStringData()))
                     bob.append(elem);
             }
             return bob.obj();

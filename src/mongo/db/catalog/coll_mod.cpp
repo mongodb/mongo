@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -89,7 +90,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
     BSONForEach(e, cmdObj) {
         const auto fieldName = e.fieldNameStringData();
-        if (CommandHelpers::isGenericArgument(fieldName)) {
+        if (isGenericArgument(fieldName)) {
             continue;  // Don't add to oplog builder.
         } else if (fieldName == "collMod") {
             // no-op

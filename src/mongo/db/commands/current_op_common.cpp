@@ -32,6 +32,7 @@
 
 #include <string>
 
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -66,7 +67,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
         const auto fieldName = elt.fieldNameStringData();
 
         if (0 == idx++ || fieldName == "$all" || fieldName == "$ownOps" ||
-            CommandHelpers::isGenericArgument(fieldName)) {
+            isGenericArgument(fieldName)) {
             continue;
         }
 

@@ -536,7 +536,18 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/rpc/rpc',
         'audit',
+        'command_generic_argument',
         'commands/server_status_core',
+    ],
+)
+
+env.Library(
+    target='command_generic_argument',
+    source=[
+        'command_generic_argument.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 

@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
@@ -138,7 +139,7 @@ BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Ver
     // Propagate all generic arguments out of the inner command since the shards will only process
     // them at the top level.
     for (auto elem : filtered) {
-        if (CommandHelpers::isGenericArgument(elem.fieldNameStringData())) {
+        if (isGenericArgument(elem.fieldNameStringData())) {
             out.append(elem);
         }
     }

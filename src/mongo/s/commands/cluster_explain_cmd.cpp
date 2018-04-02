@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/s/query/cluster_find.h"
@@ -194,7 +195,7 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
             // If the argument is in both the inner and outer command, we currently let the
             // inner version take precedence.
             const auto name = outerElem.fieldNameStringData();
-            if (CommandHelpers::isGenericArgument(name) && !innerObj.hasField(name)) {
+            if (isGenericArgument(name) && !innerObj.hasField(name)) {
                 bob.append(outerElem);
             }
         }

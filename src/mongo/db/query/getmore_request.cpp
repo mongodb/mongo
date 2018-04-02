@@ -34,6 +34,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/bson_extract_optime.h"
@@ -158,7 +159,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 return status;
             }
             lastKnownCommittedOpTime = ot;
-        } else if (!CommandHelpers::isGenericArgument(fieldName)) {
+        } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
                                   << "Unrecognized field '"

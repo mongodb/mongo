@@ -38,6 +38,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/internal_user_auth.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
@@ -164,7 +165,7 @@ public:
         while (parameterCheckIterator.more()) {
             BSONElement parameter = parameterCheckIterator.next();
             std::string parameterName = parameter.fieldName();
-            if (CommandHelpers::isGenericArgument(parameterName))
+            if (isGenericArgument(parameterName))
                 continue;
 
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);

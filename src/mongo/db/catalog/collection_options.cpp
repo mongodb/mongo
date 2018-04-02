@@ -33,6 +33,7 @@
 #include <algorithm>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -253,7 +254,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
             }
 
             idIndex = std::move(tempIdIndex);
-        } else if (!createdOn24OrEarlier && !CommandHelpers::isGenericArgument(fieldName)) {
+        } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
                                         << "' is not a valid collection option. Options: "
