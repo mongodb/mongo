@@ -65,6 +65,14 @@ void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx,
     _dbVersion = newDbVersion;
 }
 
+boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
+    OperationContext* opCtx) const {
+    if (!opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X)) {
+        invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_IS));
+    }
+    return _dbVersion;
+}
+
 void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
                                          boost::optional<DatabaseVersion> newDbVersion) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));

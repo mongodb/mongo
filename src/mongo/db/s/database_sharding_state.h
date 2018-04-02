@@ -64,6 +64,13 @@ public:
     }
 
     /**
+     * Returns this shard server's cached dbVersion, if one is cached.
+     *
+     * Invariants that the caller holds the DBLock in X or IS.
+     */
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const;
+
+    /**
      * Sets this shard server's cached dbVersion to newVersion.
      *
      * Invariants that the caller holds the DBLock in X mode.

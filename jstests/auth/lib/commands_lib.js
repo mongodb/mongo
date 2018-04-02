@@ -3900,6 +3900,22 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "getDatabaseVersion",
+          command: {getDatabaseVersion: "test"},
+          skipSharded: true,  // only available on mongod
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges:
+                    [{resource: {db: "test", collection: ""}, actions: ["getDatabaseVersion"]}],
+                expectFail: true  // only allowed on shard servers
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "getDiagnosticData",
           command: {getDiagnosticData: 1},
           testcases: [

@@ -239,6 +239,7 @@
         flushRouterConfig: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
+        getDatabaseVersion: {skip: isUnrelated},
         geoNear: {
             command:
                 {geoNear: "view", near: {type: "Point", coordinates: [-50, 37]}, spherical: true},

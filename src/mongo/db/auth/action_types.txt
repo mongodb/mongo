@@ -49,6 +49,7 @@
 "flushRouterConfig",
 "forceUUID",
 "fsync",
+"getDatabaseVersion",
 "getCmdLineOpts",
 "getLog",
 "getParameter",
