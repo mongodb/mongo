@@ -877,7 +877,8 @@ var _bulk_api_module = (function() {
 
                 const session = collection.getDB().getSession();
                 if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
-                    session._serverSession.canRetryWrites(cmd)) {
+                    session._serverSession.canRetryWrites(cmd) &&
+                    !session._serverSession.isInActiveTransaction()) {
                     cmd = session._serverSession.assignTransactionNumber(cmd);
                 }
             }
