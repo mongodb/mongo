@@ -3,6 +3,14 @@
 // Only run this test with the WiredTiger storage engine, since we expect other storage engines to
 // return early because they do not support snapshot read concern.
 // @tags: [requires_wiredtiger]
+
+function _getClusterTime(rst) {
+    const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
+    assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
+    assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
+    return pingRes.$clusterTime.clusterTime;
+}
+
 (function() {
     "use strict";
 
@@ -30,10 +38,7 @@
     const session = testDB.getMongo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
 
-    const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
-    assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
-    assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
-    const clusterTime = pingRes.$clusterTime.clusterTime;
+    const clusterTime = _getClusterTime(rst);
     let txnNumber = 0;
 
     // 'atClusterTime' can be used with readConcern level 'snapshot'.
@@ -117,4 +122,39 @@
 
     session.endSession();
     rst.stopSet();
+
+    // readConcern with 'atClusterTime' should fail when 'enableTestCommands' is set to false.
+    {
+        jsTest.setOption('enableTestCommands', false);
+        let rst = new ReplSetTest({nodes: 1});
+        rst.startSet();
+        rst.initiate();
+        let session =
+            rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+        let sessionDb = session.getDatabase(dbName);
+        assert.commandFailedWithCode(sessionDb.runCommand({
+            find: collName,
+            readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)},
+            txnNumber: NumberLong(0)
+        }),
+                                     ErrorCodes.InvalidOptions);
+        session.endSession();
+        rst.stopSet();
+
+        jsTest.setOption('enableTestCommands', true);
+        rst = new ReplSetTest({nodes: 1});
+        rst.startSet();
+        rst.initiate();
+        session =
+            rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
+        sessionDb = session.getDatabase(dbName);
+        assert.commandWorked(sessionDb.runCommand({
+            find: collName,
+            readConcern: {level: "snapshot", atClusterTime: _getClusterTime(rst)},
+            txnNumber: NumberLong(0)
+        }));
+        session.endSession();
+        rst.stopSet();
+    }
+
 }());
