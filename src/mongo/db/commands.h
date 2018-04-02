@@ -142,6 +142,7 @@ struct CommandHelpers {
             arg == "lsid" ||                             //
             arg == "txnNumber" ||                        //
             arg == "autocommit" ||                       //
+            arg == "stmtId" ||                           //
             false;  // These comments tell clang-format to keep this line-oriented.
     }
 

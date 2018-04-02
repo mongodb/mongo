@@ -291,7 +291,8 @@ void CommandHelpers::filterCommandRequestForPassthrough(BSONObjIterator* cmdIter
                    name == "readConcern" ||     //
                    name == "writeConcern" ||    //
                    name == "lsid" ||            //
-                   name == "txnNumber") {
+                   name == "txnNumber" ||       //
+                   name == "stmtId") {
             // This is the whitelist of generic arguments that commands can be trusted to blindly
             // forward to the shards.
             requestBuilder->append(elem);
