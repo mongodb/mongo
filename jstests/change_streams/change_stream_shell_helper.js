@@ -91,15 +91,8 @@
 
     jsTestLog("Testing watch() with updateLookup");
     cursor = coll.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
-    // wholeDbCursor = db.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
+    wholeDbCursor = db.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
 
-    // TODO SERVER-33820 adds supports for 'updateLookup' against an entire database.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: 1,
-        pipeline: [{$changeStream: {fullDocument: "updateLookup"}}, {$project: {_id: 0}}],
-        cursor: {}
-    }),
-                                 50761);
     assert.writeOK(coll.update({_id: 0}, {$set: {x: 10}}));
     expected = {
         documentKey: {_id: 0},
@@ -109,7 +102,7 @@
         updateDescription: {removedFields: [], updatedFields: {x: 10}},
     };
     checkNextChange(cursor, expected);
-    // checkNextChange(wholeDbCursor, expected);
+    checkNextChange(wholeDbCursor, expected);
 
     jsTestLog("Testing watch() with batchSize");
     // Only test mongod because mongos uses batch size 0 for aggregate commands internally to

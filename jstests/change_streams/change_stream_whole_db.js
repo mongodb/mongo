@@ -43,14 +43,6 @@
     };
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
-    // Test that 'updateLookup' is not allowed with a change stream on an entire database.
-    assert.commandFailedWithCode(db.runCommand({
-        aggregate: 1,
-        pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-        cursor: {}
-    }),
-                                 50761);
-
     // Dropping the database should invalidate the change stream.
     assert.commandWorked(db.dropDatabase());
     expected = {operationType: "invalidate"};

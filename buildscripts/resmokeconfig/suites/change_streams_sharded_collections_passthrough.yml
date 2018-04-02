@@ -11,6 +11,7 @@ selector:
   - jstests/change_streams/change_stream_whole_db.js
   - jstests/change_streams/change_stream_whole_db_invalidations.js
   - jstests/change_streams/change_stream_whole_db_resumability.js
+  - jstests/change_streams/lookup_post_image.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

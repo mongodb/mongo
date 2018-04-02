@@ -434,12 +434,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                           << "\"",
             fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
 
-    // TODO: SERVER-33820 should add support for 'updateLookup' with a change stream on a whole
-    // database.
-    uassert(50761,
-            "'updateLookup' not supported with a change stream on an entire database.",
-            fullDocOption != "updateLookup"_sd || !expCtx->ns.isCollectionlessAggregateNS());
-
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
     list<intrusive_ptr<DocumentSource>> stages;
