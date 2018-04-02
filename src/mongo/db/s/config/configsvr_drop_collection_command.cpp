@@ -97,6 +97,10 @@ public:
                 "_configsvrDropCollection can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         uassert(ErrorCodes::InvalidOptions,
@@ -120,7 +124,7 @@ public:
             [opCtx, nss] { Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss); });
 
         auto collStatus =
-            catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::get(opCtx).getLevel());
         if (collStatus == ErrorCodes::NamespaceNotFound) {
             // We checked the sharding catalog and found that this collection doesn't exist.
             // This may be because it never existed, or because a drop command was sent
@@ -131,7 +135,7 @@ public:
 
             // If the DB isn't in the sharding catalog either, consider the drop a success.
             auto dbStatus = catalogClient->getDatabase(
-                opCtx, nss.db().toString(), repl::ReadConcernLevel::kLocalReadConcern);
+                opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel());
             if (dbStatus == ErrorCodes::NamespaceNotFound) {
                 return true;
             }

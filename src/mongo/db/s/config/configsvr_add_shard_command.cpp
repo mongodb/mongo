@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -100,6 +101,10 @@ public:
         // progress (see SERVER-31231 for details).
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
         uassertStatusOK(swParsedRequest.getStatus());

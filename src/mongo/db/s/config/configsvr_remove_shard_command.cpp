@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -91,6 +92,10 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrRemoveShard can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << cmdObj.firstElement().fieldName()
@@ -154,7 +159,7 @@ public:
                     BSONObj(),
                     boost::none,  // return all
                     nullptr,
-                    repl::ReadConcernLevel::kMajorityReadConcern);
+                    repl::ReadConcernArgs::get(opCtx).getLevel());
                 uassertStatusOK(swChunks.getStatus());
 
                 const auto& chunks = swChunks.getValue();

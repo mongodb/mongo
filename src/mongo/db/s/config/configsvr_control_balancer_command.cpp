@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
@@ -111,6 +112,11 @@ public:
 
 private:
     void _run(OperationContext* opCtx, BSONObjBuilder* result) override {
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         uassertStatusOK(Grid::get(opCtx)->getBalancerConfiguration()->setBalancerMode(
             opCtx, BalancerSettingsType::kOff));
         Balancer::get(opCtx)->joinCurrentRound(opCtx);

@@ -391,9 +391,18 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
 ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    auto shardsAndOpTime = uassertStatusOKWithContext(
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern),
-        "could not get updated shard list from config server");
+    auto readConcern = repl::ReadConcernLevel::kMajorityReadConcern;
+
+    // ShardRemote requires a majority read. We can only allow a non-majority read if we are a
+    // config server.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !repl::ReadConcernArgs::get(opCtx).isEmpty()) {
+        readConcern = repl::ReadConcernArgs::get(opCtx).getLevel();
+    }
+
+    auto shardsAndOpTime =
+        uassertStatusOKWithContext(catalogClient->getAllShards(opCtx, readConcern),
+                                   "could not get updated shard list from config server");
 
     auto shards = std::move(shardsAndOpTime.value);
     auto reloadOpTime = std::move(shardsAndOpTime.opTime);

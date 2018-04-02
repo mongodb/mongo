@@ -39,6 +39,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/create_collection_gen.h"
@@ -67,6 +68,11 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "createCollection must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             CollectionOptions options;
             if (auto requestOptions = request().getOptions()) {

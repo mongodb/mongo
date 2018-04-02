@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
@@ -112,6 +113,10 @@ public:
                       "_configsvrMovePrimary can only be run on config servers");
         }
 
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         auto movePrimaryRequest =
             MovePrimary::parse(IDLParserErrorContext("ConfigSvrMovePrimary"), cmdObj);
         const auto dbname = parseNs("", cmdObj);
@@ -146,9 +151,10 @@ public:
         auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "movePrimary", DistLockManager::kDefaultLockTimeout));
 
-        auto dbType = uassertStatusOK(catalogClient->getDatabase(
-                                          opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern))
-                          .value;
+        auto dbType =
+            uassertStatusOK(catalogClient->getDatabase(
+                                opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel()))
+                .value;
 
         const auto fromShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
 
@@ -207,7 +213,7 @@ public:
               << " to: " << toShard->toString();
 
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern);
+            opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
 
         // Record start in changelog
         uassertStatusOK(catalogClient->logChange(

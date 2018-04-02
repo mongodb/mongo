@@ -32,6 +32,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/log.h"
@@ -78,6 +79,10 @@ public:
             uasserted(ErrorCodes::IllegalOperation,
                       "_configsvrCommitMovePrimary can only be run on config servers");
         }
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "commitMovePrimary must be called with majority writeConcern, got "

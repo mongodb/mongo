@@ -93,6 +93,10 @@ public:
                       "_configsvrDropDatabase can only be run on config servers");
         }
 
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         const std::string dbname = parseNs("", cmdObj);
 
         uassert(
@@ -115,7 +119,7 @@ public:
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
         auto dbInfo =
-            catalogClient->getDatabase(opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern);
+            catalogClient->getDatabase(opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
 
         // If the namespace isn't found, treat the drop as a success. In case the drop just happened
         // and has not fully propagated, set the client's last optime to the system's last optime to
@@ -140,7 +144,7 @@ public:
 
         // Drop the database's collections.
         for (const auto& nss : catalogClient->getAllShardedCollectionsForDb(
-                 opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern)) {
+                 opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel())) {
             auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nss.ns(), "dropCollection", DistLockManager::kDefaultLockTimeout));
             uassertStatusOK(catalogManager->dropCollection(opCtx, nss));
