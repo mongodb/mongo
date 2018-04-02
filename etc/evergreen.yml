@@ -860,7 +860,7 @@ functions:
         rm -rf ${install_directory|/data/mongo-install-directory}
 
         extra_args=""
-        if [ ${targets} = "all" ] && [ -n "${num_scons_compile_all_jobs_available|}" ]; then
+        if [ "${targets}" = "all" ] && [ -n "${num_scons_compile_all_jobs_available|}" ]; then
           echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
           extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
         fi
