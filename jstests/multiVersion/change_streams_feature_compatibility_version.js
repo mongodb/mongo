@@ -3,6 +3,7 @@
 (function() {
     "use strict";
 
+    load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
     load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
 
     const rst = new ReplSetTest({
@@ -10,7 +11,12 @@
         nodeOpts: {binVersion: "latest"},
     });
 
-    rst.startSet();
+    if (!startSetIfSupportsReadMajority(rst)) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        rst.stopSet();
+        return;
+    }
+
     rst.initiate();
 
     const testDB = rst.getPrimary().getDB(jsTestName());
