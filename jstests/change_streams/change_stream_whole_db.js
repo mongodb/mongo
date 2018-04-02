@@ -3,18 +3,14 @@
     "use strict";
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+    load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
+                                                       // assert[Valid|Invalid]ChangeStreamNss.
 
     // Test that a change stream cannot be opened on the "admin", "config", or "local" databases.
-    // TODO SERVER-34040 Should prevent change streams on these databases.
-    assert.commandWorked(db.getSiblingDB("admin").runCommand(
-        {aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}}));
-
-    assert.commandWorked(db.getSiblingDB("config").runCommand(
-        {aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}}));
-
-    assert.commandWorked(db.getSiblingDB("local").runCommand(
-        {aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}}));
+    // TODO SERVER-34086: $changeStream may run against 'admin' if 'allChangesForCluster' is true.
+    assertInvalidChangeStreamNss("admin", 1);
+    assertInvalidChangeStreamNss("config", 1);
+    assertInvalidChangeStreamNss("local", 1);
 
     // Test that a change stream can be opened before a database exists.
     assert.commandWorked(db.dropDatabase());
