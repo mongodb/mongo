@@ -525,6 +525,12 @@ public:
             BSONElement stateElem = jsobj["md5state"];
             if (!stateElem.eoo()) {
                 int len;
+
+                StringBuilder s;
+                s << "The element that calls binDataClean() must be type of BinData";
+
+                uassert(50750, s.str(), (stateElem.type() == BSONType::BinData));
+
                 const char* data = stateElem.binDataClean(len);
                 massert(16247, "md5 state not correct size", len == sizeof(st));
                 memcpy(&st, data, sizeof(st));
@@ -580,6 +586,11 @@ public:
                 exec->saveState();
                 // UNLOCKED
                 ctx.reset();
+
+                StringBuilder s;
+                s << "The element that calls binDataClean() must be type of BinData";
+
+                uassert(50751, s.str(), (owned["data"].type() == BSONType::BinData));
 
                 int len;
                 const char* data = owned["data"].binDataClean(len);
