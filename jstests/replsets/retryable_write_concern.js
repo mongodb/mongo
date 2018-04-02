@@ -5,18 +5,24 @@
 
     "use strict";
 
+    load("jstests/libs/retryable_writes_util.js");
     load("jstests/libs/write_concern_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
 
     const kNodes = 2;
 
     let checkWriteConcernTimedOut = function(result) {
         let wcErr = result.writeConcernError;
-        assert.neq(null, wcErr);
+        assert.neq(null, wcErr, tojson(result));
 
         let errInfo = wcErr.errInfo;
-        assert.neq(null, errInfo);
+        assert.neq(null, errInfo, tojson(result));
 
-        assert.eq(true, errInfo.wtimeout);
+        assert.eq(true, errInfo.wtimeout, tojson(result));
     };
 
     let runTest = function(priConn, secConn, cmd) {
