@@ -6,7 +6,6 @@
     'use strict';
 
     load('jstests/libs/profiler.js');
-
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
@@ -434,10 +433,6 @@
             continue;
         }
 
-        // Drop the profiler collection before each command, so in case this test case fails, it's
-        // easy to find this command in the profiler output that gets logged.
-        st.shard0.getDB(dbName).setProfilingLevel(0);
-        assert(st.shard0.getDB(dbName).getCollection("system.profile").drop());
         st.shard0.getDB(dbName).setProfilingLevel(2);
 
         jsTest.log("testing command " + tojson(testCase.command));
@@ -452,7 +447,6 @@
 
         st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "alwaysOn"});
         if (testCase.sendsDbVersion) {
-            commandProfile["command.databaseVersion"] = dbVersion;
             assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(testCase.command),
                                          ErrorCodes.StaleDbVersion);
 
@@ -462,11 +456,21 @@
             // profiled. SERVER-33499 will change the server so that CurOp::raiseDbProfilingLevel()
             // is called as part of generic command processing, before AutoGetDb can be called. Once
             // that is in, we should check that the dbVersion sent matched what was expected.
+            // commandProfile["command.databaseVersion"] = dbVersion;
             // profilerHasSingleMatchingEntryOrThrow(
             //    {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
+
+            const res = st.shard0.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq(dbVersion, res.dbVersion);
         } else {
-            commandProfile["command.databaseVersion"] = {$exists: false};
             assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
+
+            const res = st.shard0.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq({}, res.dbVersion);
+
+            commandProfile["command.databaseVersion"] = {$exists: false};
             profilerHasSingleMatchingEntryOrThrow(
                 {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
         }
@@ -475,6 +479,9 @@
         if (testCase.cleanUp) {
             testCase.cleanUp(st.s);
         }
+
+        // Drop the database from the shard to clear the shard's cached in-memory database info.
+        assert.commandWorked(st.shard0.getDB(dbName).runCommand({dropDatabase: 1}));
     }
 
     // After iterating through all the existing commands, ensure there were no additional test cases

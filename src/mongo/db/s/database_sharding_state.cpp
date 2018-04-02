@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/database_sharding_state.h"
@@ -34,7 +36,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -76,6 +78,8 @@ boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
 void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
                                          boost::optional<DatabaseVersion> newDbVersion) {
     invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
+    log() << "setting this node's cached database version for " << get.owner(this)->name() << " to "
+          << (newDbVersion ? newDbVersion->toBSON() : BSONObj());
     _dbVersion = newDbVersion;
 }
 

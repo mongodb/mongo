@@ -741,6 +741,11 @@ void execCommandDatabase(OperationContext* opCtx,
                     opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
                     .ignore();
             }
+        } else if (auto sce = e.extraInfo<StaleDbRoutingVersion>()) {
+            if (!opCtx->getClient()->isInDirectClient()) {
+                onDbVersionMismatch(
+                    opCtx, sce->getDb(), sce->getVersionReceived(), sce->getVersionWanted());
+            }
         } else if (auto cannotImplicitCreateCollInfo =
                        e.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
             if (ShardingState::get(opCtx)->enabled()) {
