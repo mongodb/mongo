@@ -176,7 +176,7 @@ selector:
   # The `dbstats` command builds in-memory structures that are not causally consistent.
   - jstests/core/dbstats.js
   # TODO SERVER-34248
-  - jstests/core/function_string_representation.js
+  - jstests/core/function_string_representations.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
