@@ -39,6 +39,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/versioning.h"
@@ -191,6 +192,18 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+    // Check if the FCV has been changed under us.
+    invariant(!opCtx->lockState()->isLocked());
+    Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+
+    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    // If we're not in 4.0, then fail. We want to have assurance that the schema will accept a
+    // version field in config.databases.
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "committing movePrimary failed due to version mismatch",
+            currentFCV == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
     // Must use local read concern because we will perform subsequent writes.
     auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -219,19 +232,18 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     auto newDbType = dbType;
     newDbType.setPrimary(toShard);
 
-    auto currentDatabaseVersion = dbType.getVersion();
-    boost::optional<DatabaseVersion> newDatabaseVersion = boost::none;
+    auto const currentDatabaseVersion = dbType.getVersion();
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "DatabaseVersion doesn't exist in database entry despite the config "
+                          << "server being in FCV 4.0"
+                          << dbType.toBSON(),
+            currentDatabaseVersion != boost::none);
+
+    newDbType.setVersion(Versioning::incrementDatabaseVersion(*currentDatabaseVersion));
 
     auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
-
-    // Generate the new DatabaseVersion. If the version doesn't exist currently, it's not the
-    // responsibility of movePrimary to create one. It should be done by createDatabase or
-    // setFCV=4.0.
-    if (currentDatabaseVersion) {
-        newDatabaseVersion = Versioning::incrementDatabaseVersion(*currentDatabaseVersion);
-        newDbType.setVersion(*newDatabaseVersion);
-        updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion->toBSON());
-    }
+    updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion->toBSON());
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
@@ -251,18 +263,15 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     // updated. This is likely because the database version was changed in between the query and
     // the update, so no documents were found to change. This shouldn't happen however, because we
     // are holding the dist lock during the movePrimary operation.
-    if (!updateStatus.getValue()) {
-        if (currentDatabaseVersion) {
-            uasserted(ErrorCodes::IncompatibleShardingMetadata,
-                      str::stream() << "Tried to update primary shard for database '" << dbname
-                                    << " with version "
-                                    << currentDatabaseVersion->getLastMod());
-        } else {
-            uasserted(ErrorCodes::IncompatibleShardingMetadata,
-                      str::stream() << "Tried to update primary shard for database '" << dbname
-                                    << " that currently has no version.");
-        }
-    }
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to update primary shard for database '" << dbname
+                          << " with version "
+                          << currentDatabaseVersion->getLastMod(),
+            updateStatus.getValue());
+
+    // Ensure the next attempt to retrieve the database or any of its collections will do a full
+    // reload
+    Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname);
 
     return Status::OK();
 }

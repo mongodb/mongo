@@ -5,22 +5,7 @@
 
 (function() {
     "use strict";
-    function movePrimaryReplset(useFCV40) {
-        var numDocs = 10000;
-        var baseName = "moveprimary-replset";
-        var testDBName = baseName;
-        var testCollName = 'coll';
-
-        var shardingTestConfig = {
-            name: baseName,
-            mongos: 1,
-            shards: 2,
-            config: 3,
-            rs: {nodes: 3},
-            other: {manualAddShard: true}
-        };
-        var shardingTest = new ShardingTest(shardingTestConfig);
-
+    function movePrimaryReplset() {
         var replSet1 = shardingTest.rs0;
         var replSet2 = shardingTest.rs1;
 
@@ -42,23 +27,42 @@
 
         mongosConn.adminCommand({addshard: replSet2.getURL()});
 
-        assert.commandWorked(mongosConn.getDB('admin').runCommand(
-            {moveprimary: testDBName, to: replSet2.getURL(), forTest: useFCV40}));
+        assert.commandWorked(
+            mongosConn.getDB('admin').runCommand({moveprimary: testDBName, to: replSet2.getURL()}));
         mongosConn.getDB('admin').printShardingStatus();
-        let primaryName = testDB.getSiblingDB("config")
-                              .databases.findOne({"_id": testDBName})
-                              .primary.split('/')[0];
-        assert.eq(
-            primaryName, replSet2.name, "Failed to change primary shard for unsharded database.");
+        assert.eq(testDB.getSiblingDB("config").databases.findOne({"_id": testDBName}).primary,
+                  replSet2.name,
+                  "Failed to change primary shard for unsharded database.");
 
         testDB[testCollName].update({}, {$set: {z: 'world'}}, false /*upsert*/, true /*multi*/);
         assert.eq(testDB[testCollName].count({z: 'world'}),
                   numDocs,
                   'updating and counting docs via mongos failed');
-
-        shardingTest.stop();
     }
 
-    movePrimaryReplset(false);
-    movePrimaryReplset(true);
+    var numDocs = 10000;
+    var baseName = "moveprimary-replset";
+    var testDBName = baseName;
+    var testCollName = 'coll';
+
+    var shardingTestConfig = {
+        name: baseName,
+        mongos: 1,
+        shards: 2,
+        config: 3,
+        rs: {nodes: 3},
+        other: {manualAddShard: true}
+    };
+
+    var shardingTest = new ShardingTest(shardingTestConfig);
+
+    // Set FCV to 3.6
+    assert.commandWorked(shardingTest.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
+    movePrimaryReplset();
+
+    // Set FCV to 4.0
+    assert.commandWorked(shardingTest.s.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+    movePrimaryReplset();
+
+    shardingTest.stop();
 })();

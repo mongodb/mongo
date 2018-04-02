@@ -179,7 +179,7 @@
         }
     }
 
-    function movePrimaryNoFailpoint(sharded, useFCV40) {
+    function movePrimaryNoFailpoint(sharded) {
         var db = st.getDB('test1');
         createCollections(sharded);
 
@@ -200,8 +200,7 @@
         var baruuid = fromColls[0].info.uuid;
         var foouuid = fromColls[1].info.uuid;
 
-        assert.commandWorked(
-            st.s0.adminCommand({movePrimary: "test1", to: toShard.name, forTest: useFCV40}));
+        assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
 
         checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid);
     }
@@ -214,13 +213,21 @@
     var fooIndexes = [{key: {a: 1}, name: 'index1', expireAfterSeconds: 5000}];
     var barIndexes = [{key: {a: -1}, name: 'index2'}];
 
+    // Set FCV to 3.6
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
+
     movePrimaryWithFailpoint(true);
     movePrimaryWithFailpoint(false);
-    // Test the combinations of sharded (T/F) and useFCV40 (T/F)
-    movePrimaryNoFailpoint(true, true);
-    movePrimaryNoFailpoint(true, false);
-    movePrimaryNoFailpoint(false, true);
-    movePrimaryNoFailpoint(false, false);
+    movePrimaryNoFailpoint(true);
+    movePrimaryNoFailpoint(false);
+
+    // Set FCV to 4.0
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+
+    movePrimaryWithFailpoint(true);
+    movePrimaryWithFailpoint(false);
+    movePrimaryNoFailpoint(true);
+    movePrimaryNoFailpoint(false);
 
     st.stop();
 })();

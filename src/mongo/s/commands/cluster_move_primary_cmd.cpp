@@ -105,7 +105,6 @@ public:
         ConfigsvrMovePrimary configMovePrimaryRequest;
         configMovePrimaryRequest.set_configsvrMovePrimary(nss);
         configMovePrimaryRequest.setTo(movePrimaryRequest.getTo());
-        configMovePrimaryRequest.setForTest(movePrimaryRequest.getForTest());
 
         // Invalidate the routing table cache entry for this database so that we reload the
         // collection the next time it's accessed, even if we receive a failure, e.g. NetworkError.
