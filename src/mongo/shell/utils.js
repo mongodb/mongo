@@ -63,11 +63,17 @@ function retryOnNetworkError(func, numRetries, sleepMs) {
     }
 }
 
-// Checks if a javascript exception is a network error.
+// Checks if a Javascript exception is a network error.
 function isNetworkError(error) {
-    return error.message.indexOf("network error") >= 0 ||
-        error.message.indexOf("error doing query") >= 0 ||
-        error.message.indexOf("socket exception") >= 0;
+    let networkErrs = [
+        "network error",
+        "error doing query",
+        "socket exception",
+        "SocketException",
+        "HostNotFound"
+    ];
+    // See if any of the known network error strings appear in the given message.
+    return networkErrs.some(err => error.message.includes(err));
 }
 
 // Please consider using bsonWoCompare instead of this as much as possible.
