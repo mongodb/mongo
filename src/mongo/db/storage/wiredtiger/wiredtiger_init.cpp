@@ -52,6 +52,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 
@@ -86,6 +87,19 @@ public:
 #endif
 
         size_t cacheMB = WiredTigerUtil::getCacheSizeMB(wiredTigerGlobalOptions.cacheSizeGB);
+        const double memoryThresholdPercentage = 0.8;
+        ProcessInfo p;
+        if (p.supported()) {
+            if (cacheMB > memoryThresholdPercentage * p.getMemSizeMB()) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: The configured WiredTiger cache size is more than "
+                      << memoryThresholdPercentage * 100 << "% of available RAM."
+                      << startupWarningsLog;
+                log() << "**          See "
+                         "http://dochub.mongodb.org/core/faq-memory-diagnostics-wt"
+                      << startupWarningsLog;
+            }
+        }
         const bool ephemeral = false;
         WiredTigerKVEngine* kv =
             new WiredTigerKVEngine(getCanonicalName().toString(),
