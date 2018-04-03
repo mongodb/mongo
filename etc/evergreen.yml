@@ -8524,9 +8524,9 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: enterprise
-    use_scons_cache: true
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
+    scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -8579,9 +8579,10 @@ buildvariants:
     packager_arch: x86_64
     packager_distro: debian92
     repo_edition: org
-    use_scons_cache: true
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
+    scons_cache_scope: shared
+    shared_scons_pruning: true
     build_mongoreplay: true
   tasks:
   - name: compile
