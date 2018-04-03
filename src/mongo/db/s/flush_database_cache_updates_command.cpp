@@ -121,6 +121,12 @@ public:
 
         {
             AutoGetDb autoDb(opCtx, name, MODE_IS);
+            if (!autoDb.getDb()) {
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Can't issue _flushDatabaseCacheUpdates on the database "
+                                        << name
+                                        << " because it does not exist on this shard.");
+            }
 
             // If the primary is in the critical section, secondaries must wait for the commit to
             // finish on the primary in case a secondary's caller has an afterClusterTime inclusive

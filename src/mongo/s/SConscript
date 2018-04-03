@@ -116,6 +116,7 @@ env.Library(
         'catalog/type_mongos.cpp',
         'catalog/type_shard.cpp',
         'catalog/type_shard_collection.cpp',
+        'catalog/type_shard_database.cpp',
         'catalog/type_tags.cpp',
         'chunk_version.cpp',
         'request_types/add_shard_request_type.cpp',

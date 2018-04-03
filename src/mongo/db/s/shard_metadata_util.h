@@ -43,6 +43,7 @@ class CollectionMetadata;
 class NamespaceString;
 class OperationContext;
 class ShardCollectionType;
+class ShardDatabaseType;
 template <typename T>
 class StatusWith;
 
@@ -139,6 +140,11 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
                                                           const NamespaceString& nss);
 
 /**
+ * Reads the shard server's databases collection entry identified by 'dbName'.
+ */
+StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, StringData dbName);
+
+/**
  * Updates the collections collection entry matching 'query' with 'update' using local write
  * concern.
  *
@@ -155,6 +161,22 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& update,
                                    const BSONObj& inc,
                                    const bool upsert);
+
+/**
+ * Updates the databases collection entry matching 'query' with 'update' using local write
+ * concern.
+ *
+ * Uses the $set operator on the update so that updates can be applied without resetting everything.
+ * 'inc' can be used to specify fields and their increments: it will be assigned to the $inc
+ * operator.
+ *
+ * 'inc' should not specify 'upsert' true.
+ */
+Status updateShardDatabasesEntry(OperationContext* opCtx,
+                                 const BSONObj& query,
+                                 const BSONObj& update,
+                                 const BSONObj& inc,
+                                 const bool upsert);
 
 /**
  * Reads the shard server's chunks collection corresponding to 'nss' for chunks matching 'query',
@@ -200,6 +222,12 @@ Status updateShardChunks(OperationContext* opCtx,
  * retries, rather than returning with a useful error message.
  */
 Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Deletes locally persisted database metadata associated with 'dbName': removes the databases
+ * collection entry.
+ */
+Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName);
 
 }  // namespace shardmetadatautil
 }  // namespace mongo

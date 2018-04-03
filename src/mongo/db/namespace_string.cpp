@@ -55,6 +55,7 @@ constexpr StringData NamespaceString::kLocalDb;
 constexpr StringData NamespaceString::kConfigDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
 constexpr StringData NamespaceString::kShardConfigCollectionsCollectionName;
+constexpr StringData NamespaceString::kShardConfigDatabasesCollectionName;
 constexpr StringData NamespaceString::kSystemKeysCollectionName;
 
 const NamespaceString NamespaceString::kServerConfigurationNamespace(kServerConfiguration);
