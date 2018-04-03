@@ -1510,6 +1510,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the C++ header to a stream."""
         self.gen_file_header()
 
+        # Include platform/basic.h
+        self.gen_include("mongo/platform/basic.h")
+        self.write_empty_line()
+
         # Generate include for generated header first
         self.gen_include(header_file_name)
         self.write_empty_line()
