@@ -733,6 +733,7 @@ void ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx,
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
 
     // Read the local metadata.
@@ -767,7 +768,6 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
             OperationContext * opCtx, StatusWith<DatabaseType> swDatabaseType) {
 
         if (swDatabaseType == ErrorCodes::NamespaceNotFound) {
-
             Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
                 opCtx, name, dbTask{swDatabaseType, maxLoaderVersion, termScheduled});
             if (!scheduleStatus.isOK()) {

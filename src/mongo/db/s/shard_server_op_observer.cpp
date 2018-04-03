@@ -35,11 +35,13 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard_collection.h"
+#include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -117,8 +119,8 @@ private:
  * This only runs on secondaries.
  * The global exclusive lock is expected to be held by the caller.
  */
-void onConfigDeleteInvalidateCachedMetadataAndNotify(OperationContext* opCtx,
-                                                     const BSONObj& query) {
+void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext* opCtx,
+                                                               const BSONObj& query) {
     // Notification of routing table changes are only needed on secondaries
     if (isStandaloneOrPrimary(opCtx)) {
         return;
@@ -282,6 +284,37 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         }
     }
 
+    if (args.nss.ns() == NamespaceString::kShardConfigDatabasesCollectionName) {
+        // Notification of routing table changes are only needed on secondaries
+        if (isStandaloneOrPrimary(opCtx)) {
+            return;
+        }
+
+        // This logic runs on updates to the shard's persisted cache of the config server's
+        // config.databases collection.
+        //
+        // If an update occurs to the 'enterCriticalSectionSignal' field, clear the routing
+        // table immediately. This will provoke the next secondary caller to refresh through the
+        // primary, blocking behind the critical section.
+
+        // Extract which database was updated
+        std::string db;
+        fassert(40478, bsonExtractStringField(args.criteria, ShardDatabaseType::name.name(), &db));
+
+        // Parse the '$set' update
+        BSONElement setElement;
+        Status setStatus =
+            bsonExtractTypedField(args.update, StringData("$set"), Object, &setElement);
+        if (setStatus.isOK()) {
+            BSONObj setField = setElement.Obj();
+
+            if (setField.hasField(ShardDatabaseType::enterCriticalSectionCounter.name())) {
+                AutoGetDb autoDb(opCtx, db, MODE_X);
+                DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+            }
+        }
+    }
+
     if (metadata) {
         incrementChunkOnInsertOrUpdate(
             opCtx, *metadata->getChunkManager(), args.updatedDoc, args.updatedDoc.objsize());
@@ -305,7 +338,21 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     auto& deleteState = getDeleteState(opCtx);
 
     if (nss.ns() == NamespaceString::kShardConfigCollectionsCollectionName) {
-        onConfigDeleteInvalidateCachedMetadataAndNotify(opCtx, deleteState.documentKey);
+        onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(opCtx, deleteState.documentKey);
+    }
+    if (nss.ns() == NamespaceString::kShardConfigDatabasesCollectionName) {
+        if (isStandaloneOrPrimary(opCtx)) {
+            return;
+        }
+
+        // Extract which database entry is being deleted from the _id field.
+        std::string deletedDatabase;
+        fassert(50772,
+                bsonExtractStringField(
+                    deleteState.documentKey, ShardDatabaseType::name.name(), &deletedDatabase));
+
+        AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
+        DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {
