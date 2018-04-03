@@ -377,7 +377,7 @@ inline ObjScopeGuardImpl2<Obj1, Ret (Obj2::*)(P1a, P2a), P1b, P2b> MakeGuard(
         *obj, memFun, p1, p2);
 }
 
-}  // namespace Loki
+}  // namespace mongo
 
 #define LOKI_CONCATENATE_DIRECT(s1, s2) s1##s2
 #define LOKI_CONCATENATE(s1, s2) LOKI_CONCATENATE_DIRECT(s1, s2)
