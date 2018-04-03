@@ -333,7 +333,7 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
                                 requests,
                                 false /* do not allow partial results */);
 
-    } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>&) {
+    } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>&) {
         // If any shard returned a stale shardVersion error, invalidate the routing table cache.
         // This will cause the cache to be refreshed the next time it is accessed.
         Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(*routingInfo));
@@ -508,7 +508,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                 shardQuery,
                                                 aggRequest.getCollation());
             }
-        } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>& ex) {
+        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
             LOG(1) << "got stale shardVersion error " << redact(ex) << " while dispatching "
                    << redact(targetedCommand) << " after " << (numAttempts + 1)
                    << " dispatch attempts";
@@ -975,7 +975,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
                            : std::move(cmdObj),
         Shard::RetryPolicy::kIdempotent));
 
-    if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
+    if (ErrorCodes::isStaleShardVersionError(cmdResponse.commandStatus.code())) {
         uassertStatusOK(
             cmdResponse.commandStatus.withContext("command failed because of stale config"));
     } else if (ErrorCodes::isSnapshotError(cmdResponse.commandStatus.code())) {

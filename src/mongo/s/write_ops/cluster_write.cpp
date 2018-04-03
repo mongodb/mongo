@@ -402,7 +402,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
     } catch (const DBException& ex) {
         chunk->clearBytesWritten();
 
-        if (ErrorCodes::isStaleShardingError(ex.code())) {
+        if (ErrorCodes::isStaleShardVersionError(ex.code())) {
             log() << "Unable to auto-split chunk " << redact(chunkRange.toString()) << causedBy(ex)
                   << ", going to invalidate routing table entry for " << nss;
             Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);

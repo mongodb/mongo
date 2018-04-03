@@ -193,7 +193,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             }
 
             // Failing to establish a consistent shardVersion means no results should be examined.
-            if (ErrorCodes::isStaleShardingError(status.code())) {
+            if (ErrorCodes::isStaleShardVersionError(status.code())) {
                 uassertStatusOK(status.withContext(str::stream()
                                                    << "got stale shardVersion response from shard "
                                                    << response.shardId

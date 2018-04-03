@@ -290,7 +290,7 @@ error_class("NotMasterError", [
     "InterruptedDueToReplStateChange",
     "PrimarySteppedDown",
     ])
-error_class("StaleShardingError",
+error_class("StaleShardVersionError",
             ["StaleConfig", "StaleShardVersion", "StaleEpoch"])
 error_class("NeedRetargettingError",
             ["StaleConfig", "StaleShardVersion", "StaleEpoch", "CannotImplicitlyCreateCollection"])

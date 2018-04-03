@@ -445,7 +445,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                 ex.addContext(str::stream() << "Failed to run query after " << kMaxRetries
                                             << " retries");
                 throw;
-            } else if (!ErrorCodes::isStaleShardingError(ex.code()) &&
+            } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
                        !ErrorCodes::isSnapshotError(ex.code()) &&
                        ex.code() != ErrorCodes::ShardNotFound) {
                 // Errors other than stale metadata, snapshot unavailable, or from trying to reach a
@@ -461,7 +461,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             // Note: there is no need to refresh metadata on snapshot errors since the request
             // failed because atClusterTime was too low, not because the wrong shards were targeted,
             // and subsequent attempts will choose a later atClusterTime.
-            if (ErrorCodes::isStaleShardingError(ex.code()) ||
+            if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
                 ex.code() == ErrorCodes::ShardNotFound) {
                 catalogCache->onStaleShardVersion(std::move(routingInfo));
             }
