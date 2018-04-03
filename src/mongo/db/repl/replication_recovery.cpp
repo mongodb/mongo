@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/session.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -224,6 +225,19 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
         auto entry = cursor->nextSafe();
         fassertStatusOK(40294,
                         SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
+
+        auto oplogEntryStatus = OplogEntry::parse(entry);
+        if (!oplogEntryStatus.isOK()) {
+            fassertFailedWithStatus(50763, oplogEntryStatus.getStatus());
+        }
+
+        auto oplogEntry = oplogEntryStatus.getValue();
+        if (auto txnTableOplog = Session::createMatchingTransactionTableUpdate(oplogEntry)) {
+            fassert(50764,
+                    SyncTail::syncApply(
+                        opCtx, txnTableOplog->toBSON(), OplogApplication::Mode::kRecovering));
+        }
+
         _consistencyMarkers->setAppliedThrough(
             opCtx, fassertStatusOK(40295, OpTime::parseFromOplogEntry(entry)));
     }
