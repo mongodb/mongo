@@ -3,6 +3,10 @@
 (function() {
     'use strict';
 
+    // There will be cases where a connect is impossible,
+    // let the test runner clean those up.
+    TestData.failIfUnterminatedProcesses = false;
+
     const supportsTLS1_1 = (function() {
         const openssl = getBuildInfo().openssl || {};
         if (openssl.compiled === undefined) {
@@ -33,21 +37,25 @@
         return (buildEnv.target_os === 'macOS');
     })();
 
-    function test(disabledProtocols, shouldSucceed) {
-        const expectLogMessage = !defaultEnableTLS1_0 && (disabledProtocols === null);
+    function test(serverDP, clientDP, shouldSucceed) {
+        const expectLogMessage = !defaultEnableTLS1_0 && (serverDP === null);
         let serverOpts = {
             sslMode: 'allowSSL',
             sslPEMKeyFile: 'jstests/libs/server.pem',
             sslCAFile: 'jstests/libs/ca.pem',
             waitForConnect: false
         };
-        if (disabledProtocols !== null) {
-            serverOpts.sslDisabledProtocols = disabledProtocols;
+        if (serverDP !== null) {
+            serverOpts.sslDisabledProtocols = serverDP;
         }
         clearRawMongoProgramOutput();
         const mongod = MongoRunner.runMongod(serverOpts);
         assert(mongod);
 
+        let clientOpts = [];
+        if (clientDP !== null) {
+            clientOpts = ['--sslDisabledProtocols', clientDP];
+        }
         const didSucceed = (function() {
             try {
                 assert.soon(function() {
@@ -59,6 +67,7 @@
                                                 'jstests/libs/client.pem',
                                                 '--sslCAFile',
                                                 'jstests/libs/ca.pem',
+                                                ...clientOpts,
                                                 '--eval',
                                                 ';');
                 }, "Connecting to mongod", 30 * 1000);
@@ -69,23 +78,33 @@
         })();
 
         // Exit code based success/failure.
-        assert.eq(didSucceed,
-                  shouldSucceed,
-                  "Running with disabledProtocols == " + tojson(disabledProtocols));
+        assert.eq(
+            didSucceed, shouldSucceed, "Running with " + tojson(serverDP) + "/" + tojson(clientDP));
 
         assert.eq(expectLogMessage,
                   rawMongoProgramOutput().search('Automatically disabling TLS 1.0') >= 0,
                   "TLS 1.0 was/wasn't automatically disabled");
-
-        const exitCode =
-            (didSucceed || !_isWindows()) ? MongoRunner.EXIT_CLEAN : MongoRunner.EXIT_SIGKILL;
-        MongoRunner.stopMongod(mongod, undefined, {allowedExitCode: exitCode});
     }
 
-    test(null, true);
-    test('none', true);
-    test('TLS1_0', supportsTLS1_1);
-    test('TLS1_1,TLS1_2', true);
-    test('TLS1_0,TLS1_1', supportsTLS1_1);
-    test('TLS1_0,TLS1_1,TLS1_2', false);
+    // Tests with default client behavior (TLS 1.0 disabled if 1.1 available).
+    test(null, null, true);
+    test('none', null, true);
+    test('TLS1_0', null, supportsTLS1_1);
+    test('TLS1_1,TLS1_2', null, !supportsTLS1_1);
+    test('TLS1_0,TLS1_1', null, supportsTLS1_1);
+    test('TLS1_0,TLS1_1,TLS1_2', null, false);
+
+    // Tests with TLS 1.0 always enabled on client.
+    test(null, 'none', true);
+    test('none', 'none', true);
+    test('TLS1_0', 'none', supportsTLS1_1);
+    test('TLS1_1,TLS1_2', 'none', true);
+    test('TLS1_0,TLS1_1', 'none', supportsTLS1_1);
+
+    // Tests with TLS 1.0 explicitly disabled on client.
+    test(null, 'TLS1_0', supportsTLS1_1);
+    test('none', 'TLS1_0', supportsTLS1_1);
+    test('TLS1_0', 'TLS1_0', supportsTLS1_1);
+    test('TLS1_1,TLS1_2', 'TLS1_0', false);
+    test('TLS1_0,TLS1_1', 'TLS1_0', supportsTLS1_1);
 })();

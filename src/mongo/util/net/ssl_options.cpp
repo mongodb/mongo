@@ -64,6 +64,62 @@ StatusWith<std::vector<uint8_t>> hexToVector(StringData hex) {
     });
     return ret;
 }
+
+/**
+ * Older versions of mongod/mongos accepted --sslDisabledProtocols values
+ * in the form 'noTLS1_0,noTLS1_1'.  kAcceptNegativePrefix allows us to
+ * continue accepting this format on mongod/mongos while only supporting
+ * the "standard" TLS1_X format in the shell.
+ */
+enum DisabledProtocolsMode {
+    kStandardFormat,
+    kAcceptNegativePrefix,
+};
+
+Status storeDisabledProtocols(const std::string& disabledProtocols,
+                              DisabledProtocolsMode mode = kStandardFormat) {
+    if (disabledProtocols == "none") {
+        // Allow overriding the default behavior below of implicitly disabling TLS 1.0.
+        return Status::OK();
+    }
+
+    // The disabledProtocols field is composed of a comma separated list of protocols to
+    // disable. First, tokenize the field.
+    const auto tokens = StringSplitter::split(disabledProtocols, ",");
+
+    // All universally accepted tokens, and their corresponding enum representation.
+    const std::map<std::string, SSLParams::Protocols> validConfigs{
+        {"TLS1_0", SSLParams::Protocols::TLS1_0},
+        {"TLS1_1", SSLParams::Protocols::TLS1_1},
+        {"TLS1_2", SSLParams::Protocols::TLS1_2},
+    };
+
+    // These noTLS* tokens exist for backwards compatibility.
+    const std::map<std::string, SSLParams::Protocols> validNoConfigs{
+        {"noTLS1_0", SSLParams::Protocols::TLS1_0},
+        {"noTLS1_1", SSLParams::Protocols::TLS1_1},
+        {"noTLS1_2", SSLParams::Protocols::TLS1_2},
+    };
+
+    // Map the tokens to their enum values, and push them onto the list of disabled protocols.
+    for (const std::string& token : tokens) {
+        auto mappedToken = validConfigs.find(token);
+
+        if ((mappedToken == validConfigs.end()) &&
+            (mode == DisabledProtocolsMode::kAcceptNegativePrefix)) {
+            // We allow "noTLS1_0" style on the server for backward compatibility.
+            mappedToken = validNoConfigs.find(token);
+        }
+
+        if (mappedToken != validConfigs.end()) {
+            sslGlobalParams.sslDisabledProtocols.push_back(mappedToken->second);
+        } else {
+            return Status(ErrorCodes::BadValue, "Unrecognized disabledProtocols '" + token + "'");
+        }
+    }
+
+    return Status::OK();
+}
 }  // nameapace
 
 Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
@@ -256,6 +312,12 @@ Status addSSLClientOptions(moe::OptionSection* options) {
         .incompatibleWith("ssl.PEMKeyPassword");
 #endif
 
+    options->addOptionChaining(
+        "ssl.disabledProtocols",
+        "sslDisabledProtocols",
+        moe::String,
+        "Comma separated list of TLS protocols to disable [TLS1_0,TLS1_1,TLS1_2]");
+
     return Status::OK();
 }
 
@@ -366,41 +428,11 @@ Status storeSSLServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.ssl.disabledProtocols")) {
-        // The disabledProtocols field is composed of a comma separated list of protocols to
-        // disable. First, tokenize the field.
-        std::vector<std::string> tokens =
-            StringSplitter::split(params["net.ssl.disabledProtocols"].as<string>(), ",");
-
-        // All accepted tokens, and their corresponding enum representation. The noTLS* tokens
-        // exist for backwards compatibility.
-        const std::map<std::string, SSLParams::Protocols> validConfigs{
-            {"TLS1_0", SSLParams::Protocols::TLS1_0},
-            {"noTLS1_0", SSLParams::Protocols::TLS1_0},
-            {"TLS1_1", SSLParams::Protocols::TLS1_1},
-            {"noTLS1_1", SSLParams::Protocols::TLS1_1},
-            {"TLS1_2", SSLParams::Protocols::TLS1_2},
-            {"noTLS1_2", SSLParams::Protocols::TLS1_2}};
-
-        // Map the tokens to their enum values, and push them onto the list of disabled protocols.
-        for (const std::string& token : tokens) {
-            if (token == "none") {
-                // Allow overriding the default behavior below of implicitly disabling TLS 1.0.
-                if (tokens.size() != 1) {
-                    return {ErrorCodes::BadValue,
-                            "'none' may not be specified with other values to disabledProtocols"};
-                }
-                break;
-            }
-
-            auto mappedToken = validConfigs.find(token);
-            if (mappedToken != validConfigs.end()) {
-                sslGlobalParams.sslDisabledProtocols.push_back(mappedToken->second);
-            } else {
-                return Status(ErrorCodes::BadValue,
-                              "Unrecognized disabledProtocols '" + token + "'");
-            }
+        const auto status = storeDisabledProtocols(params["net.ssl.disabledProtocols"].as<string>(),
+                                                   DisabledProtocolsMode::kAcceptNegativePrefix);
+        if (!status.isOK()) {
+            return status;
         }
-
 #if !defined(__APPLE__) && ((MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
                             (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
     } else {
@@ -537,6 +569,27 @@ Status storeSSLClientOptions(const moe::Environment& params) {
     if (params.count("ssl.FIPSMode")) {
         sslGlobalParams.sslFIPSMode = true;
     }
+
+    if (params.count("ssl.disabledProtocols")) {
+        const auto status =
+            storeDisabledProtocols(params["ssl.disabledProtocols"].as<std::string>());
+        if (!status.isOK()) {
+            return status;
+        }
+#if ((MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
+     (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
+    } else {
+        /* Similar to the server setting above, we auto-disable TLS 1.0
+         * for shell clients which support TLS 1.1 and later.
+         * Unlike above, we don't have a blanket exception for Apple,
+         * since the reason for supporting external tooling does not apply.
+         *
+         * We also skip logging to keep the spam away from the interactive client op.
+         */
+        sslGlobalParams.sslDisabledProtocols.push_back(SSLParams::Protocols::TLS1_0);
+#endif
+    }
+
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
     if (params.count("ssl.certificateSelector")) {
         const auto status =
