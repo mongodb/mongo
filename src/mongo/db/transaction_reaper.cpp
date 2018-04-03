@@ -234,7 +234,7 @@ public:
                 uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
                     _opCtx, NamespaceString(SessionsCollection::kSessionsFullNS)));
             _cm = routingInfo.cm();
-            _primary = routingInfo.primary();
+            _primary = routingInfo.db().primary();
         }
         ShardId shardId;
         if (_cm) {

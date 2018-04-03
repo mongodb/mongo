@@ -111,7 +111,7 @@ public:
         std::shared_ptr<Shard> shard;
 
         if (!routingInfo.cm()) {
-            shard = routingInfo.primary();
+            shard = routingInfo.db().primary();
         } else {
             chunkMgr = routingInfo.cm();
 
@@ -162,8 +162,12 @@ public:
         const auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         if (!routingInfo.cm()) {
-            _runCommand(
-                opCtx, routingInfo.primaryId(), ChunkVersion::UNSHARDED(), nss, cmdObj, &result);
+            _runCommand(opCtx,
+                        routingInfo.db().primaryId(),
+                        ChunkVersion::UNSHARDED(),
+                        nss,
+                        cmdObj,
+                        &result);
             return true;
         }
 

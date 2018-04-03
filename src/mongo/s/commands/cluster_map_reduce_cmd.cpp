@@ -281,9 +281,9 @@ public:
         if (!shardedInput && !shardedOutput && !customOutDB) {
             LOG(1) << "simple MR, just passthrough";
 
-            invariant(inputRoutingInfo.primary());
+            invariant(inputRoutingInfo.db().primary());
 
-            ShardConnection conn(inputRoutingInfo.primary()->getConnString(), "");
+            ShardConnection conn(inputRoutingInfo.db().primary()->getConnString(), "");
 
             BSONObj res;
             bool ok = conn->runCommand(
@@ -295,7 +295,7 @@ public:
 
             if (auto wcErrorElem = res["writeConcernError"]) {
                 appendWriteConcernErrorToCmdResponse(
-                    inputRoutingInfo.primary()->getId(), wcErrorElem, result);
+                    inputRoutingInfo.db().primary()->getId(), wcErrorElem, result);
             }
 
             result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(res));

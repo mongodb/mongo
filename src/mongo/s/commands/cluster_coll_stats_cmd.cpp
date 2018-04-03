@@ -79,7 +79,7 @@ public:
             result.appendBool("sharded", true);
         } else {
             result.appendBool("sharded", false);
-            result.append("primary", routingInfo.primaryId().toString());
+            result.append("primary", routingInfo.db().primaryId().toString());
         }
 
         auto shardResults = scatterGatherVersionedTargetByRoutingTable(

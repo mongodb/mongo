@@ -66,7 +66,7 @@ std::pair<ShardId, ChunkVersion> getSingleTargetedShardForQuery(
         return {*shardIds.begin(), chunkMgr->getVersion(*shardIds.begin())};
     }
 
-    return {routingInfo.primaryId(), ChunkVersion::UNSHARDED()};
+    return {routingInfo.db().primaryId(), ChunkVersion::UNSHARDED()};
 }
 
 /**

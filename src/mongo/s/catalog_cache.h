@@ -272,29 +272,21 @@ private:
 };
 
 /**
- * Constructed exclusively by the CatalogCache contains a reference to the routing information for
- * the specified collection.
+ * Constructed exclusively by the CatalogCache.
+ *
+ * This RoutingInfo can be considered a "package" of routing info for the database and for the
+ * collection. Once unsharded collections are treated as sharded collections with a single chunk,
+ * they will also have a ChunkManager with a "chunk distribution." At that point, this "package" can
+ * be dismantled: routing for commands that route by database can directly retrieve the
+ * CachedDatabaseInfo, while routing for commands that route by collection can directly retrieve the
+ * ChunkManager.
  */
 class CachedCollectionRoutingInfo {
 public:
-    /**
-     * These serve the same purpose: to route to the primary shard for the collection's database.
-     * Paths that have been updated to attach a databaseVersion use db(). Once all paths have been
-     * updated, primaryId() and primary() can be deleted.
-     */
-    const ShardId& primaryId() const {
-        return _db.primaryId();
-    };
-    std::shared_ptr<Shard> primary() const {
-        return _db.primary();
-    };
     CachedDatabaseInfo db() const {
         return _db;
     };
 
-    /**
-     * If the collection is sharded, returns a chunk manager for it. Otherwise, nullptr.
-     */
     std::shared_ptr<ChunkManager> cm() const {
         return _cm;
     }

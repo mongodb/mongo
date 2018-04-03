@@ -306,8 +306,8 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
         // Don't append shard version info when contacting the config servers.
-        requests.emplace_back(routingInfo->primaryId(),
-                              !routingInfo->primary()->isConfig()
+        requests.emplace_back(routingInfo->db().primaryId(),
+                              !routingInfo->db().primary()->isConfig()
                                   ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
                                   : cmdObj);
     }
@@ -443,9 +443,9 @@ DispatchShardPipelineResults dispatchShardPipeline(
         // - There is a stage that needs to be run on the primary shard and the single target shard
         //   is not the primary.
         // - The pipeline contains one or more stages which must always merge on mongoS.
-        const bool needsSplit =
-            (shardIds.size() > 1u || needsMongosMerge ||
-             (needsPrimaryShardMerge && *(shardIds.begin()) != executionNsRoutingInfo.primaryId()));
+        const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge ||
+                                 (needsPrimaryShardMerge &&
+                                  *(shardIds.begin()) != executionNsRoutingInfo.db().primaryId()));
 
         const bool isSplit = pipelineForTargetedShards->isSplitForShards();
 
@@ -524,7 +524,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
         // the primary shard, but the primary shard was not in the set of targeted shards, then we
         // must increment the number of involved shards.
         CurOp::get(opCtx)->debug().nShards = shardIds.size() +
-            (needsPrimaryShardMerge && !shardIds.count(executionNsRoutingInfo.primaryId()));
+            (needsPrimaryShardMerge && !shardIds.count(executionNsRoutingInfo.db().primaryId()));
 
         break;  // Success!
     }
@@ -757,7 +757,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
         return aggPassthrough(opCtx,
                               namespaces,
-                              executionNsRoutingInfo.primary()->getId(),
+                              executionNsRoutingInfo.db().primary()->getId(),
                               cmdObj,
                               request,
                               liteParsedPipeline,
@@ -775,7 +775,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     } else {
         // Unsharded collection.  Get collection metadata from primary chunk.
         auto collationObj = getDefaultCollationForUnshardedCollection(
-            executionNsRoutingInfo.primary().get(), namespaces.executionNss);
+            executionNsRoutingInfo.db().primary().get(), namespaces.executionNss);
         if (!collationObj.isEmpty()) {
             collation = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                                             ->makeFromBSON(collationObj));
@@ -891,7 +891,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             "merigng on a shard",
             !opCtx->getTxnNumber());
     ShardId mergingShardId =
-        pickMergingShard(opCtx, dispatchResults, executionNsRoutingInfo.primaryId());
+        pickMergingShard(opCtx, dispatchResults, executionNsRoutingInfo.db().primaryId());
 
     mergingPipeline->addInitialSource(DocumentSourceMergeCursors::create(
         std::move(dispatchResults.remoteCursors),

@@ -131,9 +131,7 @@ protected:
                 str::stream() << "can't do command: " << getName() << " on sharded collection",
                 !routingInfo.cm());
 
-        const auto primaryShardId = routingInfo.primaryId();
-        const auto primaryShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+        const auto primaryShard = routingInfo.db().primary();
 
         // Here, we first filter the command before appending an UNSHARDED shardVersion, because
         // "shardVersion" is one of the fields that gets filtered out.
@@ -156,7 +154,7 @@ protected:
 
         if (!commandResponse.writeConcernStatus.isOK()) {
             appendWriteConcernErrorToCmdResponse(
-                primaryShardId, commandResponse.response["writeConcernError"], result);
+                primaryShard->getId(), commandResponse.response["writeConcernError"], result);
         }
         result.appendElementsUnique(
             CommandHelpers::filterCommandReplyForPassthrough(std::move(commandResponse.response)));
@@ -217,7 +215,7 @@ public:
 
         uassert(13137,
                 "Source and destination collections must be on same shard",
-                fromRoutingInfo.primaryId() == toRoutingInfo.primaryId());
+                fromRoutingInfo.db().primaryId() == toRoutingInfo.db().primaryId());
 
         return nonShardedCollectionCommandPassthrough(
             opCtx,
@@ -439,9 +437,9 @@ public:
         }
 
         Strategy::CommandResult cmdResult;
-        cmdResult.shardTargetId = routingInfo.primaryId();
+        cmdResult.shardTargetId = routingInfo.db().primaryId();
         cmdResult.result = result.done();
-        cmdResult.target = routingInfo.primary()->getConnString();
+        cmdResult.target = routingInfo.db().primary()->getConnString();
 
         return ClusterExplain::buildExplainResult(
             opCtx, {cmdResult}, ClusterExplain::kSingleShard, timer.millis(), out);

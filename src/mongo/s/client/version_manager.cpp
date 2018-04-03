@@ -268,7 +268,7 @@ bool checkShardVersion(OperationContext* opCtx,
     auto& routingInfo = routingInfoStatus.getValue();
 
     const auto manager = routingInfo.cm();
-    const auto primary = routingInfo.primary();
+    const auto primary = routingInfo.db().primary();
 
     unsigned long long officialSequenceNumber = 0;
 

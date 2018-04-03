@@ -578,7 +578,7 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
     }
 
     // The collection is unsharded. Target only the primary shard for the database.
-    return {routingInfo.primaryId()};
+    return {routingInfo.db().primaryId()};
 }
 
 boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
