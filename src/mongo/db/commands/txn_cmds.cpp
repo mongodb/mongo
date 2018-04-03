@@ -48,7 +48,7 @@ public:
     CmdCommitTxn() : BasicCommand("commitTransaction") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        return AllowedOnSecondary::kAlways;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -149,7 +149,7 @@ public:
     CmdAbortTxn() : BasicCommand("abortTransaction") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        return AllowedOnSecondary::kAlways;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
