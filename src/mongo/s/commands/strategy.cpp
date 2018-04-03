@@ -360,6 +360,11 @@ void runCommand(OperationContext* opCtx,
 
             loops--;
             continue;
+        } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
+            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(e->getDb(),
+                                                                     e->getVersionReceived());
+            loops--;
+            continue;
         } catch (const DBException& e) {
             crb.reset();
             BSONObjBuilder bob = crb.getBodyBuilder();

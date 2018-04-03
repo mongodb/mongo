@@ -200,6 +200,13 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
                                                    << " at host "
                                                    << response.shardHostAndPort->toString()));
             }
+            if (ErrorCodes::StaleDbVersion == status) {
+                uassertStatusOK(status.withContext(
+                    str::stream() << "got stale databaseVersion response from shard "
+                                  << response.shardId
+                                  << " at host "
+                                  << response.shardHostAndPort->toString()));
+            }
 
             // In the case a read is performed against a view, the server can return an error
             // indicating that the underlying collection may be sharded. When this occurs the return

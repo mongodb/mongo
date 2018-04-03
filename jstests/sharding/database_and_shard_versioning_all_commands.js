@@ -447,8 +447,11 @@
 
         st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "alwaysOn"});
         if (testCase.sendsDbVersion) {
-            assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(testCase.command),
-                                         ErrorCodes.StaleDbVersion);
+            assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
+
+            const res = st.shard0.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq(dbVersion, res.dbVersion);
 
             // TODO: Currently, commands are profiled if they call CurOp::raiseDbProfilingLevel().
             // But, some commands do so only after calling AutoGetDb, where dbVersion is checked.
@@ -459,10 +462,6 @@
             // commandProfile["command.databaseVersion"] = dbVersion;
             // profilerHasSingleMatchingEntryOrThrow(
             //    {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
-
-            const res = st.shard0.adminCommand({getDatabaseVersion: dbName});
-            assert.commandWorked(res);
-            assert.eq(dbVersion, res.dbVersion);
         } else {
             assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
 
