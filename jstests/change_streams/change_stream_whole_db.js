@@ -5,20 +5,25 @@
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
                                                        // assert[Valid|Invalid]ChangeStreamNss.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     // Test that a change stream cannot be opened on the "admin", "config", or "local" databases.
     // TODO SERVER-34086: $changeStream may run against 'admin' if 'allChangesForCluster' is true.
     assertInvalidChangeStreamNss("admin", 1);
     assertInvalidChangeStreamNss("config", 1);
-    assertInvalidChangeStreamNss("local", 1);
+    if (!FixtureHelpers.isMongos(db)) {
+        assertInvalidChangeStreamNss("local", 1);
+    }
 
-    // Test that a change stream can be opened before a database exists.
-    assert.commandWorked(db.dropDatabase());
+    assertDropCollection(db, "t1");
+    assertDropCollection(db, "t2");
+
+    assertCreateCollection(db, "t1");
+    assertCreateCollection(db, "t2");
 
     let cst = new ChangeStreamTest(db);
     let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    assertCreateCollection(db, "t1");
     // Test that if there are no changes, we return an empty batch.
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
@@ -45,8 +50,7 @@
 
     // Dropping the database should invalidate the change stream.
     assert.commandWorked(db.dropDatabase());
-    expected = {operationType: "invalidate"};
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [{operationType: "invalidate"}]});
 
     cst.cleanUp();
 }());

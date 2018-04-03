@@ -94,7 +94,8 @@ public:
     DocumentSourceSingleDocumentTransformation(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         std::unique_ptr<TransformerInterface> parsedTransform,
-        std::string name);
+        std::string name,
+        bool independentOfAnyCollection);
 
     // virtuals from DocumentSource
     const char* getSourceName() const final;
@@ -122,6 +123,9 @@ public:
 
         constraints.canSwapWithMatch = true;
         constraints.canSwapWithLimit = true;
+        // This transformation could be part of a 'collectionless' change stream on an entire
+        // database or cluster, mark as independent of any collection if so.
+        constraints.isIndependentOfAnyCollection = _isIndependentOfAnyCollection;
         return constraints;
     }
 
@@ -145,6 +149,9 @@ private:
 
     // Specific name of the transformation.
     std::string _name;
+
+    // Set to true if this transformation stage can be run on the collectionless namespace.
+    bool _isIndependentOfAnyCollection;
 
     // Cached stage options in case this DocumentSource is disposed before serialized (e.g. explain
     // with a sort which will auto-dispose of the pipeline).

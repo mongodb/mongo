@@ -5,6 +5,7 @@
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
     load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     const testDB = db.getSiblingDB(jsTestName());
     let cst = new ChangeStreamTest(testDB);
@@ -79,19 +80,27 @@
     assert.eq(change.operationType, "insert", tojson(change));
     assert.eq(change.documentKey._id, 1);
 
+    // Test that renaming a collection will invalidate the change stream. MongoDB does not allow
+    // renaming of sharded collections, so only perform this test if the collection is not sharded.
+    if (!FixtureHelpers.isSharded(coll)) {
+        assertDropCollection(testDB, coll.getName());
+
+        assertCreateCollection(testDB, coll.getName());
+        assertDropCollection(testDB, "renamed_coll");
+        aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
+        assert.writeOK(coll.renameCollection("renamed_coll"));
+        cst.assertNextChangesEqual({
+            cursor: aggCursor,
+            expectedChanges: [{operationType: "invalidate"}],
+            expectInvalidate: true
+        });
+    }
+
     // Dropping a collection should invalidate the change stream.
     assertDropCollection(testDB, coll.getName());
-    cst.assertNextChangesEqual({
-        cursor: aggCursor,
-        expectedChanges: [{operationType: "invalidate"}],
-        expectInvalidate: true
-    });
-
-    // Renaming a collection should invalidate the change stream.
-    assertCreateCollection(testDB, coll.getName());
-    assertDropCollection(testDB, "renamed_coll");
     aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
-    assert.writeOK(coll.renameCollection("renamed_coll"));
+    assertCreateCollection(testDB, coll.getName());
+    assertDropCollection(testDB, coll.getName());
     cst.assertNextChangesEqual({
         cursor: aggCursor,
         expectedChanges: [{operationType: "invalidate"}],

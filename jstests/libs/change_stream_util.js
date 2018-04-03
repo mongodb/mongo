@@ -4,6 +4,8 @@
  */
 
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
+    load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
+
     // Keeps track of cursors opened during the test so that we can be sure to
     // clean them up before the test completes.
     let _allCursors = [];
@@ -39,7 +41,7 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      * Issues a 'getMore' on the provided cursor and returns the cursor returned.
      */
     self.getNextBatch = function(cursor) {
-        const collName = cursor.ns.split(/\.(.+)/)[1];
+        const collName = getCollectionNameFromFullNamespace(cursor.ns);
         return assert
             .commandWorked(_db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}))
             .cursor;
@@ -202,11 +204,17 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
  * assert.soon().
  */
 ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode(
-    {collection, pipeline, expectedCode}) {
+    {db, collName, pipeline, expectedCode}) {
     try {
-        const changeStream = collection.aggregate(pipeline);
-        assert.soon(() => changeStream.hasNext());
-        assert(false, `Unexpected result from cursor: ${tojson(changeStream.next())}`);
+        const res = assert.commandWorked(
+            db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}}));
+
+        // Extract the collection name from the cursor since the change stream may be on the whole
+        // database. The 'collName' parameter will be the integer 1 in that case and the getMore
+        // command requires 'collection' to be a string.
+        const getMoreCollName = getCollectionNameFromFullNamespace(res.cursor.ns);
+        assert.commandWorked(
+            db.runCommand({getMore: res.cursor.id, collection: getMoreCollName, batchSize: 1}));
     } catch (error) {
         assert.eq(error.code, expectedCode, `Caught unexpected error: ${tojson(error)}`);
         return true;

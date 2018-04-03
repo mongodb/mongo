@@ -498,10 +498,14 @@ BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj or
 
 intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
     BSONObj changeStreamSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    // Mark the transformation stage as independent of any collection if the change stream is
+    // watching all collections in the database.
+    const bool isIndependentOfAnyCollection = expCtx->ns.isCollectionlessAggregateNS();
     return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
         expCtx,
         stdx::make_unique<Transformation>(expCtx, changeStreamSpec),
-        kStageName.toString()));
+        kStageName.toString(),
+        isIndependentOfAnyCollection));
 }
 
 Document DocumentSourceChangeStream::Transformation::applyTransformation(const Document& input) {
@@ -532,28 +536,28 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value ns = input[repl::OplogEntry::kNamespaceFieldName];
     checkValueType(ns, repl::OplogEntry::kNamespaceFieldName, BSONType::String);
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    if (!uuid.missing()) {
+    std::vector<FieldPath> documentKeyFields;
+
+    // Deal with CRUD operations and commands.
+    auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
+
+    // Ignore commands in the oplog when looking up the document key fields since a command implies
+    // that the change stream is about to be invalidated (e.g. collection drop).
+    if (!uuid.missing() && opType != repl::OpTypeEnum::kCommand) {
         checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
-        // We need to retrieve the document key fields if our cached copy has not been populated. If
-        // the collection was unsharded but has now transitioned to a sharded state, we must update
-        // the documentKey fields to include the shard key. We only need to re-check the documentKey
-        // while the collection is unsharded; if the collection is or becomes sharded, then the
-        // documentKey is final and will not change.
-        if (!_documentKeyFieldsSharded) {
-            // If this is not a shard server, 'catalogCache' will be nullptr and we will skip the
-            // routing table check.
-            auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
-            const bool collectionIsSharded = catalogCache && [catalogCache, this]() {
-                auto routingInfo =
-                    catalogCache->getCollectionRoutingInfo(_expCtx->opCtx, _expCtx->ns);
-                return routingInfo.isOK() && routingInfo.getValue().cm();
-            }();
-            if (_documentKeyFields.empty() || collectionIsSharded) {
-                _documentKeyFields = _expCtx->mongoProcessInterface->collectDocumentKeyFields(
-                    _expCtx->opCtx, _expCtx->ns, uuid.getUuid());
-                _documentKeyFieldsSharded = collectionIsSharded;
+        // We need to retrieve the document key fields if our cache does not have an entry for this
+        // UUID or if the cache entry is not definitively final, indicating that the collection was
+        // unsharded when the entry was last populated.
+        auto it = _documentKeyCache.find(uuid.getUuid());
+        if (it == _documentKeyCache.end() || !it->second.isFinal) {
+            auto docKeyFields = _expCtx->mongoProcessInterface->collectDocumentKeyFields(
+                _expCtx->opCtx, uuid.getUuid());
+            if (it == _documentKeyCache.end() || docKeyFields.second) {
+                _documentKeyCache[uuid.getUuid()] = DocumentKeyCacheEntry(docKeyFields);
             }
         }
+
+        documentKeyFields = _documentKeyCache.find(uuid.getUuid())->second.documentKeyFields;
     }
     NamespaceString nss(ns.getString());
     Value id = input.getNestedField("o._id");
@@ -563,14 +567,12 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value updateDescription;
     Value documentKey;
 
-    // Deal with CRUD operations and commands.
-    auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
             operationType = kInsertOpType;
             fullDocument = input[repl::OplogEntry::kObjectFieldName];
             documentKey = Value(document_path_support::extractDocumentKeyFromDoc(
-                fullDocument.getDocument(), _documentKeyFields));
+                fullDocument.getDocument(), documentKeyFields));
             break;
         }
         case repl::OpTypeEnum::kDelete: {

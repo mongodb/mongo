@@ -85,10 +85,9 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
 
     MockMongoInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
 
-    std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
-                                                    const NamespaceString&,
-                                                    UUID) const final {
-        return _fields;
+    std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(OperationContext*,
+                                                                     UUID) const final {
+        return {_fields, true};
     }
 
     std::vector<FieldPath> _fields;

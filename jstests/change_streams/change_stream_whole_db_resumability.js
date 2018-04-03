@@ -5,31 +5,38 @@
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 
-    assertDropAndRecreateCollection(db, "resumeColl");
-    const coll = db.resumeColl;
+    const coll = db[jsTestName() + "resume_coll"];
+    const otherColl = db[jsTestName() + "resume_coll_other"];
+    coll.drop();
+    otherColl.drop();
 
-    // Note we do not project away 'id.ts' as it is part of the resume token.
     let cst = new ChangeStreamTest(db);
     let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
-    // Insert a document and save the resulting change stream.
+    // Insert a single document to each collection and save the resume token from the first insert.
     assert.writeOK(coll.insert({_id: 1}));
+    assert.writeOK(otherColl.insert({_id: 2}));
     const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
     assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
+    assert.eq(firstInsertChangeDoc.ns, {db: "test", coll: coll.getName()});
 
-    // Test resume after an insert.
+    // Test resuming the change stream after the first insert should pick up the insert on the
+    // second collection.
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: 1,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
 
-    assert.writeOK(coll.insert({_id: 2}));
     const secondInsertChangeDoc = cst.getOneChange(resumeCursor);
     assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
+    assert.eq(secondInsertChangeDoc.ns, {db: "test", coll: otherColl.getName()});
+
+    // Insert a third document to the first collection and test that the change stream picks it up.
     assert.writeOK(coll.insert({_id: 3}));
     const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
     assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
+    assert.eq(thirdInsertChangeDoc.ns, {db: "test", coll: coll.getName()});
 
     // Test resuming after the first insert again.
     resumeCursor = cst.startWatchingChanges({

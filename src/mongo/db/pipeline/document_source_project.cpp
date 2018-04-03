@@ -47,8 +47,12 @@ REGISTER_DOCUMENT_SOURCE(project,
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
     BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAggregationProjection::create(expCtx, projectSpec), "$project"));
+        expCtx,
+        ParsedAggregationProjection::create(expCtx, projectSpec),
+        "$project",
+        isIndependentOfAnyCollection));
     return project;
 }
 

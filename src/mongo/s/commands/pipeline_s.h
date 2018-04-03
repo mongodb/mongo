@@ -122,9 +122,8 @@ public:
             MONGO_UNREACHABLE;
         }
 
-        std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
-                                                        const NamespaceString&,
-                                                        UUID) const final {
+        std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(OperationContext*,
+                                                                         UUID) const final {
             MONGO_UNREACHABLE;
         }
 

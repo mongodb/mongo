@@ -19,6 +19,7 @@
     "use strict";
 
     load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+    load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
 
     // Replica set nodes started with --shardsvr do not enable key generation until they are added
     // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -194,10 +195,6 @@
         });
 
         awaitShell();
-    }
-
-    function getCollectionNameFromFullNamespace(ns) {
-        return ns.split(/\.(.+)/)[1];
     }
 
     // Generic function for running getMore on a $currentOp aggregation cursor and returning the

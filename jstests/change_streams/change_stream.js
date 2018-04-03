@@ -20,14 +20,14 @@
     }
 
     // Test that a change stream cannot be opened on 'system.' collections.
-    assertInvalidChangeStreamNss("test", "system.users");
-    assertInvalidChangeStreamNss("test", "system.profile");
-    assertInvalidChangeStreamNss("test", "system.version");
+    assertInvalidChangeStreamNss(db.getName(), "system.users");
+    assertInvalidChangeStreamNss(db.getName(), "system.profile");
+    assertInvalidChangeStreamNss(db.getName(), "system.version");
 
     // Test that a change stream can be opened on namespaces with 'system' in the name, but not
     // considered an internal 'system dot' namespace.
-    assertValidChangeStreamNss("test", "systemindexes");
-    assertValidChangeStreamNss("test", "system_users");
+    assertValidChangeStreamNss(db.getName(), "systemindexes");
+    assertValidChangeStreamNss(db.getName(), "system_users");
 
     // Similar test but for DB names that are not considered internal.
     assert.writeOK(db.getSiblingDB("admincustomDB")["test"].insert({}));

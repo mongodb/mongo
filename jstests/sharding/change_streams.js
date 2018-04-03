@@ -163,7 +163,8 @@
                     mongosColl.getDB(), mongosColl.getName()));
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
-        collection: mongosColl,
+        db: mongosDB,
+        collName: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         expectedCode: 40615
     });

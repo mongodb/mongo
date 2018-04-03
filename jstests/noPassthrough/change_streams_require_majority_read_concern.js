@@ -4,7 +4,9 @@
 
     load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
     load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+    load("jstests/libs/namespace_utils.js");     // For getCollectionNameFromFullNamespace.
     load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
     // Skip this test if running with --nojournal and WiredTiger.
@@ -25,10 +27,6 @@
 
     const name = "change_stream_require_majority_read_concern";
     const db = rst.getPrimary().getDB(name);
-
-    function getCollectionNameFromFullNamespace(ns) {
-        return ns.split(/\.(.+)/)[1];
-    }
 
     // Use ChangeStreamTest to verify that the pipeline returns expected results.
     const cst = new ChangeStreamTest(db);

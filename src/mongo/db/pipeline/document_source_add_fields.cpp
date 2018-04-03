@@ -47,9 +47,14 @@ REGISTER_DOCUMENT_SOURCE(addFields,
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+
+    const bool isIndependentOfAnyCollection = false;
     intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(
         new DocumentSourceSingleDocumentTransformation(
-            expCtx, ParsedAddFields::create(expCtx, addFieldsSpec), "$addFields"));
+            expCtx,
+            ParsedAddFields::create(expCtx, addFieldsSpec),
+            "$addFields",
+            isIndependentOfAnyCollection));
     return addFields;
 }
 

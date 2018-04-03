@@ -67,7 +67,11 @@
     jsTestLog("Testing watch() with pipeline");
     cursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
     wholeDbCursor = db.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
-    assert.writeOK(coll.insert({_id: 1, x: 1}));
+
+    // Store the cluster time of the insert as the timestamp to start from.
+    const resumeTime =
+        assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: 1, x: 1}]}))
+            .$clusterTime.clusterTime;
     checkNextChange(cursor, {docId: 1});
     checkNextChange(wholeDbCursor, {docId: 1});
 
@@ -80,8 +84,6 @@
     checkNextChange(wholeDbCursor, {docId: 1});
 
     jsTestLog("Testing watch() with pipeline and startAtClusterTime");
-    // Store the cluster time of the last insert as the timestamp to start from.
-    const resumeTime = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;
     cursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],
                         {startAtClusterTime: {ts: resumeTime}});
     wholeDbCursor = db.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],

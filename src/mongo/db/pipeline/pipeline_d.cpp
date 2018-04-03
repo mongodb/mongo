@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -743,10 +744,31 @@ std::string PipelineD::MongoDInterface::getShardName(OperationContext* opCtx) co
     return std::string();
 }
 
-std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
-    OperationContext* opCtx, const NamespaceString& nss, UUID uuid) const {
-    if (!ShardingState::get(opCtx)->enabled()) {
-        return {"_id"};  // Nothing is sharded.
+std::pair<std::vector<FieldPath>, bool> PipelineD::MongoDInterface::collectDocumentKeyFields(
+    OperationContext* opCtx, UUID uuid) const {
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return {{"_id"}, false};  // Nothing is sharded.
+    }
+
+    // An empty namespace indicates that the collection has been dropped. Treat it as unsharded and
+    // mark the fields as final.
+    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    if (nss.isEmpty()) {
+        return {{"_id"}, true};
+    }
+
+    // Before taking a collection lock to retrieve the shard key fields, consult the catalog cache
+    // to determine whether the collection is sharded in the first place.
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+
+    const bool collectionIsSharded = catalogCache && [&]() {
+        auto routingInfo = catalogCache->getCollectionRoutingInfo(opCtx, nss);
+        return routingInfo.isOK() && routingInfo.getValue().cm();
+    }();
+
+    // Collection exists and is not sharded, mark as not final.
+    if (!collectionIsSharded) {
+        return {{"_id"}, false};
     }
 
     auto scm = [opCtx, &nss]() -> ScopedCollectionMetadata {
@@ -754,14 +776,11 @@ std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
         return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
-    if (!scm) {
-        return {"_id"};  // Collection is not sharded.
+    // Collection is not sharded or UUID mismatch implies collection has been dropped and recreated
+    // as sharded.
+    if (!scm || !scm->uuidMatches(uuid)) {
+        return {{"_id"}, false};
     }
-
-    uassert(ErrorCodes::InvalidUUID,
-            str::stream() << "Collection " << nss.ns()
-                          << " UUID differs from UUID on change stream operations",
-            scm->uuidMatches(uuid));
 
     // Unpack the shard key.
     std::vector<FieldPath> result;
@@ -773,7 +792,8 @@ std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
     if (!gotId) {  // If not part of the shard key, "_id" comes last.
         result.emplace_back("_id");
     }
-    return result;
+    // Collection is now sharded so the document key fields will never change, mark as final.
+    return {result, true};
 }
 
 std::vector<GenericCursor> PipelineD::MongoDInterface::getCursors(

@@ -106,13 +106,25 @@ public:
         boost::intrusive_ptr<ExpressionContext> _expCtx;
         BSONObj _changeStreamSpec;
 
-        // Fields of the document key, in order, including the shard key if the collection is
-        // sharded, and anyway "_id". Empty until the first oplog entry with a uuid is encountered.
-        // Needed for transforming 'insert' oplog entries.
-        std::vector<FieldPath> _documentKeyFields;
+        struct DocumentKeyCacheEntry {
+            DocumentKeyCacheEntry() = default;
 
-        // Set to true if the collection is found to be sharded while retrieving _documentKeyFields.
-        bool _documentKeyFieldsSharded = false;
+            DocumentKeyCacheEntry(std::pair<std::vector<FieldPath>, bool> documentKeyFieldsIn)
+                : documentKeyFields(documentKeyFieldsIn.first),
+                  isFinal(documentKeyFieldsIn.second){};
+            // Fields of the document key, in order, including "_id" and the shard key if the
+            // collection is sharded. Empty until the first oplog entry with a uuid is encountered.
+            // Needed for transforming 'insert' oplog entries.
+            std::vector<FieldPath> documentKeyFields;
+
+            // Set to true if the document key fields for this entry are definitively known and will
+            // not change. This implies that either the collection has become sharded or has been
+            // dropped.
+            bool isFinal;
+        };
+
+        // Map of collection UUID to document key fields.
+        std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
