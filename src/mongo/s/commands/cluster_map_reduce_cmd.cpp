@@ -571,7 +571,7 @@ public:
             }
 
             // Do the splitting round
-            catalogCache->onStaleConfigError(std::move(outputRoutingInfo));
+            catalogCache->onStaleShardVersion(std::move(outputRoutingInfo));
             outputRoutingInfo =
                 uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, outputCollNss));
             uassert(34359,

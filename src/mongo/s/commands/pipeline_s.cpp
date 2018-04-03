@@ -156,7 +156,7 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
             return boost::none;
         } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>&) {
             // If we hit a stale shardVersion exception, invalidate the routing table cache.
-            catalogCache->onStaleConfigError(std::move(routingInfo));
+            catalogCache->onStaleShardVersion(std::move(routingInfo));
             continue;  // Try again if allowed.
         }
         break;  // Success!

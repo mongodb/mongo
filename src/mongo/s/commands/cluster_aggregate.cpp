@@ -336,7 +336,7 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
     } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>&) {
         // If any shard returned a stale shardVersion error, invalidate the routing table cache.
         // This will cause the cache to be refreshed the next time it is accessed.
-        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*routingInfo));
+        Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(*routingInfo));
         throw;
     } catch (const ExceptionForCat<ErrorCategory::SnapshotError>&) {
         // If any shard returned a snapshot error, recompute the atClusterTime.

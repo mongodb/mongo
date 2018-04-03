@@ -463,7 +463,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             // and subsequent attempts will choose a later atClusterTime.
             if (ErrorCodes::isStaleShardingError(ex.code()) ||
                 ex.code() == ErrorCodes::ShardNotFound) {
-                catalogCache->onStaleConfigError(std::move(routingInfo));
+                catalogCache->onStaleShardVersion(std::move(routingInfo));
             }
         }
     }

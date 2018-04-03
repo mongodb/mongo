@@ -271,7 +271,7 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
     return routingInfoStatus;
 }
 
-void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvalidate) {
+void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInvalidate) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
     // Ensure the move constructor of CachedCollectionRoutingInfo is invoked in order to clear the

@@ -121,7 +121,7 @@ public:
      * next time getCollectionRoutingInfo is called. Does nothing if the routing table has been
      * refreshed already.
      */
-    void onStaleConfigError(CachedCollectionRoutingInfo&&);
+    void onStaleShardVersion(CachedCollectionRoutingInfo&&);
 
     /**
      * Non-blocking method, which indiscriminately causes the database entry for the specified

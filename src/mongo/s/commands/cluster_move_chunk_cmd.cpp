@@ -196,7 +196,7 @@ public:
                                                     cmdObj["_waitForDelete"].trueValue() ||
                                                         cmdObj["waitForDelete"].trueValue()));
 
-        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+        Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(routingInfo));
 
         result.append("millis", t.millis());
         return true;

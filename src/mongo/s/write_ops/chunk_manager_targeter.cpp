@@ -728,7 +728,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
 }
 
 Status ChunkManagerTargeter::_refreshNow(OperationContext* opCtx) {
-    Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*_routingInfo));
+    Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(*_routingInfo));
 
     return init(opCtx);
 }

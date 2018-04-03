@@ -377,7 +377,7 @@ bool checkShardVersion(OperationContext* opCtx,
         return true;
     }
 
-    Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+    Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(routingInfo));
 
     const int maxNumTries = 7;
     if (tryNumber < maxNumTries) {
