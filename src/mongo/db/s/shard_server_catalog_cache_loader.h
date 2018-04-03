@@ -155,8 +155,7 @@ private:
 
     /**
      * This represents an update task for the persisted database metadata. The task will either be
-     * to
-     * persist an update to the shard persisted metadata store or to drop the persisted
+     * to persist an update to the shard persisted metadata store or to drop the persisted
      * metadata for a specific database.
      */
     struct dbTask {
@@ -399,6 +398,17 @@ private:
         long long currentTerm,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
         std::shared_ptr<Notification<void>> notify);
+
+    /**
+     * Forces the primary to refresh its metadata for 'dbName' and waits until this node's metadata
+     * has caught up to the primary's.
+     * Then retrieves the db version from this node's persisted metadata store and passes it to
+     * 'callbackFn'.
+     */
+    void _runSecondaryGetDatabase(
+        OperationContext* opCtx,
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
 
     /**
      * Refreshes db version from the config server's metadata store, and schedules maintenance
