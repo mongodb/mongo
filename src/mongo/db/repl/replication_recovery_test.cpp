@@ -40,6 +40,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_catalog.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -128,11 +130,18 @@ private:
         ReplicationCoordinator::set(service,
                                     stdx::make_unique<ReplicationCoordinatorMock>(service));
 
+        ASSERT_OK(
+            ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
+
         ASSERT_OK(_storageInterface->createCollection(
             getOperationContext(), testNs, generateOptionsWithUuid()));
+
+        SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
     }
 
     void tearDown() override {
+        SessionCatalog::get(_opCtx->getServiceContext())->reset_forTest();
+
         _opCtx.reset(nullptr);
         _consistencyMarkers.reset();
         _storageInterface.reset();
@@ -161,7 +170,9 @@ BSONObj _makeInsertDocument(int t) {
 repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                                  repl::OpTypeEnum opType,
                                  BSONObj object,
-                                 boost::optional<BSONObj> object2 = boost::none) {
+                                 boost::optional<BSONObj> object2 = boost::none,
+                                 OperationSessionInfo sessionInfo = {},
+                                 boost::optional<Date_t> wallTime = boost::none) {
     return repl::OplogEntry(opTime,                           // optime
                             1LL,                              // hash
                             opType,                           // opType
@@ -171,9 +182,9 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                             repl::OplogEntry::kOplogVersion,  // version
                             object,                           // o
                             object2,                          // o2
-                            {},                               // sessionInfo
+                            sessionInfo,                      // sessionInfo
                             boost::none,                      // isUpsert
-                            boost::none,                      // wall clock time
+                            wallTime,                         // wall clock time
                             boost::none,                      // statement id
                             boost::none,   // optime of previous write within same transaction
                             boost::none,   // pre-image optime
@@ -750,6 +761,58 @@ DEATH_TEST_F(ReplicationRecoveryTest, RecoveryFailsWithBadOp, "terminate() calle
         OpTime::kUninitializedTerm));
 
     recovery.recoverFromOplog(opCtx, boost::none);
+}
+
+TEST_F(ReplicationRecoveryTest, CorrectlyUpdatesConfigTransactions) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(Timestamp(1, 1), 1));
+    _setUpOplog(opCtx, getStorageInterface(), {1});
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+
+    auto insertOp = _makeOplogEntry({Timestamp(2, 0), 1},
+                                    repl::OpTypeEnum::kInsert,
+                                    BSON("_id" << 1),
+                                    boost::none,
+                                    sessionInfo,
+                                    Date_t::now());
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {insertOp.toBSON(), Timestamp(2, 0)}, 1));
+
+    auto lastDate = Date_t::now();
+    auto insertOp2 = _makeOplogEntry({Timestamp(3, 0), 1},
+                                     repl::OpTypeEnum::kInsert,
+                                     BSON("_id" << 2),
+                                     boost::none,
+                                     sessionInfo,
+                                     lastDate);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        opCtx, oplogNs, {insertOp2.toBSON(), Timestamp(3, 0)}, 1));
+
+    recovery.recoverFromOplog(opCtx, boost::none);
+
+    std::vector<BSONObj> expectedColl{BSON("_id" << 1), BSON("_id" << 2)};
+    _assertDocumentsInCollectionEquals(opCtx, testNs, expectedColl);
+
+    SessionTxnRecord expectedTxnRecord;
+    expectedTxnRecord.setSessionId(*sessionInfo.getSessionId());
+    expectedTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+    expectedTxnRecord.setLastWriteOpTime({Timestamp(3, 0), 1});
+    expectedTxnRecord.setLastWriteDate(lastDate);
+
+    std::vector<BSONObj> expectedTxnColl{expectedTxnRecord.toBSON()};
+    _assertDocumentsInCollectionEquals(
+        opCtx, NamespaceString::kSessionTransactionsTableNamespace, expectedTxnColl);
+
+    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
+    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(3, 0), 1));
 }
 
 }  // namespace

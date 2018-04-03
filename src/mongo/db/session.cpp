@@ -209,52 +209,6 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     wuow.commit();
 }
 
-/**
- * Returns a new oplog entry if the given entry has transaction state embedded within in.
- * The new oplog entry will contain the operation needed to replicate the transaction
- * table.
- * Returns boost::none if the given oplog doesn't have any transaction state or does not
- * support update to the transaction table.
- */
-boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
-    const repl::OplogEntry& entry) {
-    auto sessionInfo = entry.getOperationSessionInfo();
-    if (!sessionInfo.getTxnNumber()) {
-        return boost::none;
-    }
-
-    invariant(sessionInfo.getSessionId());
-    invariant(entry.getWallClockTime());
-
-    const auto updateBSON = [&] {
-        SessionTxnRecord newTxnRecord;
-        newTxnRecord.setSessionId(*sessionInfo.getSessionId());
-        newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
-        newTxnRecord.setLastWriteOpTime(entry.getOpTime());
-        newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
-        return newTxnRecord.toBSON();
-    }();
-
-    return repl::OplogEntry(
-        entry.getOpTime(),
-        0,  // hash
-        repl::OpTypeEnum::kUpdate,
-        NamespaceString::kSessionTransactionsTableNamespace,
-        boost::none,  // uuid
-        false,        // fromMigrate
-        repl::OplogEntry::kOplogVersion,
-        updateBSON,
-        BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON()),
-        {},    // sessionInfo
-        true,  // upsert
-        *entry.getWallClockTime(),
-        boost::none,  // statementId
-        boost::none,  // prevWriteOpTime
-        boost::none,  // preImangeOpTime
-        boost::none   // postImageOpTime
-        );
-}
-
 // Failpoint which allows different failure actions to happen after each write. Supports the
 // parameters below, which can be combined with each other (unless explicitly disallowed):
 //
@@ -954,6 +908,45 @@ std::vector<repl::OplogEntry> Session::addOpsForReplicatingTxnTable(
     }
 
     return newOps;
+}
+
+boost::optional<repl::OplogEntry> Session::createMatchingTransactionTableUpdate(
+    const repl::OplogEntry& entry) {
+    auto sessionInfo = entry.getOperationSessionInfo();
+    if (!sessionInfo.getTxnNumber()) {
+        return boost::none;
+    }
+
+    invariant(sessionInfo.getSessionId());
+    invariant(entry.getWallClockTime());
+
+    const auto updateBSON = [&] {
+        SessionTxnRecord newTxnRecord;
+        newTxnRecord.setSessionId(*sessionInfo.getSessionId());
+        newTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
+        newTxnRecord.setLastWriteOpTime(entry.getOpTime());
+        newTxnRecord.setLastWriteDate(*entry.getWallClockTime());
+        return newTxnRecord.toBSON();
+    }();
+
+    return repl::OplogEntry(
+        entry.getOpTime(),
+        0,  // hash
+        repl::OpTypeEnum::kUpdate,
+        NamespaceString::kSessionTransactionsTableNamespace,
+        boost::none,  // uuid
+        false,        // fromMigrate
+        repl::OplogEntry::kOplogVersion,
+        updateBSON,
+        BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON()),
+        {},    // sessionInfo
+        true,  // upsert
+        *entry.getWallClockTime(),
+        boost::none,  // statementId
+        boost::none,  // prevWriteOpTime
+        boost::none,  // preImangeOpTime
+        boost::none   // postImageOpTime
+        );
 }
 
 }  // namespace mongo

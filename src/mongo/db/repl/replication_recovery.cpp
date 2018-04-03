@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/session.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -196,6 +197,13 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     while (cursor->more()) {
         entry = cursor->nextSafe();
         fassert(40294, SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
+
+        auto oplogEntry = fassert(50763, OplogEntry::parse(entry));
+        if (auto txnTableOplog = Session::createMatchingTransactionTableUpdate(oplogEntry)) {
+            fassert(50764,
+                    SyncTail::syncApply(
+                        opCtx, txnTableOplog->toBSON(), OplogApplication::Mode::kRecovering));
+        }
     }
 
     // We may crash before setting appliedThrough. If we have a stable checkpoint, we will recover
