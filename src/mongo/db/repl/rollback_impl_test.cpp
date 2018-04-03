@@ -364,6 +364,24 @@ BSONObj makeOp(int count) {
 }
 
 /**
+ * Helper functions to make simple oplog entries with timestamps, terms, hashes, and wall clock
+ * times.
+ */
+auto makeOpWithWallClockTime(long count, long long hash, long wallClockMillis) {
+    auto kGenericUUID = unittest::assertGet(UUID::parse(kGenericUUIDStr));
+    return BSON("ts" << Timestamp(count, count) << "h" << hash << "t" << (long long)count << "op"
+                     << "n"
+                     << "o"
+                     << BSONObj()
+                     << "ns"
+                     << "top"
+                     << "ui"
+                     << kGenericUUID
+                     << "wall"
+                     << Date_t::fromMillisSinceEpoch(wallClockMillis));
+};
+
+/**
  * Helper functions to make pairs of oplog entries and recordIds for the OplogInterfaceMock used
  * to mock out the local and remote oplogs.
  */
@@ -438,6 +456,41 @@ TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
+}
+
+TEST_F(RollbackImplTest, RollbackSucceedsIfRollbackPeriodIsWithinTimeLimit) {
+
+    // The default limit is 1800 seconds. The difference here is 1000 seconds.
+    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 1, 5 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 1005 * 1000));
+
+    _remoteOplog->setOperations({commonPoint});
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(topOfOplog.first));
+
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    // Run rollback.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+}
+
+TEST_F(RollbackImplTest, RollbackFailsIfRollbackPeriodIsTooLong) {
+
+    // The default limit is 1800 seconds. The difference here is 5000 seconds.
+    auto commonPoint = makeOpAndRecordId(makeOpWithWallClockTime(1, 1, 5 * 1000));
+    auto topOfOplog = makeOpAndRecordId(makeOpWithWallClockTime(2, 2, 5005 * 1000));
+
+    _remoteOplog->setOperations({commonPoint});
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(topOfOplog.first));
+
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    // Run rollback.
+    auto rollbackStatus = _rollback->runRollback(_opCtx.get());
+
+    // Make sure rollback failed with an UnrecoverableRollbackError.
+    ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, rollbackStatus.code());
 }
 
 TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncateAfterPoint) {

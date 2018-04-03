@@ -35,7 +35,9 @@
 
     // add an oplog entry from the distant future as the most recent entry on node C
     var future_oplog_entry = conns[2].getDB("local").oplog.rs.find().sort({$natural: -1})[0];
-    future_oplog_entry["ts"] = new Timestamp(future_oplog_entry["ts"].getTime() + 200000, 1);
+    future_oplog_entry["ts"] = new Timestamp(future_oplog_entry["ts"].getTime() + 1, 1);
+    future_oplog_entry["wall"] = new Date(Date.now() + (5000 * 1000));
+
     options = {writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}};
     assert.writeOK(conns[2].getDB("local").oplog.rs.insert(future_oplog_entry, options));
 
@@ -69,8 +71,7 @@
 
     replTest.stop(CID, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
 
-    assert(rawMongoProgramOutput().match(
-               "rollback error: not willing to roll back more than 30 minutes of data"),
+    assert(rawMongoProgramOutput().match("not willing to roll back more than 1800 seconds of data"),
            "node C failed to fassert");
 
     replTest.stopSet();

@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
@@ -53,13 +54,34 @@ class RollBackLocalOperations {
     MONGO_DISALLOW_COPYING(RollBackLocalOperations);
 
 public:
+    class RollbackCommonPoint {
+
+    public:
+        RollbackCommonPoint(BSONObj oplogBSON, RecordId recordId);
+
+        RecordId getRecordId() const {
+            return _recordId;
+        }
+
+        OpTime getOpTime() const {
+            return _opTime;
+        }
+
+        boost::optional<Date_t> getWallClockTime() const {
+            return _wallClockTime;
+        }
+
+    private:
+        RecordId _recordId;
+        OpTime _opTime;
+        boost::optional<Date_t> _wallClockTime;
+    };
+
     /**
      * Type of function to roll back an operation or process it for future use.
      * It can return any status except ErrorCodes::NoSuchKey. See onRemoteOperation().
      */
     using RollbackOperationFn = stdx::function<Status(const BSONObj&)>;
-
-    using RollbackCommonPoint = std::pair<OpTime, RecordId>;
 
     /**
      * Initializes rollback processor with a valid local oplog.

@@ -61,6 +61,7 @@ namespace repl {
 namespace {
 
 RollbackImpl::Listener kNoopListener;
+RollbackImpl::RollbackTimeLimitHolder kRollbackTimeLimitHolder;
 
 // Control whether or not the server will write out data files containing deleted documents during
 // rollback. This server parameter affects both rollback via refetch and rollback via recovery to
@@ -139,27 +140,22 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onBgIndexesComplete();
 
-    // Save the latest optime on the branch of history being rolled back (for informational
-    // purposes).
-    {
-        auto localOplogIter = _localOplog->makeIterator();
-        const auto topOfOplog = localOplogIter->next();
-        if (topOfOplog.isOK()) {
-            const auto lastEntryBSON = topOfOplog.getValue().first;
-            const auto lastEntryOptime = OpTime::parseFromOplogEntry(lastEntryBSON);
-            if (lastEntryOptime.isOK()) {
-                _rollbackStats.lastLocalOptime = std::move(lastEntryOptime.getValue());
-            }
-        }
-    }
-
     auto commonPointSW = _findCommonPoint(opCtx);
     if (!commonPointSW.isOK()) {
         return commonPointSW.getStatus();
     }
-    const auto commonPoint = commonPointSW.getValue().first;
-    _rollbackStats.commonPoint = commonPoint;
-    _listener->onCommonPointFound(commonPoint.getTimestamp());
+
+    const auto commonPoint = commonPointSW.getValue();
+    const OpTime commonPointOpTime = commonPoint.getOpTime();
+    _rollbackStats.commonPoint = commonPointOpTime;
+    _listener->onCommonPointFound(commonPointOpTime.getTimestamp());
+
+    // Now that we have found the common point, we make sure to proceed only if the rollback
+    // period is not too long.
+    status = _checkAgainstTimeLimit(commonPoint);
+    if (!status.isOK()) {
+        return status;
+    }
 
     // Ask the record store for the pre-rollback counts of any collections whose counts will change
     // and create a map with the adjusted counts for post-rollback. While finding the common
@@ -612,23 +608,77 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
         return commonPointSW.getStatus();
     }
 
-    OpTime commonPoint = commonPointSW.getValue().first;
+    OpTime commonPointOpTime = commonPointSW.getValue().getOpTime();
     OpTime lastCommittedOpTime = _replicationCoordinator->getLastCommittedOpTime();
     OpTime committedSnapshot = _replicationCoordinator->getCurrentCommittedSnapshotOpTime();
 
-    log() << "Rollback common point is " << commonPoint;
+    log() << "Rollback common point is " << commonPointOpTime;
 
     // Rollback common point should be >= the replication commit point.
     invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
-              commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+              commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
     invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
-              commonPoint >= lastCommittedOpTime);
+              commonPointOpTime >= lastCommittedOpTime);
 
     // Rollback common point should be >= the committed snapshot optime.
-    invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());
-    invariant(commonPoint >= committedSnapshot);
+    invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
+    invariant(commonPointOpTime >= committedSnapshot);
 
     return commonPointSW.getValue();
+}
+
+Status RollbackImpl::_checkAgainstTimeLimit(
+    RollBackLocalOperations::RollbackCommonPoint commonPoint) {
+
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+    }
+
+    auto localOplogIter = _localOplog->makeIterator();
+    const auto topOfOplogSW = localOplogIter->next();
+    if (!topOfOplogSW.isOK()) {
+        return Status(ErrorCodes::OplogStartMissing, "no oplog during rollback");
+    }
+    const auto topOfOplogBSON = topOfOplogSW.getValue().first;
+    const auto topOfOplog = uassertStatusOK(OplogEntry::parse(topOfOplogBSON));
+
+    _rollbackStats.lastLocalOptime = topOfOplog.getOpTime();
+
+    auto topOfOplogWallOpt = topOfOplog.getWallClockTime();
+    auto commonPointWallOpt = commonPoint.getWallClockTime();
+
+    // Only compute the difference if both the top of the oplog and the common point
+    // have wall clock times.
+    if (commonPointWallOpt && topOfOplogWallOpt) {
+        auto topOfOplogWallTime = topOfOplogWallOpt.get();
+        auto commonPointWallTime = commonPointWallOpt.get();
+
+        if (topOfOplogWallTime >= commonPointWallTime) {
+
+            unsigned long long diff =
+                durationCount<Seconds>(Milliseconds(topOfOplogWallTime - commonPointWallTime));
+
+            _rollbackStats.lastLocalWallClockTime = topOfOplogWallTime;
+            _rollbackStats.commonPointWallClockTime = commonPointWallTime;
+
+            auto timeLimit = kRollbackTimeLimitHolder.getRollbackTimeLimit();
+
+            if (diff > timeLimit) {
+                return Status(ErrorCodes::UnrecoverableRollbackError,
+                              str::stream() << "not willing to roll back more than " << timeLimit
+                                            << " seconds of data. Have: "
+                                            << diff
+                                            << " seconds.");
+            }
+
+        } else {
+            warning() << "Wall clock times on oplog entries not monotonically increasing. This "
+                         "might indicate a backward clock skew. Time at common point: "
+                      << commonPointWallTime << ". Time at top of oplog: " << topOfOplogWallTime;
+        }
+    }
+
+    return Status::OK();
 }
 
 Timestamp RollbackImpl::_findTruncateTimestamp(
@@ -638,13 +688,14 @@ Timestamp RollbackImpl::_findTruncateTimestamp(
     invariant(oplog.getCollection());
     auto oplogCursor = oplog.getCollection()->getCursor(opCtx, /*forward=*/true);
 
-    auto commonPointRecord = oplogCursor->seekExact(commonPoint.second);
+    auto commonPointRecord = oplogCursor->seekExact(commonPoint.getRecordId());
+    auto commonPointOpTime = commonPoint.getOpTime();
     // Check that we've found the right document for the common point.
     invariant(commonPointRecord);
     auto commonPointTime = OpTime::parseFromOplogEntry(commonPointRecord->data.releaseToBson());
     invariantOK(commonPointTime.getStatus());
-    invariant(commonPointTime.getValue() == commonPoint.first,
-              str::stream() << "Common point: " << commonPoint.first.toString()
+    invariant(commonPointTime.getValue() == commonPointOpTime,
+              str::stream() << "Common point: " << commonPointOpTime.toString()
                             << ", record found: "
                             << commonPointTime.getValue().toString());
 
@@ -822,7 +873,17 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
               << *_rollbackStats.lastLocalOptime;
     }
     if (_rollbackStats.commonPoint) {
-        log() << "\tcommon point: " << *_rollbackStats.commonPoint;
+        log() << "\tcommon point optime: " << *_rollbackStats.commonPoint;
+    }
+    if (_rollbackStats.lastLocalWallClockTime && _rollbackStats.commonPointWallClockTime) {
+
+        auto lastWall = *_rollbackStats.lastLocalWallClockTime;
+        auto commonWall = *_rollbackStats.commonPointWallClockTime;
+        unsigned long long diff = durationCount<Seconds>(Milliseconds(lastWall - commonWall));
+
+        log() << "\tlast wall clock time on the branch of history rolled back: " << lastWall;
+        log() << "\tcommon point wall clock time: " << commonWall;
+        log() << "\tdifference in wall clock times: " << diff << " second(s)";
     }
     if (_rollbackStats.truncateTimestamp) {
         log() << "\ttruncate timestamp: " << *_rollbackStats.truncateTimestamp;
@@ -850,5 +911,56 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
     log() << "\ttotal number of entries rolled back (including no-ops): "
           << _observerInfo.numberOfEntriesObserved;
 }
+
+/**
+ * This amount, measured in seconds, represents the maximum allowed rollback period.
+ * It is calculated by taking the difference of the wall clock times of the oplog entries
+ * at the top of the local oplog and at the common point.
+ */
+class RollbackTimeLimitServerParameter final : public ServerParameter {
+    MONGO_DISALLOW_COPYING(RollbackTimeLimitServerParameter);
+
+public:
+    static constexpr auto kName = "rollbackTimeLimitSecs"_sd;
+
+    RollbackTimeLimitServerParameter()
+        : ServerParameter(ServerParameterSet::getGlobal(), kName.toString(), true, true) {}
+
+    virtual void append(OperationContext* opCtx,
+                        BSONObjBuilder& builder,
+                        const std::string& name) final {
+        builder.append(name,
+                       static_cast<long long>(kRollbackTimeLimitHolder.getRollbackTimeLimit()));
+    }
+
+    virtual Status set(const BSONElement& newValueElement) final {
+        long long newValue;
+        if (!newValueElement.coerce(&newValue) || newValue <= 0)
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "Invalid value for " << kName << ": "
+                                                    << newValueElement
+                                                    << ". Must be a positive integer.");
+        kRollbackTimeLimitHolder.setRollbackTimeLimit(static_cast<unsigned long long>(newValue));
+        return Status::OK();
+    }
+
+    virtual Status setFromString(const std::string& str) final {
+        long long newValue;
+        Status status = parseNumberFromString(str, &newValue);
+        if (!status.isOK())
+            return status;
+        if (newValue <= 0)
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "Invalid value for " << kName << ": "
+                                                    << newValue
+                                                    << ". Must be a positive integer.");
+
+        kRollbackTimeLimitHolder.setRollbackTimeLimit(static_cast<unsigned long long>(newValue));
+        return Status::OK();
+    }
+} rollbackTimeLimitSecs;
+
+constexpr decltype(RollbackTimeLimitServerParameter::kName) RollbackTimeLimitServerParameter::kName;
+
 }  // namespace repl
 }  // namespace mongo

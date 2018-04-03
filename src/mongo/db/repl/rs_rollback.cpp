@@ -917,8 +917,8 @@ Status _syncRollback(OperationContext* opCtx,
             }
         }
 
-        how.commonPoint = res.getValue().first;             // OpTime
-        how.commonPointOurDiskloc = res.getValue().second;  // RecordID
+        how.commonPoint = res.getValue().getOpTime();
+        how.commonPointOurDiskloc = res.getValue().getRecordId();
         how.removeRedundantOperations();
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError,

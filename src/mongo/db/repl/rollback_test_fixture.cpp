@@ -277,8 +277,18 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
     auto nss = NamespaceString(dbName, collName);
 
     auto coll = _createCollection(_opCtx.get(), nss.toString(), localCollOptions);
-    auto commonOperation =
-        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+
+    auto commonOpUuid = unittest::assertGet(UUID::parse("f005ba11-cafe-bead-f00d-123456789abc"));
+    auto commonOpBson = BSON("ts" << Timestamp(1, 1) << "h" << 1LL << "t" << 1LL << "op"
+                                  << "n"
+                                  << "o"
+                                  << BSONObj()
+                                  << "ns"
+                                  << "rollback_test.test"
+                                  << "ui"
+                                  << commonOpUuid);
+
+    auto commonOperation = std::make_pair(commonOpBson, RecordId(1));
 
     auto collectionModificationOperation =
         makeCommandOp(Timestamp(Seconds(2), 0), coll->uuid(), nss.toString(), collModCmd, 2);
