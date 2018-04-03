@@ -1480,7 +1480,7 @@ functions:
           sleep 30
         done
 
-  "set up EC2 instance":
+  "set up EC2 instance": &set_ec2_instance
     - command: shell.exec
       params:
         working_dir: src
@@ -1792,70 +1792,73 @@ functions:
 
     - *copy_ec2_monitor_files
 
+  ### Determine & set remote EC2 IP address ###
+  "get EC2 address": &get_ec2_address
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        if [ -z "${instance_id}" ]; then
+          exit 0
+        fi
+        # Ensure we use the latest ip_address, as it could change if the EC2 instance
+        # has been stopped and started.
+        ${activate_virtualenv}
+        # Specify '--mode start' to ensure the remote instance is running.
+        aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
+        echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
+        ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
+        sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
+        echo "Instance status: $aws_ec2"
 
-  "set EC2 address":
-    - command: shell.exec
-      params:
-        shell: bash
-        working_dir: src
-        script: |
-          if [ -z "${instance_id}" ]; then
-            exit 0
-          fi
-          # Ensure we use the latest ip_address, as it could change if the EC2 instance
-          # has been stopped and started.
-          ${activate_virtualenv}
-          # Specify '--mode start' to ensure the remote instance is running.
-          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
-          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
-          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
-          sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
-          echo "Instance status: $aws_ec2"
+  "update EC2 address": &update_ec2_address
+    command: expansions.update
+    params:
+      file: src/${aws_ec2_yml}
 
-    - command: expansions.update
-      params:
-        file: src/${aws_ec2_yml}
+  ### Process & archive remote EC2 artifacts ###
+  "tar EC2 artifacts": &tar_ec2_artifacts
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        # Tar/zip artifacts on remote host.
+        if [ -z "${ec2_artifacts}" ]; then
+          exit 0
+        fi
+        cmd="${tar|tar} czf ec2_artifacts.tgz ${ec2_artifacts}"
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
+          --verbose                                        \
+          --userHost $USER@${ip_address}                   \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries|0}                       \
+          --commands "$cmd"
 
-  "copy EC2 artifacts":
-    - command: shell.exec
-      params:
-        shell: bash
-        working_dir: src
-        script: |
-          # Tar/zip artifacts on remote host.
-          if [ -z "${ec2_artifacts}" ]; then
-            exit 0
-          fi
-          cmd="${tar|tar} czf ec2_artifacts.tgz ${ec2_artifacts}"
-          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${activate_virtualenv}
-          $python buildscripts/remote_operations.py          \
-            --verbose                                        \
-            --userHost $USER@${ip_address}                   \
-            --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
-            --commands "$cmd"
+  "copy EC2 artifacts": &copy_ec2_artifacts
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        # Copy remote artifacts.
+        if [ -z "${ec2_artifacts}" ]; then
+          exit 0
+        fi
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
+          --verbose                                        \
+          --userHost $USER@${ip_address}                   \
+          --operation "copy_from"                          \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries|0}                       \
+          --file ec2_artifacts.tgz
 
-    - command: shell.exec
-      params:
-        shell: bash
-        working_dir: src
-        script: |
-          # Copy remote artifacts.
-          if [ -z "${ec2_artifacts}" ]; then
-            exit 0
-          fi
-          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${activate_virtualenv}
-          $python buildscripts/remote_operations.py          \
-            --verbose                                        \
-            --userHost $USER@${ip_address}                   \
-            --operation "copy_from"                          \
-            --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
-            --file ec2_artifacts.tgz
-
-  "cleanup EC2 instance":
+  "cleanup EC2 instance": &cleanup_ec2_instance
     command: shell.exec
     params:
       working_dir: src
@@ -1868,12 +1871,125 @@ functions:
         aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
         echo "Terminated AMI EC2 instance: $aws_ec2"
 
-pre:
-  - func: "kill processes"
-  - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in "set up virtualenv".
-  - func: "set up virtualenv"
-  - command: expansions.update
+  "gather remote mongo coredumps": &gather_remote_mongo_coredumps
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        if [ ! -f ${aws_ec2_yml|""} ]; then
+          exit 0
+        fi
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        remote_dir=${remote_dir|.}
+        # Find all core files and move to $remote_dir
+        cmds="core_files=\$(/usr/bin/find -H . \( -name '*.core' -o -name '*.mdmp' \) 2> /dev/null)"
+        cmds="$cmds; if [ -z \"\$core_files\" ]; then exit 0; fi"
+        cmds="$cmds; echo Found remote core files \$core_files, moving to \$(pwd)"
+        cmds="$cmds; for core_file in \$core_files"
+        cmds="$cmds; do base_name=\$(echo \$core_file | sed 's/.*\///')"
+        cmds="$cmds;   if [ ! -f \$base_name ]; then mv \$core_file .; fi"
+        cmds="$cmds; done"
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
+          --verbose                                        \
+          --userHost $USER@${ip_address}                   \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries}                         \
+          --commands "$cmds"                               \
+          --commandDir $remote_dir
+
+  "copy remote mongo coredumps": &copy_remote_mongo_coredumps
+    command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        if [ ! -f ${aws_ec2_yml|""} ]; then
+          exit 0
+        fi
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        remote_dir=${remote_dir|.}
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
+          --verbose                                        \
+          --userHost $USER@${ip_address}                   \
+          --operation "copy_from"                          \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries}                         \
+          --file "$remote_dir/*.core"                      \
+          --file "$remote_dir/*.mdmp"
+        # Since both type of core files do not exist on the same host, this command
+        # will always return non-zero. As the core file retrieval is optional, we
+        # always exit successfully.
+        exit 0
+
+  "archive remote EC2 artifacts": &archive_remote_ec2_artifacts
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/ec2_artifacts.tgz
+      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_artifacts-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Remote EC2 Artifacts - Execution ${execution}
+      optional: true
+
+  "archive remote EC2 monitor files": &archive_remote_ec2_monitor_files
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/ec2_monitor_files.tgz
+      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Remote EC2 Monitor - Execution ${execution}
+      optional: true
+
+  "save ec2 task artifacts":
+    - *get_ec2_address
+    - *update_ec2_address
+    - *tar_ec2_artifacts
+    - *copy_ec2_artifacts
+    - *gather_remote_mongo_coredumps
+    - *copy_remote_mongo_coredumps
+    - *cleanup_ec2_instance
+    - *archive_remote_ec2_artifacts
+    - *archive_remote_ec2_monitor_files
+
+  ### Process & archive local client logs ###
+  "tar local client logs": &tar_local_client_logs
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        client_logs=$(ls crud*.log fsm*.log 2> /dev/null)
+        if [ ! -z "$client_logs" ]; then
+          ${tar|tar} czf client-logs.tgz $client_logs
+        fi
+
+  "archive local client logs": &archive_local_client_logs
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/client-logs.tgz
+      remote_file: ${project}/${build_variant}/${revision}/client_logs/mongo-client-logs-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Client logs - Execution ${execution}
+      optional: true
+
+  "save local client logs":
+    - *tar_local_client_logs
+    - *archive_local_client_logs
+
+  ### Set expansion macros used in each task ###
+  "set task expansion macros":
+    command: expansions.update
     params:
       updates:
       - key: activate_virtualenv
@@ -1927,88 +2043,26 @@ pre:
       - key: mongo_shell
         value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
 
-  - command: shell.exec
-    params:
-      system_log: true
-      script: |
+  ### Clear and print OOM messages ###
+  "clear OOM messages":
+      command: shell.exec
+      params:
+        system_log: true
+        script: |
 
-        ulimit -a
-        # Clear the dmesg ring buffer. The "post" phase will check dmesg for OOM messages.
-        ${set_sudo}
-        $sudo dmesg -c > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-          echo "Cleared the dmesg ring buffer"
-        else
-          echo "Could not clear the dmesg ring buffer"
-        fi
+          ulimit -a
+          # Clear the dmesg ring buffer. The "post" phase will check dmesg for OOM messages.
+          ${set_sudo}
+          $sudo dmesg -c > /dev/null 2>&1
+          if [ $? -eq 0 ]; then
+            echo "Cleared the dmesg ring buffer"
+          else
+            echo "Could not clear the dmesg ring buffer"
+          fi
 
-
-post:
-  - command: attach.results
-    params:
-      file_location: src/report.json
-  - command: attach.artifacts
-    params:
-      optional: true
-      ignore_artifacts_for_spawn: false
-      files:
-        - src/archive.json
-
-  - func: "set EC2 address"
-  - func: "copy EC2 artifacts"
-  # Gather remote mongo coredumps.
-  - command: shell.exec
-    params:
-      working_dir: "src"
-      script: |
-        if [ ! -f ${aws_ec2_yml|""} ]; then
-          exit 0
-        fi
-        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-        remote_dir=${remote_dir|.}
-        # Find all core files and move to $remote_dir
-        cmds="core_files=\$(/usr/bin/find -H . \( -name '*.core' -o -name '*.mdmp' \) 2> /dev/null)"
-        cmds="$cmds; if [ -z \"\$core_files\" ]; then exit 0; fi"
-        cmds="$cmds; echo Found remote core files \$core_files, moving to \$(pwd)"
-        cmds="$cmds; for core_file in \$core_files"
-        cmds="$cmds; do base_name=\$(echo \$core_file | sed 's/.*\///')"
-        cmds="$cmds;   if [ ! -f \$base_name ]; then mv \$core_file .; fi"
-        cmds="$cmds; done"
-        ${activate_virtualenv}
-        $python buildscripts/remote_operations.py          \
-          --verbose                                        \
-          --userHost $USER@${ip_address}                   \
-          --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries}                         \
-          --commands "$cmds"                               \
-          --commandDir $remote_dir
-  - command: shell.exec
-    params:
-      working_dir: "src"
-      script: |
-        if [ ! -f ${aws_ec2_yml|""} ]; then
-          exit 0
-        fi
-        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-        remote_dir=${remote_dir|.}
-        ${activate_virtualenv}
-        $python buildscripts/remote_operations.py          \
-          --verbose                                        \
-          --userHost $USER@${ip_address}                   \
-          --operation "copy_from"                          \
-          --sshConnectionOptions "$ssh_connection_options" \
-          --retries ${ssh_retries}                         \
-          --file "$remote_dir/*.core"                      \
-          --file "$remote_dir/*.mdmp"
-        # Since both type of core files do not exist on the same host, this command
-        # will always return non-zero. As the core file retrieval is optional, we
-        # always exit successfully.
-        exit 0
-  - func: "cleanup EC2 instance"
-
-  - func: "kill processes"
-  # Print out any Out of Memory killed process messages.
-  - command: shell.exec
+  "print OOM messages":
+    # Print out any Out of Memory killed process messages.
+    command: shell.exec
     params:
       system_log: true
       working_dir: src # Temporary files created in src will be cleaned up in "pre".
@@ -2033,8 +2087,9 @@ post:
           echo "No OOM (Out of memory) killed processes detected"
         fi
 
-  # Cleanup after the watchdog FUSE testing
-  - command: shell.exec
+  ### Cleanup after the watchdog FUSE testing ###
+  "cleanup FUSE watchdog":
+    command: shell.exec
     params:
       working_dir: src
       script: |
@@ -2046,55 +2101,9 @@ post:
           rm -rf /data/charybdefs
         fi
 
-  # Archive remote EC2 monitor files.
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/ec2_monitor_files.tgz
-      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Remote EC2 Monitor - Execution ${execution}
-      optional: true
-
-  # Archive remote EC2 artifacts.
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/ec2_artifacts.tgz
-      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_artifacts-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Remote EC2 Artifacts - Execution ${execution}
-      optional: true
-
-  # Gather and archive the local client logs.
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        client_logs=$(ls crud*.log fsm*.log 2> /dev/null)
-        if [ ! -z "$client_logs" ]; then
-          ${tar|tar} czf client-logs.tgz $client_logs
-        fi
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/client-logs.tgz
-      remote_file: ${project}/${build_variant}/${revision}/client_logs/mongo-client-logs-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Client logs - Execution ${execution}
-      optional: true
-
-  # Process and save coverage data.
-  - command: shell.exec
+  ### Process & archive Code Coverage artifacts ###
+  "process code coverage data": &process_code_coverage_data
+    command: shell.exec
     params:
       working_dir: src
       script: |
@@ -2125,13 +2134,17 @@ post:
             done
           fi
         fi
-  - command: archive.targz_pack
+
+  "tar code coverage data": &tar_code_coverage_data
+    command: archive.targz_pack
     params:
       target: "src/gcov-intermediate-files.tgz"
       source_dir: "src"
       include:
         - "*.gcda.gcov"
-  - command: s3.put
+
+  "archive code coverage data": &archive_code_coverage_data
+    command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
@@ -2143,8 +2156,14 @@ post:
       display_name: gcov intermediate files - Execution ${execution}
       optional: true
 
-  # Gather and archive the Jepsen mongod logs.
-  - command: shell.exec
+  "save code coverage data":
+    - *process_code_coverage_data
+    - *tar_code_coverage_data
+    - *archive_code_coverage_data
+
+  ### Process & archive Jepsen artifacts ###
+  "gather jepsen logs": &gather_jepsen_logs
+    command: shell.exec
     params:
       working_dir: src
       script: |
@@ -2174,14 +2193,18 @@ post:
             done
           done
         fi
-  - command: archive.targz_pack
+
+  "tar jepsen logs": &tar_jepsen_logs
+    command: archive.targz_pack
     params:
       target: "src/jepsen-mongod-logs.tgz"
       source_dir: "src"
       include:
         - "mongod*.log"
         - "stdout*.log"
-  - command: s3.put
+
+  "archive jepsen logs": &archive_jepsen_logs
+    command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
@@ -2193,14 +2216,16 @@ post:
       display_name: Jepsen mongod Logs - ${execution}
       optional: true
 
-  # Gather and archive the Jepsen results.
-  - command: archive.targz_pack
+  "tar jepsen results": &tar_jepsen_results
+    command: archive.targz_pack
     params:
       target: "src/jepsen-results.tgz"
       source_dir: "src/jepsen-mongodb/store"
       include:
         - "./**"
-  - command: s3.put
+
+  "archive jepsen results": &archive_jepsen_results
+    command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
@@ -2212,8 +2237,16 @@ post:
       display_name: Jepsen Test Results - ${execution}
       optional: true
 
-  # Gather and archive mongo coredumps.
-  - command: shell.exec
+  "save jepsen artifacts":
+    - *gather_jepsen_logs
+    - *tar_jepsen_logs
+    - *archive_jepsen_logs
+    - *tar_jepsen_results
+    - *archive_jepsen_results
+
+  ### Process & archive mongo coredumps ###
+  "gather mongo coredumps": &gather_mongo_coredumps
+    command: shell.exec
     params:
       working_dir: "src"
       script: |
@@ -2227,14 +2260,18 @@ post:
             mv $core_file .
           fi
         done
-  - command: archive.targz_pack
+
+  "tar mongo coredumps": &tar_mongo_coredumps
+    command: archive.targz_pack
     params:
       target: "mongo-coredumps.tgz"
       source_dir: "src"
       include:
         - "./**.core"
         - "./**.mdmp" # Windows: minidumps
-  - command: s3.put
+
+  "archive mongo coredumps": &archive_mongo_coredumps
+    command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
@@ -2246,8 +2283,14 @@ post:
       display_name: Core Dumps - Execution ${execution}
       optional: true
 
-  # Gather and archive failed unit test binaries.
-  - command: shell.exec
+  "save mongo coredumps":
+  - *gather_mongo_coredumps
+  - *tar_mongo_coredumps
+  - *archive_mongo_coredumps
+
+  ### Process & archive failed unittest artifacts ###
+  "gather failed unittests": &gather_failed_unittests
+    command: shell.exec
     params:
       working_dir: "src"
       script: |
@@ -2288,13 +2331,17 @@ post:
             fi
           done
         done
-  - command: archive.targz_pack
+
+  "tar failed unittests": &tar_failed_unittests
+    command: archive.targz_pack
     params:
       target: "mongo-unittests.tgz"
       source_dir: "src/unittest_binaries"
       include:
         - "./*_test${exe}"
-  - command: s3.put
+
+  "archive failed unittests": &archive_failed_unittests
+    command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
@@ -2306,72 +2353,14 @@ post:
       display_name: Unit tests - Execution ${execution}
       optional: true
 
-  # Gather and archive hang_analyzer debugger files.
-  - command: archive.targz_pack
-    params:
-      target: "src/mongo-hanganalyzer.tgz"
-      source_dir: "src"
-      include:
-        - "./debugger*.*"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/mongo-hanganalyzer.tgz
-      remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Hang Analyzer Output - Execution ${execution}
-      optional: true
+  "save failed unittests":
+  - *gather_failed_unittests
+  - *tar_failed_unittests
+  - *archive_failed_unittests
 
-  # Gather and archive disk statistics.
-  - command: archive.targz_pack
-    params:
-      target: "diskstats.tgz"
-      source_dir: "./"
-      include:
-        - "./mongo-diskstats*"
-        - "./mongo-diskstats*.csv"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: diskstats.tgz
-      remote_file: ${project}/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: Disk Stats - Execution ${execution}
-      optional: true
-
-  # Gather and archive system resource information.
-  - command: archive.targz_pack
-    params:
-      target: "system-resource-info.tgz"
-      source_dir: src
-      include:
-        - "./system_resource_info*"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: system-resource-info.tgz
-      remote_file: ${project}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: System Resource Info - Execution ${execution}
-      optional: true
-
-  # Cleanup steps.
-  - func: "cleanup environment"
-
-timeout:
-  - func: "fetch debugsymbols archive"
-  - func: "extract debugsymbols"
-  - func: "set EC2 address"
-  - command: shell.exec
+  ### Process & archive artifacts from hung processes ###
+  "run hang_analyzer":
+    command: shell.exec
     params:
       working_dir: src
       script: |
@@ -2449,6 +2438,135 @@ timeout:
             --file "$remote_dir/debugger*.*"                 \
             --file "$remote_dir/*.$core_ext"
         fi
+
+  "tar hang_analyzer debugger files": &tar_hang_analyzer_debugger_files
+    command: archive.targz_pack
+    params:
+      target: "src/mongo-hanganalyzer.tgz"
+      source_dir: "src"
+      include:
+        - "./debugger*.*"
+
+  "archive hang_analyzer debugger files": &archive_hang_analyzer_debugger_files
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/mongo-hanganalyzer.tgz
+      remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Hang Analyzer Output - Execution ${execution}
+      optional: true
+
+  "save hang_analyzer debugger files":
+  - *tar_hang_analyzer_debugger_files
+  - *archive_hang_analyzer_debugger_files
+
+  ### Process & archive disk statistic artifacts ###
+  "tar disk statistics": &tar_disk_statistics
+    command: archive.targz_pack
+    params:
+      target: "diskstats.tgz"
+      source_dir: "./"
+      include:
+        - "./mongo-diskstats*"
+        - "./mongo-diskstats*.csv"
+
+  "archive disk statistics": &archive_disk_statistics
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: diskstats.tgz
+      remote_file: ${project}/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Disk Stats - Execution ${execution}
+      optional: true
+
+  "save disk statistics":
+  - *tar_disk_statistics
+  - *archive_disk_statistics
+
+  ### Process & archive system resource artifacts ###
+  "tar system resource information": &tar_system_resource_information
+    command: archive.targz_pack
+    params:
+      target: "system-resource-info.tgz"
+      source_dir: src
+      include:
+        - "./system_resource_info*"
+
+  "archive system resource information": &archive_system_resource_information
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: system-resource-info.tgz
+      remote_file: ${project}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: System Resource Info - Execution ${execution}
+      optional: true
+
+  "save system resource information":
+  - *tar_system_resource_information
+  - *archive_system_resource_information
+
+  ### Attach report & artifacts ###
+  "attach report":
+    command: attach.results
+    params:
+      file_location: ${report_file|src/report.json}
+
+  "attach artifacts":
+    command: attach.artifacts
+    params:
+      optional: true
+      ignore_artifacts_for_spawn: false
+      files:
+        - ${archive_file|src/archive.json}
+
+
+# Pre task steps
+pre: &pre
+  - func: "kill processes"
+  - func: "cleanup environment"
+  # The python virtual environment is installed in ${workdir}, which is created in "set up virtualenv".
+  - func: "set up virtualenv"
+  - func: "set task expansion macros"
+  - func: "clear OOM messages"
+
+# Post task steps
+post: &post
+  - func: "attach report"
+  - func: "attach artifacts"
+  - func: "save ec2 task artifacts"
+  - func: "kill processes"
+  - func: "save local client logs"
+  - func: "save code coverage data"
+  - func: "save jepsen artifacts"
+  - func: "save mongo coredumps"
+  - func: "save failed unittests"
+  - func: "save hang_analyzer debugger files"
+  - func: "save disk statistics"
+  - func: "save system resource information"
+  - func: "print OOM messages"
+  - func: "cleanup FUSE watchdog"
+  - func: "cleanup environment"
+
+# Timeout steps
+timeout:
+  - func: "fetch debugsymbols archive"
+  - func: "extract debugsymbols"
+  - func: "get EC2 address"
+  - func: "update EC2 address"
+  - func: "run hang_analyzer"
+
 
 #######################################
 #               Tasks                 #
