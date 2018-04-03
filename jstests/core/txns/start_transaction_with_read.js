@@ -1,26 +1,17 @@
 // Test transaction starting with read.
-// @tags: [requires_replication]
+// @tags: [uses_transactions]
 (function() {
     "use strict";
-    load('jstests/libs/uuid_util.js');
 
     const dbName = "test";
     const collName = "start_transaction_with_read";
 
-    const rst = new ReplSetTest({nodes: 1});
-    rst.startSet();
-    rst.initiate();
-    const testDB = rst.getPrimary().getDB(dbName);
+    const testDB = db.getSiblingDB(dbName);
     const coll = testDB[collName];
 
-    if (!testDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-        rst.stopSet();
-        return;
-    }
+    coll.drop();
 
     testDB.runCommand({create: coll.getName(), writeConcern: {w: "majority"}});
-    const uuid = getUUIDFromListCollections(testDB, coll.getName());
-    const oplog = testDB.getSiblingDB('local').oplog.rs;
     let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
@@ -74,15 +65,5 @@
     assert.eq({_id: "insert-2"}, coll.findOne({_id: "insert-2"}));
     assert.eq(initialDoc, coll.findOne(initialDoc));
 
-    // Oplog has the "applyOps" entry that includes two insert ops.
-    const insertOps = [
-        {op: 'i', ns: coll.getFullName(), o: {_id: "insert-1"}},
-        {op: 'i', ns: coll.getFullName(), o: {_id: "insert-2"}},
-    ];
-    let topOfOplog = oplog.find().sort({$natural: -1}).limit(1).next();
-    assert.eq(topOfOplog.txnNumber, NumberLong(txnNumber));
-    assert.docEq(topOfOplog.o.applyOps, insertOps.map(x => Object.assign(x, {ui: uuid})));
-
     session.endSession();
-    rst.stopSet();
 }());
