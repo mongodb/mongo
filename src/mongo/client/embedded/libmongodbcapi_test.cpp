@@ -30,6 +30,7 @@
 #include "mongo/client/embedded/libmongodbcapi.h"
 
 #include <set>
+#include <yaml-cpp/yaml.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/json.h"
@@ -68,14 +69,19 @@ protected:
         if (!globalTempDir) {
             globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
-        const char* argv[] = {"mongo_embedded_capi_test",
-                              "--port",
-                              "0",
-                              "--storageEngine",
-                              "mobile",
-                              "--dbpath",
-                              globalTempDir->path().c_str()};
-        db = libmongodbcapi_db_new(7, argv, nullptr);
+
+        YAML::Emitter yaml;
+        yaml << YAML::BeginMap;
+
+        yaml << YAML::Key << "storage";
+        yaml << YAML::Value << YAML::BeginMap;
+        yaml << YAML::Key << "dbPath";
+        yaml << YAML::Value << globalTempDir->path();
+        yaml << YAML::EndMap;  // storage
+
+        yaml << YAML::EndMap;
+
+        db = libmongodbcapi_db_new(yaml.c_str());
         ASSERT(db != nullptr);
     }
 
@@ -428,7 +434,7 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
 // This test is temporary to make sure that only one database can be created
 // This restriction may be relaxed at a later time
 TEST_F(MongodbCAPITest, CreateMultipleDBs) {
-    libmongodbcapi_db* db2 = libmongodbcapi_db_new(0, nullptr, nullptr);
+    libmongodbcapi_db* db2 = libmongodbcapi_db_new(nullptr);
     ASSERT(db2 == nullptr);
     ASSERT_EQUALS(libmongodbcapi_get_last_error(), LIBMONGODB_CAPI_ERROR_UNKNOWN);
 }

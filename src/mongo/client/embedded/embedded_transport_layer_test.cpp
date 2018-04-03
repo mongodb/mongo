@@ -30,6 +30,7 @@
 
 #include <mongoc.h>
 #include <set>
+#include <yaml-cpp/yaml.h>
 
 #include "mongo/client/embedded/functions_for_test.h"
 #include "mongo/client/embedded/libmongodbcapi.h"
@@ -55,13 +56,19 @@ protected:
         if (!globalTempDir) {
             globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
-        int argc = 5;
-        const char* argv[] = {"mongo_embedded_transport_layer_test",
-                              "--storageEngine",
-                              "mobile",
-                              "--dbpath",
-                              globalTempDir->path().c_str()};
-        db_handle = libmongodbcapi_db_new(argc, argv, nullptr);
+
+        YAML::Emitter yaml;
+        yaml << YAML::BeginMap;
+
+        yaml << YAML::Key << "storage";
+        yaml << YAML::Value << YAML::BeginMap;
+        yaml << YAML::Key << "dbPath";
+        yaml << YAML::Value << globalTempDir->path();
+        yaml << YAML::EndMap;  // storage
+
+        yaml << YAML::EndMap;
+
+        db_handle = libmongodbcapi_db_new(yaml.c_str());
 
         cd_client = embedded_mongoc_client_new(db_handle);
         mongoc_client_set_error_api(cd_client, 2);

@@ -41,7 +41,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
         'service_entry_point_embedded',
     ],
 )
@@ -61,6 +60,7 @@ env.Library(
     source=[
         'embedded_options.cpp',
         'embedded_options_init.cpp',
+        'embedded_options_parser_init.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options',
@@ -147,7 +147,9 @@ if get_option('install-mode') == 'hygienic':
         ],
     )
 
-capiTest = env.Program(
+capiTestEnv = env.Clone()
+capiTestEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+capiTest = capiTestEnv.Program(
     target='mongo_embedded_capi_test',
     source=[
         'libmongodbcapi_test.cpp',
@@ -204,7 +206,9 @@ if get_option('install-mode') == 'hygienic':
         ],
     )
 
-embeddedTransportTest = env.Program(
+embeddedTransportTestEnv = env.Clone()
+embeddedTransportTestEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+embeddedTransportTest = embeddedTransportTestEnv.Program(
     target='mongo_embedded_transport_test',
     source=[
         'embedded_transport_layer_test.cpp',

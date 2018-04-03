@@ -34,7 +34,7 @@ namespace mongo {
 class ServiceContext;
 
 namespace embedded {
-ServiceContext* initialize(int argc, char* argv[], char** envp);
+ServiceContext* initialize(const char* yaml_config);
 void shutdown(ServiceContext* serviceContext);
 }  // namespace embedded
 }  // namespace mongo

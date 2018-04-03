@@ -79,16 +79,12 @@ int libmongodbcapi_fini();
 /**
 * Starts the database and returns a handle with the service context.
 *
-* @param argc
-*      The number of arguments in argv
-* @param argv
-*      The arguments that will be passed to mongod at startup to initialize state
-* @param envp
-*      Environment variables that will be passed to mongod at startup to initilize state
+* @param config null-terminated YAML formatted MongoDB configuration. See documentation for valid
+* options.
 *
 * @return A pointer to a db handle or null on error
 */
-libmongodbcapi_db* libmongodbcapi_db_new(int argc, const char** argv, const char** envp);
+libmongodbcapi_db* libmongodbcapi_db_new(const char* yaml_config);
 
 /**
 * Shuts down the database
