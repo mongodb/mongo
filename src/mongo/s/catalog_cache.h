@@ -116,10 +116,19 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Non-blocking method to be called whenever using the specified routing table has encountered a
-     * stale config exception. Returns immediately and causes the routing table to be refreshed the
-     * next time getCollectionRoutingInfo is called. Does nothing if the routing table has been
-     * refreshed already.
+     * Non-blocking method that marks the current cached database entry as needing refresh if the
+     * entry's databaseVersion matches 'databaseVersion'.
+     *
+     * To be called if routing by a copy of the cached database entry as of 'databaseVersion' caused
+     * a StaleDbVersion to be received.
+     */
+    void onStaleDatabaseVersion(const StringData dbName, const DatabaseVersion& databaseVersion);
+
+    /**
+     * Non-blocking method that marks the current cached collection entry as needing refresh if its
+     * collectionVersion matches the input's ChunkManager's collectionVersion.
+     *
+     * To be called if using the input routing info caused a StaleShardVersion to be received.
      */
     void onStaleShardVersion(CachedCollectionRoutingInfo&&);
 

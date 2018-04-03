@@ -271,6 +271,24 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
     return routingInfoStatus;
 }
 
+void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
+                                          const DatabaseVersion& databaseVersion) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    const auto itDbEntry = _databases.find(dbName);
+    if (itDbEntry == _databases.end()) {
+        // The database was dropped.
+        return;
+    } else if (itDbEntry->second->needsRefresh) {
+        // Refresh has been scheduled for the database already
+        return;
+    } else if (!itDbEntry->second->dbt || itDbEntry->second->dbt->getVersion() == databaseVersion) {
+        // If the versions match, the cached database info is stale, so mark it as needs refresh.
+        log() << "Marking cached database entry for '" << dbName << "' as stale";
+        itDbEntry->second->needsRefresh = true;
+    }
+}
+
 void CatalogCache::onStaleShardVersion(CachedCollectionRoutingInfo&& ccriToInvalidate) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
