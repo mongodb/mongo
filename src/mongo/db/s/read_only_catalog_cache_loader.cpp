@@ -39,6 +39,10 @@ void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,

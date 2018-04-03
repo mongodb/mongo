@@ -488,6 +488,19 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
     }
 }
 
+void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
+                                                         StringData dbName) {
+    stdx::unique_lock<stdx::mutex> lg(_mutex);
+    const auto initialTerm = _term;
+
+    uassert(ErrorCodes::NotMaster,
+            str::stream() << "Unable to wait for database metadata flush for " << dbName.toString()
+                          << " because the node's replication role changed.",
+            _role == ReplicaSetRole::Primary && _term == initialTerm);
+
+    return;
+}
+
 void ShardServerCatalogCacheLoader::_runSecondaryGetChunksSince(
     OperationContext* opCtx,
     const NamespaceString& nss,

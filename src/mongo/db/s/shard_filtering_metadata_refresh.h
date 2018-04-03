@@ -78,4 +78,6 @@ void onDbVersionMismatch(OperationContext* opCtx,
                          const DatabaseVersion& clientDbVersion,
                          const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
 
+void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName);
+
 }  // namespace mongo

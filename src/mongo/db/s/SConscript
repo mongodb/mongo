@@ -230,6 +230,7 @@ env.Library(
         'config/configsvr_shard_collection_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',
+        'flush_database_cache_updates_command.cpp',
         'flush_routing_table_cache_updates_command.cpp',
         'get_database_version_command.cpp',
         'get_shard_version_command.cpp',
