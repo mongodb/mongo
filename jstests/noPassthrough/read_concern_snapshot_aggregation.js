@@ -33,6 +33,8 @@
         let cmdAsSnapshotRead = Object.extend({}, cmd);
         cmdAsSnapshotRead.txnNumber = NumberLong(++txnNumber);
         cmdAsSnapshotRead.readConcern = {level: "snapshot"};
+        cmdAsSnapshotRead.autocommit = false;
+        cmdAsSnapshotRead.startTransaction = true;
         assert.commandFailedWithCode(sessionDB.runCommand(cmdAsSnapshotRead), code);
 
         // As a sanity check, also make sure that the command succeeds when run without a txn number
@@ -91,7 +93,9 @@
             pipeline: pipeline,
             cursor: {batchSize: 0},
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(++txnNumber)
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false
         });
         assert.commandWorked(cmdRes);
         assert.neq(0, cmdRes.cursor.id);
@@ -103,6 +107,8 @@
             new DBCommandCursor(sessionDB, cmdRes, undefined, undefined, NumberLong(txnNumber))
                 .toArray();
         assert.eq(results, expectedResults);
+        assert.commandWorked(sessionDB.adminCommand(
+            {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
     }
 
     // Test that snapshot isolation works with $lookup using localField/foreignField syntax.
@@ -188,6 +194,8 @@
         }],
         txnNumber: NumberLong(++txnNumber),
         readConcern: {level: "snapshot"},
+        autocommit: false,
+        startTransaction: true,
         cursor: {batchSize: 0}
     }));
     assert(cmdRes.hasOwnProperty("cursor"));
@@ -198,8 +206,14 @@
         coll.insert({_id: numInitialGeoInsert, geo: {type: "Point", coordinates: [0, 0]}},
                     {writeConcern: {w: "majority"}}));
 
-    cmdRes = assert.commandWorked(sessionDB.runCommand(
-        {getMore: NumberLong(cursorId), collection: kCollName, txnNumber: NumberLong(txnNumber)}));
+    cmdRes = assert.commandWorked(sessionDB.runCommand({
+        getMore: NumberLong(cursorId),
+        collection: kCollName,
+        autocommit: false,
+        txnNumber: NumberLong(txnNumber)
+    }));
+    assert.commandWorked(sessionDB.adminCommand(
+        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert(cmdRes.hasOwnProperty("cursor"));
     assert(cmdRes.cursor.hasOwnProperty("nextBatch"));
     assert.eq(cmdRes.cursor.nextBatch.length, numInitialGeoInsert);
@@ -229,8 +243,12 @@
         ],
         cursor: {},
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(++txnNumber)
+        txnNumber: NumberLong(++txnNumber),
+        startTransaction: true,
+        autocommit: false
     });
+    assert.commandWorked(sessionDB.adminCommand(
+        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.commandWorked(cmdRes);
     assert.eq(0, cmdRes.cursor.id);
     assert.eq(cmdRes.cursor.firstBatch, [

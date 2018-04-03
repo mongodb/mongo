@@ -41,15 +41,13 @@
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: "hangAfterPreallocateSnapshot", mode: "alwaysOn"}));
 
-    TestData.sessionId = assert.commandWorked(testDB.adminCommand({startSession: 1})).id;
     const awaitCommand = startParallelShell(function() {
-        const res = db.runCommand({
-            find: "coll",
-            readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(0)
-        });
+        const session = db.getMongo().startSession();
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = sessionDb.runCommand({find: "coll"});
         assert.commandFailedWithCode(res, ErrorCodes.SnapshotUnavailable);
+        session.endSession();
     }, rst.ports[0]);
 
     waitForOp({"command.find": kCollName, "command.readConcern.level": "snapshot"});
@@ -70,6 +68,5 @@
 
     awaitCommand();
 
-    assert.commandWorked(testDB.adminCommand({endSessions: [TestData.sessionId]}));
     rst.stopSet();
 })();

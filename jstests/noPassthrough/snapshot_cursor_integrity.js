@@ -34,6 +34,8 @@
         find: collName,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(0),
+        autocommit: false,
+        startTransaction: true,
         batchSize: 2
     }));
     assert(res.hasOwnProperty("cursor"));
@@ -45,38 +47,66 @@
         primaryDB.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50737);
 
     // The cursor can still be iterated in session1.
-    assert.commandWorked(sessionDB1.runCommand(
-        {getMore: cursorID, collection: collName, txnNumber: NumberLong(0), batchSize: 2}));
+    assert.commandWorked(sessionDB1.runCommand({
+        getMore: cursorID,
+        collection: collName,
+        autocommit: false,
+        txnNumber: NumberLong(0),
+        batchSize: 2
+    }));
 
     // The cursor may not be iterated in a different session.
     assert.commandFailedWithCode(
-        sessionDB2.runCommand(
-            {getMore: cursorID, collection: collName, txnNumber: NumberLong(0), batchSize: 2}),
-        50738);
+        sessionDB2.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50738);
 
     // The cursor can still be iterated in session1.
-    assert.commandWorked(sessionDB1.runCommand(
-        {getMore: cursorID, collection: collName, txnNumber: NumberLong(0), batchSize: 2}));
+    assert.commandWorked(sessionDB1.runCommand({
+        getMore: cursorID,
+        collection: collName,
+        autocommit: false,
+        txnNumber: NumberLong(0),
+        batchSize: 2
+    }));
 
     // The cursor may not be iterated outside of any transaction.
     assert.commandFailedWithCode(
         sessionDB1.runCommand({getMore: cursorID, collection: collName, batchSize: 2}), 50740);
 
     // The cursor can still be iterated in its transaction in session1.
-    assert.commandWorked(sessionDB1.runCommand(
-        {getMore: cursorID, collection: collName, txnNumber: NumberLong(0), batchSize: 2}));
+    assert.commandWorked(sessionDB1.runCommand({
+        getMore: cursorID,
+        collection: collName,
+        autocommit: false,
+        txnNumber: NumberLong(0),
+        batchSize: 2
+    }));
 
     // The cursor may not be iterated in a different transaction on session1.
-    assert.commandFailedWithCode(
-        sessionDB1.runCommand(
-            {getMore: cursorID, collection: collName, txnNumber: NumberLong(1), batchSize: 2}),
-        ErrorCodes.CursorNotFound);
+    assert.commandWorked(sessionDB1.runCommand({
+        find: collName,
+        txnNumber: NumberLong(1),
+        autocommit: false,
+        readConcern: {level: "snapshot"},
+        startTransaction: true
+    }));
+    assert.commandFailedWithCode(sessionDB1.runCommand({
+        getMore: cursorID,
+        collection: collName,
+        autocommit: false,
+        txnNumber: NumberLong(1),
+        batchSize: 2
+    }),
+                                 ErrorCodes.CursorNotFound);
 
     // The cursor can no longer be iterated because its transaction has ended.
-    assert.commandFailedWithCode(
-        sessionDB1.runCommand(
-            {getMore: cursorID, collection: collName, txnNumber: NumberLong(0), batchSize: 2}),
-        ErrorCodes.TransactionTooOld);
+    assert.commandFailedWithCode(sessionDB1.runCommand({
+        getMore: cursorID,
+        collection: collName,
+        autocommit: false,
+        txnNumber: NumberLong(0),
+        batchSize: 2
+    }),
+                                 ErrorCodes.TransactionTooOld);
 
     // Establish a cursor outside of any transaction in session1.
     res = assert.commandWorked(sessionDB1.runCommand({find: collName, batchSize: 2}));
@@ -85,10 +115,21 @@
     cursorID = res.cursor.id;
 
     // The cursor may not be iterated inside a transaction.
-    assert.commandFailedWithCode(
-        sessionDB1.runCommand(
-            {getMore: cursorID, collection: collName, txnNumber: NumberLong(2), batchSize: 2}),
-        50739);
+    assert.commandWorked(sessionDB1.runCommand({
+        find: collName,
+        txnNumber: NumberLong(2),
+        autocommit: false,
+        readConcern: {level: "snapshot"},
+        startTransaction: true
+    }));
+    assert.commandFailedWithCode(sessionDB1.runCommand({
+        getMore: cursorID,
+        collection: collName,
+        autocommit: false,
+        txnNumber: NumberLong(2),
+        batchSize: 2
+    }),
+                                 50739);
 
     // The cursor can still be iterated outside of any transaction. Exhaust the cursor.
     assert.commandWorked(sessionDB1.runCommand({getMore: cursorID, collection: collName}));

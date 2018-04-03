@@ -1,3 +1,5 @@
+// TODO: SERVER-34388 Simplify this test by wrapping all the statements
+// in one transaction once a failing command won't abort the transaction
 /**
  * Test that explained aggregation commands behave correctly with the readConcern option.
  */

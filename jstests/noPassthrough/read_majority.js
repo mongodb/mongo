@@ -46,41 +46,29 @@ load("jstests/libs/analyze_plan.js");
             replTest.getPrimary().getDB("test").getMongo().startSession({causalConsistency: false});
         const db = session.getDatabase("test");
         const t = db.coll;
-        let txnNumber = 0;
 
         function assertNoSnapshotAvailableForReadConcernLevel() {
-            var res = t.runCommand('find', {
-                batchSize: 2,
-                readConcern: {level: level},
-                maxTimeMS: 1000,
-                txnNumber: NumberLong(txnNumber++)
-            });
+            var res =
+                t.runCommand('find', {batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
             assert.commandFailed(res);
             assert.eq(res.code, ErrorCodes.ExceededTimeLimit);
         }
 
         function getCursorForReadConcernLevel() {
-            var res = t.runCommand(
-                'find',
-                {batchSize: 2, readConcern: {level: level}, txnNumber: NumberLong(txnNumber)});
+            var res = t.runCommand('find', {batchSize: 2, readConcern: {level: level}});
             assert.commandWorked(res);
-            return new DBCommandCursor(db, res, 2, undefined, txnNumber++);
+            return new DBCommandCursor(db, res, 2, undefined);
         }
 
         function getAggCursorForReadConcernLevel() {
-            var res = t.runCommand('aggregate', {
-                pipeline: [],
-                cursor: {batchSize: 2},
-                readConcern: {level: level},
-                txnNumber: NumberLong(txnNumber)
-            });
+            var res = t.runCommand(
+                'aggregate', {pipeline: [], cursor: {batchSize: 2}, readConcern: {level: level}});
             assert.commandWorked(res);
-            return new DBCommandCursor(db, res, 2, undefined, txnNumber++);
+            return new DBCommandCursor(db, res, 2, undefined);
         }
 
         function getExplainPlan(query) {
-            var res = db.runCommand(
-                {explain: {find: t.getName(), filter: query, txnNumber: NumberLong(txnNumber++)}});
+            var res = db.runCommand({explain: {find: t.getName(), filter: query}});
             return assert.commandWorked(res).queryPlanner.winningPlan;
         }
 
@@ -93,7 +81,7 @@ load("jstests/libs/analyze_plan.js");
             "const session = db.getMongo().startSession({causalConsistency: false}); " +
                 "const sessionDB = session.getDatabase(db.getName()); " +
                 "sessionDB.coll.runCommand('find', {batchSize: 2, readConcern: {level: \"" + level +
-                "\"}, txnNumber: NumberLong(" + (txnNumber++) + ")});",
+                "\"}});",
             replTest.ports[0]);
 
         assert.soon(function() {
@@ -223,19 +211,14 @@ load("jstests/libs/analyze_plan.js");
         // Commands that only support read concern 'local', (such as ping) must work when it is
         // explicitly specified and fail for majority-committed read concern levels.
         assert.commandWorked(db.adminCommand({ping: 1, readConcern: {level: 'local'}}));
-        var res = assert.commandFailed(db.adminCommand(
-            {ping: 1, readConcern: {level: level}, txnNumber: NumberLong(txnNumber++)}));
+        var res = assert.commandFailed(db.adminCommand({ping: 1, readConcern: {level: level}}));
         assert.eq(res.code, ErrorCodes.InvalidOptions);
 
         // Agg $out also doesn't support majority committed reads.
         assert.commandWorked(t.runCommand(
             'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: 'local'}}));
-        var res = assert.commandFailed(t.runCommand('aggregate', {
-            pipeline: [{$out: 'out'}],
-            cursor: {},
-            readConcern: {level: level},
-            txnNumber: NumberLong(txnNumber++)
-        }));
+        var res = assert.commandFailed(t.runCommand(
+            'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: level}}));
         assert.eq(res.code, ErrorCodes.InvalidOptions);
 
         replTest.stopSet();
@@ -254,8 +237,8 @@ load("jstests/libs/analyze_plan.js");
         testReadConcernLevel("majority");
     }
 
-    // TODO SERVER-33218: Test for readConcern level snapshot once itcount() preserves
-    // txnNumber. Without this, itcount() calls will execute a getMore without txnNumber.
+    // TODO SERVER-34388: Test snapshot readConcern when failing commands do
+    // not abort the transaction.
     /*
     if (supportsSnapshotReadConcern) {
         testReadConcernLevel("snapshot");

@@ -259,6 +259,8 @@
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.pipeline": [{$match: {x: 1}}]}, {"command.pipeline": [{$match: {x: 1}}]});
 
+    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
+    // reads since this command is not supported with transaction api.
     // Test geoNear.
     testCommand(function() {
         const res = assert.commandWorked(db.runCommand({

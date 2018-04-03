@@ -1,3 +1,5 @@
+// TODO: SERVER-34388 Simplify this test by wrapping all the statements
+// in one transaction once a failing command won't abort the transaction
 // Test that causally consistent majority-committed reads will wait for the majority commit point to
 // move past 'afterClusterTime'.
 // @tags: [requires_replication]
