@@ -68,11 +68,8 @@
     // Establish change stream cursor on the second mongos, which is not aware that the
     // collection is sharded.
     let cstMongos1 = new ChangeStreamTest(mongos1DB);
-    let cursorMongos1 = cstMongos1.startWatchingChanges({
-        pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-        collection: mongos1Coll,
-        includeToken: true
-    });
+    let cursorMongos1 = cstMongos1.startWatchingChanges(
+        {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: mongos1Coll});
     assert.eq(0, cursorMongos1.firstBatch.length, "Cursor had changes: " + tojson(cursorMongos1));
 
     // Establish a change stream cursor on the now sharded collection through the first mongos.

@@ -93,6 +93,14 @@ private:
 class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource,
                                                      public SplittableDocumentSource {
 public:
+    // Used to record the results of comparing the token data extracted from documents in the
+    // resumed stream against the client's resume token.
+    enum class ResumeStatus {
+        kFoundToken,    // The stream produced a document satisfying the client resume token.
+        kCannotResume,  // The stream's latest document is more recent than the resume token.
+        kCheckNextDoc   // The next document produced by the stream may contain the resume token.
+    };
+
     GetNextResult getNext() final;
     const char* getSourceName() const final;
 
@@ -115,7 +123,8 @@ public:
      * to ensure that each shard has enough oplog history to resume the change stream.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return DocumentSourceShardCheckResumability::create(pExpCtx, _token.getClusterTime());
+        return DocumentSourceShardCheckResumability::create(pExpCtx,
+                                                            _tokenFromClient.getClusterTime());
     };
 
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
@@ -139,7 +148,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeToken token);
 
     const ResumeToken& getTokenForTest() {
-        return _token;
+        return _tokenFromClient;
     }
 
 private:
@@ -149,8 +158,8 @@ private:
     DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            ResumeToken token);
 
-    ResumeToken _token;
-    bool _haveSeenResumeToken;
+    ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
+    ResumeToken _tokenFromClient;
 };
 
 }  // namespace mongo

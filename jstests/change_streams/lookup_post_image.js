@@ -19,8 +19,8 @@
         jsTestLog("Testing change streams without 'fullDocument' specified");
         // Test that not specifying 'fullDocument' does include a 'fullDocument' in the result for
         // an insert.
-        let cursor = cst.startWatchingChanges(
-            {pipeline: [{$changeStream: {}}], collection: collToWatch, includeToken: true});
+        let cursor =
+            cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collToWatch});
         assert.writeOK(coll.insert({_id: "fullDocument not specified"}));
         let latestChange = cst.getOneChange(cursor);
         assert.eq(latestChange.operationType, "insert");
@@ -45,11 +45,8 @@
 
         // Test that specifying 'fullDocument' as 'default' does include a 'fullDocument' in the
         // result for an insert.
-        cursor = cst.startWatchingChanges({
-            collection: collToWatch,
-            pipeline: [{$changeStream: {fullDocument: "default"}}],
-            includeToken: true
-        });
+        cursor = cst.startWatchingChanges(
+            {collection: collToWatch, pipeline: [{$changeStream: {fullDocument: "default"}}]});
         assert.writeOK(coll.insert({_id: "fullDocument is default"}));
         latestChange = cst.getOneChange(cursor);
         assert.eq(latestChange.operationType, "insert");
@@ -74,11 +71,8 @@
 
         // Test that specifying 'fullDocument' as 'updateLookup' does include a 'fullDocument' in
         // the result for an insert.
-        cursor = cst.startWatchingChanges({
-            collection: collToWatch,
-            pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-            includeToken: true
-        });
+        cursor = cst.startWatchingChanges(
+            {collection: collToWatch, pipeline: [{$changeStream: {fullDocument: "updateLookup"}}]});
         assert.writeOK(coll.insert({_id: "fullDocument is lookup"}));
         latestChange = cst.getOneChange(cursor);
         assert.eq(latestChange.operationType, "insert");
@@ -107,8 +101,7 @@
             pipeline: [
                 {$changeStream: {fullDocument: "updateLookup"}},
                 {$match: {operationType: "update"}}
-            ],
-            includeToken: true
+            ]
         });
         assert.writeOK(coll.update({_id: "fullDocument is lookup"}, {$set: {updatedAgain: true}}));
         assert.writeOK(coll.remove({_id: "fullDocument is lookup"}));

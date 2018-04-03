@@ -39,8 +39,7 @@
         assertDropAndRecreateCollection(testDB, "change_stream_whole_db_agg_invalidations");
 
     // Get a valid resume token that the next change stream can use.
-    aggCursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: 1, includeToken: true});
+    aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
     assert.writeOK(collAgg.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
@@ -55,12 +54,10 @@
         return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(testDB,
                                                                              collAgg.getName());
     });
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: 1,
-        pipeline: [{$changeStream: {resumeAfter: resumeToken}}, cst.oplogProjection],
-        cursor: {}
-    }),
-                                 40615);
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {aggregate: 1, pipeline: [{$changeStream: {resumeAfter: resumeToken}}], cursor: {}}),
+        40615);
 
     // Test that invalidation entries for other databases are filtered out.
     const otherDB = testDB.getSiblingDB("change_stream_whole_db_invalidations_other");

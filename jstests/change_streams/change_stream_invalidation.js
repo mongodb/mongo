@@ -51,8 +51,7 @@
     const collAgg = assertDropAndRecreateCollection(db, "change_stream_agg_invalidations");
     const collAggUuid = getUUIDFromListCollections(db, collAgg.getName());
     // Get a valid resume token that the next aggregate command can use.
-    aggcursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: collAgg, includeToken: true});
+    aggcursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collAgg});
 
     assert.writeOK(collAgg.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
@@ -68,7 +67,7 @@
     });
     assert.commandFailed(db.runCommand({
         aggregate: collAgg.getName(),
-        pipeline: [{$changeStream: {resumeAfter: resumeToken}}, cst.oplogProjection],
+        pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         cursor: {}
     }));
 
@@ -79,11 +78,8 @@
     assertDropCollection(db, collDoesNotExistName);
 
     // Cursor creation succeeds, but there are no results.
-    aggcursor = cst.startWatchingChanges({
-        collection: collDoesNotExistName,
-        pipeline: [{$changeStream: {}}],
-        includeToken: true,
-    });
+    aggcursor = cst.startWatchingChanges(
+        {collection: collDoesNotExistName, pipeline: [{$changeStream: {}}]});
 
     // We explicitly test getMore, to ensure that the getMore command for a non-existent collection
     // does not return an error.

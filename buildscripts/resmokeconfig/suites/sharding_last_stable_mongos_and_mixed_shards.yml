@@ -10,6 +10,7 @@ selector:
   # command to the shards - it'll just return success immediately. 
   - jstests/sharding/max_time_ms_sharded_new_commands.js
   #### Enable when 4.0 becomes last-stable.
+  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/create_database.js
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   - jstests/sharding/dump_coll_metadata.js

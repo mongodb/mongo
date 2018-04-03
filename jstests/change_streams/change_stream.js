@@ -171,8 +171,8 @@
     if (!isMongos) {
         jsTestLog("Ensuring attempt to read with legacy operations fails.");
         db.getMongo().forceReadMode('legacy');
-        const legacyCursor = db.tailable2.aggregate([{$changeStream: {}}, cst.oplogProjection],
-                                                    {cursor: {batchSize: 0}});
+        const legacyCursor =
+            db.tailable2.aggregate([{$changeStream: {}}], {cursor: {batchSize: 0}});
         assert.throws(function() {
             legacyCursor.next();
         }, [], "Legacy getMore expected to fail on changeStream cursor.");
@@ -183,8 +183,8 @@
     assertDropAndRecreateCollection(db, "resume1");
 
     // Note we do not project away 'id.ts' as it is part of the resume token.
-    let resumeCursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: db.resume1, includeToken: true});
+    let resumeCursor =
+        cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.resume1});
 
     // Insert a document and save the resulting change stream.
     assert.writeOK(db.resume1.insert({_id: 1}));
@@ -195,7 +195,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
 
@@ -211,7 +210,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), secondInsertChangeDoc);
@@ -221,7 +219,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);

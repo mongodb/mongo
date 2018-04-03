@@ -10,8 +10,7 @@
 
     // Note we do not project away 'id.ts' as it is part of the resume token.
     let cst = new ChangeStreamTest(db);
-    let resumeCursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: 1, includeToken: true});
+    let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
 
     // Insert a document and save the resulting change stream.
     assert.writeOK(coll.insert({_id: 1}));
@@ -22,7 +21,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: 1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
 
@@ -37,7 +35,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: 1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), secondInsertChangeDoc);
@@ -47,7 +44,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id}}],
         collection: 1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
