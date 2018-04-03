@@ -177,7 +177,9 @@ fi
 echo "Data Devices: $data_devices_info"
 
 # Launch a new instance.
+aws_ec2_status_yml=aws_ec2_status.yml
 aws_ec2=$(python buildscripts/aws_ec2.py \
+          --yamlFile $aws_ec2_status_yml \
           --ami $ami                     \
           --instanceType $instance_type  \
           --keyName $ssh_key_id          \
@@ -190,19 +192,29 @@ aws_ec2=$(python buildscripts/aws_ec2.py \
           $expire_tag                    \
           $block_log_device_option       \
           $block_data_device_option | tr -cd "[:print:]\n")
+aws_status=$?
 echo "Spawned new AMI EC2 instance: $aws_ec2"
 
-# Get new instance ID & ip_address
-instance_id=$(echo $aws_ec2 | sed -e "s/.*instance_id: //; s/ .*//")
-ip_address=$(echo $aws_ec2 | sed -e "s/.*private_ip_address: //; s/ .*//")
+# Read the attributes from $aws_ec2_status_yml and save in $aws_ec2_yml.
+> $aws_ec2_yml
+ec2_attributes="instance_id private_ip_address"
+for ec2_attribute in $ec2_attributes
+do
+  ec2_value=$(python buildscripts/yaml_key_value.py --yamlFile $aws_ec2_status_yml --yamlKey $ec2_attribute)
+  # Only save the ec2_attribute if it's defined.
+  if [ -n "$ec2_value" ]; then
+    echo "$ec2_attribute: $ec2_value" >> $aws_ec2_yml
+  fi
+done
 
-# Save AWS information on spawned EC2 instance to be used as an expansion macro.
-echo "instance_id: $instance_id" > $aws_ec2_yml
-echo "ami: $ami" >> $aws_ec2_yml
-echo "instance_type: $instance_type" >> $aws_ec2_yml
-echo "ip_address: $ip_address" >> $aws_ec2_yml
-echo "data_device_names: $data_device_names" >> $aws_ec2_yml
-echo "raid_data_device_name: $raid_data_device_name" >> $aws_ec2_yml
-echo "log_device_name: $log_device_name" >> $aws_ec2_yml
-echo "fstype: $fstype" >> $aws_ec2_yml
-echo "fs_options: $fs_options" >> $aws_ec2_yml
+# Save additional AWS information on spawned EC2 instance to be used as an expansion macro.
+options="data_device_names raid_data_device_name log_device_name fstype fs_options"
+for option in $options
+do
+  # Only save the option if it's defined.
+  if [ -n "${!option}" ]; then
+    echo "$option: ${!option}" >> $aws_ec2_yml
+  fi
+done
+
+exit $aws_status

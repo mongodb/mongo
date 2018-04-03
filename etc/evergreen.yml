@@ -191,7 +191,7 @@ variables:
 - &powercycle_test
   ec2_artifacts: ${log_path} ${db_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
-  connection_options: --sshUserHost=${ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
+  connection_options: --sshUserHost=${private_ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
   crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
   client_options: --numCrudClients=20 --numFsmClients=20
@@ -1233,25 +1233,29 @@ functions:
           if [ -z "${ec2_monitor_files}" ] || [ -z "${instance_id}" ]; then
             exit 0
           fi
-          # Ensure we use the latest ip_address, as it could change if the EC2 instance
+          # Ensure we use the latest private_ip_address, as it could change if the EC2 instance
           # has been stopped and started.
           ${activate_virtualenv}
           # Specify '--mode start' to ensure the remote instance is running.
-          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
-          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
-          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
+          monitor_ec2_yml=monitor_ec2.yml
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start --yamlFile $monitor_ec2_yml)
+          private_ip_address=$($python buildscripts/yaml_key_value.py --yamlFile $monitor_ec2_yml --yamlKey private_ip_address)
+          if [ -z "$private_ip_address" ]; then
+            echo "Cannot determine the IP address for the remote monitor."
+            continue
+          fi
           cmd="${tar|tar} czf ec2_monitor_files.tgz ${ec2_monitor_files}"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ssh_connection_options="$ssh_connection_options -o ConnectionAttempts=3"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@$ip_address                     \
+            --userHost $USER@$private_ip_address             \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmd"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@$ip_address                     \
+            --userHost $USER@$private_ip_address             \
             --operation "copy_from"                          \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
@@ -1314,7 +1318,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --operation "copy_to"                            \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
@@ -1352,7 +1356,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
@@ -1379,7 +1383,7 @@ functions:
           cmds="$sudo mkdir -p ${remote_dir}; $sudo chown $user_group ${remote_dir}; $set_permission; ls -ld ${remote_dir}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
@@ -1401,7 +1405,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --operation "copy_to"                            \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
@@ -1426,7 +1430,7 @@ functions:
             ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
             $python buildscripts/remote_operations.py          \
               --verbose                                        \
-              --userHost $USER@${ip_address}                   \
+              --userHost $USER@${private_ip_address}                   \
               --sshConnectionOptions "$ssh_connection_options" \
               --retries ${ssh_retries|0}                       \
               --commands "$cmds"
@@ -1469,7 +1473,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
@@ -1540,7 +1544,7 @@ functions:
             ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
             $python buildscripts/remote_operations.py          \
               --verbose                                        \
-              --userHost $USER@${ip_address}                   \
+              --userHost $USER@${private_ip_address}                   \
               --sshConnectionOptions "$ssh_connection_options" \
               --retries ${ssh_retries|0}                       \
               --commands "$cmds"
@@ -1563,7 +1567,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
@@ -1580,19 +1584,18 @@ functions:
           if [ -z "${instance_id}" ]; then
             exit 0
           fi
-          # Ensure we use the latest ip_address, as it could change if the EC2 instance
+          # Ensure we use the latest private_ip_address, as it could change if the EC2 instance
           # has been stopped and started.
           ${activate_virtualenv}
           # Specify '--mode start' to ensure the remote instance is running.
-          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
-          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
-          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
-          sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
-          echo "Instance status: $aws_ec2"
+          aws_ec2_status_yml=aws_ec2_status.yml
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start --yamlFile $aws_ec2_status_yml)
+          private_ip_address=$($python buildscripts/yaml_key_value.py --yamlFile $aws_ec2_status_yml --yamlKey private_ip_address)
+          echo "private_ip_address: $private_ip_address" > private_ip_address.yml
 
     - command: expansions.update
       params:
-        file: src/${aws_ec2_yml}
+        file: src/private_ip_address.yml
 
   "copy EC2 artifacts":
     - command: shell.exec
@@ -1609,7 +1612,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmd"
@@ -1627,7 +1630,7 @@ functions:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --operation "copy_from"                          \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
@@ -1746,7 +1749,7 @@ post:
         ${activate_virtualenv}
         $python buildscripts/remote_operations.py          \
           --verbose                                        \
-          --userHost $USER@${ip_address}                   \
+          --userHost $USER@${private_ip_address}                   \
           --sshConnectionOptions "$ssh_connection_options" \
           --retries ${ssh_retries}                         \
           --commands "$cmds"                               \
@@ -1763,7 +1766,7 @@ post:
         ${activate_virtualenv}
         $python buildscripts/remote_operations.py          \
           --verbose                                        \
-          --userHost $USER@${ip_address}                   \
+          --userHost $USER@${private_ip_address}                   \
           --operation "copy_from"                          \
           --sshConnectionOptions "$ssh_connection_options" \
           --retries ${ssh_retries}                         \
@@ -2151,10 +2154,9 @@ timeout:
         PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/hang_analyzer.py $hang_analyzer_option
 
         # Call hang_analyzer.py script for tasks that are running remote mongo processes
-        # The file ${aws_ec2_yml} will define the remote's ${ip_address}.
         # Any task which uses remote processes will have previously loaded this file to set these
         # expansion macros.
-        if [ -f ${aws_ec2_yml|""} ]; then
+        if [ -n "${private_ip_address}" ]; then
           core_ext=core
           if [ "Windows_NT" = "$OS" ]; then
             core_ext=mdmp
@@ -2172,7 +2174,7 @@ timeout:
           if [ ! -z "$file_param" ]; then
             $python buildscripts/remote_operations.py          \
               --verbose                                        \
-              --userHost $USER@${ip_address}                   \
+              --userHost $USER@${private_ip_address}                   \
               --operation "copy_to"                            \
               --sshConnectionOptions "$ssh_connection_options" \
               --retries ${ssh_retries}                         \
@@ -2183,14 +2185,14 @@ timeout:
           cmds="PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $python buildscripts/hang_analyzer.py $hang_analyzer_option"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries}                         \
             --commands "$cmds"                               \
             --commandDir $remote_dir
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
-            --userHost $USER@${ip_address}                   \
+            --userHost $USER@${private_ip_address}                   \
             --operation "copy_from"                          \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries}                         \

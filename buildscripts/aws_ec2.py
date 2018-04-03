@@ -217,6 +217,7 @@ def main():
     parser = optparse.OptionParser(description=__doc__)
     control_options = optparse.OptionGroup(parser, "Control options")
     create_options = optparse.OptionGroup(parser, "Create options")
+    status_options = optparse.OptionGroup(parser, "Status options")
 
     parser.add_option("--mode",
                       dest="mode",
@@ -306,8 +307,14 @@ def main():
                                    " bracketed YAML - i.e. JSON with support for single quoted"
                                    " and unquoted keys. Example, '{DryRun: True}'")
 
+    status_options.add_option("--yamlFile",
+                              dest="yaml_file",
+                              default=None,
+                              help="Save the status into the specified YAML file.")
+
     parser.add_option_group(control_options)
     parser.add_option_group(create_options)
+    parser.add_option_group(status_options)
 
     (options, _) = parser.parse_args()
 
@@ -361,14 +368,20 @@ def main():
             wait_time_secs=options.wait_time_secs,
             show_progress=True)
 
-    print("Return code: {}, Instance status:".format(ret_code))
     if ret_code:
-        print(instance_status)
-    else:
-        for field in instance_status._fields:
-            print("\t{}: {}".format(field, getattr(instance_status, field)))
+        print("Return code: {}, {}".format(ret_code, instance_status))
+        sys.exit(ret_code)
 
-    sys.exit(ret_code)
+    status_dict = {}
+    for field in getattr(instance_status, "_fields", []):
+        status_dict[field] = getattr(instance_status, field)
+
+    if options.yaml_file:
+        print("Saving status to {}".format(options.yaml_file))
+        with open(options.yaml_file, "w") as ystream:
+            yaml.safe_dump(status_dict, ystream)
+
+    print(yaml.safe_dump(status_dict))
 
 if __name__ == "__main__":
     main()
