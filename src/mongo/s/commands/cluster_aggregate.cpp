@@ -178,12 +178,11 @@ StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationConte
 }
 
 std::set<ShardId> getTargetedShards(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const LiteParsedPipeline& litePipe,
+                                    bool mustRunOnAllShards,
                                     const CachedCollectionRoutingInfo& routingInfo,
                                     const BSONObj shardQuery,
                                     const BSONObj collation) {
-    if (mustRunOnAllShards(nss, routingInfo, litePipe)) {
+    if (mustRunOnAllShards) {
         // The pipeline begins with a stage which must be run on all shards.
         std::vector<ShardId> shardIds;
         Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
@@ -198,7 +197,7 @@ BSONObj createCommandForTargetedShards(
     const AggregationRequest& request,
     const BSONObj originalCmdObj,
     const std::unique_ptr<Pipeline, PipelineDeleter>& pipelineForTargetedShards,
-    LogicalTime atClusterTime) {
+    boost::optional<LogicalTime> atClusterTime) {
     // Create the command for the shards.
     MutableDocument targetedCmd(request.serializeToCommandObj());
     targetedCmd[AggregationRequest::kFromMongosName] = Value(true);
@@ -233,9 +232,9 @@ BSONObj createCommandForTargetedShards(
     }
 
     // TODO: SERVER-34078
-    BSONObj cmdObj = (atClusterTime != LogicalTime::kUninitialized)
-        ? appendAtClusterTime(targetedCmd.freeze().toBson(), atClusterTime)
-        : targetedCmd.freeze().toBson();
+    BSONObj cmdObj =
+        (atClusterTime ? appendAtClusterTime(targetedCmd.freeze().toBson(), *atClusterTime)
+                       : targetedCmd.freeze().toBson());
 
     // agg creates temp collection and should handle implicit create separately.
     return appendAllowImplicitCreate(cmdObj, true);
@@ -264,16 +263,6 @@ BSONObj createCommandForMergingShard(
     return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
 }
 
-/**
- * Verifies that the shardIds are the same as they were atClusterTime using versioned table.
- * TODO: SERVER-33767
- */
-bool verifyTargetedShardsAtClusterTime(OperationContext* opCtx,
-                                       const std::set<ShardId>& shardIds,
-                                       LogicalTime atClusterTime) {
-    return true;
-}
-
 std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -285,11 +274,12 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
     const BSONObj& collation) {
     LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
 
+    bool mustRunOnAll = mustRunOnAllShards(nss, *routingInfo, litePipe);
     std::set<ShardId> shardIds =
-        getTargetedShards(opCtx, nss, litePipe, *routingInfo, shardQuery, collation);
+        getTargetedShards(opCtx, mustRunOnAll, *routingInfo, shardQuery, collation);
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
-    if (mustRunOnAllShards(nss, *routingInfo, litePipe)) {
+    if (mustRunOnAll) {
         // The pipeline contains a stage which must be run on all shards. Skip versioning and
         // enqueue the raw command objects.
         for (auto&& shardId : shardIds) {
@@ -413,31 +403,20 @@ DispatchShardPipelineResults dispatchShardPipeline(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, executionNss));
 
         // Determine whether we can run the entire aggregation on a single shard.
-        std::set<ShardId> shardIds = getTargetedShards(opCtx,
-                                                       executionNss,
-                                                       liteParsedPipeline,
-                                                       executionNsRoutingInfo,
-                                                       shardQuery,
-                                                       aggRequest.getCollation());
+        bool mustRunOnAll =
+            mustRunOnAllShards(executionNss, executionNsRoutingInfo, liteParsedPipeline);
+        std::set<ShardId> shardIds = getTargetedShards(
+            opCtx, mustRunOnAll, executionNsRoutingInfo, shardQuery, aggRequest.getCollation());
 
         uassert(ErrorCodes::ShardNotFound,
                 "No targets were found for this aggregation. All shards were removed from the "
                 "cluster mid-operation",
                 shardIds.size() > 0);
 
-        auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        bool isSnapshotRead(readConcernArgs.getLevel() ==
-                            repl::ReadConcernLevel::kSnapshotReadConcern);
+        auto atClusterTime = computeAtClusterTime(
+            opCtx, mustRunOnAll, shardIds, executionNss, shardQuery, aggRequest.getCollation());
 
-        LogicalTime atClusterTime;
-        // TODO: SERVER-34074
-        if (isSnapshotRead) {
-            atClusterTime = computeAtClusterTimeForShards(opCtx, shardIds);
-            bool isSameShardIds = verifyTargetedShardsAtClusterTime(opCtx, shardIds, atClusterTime);
-            if (!isSameShardIds) {  // use the current clusterTime if chunks moved
-                atClusterTime = LogicalClock::get(opCtx)->getClusterTime();
-            }
-        }
+        invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
 
         // Don't need to split the pipeline if we are only targeting a single shard, unless:
         // - There is a stage that needs to be run on the primary shard and the single target shard
@@ -949,18 +928,10 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
     }
     auto shard = std::move(swShard.getValue());
 
-    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    bool isSnapshotRead(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
-    LogicalTime atClusterTime;
-    // TODO: SERVER-34074
-    if (isSnapshotRead) {
-        std::set<ShardId> shardIds = {shardId};
-        atClusterTime = computeAtClusterTimeForShards(opCtx, shardIds);
-        bool isSameShardIds = verifyTargetedShardsAtClusterTime(opCtx, shardIds, atClusterTime);
-        if (!isSameShardIds) {  // use the current clusterTime if chunks moved
-            atClusterTime = LogicalClock::get(opCtx)->getClusterTime();
-        }
-    }
+    // aggPassthrough is for unsharded collections since changing primary shardId will cause SSV
+    // error and hence shardId history does not need to be verified.
+    auto atClusterTime = computeAtClusterTimeForOneShard(opCtx, shardId);
+
 
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
