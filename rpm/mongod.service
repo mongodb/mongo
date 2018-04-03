@@ -7,7 +7,7 @@ Documentation=https://docs.mongodb.org/manual
 User=mongod
 Group=mongod
 Environment="OPTIONS=-f /etc/mongod.conf"
-ExecStart=/usr/bin/mongod $OPTIONS
+ExecStart=/usr/bin/mongod --fork --pidfilepath /var/run/mongodb/mongod.pid $OPTIONS
 ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
 ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
 ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
