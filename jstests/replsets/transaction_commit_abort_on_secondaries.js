@@ -22,8 +22,8 @@
 
     // Do an initial write so we have something to find.
     const initialDoc = {_id: 0};
-    assert.writeOK(
-        primary.getDB(dbName)[collName].insert(initialDoc, {writeConcern: {w: "majority"}}));
+    assert.writeOK(primary.getDB(dbName)[collName].insert(initialDoc));
+    rst.awaitLastOpCommitted();
 
     // Initiate a session on the secondary.
     const sessionOptions = {causalConsistency: false};
