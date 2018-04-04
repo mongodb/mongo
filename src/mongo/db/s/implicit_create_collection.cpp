@@ -36,6 +36,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
@@ -89,10 +90,16 @@ public:
         });
 
         try {
-            AutoGetCollection autoColl(opCtx, _ns, MODE_IS);
-            if (autoColl.getCollection() != nullptr) {
-                // Collection already created, no more work needs to be done.
-                return Status::OK();
+            // Take the DBLock and CollectionLock directly rather than using AutoGetCollection
+            // (which calls AutoGetDb) to avoid doing database and shard version checks.
+            Lock::DBLock dbLock(opCtx, _ns.db(), MODE_IS);
+            const auto db = dbHolder().get(opCtx, _ns.db());
+            if (db) {
+                Lock::CollectionLock collLock(opCtx->lockState(), _ns.ns(), MODE_IS);
+                if (db->getCollection(opCtx, _ns.ns())) {
+                    // Collection already created, no more work needs to be done.
+                    return Status::OK();
+                }
             }
         } catch (const DBException& ex) {
             return ex.toStatus();
