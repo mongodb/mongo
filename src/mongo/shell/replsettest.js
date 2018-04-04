@@ -1246,14 +1246,28 @@ var ReplSetTest = function(opts) {
     };
 
     this.getHashes = function(db) {
+        assert.neq(db, 'local', 'Cannot run getHashes() on the "local" database');
+
         this.getPrimary();
         var res = {};
-        res.master = this.liveNodes.master.getDB(db).runCommand("dbhash");
+
+        // If MapReduce is interrupted by a stepdown, it could still have 'tmp.mr' collections that
+        // it will not be able to delete. Excluding them from dbhash will prevent a mismatch.
+        // TODO SERVER-27147: no need to exclude 'tmp.mr' collections
+        var collections = this.liveNodes.master.getDB(db).getCollectionNames();
+        var colls_excluding_tmp_mr = collections.filter(coll => !coll.startsWith("tmp.mr."));
+        res.master = this.liveNodes.master.getDB(db).runCommand(
+            {dbhash: 1, collections: colls_excluding_tmp_mr});
         res.slaves = [];
         this.liveNodes.slaves.forEach(function(node) {
             var isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
             if (!isArbiter) {
-                var slaveRes = node.getDB(db).runCommand("dbhash");
+                collections = node.getDB(db).getCollectionNames();
+                colls_excluding_tmp_mr = collections.filter(coll => {
+                    return !coll.startsWith("tmp.mr.");
+                });
+                var slaveRes =
+                    node.getDB(db).runCommand({dbhash: 1, collections: colls_excluding_tmp_mr});
                 res.slaves.push(slaveRes);
             }
         });
@@ -1439,12 +1453,12 @@ var ReplSetTest = function(opts) {
                     continue;
                 }
 
-                var dbHashes = rst.getHashes(dbName);
-                var primaryDBHash = dbHashes.master;
-                var primaryCollections = Object.keys(primaryDBHash.collections);
-                assert.commandWorked(primaryDBHash);
-
                 try {
+                    var dbHashes = rst.getHashes(dbName);
+                    var primaryDBHash = dbHashes.master;
+                    var primaryCollections = Object.keys(primaryDBHash.collections);
+                    assert.commandWorked(primaryDBHash);
+
                     // Filter only collections that were retrieved by the dbhash. listCollections
                     // may include non-replicated collections like system.profile.
                     var primaryCollInfo =
