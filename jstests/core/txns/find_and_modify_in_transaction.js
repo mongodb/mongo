@@ -36,8 +36,7 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a non-matching find-and-modify with update.");
@@ -55,8 +54,7 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a matching find-and-modify with remove.");
@@ -74,8 +72,7 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 1}, {_id: 2, a: 2}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a matching find-and-modify with update, requesting the old doc.");
@@ -93,8 +90,7 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 101}, {_id: 2, a: 2}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a matching find-and-modify with update, requesting the new doc.");
@@ -113,8 +109,7 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 101}, {_id: 2, a: 102}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a matching find-and-modify with upsert, requesting the new doc.");
@@ -134,8 +129,7 @@
         sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 101}, {_id: 2, a: 202}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a non-matching find-and-modify with upsert, requesting the old doc.");
@@ -157,8 +151,7 @@
     }));
     assert.docEq(res.cursor.firstBatch, [{a: 103}]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 
     jsTest.log("Do a non-matching find-and-modify with upsert, requesting the new doc.");
@@ -178,7 +171,6 @@
         sessionDb.runCommand({find: collName, filter: {a: 204}, txnNumber: NumberLong(txnNumber)}));
     assert.docEq(res.cursor.firstBatch, [newdoc]);
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
+    assert.commandWorked(sessionDb.runCommand(
         {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
 }());

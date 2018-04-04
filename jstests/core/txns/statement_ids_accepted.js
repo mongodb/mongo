@@ -20,8 +20,7 @@
     let txnNumber = 0;
 
     jsTestLog("Check that abortTransaction accepts a statement ID");
-    // abortTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
@@ -42,8 +41,7 @@
     // The applyOps command is intentionally left out.
 
     jsTestLog("Check that commitTransaction accepts a statement ID");
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
@@ -156,8 +154,7 @@
     }));
 
     // Abort the transaction to release locks.
-    // abortTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
@@ -249,8 +246,7 @@
     }));
 
     jsTestLog("Check that prepareTransaction accepts a statement ID");
-    // prepareTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         prepareTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
@@ -271,8 +267,7 @@
 
     // Abort the last transaction because it appears the system stalls during shutdown if
     // a transaction is open.
-    // abortTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(1),

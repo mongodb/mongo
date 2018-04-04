@@ -29,8 +29,7 @@
         txnNumber: NumberLong(++txnNumber),
         autocommit: false
     }));
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }));
@@ -46,8 +45,7 @@
         autocommit: false
     }),
                                  ErrorCodes.NamespaceNotFound);
-    // commitTransaction can only be called on the admin database.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
+    assert.commandFailedWithCode(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }),
@@ -66,8 +64,7 @@
         txnNumber: NumberLong(++txnNumber),
         autocommit: false
     }));
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }));
@@ -83,8 +80,7 @@
         autocommit: false
     }),
                                  ErrorCodes.NamespaceNotFound);
-    // commitTransaction can only be called on the admin database.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
+    assert.commandFailedWithCode(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }),
@@ -99,8 +95,7 @@
         txnNumber: NumberLong(++txnNumber),
         autocommit: false
     }));
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }));
@@ -120,8 +115,7 @@
         txnNumber: NumberLong(++txnNumber),
         autocommit: false
     }));
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }));
@@ -139,8 +133,7 @@
         autocommit: false
     }),
                                  ErrorCodes.NamespaceNotFound);
-    // commitTransaction can only be called on the admin database.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
+    assert.commandFailedWithCode(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }),
@@ -156,8 +149,7 @@
         txnNumber: NumberLong(++txnNumber),
         autocommit: false
     }));
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }));

@@ -55,8 +55,7 @@
         txnNumber: NumberLong(txnNumber),
     }));
 
-    // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
+    assert.commandWorked(sessionDb.runCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
     }));
