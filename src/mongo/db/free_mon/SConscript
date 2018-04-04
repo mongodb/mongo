@@ -34,8 +34,7 @@ if get_option("enable-free-mon") == "on":
         source=[
             'free_mon_mongod.cpp',
             'free_mon_options.cpp',
-            'http_client_curl.cpp',
-            #'http_client_curl.cpp' if not env.TargetOSIs('windows') else 'http_client_winhttp.cpp',
+            'http_client_curl.cpp' if not env.TargetOSIs('windows') else 'http_client_winhttp.cpp',
         ],
         LIBDEPS=[
             'free_mon',
@@ -46,8 +45,7 @@ if get_option("enable-free-mon") == "on":
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         ],
         SYSLIBDEPS=[
-            'libcurld' if env.TargetOSIs('windows') else 'curl',
-    #        'winhttp' if env.TargetOSIs('windows') else 'curl',
+            'winhttp' if env.TargetOSIs('windows') else 'curl',
         ],
     )
 else:
