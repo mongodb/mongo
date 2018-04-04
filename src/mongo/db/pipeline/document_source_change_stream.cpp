@@ -34,6 +34,7 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_path_support.h"
@@ -395,6 +396,14 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+
+    // Prevent $changeStream from running on an entire database (or cluster-wide) unless we are in
+    // test mode.
+    // TODO SERVER-34283: remove once whole-database $changeStream is feature-complete.
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "Running $changeStream on an entire database or cluster is not permitted unless the "
+            "deployment is in test mode.",
+            !(expCtx->ns.isCollectionlessAggregateNS() && !getTestCommandsEnabled()));
 
     // Change stream on an entire database is a new 4.0 feature.
     uassert(ErrorCodes::QueryFeatureNotAllowed,

@@ -225,6 +225,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
