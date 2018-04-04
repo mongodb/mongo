@@ -6075,7 +6075,6 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_mmapv1
       --excludeWithAnyTags=SERVER-34286
-    tooltags: "-tags 'ssl sasl'"
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -6088,6 +6087,8 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: enterprise
     scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -6149,7 +6150,6 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=requires_mmapv1
       --excludeWithAnyTags=SERVER-34286
-    tooltags: "-tags 'ssl'"
     push_path: linux
     push_bucket: downloads.mongodb.org
     push_name: linux
@@ -6165,6 +6165,8 @@ buildvariants:
     repo_edition: org
     scons_cache_scope: shared
     shared_scons_pruning: true
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags 'ssl'"
     build_mongoreplay: true
   tasks:
   - name: compile
