@@ -30,5 +30,37 @@ var RetryableWritesUtil = (function() {
         return !kStorageEnginesWithoutDocumentLocking.has(storageEngineName);
     }
 
-    return {isRetryableCode, isRetryableWriteCmdName, storageEngineSupportsRetryableWrites};
+    /**
+     * Asserts the connection has a document in its transaction collection that has the given
+     * sessionId, txnNumber, and lastWriteOptimeTs.
+     */
+    function checkTransactionTable(conn, lsid, txnNumber, ts) {
+        let table = conn.getDB("config").transactions;
+        let res = table.findOne({"_id.id": lsid.id});
+
+        assert.eq(res.txnNum, txnNumber);
+        assert.eq(res.lastWriteOpTime.ts, ts);
+    }
+
+    /**
+     * Asserts the transaction collection document for the given session id is the same on both
+     * connections.
+     */
+    function assertSameRecordOnBothConnections(primary, secondary, lsid) {
+        let primaryRecord = primary.getDB("config").transactions.findOne({"_id.id": lsid.id});
+        let secondaryRecord = secondary.getDB("config").transactions.findOne({"_id.id": lsid.id});
+
+        assert.eq(bsonWoCompare(primaryRecord, secondaryRecord),
+                  0,
+                  "expected transaction records: " + tojson(primaryRecord) + " and " +
+                      tojson(secondaryRecord) + " to be the same for lsid: " + tojson(lsid));
+    }
+
+    return {
+        isRetryableCode,
+        isRetryableWriteCmdName,
+        storageEngineSupportsRetryableWrites,
+        checkTransactionTable,
+        assertSameRecordOnBothConnections,
+    };
 })();

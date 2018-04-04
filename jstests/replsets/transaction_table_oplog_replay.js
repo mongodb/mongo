@@ -12,32 +12,6 @@
     }
 
     /**
-     * Asserts the connection has a document in its transaction collection that has the given
-     * sessionId, txnNumber, and lastWriteOptimeTs.
-     */
-    function checkTransactionTable(conn, lsid, txnNumber, ts) {
-        let table = conn.getDB("config").transactions;
-        let res = table.findOne({"_id.id": lsid.id});
-
-        assert.eq(res.txnNum, txnNumber);
-        assert.eq(res.lastWriteOpTime.ts, ts);
-    }
-
-    /**
-     * Asserts the transaction collection document for the given session id is the same on both
-     * connections.
-     */
-    function assertSameRecordOnBothConnections(primary, secondary, lsid) {
-        let primaryRecord = primary.getDB("config").transactions.findOne({"_id.id": lsid.id});
-        let secondaryRecord = secondary.getDB("config").transactions.findOne({"_id.id": lsid.id});
-
-        assert.eq(bsonWoCompare(primaryRecord, secondaryRecord),
-                  0,
-                  "expected transaction records: " + tojson(primaryRecord) + " and " +
-                      tojson(secondaryRecord) + " to be the same for lsid: " + tojson(lsid));
-    }
-
-    /**
      * Runs each command on the primary, awaits replication then asserts the secondary's transaction
      * collection has been updated to store the latest txnNumber and lastWriteOpTimeTs for each
      * sessionId.
@@ -51,7 +25,7 @@
             let res = assert.commandWorked(primary.getDB("test").runCommand(cmd));
             let opTime = (res.opTime.ts ? res.opTime.ts : res.opTime);
 
-            checkTransactionTable(primary, cmd.lsid, cmd.txnNumber, opTime);
+            RetryableWritesUtil.checkTransactionTable(primary, cmd.lsid, cmd.txnNumber, opTime);
             responseTimestamps.push(opTime);
         });
 
@@ -59,12 +33,13 @@
         secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
         replTest.awaitReplication();
         cmds.forEach(function(cmd, i) {
-            checkTransactionTable(secondary, cmd.lsid, cmd.txnNumber, responseTimestamps[i]);
+            RetryableWritesUtil.checkTransactionTable(
+                secondary, cmd.lsid, cmd.txnNumber, responseTimestamps[i]);
         });
 
         // Both nodes should have the same transaction collection record for each sessionId.
         cmds.forEach(function(cmd) {
-            assertSameRecordOnBothConnections(primary, secondary, cmd.lsid);
+            RetryableWritesUtil.assertSameRecordOnBothConnections(primary, secondary, cmd.lsid);
         });
     }
 
@@ -83,7 +58,7 @@
             let res = assert.commandWorked(primary.getDB("test").runCommand(cmd));
             let opTime = (res.opTime.ts ? res.opTime.ts : res.opTime);
 
-            checkTransactionTable(primary, cmd.lsid, cmd.txnNumber, opTime);
+            RetryableWritesUtil.checkTransactionTable(primary, cmd.lsid, cmd.txnNumber, opTime);
             latestOpTimeTs = opTime;
             highestTxnNumber =
                 (cmd.txnNumber > highestTxnNumber ? cmd.txnNumber : highestTxnNumber);
@@ -93,10 +68,11 @@
         // highest transaction number and the latest write optime.
         secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
         replTest.awaitReplication();
-        checkTransactionTable(secondary, cmds[0].lsid, highestTxnNumber, latestOpTimeTs);
+        RetryableWritesUtil.checkTransactionTable(
+            secondary, cmds[0].lsid, highestTxnNumber, latestOpTimeTs);
 
         // Both nodes should have the same transaction collection record for the sessionId.
-        assertSameRecordOnBothConnections(primary, secondary, cmds[0].lsid);
+        RetryableWritesUtil.assertSameRecordOnBothConnections(primary, secondary, cmds[0].lsid);
     }
 
     const replTest = new ReplSetTest({nodes: 2});
