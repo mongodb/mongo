@@ -390,6 +390,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << "file_manager=(close_idle_time=100000),";  //~28 hours, will put better fix in 3.1.x
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
         ss << "verbose=(recovery_progress),";
+
+        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
+                      logger::LogSeverity::Debug(2))) {
+            ss << "verbose=(recovery),";
+        }
     }
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig("system");
