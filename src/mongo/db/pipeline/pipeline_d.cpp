@@ -749,7 +749,7 @@ std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
         return {"_id"};  // Nothing is sharded.
     }
 
-    auto scm = [this, opCtx, &nss]() -> ScopedCollectionMetadata {
+    auto scm = [opCtx, &nss]() -> ScopedCollectionMetadata {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();

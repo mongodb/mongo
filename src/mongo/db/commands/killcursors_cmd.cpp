@@ -50,7 +50,7 @@ public:
 private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
         auto opCtx = client->getOperationContext();
-        const auto check = [client, opCtx, id](CursorManager* manager) {
+        const auto check = [opCtx, id](CursorManager* manager) {
             return manager->checkAuthForKillCursors(opCtx, id);
         };
 

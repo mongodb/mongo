@@ -339,7 +339,7 @@ private:
 
                 MsgData::View msgView(buffer.get());
                 return read(asio::buffer(msgView.data(), msgView.dataLen()))
-                    .then([ buffer = std::move(buffer), msgLen, this ](size_t size) mutable {
+                    .then([ buffer = std::move(buffer), msgLen ](size_t size) mutable {
                         networkCounter.hitPhysicalIn(msgLen);
                         return Message(std::move(buffer));
                     });
