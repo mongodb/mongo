@@ -74,6 +74,7 @@ void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
 struct ActiveTransactionHistory {
     boost::optional<SessionTxnRecord> lastTxnRecord;
     Session::CommittedStatementTimestampMap committedStatements;
+    bool transactionCommitted{false};
     bool hasIncompleteHistory{false};
 };
 
@@ -121,6 +122,12 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                            *entry.getStatementId(),
                                            existingOpTime,
                                            entry.getOpTime());
+            }
+
+            // applyOps oplog entry marks the commit of a transaction.
+            if (entry.isCommand() &&
+                entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
+                result.transactionCommitted = true;
             }
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
@@ -260,6 +267,9 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
                 _activeTxnNumber = _lastWrittenSessionRecord->getTxnNum();
                 _activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
                 _hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;
+                if (activeTxnHistory.transactionCommitted) {
+                    _txnState = MultiDocumentTransactionState::kCommitted;
+                }
             }
 
             break;
