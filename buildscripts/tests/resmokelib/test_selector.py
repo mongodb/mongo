@@ -109,7 +109,8 @@ class MockTestFileExplorer(object):
     def __init__(self):
         self.files = [
             "dir/subdir1/test11.js", "dir/subdir1/test12.js", "dir/subdir2/test21.js",
-            "dir/subdir3/a/test3a1.js", "build/testA", "build/testB", "build/testC", "dbtest"
+            "dir/subdir3/a/test3a1.js", "build/testA", "build/testB", "build/testC", "dbtest",
+            "dbtest.exe"
         ]
         self.tags = {
             "dir/subdir1/test11.js": ["tag1", "tag2"], "dir/subdir1/test12.js": ["tag3"],
@@ -523,7 +524,3 @@ class TestFilterTests(unittest.TestCase):
         selected, excluded = selector.filter_tests("db_test", config, self.test_file_explorer)
         self.assertEqual(["dbtestB"], selected)
         self.assertEqual(["dbtestA", "dbtestC"], excluded)
-
-
-if __name__ == "__main__":
-    unittest.main()

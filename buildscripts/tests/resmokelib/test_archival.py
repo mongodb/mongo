@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """ Unit tests for archival. """
 
 from __future__ import absolute_import
@@ -241,7 +240,3 @@ class ArchivalLimitTests(ArchivalTestCase):
         status, message = self.archive.archive_files_to_s3(display_name, temp_file, self.bucket,
                                                            s3_path)
         self.assertEqual(1, status, message)
-
-
-if __name__ == "__main__":
-    unittest.main()

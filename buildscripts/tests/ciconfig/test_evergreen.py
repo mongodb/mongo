@@ -192,7 +192,3 @@ class TestVariant(unittest.TestCase):
         resmoke_task = variant_debian.get_task("resmoke_task")
         self.assertEqual("--suites=somesuite --storageEngine=mmapv1",
                          resmoke_task.combined_resmoke_args)
-
-
-if __name__ == "__main__":
-    unittest.main()

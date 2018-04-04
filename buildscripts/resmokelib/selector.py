@@ -568,6 +568,14 @@ class _SleepTestCaseSelector(_Selector):
         _Selector.__init__(self, test_file_explorer, tests_are_files=False)
 
 
+class _PyTestCaseSelectorConfig(_SelectorConfig):
+    """_SelectorConfig subclass for py_test tests."""
+
+    def __init__(self, roots, include_files=None, exclude_files=None):
+        _SelectorConfig.__init__(self, roots=roots, include_files=include_files,
+                                 exclude_files=exclude_files)
+
+
 ##########################################
 # Module entry point for filtering tests #
 ##########################################
@@ -582,6 +590,7 @@ _SELECTOR_REGISTRY = {
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
+    "py_test": (_PyTestCaseSelectorConfig, _Selector),
     "sleep_test": (_SleepTestCaseSelectorConfig, _SleepTestCaseSelector),
 }
 

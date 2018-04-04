@@ -444,7 +444,3 @@ class RemoteOperation(RemoteOperationsTestCase):
 
         # Invalid operation
         self.assertRaises(ValueError, lambda: self.rop.operation("invalid", None))
-
-
-if __name__ == "__main__":
-    unittest.main()

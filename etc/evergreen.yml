@@ -4524,6 +4524,16 @@ tasks:
   - func: "do setup"
   - func: "run idl tests"
 
+- name: buildscripts_test
+  depends_on: []
+  commands:
+  - func: "git get project"
+  - func: "get buildnumber"
+  - func: "set up credentials"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=buildscripts_test
+
 - name: package
   depends_on:
   - name: compile
@@ -6408,6 +6418,7 @@ buildvariants:
   - name: auth_audit
   - name: benchmarks_orphaned
   - name: benchmarks_sharding
+  - name: buildscripts_test
   - name: dbtest
   - name: ese
   - name: external_auth
@@ -7215,6 +7226,7 @@ buildvariants:
   - name: benchmarks_sharding
     distros:
     - centos6-perf
+  - name: buildscripts_test
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_passthrough
   - name: causally_consistent_jscore_passthrough_auth

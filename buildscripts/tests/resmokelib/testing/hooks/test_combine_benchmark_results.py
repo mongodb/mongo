@@ -151,7 +151,3 @@ class TestBenchmarkThreadsReport(CombineBenchmarkResultsFixture):
         self.assertEqual(len(report.keys()), 1)
         self.assertIn("1", report.keys())
         self.assertNotIn("1_mean", report.keys())
-
-
-if __name__ == "__main__":
-    unittest.main()
