@@ -188,7 +188,7 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
 
     const bool primaryDraining = (drainingCount > 0);
     auto getPrimaryOrFirstNonDrainingShard =
-        [&opCtx, primaryShardId, &shardIds, primaryDraining]() {
+        [&opCtx, primaryShardId, primaryDraining]() {
             if (primaryDraining) {
                 vector<ShardId> allShardIds;
                 Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
