@@ -232,7 +232,7 @@ public:
     /**
      * Transfers management of transaction resources from the Session to the OperationContext.
      */
-    void unstashTransactionResources(OperationContext* opCtx);
+    void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
 
     /**
      * Commits the transaction, including committing the write unit of work and updating

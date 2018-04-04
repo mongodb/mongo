@@ -253,6 +253,7 @@ error_code("ReentrancyNotAllowed", 252)
 error_code("FreeMonHttpInFlight", 253)
 error_code("FreeMonHttpTemporaryFailure", 254)
 error_code("FreeMonHttpPermanentFailure", 255)
+error_code("TransactionCommitted", 256)
 
 # Error codes 4000-8999 are reserved.
 
