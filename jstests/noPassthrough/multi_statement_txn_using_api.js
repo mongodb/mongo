@@ -23,40 +23,56 @@
     const sessionDb = session.getDatabase(dbName);
 
     jsTestLog("Start transaction");
-    session.startTransaction();
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
-    jsTestLog("Insert a doc within the transaction");
+    // Performing a read first should work when snapshot readConcern is specified.
+    assert.docEq(null, sessionDb.coll.findOne({_id: "insert-1"}));
+
+    // Insert a doc within the transaction.
     assert.commandWorked(sessionDb.coll.insert({_id: "insert-1", a: 0}));
 
-    jsTestLog("Insert a 2nd within the same transaction");
+    // Insert a 2nd doc within the same transaction.
     assert.commandWorked(sessionDb.coll.insert({_id: "insert-2", a: 0}));
 
-    jsTestLog("Insert a 3nd within the same transaction");
+    // Insert a 3rd doc within the same transaction.
     assert.commandWorked(sessionDb.coll.insert({_id: "insert-3", a: 0}));
 
-    jsTestLog("Update a document in the same transaction");
+    // Update a document in the same transaction.
     assert.commandWorked(sessionDb.coll.update({_id: "insert-1"}, {$inc: {a: 1}}));
 
-    jsTestLog("Delete a document in the same transaction");
+    // Delete a document in the same transaction.
     assert.commandWorked(sessionDb.coll.deleteOne({_id: "insert-2"}));
 
-    jsTestLog("Try to find and modify a document within a transaction");
+    // Try to find and modify a document within a transaction.
     sessionDb.coll.findAndModify(
         {query: {_id: "insert-3"}, update: {$set: {_id: "insert-3", a: 2}}});
 
-    jsTestLog("Try to find a document within a transaction.");
+    // Try to find a document within a transaction.
     let cursor = sessionDb.coll.find({_id: "insert-1"});
     assert.docEq({_id: "insert-1", a: 1}, cursor.next());
 
-    jsTestLog("Try to find a document using findOne within a transaction.");
+    // Try to find a document using findOne within a transaction
     assert.eq({_id: "insert-1", a: 1}, sessionDb.coll.findOne({_id: "insert-1"}));
 
     jsTestLog("Committing transaction.");
     session.commitTransaction();
 
+    // Make sure the correct documents exist after committing the transaciton.
     assert.eq({_id: "insert-1", a: 1}, sessionDb.coll.findOne({_id: "insert-1"}));
     assert.eq({_id: "insert-3", a: 2}, sessionDb.coll.findOne({_id: "insert-3"}));
     assert.eq(null, sessionDb.coll.findOne({_id: "insert-2"}));
+
+    jsTestLog("Start second transaction");
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+
+    // Insert a doc within the transaction.
+    assert.commandWorked(sessionDb.coll.insert({_id: "insert-4", a: 0}));
+
+    jsTestLog("Aborting transaction.");
+    session.abortTransaction();
+
+    // Verify that we cannot see the document we tried to insert.
+    assert.eq(null, sessionDb.coll.findOne({_id: "insert-4"}));
 
     session.endSession();
     rst.stopSet();
