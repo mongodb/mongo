@@ -2047,6 +2047,9 @@ Examples:
     orig_canary_doc = canary_doc = ""
     validate_canary_cmd = ""
 
+    # Set the Pymongo connection timeout to 1 hour for canary insert & validation.
+    one_hour_ms = 60 * 60 * 1000
+
     # The remote mongod host comes from the ssh_user_host,
     # which may be specified as user@host.
     ssh_user, ssh_host = get_user_host(options.ssh_user_host)
@@ -2187,8 +2190,6 @@ Examples:
 
         # Optionally validate canary document locally.
         if validate_canary_local:
-            # Increase the Pymongo connection timeout to 1 hour.
-            one_hour_ms = 60 * 60 * 1000
             mongo = pymongo.MongoClient(**get_mongo_client_args(
                 host=mongod_host, port=secret_port, serverSelectionTimeoutMS=one_hour_ms,
                 socketTimeoutMS=one_hour_ms))
@@ -2278,8 +2279,9 @@ Examples:
         if options.canary:
             canary_doc = {"x": time.time()}
             orig_canary_doc = copy.deepcopy(canary_doc)
-            mongo = pymongo.MongoClient(**get_mongo_client_args(host=mongod_host,
-                                                                port=standard_port))
+            mongo = pymongo.MongoClient(**get_mongo_client_args(
+                host=mongod_host, port=standard_port, serverSelectionTimeoutMS=one_hour_ms,
+                socketTimeoutMS=one_hour_ms))
             crash_canary["function"] = mongo_insert_canary
             crash_canary["args"] = [mongo, options.db_name, options.collection_name, canary_doc]
         ret, output = crash_server(options, crash_canary, standard_port, local_ops, script_name,
