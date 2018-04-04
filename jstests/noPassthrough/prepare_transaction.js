@@ -48,9 +48,9 @@
     assert.commandWorked(res);
     assert.docEq([doc1], res.cursor.firstBatch);
 
-    // Run prepare, which immediately runs abort afterwards.
+    // Run prepare on the admin db, which immediately runs abort afterwards.
     assert.commandWorked(
-        sessionDB.runCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
 
     // The insert should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the insert is not visible.
@@ -84,9 +84,9 @@
     assert.commandWorked(res);
     assert.docEq([doc2], res.cursor.firstBatch);
 
-    // Run prepare, which immediately runs abort afterwards.
+    // Run prepare on the admin db, which immediately runs abort afterwards.
     assert.commandWorked(
-        sessionDB.runCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
 
     // The update should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the update is not visible.
@@ -121,9 +121,9 @@
     assert.commandWorked(res);
     assert.docEq([], res.cursor.firstBatch);
 
-    // Run prepare.
+    // Run prepare on the admin db.
     assert.commandWorked(
-        sessionDB.runCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
 
     // The delete should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the document is still visible.

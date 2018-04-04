@@ -39,7 +39,7 @@
             "txnNumber: NumberLong(" + txn + ")," + "readConcern: {level: 'snapshot'}," +
             "autocommit: false" + "}));";
         // Run prepare, which blocks until the failpoint is unset.
-        command += "assert.commandWorked(sessionDB.runCommand(" +
+        command += "assert.commandWorked(sessionDB.adminCommand(" +
             "{prepareTransaction: 1, txnNumber: NumberLong(" + txn + ")}))";
 
         return startParallelShell(command, conn.port);
