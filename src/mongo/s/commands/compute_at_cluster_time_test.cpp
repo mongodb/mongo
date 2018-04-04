@@ -51,11 +51,6 @@ const HostAndPort shardOne("shardOne:1234");
 const ShardId shardTwoId("shardTwo");
 const HostAndPort shardTwo("shardTwo:1234");
 
-const NamespaceString kNss = NamespaceString("test", "coll");
-const BSONObj kEmptyQuery;
-const BSONObj kEmptyCollation;
-const LogicalTime kInMemoryLogicalTime(Timestamp(3, 1));
-
 class AtClusterTimeTest : public ShardingTestFixture {
 protected:
     void setUp() {
@@ -66,14 +61,6 @@ protected:
         shardInfos.push_back(std::make_tuple(shardTwoId, shardTwo));
 
         ShardingTestFixture::addRemoteShards(shardInfos);
-
-        repl::ReadConcernArgs::get(operationContext()) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-
-        // Set up a logical clock with an initial time.
-        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
-        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
-        LogicalClock::set(serviceContext(), std::move(logicalClock));
     }
 };
 
@@ -88,9 +75,8 @@ TEST_F(AtClusterTimeTest, ComputeValidValid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(
-        operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT_EQ(*maxTime, timeTwo);
+    auto maxTime = computeAtClusterTimeForShards(operationContext(), {shardOneId, shardTwoId});
+    ASSERT_EQ(maxTime, timeTwo);
 }
 
 TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
@@ -102,9 +88,8 @@ TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
     shardTwo->updateLastCommittedOpTime(timeTwo);
     ASSERT_EQ(timeTwo, shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(
-        operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT_EQ(*maxTime, timeTwo);
+    auto maxTime = computeAtClusterTimeForShards(operationContext(), {shardOneId, shardTwoId});
+    ASSERT_EQ(maxTime, timeTwo);
 }
 
 TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
@@ -114,11 +99,11 @@ TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
     auto shardTwo = shardRegistry()->getShardNoReload(shardTwoId);
     ASSERT_EQ(LogicalTime(), shardTwo->getLastCommittedOpTime());
 
-    auto maxTime = computeAtClusterTime(
-        operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
+    auto maxTime = computeAtClusterTimeForShards(operationContext(), {shardOneId, shardTwoId});
+    ASSERT_EQ(maxTime, LogicalTime());
 }
 
+const NamespaceString kNss = NamespaceString("test", "coll");
 
 class AtClusterTimeTargetingTest : public CatalogCacheTestFixture {
 protected:
@@ -128,50 +113,36 @@ protected:
 
         // Set up a logical clock with an initial time.
         auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
-        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
+        LogicalTime initialTime(Timestamp(10, 1));
+        logicalClock->setClusterTimeFromTrustedSource(initialTime);
         LogicalClock::set(serviceContext(), std::move(logicalClock));
     }
 };
 
-// Verifies that the latest in-memory logical time is returned when one shard lastCommittedOpTime on
-// one shard is not initialized.
-TEST_F(AtClusterTimeTargetingTest, ReturnsLatestInMemoryTime) {
+// Verifies that the latest in-memory logical time is always returned.
+//
+// TODO SERVER-33767: Once the multi-versioned routing table is integrated into global snapshot
+// reads, replace this test with one that verifies the latest known committed optime for the
+// targeted shards is returned, unless different shards would be targeted at that time, in which
+// case the latest in-memory logical time is returned.
+TEST_F(AtClusterTimeTargetingTest, AlwaysReturnsLatestInMemoryTime) {
     auto routingInfo = loadRoutingTableWithTwoChunksAndTwoShards(kNss);
     auto query = BSON("find" << kNss.coll());
     auto collation = BSONObj();
     auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
 
-    LogicalTime time(Timestamp(2, 1));
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    LogicalTime time(Timestamp(5, 1));
     shardRegistry()->getShardNoReload(ShardId("0"))->updateLastCommittedOpTime(time);
 
-    ASSERT_LT(time, kInMemoryLogicalTime);
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    ASSERT_EQ(kInMemoryLogicalTime,
-              *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
-}
-
-// Verifies that the greatest logical time is returned when all shard's lastCommittedOpTime values
-// are initialized.
-TEST_F(AtClusterTimeTargetingTest, ReturnsLatestTimeFromShard) {
-    auto routingInfo = loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-    auto query = BSON("find" << kNss.coll());
-    auto collation = BSONObj();
-    auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
-
-    LogicalTime time1(Timestamp(2, 1));
-    shardRegistry()->getShardNoReload(ShardId("0"))->updateLastCommittedOpTime(time1);
-
-    LogicalTime time2(Timestamp(4, 1));
-    shardRegistry()->getShardNoReload(ShardId("1"))->updateLastCommittedOpTime(time2);
-
-    ASSERT_LT(time1, kInMemoryLogicalTime);
-    ASSERT_GT(time2, kInMemoryLogicalTime);
-
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    ASSERT_EQ(time2,
-              *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    // The latest lastCommittedOpTime for a targeted shard should be ignored, with the latest
+    // in-memory logical time returned instead.
+    ASSERT_NE(time,
+              *computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
+    ASSERT_EQ(LogicalClock::get(operationContext())->getClusterTime(),
+              *computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 }
 
 // Verifies that a null logical time is returned for all requests without snapshot readConcern.
@@ -182,25 +153,25 @@ TEST_F(AtClusterTimeTargetingTest, NonSnapshotReadConcern) {
     auto shards = getTargetedShardsForQuery(operationContext(), routingInfo, query, collation);
 
     // Uninitialized read concern.
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
 
     // Local readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 
     // Majority readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 
     // Linearizable readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLinearizableReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 
     // Available readConcern.
     readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kAvailableReadConcern);
-    ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_FALSE(computeAtClusterTime(operationContext(), routingInfo, shards, query, collation));
 }
 
 }  // namespace

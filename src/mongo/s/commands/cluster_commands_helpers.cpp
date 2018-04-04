@@ -557,31 +557,8 @@ BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atC
     return readConcernBob.obj();
 }
 
-boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* opCtx,
-                                                             const ShardId& shardId) {
-
-    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
-        repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return boost::none;
-    }
-
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    invariant(shardRegistry);
-    return shardRegistry->getShardNoReload(shardId)->getLastCommittedOpTime();
-}
-
-boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
-                                                  bool mustRunOnAll,
-                                                  const std::set<ShardId>& shardIds,
-                                                  const NamespaceString& nss,
-                                                  const BSONObj query,
-                                                  const BSONObj collation) {
-
-    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
-        repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return boost::none;
-    }
-
+LogicalTime computeAtClusterTimeForShards(OperationContext* opCtx,
+                                          const std::set<ShardId>& shardIds) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     invariant(shardRegistry);
     LogicalTime highestTime;
@@ -590,36 +567,9 @@ boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
             shardRegistry->getShardNoReload(shardId)->getLastCommittedOpTime();
         if (lastCommittedOpTime > highestTime) {
             highestTime = lastCommittedOpTime;
-        } else if (lastCommittedOpTime == LogicalTime::kUninitialized) {
-            // Use current cluster time if at least one of targeted shards does not have the
-            // accurate lastCommittedOpTime.
-            highestTime = LogicalClock::get(opCtx)->getClusterTime();
         }
     }
-
-    // mustRunOnAll is also used in tests to bypass getting the routing table when it is not a part
-    // of the fixture.
-    if (mustRunOnAll) {
-        return highestTime;
-    }
-
-    auto routingInfo = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoAt(
-        opCtx, nss, highestTime.asTimestamp()));
-
-    const auto cm = routingInfo.cm();
-    if (!cm) {  // The collection is unsharded and received the primary shardId.
-        return highestTime;
-    }
-
-    // Verify that the at the highestTime the shardIds were the same. If any of the targeted
-    // chunks have been migrated since the highestTime the query may return false empty results.
-    std::set<ShardId> shardIdsAt = {};
-    cm->getShardIdsForQuery(opCtx, query, collation, &shardIdsAt);
-    if (shardIds == shardIdsAt) {
-        return highestTime;
-    }
-
-    return LogicalClock::get(opCtx)->getClusterTime();
+    return highestTime;
 }
 
 std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
@@ -636,6 +586,20 @@ std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
 
     // The collection is unsharded. Target only the primary shard for the database.
     return {routingInfo.db().primaryId()};
+}
+
+boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
+                                                  const CachedCollectionRoutingInfo& routingInfo,
+                                                  const std::set<ShardId>& shardIds,
+                                                  const BSONObj& query,
+                                                  const BSONObj& collation) {
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
+        repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return boost::none;
+    }
+
+    // TODO SERVER-33767: Integrate multi-versioned routing table into atClusterTime selection.
+    return LogicalClock::get(opCtx)->getClusterTime();
 }
 
 }  // namespace mongo

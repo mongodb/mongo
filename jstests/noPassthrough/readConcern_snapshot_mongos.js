@@ -102,10 +102,6 @@
         txnNumber: NumberLong(txnNumber++)
     }));
 
-    // readConcern 'snapshot' is supported by find on mongos.
-    assert.commandWorked(sessionDb.runCommand(
-        {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
-
     assert.commandWorked(sessionDb.coll.insert({}, {w: 2}));
     assert.commandWorked(coll.createIndex({geo: "2d"}));
     assert.commandWorked(coll.createIndex({haystack: "geoHaystack", a: 1}, {bucketSize: 1}));
@@ -120,6 +116,11 @@
         txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.InvalidOptions);
+
+    // readConcern 'snapshot' is supported by find on mongos.
+    assert.commandWorked(sessionDb.runCommand(
+        {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
+
     // TODO SERVER-33709: Add snapshot support for cluster count on mongos.
     assert.commandFailedWithCode(sessionDb.runCommand({
         count: collName,

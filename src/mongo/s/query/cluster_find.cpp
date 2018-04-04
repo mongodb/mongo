@@ -230,13 +230,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Determine atClusterTime for snapshot reads. This will be a null time for requests with any
     // other readConcern.
     auto atClusterTime = computeAtClusterTime(opCtx,
-                                              false,
+                                              routingInfo,
                                               shardIds,
-                                              query.nss(),
                                               query.getQueryRequest().getFilter(),
                                               query.getQueryRequest().getCollation());
 
-    invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
     // Construct the query and parameters.
 
     ClusterClientCursorParams params(query.nss(), readPref);
