@@ -664,9 +664,6 @@ var {
                 if (_txnOptions.getTxnReadConcern() !== undefined) {
                     cmdObjUnwrapped.readConcern = _txnOptions.getTxnReadConcern();
                 }
-                if (_txnOptions.getTxnWriteConcern() !== undefined) {
-                    cmdObjUnwrapped.writeConcern = _txnOptions.getTxnWriteConcern();
-                }
                 _firstStatement = false;
             }
 
@@ -694,7 +691,11 @@ var {
         };
 
         const endTransaction = (commandName, driverSession) => {
-            const cmd = {[commandName]: 1, txnNumber: NumberLong(_txnNumber)};
+            let cmd = {[commandName]: 1, txnNumber: NumberLong(_txnNumber)};
+            // writeConcern should only be specified on commit or abort
+            if (_txnOptions.getTxnWriteConcern() !== undefined) {
+                cmd.writeConcern = _txnOptions.getTxnWriteConcern();
+            }
             // run command against the admin database.
             const res = this.client.runCommand(driverSession, "admin", cmd, 0);
             _txnState = ServerSession.TransactionStates.kInactive;
