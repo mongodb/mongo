@@ -73,8 +73,18 @@ public:
     class AppenderHandle {
         friend class LogDomain;
 
+        static const size_t invalid_handle = (size_t)-1;
+
     public:
-        AppenderHandle() {}
+        AppenderHandle() : _index(invalid_handle) {}
+
+        explicit operator bool() const noexcept {
+            return _index != invalid_handle;
+        }
+
+        void reset() {
+            _index = invalid_handle;
+        }
 
     private:
         explicit AppenderHandle(size_t index) : _index(index) {}

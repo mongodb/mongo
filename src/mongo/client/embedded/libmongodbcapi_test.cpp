@@ -467,7 +467,38 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::serverGlobalParams.noUnixSocket = true;
     ::mongo::unittest::setupTestLogger();
 
+    // Check so we can initialize the library without providing init params
     int init = libmongodbcapi_init(nullptr);
+    if (init != LIBMONGODB_CAPI_SUCCESS) {
+        std::cerr << "libmongodbcapi_init() failed with " << init << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    int fini = libmongodbcapi_fini();
+    if (fini != LIBMONGODB_CAPI_SUCCESS) {
+        std::cerr << "libmongodbcapi_fini() failed with " << fini << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // Initialize the library with a log callback and test so we receive at least one callback
+    // during the lifetime of the test
+    libmongodbcapi_init_params params;
+    memset(&params, 0, sizeof(params));
+
+    bool receivedCallback = false;
+    params.log_flags = LIBMONGODB_CAPI_LOG_STDOUT | LIBMONGODB_CAPI_LOG_CALLBACK;
+    params.log_callback = [](void* user_data,
+                             const char* message,
+                             const char* component,
+                             const char* context,
+                             int severety) {
+        ASSERT(message);
+        ASSERT(component);
+        *reinterpret_cast<bool*>(user_data) = true;
+    };
+    params.log_user_data = &receivedCallback;
+
+    init = libmongodbcapi_init(&params);
     if (init != LIBMONGODB_CAPI_SUCCESS) {
         std::cerr << "libmongodbcapi_init() failed with " << init << std::endl;
         return EXIT_FAILURE;
@@ -475,11 +506,13 @@ int main(int argc, char** argv, char** envp) {
 
     ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 
-    int fini = libmongodbcapi_fini();
+    fini = libmongodbcapi_fini();
     if (fini != LIBMONGODB_CAPI_SUCCESS) {
         std::cerr << "libmongodbcapi_fini() failed with " << fini << std::endl;
         return EXIT_FAILURE;
     }
+
+    ASSERT(receivedCallback);
 
     globalTempDir.reset();
 }

@@ -1,4 +1,4 @@
-/*    Copyright 2013 10gen Inc.
+/*    Copyright 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,67 +27,51 @@
 
 #pragma once
 
-#include <string>
+#include <functional>
+#include <sstream>
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/logger/component_message_log_domain.h"
-#include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/base/status.h"
+#include "mongo/logger/appender.h"
+#include "mongo/logger/encoder.h"
 
 namespace mongo {
-namespace logger {
+namespace embedded {
 
 /**
- * Container for managing log domains.
- *
- * Use this while setting up the logging system, before launching any threads.
+ * Appender for writing to callbacks registered with the embedded C API.
  */
-class LogManager {
-    MONGO_DISALLOW_COPYING(LogManager);
+template <typename Event>
+class EmbeddedLogAppender : public logger::Appender<Event> {
+    EmbeddedLogAppender(EmbeddedLogAppender const&) = delete;
+    EmbeddedLogAppender& operator=(EmbeddedLogAppender const&) = delete;
 
 public:
-    LogManager();
-    ~LogManager();
+    typedef logger::Encoder<Event> EventEncoder;
 
-    /**
-     * Gets the global domain for this manager.  It has no name.
-     * Will attach a default console log appender.
-     */
-    ComponentMessageLogDomain* getGlobalDomain() {
-        return &_globalDomain;
+    explicit EmbeddedLogAppender(
+        std::function<void(void*, const char*, const char*, const char*, int)> callback,
+        void* callbackUserData,
+        std::unique_ptr<EventEncoder> encoder)
+        : _encoder(std::move(encoder)),
+          _callback(std::move(callback)),
+          _callbackUserData(callbackUserData) {}
+
+    Status append(const Event& event) final {
+        std::stringstream output;
+        _encoder->encode(event, output);
+        _callback(_callbackUserData,
+                  output.str().c_str(),
+                  event.getComponent().getShortName().c_str(),
+                  event.getContextName().toString().c_str(),
+                  event.getSeverity().toInt());
+        return Status::OK();
     }
 
-    /**
-     * Get the log domain with the given name, creating if needed.
-     */
-    MessageLogDomain* getNamedDomain(const std::string& name);
-
-    /**
-     * Detaches the default console log appender
-     *
-     * @note This function is not thread safe.
-     */
-    void detachDefaultConsoleAppender();
-
-    /**
-     * Reattaches the default console log appender
-     *
-     * @note This function is not thread safe.
-     */
-    void reattachDefaultConsoleAppender();
-
-    /**
-     * Checks if the default console log appender is attached
-     */
-    bool isDefaultConsoleAppenderAttached() const;
-
 private:
-    typedef stdx::unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
-
-    DomainsByNameMap _domains;
-    ComponentMessageLogDomain _globalDomain;
-    ComponentMessageLogDomain::AppenderHandle _defaultAppender;
+    std::unique_ptr<EventEncoder> _encoder;
+    std::function<void(void*, const char*, const char*, const char*, int)> _callback;
+    void* const _callbackUserData;
 };
 
-}  // namespace logger
+}  // namespace embedded
 }  // namespace mongo
