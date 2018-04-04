@@ -29,7 +29,7 @@
         batchSize: 10,
         txnNumber: NumberLong(txnNumber),
         readConcern: {level: "snapshot"},
-        // Only the first operation in a transaction has autocommit flag.
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(res.cursor.firstBatch, [initialDoc]);
@@ -40,11 +40,16 @@
         insert: collName,
         documents: [{_id: "insert-1"}],
         txnNumber: NumberLong(txnNumber),
+        autocommit: false
     }));
 
     // Read in the same transaction returns the doc.
-    res = sessionDb.runCommand(
-        {find: collName, filter: {_id: "insert-1"}, txnNumber: NumberLong(txnNumber)});
+    res = sessionDb.runCommand({
+        find: collName,
+        filter: {_id: "insert-1"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    });
     assert.commandWorked(res);
     assert.docEq([{_id: "insert-1"}], res.cursor.firstBatch);
 
@@ -53,13 +58,12 @@
         insert: collName,
         documents: [{_id: "insert-2"}],
         txnNumber: NumberLong(txnNumber),
+        autocommit: false
     }));
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-    }));
+    assert.commandWorked(sessionDb.adminCommand(
+        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
 
     // Read with default read concern sees the committed transaction.
     assert.eq({_id: "insert-1"}, coll.findOne({_id: "insert-1"}));

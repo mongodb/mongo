@@ -249,7 +249,8 @@ class OperationContextSession {
 public:
     OperationContextSession(OperationContext* opCtx,
                             bool checkOutSession,
-                            boost::optional<bool> autocommit);
+                            boost::optional<bool> autocommit,
+                            boost::optional<bool> startTransaction);
 
     ~OperationContextSession();
 

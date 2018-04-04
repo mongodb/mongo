@@ -265,7 +265,8 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
 
 void Session::beginOrContinueTxn(OperationContext* opCtx,
                                  TxnNumber txnNumber,
-                                 boost::optional<bool> autocommit) {
+                                 boost::optional<bool> autocommit,
+                                 boost::optional<bool> startTransaction) {
     if (opCtx->getClient()->isInDirectClient()) {
         return;
     }
@@ -273,7 +274,7 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
     invariant(!opCtx->lockState()->isLocked());
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _beginOrContinueTxn(lg, txnNumber, autocommit);
+    _beginOrContinueTxn(lg, txnNumber, autocommit, startTransaction);
 }
 
 void Session::beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber) {
@@ -414,24 +415,85 @@ bool Session::checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtI
 
 void Session::_beginOrContinueTxn(WithLock wl,
                                   TxnNumber txnNumber,
-                                  boost::optional<bool> autocommit) {
+                                  boost::optional<bool> autocommit,
+                                  boost::optional<bool> startTransaction) {
+
+    // Check whether the session information needs to be refreshed from disk.
     _checkValid(wl);
+
+    // Check if the given transaction number is valid for this session. The transaction number must
+    // be >= the active transaction number.
     _checkTxnValid(wl, txnNumber);
 
-    if (txnNumber == _activeTxnNumber) {
-        // Continuing an existing transaction.
-        uassert(ErrorCodes::IllegalOperation,
-                "Specifying 'autocommit' is only allowed at the beginning of a transaction",
-                autocommit == boost::none);
+    // Reject argument combinations that are never valid.
+    uassert(ErrorCodes::InvalidOptions,
+            "Specifying autocommit=true is not allowed.",
+            autocommit != boost::optional<bool>(true));
 
+    uassert(ErrorCodes::InvalidOptions,
+            "Specifying startTransaction=false is not allowed.",
+            startTransaction != boost::optional<bool>(false));
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Must specify autocommit=false on all operations of a multi-statement transaction.",
+            !(startTransaction == boost::optional<bool>(true) && autocommit == boost::none));
+
+    //
+    // Continue an active transaction.
+    //
+    if (txnNumber == _activeTxnNumber) {
+
+        // It is never valid to specify 'startTransaction' on an active transaction.
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "Cannot specify 'startTransaction' on transaction " << txnNumber
+                              << " since it is already in progress.",
+                startTransaction == boost::none);
+
+        // Continue a retryable write or a snapshot read.
+        if (_txnState == MultiDocumentTransactionState::kNone ||
+            _txnState == MultiDocumentTransactionState::kInSnapshotRead) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot specify 'autocommit' on an operation not inside a multi-statement "
+                    "transaction.",
+                    autocommit == boost::none);
+            return;
+        }
+
+        // Continue a multi-statement transaction. In this case, it is required that
+        // autocommit=false be given as an argument on the request. Retryable writes and snapshot
+        // reads will have _autocommit=true, so that is why we verify that _autocommit=false here.
+        if (!_autocommit) {
+            uassert(
+                ErrorCodes::InvalidOptions,
+                "Must specify autocommit=false on all operations of a multi-statement transaction.",
+                autocommit == boost::optional<bool>(false));
+        }
         return;
     }
 
-    // Start a new transaction with an autocommit field
-    _setActiveTxn(wl, txnNumber);
-    _autocommit = (autocommit != boost::none) ? *autocommit : true;  // autocommit defaults to true
-    _txnState = _autocommit ? MultiDocumentTransactionState::kNone
-                            : MultiDocumentTransactionState::kInProgress;
+    //
+    // Start a new transaction.
+    //
+    // At this point, the given transaction number must be > _activeTxnNumber. Existence of an
+    // 'autocommit' field means we interpret this operation as part of a multi-document transaction.
+    invariant(txnNumber > _activeTxnNumber);
+    if (autocommit) {
+        invariant(*autocommit == false);
+        uassert(ErrorCodes::NoSuchTransaction,
+                str::stream() << "Given transaction number " << txnNumber
+                              << " does not match any in-progress transactions.",
+                startTransaction != boost::none);
+
+        _setActiveTxn(wl, txnNumber);
+        _txnState = MultiDocumentTransactionState::kInProgress;
+        _autocommit = false;
+    } else {
+        invariant(startTransaction == boost::none);
+        _setActiveTxn(wl, txnNumber);
+        _autocommit = true;
+        _txnState = MultiDocumentTransactionState::kNone;
+    }
+
     invariant(_transactionOperations.empty());
 }
 
@@ -509,7 +571,6 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     // effectively owns the Session. That is, a user might lock the Client to ensure it doesn't go
     // away, and then lock the Session owned by that client. We rely on the fact that we are not
     // using the DefaultLockerImpl to avoid deadlock.
-
     invariant(!isMMAPV1());
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     stdx::unique_lock<stdx::mutex> lg(_mutex);
@@ -627,8 +688,8 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
 
 void Session::_abortTransaction(WithLock wl) {
     // TODO SERVER-33432 Disallow aborting committed transaction after we implement implicit abort.
-    // A transaction in kCommitting state will either commit or abort for storage-layer reasons;
-    // it is too late to abort externally.
+    // A transaction in kCommitting state will either commit or abort for storage-layer reasons; it
+    // is too late to abort externally.
     if (_txnState == MultiDocumentTransactionState::kCommitting ||
         _txnState == MultiDocumentTransactionState::kCommitted) {
         return;
@@ -720,9 +781,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         invariant(opObserver);
         opObserver->onTransactionCommit(opCtx);
         lk.lock();
-        // It's possible some other thread aborted the transaction (e.g. through killSession)
-        // while the opObserver was running.  If that happened, the commit should be reported
-        // as failed.
+        // It's possible some other thread aborted the transaction (e.g. through killSession) while
+        // the opObserver was running.  If that happened, the commit should be reported as failed.
         uassert(ErrorCodes::TransactionAborted,
                 str::stream() << "Transaction " << opCtx->getTxnNumber()
                               << " aborted while attempting to commit",
@@ -732,8 +792,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     _txnState = MultiDocumentTransactionState::kCommitting;
     bool committed = false;
     ON_BLOCK_EXIT([this, &committed, opCtx]() {
-        // If we're still "committing", the recovery unit failed to commit, and the lock
-        // is not held.  We can't safely use _txnState here, as it is protected by the lock.
+        // If we're still "committing", the recovery unit failed to commit, and the lock is not
+        // held.  We can't safely use _txnState here, as it is protected by the lock.
         if (!committed) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             opCtx->setWriteUnitOfWork(nullptr);
@@ -853,7 +913,7 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                 // entry gets invalidated and immediately refreshed while there were no writes for
                 // newTxnNumber yet. In this case _activeTxnNumber will be less than newTxnNumber
                 // and we will fail to update the cache even though the write was successful.
-                _beginOrContinueTxn(lg, newTxnNumber, boost::none);
+                _beginOrContinueTxn(lg, newTxnNumber, boost::none, boost::none);
             }
 
             if (newTxnNumber == _activeTxnNumber) {

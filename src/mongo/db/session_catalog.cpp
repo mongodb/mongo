@@ -237,7 +237,8 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
 
 OperationContextSession::OperationContextSession(OperationContext* opCtx,
                                                  bool checkOutSession,
-                                                 boost::optional<bool> autocommit)
+                                                 boost::optional<bool> autocommit,
+                                                 boost::optional<bool> startTransaction)
     : _opCtx(opCtx) {
 
     if (!opCtx->getLogicalSessionId()) {
@@ -265,7 +266,8 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
     checkedOutSession->get()->refreshFromStorageIfNeeded(opCtx);
 
     if (opCtx->getTxnNumber()) {
-        checkedOutSession->get()->beginOrContinueTxn(opCtx, *opCtx->getTxnNumber(), autocommit);
+        checkedOutSession->get()->beginOrContinueTxn(
+            opCtx, *opCtx->getTxnNumber(), autocommit, startTransaction);
     }
 }
 

@@ -28,7 +28,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId++),
-        // Only the first write in a transaction has autocommit flag.
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -39,7 +39,8 @@
         find: collName,
         filter: {_id: "insert-1"},
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     });
     assert.commandWorked(res);
     assert.docEq([{_id: "insert-1"}], res.cursor.firstBatch);
@@ -49,7 +50,8 @@
         insert: collName,
         documents: [{_id: "insert-2"}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
 
     // Cannot read with default read concern.
@@ -61,6 +63,8 @@
     assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
 
     // Read with default read concern sees the committed transaction.
@@ -82,7 +86,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId++),
-        // Only the first write in a transaction has autocommmit flag.
+        startTransaction: true,
         autocommit: false
     }));
     // Batch update in transaction.
@@ -91,7 +95,8 @@
         updates:
             [{q: {_id: "update-1"}, u: {$inc: {a: 1}}}, {q: {_id: "update-2"}, u: {$inc: {a: 1}}}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
     // Cannot read with default read concern.
     assert.eq({_id: "update-1", a: 0}, testColl.findOne({_id: "update-1"}));
@@ -101,6 +106,8 @@
     assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
     // Read with default read concern sees the commmitted transaction.
     assert.eq({_id: "update-1", a: 2}, testColl.findOne({_id: "update-1"}));
@@ -117,7 +124,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId++),
-        // Only the first write in a transaction has autocommit flag.
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -126,13 +133,15 @@
         update: collName,
         updates: [{q: {_id: "doc-1"}, u: {$inc: {a: 1}}}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
     assert.commandWorked(sessionDb.runCommand({
         update: collName,
         updates: [{q: {_id: "doc-2"}, u: {$inc: {a: 1}}}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
     // Cannot read with default read concern.
     assert.eq(null, testColl.findOne({_id: "doc-1"}));
@@ -143,7 +152,8 @@
         find: collName,
         filter: {$or: [{_id: "doc-1"}, {_id: "doc-2"}]},
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     });
     assert.commandWorked(res);
     assert.docEq([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], res.cursor.firstBatch);
@@ -152,7 +162,10 @@
     assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
+
     // Read with default read concern sees the commmitted transaction.
     assert.eq({_id: "doc-1", a: 1}, testColl.findOne({_id: "doc-1"}));
     assert.eq({_id: "doc-2", a: 1}, testColl.findOne({_id: "doc-2"}));
@@ -169,7 +182,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(stmtId++),
-        // Only the first write in a transaction has autocommit flag.
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -178,14 +191,16 @@
         delete: collName,
         deletes: [{q: {_id: "doc-1"}, limit: 1}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
     // Batch delete.
     assert.commandWorked(sessionDb.runCommand({
         delete: collName,
         deletes: [{q: {_id: "doc-2"}, limit: 1}, {q: {_id: "doc-3"}, limit: 1}],
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
     // Cannot read the new doc and still see the to-be removed docs with default read concern.
     assert.eq({_id: "doc-1"}, testColl.findOne({_id: "doc-1"}));
@@ -197,7 +212,8 @@
         find: collName,
         filter: {$or: [{_id: "doc-1"}, {_id: "doc-2"}, {_id: "doc-3"}]},
         txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++)
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     });
     assert.commandWorked(res);
     assert.docEq([], res.cursor.firstBatch);
@@ -206,7 +222,10 @@
     assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
     }));
+
     // Read with default read concern sees the commmitted transaction.
     assert.eq(null, testColl.findOne({_id: "doc-1"}));
     assert.eq(null, testColl.findOne({_id: "doc-2"}));

@@ -654,13 +654,13 @@ var {
                 cmdObjUnwrapped.txnNumber = new NumberLong(_txnNumber);
             }
 
-            // readConcern and autocommit can only be specified on the first statement in a
-            // transaction.
+            // All operations of a multi-statement transaction must specify autocommit=false.
+            cmdObjUnwrapped.autocommit = false;
+
+            // 'readConcern' and 'startTransaction' can only be specified on the first statement in
+            // a transaction.
             if (_firstStatement) {
-                // TODO: As a part of SERVER-34052, we might also need to specify
-                // `cmdObjUnwrapped.startTransaction = 1` on the first statement of a multi
-                // statement txn.
-                cmdObjUnwrapped.autocommit = false;
+                cmdObjUnwrapped.startTransaction = true;
                 if (_txnOptions.getTxnReadConcern() !== undefined) {
                     cmdObjUnwrapped.readConcern = _txnOptions.getTxnReadConcern();
                 }

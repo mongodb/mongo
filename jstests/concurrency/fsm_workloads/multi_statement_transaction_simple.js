@@ -15,6 +15,7 @@ var $config = (function() {
             filter: {},
             readConcern: {level: "snapshot"},
             txnNumber: NumberLong(txnNumber),
+            startTransaction: true,
             autocommit: false
         });
         assertWhenOwnColl.commandWorked(res);
@@ -26,6 +27,7 @@ var $config = (function() {
                 getMore: cursorId,
                 collection: collName,
                 txnNumber: NumberLong(txnNumber),
+                autocommit: false
             });
             assertWhenOwnColl.commandWorked(res);
             res.cursor.nextBatch.forEach(function(account) {
@@ -34,8 +36,8 @@ var $config = (function() {
             cursorId = res.cursor.id;
         }
         // commitTransaction can only be called on the admin database.
-        assertWhenOwnColl.commandWorked(
-            sessionDb.adminCommand({commitTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+        assertWhenOwnColl.commandWorked(sessionDb.adminCommand(
+            {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
         return total;
     }
 
@@ -65,13 +67,15 @@ var $config = (function() {
                   update: collName,
                   updates: [{q: {_id: transferFrom}, u: {$inc: {balance: -transferAmount}}}],
                   readConcern: {level: "snapshot"},
+                  startTransaction: true,
                   autocommit: false
                 },
                 {
                   update: collName,
-                  updates: [{q: {_id: transferTo}, u: {$inc: {balance: transferAmount}}}]
+                  updates: [{q: {_id: transferTo}, u: {$inc: {balance: transferAmount}}}],
+                  autocommit: false
                 },
-                {commitTransaction: 1}
+                {commitTransaction: 1, autocommit: false}
             ];
 
             let hasWriteConflict;

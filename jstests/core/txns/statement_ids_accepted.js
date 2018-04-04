@@ -25,6 +25,7 @@
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -36,6 +37,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -47,6 +49,7 @@
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -65,6 +68,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -124,6 +128,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -133,6 +138,7 @@
         batchSize: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(1),
+        autocommit: false
     }));
 
     jsTestLog("Check that findandmodify accepts a statement ID");
@@ -142,6 +148,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -152,6 +159,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -161,6 +169,7 @@
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        autocommit: false
     }));
     jsTestLog("Check that geoNear accepts a statement ID");
     assert.writeOK(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
@@ -187,6 +196,8 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
     }));
 
     jsTestLog("Check that geoSearch accepts a statement ID");
@@ -198,6 +209,8 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
     }));
 
     jsTestLog("Check that group accepts a statement ID");
@@ -213,6 +226,8 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
     }));
 
     jsTestLog("Check that insert accepts a statement ID");
@@ -222,6 +237,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -236,7 +252,7 @@
         },
         out: {inline: 1},
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
+        stmtId: NumberInt(0)
     }));
 
     jsTestLog("Check that parallelCollectionScan accepts a statement ID");
@@ -254,6 +270,7 @@
         prepareTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -266,6 +283,7 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -276,6 +294,7 @@
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         stmtId: NumberInt(1),
+        autocommit: false
     }));
 
     session.endSession();

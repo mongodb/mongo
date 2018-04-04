@@ -10,7 +10,7 @@
     const collName = "transaction_commit_abort_on_secondaries";
 
     const rst = new ReplSetTest({name: collName, nodes: 2});
-    let nodes = rst.startSet();
+    rst.startSet();
     // We want a stable topology, so make the secondary unelectable.
     let config = rst.getReplSetConfig();
     config.members[1].priority = 0;

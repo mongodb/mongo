@@ -28,17 +28,22 @@
         remove: true,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(null, res.value);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a non-matching find-and-modify with update.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -47,17 +52,22 @@
         update: {$inc: {a: 100}},
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(null, res.value);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 1}, {_id: 2, a: 2}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a matching find-and-modify with remove.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -66,17 +76,22 @@
         remove: true,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq({_id: 0, a: 0}, res.value);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 1}, {_id: 2, a: 2}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a matching find-and-modify with update, requesting the old doc.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -85,17 +100,22 @@
         update: {$inc: {a: 100}},
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq({_id: 1, a: 1}, res.value);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 101}, {_id: 2, a: 2}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a matching find-and-modify with update, requesting the new doc.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -105,17 +125,22 @@
         new: true,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq({_id: 2, a: 102}, res.value);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 101}, {_id: 2, a: 102}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a matching find-and-modify with upsert, requesting the new doc.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -126,17 +151,22 @@
         new: true,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq({_id: 2, a: 202}, res.value);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 1, a: 101}, {_id: 2, a: 202}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a non-matching find-and-modify with upsert, requesting the old doc.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -146,6 +176,7 @@
         update: {$inc: {a: 100}},
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(null, res.value);
@@ -153,13 +184,18 @@
         find: collName,
         filter: {a: 103},
         projection: {_id: 0},
-        txnNumber: NumberLong(txnNumber)
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
     }));
     assert.docEq(res.cursor.firstBatch, [{a: 103}]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a non-matching find-and-modify with upsert, requesting the new doc.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -170,15 +206,20 @@
         new: true,
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     const newdoc = res.value;
     assert.eq(204, newdoc.a);
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {a: 204}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {a: 204}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [newdoc]);
 
     // commitTransaction can only be run on the admin database.
-    assert.commandWorked(sessionDb.adminCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 }());

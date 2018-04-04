@@ -37,26 +37,27 @@
         documents: [doc1],
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
         autocommit: false
     }));
     // Should not be visible.
     assert.eq(null, testColl.findOne(doc1));
 
     // Should be visible in this session.
-    let res =
-        sessionDB.runCommand({find: collName, filter: doc1, txnNumber: NumberLong(txnNumber)});
+    let res = sessionDB.runCommand(
+        {find: collName, filter: doc1, txnNumber: NumberLong(txnNumber), autocommit: false});
     assert.commandWorked(res);
     assert.docEq([doc1], res.cursor.firstBatch);
 
     // Run prepare on the admin db, which immediately runs abort afterwards.
-    assert.commandWorked(
-        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+    assert.commandWorked(sessionDB.adminCommand(
+        {prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
 
     // The insert should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the insert is not visible.
     assert.eq(null, testColl.findOne(doc1));
-    txnNumber++;
-    res = sessionDB.runCommand({find: collName, filter: doc1, txnNumber: NumberLong(txnNumber)});
+
+    res = sessionDB.runCommand({find: collName, filter: doc1});
     assert.commandWorked(res);
     assert.eq([], res.cursor.firstBatch);
 
@@ -73,6 +74,7 @@
         updates: [{q: doc1, u: {$inc: {x: 1}}}],
         txnNumber: NumberLong(txnNumber),
         readConcern: {level: "snapshot"},
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -80,18 +82,18 @@
     assert.eq(null, testColl.findOne(doc2));
 
     // Should be visible in this session.
-    res = sessionDB.runCommand({find: collName, filter: doc2, txnNumber: NumberLong(txnNumber)});
+    res = sessionDB.runCommand(
+        {find: collName, filter: doc2, txnNumber: NumberLong(txnNumber), autocommit: false});
     assert.commandWorked(res);
     assert.docEq([doc2], res.cursor.firstBatch);
 
-    // Run prepare on the admin db, which immediately runs abort afterwards.
-    assert.commandWorked(
-        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+    // Run prepare, which immediately runs abort afterwards.
+    assert.commandWorked(sessionDB.adminCommand(
+        {prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
 
     // The update should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the update is not visible.
-    txnNumber++;
-    res = sessionDB.runCommand({find: collName, filter: doc2, txnNumber: NumberLong(txnNumber)});
+    res = sessionDB.runCommand({find: collName, filter: doc2});
     assert.commandWorked(res);
     assert.eq([], res.cursor.firstBatch);
 
@@ -110,6 +112,7 @@
         deletes: [{q: doc2, limit: 1}],
         txnNumber: NumberLong(txnNumber),
         readConcern: {level: "snapshot"},
+        startTransaction: true,
         autocommit: false
     }));
 
@@ -117,18 +120,18 @@
     assert.eq(doc2, testColl.findOne(doc2));
 
     // Should not be visible in this session.
-    res = sessionDB.runCommand({find: collName, filter: doc2, txnNumber: NumberLong(txnNumber)});
+    res = sessionDB.runCommand(
+        {find: collName, filter: doc2, txnNumber: NumberLong(txnNumber), autocommit: false});
     assert.commandWorked(res);
     assert.docEq([], res.cursor.firstBatch);
 
-    // Run prepare on the admin db.
-    assert.commandWorked(
-        sessionDB.adminCommand({prepareTransaction: 1, txnNumber: NumberLong(txnNumber)}));
+    // Run prepare.
+    assert.commandWorked(sessionDB.adminCommand(
+        {prepareTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
 
     // The delete should be visible in this session, but because the prepare command immediately
     // aborts afterwards, the transaction is rolled back and the document is still visible.
-    txnNumber++;
-    res = sessionDB.runCommand({find: collName, filter: doc2, txnNumber: NumberLong(txnNumber)});
+    res = sessionDB.runCommand({find: collName, filter: doc2});
     assert.commandWorked(res);
     assert.eq([doc2], res.cursor.firstBatch);
     replSet.stopSet();

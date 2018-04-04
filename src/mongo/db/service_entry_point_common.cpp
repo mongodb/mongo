@@ -541,17 +541,26 @@ void execCommandDatabase(OperationContext* opCtx,
         const bool shouldCheckoutSession = static_cast<bool>(opCtx->getTxnNumber()) &&
             sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend();
 
+        // Parse the arguments specific to multi-statement transactions.
+        boost::optional<bool> startMultiDocTxn = boost::none;
         boost::optional<bool> autocommitVal = boost::none;
-        if (sessionOptions && sessionOptions->getAutocommit()) {
-            autocommitVal = *sessionOptions->getAutocommit();
-        } else if (sessionOptions && command->getName() == "doTxn") {
-            // Autocommit is overridden specifically for doTxn to get the oplog entry generation
-            // behavior used for multi-document transactions.
-            // The doTxn command still logically behaves as a commit.
-            autocommitVal = false;
+        if (sessionOptions) {
+            startMultiDocTxn = sessionOptions->getStartTransaction();
+            autocommitVal = sessionOptions->getAutocommit();
+            if (command->getName() == "doTxn") {
+                // Autocommit and 'startMultiDocTxn' are overridden for 'doTxn' to get the oplog
+                // entry generation behavior used for multi-document transactions. The 'doTxn'
+                // command still logically behaves as a commit.
+                autocommitVal = false;
+                startMultiDocTxn = true;
+            }
         }
 
-        OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession, autocommitVal);
+        // This constructor will check out the session and start a transaction, if necessary. It
+        // handles the appropriate state management for both multi-statement transactions and
+        // retryable writes.
+        OperationContextSession sessionTxnState(
+            opCtx, shouldCheckoutSession, autocommitVal, startMultiDocTxn);
 
         const auto dbname = request.getDatabase().toString();
         uassert(

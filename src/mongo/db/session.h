@@ -108,26 +108,31 @@ public:
     void refreshFromStorageIfNeeded(OperationContext* opCtx);
 
     /**
-     * Starts a new transaction on the session, must be called after refreshFromStorageIfNeeded has
-     * been called. If an attempt is made to start a transaction with number less than the latest
-     * transaction this session has seen, an exception will be thrown.
+     * Starts a new transaction on the session, or continues an already active transaction. In this
+     * context, a "transaction" is a sequence of operations associated with a transaction number.
+     * This sequence of operations could be a retryable write or multi-statement transaction. Both
+     * utilize this method.
      *
-     * Sets the autocommit parameter for this transaction. If it is boost::none, no autocommit
-     * parameter was passed into the request. If this is the first statement of a transaction,
-     * the autocommit parameter will default to true.
+     * The 'autocommit' argument represents the value of the field given in the original client
+     * request. If it is boost::none, no autocommit parameter was passed into the request. Every
+     * operation that is part of a multi statement transaction must specify 'autocommit=false'.
+     * 'startTransaction' represents the value of the field given in the original client request,
+     * and indicates whether this operation is the beginning of a multi-statement transaction.
      *
-     * Autocommit can only be specified on the first statement of a transaction. If otherwise,
-     * this function will throw.
-     *
-     * Throws if the session has been invalidated or if an attempt is made to start a transaction
-     * older than the active.
+     * Throws an exception if:
+     *      - An attempt is made to start a transaction with number less than the latest
+     *        transaction this session has seen.
+     *      - The session has been invalidated.
+     *      - The values of 'autocommit' and/or 'startTransaction' are inconsistent with the current
+     *        state of the transaction.
      *
      * In order to avoid the possibility of deadlock, this method must not be called while holding a
-     * lock.
+     * lock. This method must also be called after refreshFromStorageIfNeeded has been called.
      */
     void beginOrContinueTxn(OperationContext* opCtx,
                             TxnNumber txnNumber,
-                            boost::optional<bool> autocommit);
+                            boost::optional<bool> autocommit,
+                            boost::optional<bool> startTransaction);
     /**
      * Similar to beginOrContinueTxn except it is used specifically for shard migrations and does
      * not check or modify the autocommit parameter.
@@ -313,7 +318,10 @@ public:
         const repl::OplogEntry& entry);
 
 private:
-    void _beginOrContinueTxn(WithLock, TxnNumber txnNumber, boost::optional<bool> autocommit);
+    void _beginOrContinueTxn(WithLock,
+                             TxnNumber txnNumber,
+                             boost::optional<bool> autocommit,
+                             boost::optional<bool> startTransaction);
 
     void _beginOrContinueTxnOnMigration(WithLock, TxnNumber txnNumber);
 
