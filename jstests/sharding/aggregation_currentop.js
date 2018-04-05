@@ -614,8 +614,8 @@
     // will only permit a user to view other users' sessions if the caller possesses the 'inprog'
     // privilege and 'allUsers' is true.
     const userNames = ["user_inprog", "admin", "user_no_inprog"];
-    const sessionDBs = [];
-    const sessions = [];
+    let sessionDBs = [];
+    let sessions = [];
 
     // Returns a set of predicates that filter $currentOp for all stashed transactions.
     function sessionFilter() {
@@ -683,6 +683,19 @@
             .itcount(),
         3);
 
+    // Confirm that the 'idleSessions' parameter defaults to true.
+    assert.eq(shardAdminDB.aggregate([{$currentOp: {allUsers: true}}, {$match: sessionFilter()}])
+                  .itcount(),
+              3);
+
+    // Confirm that idleSessions:false omits the stashed locks from the report.
+    assert.eq(
+        shardAdminDB
+            .aggregate(
+                [{$currentOp: {allUsers: true, idleSessions: false}}, {$match: sessionFilter()}])
+            .itcount(),
+        0);
+
     // Allow all transactions to complete and close the associated sessions.
     for (let i in userNames) {
         assert(shardAdminDB.auth(userNames[i], "pwd"));
@@ -701,6 +714,45 @@
 
     // Restart the cluster with auth disabled.
     restartCluster(st, {keyFile: null});
+
+    // Test that $currentOp will display all stashed transaction locks by default if auth is
+    // disabled, even with 'allUsers:false'.
+    const session = shardAdminDB.getMongo().startSession();
+
+    // Start but do not complete a transaction.
+    const sessionDB = session.getDatabase(shardTestDB.getName());
+    assert.commandWorked(sessionDB.runCommand({
+        insert: "test",
+        documents: [{_id: `txn-insert-no-auth`}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(0),
+        startTransaction: true,
+        autocommit: false
+    }));
+    sessionDBs = [sessionDB];
+    sessions = [session];
+
+    // Use $currentOp to confirm that the incomplete transaction has stashed its locks.
+    assert.eq(shardAdminDB.aggregate([{$currentOp: {allUsers: false}}, {$match: sessionFilter()}])
+                  .itcount(),
+              1);
+
+    // Confirm that idleSessions:false omits the stashed locks from the report.
+    assert.eq(
+        shardAdminDB
+            .aggregate(
+                [{$currentOp: {allUsers: false, idleSessions: false}}, {$match: sessionFilter()}])
+            .itcount(),
+        0);
+
+    // Allow the transactions to complete and close the session.
+    assert.commandWorked(sessionDB.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(0),
+        autocommit: false,
+        writeConcern: {w: 'majority'}
+    }));
+    session.endSession();
 
     // Run a set of tests of behaviour common to replset and mongoS when auth is disabled.
     function runNoAuthTests(conn, curOpSpec) {

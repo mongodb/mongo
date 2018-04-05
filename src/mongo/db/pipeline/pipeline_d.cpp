@@ -838,11 +838,14 @@ void PipelineD::MongoDInterface::_reportCurrentOpsForIdleSessions(OperationConte
                                                                   std::vector<BSONObj>* ops) const {
     auto sessionCatalog = SessionCatalog::get(opCtx);
 
+    const bool authEnabled =
+        AuthorizationSession::get(opCtx->getClient())->getAuthorizationManager().isAuthEnabled();
+
     // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers to
     // create a pattern that will match against all authenticated usernames for the current client.
     // If the user is listing ops for all users, we create an empty pattern; constructing an
     // instance of SessionKiller::Matcher with this empty pattern will return all sessions.
-    auto sessionFilter = (userMode == CurrentOpUserMode::kExcludeOthers
+    auto sessionFilter = (authEnabled && userMode == CurrentOpUserMode::kExcludeOthers
                               ? makeSessionFilterForAuthenticatedUsers(opCtx)
                               : KillAllSessionsByPatternSet{{}});
 
