@@ -35,6 +35,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -112,12 +113,13 @@ public:
      * If 'db' matches the 'db' in the namespace the client sent versions for, returns the database
      * version sent by the client (if any), else returns boost::none.
      */
-    boost::optional<DatabaseVersion> getDbVersion(const StringData db) const;
+    boost::optional<DatabaseVersion> getDbVersion(const StringData dbName) const;
 
     /**
-     * Stores the given chunk version of a namespace into this object.
+     * Makes the OperationShardingState behave as if an UNSHARDED shardVersion was sent for every
+     * possible namespace.
      */
-    void setShardVersion(NamespaceString nss, ChunkVersion newVersion);
+    void setGlobalUnshardedShardVersion();
 
     /**
      * This call is a no op if there isn't a currently active migration critical section. Otherwise
@@ -156,10 +158,14 @@ private:
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowImplicitCollectionCreation{true};
 
-    bool _hasShardVersion = false;
-    ChunkVersion _shardVersion{ChunkVersion::UNSHARDED()};
-    boost::optional<DatabaseVersion> _dbVersion;
-    NamespaceString _nss;
+    // Should be set to true if all collections accessed are expected to be unsharded.
+    bool _globalUnshardedShardVersion = false;
+
+    // The OperationShardingState class supports storing shardVersions for multiple namespaces (and
+    // databaseVersions for multiple databases), even though client code has not been written yet to
+    // *send* multiple shardVersions or databaseVersions.
+    StringMap<ChunkVersion> _shardVersions;
+    StringMap<DatabaseVersion> _databaseVersions;
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.

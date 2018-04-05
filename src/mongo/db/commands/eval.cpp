@@ -190,7 +190,7 @@ public:
                 "can't send a shardVersion with the 'eval' command, since you can't use sharded "
                 "collections from 'eval'",
                 !oss.hasShardVersion());
-        oss.setShardVersion(NamespaceString(dbname), ChunkVersion::UNSHARDED());
+        oss.setGlobalUnshardedShardVersion();
 
         try {
             if (cmdObj["nolock"].trueValue()) {
