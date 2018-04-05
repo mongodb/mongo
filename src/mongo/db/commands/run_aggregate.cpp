@@ -339,29 +339,20 @@ Status runAggregate(OperationContext* opCtx,
                 uassertStatusOK(waitForReadConcern(opCtx, readConcern, true));
             }
 
-            if (origNss.isCollectionlessAggregateNS()) {
-                // If the change stream is opened against all collections in a database which does
-                // not exist yet, go ahead and create it. Use MODE_IX since the AutoGetOrCreateDb
-                // helper will automatically reacquire as MODE_X if the database does not exist.
-                AutoGetOrCreateDb dbLock(opCtx, origNss.db(), MODE_IX);
-                invariant(dbLock.getDb());
-            } else {
-                // Change streams can only be run against collections;
+            // If the change stream is opened against a database which does not exist yet, go ahead
+            // and create it. Use MODE_IX since the AutoGetOrCreateDb helper will automatically
+            // reacquire as MODE_X if the database does not exist.
+            AutoGetOrCreateDb dbLock(opCtx, origNss.db(), MODE_IX);
+            invariant(dbLock.getDb());
+            if (!origNss.isCollectionlessAggregateNS()) {
                 // AutoGetCollectionForReadCommand will raise an error if the given namespace is a
-                // view. A change stream may be opened on a namespace before the associated
-                // collection is created, but only if the database already exists. If the
-                // $changeStream was sent from mongoS then the database exists at the cluster level
-                // even if not yet present on this shard, so we allow the $changeStream to run.
+                // view.
                 AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
 
                 // Resolve the collator to either the user-specified collation or the default
                 // collation of the collection on which $changeStream was invoked, so that we do not
                 // end up resolving the collation on the oplog.
                 invariant(!collatorToUse);
-                if (!origNssCtx.getDb() && !request.isFromMongos()) {
-                    AutoGetOrCreateDb dbLock(opCtx, origNss.db(), MODE_X);
-                    invariant(dbLock.getDb());
-                }
                 Collection* origColl = origNssCtx.getCollection();
                 collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
             }
