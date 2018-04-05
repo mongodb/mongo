@@ -2798,7 +2798,7 @@ private:
 };
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
-    // This is optimize all arguments to this expression
+    // This is optimizes all arguments to this expression
     ExpressionNary::optimize();
 
     // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of an
