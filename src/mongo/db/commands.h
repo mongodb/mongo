@@ -305,13 +305,6 @@ public:
     }
 
     /**
-     * Checks if the client associated with the given OperationContext is authorized to run this
-     * command.
-     */
-    virtual Status checkAuthForRequest(OperationContext* opCtx,
-                                       const OpMsgRequest& request) const = 0;
-
-    /**
      * Redacts "cmdObj" in-place to a form suitable for writing to logs.
      *
      * The default implementation does nothing.
@@ -377,18 +370,6 @@ public:
     static void generateHelpResponse(OperationContext* opCtx,
                                      rpc::ReplyBuilderInterface* replyBuilder,
                                      const Command& command);
-
-    /**
-     * Checks to see if the client executing "opCtx" is authorized to run the given command with the
-     * given parameters on the given named database.
-     *
-     * Returns Status::OK() if the command is authorized.  Most likely returns
-     * ErrorCodes::Unauthorized otherwise, but any return other than Status::OK implies not
-     * authorized.
-     */
-    static Status checkAuthorization(Command* c,
-                                     OperationContext* opCtx,
-                                     const OpMsgRequest& request);
 
 private:
     // Counters for how many times this command has been executed and failed
@@ -499,8 +480,9 @@ public:
      * the client executing "opCtx" is authorized to run the given command
      * with the given parameters on the given named database.
      * Note: nonvirtual.
+     * The 'request' must outlive this CommandInvocation.
      */
-    void checkAuthorization(OperationContext* opCtx) const;
+    void checkAuthorization(OperationContext* opCtx, const OpMsgRequest& request) const;
 
 protected:
     ResourcePattern resourcePattern() const;
@@ -511,6 +493,8 @@ private:
      * Throws unless `opCtx`'s client is authorized to `run()` this.
      */
     virtual void doCheckAuthorization(OperationContext* opCtx) const = 0;
+
+    Status _checkAuthorizationImpl(OperationContext* opCtx, const OpMsgRequest& request) const;
 
     const Command* const _definition;
 };
@@ -627,15 +611,6 @@ private:
         // The default implementation of addRequiredPrivileges should never be hit.
         fassertFailed(16940);
     }
-
-    //
-    // Methods provided for subclasses if they implement above interface.
-    //
-
-    /**
-     * Calls checkAuthForOperation.
-     */
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final;
 };
 
 /**

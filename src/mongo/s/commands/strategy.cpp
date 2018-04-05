@@ -179,10 +179,13 @@ void execCommandClient(OperationContext* opCtx,
                 topLevelFields[fieldName]++ == 0);
     }
 
-    Status status = Command::checkAuthorization(c, opCtx, request);
-    if (!status.isOK()) {
+    auto invocation = c->parse(opCtx, request);
+
+    try {
+        invocation->checkAuthorization(opCtx, request);
+    } catch (const DBException& e) {
         auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, status);
+        CommandHelpers::appendCommandStatus(body, e.toStatus());
         return;
     }
 
@@ -199,8 +202,6 @@ void execCommandClient(OperationContext* opCtx,
         CommandHelpers::appendCommandStatus(body, wcResult.getStatus());
         return;
     }
-
-    auto invocation = c->parse(opCtx, request);
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();
     if (!supportsWriteConcern && !wcResult.getValue().usedDefault) {

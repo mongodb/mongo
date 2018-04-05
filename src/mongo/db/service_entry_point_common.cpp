@@ -648,7 +648,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         ImpersonationSessionGuard guard(opCtx);
-        uassertStatusOK(Command::checkAuthorization(command, opCtx, request));
+        invocation->checkAuthorization(opCtx, request);
 
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 

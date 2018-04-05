@@ -339,6 +339,17 @@ void CommandReplyBuilder::reset() {
 
 CommandInvocation::~CommandInvocation() = default;
 
+void CommandInvocation::checkAuthorization(OperationContext* opCtx,
+                                           const OpMsgRequest& request) const {
+    const Command* c = definition();
+    Status status = _checkAuthorizationImpl(opCtx, request);
+    if (!status.isOK()) {
+        log(LogComponent::kAccessControl) << status;
+    }
+    CommandHelpers::logAuthViolation(opCtx, c, request, status.code());
+    uassertStatusOK(status);
+}
+
 //////////////////////////////////////////////////////////////
 // Command
 
@@ -356,10 +367,8 @@ private:
             BSONObjBuilder bob = result->getBodyBuilder();
             bool ok = _command->run(opCtx, _dbName, _request->body, bob);
             CommandHelpers::appendCommandStatus(bob, ok);
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandAuditHook hook(_command);
-            audit::logCommandAuthzCheck(
-                opCtx->getClient(), *_request, &hook, ErrorCodes::Unauthorized);
+        } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
+            CommandHelpers::logAuthViolation(opCtx, _command, *_request, e.code());
             throw;
         }
     }
@@ -391,7 +400,8 @@ private:
     }
 
     void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(_command->checkAuthForRequest(opCtx, *_request));
+        uassertStatusOK(_command->checkAuthForOperation(
+            opCtx, _request->getDatabase().toString(), _request->body));
     }
 
     const BSONObj& cmdObj() const {
@@ -442,12 +452,6 @@ Status BasicCommand::explain(OperationContext* opCtx,
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 
-Status BasicCommand::checkAuthForRequest(OperationContext* opCtx,
-                                         const OpMsgRequest& request) const {
-    CommandHelpers::uassertNoDocumentSequences(getName(), request);
-    return checkAuthForOperation(opCtx, request.getDatabase().toString(), request.body);
-}
-
 Status BasicCommand::checkAuthForOperation(OperationContext* opCtx,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj) const {
@@ -464,10 +468,10 @@ Status BasicCommand::checkAuthForCommand(Client* client,
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
-static Status _checkAuthorizationImpl(Command* c,
-                                      OperationContext* opCtx,
-                                      const OpMsgRequest& request) {
+Status CommandInvocation::_checkAuthorizationImpl(OperationContext* opCtx,
+                                                  const OpMsgRequest& request) const {
     namespace mmb = mutablebson;
+    const Command* c = definition();
     auto client = opCtx->getClient();
     auto dbname = request.getDatabase();
     if (c->adminOnly() && dbname != "admin") {
@@ -476,7 +480,14 @@ static Status _checkAuthorizationImpl(Command* c,
                                     << " may only be run against the admin database.");
     }
     if (AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
-        Status status = c->checkAuthForRequest(opCtx, request);
+        Status status = [&] {
+            try {
+                doCheckAuthorization(opCtx);
+                return Status::OK();
+            } catch (const DBException& e) {
+                return e.toStatus();
+            }
+        }();
         if (status == ErrorCodes::Unauthorized) {
             mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
             c->redactForLogging(&cmdToLog);
@@ -494,18 +505,6 @@ static Status _checkAuthorizationImpl(Command* c,
                                     << " must run from localhost when running db without auth");
     }
     return Status::OK();
-}
-
-Status Command::checkAuthorization(Command* c,
-                                   OperationContext* opCtx,
-                                   const OpMsgRequest& request) {
-    Status status = _checkAuthorizationImpl(c, opCtx, request);
-    if (!status.isOK()) {
-        log(LogComponent::kAccessControl) << status;
-    }
-    CommandAuditHook hook(c);
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, &hook, status.code());
-    return status;
 }
 
 void Command::generateHelpResponse(OperationContext* opCtx,

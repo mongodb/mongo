@@ -89,8 +89,17 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             dbNameForAuthCheck = "admin";
         }
 
-        return Command::checkAuthorization(
-            commandInOplogEntry, opCtx, OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o));
+        // TODO reuse the parse result for when we run() later. Note that when running,
+        // we must use a potentially different dbname.
+        return [&] {
+            try {
+                auto request = OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o);
+                commandInOplogEntry->parse(opCtx, request)->checkAuthorization(opCtx, request);
+                return Status::OK();
+            } catch (const DBException& e) {
+                return e.toStatus();
+            }
+        }();
     }
 
     if (opType == "i"_sd) {

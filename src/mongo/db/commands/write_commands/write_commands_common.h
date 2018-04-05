@@ -41,9 +41,12 @@
 namespace mongo {
 namespace auth {
 
-Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
-                                BatchedCommandRequest::BatchType cmdType,
-                                const OpMsgRequest& request);
+/**
+ * Throws if write command shouldn't proceed.
+ */
+void checkAuthForWriteCommand(AuthorizationSession* authzSession,
+                              BatchedCommandRequest::BatchType cmdType,
+                              const OpMsgRequest& request);
 
 }  // namespace auth
 }  // namespace mongo

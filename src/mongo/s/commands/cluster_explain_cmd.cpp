@@ -76,41 +76,13 @@ public:
         return "explain database reads and writes";
     }
 
-    /**
-     * You are authorized to run an explain if you are authorized to run
-     * the command that you are explaining. The auth check is performed recursively
-     * on the nested command.
-     */
-    Status checkAuthForRequest(OperationContext* opCtx,
-                               const OpMsgRequest& request) const override {
-        CommandHelpers::uassertNoDocumentSequences(getName(), request);
-        const std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
-
-        if (Object != cmdObj.firstElement().type()) {
-            return Status(ErrorCodes::BadValue, "explain command requires a nested object");
-        }
-
-        BSONObj explainedObj = cmdObj.firstElement().Obj();
-
-        auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
-        if (!explainedCommand) {
-            return Status(ErrorCodes::CommandNotFound,
-                          str::stream() << "unknown command: "
-                                        << explainedObj.firstElementFieldName());
-        }
-
-        return explainedCommand->checkAuthForRequest(
-            opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(explainedObj)));
-    }
-
 private:
     class Invocation;
 };
 
 class ClusterExplainCmd::Invocation final : public CommandInvocation {
 public:
-    Invocation(ClusterExplainCmd* explainCommand,
+    Invocation(const ClusterExplainCmd* explainCommand,
                const OpMsgRequest& request,
                ExplainOptions::Verbosity verbosity,
                std::unique_ptr<OpMsgRequest> innerRequest,
@@ -153,8 +125,13 @@ private:
         return command()->secondaryAllowed(context);
     }
 
+    /**
+     * You are authorized to run an explain if you are authorized to run
+     * the command that you are explaining. The auth check is performed recursively
+     * on the nested command.
+     */
     void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(command()->checkAuthForRequest(opCtx, *_outerRequest));
+        _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
     }
 
     const ClusterExplainCmd* command() const {
@@ -169,6 +146,37 @@ private:
     std::unique_ptr<CommandInvocation> _innerInvocation;
 };
 
+/**
+ * Synthesize a BSONObj for the command to be explained.
+ * To do this we must copy generic arguments from the enclosing explain command.
+ */
+BSONObj makeExplainedObj(const BSONObj& outerObj, StringData dbName) {
+    const auto& first = outerObj.firstElement();
+    uassert(
+        ErrorCodes::BadValue, "explain command requires a nested object", first.type() == Object);
+    const BSONObj& innerObj = first.Obj();
+
+    if (auto innerDb = innerObj["$db"]) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Mismatched $db in explain command. Expected " << dbName
+                              << " but got "
+                              << innerDb.checkAndGetStringData(),
+                innerDb.checkAndGetStringData() == dbName);
+    }
+
+    BSONObjBuilder bob;
+    bob.appendElements(innerObj);
+    for (auto outerElem : outerObj) {
+        // If the argument is in both the inner and outer command, we currently let the
+        // inner version take precedence.
+        const auto name = outerElem.fieldNameStringData();
+        if (isGenericArgument(name) && !innerObj.hasField(name)) {
+            bob.append(outerElem);
+        }
+    }
+    return bob.obj();
+}
+
 std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* opCtx,
                                                             const OpMsgRequest& request) {
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
@@ -178,37 +186,13 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
 
     // This is the nested command which we are explaining. We need to propagate generic
     // arguments into the inner command since it is what is passed to the virtual
-    // Command::explain() method.
-    const BSONObj explainedObj = [&] {
-        const auto innerObj = cmdObj.firstElement().Obj();
-        if (auto innerDb = innerObj["$db"]) {
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Mismatched $db in explain command. Expected " << dbName
-                                  << " but got "
-                                  << innerDb.checkAndGetStringData(),
-                    innerDb.checkAndGetStringData() == dbName);
-        }
-
-        BSONObjBuilder bob;
-        bob.appendElements(innerObj);
-        for (auto outerElem : cmdObj) {
-            // If the argument is in both the inner and outer command, we currently let the
-            // inner version take precedence.
-            const auto name = outerElem.fieldNameStringData();
-            if (isGenericArgument(name) && !innerObj.hasField(name)) {
-                bob.append(outerElem);
-            }
-        }
-        return bob.obj();
-    }();
-
+    // CommandInvocation::explain() method.
+    const BSONObj explainedObj = makeExplainedObj(cmdObj, dbName);
     const std::string cmdName = explainedObj.firstElementFieldName();
     auto explainedCommand = CommandHelpers::findCommand(cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Explain failed due to unknown command: " << cmdName,
-            explainedCommand != nullptr);
-
-    // Actually call the nested command's explain(...) method.
+            explainedCommand);
     auto innerRequest = std::make_unique<OpMsgRequest>(OpMsg{explainedObj});
     auto innerInvocation = explainedCommand->parse(opCtx, *innerRequest);
     return stdx::make_unique<Invocation>(

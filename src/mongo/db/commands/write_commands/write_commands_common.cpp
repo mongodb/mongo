@@ -30,6 +30,7 @@
 
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -44,52 +45,28 @@ namespace mongo {
 namespace auth {
 namespace {
 
-using write_ops::Delete;
-using write_ops::Insert;
-using write_ops::Update;
-using write_ops::UpdateOpEntry;
-
-/**
- * Helper to determine whether or not there are any upserts in the batch
- */
-bool containsUpserts(const std::vector<UpdateOpEntry>& updates) {
-    for (auto&& update : updates) {
-        if (update.getUpsert())
-            return true;
-    }
-
-    return false;
-}
-
 /**
  * Helper to extract the namespace being indexed from a raw BSON write command.
  *
  * TODO: Remove when we have parsing hooked before authorization.
  */
-StatusWith<NamespaceString> getIndexedNss(const std::vector<BSONObj>& documentsToInsert) {
-    if (documentsToInsert.empty()) {
-        return {ErrorCodes::FailedToParse, "index write batch is empty"};
-    }
-
-    const std::string nsToIndex = documentsToInsert.front()["ns"].str();
-    if (nsToIndex.empty()) {
-        return {ErrorCodes::FailedToParse,
-                "index write batch contains an invalid index descriptor"};
-    }
-
-    if (documentsToInsert.size() != 1) {
-        return {ErrorCodes::FailedToParse,
-                "index write batches may only contain a single index descriptor"};
-    }
-
-    return {NamespaceString(std::move(nsToIndex))};
+NamespaceString getIndexedNss(const std::vector<BSONObj>& documentsToInsert) {
+    uassert(ErrorCodes::FailedToParse, "index write batch is empty", !documentsToInsert.empty());
+    std::string nsToIndex = documentsToInsert.front()["ns"].str();
+    uassert(ErrorCodes::FailedToParse,
+            "index write batch contains an invalid index descriptor",
+            !nsToIndex.empty());
+    uassert(ErrorCodes::FailedToParse,
+            "index write batches may only contain a single index descriptor",
+            documentsToInsert.size() == 1);
+    return NamespaceString(std::move(nsToIndex));
 }
 
 }  // namespace
 
-Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
-                                BatchedCommandRequest::BatchType cmdType,
-                                const OpMsgRequest& request) {
+void checkAuthForWriteCommand(AuthorizationSession* authzSession,
+                              BatchedCommandRequest::BatchType cmdType,
+                              const OpMsgRequest& request) {
     std::vector<Privilege> privileges;
     ActionSet actionsOnCommandNSS;
 
@@ -98,46 +75,49 @@ Status checkAuthForWriteCommand(AuthorizationSession* authzSession,
     }
 
     NamespaceString cmdNSS;
-    if (cmdType == BatchedCommandRequest::BatchType_Insert) {
-        auto op = Insert::parse(IDLParserErrorContext("insert"), request);
-        cmdNSS = op.getNamespace();
-        if (!op.getNamespace().isSystemDotIndexes()) {
-            actionsOnCommandNSS.addAction(ActionType::insert);
-        } else {
-            // Special-case indexes until we have a command
-            const auto swNssToIndex = getIndexedNss(op.getDocuments());
-            if (!swNssToIndex.isOK()) {
-                return swNssToIndex.getStatus();
+
+    switch (cmdType) {
+        case BatchedCommandRequest::BatchType_Insert: {
+            auto op = write_ops::Insert::parse(IDLParserErrorContext("insert"), request);
+            cmdNSS = op.getNamespace();
+            if (!op.getNamespace().isSystemDotIndexes()) {
+                actionsOnCommandNSS.addAction(ActionType::insert);
+            } else {
+                // Special-case indexes until we have a command
+                auto nssToIndex = getIndexedNss(op.getDocuments());
+                privileges.push_back(Privilege(ResourcePattern::forExactNamespace(nssToIndex),
+                                               ActionType::createIndex));
             }
-
-            const auto& nssToIndex = swNssToIndex.getValue();
-            privileges.push_back(
-                Privilege(ResourcePattern::forExactNamespace(nssToIndex), ActionType::createIndex));
+            break;
         }
-    } else if (cmdType == BatchedCommandRequest::BatchType_Update) {
-        auto op = Update::parse(IDLParserErrorContext("update"), request);
-        cmdNSS = op.getNamespace();
-        actionsOnCommandNSS.addAction(ActionType::update);
-
-        // Upsert also requires insert privs
-        if (containsUpserts(op.getUpdates())) {
-            actionsOnCommandNSS.addAction(ActionType::insert);
+        case BatchedCommandRequest::BatchType_Update: {
+            auto op = write_ops::Update::parse(IDLParserErrorContext("update"), request);
+            cmdNSS = op.getNamespace();
+            actionsOnCommandNSS.addAction(ActionType::update);
+            // Upsert also requires insert privs
+            const auto& updates = op.getUpdates();
+            if (std::any_of(
+                    updates.begin(), updates.end(), [](auto&& x) { return x.getUpsert(); })) {
+                actionsOnCommandNSS.addAction(ActionType::insert);
+            }
+            break;
         }
-    } else {
-        fassert(17251, cmdType == BatchedCommandRequest::BatchType_Delete);
-        auto op = Delete::parse(IDLParserErrorContext("delete"), request);
-        cmdNSS = op.getNamespace();
-        actionsOnCommandNSS.addAction(ActionType::remove);
+        case BatchedCommandRequest::BatchType_Delete: {
+            auto op = write_ops::Delete::parse(IDLParserErrorContext("delete"), request);
+            cmdNSS = op.getNamespace();
+            actionsOnCommandNSS.addAction(ActionType::remove);
+            break;
+        }
     }
 
     if (!actionsOnCommandNSS.empty()) {
-        privileges.emplace_back(ResourcePattern::forExactNamespace(cmdNSS), actionsOnCommandNSS);
+        privileges.push_back(
+            Privilege(ResourcePattern::forExactNamespace(cmdNSS), actionsOnCommandNSS));
     }
 
-    if (authzSession->isAuthorizedForPrivileges(privileges))
-        return Status::OK();
-
-    return Status(ErrorCodes::Unauthorized, "unauthorized");
+    uassert(ErrorCodes::Unauthorized,
+            "unauthorized",
+            authzSession->isAuthorizedForPrivileges(privileges));
 }
 
 }  // namespace auth

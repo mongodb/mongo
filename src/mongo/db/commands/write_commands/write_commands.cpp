@@ -71,17 +71,6 @@ void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
     }
 }
 
-Status checkAuthForWriteCommand(Client* client,
-                                BatchedCommandRequest::BatchType batchType,
-                                const OpMsgRequest& request) {
-    Status status =
-        auth::checkAuthForWriteCommand(AuthorizationSession::get(client), batchType, request);
-    if (!status.isOK()) {
-        LastError::get(client).setLastError(status.code(), status.reason());
-    }
-    return status;
-}
-
 bool shouldSkipOutput(OperationContext* opCtx) {
     const WriteConcernOptions& writeConcern = opCtx->getWriteConcern();
     return writeConcern.wMode.empty() && writeConcern.wNumNodes == 0 &&
@@ -202,7 +191,7 @@ public:
     explicit WriteCommand(StringData name) : Command(name) {}
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
-                                             const OpMsgRequest& request) override;
+                                             const OpMsgRequest& request) final;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
@@ -229,6 +218,8 @@ public:
 
 private:
     class Invocation;
+
+    virtual BatchedCommandRequest::BatchType writeType() const = 0;
 };
 
 class WriteCommand::Invocation : public CommandInvocation {
@@ -277,7 +268,13 @@ private:
     }
 
     void doCheckAuthorization(OperationContext* opCtx) const final {
-        uassertStatusOK(command()->checkAuthForRequest(opCtx, *_request));
+        try {
+            auth::checkAuthForWriteCommand(
+                AuthorizationSession::get(opCtx->getClient()), command()->writeType(), *_request);
+        } catch (const DBException& e) {
+            LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
+            throw;
+        }
     }
 
     const WriteCommand* command() const {
@@ -306,11 +303,6 @@ public:
         return "insert documents";
     }
 
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
-        return checkAuthForWriteCommand(
-            opCtx->getClient(), BatchedCommandRequest::BatchType_Insert, request);
-    }
-
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
                  BSONObjBuilder& result) const final {
@@ -322,6 +314,10 @@ public:
                        batch.getDocuments().size(),
                        std::move(reply),
                        &result);
+    }
+
+    BatchedCommandRequest::BatchType writeType() const override {
+        return BatchedCommandRequest::BatchType_Insert;
     }
 } cmdInsert;
 
@@ -335,11 +331,6 @@ public:
 
     std::string help() const final {
         return "update documents";
-    }
-
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
-        return checkAuthForWriteCommand(
-            opCtx->getClient(), BatchedCommandRequest::BatchType_Update, request);
     }
 
     void runImpl(OperationContext* opCtx,
@@ -388,6 +379,10 @@ public:
         Explain::explainStages(exec.get(), collection.getCollection(), verbosity, out);
         return Status::OK();
     }
+
+    BatchedCommandRequest::BatchType writeType() const override {
+        return BatchedCommandRequest::BatchType_Update;
+    }
 } cmdUpdate;
 
 class CmdDelete final : public WriteCommand {
@@ -400,11 +395,6 @@ public:
 
     std::string help() const final {
         return "delete documents";
-    }
-
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
-        return checkAuthForWriteCommand(
-            opCtx->getClient(), BatchedCommandRequest::BatchType_Delete, request);
     }
 
     void runImpl(OperationContext* opCtx,
@@ -448,6 +438,10 @@ public:
             opCtx, &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedDelete));
         Explain::explainStages(exec.get(), collection.getCollection(), verbosity, out);
         return Status::OK();
+    }
+
+    BatchedCommandRequest::BatchType writeType() const override {
+        return BatchedCommandRequest::BatchType_Delete;
     }
 } cmdDelete;
 

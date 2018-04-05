@@ -87,37 +87,13 @@ public:
         return explainedCommand->parseNs(dbname, explainedObj);
     }
 
-    /**
-     * You are authorized to run an explain if you are authorized to run
-     * the command that you are explaining. The auth check is performed recursively
-     * on the nested command.
-     */
-    Status checkAuthForRequest(OperationContext* opCtx,
-                               const OpMsgRequest& request) const override {
-        CommandHelpers::uassertNoDocumentSequences(getName(), request);
-        const BSONObj& cmdObj = request.body;
-        if (Object != cmdObj.firstElement().type()) {
-            return Status(ErrorCodes::BadValue, "explain command requires a nested object");
-        }
-        auto explainedObj = cmdObj.firstElement().Obj();
-        auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
-        if (!explainedCommand) {
-            return Status(ErrorCodes::CommandNotFound,
-                          str::stream() << "unknown command: "
-                                        << explainedObj.firstElementFieldName());
-        }
-        return explainedCommand->checkAuthForRequest(
-            opCtx,
-            OpMsgRequest::fromDBAndBody(request.getDatabase().toString(), std::move(explainedObj)));
-    }
-
 private:
     class Invocation;
 };
 
 class CmdExplain::Invocation final : public CommandInvocation {
 public:
-    Invocation(CmdExplain* explainCommand,
+    Invocation(const CmdExplain* explainCommand,
                const OpMsgRequest& request,
                ExplainOptions::Verbosity verbosity,
                std::unique_ptr<OpMsgRequest> innerRequest,
@@ -163,8 +139,13 @@ public:
         return command()->secondaryAllowed(context);
     }
 
+    /**
+     * You are authorized to run an explain if you are authorized to run
+     * the command that you are explaining. The auth check is performed recursively
+     * on the nested command.
+     */
     void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(command()->checkAuthForRequest(opCtx, *_outerRequest));
+        _innerInvocation->checkAuthorization(opCtx, *_innerRequest);
     }
 
 private:
@@ -186,6 +167,9 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     std::string dbname = request.getDatabase().toString();
     const BSONObj& cmdObj = request.body;
     ExplainOptions::Verbosity verbosity = uassertStatusOK(ExplainOptions::parseCmdBSON(cmdObj));
+    uassert(ErrorCodes::BadValue,
+            "explain command requires a nested object",
+            cmdObj.firstElement().type() == Object);
     auto explainedObj = cmdObj.firstElement().Obj();
     if (auto innerDb = explainedObj["$db"]) {
         uassert(ErrorCodes::InvalidNamespace,
@@ -199,7 +183,6 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
             str::stream() << "Explain failed due to unknown command: "
                           << explainedObj.firstElementFieldName(),
             explainedCommand);
-
     auto innerRequest =
         stdx::make_unique<OpMsgRequest>(OpMsgRequest::fromDBAndBody(dbname, explainedObj));
     auto innerInvocation = explainedCommand->parse(opCtx, *innerRequest);
