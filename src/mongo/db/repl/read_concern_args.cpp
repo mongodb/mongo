@@ -246,6 +246,26 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
     return Status::OK();
 }
 
+Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
+    if (_level && *_level != ReadConcernLevel::kSnapshotReadConcern &&
+        *_level != ReadConcernLevel::kMajorityReadConcern &&
+        *_level != ReadConcernLevel::kLocalReadConcern) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "The readConcern level must be either 'local' or 'majority' in order to "
+                      "upconvert the readConcern level to 'snapshot'");
+    }
+
+    if (_opTime) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Cannot upconvert the readConcern level to 'snapshot' when '"
+                                    << kAfterOpTimeFieldName
+                                    << "' is provided");
+    }
+
+    _level = ReadConcernLevel::kSnapshotReadConcern;
+    return Status::OK();
+}
+
 void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
 

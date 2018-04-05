@@ -20,12 +20,19 @@
     let txnNumber = 0;
 
     jsTestLog("Check that abortTransaction accepts a statement ID");
+    assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
+    }));
     // abortTransaction can only be run on the admin database.
     assert.commandWorked(sessionDb.adminCommand({
         abortTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
+        stmtId: NumberInt(1),
         autocommit: false
     }));
 
@@ -44,12 +51,19 @@
     // The applyOps command is intentionally left out.
 
     jsTestLog("Check that commitTransaction accepts a statement ID");
+    assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
+    }));
     // commitTransaction can only be run on the admin database.
     assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
+        stmtId: NumberInt(1),
         autocommit: false
     }));
 
@@ -261,12 +275,19 @@
     }));
 
     jsTestLog("Check that prepareTransaction accepts a statement ID");
+    assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
+    }));
     // prepareTransaction can only be run on the admin database.
     assert.commandWorked(sessionDb.adminCommand({
         prepareTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
+        stmtId: NumberInt(1),
         autocommit: false
     }));
 

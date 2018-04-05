@@ -88,6 +88,12 @@ public:
     Status initialize(const BSONElement& readConcernElem);
 
     /**
+     * Upconverts the readConcern level to 'snapshot', or returns a non-ok status if this
+     * readConcern cannot be upconverted.
+     */
+    Status upconvertReadConcernLevelToSnapshot();
+
+    /**
      * Appends level and afterOpTime.
      */
     void appendInfo(BSONObjBuilder* builder) const;

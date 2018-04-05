@@ -359,12 +359,20 @@ void appendReplyMetadata(OperationContext* opCtx,
  * if the read concern is not valid for the command.
  */
 StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* invocation,
-                                                      const BSONObj& cmdObj) {
+                                                      const BSONObj& cmdObj,
+                                                      bool upconvertToSnapshot) {
     repl::ReadConcernArgs readConcernArgs;
 
     auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
     if (!readConcernParseStatus.isOK()) {
         return readConcernParseStatus;
+    }
+
+    if (upconvertToSnapshot) {
+        auto upconvertToSnapshotStatus = readConcernArgs.upconvertReadConcernLevelToSnapshot();
+        if (!upconvertToSnapshotStatus.isOK()) {
+            return upconvertToSnapshotStatus;
+        }
     }
 
     if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
@@ -724,7 +732,12 @@ void execCommandDatabase(OperationContext* opCtx,
         // Session::inMultiDocumentTransaction().
         if (!opCtx->getClient()->isInDirectClient() || !opCtx->getTxnNumber() ||
             !opCtx->getLogicalSessionId()) {
-            readConcernArgs = uassertStatusOK(_extractReadConcern(invocation.get(), request.body));
+            auto session = OperationContextSession::get(opCtx);
+            const bool upconvertToSnapshot = session && session->inMultiDocumentTransaction() &&
+                sessionOptions &&
+                (sessionOptions->getStartTransaction() == boost::optional<bool>(true));
+            readConcernArgs = uassertStatusOK(
+                _extractReadConcern(invocation.get(), request.body, upconvertToSnapshot));
         }
 
         if (readConcernArgs.getArgsAtClusterTime()) {
@@ -825,7 +838,7 @@ void execCommandDatabase(OperationContext* opCtx,
             // Note: the read concern may not have been successfully or yet placed on the opCtx, so
             // parsing it separately here.
             const std::string db = request.getDatabase().toString();
-            auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body);
+            auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body, false);
             auto operationTime = readConcernArgsStatus.isOK()
                 ? computeOperationTime(
                       opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())

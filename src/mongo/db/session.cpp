@@ -481,6 +481,15 @@ void Session::_beginOrContinueTxn(WithLock wl,
                 ErrorCodes::InvalidOptions,
                 "Must specify autocommit=false on all operations of a multi-statement transaction.",
                 autocommit == boost::optional<bool>(false));
+            if (_txnState == MultiDocumentTransactionState::kInProgress && !_txnResourceStash) {
+                // This indicates that the first command in the transaction failed but did not
+                // implicitly abort the transaction. It is not safe to continue the transaction, in
+                // particular because we have not saved the readConcern from the first statement of
+                // the transaction.
+                _abortTransaction(wl);
+                uasserted(ErrorCodes::NoSuchTransaction,
+                          str::stream() << "Transaction " << txnNumber << " has been aborted.");
+            }
         }
         return;
     }

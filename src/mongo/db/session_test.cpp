@@ -752,7 +752,15 @@ TEST_F(SessionTest, AutocommitRequiredOnEveryTxnOp) {
     ASSERT(session.getAutocommit());
 
     const TxnNumber txnNum = 100;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
     session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+
+    // We must have stashed transaction resources to do a second operation on the transaction.
+    session.unstashTransactionResources(opCtx(), "insert");
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    session.stashTransactionResources(opCtx());
 
     // Autocommit should be set to false
     ASSERT_FALSE(session.getAutocommit());
@@ -780,9 +788,17 @@ TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
     session.beginOrContinueTxn(opCtx(), txnNum, false, true);
-    WriteUnitOfWork wuow(opCtx());
+
+    // We must have stashed transaction resources to re-open the transaction.
+    session.unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     session.addTransactionOperation(opCtx(), operation);
+    ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
+    // The transaction machinery cannot store an empty locker.
+    { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now()); }
+    session.stashTransactionResources(opCtx());
+
+    // Check the transaction operations before re-opening the transaction.
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
 
     // Re-opening the same transaction should have no effect.
