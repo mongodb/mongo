@@ -200,6 +200,14 @@ public:
                                                const BSONObj resumeToken);
 
 private:
+    enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
+
+    // Helper function which throws if the $changeStream fails any of a series of semantic checks.
+    // For instance, whether it is permitted to run given the current FCV, whether the namespace is
+    // valid for the options specified in the spec, etc.
+    static void assertIsLegalSpecification(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const DocumentSourceChangeStreamSpec& spec);
+
     // It is illegal to construct a DocumentSourceChangeStream directly, use createFromBson()
     // instead.
     DocumentSourceChangeStream() = default;

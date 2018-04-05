@@ -10,17 +10,18 @@
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
     load("jstests/replsets/libs/two_phase_drops.js");  // For 'TwoPhaseDropCollectionTest'.
 
-    let cst = new ChangeStreamTest(db);
     const coll = assertDropAndRecreateCollection(db, "change_post_image");
 
-    function testUpdateLookup(coll, collToWatch) {
+    function testUpdateLookup(coll, collToWatch, changeStreamDB = db, changeStreamSpec = {}) {
         coll.drop();
+
+        const cst = new ChangeStreamTest(changeStreamDB);
 
         jsTestLog("Testing change streams without 'fullDocument' specified");
         // Test that not specifying 'fullDocument' does include a 'fullDocument' in the result for
         // an insert.
-        let cursor =
-            cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collToWatch});
+        let cursor = cst.startWatchingChanges(
+            {pipeline: [{$changeStream: changeStreamSpec}], collection: collToWatch});
         assert.writeOK(coll.insert({_id: "fullDocument not specified"}));
         let latestChange = cst.getOneChange(cursor);
         assert.eq(latestChange.operationType, "insert");
@@ -45,8 +46,9 @@
 
         // Test that specifying 'fullDocument' as 'default' does include a 'fullDocument' in the
         // result for an insert.
+        const defaultFullDocSpec = Object.assign({fullDocument: "default"}, changeStreamSpec);
         cursor = cst.startWatchingChanges(
-            {collection: collToWatch, pipeline: [{$changeStream: {fullDocument: "default"}}]});
+            {collection: collToWatch, pipeline: [{$changeStream: defaultFullDocSpec}]});
         assert.writeOK(coll.insert({_id: "fullDocument is default"}));
         latestChange = cst.getOneChange(cursor);
         assert.eq(latestChange.operationType, "insert");
@@ -71,8 +73,9 @@
 
         // Test that specifying 'fullDocument' as 'updateLookup' does include a 'fullDocument' in
         // the result for an insert.
+        const updateLookupSpec = Object.assign({fullDocument: "updateLookup"}, changeStreamSpec);
         cursor = cst.startWatchingChanges(
-            {collection: collToWatch, pipeline: [{$changeStream: {fullDocument: "updateLookup"}}]});
+            {collection: collToWatch, pipeline: [{$changeStream: updateLookupSpec}]});
         assert.writeOK(coll.insert({_id: "fullDocument is lookup"}));
         latestChange = cst.getOneChange(cursor);
         assert.eq(latestChange.operationType, "insert");
@@ -98,10 +101,7 @@
         // in a 'fullDocument' with a value of null.
         cursor = cst.startWatchingChanges({
             collection: collToWatch,
-            pipeline: [
-                {$changeStream: {fullDocument: "updateLookup"}},
-                {$match: {operationType: "update"}}
-            ]
+            pipeline: [{$changeStream: updateLookupSpec}, {$match: {operationType: "update"}}]
         });
         assert.writeOK(coll.update({_id: "fullDocument is lookup"}, {$set: {updatedAgain: true}}));
         assert.writeOK(coll.remove({_id: "fullDocument is lookup"}));
@@ -123,10 +123,12 @@
         assert.writeOK(coll.update({_id: "fullDocument is lookup 2"}, {$set: {updated: true}}));
 
         // Open a $changeStream cursor with batchSize 0, so that no oplog entries are retrieved yet.
+        const resumeAfterDeleteAndUpdateLookupSpec = Object.assign(
+            {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}, changeStreamSpec);
         cursor = cst.startWatchingChanges({
             collection: collToWatch,
             pipeline: [
-                {$changeStream: {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}},
+                {$changeStream: resumeAfterDeleteAndUpdateLookupSpec},
                 {$match: {operationType: {$ne: "delete"}}}
             ],
             aggregateOptions: {cursor: {batchSize: 0}}
@@ -136,7 +138,7 @@
         let cursorBeforeDrop = cst.startWatchingChanges({
             collection: collToWatch,
             pipeline: [
-                {$changeStream: {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}},
+                {$changeStream: resumeAfterDeleteAndUpdateLookupSpec},
                 {$match: {operationType: {$ne: "delete"}}}
             ],
             aggregateOptions: {cursor: {batchSize: 0}}
@@ -177,10 +179,10 @@
         assert.eq(latestChange.fullDocument, null);
 
         // Test establishing new cursors with resume token on dropped collections fails.
-        let res = db.runCommand({
+        let res = changeStreamDB.runCommand({
             aggregate: collToWatch,
             pipeline: [
-                {$changeStream: {fullDocument: "updateLookup", resumeAfter: deleteDocResumePoint}},
+                {$changeStream: resumeAfterDeleteAndUpdateLookupSpec},
                 {$match: {operationType: "update"}}
             ],
             cursor: {batchSize: 0}
@@ -207,8 +209,8 @@
         // specified.
         const collInvalidate = assertDropAndRecreateCollection(db, "collInvalidate");
         cursor = cst.startWatchingChanges({
-            collection: collInvalidate.getName(),
-            pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+            collection: isNumber(collToWatch) ? collToWatch : collInvalidate.getName(),
+            pipeline: [{$changeStream: updateLookupSpec}],
             aggregateOptions: {cursor: {batchSize: 0}}
         });
         assert.writeOK(collInvalidate.insert({_id: "testing invalidate"}));
@@ -229,7 +231,7 @@
 
         cursor = cst.startWatchingChanges({
             collection: collToWatch,
-            pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
+            pipeline: [{$changeStream: updateLookupSpec}],
         });
         assert.writeOK(coll.update({_id: "getMoreEnabled"}, {$set: {updated: true}}));
 
@@ -243,5 +245,6 @@
     // Test update lookup with a change stream on a whole database.
     testUpdateLookup(coll, 1);
 
-    cst.cleanUp();
+    // Test update lookup with a change stream on the whole cluster.
+    testUpdateLookup(coll, 1, db.getSiblingDB("admin"), {allChangesForCluster: true});
 }());

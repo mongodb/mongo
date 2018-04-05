@@ -242,19 +242,22 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
     Timestamp startFrom,
     bool startFromInclusive) {
     auto nss = expCtx->ns;
-    auto onEntireDB = nss.isCollectionlessAggregateNS();
-    const auto regexAllCollections = R"(\.(?!(\$|system\.)))";
+    // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
+    ChangeStreamType sourceType = (nss.isAdminDB() ? ChangeStreamType::kAllChangesForCluster
+                                                   : (nss.isCollectionlessAggregateNS()
+                                                          ? ChangeStreamType::kSingleDatabase
+                                                          : ChangeStreamType::kSingleCollection));
+
+    // Regular expressions that match all oplog entries on supported databases and collections.
+    const auto regexAllCollections = R"(\.(?!(\$|system\.)))"_sd;
+    const auto regexAllDBs = "(?!(admin|config|local)).+"_sd;
+    const auto regexCmdColl = R"(\.\$cmd$)"_sd;
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
     BSONArrayBuilder invalidatingCommands;
     invalidatingCommands.append(BSON("o.dropDatabase" << 1));
 
-    // For change streams on an entire database, all collections drops and renames are considered
-    // invalidate entries.
-    if (onEntireDB) {
-        invalidatingCommands.append(BSON("o.drop" << BSON("$exists" << true)));
-        invalidatingCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
-    } else {
+    if (sourceType == ChangeStreamType::kSingleCollection) {
         invalidatingCommands.append(BSON("o.drop" << nss.coll()));
         invalidatingCommands.append(BSON("o.renameCollection" << nss.ns()));
         if (expCtx->collation.isEmpty()) {
@@ -265,15 +268,29 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
             invalidatingCommands.append(
                 BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
         }
+    } else {
+        // For change streams on an entire database, the stream is invalidated if any collections in
+        // that database are dropped or renamed. For cluster-wide streams, drops or renames of any
+        // collection in any database (aside from the internal databases admin, config and local)
+        // will invalidate the stream.
+        invalidatingCommands.append(BSON("o.drop" << BSON("$exists" << true)));
+        invalidatingCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
     }
 
-    // 1.1) Commands that are on target db and one of the above.
+    // For cluster-wide $changeStream, match the command namespace of any database other than admin,
+    // config, or local. Otherwise, match only against the target db's command namespace.
+    auto cmdNsFilter = (sourceType == ChangeStreamType::kAllChangesForCluster
+                            ? BSON("ns" << BSONRegEx("^" + regexAllDBs + regexCmdColl))
+                            : BSON("ns" << nss.getCommandNS().ns()));
+
+    // 1.1) Commands that are on target db(s) and one of the above invalidating commands.
     auto commandsOnTargetDb =
-        BSON("$and" << BSON_ARRAY(BSON("ns" << nss.getCommandNS().ns())
-                                  << BSON("$or" << invalidatingCommands.arr())));
+        BSON("$and" << BSON_ARRAY(cmdNsFilter << BSON("$or" << invalidatingCommands.arr())));
 
     // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
-    auto renameDropTarget = BSON("o.to" << nss.ns());
+    auto renameDropTarget = (sourceType == ChangeStreamType::kAllChangesForCluster
+                                 ? BSON("o.to" << BSON("$exists" << true))
+                                 : BSON("o.to" << nss.ns()));
 
     // All supported commands that are either (1.1) or (1.2).
     BSONObj commandMatch = BSON("op"
@@ -290,19 +307,27 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
                                    << "migrateChunkToNewShard");
 
     // 2) Supported operations on the target namespace.
-    BSONObj opMatch;
-    if (onEntireDB) {
-        // Match all namespaces that start with db name, followed by ".", then not followed by
-        // '$' or 'system.'
-        opMatch = BSON("ns" << BSONRegEx("^" + nss.db() + regexAllCollections)
-                            << OR(normalOpTypeMatch, chunkMigratedMatch));
-    } else {
-        opMatch = BSON("ns" << nss.ns() << OR(normalOpTypeMatch, chunkMigratedMatch));
+    BSONObj nsMatch;
+    switch (sourceType) {
+        case ChangeStreamType::kSingleCollection:
+            // Match the target namespace exactly.
+            nsMatch = BSON("ns" << nss.ns());
+            break;
+        case ChangeStreamType::kSingleDatabase:
+            // Match all namespaces that start with db name, followed by ".", then NOT followed by
+            // '$' or 'system.'
+            nsMatch = BSON("ns" << BSONRegEx("^" + nss.db() + regexAllCollections));
+            break;
+        case ChangeStreamType::kAllChangesForCluster:
+            // Match all namespaces that start with any db name other than admin, config, or local,
+            // followed by ".", then NOT followed by '$' or 'system.'
+            nsMatch = BSON("ns" << BSONRegEx("^" + regexAllDBs + regexAllCollections));
     }
+    auto opMatch = BSON(nsMatch["ns"] << OR(normalOpTypeMatch, chunkMigratedMatch));
 
     // Match oplog entries after "start" and are either supported (1) commands or (2) operations,
-    // excepting those tagged "fromMigrate".
-    // Include the resume token, if resuming, so we can verify it was still present in the oplog.
+    // excepting those tagged "fromMigrate". Include the resume token, if resuming, so we can verify
+    // it was still present in the oplog.
     return BSON("$and" << BSON_ARRAY(BSON("ts" << (startFromInclusive ? GTE : GT) << startFrom)
                                      << BSON(OR(opMatch, commandMatch))
                                      << BSON("fromMigrate" << NE << true)));
@@ -397,38 +422,11 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
 
-    // Prevent $changeStream from running on an entire database (or cluster-wide) unless we are in
-    // test mode.
-    // TODO SERVER-34283: remove once whole-database $changeStream is feature-complete.
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            "Running $changeStream on an entire database or cluster is not permitted unless the "
-            "deployment is in test mode.",
-            !(expCtx->ns.isCollectionlessAggregateNS() && !getTestCommandsEnabled()));
-
-    // Change stream on an entire database is a new 4.0 feature.
-    uassert(ErrorCodes::QueryFeatureNotAllowed,
-            str::stream() << "$changeStream on an entire database is not allowed in the current "
-                             "feature compatibility version. See "
-                          << feature_compatibility_version_documentation::kCompatibilityLink
-                          << " for more information.",
-            !expCtx->ns.isCollectionlessAggregateNS() ||
-                serverGlobalParams.featureCompatibility.getVersion() >=
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-
     auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
                                                       elem.embeddedObject());
 
-    // TODO SERVER-34086: $changeStream may run against the 'admin' database iff
-    // 'allChangesForCluster' is true.
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.db()
-                          << " database",
-            !(expCtx->ns.isAdminDB() || expCtx->ns.isLocal() || expCtx->ns.isConfigDB()));
-
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.ns()
-                          << " collection",
-            !expCtx->ns.isSystem());
+    // Make sure that it is legal to run this $changeStream before proceeding.
+    DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec);
 
     boost::optional<Timestamp> startFrom;
     intrusive_ptr<DocumentSource> resumeStage = nullptr;
@@ -494,6 +492,50 @@ BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj or
     MutableDocument newCmd(originalCmd);
     newCmd[AggregationRequest::kPipelineName] = Value(pipeline);
     return newCmd.freeze().toBson();
+}
+
+void DocumentSourceChangeStream::assertIsLegalSpecification(
+    const intrusive_ptr<ExpressionContext>& expCtx, const DocumentSourceChangeStreamSpec& spec) {
+    // Prevent $changeStream from running on an entire database (or cluster-wide) unless we are in
+    // test mode.
+    // TODO SERVER-34283: remove once whole-database $changeStream is feature-complete.
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "Running $changeStream on an entire database or cluster is not permitted unless the "
+            "deployment is in test mode.",
+            !(expCtx->ns.isCollectionlessAggregateNS() && !getTestCommandsEnabled()));
+
+    // Change stream on an entire database is a new 4.0 feature.
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << "$changeStream on an entire database is not allowed in the current "
+                             "feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            !expCtx->ns.isCollectionlessAggregateNS() ||
+                serverGlobalParams.featureCompatibility.getVersion() >=
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+    // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
+    // {aggregate: 1}.
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "A $changeStream with 'allChangesForCluster:true' may only be opened "
+                             "on the 'admin' database, and with no collection name; found "
+                          << expCtx->ns.ns(),
+            !spec.getAllChangesForCluster() ||
+                (expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS()));
+
+    // Prevent $changeStream from running on internal databases. A stream may run against the
+    // 'admin' database iff 'allChangesForCluster' is true.
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.db()
+                          << " database",
+            expCtx->ns.isAdminDB() ? spec.getAllChangesForCluster()
+                                   : (!expCtx->ns.isLocal() && !expCtx->ns.isConfigDB()));
+
+    // Prevent $changeStream from running on internal collections in any database.
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.ns()
+                          << " collection",
+            !expCtx->ns.isSystem());
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(

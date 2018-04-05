@@ -7,8 +7,7 @@
                                                        // assert[Valid|Invalid]ChangeStreamNss.
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
-    // Test that a change stream cannot be opened on the "admin", "config", or "local" databases.
-    // TODO SERVER-34086: $changeStream may run against 'admin' if 'allChangesForCluster' is true.
+    // Test that a single-database change stream cannot be opened on "admin", "config", or "local".
     assertInvalidChangeStreamNss("admin", 1);
     assertInvalidChangeStreamNss("config", 1);
     if (!FixtureHelpers.isMongos(db)) {

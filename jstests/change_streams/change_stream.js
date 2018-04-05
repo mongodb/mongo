@@ -19,6 +19,16 @@
         assertInvalidChangeStreamNss("local");
     }
 
+    // Test that a change stream can be opened on the admin database if {allChangesForCluster:true}
+    // is specified.
+    assertValidChangeStreamNss("admin", 1, {allChangesForCluster: true});
+    // Test that a change stream cannot be opened on the admin database if a collection is
+    // specified, even with {allChangesForCluster:true}.
+    assertInvalidChangeStreamNss("admin", "testcoll", {allChangesForCluster: true});
+    // Test that a change stream cannot be opened on a database other than admin if
+    // {allChangesForCluster:true} is specified.
+    assertInvalidChangeStreamNss(db.getName(), 1, {allChangesForCluster: true});
+
     // Test that a change stream cannot be opened on 'system.' collections.
     assertInvalidChangeStreamNss(db.getName(), "system.users");
     assertInvalidChangeStreamNss(db.getName(), "system.profile");

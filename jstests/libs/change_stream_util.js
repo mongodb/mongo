@@ -38,6 +38,19 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     };
 
     /**
+     * Returns a change stream cursor that listens for every change in the cluster. Assumes that the
+     * ChangeStreamTest has been created on the 'admin' db, and will assert if not. It uses the
+     * 'aggregateOptions' if provided and saves the cursor so that it can be cleaned up later.
+     */
+    self.startWatchingAllChangesForCluster = function(aggregateOptions) {
+        return self.startWatchingChanges({
+            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            collection: 1,
+            aggregateOptions: aggregateOptions
+        });
+    };
+
+    /**
      * Issues a 'getMore' on the provided cursor and returns the cursor returned.
      */
     self.getNextBatch = function(cursor) {
@@ -225,18 +238,23 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
 /**
  * A set of functions to help validate the behaviour of $changeStreams for a given namespace.
  */
-function assertChangeStreamNssBehaviour(dbName, collName = "test", assertFunc) {
+function assertChangeStreamNssBehaviour(dbName, collName = "test", options, assertFunc) {
     const testDb = db.getSiblingDB(dbName);
-    const res =
-        testDb.runCommand({aggregate: collName, pipeline: [{$changeStream: {}}], cursor: {}});
+    options = (options || {});
+    const res = testDb.runCommand(
+        Object.assign({aggregate: collName, pipeline: [{$changeStream: options}], cursor: {}}));
     return assertFunc(res);
 }
-function assertValidChangeStreamNss(dbName, collName = "test") {
-    const res = assertChangeStreamNssBehaviour(dbName, collName, assert.commandWorked);
-    assert.commandWorked(
-        db.getSiblingDB(dbName).runCommand({killCursors: collName, cursors: [res.cursor.id]}));
+function assertValidChangeStreamNss(dbName, collName = "test", options) {
+    const res = assertChangeStreamNssBehaviour(dbName, collName, options, assert.commandWorked);
+    assert.commandWorked(db.getSiblingDB(dbName).runCommand(
+        {killCursors: (collName == 1 ? "$cmd.aggregate" : collName), cursors: [res.cursor.id]}));
 }
-function assertInvalidChangeStreamNss(dbName, collName = "test") {
+function assertInvalidChangeStreamNss(dbName, collName = "test", options) {
     assertChangeStreamNssBehaviour(
-        dbName, collName, (res) => assert.commandFailedWithCode(res, ErrorCodes.InvalidNamespace));
+        dbName,
+        collName,
+        options,
+        (res) => assert.commandFailedWithCode(
+            res, [ErrorCodes.InvalidNamespace, ErrorCodes.InvalidOptions]));
 }

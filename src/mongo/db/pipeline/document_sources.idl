@@ -95,6 +95,12 @@ structs:
               default: '"default"'
               description: A string '"updateLookup"' or '"default"', indicating whether or not we
                            should return a full document or just changes for an update.
+          allChangesForCluster:
+              cpp_name: allChangesForCluster
+              type: bool
+              default: false
+              description: A flag indicating whether the stream should report all changes that occur
+                           on the deployment, aside from those on internal databases or collections.
 
   ListSessionsUser:
     description: "A struct representing a $listSessions/$listLocalSessions User"
