@@ -429,11 +429,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
                     return Status(ErrorCodes::UnrecoverableRollbackError, message);
                 }
 
-                // Checks if dropTarget is false. If it has a UUID value, we need to
+                // Checks if dropTarget is present. If it has a UUID value, we need to
                 // make sure to un-drop the collection that was dropped in the process
                 // of renaming.
-                auto dropTarget = obj.getField("dropTarget");
-                if (dropTarget.type() != Bool) {
+                if (auto dropTarget = obj.getField("dropTarget")) {
                     auto status =
                         fixUpInfo.recordDropTargetInfo(dropTarget, obj, oplogEntry.getOpTime());
                     if (!status.isOK()) {

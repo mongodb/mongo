@@ -152,8 +152,6 @@ OplogInterfaceMock::Operation makeRenameCollectionOplogEntry(const NamespaceStri
 
     if (dropTarget) {
         obj = obj.addField(BSON("dropTarget" << *dropTarget).firstElement());
-    } else {
-        obj = obj.addField(BSON("dropTarget" << false).firstElement());
     }
     return std::make_pair(
         BSON("ts" << opTime.getTimestamp() << "t" << opTime.getTerm() << "h" << 1LL << "op"
