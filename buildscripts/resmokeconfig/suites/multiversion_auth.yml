@@ -19,6 +19,9 @@ selector:
   # TODO: SERVER-30161
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
+  # TODO: SERVER-34326
+  - jstests/multiVersion/global_snapshot_reads_downgrade_cluster.js
+  - jstests/multiVersion/global_snapshot_reads_upgrade_cluster.js
 
 # Multiversion tests start their own mongod's.
 executor:
