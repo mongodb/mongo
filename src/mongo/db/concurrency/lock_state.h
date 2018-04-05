@@ -305,7 +305,6 @@ private:
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel;
-    std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
 
     // Mode for which the Locker acquired a ticket, or MODE_NONE if no ticket was acquired.
     LockMode _modeForTicket = MODE_NONE;
