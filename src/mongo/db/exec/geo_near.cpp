@@ -527,16 +527,16 @@ public:
     //
 
     void debugString(StringBuilder& debug, int level = 0) const final {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     bool equivalent(const MatchExpression* other) const final {
-        invariant(false);
+        MONGO_UNREACHABLE;
         return false;
     }
 
     unique_ptr<MatchExpression> shallowClone() const final {
-        invariant(false);
+        MONGO_UNREACHABLE;
         return NULL;
     }
 

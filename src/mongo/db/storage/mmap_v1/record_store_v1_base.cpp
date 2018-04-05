@@ -935,7 +935,7 @@ int RecordStoreV1Base::quantizeAllocationSpace(int allocSize) {
             return bucketSizes[i];
         }
     }
-    invariant(false);  // prior invariant means we should find something.
+    MONGO_UNREACHABLE;  // prior invariant means we should find something.
 }
 
 bool RecordStoreV1Base::isQuantized(int recordSize) {
@@ -957,6 +957,6 @@ int RecordStoreV1Base::bucket(int size) {
     // Technically, this is reachable if size == INT_MAX, but it would be an error to pass that
     // in anyway since it would be impossible to have a record that large given the file and
     // extent headers.
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 }

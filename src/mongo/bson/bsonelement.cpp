@@ -369,7 +369,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDecimal:
                     return compareIntToDecimal(l._numberInt(), r._numberDecimal());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 
@@ -384,7 +384,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDecimal:
                     return compareLongToDecimal(l._numberLong(), r._numberDecimal());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 
@@ -399,7 +399,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDecimal:
                     return compareDoubleToDecimal(l._numberDouble(), r._numberDecimal());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 
@@ -414,7 +414,7 @@ int BSONElement::compareElements(const BSONElement& l,
                 case NumberDouble:
                     return compareDecimalToDouble(l._numberDecimal(), r._numberDouble());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 

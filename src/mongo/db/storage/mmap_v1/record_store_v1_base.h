@@ -258,7 +258,7 @@ public:
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize) {
-        invariant(false);  // MMAPv1 has its own repair which doesn't call this.
+        MONGO_UNREACHABLE;  // MMAPv1 has its own repair which doesn't call this.
     }
 
 protected:

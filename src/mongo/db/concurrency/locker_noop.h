@@ -58,7 +58,7 @@ public:
     }
 
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode) {
@@ -165,11 +165,11 @@ public:
     }
 
     virtual void releaseTicket() {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual void reacquireTicket(OperationContext* opCtx) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual void dump() const {

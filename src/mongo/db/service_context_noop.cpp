@@ -60,7 +60,7 @@ StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
             return false;
         }
         virtual const StorageEngine::Factory* next() {
-            invariant(false);
+            MONGO_UNREACHABLE;
         }
     };
     return new EmptySFI();

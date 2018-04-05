@@ -205,19 +205,15 @@ Status MmapV1ExtentManager::init(OperationContext* opCtx) {
 }
 
 const DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) const {
-    if (fileId < 0 || fileId >= _files.size()) {
-        log() << "_getOpenFile() invalid file index requested " << fileId;
-        invariant(false);
-    }
+    invariant(fileId >= 0 && fileId < _files.size(),
+              str::stream() << "_getOpenFile() invalid file index requested " << fileId);
 
     return _files[fileId];
 }
 
 DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) {
-    if (fileId < 0 || fileId >= _files.size()) {
-        log() << "_getOpenFile() invalid file index requested " << fileId;
-        invariant(false);
-    }
+    invariant(fileId >= 0 && fileId < _files.size(),
+              str::stream() << "_getOpenFile() invalid file index requested " << fileId);
 
     return _files[fileId];
 }

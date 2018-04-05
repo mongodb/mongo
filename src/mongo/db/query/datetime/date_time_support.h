@@ -269,7 +269,7 @@ public:
                     break;
                 default:
                     // Should never happen as format is pre-validated
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
     }

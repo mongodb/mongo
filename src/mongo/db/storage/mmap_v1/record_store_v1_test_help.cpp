@@ -215,8 +215,7 @@ int DummyExtentManager::numFiles() const {
 }
 
 long long DummyExtentManager::fileSize() const {
-    invariant(false);
-    return -1;
+    MONGO_UNREACHABLE;
 }
 
 DiskLoc DummyExtentManager::allocateExtent(OperationContext* opCtx,
@@ -254,7 +253,7 @@ void DummyExtentManager::freeExtent(OperationContext* opCtx, DiskLoc extent) {
 void DummyExtentManager::freeListStats(OperationContext* opCtx,
                                        int* numExtents,
                                        int64_t* totalFreeSizeBytes) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 std::unique_ptr<RecordFetcher> DummyExtentManager::recordNeedsFetch(const DiskLoc& loc) const {
@@ -271,7 +270,7 @@ MmapV1RecordHeader* DummyExtentManager::recordForV1(const DiskLoc& loc) const {
 }
 
 Extent* DummyExtentManager::extentForV1(const DiskLoc& loc) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 DiskLoc DummyExtentManager::extentLocForV1(const DiskLoc& loc) const {

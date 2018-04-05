@@ -578,7 +578,7 @@ int SSLManagerWindows::SSL_write(SSLConnectionInterface* connInterface, const vo
 }
 
 int SSLManagerWindows::SSL_shutdown(SSLConnectionInterface* conn) {
-    invariant(false);
+    MONGO_UNREACHABLE;
     return 0;
 }
 

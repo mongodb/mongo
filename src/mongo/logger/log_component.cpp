@@ -83,7 +83,7 @@ LogComponent LogComponent::parent() const {
         default:
             return kDefault;
     }
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 StringData LogComponent::toStringData() const {
@@ -134,7 +134,7 @@ StringData LogComponent::toStringData() const {
             return "total"_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 std::string LogComponent::getShortName() const {
@@ -212,7 +212,7 @@ StringData LogComponent::getNameForLog() const {
             return "TOTAL   "_sd;
             // No default. Compiler should complain if there's a log component that's not handled.
     }
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 std::ostream& operator<<(std::ostream& os, LogComponent component) {

@@ -34,167 +34,167 @@
 namespace mongo {
 
 Decimal128::Decimal128(int32_t int32Value) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128::Decimal128(int64_t int64Value) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128::Decimal128(double doubleValue,
                        RoundingPrecision roundPrecision,
                        RoundingMode roundMode) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128::Value Decimal128::getValue() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::toAbs() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int32_t Decimal128::toInt(RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int32_t Decimal128::toInt(uint32_t* signalingFlags, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int64_t Decimal128::toLong(RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int64_t Decimal128::toLong(uint32_t* signalingFlags, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int32_t Decimal128::toIntExact(RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int32_t Decimal128::toIntExact(uint32_t* signalingFlags, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int64_t Decimal128::toLongExact(RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 int64_t Decimal128::toLongExact(uint32_t* signalingFlags, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 double Decimal128::toDouble(RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 double Decimal128::toDouble(uint32_t* signalingFlags, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 std::string Decimal128::toString() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isZero() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isNaN() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isInfinite() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isNegative() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::add(const Decimal128& other, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::add(const Decimal128& other,
                            uint32_t* signalingFlags,
                            RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::subtract(const Decimal128& other, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::subtract(const Decimal128& other,
                                 uint32_t* signalingFlags,
                                 RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::multiply(const Decimal128& other, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::multiply(const Decimal128& other,
                                 uint32_t* signalingFlags,
                                 RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::divide(const Decimal128& other, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::divide(const Decimal128& other,
                               uint32_t* signalingFlags,
                               RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::quantize(const Decimal128& other, RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::quantize(const Decimal128& reference,
                                 uint32_t* signalingFlags,
                                 RoundingMode roundMode) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 Decimal128 Decimal128::normalize() const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isEqual(const Decimal128& other) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isNotEqual(const Decimal128& other) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isGreater(const Decimal128& other) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isGreaterEqual(const Decimal128& other) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isLess(const Decimal128& other) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool Decimal128::isLessEqual(const Decimal128& other) const {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 const Decimal128 Decimal128::kLargestPositive = Decimal128();

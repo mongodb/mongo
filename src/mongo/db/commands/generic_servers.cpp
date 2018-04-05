@@ -364,7 +364,6 @@ void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
 #endif
     {
         exitCleanly(EXIT_CLEAN);  // this never returns
-        invariant(false);
     }
 }
 

@@ -94,7 +94,7 @@ MemberState ReplicationCoordinatorMock::getMemberState() const {
 
 Status ReplicationCoordinatorMock::waitForMemberState(MemberState expectedState,
                                                       Milliseconds timeout) {
-    invariant(false);
+    MONGO_UNREACHABLE;
     return Status::OK();
 }
 
@@ -248,7 +248,7 @@ ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) {}
 
 Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
-    invariant(false);
+    MONGO_UNREACHABLE;
     return Status::OK();
 }
 
@@ -401,7 +401,7 @@ bool ReplicationCoordinatorMock::shouldChangeSyncSource(
     const HostAndPort& currentSource,
     const rpc::ReplSetMetadata& replMetadata,
     boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {

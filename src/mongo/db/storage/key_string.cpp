@@ -1637,7 +1637,7 @@ void toBsonValue(uint8_t ctype,
             break;
         }
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
     }
 }
 
@@ -1920,7 +1920,7 @@ void filterKeyFromKeyString(uint8_t ctype,
             break;
         }
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
     }
 }
 

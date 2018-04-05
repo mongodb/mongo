@@ -553,7 +553,7 @@ bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(StringData ns, LockMode 
             break;
     }
 
-    invariant(false);
+    MONGO_UNREACHABLE;
     return false;
 }
 
@@ -908,7 +908,7 @@ LockMode LockerImpl<IsForMMAPV1>::_getModeForMMAPV1FlushLock() const {
         case MODE_IS:
             return MODE_IS;
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
             return MODE_NONE;
     }
 }

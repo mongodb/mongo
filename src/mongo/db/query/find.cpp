@@ -228,7 +228,7 @@ Message getMore(OperationContext* opCtx,
 
     // For testing, we may want to fail if we receive a getmore.
     if (MONGO_FAIL_POINT(failReceivedGetmore)) {
-        invariant(0);
+        MONGO_UNREACHABLE;
     }
 
     *exhaust = false;

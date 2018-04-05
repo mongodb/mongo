@@ -1206,7 +1206,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                 } else if (op == dbDelete) {
                     receivedDelete(opCtx, nsString, m);
                 } else {
-                    invariant(false);
+                    MONGO_UNREACHABLE;
                 }
             }
         } catch (const AssertionException& ue) {

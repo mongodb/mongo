@@ -617,7 +617,7 @@ bool BitTestMatchExpression::performBitTest(long long eValue) const {
         case BITS_ANY_CLEAR:
             return ~eValue & _bitMask;
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
     }
 }
 
@@ -713,7 +713,7 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int level) const 
             debug << "$bitsAnyClear:";
             break;
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
     }
 
     debug << " [";
@@ -749,7 +749,7 @@ void BitTestMatchExpression::serialize(BSONObjBuilder* out) const {
             opString = "$bitsAnyClear";
             break;
         default:
-            invariant(false);
+            MONGO_UNREACHABLE;
     }
 
     BSONArrayBuilder arrBob;

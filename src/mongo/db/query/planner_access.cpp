@@ -1336,7 +1336,7 @@ void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
         handleFilterAnd(scanState);
     } else {
         // We must be building leaves for either and AND or an OR.
-        invariant(0);
+        MONGO_UNREACHABLE;
     }
 }
 

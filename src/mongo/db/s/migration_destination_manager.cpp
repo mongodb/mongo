@@ -1024,7 +1024,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             if (Helpers::findById(opCtx, ctx.db(), nss.ns(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
                     if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
-                        invariant(0);
+                        MONGO_UNREACHABLE;
                     }
                     continue;
                 }
@@ -1057,7 +1057,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             // do not apply insert/update if doc does not belong to the chunk being migrated
             if (!isInRange(updatedDoc, min, max, shardKeyPattern)) {
                 if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
-                    invariant(0);
+                    MONGO_UNREACHABLE;
                 }
                 continue;
             }

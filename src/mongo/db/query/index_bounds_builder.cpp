@@ -958,7 +958,7 @@ void IndexBoundsBuilder::alignBounds(IndexBounds* bounds, const BSONObj& kp, int
         log() << "INVALID BOUNDS: " << redact(bounds->toString()) << endl
               << "kp = " << redact(kp) << endl
               << "scanDir = " << scanDir;
-        invariant(0);
+        MONGO_UNREACHABLE;
     }
 }
 

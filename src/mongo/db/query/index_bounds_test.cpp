@@ -856,7 +856,7 @@ std::string toString(IndexBoundsChecker::Location location) {
         case IndexBoundsChecker::AHEAD:
             return "AHEAD";
     }
-    invariant(0);
+    MONGO_UNREACHABLE;
 }
 
 /**

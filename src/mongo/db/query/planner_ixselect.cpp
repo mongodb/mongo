@@ -323,7 +323,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
 
         // NOTE: This shouldn't be reached.  Text index implies there is a separator implies we
         // will always hit the 'return true' above.
-        invariant(0);
+        MONGO_UNREACHABLE;
         return true;
     } else if (IndexNames::HASHED == indexedFieldType) {
         if (ComparisonMatchExpressionBase::isEquality(exprtype)) {

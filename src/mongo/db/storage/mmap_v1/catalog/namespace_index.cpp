@@ -241,10 +241,7 @@ void NamespaceIndex::init(OperationContext* opCtx) {
               << "took " << static_cast<double>(timer.millis()) / 1000.0 << " seconds";
     }
 
-    if (p == 0) {
-        severe() << "error couldn't open file " << pathString << " terminating" << endl;
-        invariant(false);
-    }
+    invariant(p, str::stream() << "error couldn't open file " << pathString << " terminating");
 
     invariant(len <= 0x7fffffff);
     _ht.reset(new NamespaceHashTable(p, (int)len, "namespace index"));

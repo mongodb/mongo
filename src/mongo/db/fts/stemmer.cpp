@@ -59,7 +59,7 @@ StringData Stemmer::stem(StringData word) const {
 
     if (sb_sym == NULL) {
         // out of memory
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     return StringData((const char*)(sb_sym), sb_stemmer_length(_stemmer));

@@ -723,7 +723,7 @@ Status GeoParser::parseGeometryCollection(const BSONObj& obj,
                 geoObj, skipValidation, out->multiPolygons.mutableVector().back());
         } else {
             // Should not reach here.
-            invariant(false);
+            MONGO_UNREACHABLE;
         }
 
         // Check parsing result.

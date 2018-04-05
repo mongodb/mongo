@@ -127,7 +127,7 @@ Status FTSQueryImpl::parse(TextIndexVersion textIndexVersion) {
                 }
             }
         } else {
-            invariant(false);
+            MONGO_UNREACHABLE;
         }
     }
 

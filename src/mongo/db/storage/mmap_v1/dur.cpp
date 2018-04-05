@@ -302,17 +302,17 @@ void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
         }
     }
 
-    if (low != 0xffffffff) {
-        std::stringstream ss;
-        ss << "journal error warning views mismatch " << mmf->filename() << ' ' << hex << low
-           << ".." << high << " len:" << high - low + 1;
-
-        log() << ss.str() << endl;
-        log() << "priv loc: " << (void*)(p + low) << ' ' << endl;
-
-        severe() << "Written data does not match in-memory view. Missing WriteIntent?";
-        invariant(false);
-    }
+    invariant(
+        low == 0xffffffff,
+        str::stream() << "journal error warning views mismatch " << mmf->filename() << ' ' << hex
+                      << low
+                      << ".."
+                      << high
+                      << " len:"
+                      << high - low + 1
+                      << ". priv loc: "
+                      << (void*)(p + low)
+                      << ". Written data does not match in-memory view. Missing WriteIntent?");
 }
 
 
@@ -581,12 +581,9 @@ void DurableImpl::syncDataAndTruncateJournal(OperationContext* opCtx) {
 }
 
 void DurableImpl::closingFileNotification() {
-    if (commitJob.hasWritten()) {
-        severe() << "journal warning files are closing outside locks with writes pending";
-
-        // File is closing while there are unwritten changes
-        invariant(false);
-    }
+    // File is closing while there are unwritten changes
+    invariant(!commitJob.hasWritten(),
+              "journal warning files are closing outside locks with writes pending");
 }
 
 void DurableImpl::commitAndStopDurThread(OperationContext* opCtx) {
@@ -658,7 +655,7 @@ static void remapPrivateView(OperationContext* opCtx, double fraction) {
         severe() << "unknown exception in remapPrivateView causing immediate shutdown: ";
     }
 
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 
@@ -848,21 +845,21 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
             LOG(4) << "groupCommit end";
         } catch (DBException& e) {
             severe() << "dbexception in durThread causing immediate shutdown: " << redact(e);
-            invariant(false);
+            MONGO_UNREACHABLE;
         } catch (std::ios_base::failure& e) {
             severe() << "ios_base exception in durThread causing immediate shutdown: "
                      << redact(e.what());
-            invariant(false);
+            MONGO_UNREACHABLE;
         } catch (std::bad_alloc& e) {
             severe() << "bad_alloc exception in durThread causing immediate shutdown: "
                      << redact(e.what());
-            invariant(false);
+            MONGO_UNREACHABLE;
         } catch (std::exception& e) {
             severe() << "exception in durThread causing immediate shutdown: " << redact(e.what());
-            invariant(false);
+            MONGO_UNREACHABLE;
         } catch (...) {
             severe() << "unhandled exception in durThread causing immediate shutdown";
-            invariant(false);
+            MONGO_UNREACHABLE;
         }
     }
 

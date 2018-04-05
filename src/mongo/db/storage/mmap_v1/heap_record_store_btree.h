@@ -80,7 +80,7 @@ public:
                                 int len,
                                 bool enforceQuota,
                                 UpdateNotifier* notifier) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual bool updateWithDamagesSupported() const {
@@ -92,25 +92,25 @@ public:
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
 
     virtual Status truncate(OperationContext* opCtx) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual bool compactSupported() const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual Status validate(OperationContext* opCtx,
@@ -118,49 +118,49 @@ public:
                             ValidateAdaptor* adaptor,
                             ValidateResults* results,
                             BSONObjBuilder* output) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
                                    double scale) const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual void increaseStorageSize(OperationContext* opCtx, int size, bool enforceQuota) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = NULL,
                                 int infoLevel = 0) const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual long long dataSize(OperationContext* opCtx) const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual MmapV1RecordHeader* recordFor(const RecordId& loc) const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual bool isCapped() const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual const char* name() const {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
     // more things that we actually care about below
 
