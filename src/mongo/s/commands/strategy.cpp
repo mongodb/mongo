@@ -703,23 +703,34 @@ void Strategy::explainFind(OperationContext* opCtx,
                            BSONObjBuilder* out) {
     const auto explainCmd = ClusterExplain::wrapAsExplain(findCommand, verbosity);
 
-    // We will time how long it takes to run the commands on the shards.
-    Timer timer;
+    long long millisElapsed;
+    std::vector<AsyncRequestsSender::Response> shardResponses;
 
-    const auto routingInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
-    auto shardResponses =
-        scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                   qr.nss().db(),
-                                                   qr.nss(),
-                                                   routingInfo,
-                                                   explainCmd,
-                                                   readPref,
-                                                   Shard::RetryPolicy::kIdempotent,
-                                                   qr.getFilter(),
-                                                   qr.getCollation());
-
-    long long millisElapsed = timer.millis();
+    short loops = 5;
+    do {
+        // We will time how long it takes to run the commands on the shards.
+        Timer timer;
+        try {
+            const auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
+            shardResponses =
+                scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                           qr.nss().db(),
+                                                           qr.nss(),
+                                                           routingInfo,
+                                                           explainCmd,
+                                                           readPref,
+                                                           Shard::RetryPolicy::kIdempotent,
+                                                           qr.getFilter(),
+                                                           qr.getCollation());
+            millisElapsed = timer.millis();
+            break;
+        } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
+            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(e->getDb(),
+                                                                     e->getVersionReceived());
+            loops--;
+        }
+    } while (loops > 0);
 
     const char* mongosStageName =
         ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);

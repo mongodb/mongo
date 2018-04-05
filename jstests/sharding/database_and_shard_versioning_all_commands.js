@@ -445,7 +445,6 @@
         commandProfile["command.shardVersion"] =
             testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
 
-        st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "alwaysOn"});
         if (testCase.sendsDbVersion) {
             assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
 
@@ -473,7 +472,6 @@
             profilerHasSingleMatchingEntryOrThrow(
                 {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
         }
-        st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "off"});
 
         if (testCase.cleanUp) {
             testCase.cleanUp(st.s);

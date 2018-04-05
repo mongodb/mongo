@@ -40,8 +40,6 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(checkForDbVersionMismatch);
-
 const Database::Decoration<DatabaseShardingState> DatabaseShardingState::get =
     Database::declareDecoration<DatabaseShardingState>();
 
@@ -89,12 +87,6 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
 
     const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
     if (!clientDbVersion) {
-        return;
-    }
-
-    if (!MONGO_FAIL_POINT(checkForDbVersionMismatch)) {
-        // While checking the dbVersion and triggering a cache refresh on StaleDbVersion is under
-        // development, only check for dbVersion mismatch if explicitly asked to.
         return;
     }
 
