@@ -214,12 +214,15 @@ int runQueryWithReadCommands(DBClientBase* conn,
     }
 
     while (cursorResponse.getCursorId() != 0) {
-        GetMoreRequest getMoreRequest(qr->nss(),
-                                      cursorResponse.getCursorId(),
-                                      qr->getBatchSize(),
-                                      boost::none,   // maxTimeMS
-                                      boost::none,   // term
-                                      boost::none);  // lastKnownCommittedOpTime
+        GetMoreRequest getMoreRequest(
+            qr->nss(),
+            cursorResponse.getCursorId(),
+            qr->getBatchSize()
+                ? boost::optional<std::int64_t>(static_cast<std::int64_t>(*qr->getBatchSize()))
+                : boost::none,
+            boost::none,   // maxTimeMS
+            boost::none,   // term
+            boost::none);  // lastKnownCommittedOpTime
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,
                 str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,

@@ -113,7 +113,7 @@ public:
     /**
      * Returns a reference to the vector of remote hosts involved in this operation.
      */
-    virtual const std::vector<ClusterClientCursorParams::RemoteCursor>& getRemotes() const = 0;
+    virtual const std::size_t getNumRemotes() const = 0;
 
     /**
      * Returns the number of result documents returned so far by this cursor via the next() method.

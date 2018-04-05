@@ -86,6 +86,7 @@ env.Library(
     source=[
         "async_results_merger.cpp",
         "establish_cursors.cpp",
+        env.Idlc('async_results_merger_params.idl')[0],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",

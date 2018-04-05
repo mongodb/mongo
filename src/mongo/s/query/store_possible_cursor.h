@@ -74,6 +74,6 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager,
-                                        TailableMode tailableMode = TailableMode::kNormal);
+                                        TailableModeEnum tailableMode = TailableModeEnum::kNormal);
 
 }  // namespace mongo

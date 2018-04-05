@@ -41,6 +41,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/cluster_aggregation_planner.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -263,25 +264,14 @@ BSONObj createCommandForMergingShard(
     return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
 }
 
-/**
- * Verifies that the shardIds are the same as they were atClusterTime using versioned table.
- * TODO: SERVER-33767
- */
-bool verifyTargetedShardsAtClusterTime(OperationContext* opCtx,
-                                       const std::set<ShardId>& shardIds,
-                                       LogicalTime atClusterTime) {
-    return true;
-}
-
-std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const LiteParsedPipeline& litePipe,
-    CachedCollectionRoutingInfo* routingInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    const BSONObj& shardQuery,
-    const BSONObj& collation) {
+std::vector<RemoteCursor> establishShardCursors(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const LiteParsedPipeline& litePipe,
+                                                CachedCollectionRoutingInfo* routingInfo,
+                                                const BSONObj& cmdObj,
+                                                const ReadPreferenceSetting& readPref,
+                                                const BSONObj& shardQuery,
+                                                const BSONObj& collation) {
     LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
 
     bool mustRunOnAll = mustRunOnAllShards(nss, *routingInfo, litePipe);
@@ -351,7 +341,7 @@ struct DispatchShardPipelineResults {
 
     // Populated if this *is not* an explain, this vector represents the cursors on the remote
     // shards.
-    std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors;
+    std::vector<RemoteCursor> remoteCursors;
 
     // Populated if this *is* an explain, this vector represents the results from each shard.
     std::vector<AsyncRequestsSender::Response> remoteExplainOutput;
@@ -389,7 +379,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // pipeline is already split and we now only need to target a single shard, reassemble the
     // original pipeline.
     // - After exhausting 10 attempts to establish the cursors, we give up and throw.
-    auto cursors = std::vector<ClusterClientCursorParams::RemoteCursor>();
+    auto cursors = std::vector<RemoteCursor>();
     auto shardResults = std::vector<AsyncRequestsSender::Response>();
     auto opCtx = expCtx->opCtx;
 
@@ -547,7 +537,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      BSONObj cmdToRunOnNewShards,
                                      const LiteParsedPipeline& liteParsedPipeline,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
-                                     std::vector<ClusterClientCursorParams::RemoteCursor> cursors) {
+                                     std::vector<RemoteCursor> cursors) {
 
     ClusterClientCursorParams params(requestedNss, ReadPreferenceSetting::get(opCtx));
 
@@ -555,7 +545,6 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     params.tailableMode = pipelineForMerging->getContext()->tailableMode;
     params.mergePipeline = std::move(pipelineForMerging);
     params.remotes = std::move(cursors);
-
     // A batch size of 0 is legal for the initial aggregate, but not valid for getMores, the batch
     // size we pass here is used for getMores, so do not specify a batch size if the initial request
     // had a batch size of 0.
@@ -565,12 +554,19 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     if (liteParsedPipeline.hasChangeStream()) {
         // For change streams, we need to set up a custom stage to establish cursors on new shards
-        // when they are added.
-        params.createCustomCursorSource = [cmdToRunOnNewShards](OperationContext* opCtx,
-                                                                executor::TaskExecutor* executor,
-                                                                ClusterClientCursorParams* params) {
+        // when they are added.  Be careful to extract the targeted shard IDs before the remote
+        // cursors are transferred from the ClusterClientCursorParams to the AsyncResultsMerger.
+        std::vector<ShardId> shardIds;
+        for (const auto& remote : params.remotes) {
+            shardIds.emplace_back(remote.getShardId().toString());
+        }
+
+        params.createCustomCursorSource = [cmdToRunOnNewShards,
+                                           shardIds](OperationContext* opCtx,
+                                                     executor::TaskExecutor* executor,
+                                                     ClusterClientCursorParams* params) {
             return stdx::make_unique<RouterStageUpdateOnAddShard>(
-                opCtx, executor, params, cmdToRunOnNewShards);
+                opCtx, executor, params, std::move(shardIds), cmdToRunOnNewShards);
         };
     }
     auto ccc = ClusterClientCursorImpl::make(
@@ -619,7 +615,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     ccc->detachFromOperationContext();
 
-    int nShards = ccc->getRemotes().size();
+    int nShards = ccc->getNumRemotes();
     CursorId clusterCursorId = 0;
 
     if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
@@ -685,7 +681,8 @@ ShardId pickMergingShard(OperationContext* opCtx,
     return dispatchResults.needsPrimaryShardMerge
         ? primaryShard
         : dispatchResults.remoteCursors[prng.nextInt32(dispatchResults.remoteCursors.size())]
-              .shardId;
+              .getShardId()
+              .toString();
 }
 
 }  // namespace
@@ -838,15 +835,16 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         auto executorPool = Grid::get(opCtx)->getExecutorPool();
         const BSONObj reply = uassertStatusOK(storePossibleCursor(
             opCtx,
-            remoteCursor.shardId,
-            remoteCursor.hostAndPort,
-            remoteCursor.cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
+            remoteCursor.getShardId().toString(),
+            remoteCursor.getHostAndPort(),
+            remoteCursor.getCursorResponse().toBSON(CursorResponse::ResponseType::InitialResponse),
             namespaces.requestedNss,
             executorPool->getArbitraryExecutor(),
             Grid::get(opCtx)->getCursorManager(),
             mergeCtx->tailableMode));
 
-        return appendCursorResponseToCommandResult(remoteCursor.shardId, reply, result);
+        return appendCursorResponseToCommandResult(
+            remoteCursor.getShardId().toString(), reply, result);
     }
 
     // If we reach here, we have a merge pipeline to dispatch.
@@ -882,10 +880,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     ShardId mergingShardId =
         pickMergingShard(opCtx, dispatchResults, executionNsRoutingInfo.db().primaryId());
 
-    mergingPipeline->addInitialSource(DocumentSourceMergeCursors::create(
+    cluster_aggregation_planner::addMergeCursorsSource(
+        mergingPipeline.get(),
         std::move(dispatchResults.remoteCursors),
-        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        mergeCtx));
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
     auto mergeCmdObj = createCommandForMergingShard(request, mergeCtx, cmdObj, mergingPipeline);
 
     auto mergeResponse =
@@ -980,8 +978,8 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
             namespaces.requestedNss,
             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
             Grid::get(opCtx)->getCursorManager(),
-            liteParsedPipeline.hasChangeStream() ? TailableMode::kTailableAndAwaitData
-                                                 : TailableMode::kNormal));
+            liteParsedPipeline.hasChangeStream() ? TailableModeEnum::kTailableAndAwaitData
+                                                 : TailableModeEnum::kNormal));
     }
 
     // First append the properly constructed writeConcernError. It will then be skipped

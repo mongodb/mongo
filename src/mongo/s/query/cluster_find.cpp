@@ -346,7 +346,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     }
 
     // Fill out query exec properties.
-    CurOp::get(opCtx)->debug().nShards = ccc->getRemotes().size();
+    CurOp::get(opCtx)->debug().nShards = ccc->getNumRemotes();
     CurOp::get(opCtx)->debug().nreturned = results->size();
 
     // If the cursor is exhausted, then there are no more results to return and we don't need to
@@ -490,7 +490,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
 
     // Set the originatingCommand object and the cursorID in CurOp.
     {
-        CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue().getRemotes().size();
+        CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue().getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = request.cursorid;
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setOriginatingCommand_inlock(
