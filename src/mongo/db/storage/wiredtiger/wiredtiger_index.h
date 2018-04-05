@@ -133,6 +133,10 @@ public:
         return _keyStringVersion;
     }
 
+    std::string collectionNamespace() const {
+        return _collectionNamespace;
+    }
+
     std::string indexName() const {
         return _indexName;
     }
