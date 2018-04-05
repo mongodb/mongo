@@ -2208,7 +2208,7 @@ TEST(ExpressionPowTest, NegativeOneRaisedToNegativeOddExponentShouldOutPutNegati
                           });
 }
 
-TEST(ExpressionArrayTest, ExpressionArrayWithALlConstantValuesShouldOptimizeToExpressionConstant) {
+TEST(ExpressionArrayTest, ExpressionArrayWithAllConstantValuesShouldOptimizeToExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -2245,6 +2245,45 @@ TEST(ExpressionArrayTest, ExpressionArrayShouldOptimizeSubExpressionToExpression
     auto constantExpression =
         dynamic_cast<ExpressionConstant*>(optimizedToConstantWithSubExpression.get());
     ASSERT_TRUE(constantExpression);
+}
+
+TEST(ExpressionIndexOfArray, ExpressionIndexOfArrayShouldOptimizeArguments) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto expIndexOfArray = Expression::parseExpression(
+        expCtx,
+        BSON("$indexOfArray" << BSON_ARRAY(BSON_ARRAY(BSON("$add" << BSON_ARRAY(1 << 1)) << 1 << 1)
+                                           // Start index
+                                           << BSON("$add" << BSON_ARRAY(1 << 1))
+                                           // End index
+                                           << BSON("$add" << BSON_ARRAY(1 << 1)))),
+        expCtx->variablesParseState);
+    auto argsOptimizedToConstants = expIndexOfArray->optimize();
+    auto shouldBeNary = dynamic_cast<ExpressionNary*>(argsOptimizedToConstants.get());
+    ASSERT_TRUE(shouldBeNary);
+
+    auto optimizedArgs = shouldBeNary->getOperandList();
+    // All arguments should be ExpressionConstants.
+    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[0].get()));
+    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[1].get()));
+    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[2].get()));
+}
+
+TEST(ExpressionIndexOfArray, ExpressionIndexOfArrayShouldOptimizeNullishInputArrayToExpressionConstant) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+
+    auto expIndex = Expression::parseExpression(
+        expCtx, fromjson("{ $indexOfArray : [ undefined , 1, 1]}"), expCtx->variablesParseState);
+
+    auto isExpIndexOfArray = dynamic_cast<ExpressionIndexOfArray*>(expIndex.get());
+    ASSERT_TRUE(isExpIndexOfArray);
+
+    auto nullishValueOptimizedToExpConstant = isExpIndexOfArray->optimize();
+    auto shouldBeExpressionConstant = dynamic_cast<ExpressionConstant*>(nullishValueOptimizedToExpConstant.get());
+    ASSERT_TRUE(shouldBeExpressionConstant);
+    // Nullish input array should become a Value(BSONNULL).
+    ASSERT_VALUE_EQ(Value(BSONNULL), shouldBeExpressionConstant->getValue());
 }
 
 namespace FieldPath {

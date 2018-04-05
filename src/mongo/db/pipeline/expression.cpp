@@ -2730,7 +2730,7 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
             arrayArg.isArray());
 
     std::vector<Value> array = arrayArg.getArray();
-    std::vector<Value> operands = parseDeps(root, vpOperand, array.size());
+    std::vector<Value> operands = evaluateAndValidateArguments(root, vpOperand, array.size());
     for (int i = operands[1].getInt(); i < operands[2].getInt(); i++) {
         if (getExpressionContext()->getValueComparator().evaluate(array[i] == operands[0])) {
             return Value(static_cast<int>(i));
@@ -2740,7 +2740,7 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
     return Value(-1);
 }
 
-vector<Value> ExpressionIndexOfArray::parseDeps(const Document& root,
+vector<Value> ExpressionIndexOfArray::evaluateAndValidateArguments(const Document& root,
                                                 const ExpressionVector& operands,
                                                 size_t arrayLength) const {
     std::vector<Value> deps;
@@ -2765,10 +2765,10 @@ vector<Value> ExpressionIndexOfArray::parseDeps(const Document& root,
     return deps;
 }
 /**
- *  This class handles the case where IndexOfArray is given an ExpressionConstant
- *  instead of using a vector and searching through it we can use a unordered_map
- *  for O(1) lookup time.
- **/
+ * This class handles the case where IndexOfArray is given an ExpressionConstant
+ * instead of using a vector and searching through it we can use a unordered_map
+ * for O(1) lookup time.
+ */
 class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
 public:
     Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -2779,7 +2779,7 @@ public:
     }
 
     virtual Value evaluate(const Document& root) const {
-        std::vector<Value> operands = parseDeps(root, vpOperand, _indexMap.size());
+        std::vector<Value> operands = evaluateAndValidateArguments(root, vpOperand, _indexMap.size());
         auto index = _indexMap.find(operands[0]);
         auto comparator = getExpressionContext()->getValueComparator();
         Value vIndex = Value(index->second);
@@ -2797,15 +2797,15 @@ private:
 };
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
+    // This is optimize all arguments to this expression
     ExpressionNary::optimize();
 
-    // If the input arr is an ExpressionConstant we can optimize using a unordered_map instead of an
-    // Array
-    if (dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
-        ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[0].get());
-        const Value valueArray = ec->getValue();
+    // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of an
+    // array
+    if (auto constantArray =  dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
+        const Value valueArray = constantArray->getValue();
         if (valueArray.nullish()) {
-            return this;
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
         uassert(50749,
                 str::stream() << "First operand of $indexOfArray must be an array. First "
@@ -2819,8 +2819,8 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
             getExpressionContext()->getValueComparator().makeUnorderedValueMap<int>();
 
         for (int i = 0; i < int(arr.size()); i++) {
-            auto pair = std::make_pair(arr[i], i);
-            indexMap.insert(pair);
+            // auto pair = std::make_pair(arr[i], i);
+            indexMap.emplace(arr[i], i);
         }
         return intrusive_ptr<Expression>(
             new Optimized(getExpressionContext(), indexMap, vpOperand));

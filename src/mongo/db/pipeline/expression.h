@@ -1219,17 +1219,23 @@ public:
 };
 
 
-class ExpressionIndexOfArray  : public ExpressionRangedArity<ExpressionIndexOfArray, 2, 4> {
+class ExpressionIndexOfArray : public ExpressionRangedArity<ExpressionIndexOfArray, 2, 4> {
 public:
     explicit ExpressionIndexOfArray(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx) {}
 
-    Value evaluate(const Document& root) const ;
-    std::vector<Value> parseDeps(const Document& root,
-                                  const ExpressionVector& operands,
-                                  size_t arrayLength) const;
+    Value evaluate(const Document& root) const;
     boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
+
+protected:
+    // Evaluates and validates the value that is being searched for and if given the start index and
+    // the end index passed to ExpressionIndexOfArray returns arguments in the form of a
+    // vector<Value>
+    std::vector<Value> evaluateAndValidateArguments(const Document& root,
+                                                    const ExpressionVector& operands,
+                                                    size_t arrayLength) const;
+
 private:
     class Optimized;
 };
