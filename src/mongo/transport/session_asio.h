@@ -54,8 +54,10 @@ class TransportLayerASIO::ASIOSession : public Session {
     MONGO_DISALLOW_COPYING(ASIOSession);
 
 public:
-    ASIOSession(TransportLayerASIO* tl, GenericSocket socket)
-        : _socket(std::move(socket)), _tl(tl) {
+    // If the socket is disconnected while any of these options are being set, this constructor
+    // may throw, but it is guaranteed to throw a mongo DBException.
+    ASIOSession(TransportLayerASIO* tl, GenericSocket socket) try : _socket(std::move(socket)),
+                                                                    _tl(tl) {
         std::error_code ec;
 
         _socket.non_blocking(_tl->_listenerOptions.transportMode == Mode::kAsynchronous, ec);
@@ -69,10 +71,13 @@ public:
         }
 
         _local = endpointToHostAndPort(_socket.local_endpoint());
-        _remote = endpointToHostAndPort(_socket.remote_endpoint(ec));
-        if (ec) {
-            LOG(3) << "Unable to get remote endpoint address: " << ec.message();
-        }
+        _remote = endpointToHostAndPort(_socket.remote_endpoint());
+    } catch (const DBException&) {
+        throw;
+    } catch (const asio::system_error& error) {
+        uasserted(ErrorCodes::SocketException, error.what());
+    } catch (...) {
+        uasserted(50797, str::stream() << "Unknown exception while configuring socket.");
     }
 
     ~ASIOSession() {

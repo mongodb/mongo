@@ -309,9 +309,13 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
             return;
         }
 
-        std::shared_ptr<ASIOSession> session(new ASIOSession(this, std::move(peerSocket)));
+        try {
+            std::shared_ptr<ASIOSession> session(new ASIOSession(this, std::move(peerSocket)));
+            _sep->startSession(std::move(session));
+        } catch (const DBException& e) {
+            warning() << "Error accepting new connection " << e;
+        }
 
-        _sep->startSession(std::move(session));
         _acceptConnection(acceptor);
     };
 
