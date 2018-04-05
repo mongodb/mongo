@@ -582,40 +582,23 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         """Generate comparison operators declarations for the type."""
         # pylint: disable=invalid-name
 
-        template_params = {'class_name': common.title_case(struct.name)}
-
-        with self._with_template(template_params):
-            self._writer.write_template(
-                'friend bool operator==(const ${class_name}& left, const ${class_name}& right);')
-            self._writer.write_template(
-                'friend bool operator!=(const ${class_name}& left, const ${class_name}& right);')
-            self._writer.write_template(
-                'friend bool operator<(const ${class_name}& left, const ${class_name}& right);')
-
-        self.write_empty_line()
-
-    def gen_comparison_operators_definitions(self, struct):
-        # type: (ast.Struct) -> None
-        """Generate comparison operators definitions for the type."""
-        # pylint: disable=invalid-name
-
         sorted_fields = sorted([
             field for field in struct.fields if (not field.ignore) and field.comparison_order != -1
         ], key=lambda f: f.comparison_order)
         fields = [_get_field_member_name(field) for field in sorted_fields]
 
-        for rel_op in ['==', '!=', '<']:
+        with self._block("auto relationalTie() const {", "}"):
+            self._writer.write_line('return std::tie(%s);' % (', '.join(fields)))
+
+        for rel_op in ['==', '!=', '<', '>', '<=', '>=']:
+            self.write_empty_line()
             decl = common.template_args(
-                "inline bool operator${rel_op}(const ${class_name}& left, const ${class_name}& right) {",
+                "friend bool operator${rel_op}(const ${class_name}& left, const ${class_name}& right) {",
                 rel_op=rel_op, class_name=common.title_case(struct.name))
 
             with self._block(decl, "}"):
-                self._writer.write_line('return std::tie(%s) %s std::tie(%s);' %
-                                        (','.join(["left.%s" % (field) for field in fields]),
-                                         rel_op,
-                                         ','.join(["right.%s" % (field) for field in fields])))
-
-            self.write_empty_line()
+                self._writer.write_line('return left.relationalTie() %s right.relationalTie();' %
+                                        (rel_op))
 
         self.write_empty_line()
 
@@ -634,6 +617,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'boost/optional.hpp',
             'cstdint',
             'string',
+            'tuple',
             'vector',
         ]
 
@@ -732,9 +716,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             self.gen_serializer_member(field)
 
                 self.write_empty_line()
-
-                if struct.generate_comparison_operators:
-                    self.gen_comparison_operators_definitions(struct)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
