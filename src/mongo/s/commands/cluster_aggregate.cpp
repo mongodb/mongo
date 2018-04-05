@@ -282,7 +282,6 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
     const ReadPreferenceSetting& readPref,
     const BSONObj& shardQuery,
     const BSONObj& collation) {
->>>>>>> parent of 7d09f27... SERVER-33323 Use the IDL to serialize the ARM
     LOG(1) << "Dispatching command " << redact(cmdObj) << " to establish cursors on shards";
 
     bool mustRunOnAll = mustRunOnAllShards(nss, *routingInfo, litePipe);
