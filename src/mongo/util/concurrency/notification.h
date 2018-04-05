@@ -57,7 +57,7 @@ public:
      * Returns true if the notification has been set (i.e., the call to get/waitFor would not
      * block).
      */
-    explicit operator bool() {
+    explicit operator bool() const {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         return !!_value;
     }
@@ -109,7 +109,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _condVar;
 
     // Protected by mutex and only moves from not-set to set once
@@ -119,7 +119,7 @@ private:
 template <>
 class Notification<void> {
 public:
-    explicit operator bool() {
+    explicit operator bool() const {
         return _notification.operator bool();
     }
 
