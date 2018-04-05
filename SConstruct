@@ -2474,14 +2474,36 @@ def doConfigure(myenv):
             "undefined" : myenv.File("#etc/ubsan.blacklist"),
         }
 
-        blackfiles = set([v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list])
-        blacklist_options=["-fsanitize-blacklist=%s" % blackfile
-                           for blackfile in blackfiles
-                           if os.stat(blackfile.path).st_size != 0]
+        # Select those unique black files that are associated with the
+        # currently enabled sanitizers, but filter out those that are
+        # zero length.
+        blackfiles = {v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list}
+        blackfiles = [f for f in blackfiles if os.stat(f.path).st_size != 0]
 
-        for blacklist_option in blacklist_options:
-            if AddToCCFLAGSIfSupported(myenv, blacklist_option):
-                myenv.Append(LINKFLAGS=[blacklist_option])
+        # Filter out any blacklist options that the toolchain doesn't support.
+        supportedBlackfiles = []
+        blackfilesTestEnv = myenv.Clone()
+        for blackfile in blackfiles:
+            if AddToCCFLAGSIfSupported(blackfilesTestEnv, "-fsanitize-blacklist=%s" % blackfile):
+                supportedBlackfiles.append(blackfile)
+        blackfilesTestEnv = None
+        blackfiles = sorted(supportedBlackfiles)
+
+        # If we ended up with any blackfiles after the above filters,
+        # then expand them into compiler flag arguments, and use a
+        # generator to return at command line expansion time so that
+        # we can change the signature if the file contents change.
+        if blackfiles:
+            blacklist_options=["-fsanitize-blacklist=%s" % blackfile for blackfile in blackfiles]
+            def SanitizerBlacklistGenerator(source, target, env, for_signature):
+                if for_signature:
+                    return [f.get_csig() for f in blackfiles]
+                return blacklist_options
+            myenv.AppendUnique(
+                SANITIZER_BLACKLIST_GENERATOR=SanitizerBlacklistGenerator,
+                CCFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
+                LINKFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
+            )
 
         llvm_symbolizer = get_option('llvm-symbolizer')
         if os.path.isabs(llvm_symbolizer):
