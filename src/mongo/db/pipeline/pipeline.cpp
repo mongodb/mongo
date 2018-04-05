@@ -613,7 +613,9 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
 }
 
 void Pipeline::pushBack(boost::intrusive_ptr<DocumentSource> newStage) {
-    newStage->setSource(_sources.back().get());
+    if (!_sources.empty()) {
+        newStage->setSource(_sources.back().get());
+    }
     _sources.push_back(std::move(newStage));
 }
 

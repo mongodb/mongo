@@ -147,7 +147,7 @@ BSONObj ClusterClientCursorImpl::getOriginatingCommand() const {
     return _params.originatingCommandObj;
 }
 
-const std::size_t ClusterClientCursorImpl::getNumRemotes() const {
+std::size_t ClusterClientCursorImpl::getNumRemotes() const {
     return _root->getNumRemotes();
 }
 
