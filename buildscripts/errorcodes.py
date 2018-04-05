@@ -5,14 +5,20 @@ Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
 """
 
+from __future__ import absolute_import
 from __future__ import print_function
 
 import bisect
+import os.path
 import sys
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
 
-from buildscripts import utils
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from buildscripts import utils  # pylint: disable=wrong-import-position
 
 try:
     import regex as re
