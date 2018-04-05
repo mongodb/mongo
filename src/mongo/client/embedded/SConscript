@@ -85,6 +85,16 @@ env.Library(
 )
 
 env.Library(
+    target='index_create_impl_embedded',
+    source=[
+        'index_create_impl_embedded.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
+    ],
+)
+
+env.Library(
     target='embedded',
     source=[
         'embedded.cpp',
@@ -104,6 +114,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/version_impl',
         'embedded_commands',
         'embedded_options',
+        'index_create_impl_embedded',
         'repl_coordinator_embedded',
         'service_context_embedded',
         'service_entry_point_embedded',

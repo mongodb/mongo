@@ -65,14 +65,6 @@
 namespace mongo {
 
 namespace {
-MONGO_INITIALIZER(InitializeMultiIndexBlockFactory)(InitializerContext* const) {
-    MultiIndexBlock::registerFactory(
-        [](OperationContext* const opCtx, Collection* const collection) {
-            return stdx::make_unique<MultiIndexBlockImpl>(opCtx, collection);
-        });
-    return Status::OK();
-}
-
 
 /**
  * Returns true if writes to the catalog entry for the input namespace require being
@@ -259,7 +251,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         }
 
         // Any foreground indexes make all indexes be built in the foreground.
-        _buildInBackground = (_buildInBackground && info["background"].trueValue());
+        _buildInBackground = (_buildInBackground && initBackgroundIndexFromSpec(info));
     }
 
     std::vector<BSONObj> indexInfoObjs;
