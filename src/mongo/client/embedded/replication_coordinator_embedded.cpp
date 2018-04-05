@@ -129,6 +129,10 @@ WriteConcernOptions ReplicationCoordinatorEmbedded::populateUnsetWriteConcernOpt
     return writeConcern;
 }
 
+bool ReplicationCoordinatorEmbedded::buildsIndexes() {
+    return true;
+}
+
 OpTime ReplicationCoordinatorEmbedded::getCurrentCommittedSnapshotOpTime() const {
     UASSERT_NOT_IMPLEMENTED;
 }
@@ -325,10 +329,6 @@ Status ReplicationCoordinatorEmbedded::processReplSetElect(const ReplSetElectArg
 
 Status ReplicationCoordinatorEmbedded::processReplSetUpdatePosition(const UpdatePositionArgs&,
                                                                     long long*) {
-    UASSERT_NOT_IMPLEMENTED;
-}
-
-bool ReplicationCoordinatorEmbedded::buildsIndexes() {
     UASSERT_NOT_IMPLEMENTED;
 }
 

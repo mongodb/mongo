@@ -173,6 +173,30 @@ TEST_F(MongodbCAPITest, IsMaster) {
     ASSERT(output.getBoolField("ismaster"));
 }
 
+TEST_F(MongodbCAPITest, CreateIndex) {
+    // create the client object
+    auto client = createClient();
+
+    // craft the createIndexes message
+    mongo::BSONObj inputObj = mongo::fromjson(
+        R"raw_delimiter({
+            createIndexes: 'items',
+            indexes: 
+            [
+                {
+                    key: {
+                        task: 1
+                    },
+                    name: 'task_1'
+                }
+            ]
+        })raw_delimiter");
+    auto inputOpMsg = mongo::OpMsgRequest::fromDBAndBody("todo", inputObj);
+    auto output = performRpc(client, inputOpMsg);
+
+    ASSERT(output.getIntField("numIndexesAfter") == output.getIntField("numIndexesBefore") + 1);
+}
+
 TEST_F(MongodbCAPITest, TrimMemory) {
     // create the client object
     auto client = createClient();

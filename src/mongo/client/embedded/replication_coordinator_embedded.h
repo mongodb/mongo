@@ -83,6 +83,7 @@ public:
 
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
+    bool buildsIndexes() override;
 
     // Not implemented members that should not be called. Will assert or invariant.
 
@@ -175,8 +176,6 @@ public:
     Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* response) override;
 
     Status processReplSetUpdatePosition(const repl::UpdatePositionArgs&, long long*) override;
-
-    bool buildsIndexes() override;
 
     std::vector<HostAndPort> getHostsWrittenTo(const repl::OpTime&, bool) override;
 
