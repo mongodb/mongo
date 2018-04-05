@@ -90,7 +90,7 @@ def _execute_suite(suite):  # pylint: disable=too-many-branches,too-many-return-
     finally:
         if archive:
             archive.exit()
-    return True
+    return False
 
 
 def _log_summary(logger, suites, time_taken):
