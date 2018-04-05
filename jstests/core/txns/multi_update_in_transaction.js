@@ -28,20 +28,22 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(0, res.n);
 
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
-    assert.commandWorked(sessionDb.runCommand({
+    assert.commandWorked(sessionDb.adminCommand({
         commitTransaction: 1,
         txnNumber: NumberLong(txnNumber++),
         // TODO(russotto): Majority write concern on commit is to avoid a WriteConflictError
         // writing to the transaction table.
-        writeConcern: {w: "majority"}
+        writeConcern: {w: "majority"},
+        autocommit: false
     }));
 
     jsTest.log("Do a single-result multi-update.");
@@ -51,15 +53,20 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(1, res.n);
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1, b: 1}]);
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a multiple-result multi-update.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -68,16 +75,21 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(2, res.n);
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch,
                  [{_id: 0, a: 0, b: 2}, {_id: 1, a: 0, b: 2}, {_id: 2, a: 1, b: 1}]);
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a multiple-query multi-update.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -89,17 +101,22 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(3, res.n);
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(
         res.cursor.firstBatch,
         [{_id: 0, a: 0, b: 2, c: 1}, {_id: 1, a: 0, b: 2, c: 1}, {_id: 2, a: 1, b: 1, c: 2}]);
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 
     jsTest.log("Do a multi-update with upsert.");
     res = assert.commandWorked(sessionDb.runCommand({
@@ -108,12 +125,13 @@
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),
+        startTransaction: true,
         autocommit: false
     }));
     assert.eq(1, res.n);
     assert.eq(res.upserted[0]._id, 3);
-    res = assert.commandWorked(
-        sessionDb.runCommand({find: collName, filter: {}, txnNumber: NumberLong(txnNumber)}));
+    res = assert.commandWorked(sessionDb.runCommand(
+        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.docEq(res.cursor.firstBatch, [
         {_id: 0, a: 0, b: 2, c: 1},
         {_id: 1, a: 0, b: 2, c: 1},
@@ -121,6 +139,10 @@
         {_id: 3, d: 1}
     ]);
 
-    assert.commandWorked(sessionDb.runCommand(
-        {commitTransaction: 1, txnNumber: NumberLong(txnNumber++), writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber++),
+        writeConcern: {w: "majority"},
+        autocommit: false
+    }));
 }());
