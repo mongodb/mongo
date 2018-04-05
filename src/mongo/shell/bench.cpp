@@ -68,6 +68,7 @@ const std::map<OpType, std::string> kOpTypeNames{{OpType::NONE, "none"},
 // executed with no query options. This is only meaningful if a command is run via OP_QUERY against
 // '$cmd'.
 const int kNoOptions = 0;
+const int kStartTransactionOption = 1;
 
 const BSONObj readConcernSnapshot = BSON("level"
                                          << "snapshot");
@@ -162,6 +163,11 @@ bool runCommandWithSession(DBClientBase* conn,
 
     if (txnNumber) {
         cmdObjWithLsidBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *txnNumber);
+        cmdObjWithLsidBuilder.append("autocommit", false);
+    }
+
+    if (options == kStartTransactionOption) {
+        cmdObjWithLsidBuilder.append("startTransaction", true);
     }
 
     return conn->runCommand(dbname, cmdObjWithLsidBuilder.done(), *result);
@@ -174,6 +180,18 @@ bool runCommandWithSession(DBClientBase* conn,
                            const boost::optional<LogicalSessionIdToClient>& lsid,
                            BSONObj* result) {
     return runCommandWithSession(conn, dbname, cmdObj, options, lsid, boost::none, result);
+}
+
+void abortTransaction(DBClientBase* conn,
+                      const boost::optional<LogicalSessionIdToClient>& lsid,
+                      boost::optional<TxnNumber> txnNumber) {
+    BSONObj abortTransactionCmd = BSON("abortTransaction" << 1);
+    BSONObj abortCommandResult;
+    uassert(
+        ErrorCodes::CommandFailed,
+        str::stream() << "abort command failed; reply was: " << abortCommandResult,
+        runCommandWithSession(
+            conn, "admin", abortTransactionCmd, kNoOptions, lsid, txnNumber, &abortCommandResult));
 }
 
 /**
@@ -195,11 +213,15 @@ int runQueryWithReadCommands(DBClientBase* conn,
     const auto dbName = qr->nss().db().toString();
 
     BSONObj findCommandResult;
-    uassert(
-        ErrorCodes::CommandFailed,
-        str::stream() << "find command failed; reply was: " << findCommandResult,
-        runCommandWithSession(
-            conn, dbName, qr->asFindCommand(), kNoOptions, lsid, txnNumber, &findCommandResult));
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "find command failed; reply was: " << findCommandResult,
+            runCommandWithSession(conn,
+                                  dbName,
+                                  qr->asFindCommand(),
+                                  txnNumber ? kStartTransactionOption : kNoOptions,
+                                  lsid,
+                                  txnNumber,
+                                  &findCommandResult));
 
     CursorResponse cursorResponse =
         uassertStatusOK(CursorResponse::parseFromBSON(findCommandResult));
@@ -765,6 +787,14 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     }
 
     TxnNumber txnNumber = 0;
+
+    ON_BLOCK_EXIT([&] {
+        // Executing the transaction with a new txnNumber would end the previous transaction
+        // automatically, but we have to end the last transaction manually with an abort command.
+        if (txnNumber > 0) {
+            abortTransaction(conn, lsid, txnNumber);
+        }
+    });
 
     std::unique_ptr<Scope> scope{getGlobalScriptEngine()->newScopeForCurrentThread()};
     verify(scope.get());
