@@ -1046,6 +1046,37 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), badNss).getCollection());
 }
 
+TEST_F(SyncTailTest, MultiInitialSyncApplySkipsApplyOpsOnNamespaceNotFound) {
+    BSONObj emptyDoc;
+    SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
+    auto doc1 = BSON("_id" << 1);
+    auto doc2 = BSON("_id" << 2);
+    auto doc3 = BSON("_id" << 3);
+    auto op0 = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
+    auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss, doc1);
+    auto op2 = makeCommandOplogEntry({Timestamp(Seconds(3), 0), 1LL},
+                                     NamespaceString("admin.$cmd"),
+                                     BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                                        << "i"
+                                                                        << "ns"
+                                                                        << badNss.ns()
+                                                                        << "o"
+                                                                        << doc2))));
+    auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
+    MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
+    AtomicUInt32 fetchCount(0);
+    ASSERT_OK(multiInitialSyncApply_noAbort(_opCtx.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 0U);
+
+    OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
+    auto iter = collectionReader.makeIterator();
+    ASSERT_BSONOBJ_EQ(doc3, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
 TEST_F(SyncTailTest,
        MultiInitialSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFromSyncSource) {
     SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));

@@ -1386,6 +1386,13 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                 // update is not present locally. In that case we fetch the document from the
                 // sync source.
                 if (s != ErrorCodes::UpdateOperationFailed) {
+                    // SERVER-33618 An applyOps oplog entry may contain only CRUD operations.
+                    // Therefore, it should receive the same treatment.
+                    if (s == ErrorCodes::NamespaceNotFound && entry.isCommand() &&
+                        entry.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+                        continue;
+                    }
+
                     error() << "Error applying operation: " << redact(s) << " ("
                             << redact(entry.raw) << ")";
                     return s;
