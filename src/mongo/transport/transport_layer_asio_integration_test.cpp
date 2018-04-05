@@ -69,7 +69,7 @@ TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
     log() << "Received response: \"" << httpResp << "\"";
     ASSERT_TRUE(httpResp.startsWith("HTTP/1.0 200 OK"));
 
-    // Why oh why can't ASIO unify their error codes
+// Why oh why can't ASIO unify their error codes
 #ifdef _WIN32
     ASSERT_EQ(ec, asio::error::connection_reset);
 #else
