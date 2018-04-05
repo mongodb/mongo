@@ -59,7 +59,7 @@ GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
 GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
-                               boost::optional<std::int64_t> sizeOfBatch,
+                               boost::optional<long long> sizeOfBatch,
                                boost::optional<Milliseconds> awaitDataTimeout,
                                boost::optional<long long> term,
                                boost::optional<repl::OpTime> lastKnownCommittedOpTime)
@@ -108,7 +108,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
     boost::optional<NamespaceString> nss;
 
     // Optional fields.
-    boost::optional<std::int64_t> batchSize;
+    boost::optional<long long> batchSize;
     boost::optional<Milliseconds> awaitDataTimeout;
     boost::optional<long long> term;
     boost::optional<repl::OpTime> lastKnownCommittedOpTime;

@@ -44,7 +44,6 @@ public:
     RouterStageUpdateOnAddShard(OperationContext* opCtx,
                                 executor::TaskExecutor* executor,
                                 ClusterClientCursorParams* params,
-                                std::vector<ShardId> shardIds,
                                 BSONObj cmdToRunOnNewShards);
 
     StatusWith<ClusterQueryResult> next(ExecContext) final;
@@ -59,10 +58,10 @@ private:
     /**
      * Open the cursors on the new shards.
      */
-    std::vector<RemoteCursor> establishShardCursorsOnNewShards(const BSONObj& newShardDetectedObj);
+    std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursorsOnNewShards(
+        std::vector<ShardId> existingShardIds, const BSONObj& newShardDetectedObj);
 
     ClusterClientCursorParams* _params;
-    std::vector<ShardId> _shardIds;
     BSONObj _cmdToRunOnNewShards;
 };
 }

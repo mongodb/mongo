@@ -198,7 +198,7 @@ public:
         /**
          * Returns a reference to the vector of remote hosts involved in this operation.
          */
-        const std::size_t getNumRemotes() const;
+        const std::vector<ClusterClientCursorParams::RemoteCursor>& getRemotes() const;
 
         /**
          * Returns the cursor id for the underlying cursor, or zero if no cursor is owned.

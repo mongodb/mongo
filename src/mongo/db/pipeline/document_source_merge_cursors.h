@@ -55,11 +55,11 @@ public:
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
     /**
-     * Creates a new DocumentSourceMergeCursors from the given parameters.
+     * Creates a new DocumentSourceMergeCursors from the given 'remoteCursors'.
      */
     static boost::intrusive_ptr<DocumentSource> create(
+        std::vector<ClusterClientCursorParams::RemoteCursor>&& remoteCursors,
         executor::TaskExecutor*,
-        AsyncResultsMergerParams,
         const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final {
@@ -77,7 +77,9 @@ public:
     /**
      * Serializes this stage to be sent to perform the merging on a different host.
      */
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
@@ -100,23 +102,21 @@ protected:
 
 private:
     DocumentSourceMergeCursors(executor::TaskExecutor*,
-                               AsyncResultsMergerParams,
-                               const boost::intrusive_ptr<ExpressionContext>&,
-                               boost::optional<BSONObj> ownedParamsSpec = boost::none);
+                               std::unique_ptr<ClusterClientCursorParams>,
+                               const boost::intrusive_ptr<ExpressionContext>&);
 
-    // When we have parsed the params out of a BSONObj, the object needs to stay around while the
-    // params are in use. We store them here.
-    boost::optional<BSONObj> _armParamsObj;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+        MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+    }
 
     executor::TaskExecutor* _executor;
 
-    // '_armParams' is populated until the first call to getNext(). Upon the first call to getNext()
-    // '_arm' will be populated using '_armParams', and '_armParams' will become boost::none. So if
-    // getNext() is never called we will never populate '_arm'. If we did so the destruction of this
-    // stage would cause the cursors within the ARM to be killed prematurely. For example, if this
-    // stage is parsed on mongos then forwarded to the shards, it should not kill the cursors when
-    // it goes out of scope on mongos.
-    boost::optional<AsyncResultsMergerParams> _armParams;
+    // '_arm' is not populated until the first call to getNext(). If getNext() is never called we
+    // will not create an AsyncResultsMerger. If we did so the destruction of this stage would cause
+    // the cursors within the ARM to be killed prematurely. For example, if this stage is parsed on
+    // mongos then forwarded to the shards, it should not kill the cursors when it goes out of scope
+    // on mongos.
+    std::unique_ptr<ClusterClientCursorParams> _armParams;
     boost::optional<AsyncResultsMerger> _arm;
 };
 

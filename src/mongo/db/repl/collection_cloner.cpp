@@ -43,6 +43,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"
@@ -612,25 +613,20 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
            << " cursors established.";
 
     // Initialize the 'AsyncResultsMerger'(ARM).
-    std::vector<RemoteCursor> remoteCursors;
+    std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors;
     for (auto&& cursorResponse : cursorResponses) {
         // A placeholder 'ShardId' is used until the ARM is made less sharding specific.
-        remoteCursors.emplace_back();
-        auto& newCursor = remoteCursors.back();
-        newCursor.setShardId("CollectionClonerSyncSource");
-        newCursor.setHostAndPort(_source);
-        newCursor.setCursorResponse(std::move(cursorResponse));
+        remoteCursors.emplace_back(
+            ShardId("CollectionClonerSyncSource"), _source, std::move(cursorResponse));
     }
 
-    AsyncResultsMergerParams armParams;
-    armParams.setNss(_sourceNss);
-    armParams.setRemotes(std::move(remoteCursors));
-    if (_collectionCloningBatchSize > 0) {
-        armParams.setBatchSize(_collectionCloningBatchSize);
-    }
+    _clusterClientCursorParams = stdx::make_unique<ClusterClientCursorParams>(_sourceNss);
+    _clusterClientCursorParams->remotes = std::move(remoteCursors);
+    if (_collectionCloningBatchSize > 0)
+        _clusterClientCursorParams->batchSize = _collectionCloningBatchSize;
     Client::initThreadIfNotAlready();
     _arm = stdx::make_unique<AsyncResultsMerger>(
-        cc().getOperationContext(), _executor, std::move(armParams));
+        cc().getOperationContext(), _executor, _clusterClientCursorParams.get());
 
     // This completion guard invokes _finishCallback on destruction.
     auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };

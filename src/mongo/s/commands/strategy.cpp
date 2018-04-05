@@ -585,7 +585,7 @@ DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss
     }
     uassertStatusOK(statusGetDb);
 
-    boost::optional<std::int64_t> batchSize;
+    boost::optional<long long> batchSize;
     if (ntoreturn) {
         batchSize = ntoreturn;
     }

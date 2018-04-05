@@ -519,7 +519,7 @@ Status runAggregate(OperationContext* opCtx,
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
         opCtx->recoveryUnit()->getReadConcernLevel(),
         cmdObj);
-    if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+    if (expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
         cursorParams.setTailable(true);
         cursorParams.setAwaitData(true);
     }

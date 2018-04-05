@@ -51,8 +51,6 @@ public:
 
     bool remotesExhausted() final;
 
-    std::size_t getNumRemotes() const final;
-
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 

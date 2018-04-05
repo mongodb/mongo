@@ -262,7 +262,7 @@ private:
 
     uint64_t _maxMemoryUsageBytes;
     bool _done;
-    bool _mergingPresorted;  // TODO SERVER-34009 Remove this flag.
+    bool _mergingPresorted;
     std::unique_ptr<MySorter> _sorter;
     std::unique_ptr<MySorter::Iterator> _output;
 };

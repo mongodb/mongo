@@ -12,7 +12,6 @@ env.Library(
         "hostandport.cpp",
         "hostname_canonicalization.cpp",
         "sockaddr.cpp",
-        env.Idlc('hostandport.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -1165,7 +1165,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
 
 TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
     QueryRequest qr(testns);
-    qr.setTailableMode(TailableModeEnum::kTailable);
+    qr.setTailableMode(TailableMode::kTailable);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
@@ -1183,7 +1183,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithNoCursorTimeoutFails) {
 
 TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
     QueryRequest qr(testns);
-    qr.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    qr.setTailableMode(TailableMode::kTailableAndAwaitData);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 

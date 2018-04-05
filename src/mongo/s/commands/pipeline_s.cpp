@@ -114,7 +114,7 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
         cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
     }
 
-    auto shardResult = std::vector<RemoteCursor>();
+    auto shardResult = std::vector<ClusterClientCursorParams::RemoteCursor>();
     auto findCmd = cmdBuilder.obj();
     size_t numAttempts = 0;
     while (++numAttempts <= kMaxNumStaleVersionRetries) {
@@ -164,13 +164,13 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
 
     invariant(shardResult.size() == 1u);
 
-    auto& cursor = shardResult.front().getCursorResponse();
+    auto& cursor = shardResult.front().cursorResponse;
     auto& batch = cursor.getBatch();
 
     // We should have at most 1 result, and the cursor should be exhausted.
     uassert(ErrorCodes::InternalError,
             str::stream() << "Shard cursor was unexpectedly open after lookup: "
-                          << shardResult.front().getHostAndPort()
+                          << shardResult.front().hostAndPort
                           << ", id: "
                           << cursor.getCursorId(),
             cursor.getCursorId() == 0);

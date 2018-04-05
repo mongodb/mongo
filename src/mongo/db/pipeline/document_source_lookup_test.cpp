@@ -520,8 +520,9 @@ public:
     Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         Pipeline* pipeline) final {
         while (_removeLeadingQueryStages && !pipeline->getSources().empty()) {
-            if (pipeline->popFrontWithName("$match") || pipeline->popFrontWithName("$sort") ||
-                pipeline->popFrontWithName("$project")) {
+            if (pipeline->popFrontWithCriteria("$match") ||
+                pipeline->popFrontWithCriteria("$sort") ||
+                pipeline->popFrontWithCriteria("$project")) {
                 continue;
             }
             break;

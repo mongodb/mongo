@@ -319,19 +319,19 @@ public:
     }
 
     bool isTailable() const {
-        return _tailableMode == TailableModeEnum::kTailable ||
-            _tailableMode == TailableModeEnum::kTailableAndAwaitData;
+        return _tailableMode == TailableMode::kTailable ||
+            _tailableMode == TailableMode::kTailableAndAwaitData;
     }
 
     bool isTailableAndAwaitData() const {
-        return _tailableMode == TailableModeEnum::kTailableAndAwaitData;
+        return _tailableMode == TailableMode::kTailableAndAwaitData;
     }
 
-    void setTailableMode(TailableModeEnum tailableMode) {
+    void setTailableMode(TailableMode tailableMode) {
         _tailableMode = tailableMode;
     }
 
-    TailableModeEnum getTailableMode() const {
+    TailableMode getTailableMode() const {
         return _tailableMode;
     }
 
@@ -498,7 +498,7 @@ private:
     bool _hasReadPref = false;
 
     // Options that can be specified in the OP_QUERY 'flags' header.
-    TailableModeEnum _tailableMode = TailableModeEnum::kNormal;
+    TailableMode _tailableMode = TailableMode::kNormal;
     bool _slaveOk = false;
     bool _oplogReplay = false;
     bool _noCursorTimeout = false;

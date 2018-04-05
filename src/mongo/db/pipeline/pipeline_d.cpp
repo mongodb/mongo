@@ -386,7 +386,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
-    if (expCtx->needsMerge && expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+    if (expCtx->needsMerge && expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
         plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
     }
 

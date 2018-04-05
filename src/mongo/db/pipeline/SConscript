@@ -301,7 +301,6 @@ pipelineeEnv.Library(
         'document_source_skip.cpp',
         'document_source_sort.cpp',
         'document_source_sort_by_count.cpp',
-        "cluster_aggregation_planner.cpp",
         'document_source_tee_consumer.cpp',
         'document_source_unwind.cpp',
         'mongo_process_common.cpp',

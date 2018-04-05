@@ -133,7 +133,7 @@ TEST(ExpressionOptimizeTest, IsValidText) {
 TEST(ExpressionOptimizeTest, IsValidTextTailable) {
     // Filter inside QueryRequest is not used.
     auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setTailableMode(TailableModeEnum::kTailable);
+    qr->setTailableMode(TailableMode::kTailable);
     ASSERT_OK(qr->validate());
 
     // Invalid: TEXT and tailable.

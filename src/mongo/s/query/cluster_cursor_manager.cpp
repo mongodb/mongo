@@ -147,9 +147,10 @@ BSONObj ClusterCursorManager::PinnedCursor::getOriginatingCommand() const {
     return _cursor->getOriginatingCommand();
 }
 
-const std::size_t ClusterCursorManager::PinnedCursor::getNumRemotes() const {
+const std::vector<ClusterClientCursorParams::RemoteCursor>&
+ClusterCursorManager::PinnedCursor::getRemotes() const {
     invariant(_cursor);
-    return _cursor->getNumRemotes();
+    return _cursor->getRemotes();
 }
 
 CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {

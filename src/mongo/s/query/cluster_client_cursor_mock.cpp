@@ -68,7 +68,8 @@ BSONObj ClusterClientCursorMock::getOriginatingCommand() const {
     return _originatingCommand;
 }
 
-const std::size_t ClusterClientCursorMock::getNumRemotes() const {
+const std::vector<ClusterClientCursorParams::RemoteCursor>& ClusterClientCursorMock::getRemotes()
+    const {
     MONGO_UNREACHABLE;
 }
 

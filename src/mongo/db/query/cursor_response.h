@@ -141,23 +141,6 @@ public:
     };
 
     /**
-     * Constructs a CursorResponse from the command BSON response.
-     */
-    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);
-
-    /**
-     * A throwing version of 'parseFromBSON'.
-     */
-    static CursorResponse parseFromBSONThrowing(const BSONObj& cmdResponse) {
-        return uassertStatusOK(parseFromBSON(cmdResponse));
-    }
-
-    /**
-     * Constructs an empty cursor response.
-     */
-    CursorResponse() = default;
-
-    /**
      * Constructs from values for each of the fields.
      */
     CursorResponse(NamespaceString nss,
@@ -203,13 +186,15 @@ public:
     }
 
     /**
+     * Constructs a CursorResponse from the command BSON response.
+     */
+    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);
+
+    /**
      * Converts this response to its raw BSON representation.
      */
     BSONObj toBSON(ResponseType responseType) const;
     void addToBSON(ResponseType responseType, BSONObjBuilder* builder) const;
-    BSONObj toBSONAsInitialResponse() const {
-        return toBSON(ResponseType::InitialResponse);
-    }
 
 private:
     NamespaceString _nss;

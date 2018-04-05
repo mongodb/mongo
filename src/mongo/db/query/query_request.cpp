@@ -495,16 +495,16 @@ void QueryRequest::asFindCommand(BSONObjBuilder* cmdBuilder) const {
     }
 
     switch (_tailableMode) {
-        case TailableModeEnum::kTailable: {
+        case TailableMode::kTailable: {
             cmdBuilder->append(kTailableField, true);
             break;
         }
-        case TailableModeEnum::kTailableAndAwaitData: {
+        case TailableMode::kTailableAndAwaitData: {
             cmdBuilder->append(kTailableField, true);
             cmdBuilder->append(kAwaitDataField, true);
             break;
         }
-        case TailableModeEnum::kNormal: {
+        case TailableMode::kNormal: {
             break;
         }
     }
@@ -623,7 +623,7 @@ Status QueryRequest::validate() const {
                                     << _maxTimeMS);
     }
 
-    if (_tailableMode != TailableModeEnum::kNormal) {
+    if (_tailableMode != TailableMode::kNormal) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
         const BSONObj expectedSort = BSON(kNaturalSortField << 1);
         if (!_sort.isEmpty() &&
@@ -911,9 +911,9 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
 
 int QueryRequest::getOptions() const {
     int options = 0;
-    if (_tailableMode == TailableModeEnum::kTailable) {
+    if (_tailableMode == TailableMode::kTailable) {
         options |= QueryOption_CursorTailable;
-    } else if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+    } else if (_tailableMode == TailableMode::kTailableAndAwaitData) {
         options |= QueryOption_CursorTailable;
         options |= QueryOption_AwaitData;
     }
