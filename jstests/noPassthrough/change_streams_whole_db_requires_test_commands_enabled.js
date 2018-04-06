@@ -1,6 +1,9 @@
 // Confirm that $changeStream can only run on an entire database if 'enableTestCommands' is true.
-// TODO SERVER-34283: remove once whole-database $changeStream is feature-complete.
+// Because the $changeStream stage requires a replica set to run, we tag this test as
+// requires_replication.
+// @tags: [requires_replication,requires_journaling]
 
+// TODO SERVER-34283: remove this test once whole-database $changeStream is feature-complete.
 (function() {
     'use strict';
 
