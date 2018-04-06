@@ -369,7 +369,7 @@ public:
 
     void setError(Status statusArg) noexcept {
         invariant(!statusArg.isOK());
-        dassert(state.load() < SSBState::kFinished);
+        dassert(state.load() < SSBState::kFinished, statusArg.toString());
         status = std::move(statusArg);
         transitionToFinished();
     }
