@@ -1,6 +1,8 @@
 // Tests that concurrent change streams requests that would create the database will take locks in
 // an order that avoids a deadlock.
 // This test was designed to reproduce SERVER-34333.
+// This test uses the WiredTiger storage engine, which does not support running without journaling.
+// @tags: [requires_replication,requires_journaling]
 (function() {
     "use strict";
     load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
