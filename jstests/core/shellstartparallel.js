@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 function f() {
     throw Error("intentional_throw_to_test_assert_throws");
 }

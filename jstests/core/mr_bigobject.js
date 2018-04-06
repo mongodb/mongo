@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [does_not_support_stepdowns, requires_fastcount]
 
 t = db.mr_bigobject;
 t.drop();

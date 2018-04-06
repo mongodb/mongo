@@ -1,5 +1,10 @@
-// @tags: [does_not_support_stepdowns, requires_getmore, requires_non_retryable_commands,
-// requires_non_retryable_writes]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_getmore,
+//   requires_non_retryable_commands,
+//   requires_non_retryable_writes,
+//   requires_fastcount,
+// ]
 
 /*
  * Declaratively-defined tests for views for all database commands. This file contains a map of test

@@ -1,4 +1,6 @@
 // Tests bulk insert of docs from the shell
+//
+// @tags: [requires_fastcount]
 
 var coll = db.bulkInsertTest;
 coll.drop();

@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.arrayfind2;
 t.drop();

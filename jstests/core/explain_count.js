@@ -1,4 +1,6 @@
 // Test running explains on count commands.
+//
+// @tags: [requires_fastcount]
 
 load("jstests/libs/analyze_plan.js");     // For assertExplainCount.
 load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.

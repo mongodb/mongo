@@ -1,5 +1,8 @@
 // Verify that we can index multiple geo fields with 2dsphere, and that
 // performance is what we expect it to be with indexing both fields.
+//
+// @tags: [requires_fastcount]
+
 var t = db.geo_s2twofields;
 t.drop();
 

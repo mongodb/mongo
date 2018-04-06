@@ -1,4 +1,7 @@
 // Test $minDistance option for $near and $nearSphere queries, and geoNear command. SERVER-9395.
+//
+// @tags: [requires_fastcount]
+
 (function() {
     "use strict";
 

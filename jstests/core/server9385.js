@@ -1,4 +1,7 @@
 // SERVER-9385 ensure saving a document derived from bson->js conversion doesn't lose it's _id
+//
+// @tags: [requires_fastcount]
+
 t = db.server9385;
 t.drop();
 

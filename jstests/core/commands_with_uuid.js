@@ -1,6 +1,8 @@
 /**
 * Tests that using a UUID as an argument to commands will retrieve results from the correct
 * collection.
+*
+* @tags: [requires_fastcount]
 */
 
 (function() {

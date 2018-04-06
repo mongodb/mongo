@@ -1,4 +1,6 @@
 // Reproduces simple test for SERVER-2832
+//
+// @tags: [requires_fastcount]
 
 // The setup to reproduce was/is to create a set of points where the
 // "expand" portion of the geo-lookup expands the 2d range in only one

@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns, requires_non_retryable_writes]
+// @tags: [does_not_support_stepdowns, requires_non_retryable_writes, requires_fastcount]
 
 // SERVER-16497: Check that failIndexKeyTooLong setting works
 (function() {

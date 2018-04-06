@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_fastcount]
 
 a = db.getSisterDB("copydb2-test-a");
 b = db.getSisterDB("copydb2-test-b");

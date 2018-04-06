@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_fastcount]
 
 // Basic tests for the copydb command.  These only test copying from the same server; these do not
 // test the ability of copydb to pull a database from another server (with or without auth).

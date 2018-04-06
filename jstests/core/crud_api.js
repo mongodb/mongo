@@ -5,6 +5,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
+//   requires_fastcount,
 // ]
 
 (function() {

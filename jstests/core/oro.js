@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, requires_collstats]
 
 // Test $or query with several clauses on separate indexes.
 

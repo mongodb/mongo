@@ -1,6 +1,6 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_fastcount]
 
 // ensure a document with _id undefined cannot be saved
 t = db.insert_id_undefined;

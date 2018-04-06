@@ -5,7 +5,7 @@
  * former operation may be routed to a secondary in the replica set, whereas the latter must be
  * routed to the primary.
  *
- * @tags: [assumes_read_preference_unchanged]
+ * @tags: [assumes_read_preference_unchanged, requires_fastcount]
  */
 (function() {
     load("jstests/libs/stats.js");

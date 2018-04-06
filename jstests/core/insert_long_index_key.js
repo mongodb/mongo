@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.insert_long_index_key;
 t.drop();
 

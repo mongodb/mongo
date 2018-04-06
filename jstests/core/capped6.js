@@ -6,6 +6,7 @@
 //   # the replica set, whereas the latter must be routed to the primary.
 //   assumes_read_preference_unchanged,
 //   requires_non_retryable_commands,
+//   requires_fastcount,
 // ]
 (function() {
     var coll = db.capped6;

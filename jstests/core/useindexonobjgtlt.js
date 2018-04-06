@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.factories;
 t.drop();
 t.insert({name: "xyz", metro: {city: "New York", state: "NY"}});

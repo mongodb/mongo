@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.update_invalid1;
 t.drop();
