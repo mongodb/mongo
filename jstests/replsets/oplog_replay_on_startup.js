@@ -59,7 +59,7 @@
             assert.writeOK(oplog.insert({
                 ts: ts(num),
                 t: NumberLong(term),
-                h: 1,
+                h: NumberLong(1),
                 op: 'i',
                 ns: ns,
                 o: {_id: num},
