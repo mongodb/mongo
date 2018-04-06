@@ -36,6 +36,19 @@ def get_thread_id():
     raise ValueError("Failed to find thread id in {}".format(thread_info))
 
 
+def get_current_thread_name():
+    """Returns the name of the current GDB thread"""
+    fallback_name = '"%s"' % (gdb.selected_thread().name or '')
+    try:
+        # This goes through the pretty printer for StringData which adds "" around the name.
+        name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
+        if name == '""':
+            return fallback_name
+        return name
+    except gdb.error:
+        return fallback_name
+
+
 ###################################################################################################
 #
 # Commands
@@ -163,18 +176,6 @@ class MongoDBUniqueStack(gdb.Command):
             if current_thread and current_thread.is_valid():
                 current_thread.switch()
 
-    @staticmethod
-    def _get_current_thread_name():
-        """Return the current thread name."""
-        fallback_name = '"%s"' % (gdb.selected_thread().name or '')
-        try:
-            # This goes through the pretty printer for StringData which adds "" around the name.
-            name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
-            if name == '""':
-                return fallback_name
-            return name
-        except gdb.error:
-            return fallback_name
 
     def _process_thread_stack(self, arg, stacks, thread):
         """Process the thread stack."""
@@ -182,7 +183,7 @@ class MongoDBUniqueStack(gdb.Command):
         thread_info['pthread'] = get_thread_id()
         thread_info['gdb_thread_num'] = thread.num
         thread_info['lwpid'] = thread.ptid[1]
-        thread_info['name'] = self._get_current_thread_name()
+        thread_info['name'] = get_current_thread_name()
 
         if sys.platform.startswith("linux"):
             header_format = "Thread {gdb_thread_num}: {name} (Thread 0x{pthread:x} (LWP {lwpid}))"

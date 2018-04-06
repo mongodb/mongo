@@ -18,10 +18,11 @@ if sys.version_info[0] >= 3:
 class Thread(object):
     """Thread class."""
 
-    def __init__(self, thread_id, lwpid):
+    def __init__(self, thread_id, lwpid, thread_name):
         """Initialize Thread."""
         self.thread_id = thread_id
         self.lwpid = lwpid
+        self.name = thread_name
 
     def __eq__(self, other):
         if isinstance(other, Thread):
@@ -32,7 +33,7 @@ class Thread(object):
         return not self == other
 
     def __str__(self):
-        return "Thread 0x{:012x} (LWP {})".format(self.thread_id, self.lwpid)
+        return "{} (Thread 0x{:012x} (LWP {}))".format(self.name, self.thread_id, self.lwpid)
 
     def key(self):
         """Return thread key."""
@@ -190,15 +191,15 @@ class Graph(object):
             if node not in nodes_visited:
                 cycle_path = self.depth_first_search(node, nodes_visited)
                 if cycle_path:
-                    return cycle_path
+                    return [str(self.nodes[node_key]['node']) for node_key in cycle_path]
         return None
 
 
-def find_lwpid(thread_dict, search_thread_id):
-    """Find lwpid."""
-    for (lwpid, thread_id) in thread_dict.items():
-        if thread_id == search_thread_id:
-            return lwpid
+def find_thread(thread_dict, search_thread_id):
+    """Find thread."""
+    for (lwpid, thread) in thread_dict.items():
+        if thread.thread_id == search_thread_id:
+            return thread
     return None
 
 
@@ -245,27 +246,26 @@ def find_mutex_holder(graph, thread_dict, show):
     mutex_this, _ = gdb.lookup_symbol("this", frame.block())
     mutex_value = mutex_this.value(frame)
     # The mutex holder is a LWPID
-    mutex_holder = int(mutex_value["_M_mutex"]["__data"]["__owner"])
+    mutex_holder_lwpid = int(mutex_value["_M_mutex"]["__data"]["__owner"])
+
     # At time thread_dict was initialized, the mutex holder may not have been found.
     # Use the thread LWP as a substitute for showing output or generating the graph.
-    if mutex_holder not in thread_dict:
+    if mutex_holder_lwpid not in thread_dict:
         print("Warning: Mutex at {} held by thread with LWP {}"
               " not found in thread_dict. Using LWP to track thread.".format(
-                  mutex_value, mutex_holder))
-        mutex_holder_id = mutex_holder
+                  mutex_value, mutex_holder_lwpid))
+        mutex_holder = Thread(mutex_holder_lwpid, mutex_holder_lwpid, '"[unknown]"')
     else:
-        mutex_holder_id = thread_dict[mutex_holder]
+        mutex_holder = thread_dict[mutex_holder_lwpid]
 
     (_, mutex_waiter_lwpid, _) = gdb.selected_thread().ptid
-    mutex_waiter_id = thread_dict[mutex_waiter_lwpid]
+    mutex_waiter = thread_dict[mutex_waiter_lwpid]
     if show:
-        print("Mutex at {} held by thread 0x{:x} (LWP {})"
-              " waited on by thread 0x{:x} (LWP {})".format(
-                  mutex_value, mutex_holder_id, mutex_holder, mutex_waiter_id, mutex_waiter_lwpid))
+        print("Mutex at {} held by {} waited on by {}".format(mutex_value, mutex_holder,
+                  mutex_waiter))
     if graph:
-        graph.add_edge(
-            Thread(mutex_waiter_id, mutex_waiter_lwpid), Lock(long(mutex_value), "Mutex"))
-        graph.add_edge(Lock(long(mutex_value), "Mutex"), Thread(mutex_holder_id, mutex_holder))
+        graph.add_edge(mutex_waiter, Lock(long(mutex_value), "Mutex"))
+        graph.add_edge(Lock(long(mutex_value), "Mutex"), mutex_holder)
 
 
 def find_lock_manager_holders(graph, thread_dict, show):
@@ -276,7 +276,8 @@ def find_lock_manager_holders(graph, thread_dict, show):
 
     frame.select()
 
-    (_, lwpid, _) = gdb.selected_thread().ptid
+    (_, lock_waiter_lwpid, _) = gdb.selected_thread().ptid
+    lock_waiter = thread_dict[lock_waiter_lwpid]
 
     locker_ptr_type = gdb.lookup_type("mongo::LockerImpl<false>").pointer()
     lock_head = gdb.parse_and_eval(
@@ -289,16 +290,14 @@ def find_lock_manager_holders(graph, thread_dict, show):
         locker_ptr = lock_request["locker"]
         locker_ptr = locker_ptr.cast(locker_ptr_type)
         locker = locker_ptr.dereference()
-        lock_thread_id = int(locker["_threadId"]["_M_thread"])
-        lock_thread_lwpid = find_lwpid(thread_dict, lock_thread_id)
+        lock_holder_id = int(locker["_threadId"]["_M_thread"])
+        lock_holder = find_thread(thread_dict, lock_holder_id)
         if show:
-            print("MongoDB Lock at {} ({}) held by thread id 0x{:x} (LWP {})".format(
-                lock_head, lock_request["mode"], lock_thread_id, lock_thread_lwpid) +
-                  " waited on by thread 0x{:x} (LWP {})".format(thread_dict[lwpid], lwpid))
+            print("MongoDB Lock at {} ({}) held by {} waited on by {}".format(lock_head,
+                lock_request["mode"], lock_holder, lock_waiter))
         if graph:
-            graph.add_edge(Thread(thread_dict[lwpid], lwpid), Lock(long(lock_head), "MongoDB lock"))
-            graph.add_edge(
-                Lock(long(lock_head), "MongoDB lock"), Thread(lock_thread_id, lock_thread_lwpid))
+            graph.add_edge(lock_waiter, Lock(long(lock_head), "MongoDB lock"))
+            graph.add_edge(Lock(long(lock_head), "MongoDB lock"), lock_holder)
         lock_request_ptr = lock_request["next"]
 
 
@@ -326,11 +325,12 @@ def get_threads_info():
             # PTID is a tuple: Process ID (PID), Lightweight Process ID (LWPID), Thread ID (TID)
             (_, lwpid, _) = thread.ptid
             thread_num = thread.num
+            thread_name = get_current_thread_name()  # pylint: disable=undefined-variable
             thread_id = get_thread_id()  # pylint: disable=undefined-variable
             if not thread_id:
                 print("Unable to retrieve thread_info for thread %d" % thread_num)
                 continue
-            thread_dict[lwpid] = thread_id
+            thread_dict[lwpid] = Thread(thread_id, lwpid, thread_name)
         except gdb.error as err:
             print("Ignoring GDB error '%s' in get_threads_info" % str(err))
 
