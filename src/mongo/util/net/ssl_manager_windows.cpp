@@ -1472,9 +1472,9 @@ Status validatePeerCertificate(const std::string& remoteHost,
         const_cast<LPSTR>(szOID_PKIX_KP_SERVER_AUTH),
     };
 
-    // If remoteHost is empty, then this is running on the server side, and we want to verify the
-    // client cert
-    if (remoteHost.empty()) {
+    // If remoteHost is not empty, then this is running on the client side, and we want to verify
+    // the server cert.
+    if (!remoteHost.empty()) {
         certChainPara.RequestedUsage.dwType = USAGE_MATCH_TYPE_AND;
         certChainPara.RequestedUsage.Usage.cUsageIdentifier = _countof(usage);
         certChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = usage;
