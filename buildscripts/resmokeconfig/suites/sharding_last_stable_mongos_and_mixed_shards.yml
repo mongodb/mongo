@@ -21,6 +21,7 @@ selector:
   - jstests/sharding/view_rewrite.js
   - jstests/sharding/explain_agg_read_pref.js
   - jstests/sharding/max_time_ms_sharded_new_commands.js
+  - jstests/sharding/migration_critical_section_concurrency.js
   - jstests/sharding/move_primary_basic.js
   - jstests/sharding/moveChunk_recipient_rejects_chunk_if_UUID_mismatch.js
   - jstests/sharding/write_cmd_auto_split.js
