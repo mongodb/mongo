@@ -15,7 +15,8 @@
     let txnNumber = 0;
 
     // Set up the test collection.
-    testColl.drop();
+    testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
+
     assert.commandWorked(
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
 

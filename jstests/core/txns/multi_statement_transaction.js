@@ -8,7 +8,7 @@
     const testDB = db.getSiblingDB(dbName);
     const testColl = testDB[collName];
 
-    testColl.drop();
+    testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
     assert.commandWorked(
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
@@ -73,7 +73,7 @@
 
     jsTest.log("Update documents in a transaction");
 
-    testColl.remove({}, {writeConcern: {w: "majority"}});
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
     // Insert the docs to be updated.
     assert.commandWorked(sessionDb[collName].insert(
         [{_id: "update-1", a: 0}, {_id: "update-2", a: 0}], {writeConcern: {w: "majority"}}));
@@ -115,7 +115,7 @@
 
     jsTest.log("Insert, update and read documents in a transaction");
 
-    testColl.remove({}, {writeConcern: {w: "majority"}});
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
     txnNumber++;
     stmtId = 0;
     assert.commandWorked(sessionDb.runCommand({
@@ -172,8 +172,9 @@
 
     jsTest.log("Insert and delete documents in a transaction");
 
-    testColl.remove({}, {writeConcern: {w: "majority"}});
-    testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}});
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(
+        testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}}));
     txnNumber++;
     stmtId = 0;
     assert.commandWorked(sessionDb.runCommand({

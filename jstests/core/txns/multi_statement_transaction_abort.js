@@ -8,7 +8,7 @@
     const testDB = db.getSiblingDB(dbName);
     const testColl = testDB[collName];
 
-    testColl.drop();
+    testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
     assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
     let txnNumber = 0;
@@ -56,7 +56,7 @@
 
     jsTest.log("Insert two documents in a transaction and commit");
 
-    // Insert a doc with the same _id's in a new transaction should work.
+    // Insert a doc with the same _id in a new transaction should work.
     txnNumber++;
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
@@ -89,7 +89,7 @@
                                  ErrorCodes.NoSuchTransaction);
 
     jsTest.log("Abort transaction on duplicated key errors");
-    testColl.drop();
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(testColl.insert({_id: "insert-1"}, {writeConcern: {w: "majority"}}));
     txnNumber++;
     // The first insert works well.
@@ -123,8 +123,7 @@
     assert.eq(null, testColl.findOne({_id: "insert-2"}));
 
     jsTest.log("Abort transaction on write conflict errors");
-    testColl.drop();
-    assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
     txnNumber++;
     const session2 = testDB.getMongo().startSession(sessionOptions);
     const sessionDb2 = session2.getDatabase(dbName);
@@ -143,7 +142,7 @@
         insert: collName,
         documents: [{_id: "insert-2", from: 2}],
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
+        txnNumber: NumberLong(txnNumber2),
         startTransaction: true,
         autocommit: false
     }));
@@ -151,7 +150,7 @@
     assert.commandFailedWithCode(sessionDb2.runCommand({
         insert: collName,
         documents: [{_id: "insert-1", from: 2}],
-        txnNumber: NumberLong(txnNumber),
+        txnNumber: NumberLong(txnNumber2),
         autocommit: false
     }),
                                  ErrorCodes.WriteConflict);
@@ -164,10 +163,10 @@
         autocommit: false
     }));
     // Transaction on session 2 is aborted.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
+    assert.commandFailedWithCode(sessionDb2.adminCommand({
         commitTransaction: 1,
         writeConcern: {w: "majority"},
-        txnNumber: NumberLong(txnNumber),
+        txnNumber: NumberLong(txnNumber2),
         autocommit: false
     }),
                                  ErrorCodes.NoSuchTransaction);
@@ -207,7 +206,7 @@
     assert.eq({_id: "running-txn-2"}, testColl.findOne({_id: "running-txn-2"}));
 
     jsTest.log("Higher transaction number aborts existing running snapshot read.");
-    assert.commandWorked(testColl.remove({}));
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(
         testColl.insert([{doc: 1}, {doc: 2}, {doc: 3}], {writeConcern: {w: "majority"}}));
     txnNumber++;

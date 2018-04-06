@@ -9,7 +9,7 @@
     const testDB = db.getSiblingDB(dbName);
     const coll = testDB[collName];
 
-    coll.drop();
+    testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
     testDB.runCommand({create: coll.getName(), writeConcern: {w: "majority"}});
     let txnNumber = 0;

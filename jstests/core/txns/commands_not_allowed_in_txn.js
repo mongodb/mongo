@@ -8,8 +8,7 @@
     const testDB = db.getSiblingDB(dbName);
     const testColl = testDB[collName];
 
-    testColl.drop();
-
+    testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
     let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
@@ -29,8 +28,8 @@
 
     function setup() {
         testColl.dropIndex({a: 1});
-        testDB.create_collection.drop();
-        testDB.drop_collection.drop();
+        testDB.runCommand({drop: "create_collection", writeConcern: {w: "majority"}});
+        testDB.runCommand({drop: "drop_collection", writeConcern: {w: "majority"}});
         assert.commandWorked(
             testDB.createCollection("drop_collection", {writeConcern: {w: "majority"}}));
     }
