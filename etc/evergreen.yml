@@ -3909,6 +3909,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: replica_sets_kill_primary_jscore_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_kill_primary_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets_kill_secondaries_jscore_passthrough
   depends_on:
   - name: jsCore
@@ -5357,6 +5368,7 @@ buildvariants:
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
@@ -6416,6 +6428,9 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
     - windows-64-vs2015-large
+  - name: replica_sets_kill_primary_jscore_passthrough
+    distros:
+    - windows-64-vs2015-large
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
     - windows-64-vs2015-large
@@ -7402,6 +7417,9 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
     distros:
     - rhel62-large
+  - name: replica_sets_kill_primary_jscore_passthrough
+    distros:
+    - rhel62-large
   - name: replica_sets_kill_secondaries_jscore_passthrough
     distros:
     - rhel62-large
@@ -7547,6 +7565,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: sasl
@@ -9640,6 +9659,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
@@ -9797,6 +9817,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_kill_primary_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
