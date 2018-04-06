@@ -136,7 +136,7 @@ Status _failIndexBuild(MultiIndexBlock& indexer, Status status, bool allowBackgr
 
     if (allowBackgroundBuilding) {
         error() << "Background index build failed. Status: " << redact(status);
-        fassertFailed(50763);
+        fassertFailed(50769);
     } else {
         return status;
     }
