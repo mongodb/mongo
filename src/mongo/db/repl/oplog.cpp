@@ -224,7 +224,8 @@ void setOplogCollectionName(ServiceContext* service) {
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
+                            OplogApplication::Mode mode) {
     // Check if collection exists.
     Database* db = dbHolder().get(opCtx, indexNss.ns());
     auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
@@ -238,21 +239,31 @@ void createIndexForApplyOps(OperationContext* opCtx,
     bool relaxIndexConstraints =
         ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss);
     if (indexSpec["background"].trueValue()) {
-        Lock::TempRelease release(opCtx->lockState());
-        if (opCtx->lockState()->isLocked()) {
-            // If TempRelease fails, background index build will deadlock.
+        if (mode == OplogApplication::Mode::kRecovering) {
             LOG(3) << "apply op: building background index " << indexSpec
-                   << " in the foreground because temp release failed";
+                   << " in the foreground because the node is in recovery";
             IndexBuilder builder(indexSpec, relaxIndexConstraints);
             Status status = builder.buildInForeground(opCtx, db);
             uassertStatusOK(status);
         } else {
-            IndexBuilder* builder = new IndexBuilder(indexSpec, relaxIndexConstraints);
-            // This spawns a new thread and returns immediately.
-            builder->go();
-            // Wait for thread to start and register itself
-            IndexBuilder::waitForBgIndexStarting();
+            Lock::TempRelease release(opCtx->lockState());
+            if (opCtx->lockState()->isLocked()) {
+                // If TempRelease fails, background index build will deadlock.
+                LOG(3) << "apply op: building background index " << indexSpec
+                       << " in the foreground because temp release failed";
+                IndexBuilder builder(indexSpec, relaxIndexConstraints);
+                Status status = builder.buildInForeground(opCtx, db);
+                uassertStatusOK(status);
+            } else {
+                IndexBuilder* builder = new IndexBuilder(
+                    indexSpec, relaxIndexConstraints, opCtx->recoveryUnit()->getCommitTimestamp());
+                // This spawns a new thread and returns immediately.
+                builder->go();
+                // Wait for thread to start and register itself
+                IndexBuilder::waitForBgIndexStarting();
+            }
         }
+
         opCtx->recoveryUnit()->abandonSnapshot();
     } else {
         IndexBuilder builder(indexSpec, relaxIndexConstraints);
@@ -794,7 +805,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           BSONObj nsObj = BSON("ns" << nss.ns());
           indexSpec = indexSpec.addField(nsObj.firstElement());
 
-          createIndexForApplyOps(opCtx, indexSpec, nss, {});
+          createIndexForApplyOps(opCtx, indexSpec, nss, {}, mode);
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists, ErrorCodes::NamespaceNotFound}}},
@@ -1169,7 +1180,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             NamespaceString indexNss;
             std::tie(indexSpec, indexNss) =
                 repl::prepForApplyOpsIndexInsert(fieldO, op, requestNss);
-            createIndexForApplyOps(opCtx, indexSpec, indexNss, incrementOpsAppliedStats);
+            createIndexForApplyOps(opCtx, indexSpec, indexNss, incrementOpsAppliedStats, mode);
             return Status::OK();
         }
         uassert(ErrorCodes::NamespaceNotFound,

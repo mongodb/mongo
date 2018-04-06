@@ -258,7 +258,8 @@ void signalOplogWaiters();
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
+                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
+                            OplogApplication::Mode mode);
 
 /**
  * Allocates optimes for new entries in the oplog.  Returns an OplogSlot or a vector of OplogSlots,

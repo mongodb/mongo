@@ -62,10 +62,13 @@ class OperationContext;
  * like inserts on system.indexes.
  * The argument "relaxConstraints" specifies whether we should honor or ignore index constraints,
  * The ignoring of constraints is for replication due to idempotency reasons.
+ * The argument "initIndexTs" specifies the timestamp to be used to make the initial catalog write.
  */
 class IndexBuilder : public BackgroundJob {
 public:
-    IndexBuilder(const BSONObj& index, bool relaxConstraints);
+    IndexBuilder(const BSONObj& index,
+                 bool relaxConstraints,
+                 Timestamp initIndexTs = Timestamp::min());
     virtual ~IndexBuilder();
 
     virtual void run();
@@ -92,6 +95,7 @@ private:
 
     const BSONObj _index;
     const bool _relaxConstraints;
+    const Timestamp _initIndexTs;
     std::string _name;  // name of this builder, not related to the index
     static AtomicUInt32 _indexBuildCount;
 };
