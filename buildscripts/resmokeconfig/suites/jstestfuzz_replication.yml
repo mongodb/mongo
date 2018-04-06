@@ -17,8 +17,6 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          excludedDBsFromDBHash:
-            - config
           skipValidationOnInvalidViewDefinitions: true
   - class: ValidateCollections
     shell_options:
