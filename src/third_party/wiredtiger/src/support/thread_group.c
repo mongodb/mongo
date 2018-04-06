@@ -81,8 +81,8 @@ __thread_group_shrink(
 
 		WT_ASSERT(session, thread->tid.created);
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
-		    "Stopping utility thread: %p:%" PRIu32,
-		    (void *)group, thread->id);
+		    "Stopping utility thread: %s:%" PRIu32,
+		    group->name, thread->id);
 		if (F_ISSET(thread, WT_THREAD_ACTIVE))
 			--group->current_threads;
 		F_CLR(thread, WT_THREAD_ACTIVE | WT_THREAD_RUN);
@@ -143,9 +143,9 @@ __thread_group_resize(
 	thread = NULL;
 
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
-	    "Resize thread group: %p, from min: %" PRIu32 " -> %" PRIu32
+	    "Resize thread group: %s, from min: %" PRIu32 " -> %" PRIu32
 	    " from max: %" PRIu32 " -> %" PRIu32,
-	    (void *)group, group->min, new_min, group->max, new_max);
+	    group->name, group->min, new_min, group->max, new_max);
 
 	WT_ASSERT(session,
 	    group->current_threads <= group->alloc &&
@@ -155,7 +155,10 @@ __thread_group_resize(
 		return (0);
 
 	if (new_min > new_max)
-		return (EINVAL);
+		WT_RET_MSG(session, EINVAL,
+		    "Illegal thread group resize: %s, from min: %" PRIu32
+		    " -> %" PRIu32 " from max: %" PRIu32 " -> %" PRIu32,
+		    group->name, group->min, new_min, group->max, new_max);
 
 	/*
 	 * Call shrink to reduce the number of thread structures and running
@@ -205,8 +208,8 @@ __thread_group_resize(
 		 * number later.
 		 */
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
-		    "Starting utility thread: %p:%" PRIu32,
-		    (void *)group, thread->id);
+		    "Starting utility thread: %s:%" PRIu32,
+		    group->name, thread->id);
 		F_SET(thread, WT_THREAD_RUN);
 		WT_ERR(__wt_thread_create(thread->session,
 		    &thread->tid, __thread_run, thread));
@@ -285,8 +288,8 @@ __wt_thread_group_create(
 
 	cond_alloced = false;
 
-	__wt_verbose(session, WT_VERB_THREAD_GROUP,
-	    "Creating thread group: %p", (void *)group);
+	__wt_verbose(session,
+	    WT_VERB_THREAD_GROUP, "Creating thread group: %s", name);
 
 	WT_RET(__wt_rwlock_init(session, &group->lock));
 	WT_ERR(__wt_cond_alloc(
@@ -321,7 +324,7 @@ __wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 	WT_DECL_RET;
 
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
-	    "Destroying thread group: %p", (void *)group);
+	    "Destroying thread group: %s", group->name);
 
 	WT_ASSERT(session, __wt_rwlock_islocked(session, &group->lock));
 
@@ -364,8 +367,8 @@ __wt_thread_group_start_one(
 		thread = group->threads[group->current_threads++];
 		WT_ASSERT(session, thread != NULL);
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
-		    "Activating utility thread: %p:%" PRIu32,
-		    (void *)group, thread->id);
+		    "Activating utility thread: %s:%" PRIu32,
+		    group->name, thread->id);
 		WT_ASSERT(session, !F_ISSET(thread, WT_THREAD_ACTIVE));
 		F_SET(thread, WT_THREAD_ACTIVE);
 		__wt_cond_signal(session, thread->pause_cond);
@@ -391,8 +394,8 @@ __wt_thread_group_stop_one(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 	if (group->current_threads > group->min) {
 		thread = group->threads[--group->current_threads];
 		__wt_verbose(session, WT_VERB_THREAD_GROUP,
-		    "Pausing utility thread: %p:%" PRIu32,
-		    (void *)group, thread->id);
+		    "Pausing utility thread: %s:%" PRIu32,
+		    group->name, thread->id);
 		WT_ASSERT(session, F_ISSET(thread, WT_THREAD_ACTIVE));
 		F_CLR(thread, WT_THREAD_ACTIVE);
 		__wt_cond_signal(session, thread->pause_cond);

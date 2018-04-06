@@ -128,18 +128,7 @@ for line in open(f, 'r'):
             break_on_hyphens=False,
             replace_whitespace=False,
             fix_sentence_endings=True)
-    lastname = None
-    for c in sorted(api_data.methods[config_name].config):
-        name = c.name
-        if '.' in name:
-            print >>sys.stderr, "Bad config key " + name
-
-        # Deal with duplicates: with complex configurations (like
-        # WT_SESSION::create), it's simpler to deal with duplicates here than
-        # manually in api_data.py.
-        if name == lastname:
-            continue
-        lastname = name
+    for c in api_data.methods[config_name].config:
         if 'undoc' in c.flags:
             continue
         output = parseconfig(c, config_name)
@@ -244,8 +233,8 @@ def getsubconfigstr(c):
 # Write structures of arrays of allowable configuration options, including a
 # NULL as a terminator for iteration.
 for name in sorted(api_data.methods.keys()):
-    ctype = api_data.methods[name].config
-    if ctype:
+    config = api_data.methods[name].config
+    if config:
         tfile.write('''
 static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 \t%(check)s
@@ -253,7 +242,7 @@ static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 };
 ''' % {
     'name' : name.replace('.', '_'),
-    'check' : '\n\t'.join(getconfcheck(c) for c in sorted(ctype)),
+    'check' : '\n\t'.join(getconfcheck(c) for c in config),
 })
 
 # Write the initialized list of configuration entry structures.
@@ -263,7 +252,7 @@ tfile.write('static const WT_CONFIG_ENTRY config_entries[] = {')
 slot=-1
 config_defines = ''
 for name in sorted(api_data.methods.keys()):
-    ctype = api_data.methods[name].config
+    config = api_data.methods[name].config
     slot += 1
 
     # Build a list of #defines that reference specific slots in the list (the
@@ -279,15 +268,15 @@ for name in sorted(api_data.methods.keys()):
 %(config)s,''' % {
     'config' : '\n'.join('\t  "%s"' % line
         for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
-            for c in sorted(ctype))) or [""]),
+            for c in config)) or [""]),
     'name' : name
 })
 
     # Write the checks reference, or NULL if no related checks structure.
     tfile.write('\n\t  ')
-    if ctype:
+    if config:
         tfile.write(
-            'confchk_' + name.replace('.', '_') + ', ' + str(len(ctype)))
+            'confchk_' + name.replace('.', '_') + ', ' + str(len(config)))
     else:
         tfile.write('NULL, 0')
 

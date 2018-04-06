@@ -176,6 +176,7 @@ INCR
 INIT
 INITIALIZER
 INMEM
+INPROGRESS
 INSN
 INTL
 INULL
@@ -685,6 +686,7 @@ enqueue
 enqueued
 env
 eof
+epi
 eq
 equalp
 errhandler
@@ -947,6 +949,7 @@ mkdir
 mmap
 mmrand
 mnt
+movemask
 msecs
 msg
 msvc

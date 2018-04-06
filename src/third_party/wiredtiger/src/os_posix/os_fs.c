@@ -39,6 +39,8 @@ __posix_sync(
 	WT_DECL_RET;
 
 #if defined(F_FULLFSYNC)
+	static bool fullfsync_error_logged = false;
+
 	/*
 	 * OS X fsync documentation:
 	 * "Note that while fsync() will flush all data from the host to the
@@ -56,10 +58,16 @@ __posix_sync(
 	WT_SYSCALL_RETRY(fcntl(fd, F_FULLFSYNC, 0) == -1 ? -1 : 0, ret);
 	if (ret == 0)
 		return (0);
+
 	/*
 	 * Assume F_FULLFSYNC failed because the file system doesn't support it
 	 * and fallback to fsync.
 	 */
+	if (!fullfsync_error_logged) {
+		fullfsync_error_logged = true;
+		__wt_err(session, ret,
+		    "fcntl(F_FULLFSYNC) failed, falling back to fsync");
+	}
 #endif
 #if defined(HAVE_FDATASYNC)
 	WT_SYSCALL_RETRY(fdatasync(fd), ret);

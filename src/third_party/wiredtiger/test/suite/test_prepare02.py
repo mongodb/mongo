@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_prepare02.py
-#   Prepare : check post conditions to prepare operation
+#   Prepare : Session API usage generates expected error in prepared state.
 #
 
 from suite_subprocess import suite_subprocess

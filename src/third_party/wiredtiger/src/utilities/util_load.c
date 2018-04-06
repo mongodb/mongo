@@ -486,7 +486,7 @@ config_rename(WT_SESSION *session, char **urip, const char *name)
 		return (util_err(session, errno, NULL));
 
 	/*
-	 * Find the separating colon characters, but not the trailing one may
+	 * Find the separating colon characters, but note the trailing one may
 	 * not be there.
 	 */
 	if ((p = strchr(*urip, ':')) == NULL) {

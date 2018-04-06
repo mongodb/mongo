@@ -441,7 +441,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 			 * control can be running below our locked internal
 			 * page.
 			 */
-			if (__wt_btree_truncate_active(session, child))
+			if (__wt_page_del_active(session, child, true))
 				return (EBUSY);
 			break;
 		default:

@@ -704,7 +704,7 @@ err:		WT_TRET(cursor->reopen(cursor, false));
  */
 int
 __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
-    const char *cfg[], WT_CURSOR **cursorp)
+    WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
@@ -752,10 +752,22 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 	}
 
 	/*
+	 * Caller guarantees that exactly one of the URI and the
+	 * duplicate cursor is non-NULL.
+	 */
+	if (to_dup != NULL) {
+		WT_ASSERT(session, uri == NULL);
+		uri = to_dup->uri;
+		hash_value = to_dup->uri_hash;
+	} else {
+		WT_ASSERT(session, uri != NULL);
+		hash_value = __wt_hash_city64(uri, strlen(uri));
+	}
+
+	/*
 	 * Walk through all cursors, if there is a cached
 	 * cursor that matches uri and configuration, use it.
 	 */
-	hash_value = __wt_hash_city64(uri, strlen(uri));
 	bucket = hash_value % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(cursor, &session->cursor_cache[bucket], q) {
 		if (cursor->uri_hash == hash_value &&

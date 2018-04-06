@@ -238,6 +238,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_alter[] = {
 	{ "access_pattern_hint", "string",
 	    NULL, "choices=[\"none\",\"random\",\"sequential\"]",
 	    NULL, 0 },
+	{ "app_metadata", "string", NULL, NULL, NULL, 0 },
 	{ "assert", "category",
 	    NULL, NULL,
 	    confchk_assert_subconfigs, 2 },
@@ -1274,9 +1275,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_CURSOR_reconfigure, 2
 	},
 	{ "WT_SESSION.alter",
-	  "access_pattern_hint=none,assert=(commit_timestamp=none,"
-	  "read_timestamp=none),cache_resident=false,log=(enabled=true)",
-	  confchk_WT_SESSION_alter, 4
+	  "access_pattern_hint=none,app_metadata=,"
+	  "assert=(commit_timestamp=none,read_timestamp=none),"
+	  "cache_resident=false,log=(enabled=true)",
+	  confchk_WT_SESSION_alter, 5
 	},
 	{ "WT_SESSION.begin_transaction",
 	  "ignore_prepare=false,isolation=,name=,priority=0,read_timestamp="

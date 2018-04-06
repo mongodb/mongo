@@ -10,18 +10,19 @@
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_READ_CACHE			0x0001u
-#define	WT_READ_IGNORE_CACHE_SIZE	0x0002u
-#define	WT_READ_LOOKASIDE		0x0004u
-#define	WT_READ_NOTFOUND_OK		0x0008u
-#define	WT_READ_NO_EMPTY		0x0010u
-#define	WT_READ_NO_GEN			0x0020u
-#define	WT_READ_NO_SPLIT		0x0040u
-#define	WT_READ_NO_WAIT			0x0080u
-#define	WT_READ_PREV			0x0100u
-#define	WT_READ_RESTART_OK		0x0200u
-#define	WT_READ_SKIP_INTL		0x0400u
-#define	WT_READ_TRUNCATE		0x0800u
-#define	WT_READ_WONT_NEED		0x1000u
+#define	WT_READ_DELETED_CHECK		0x0002u
+#define	WT_READ_DELETED_SKIP		0x0004u
+#define	WT_READ_IGNORE_CACHE_SIZE	0x0008u
+#define	WT_READ_LOOKASIDE		0x0010u
+#define	WT_READ_NOTFOUND_OK		0x0020u
+#define	WT_READ_NO_GEN			0x0040u
+#define	WT_READ_NO_SPLIT		0x0080u
+#define	WT_READ_NO_WAIT			0x0100u
+#define	WT_READ_PREV			0x0200u
+#define	WT_READ_RESTART_OK		0x0400u
+#define	WT_READ_SKIP_INTL		0x0800u
+#define	WT_READ_TRUNCATE		0x1000u
+#define	WT_READ_WONT_NEED		0x2000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
@@ -506,11 +507,7 @@ struct __wt_page {
 		 * Internal pages (both column- and row-store).
 		 *
 		 * In-memory internal pages have an array of pointers to child
-		 * structures, maintained in collated order.  When a page is
-		 * read into memory, the initial list of children is stored in
-		 * the "orig_index" field, and it and the collated order are
-		 * the same.  After a page splits, the collated order and the
-		 * original order will differ.
+		 * structures, maintained in collated order.
 		 *
 		 * Multiple threads of control may be searching the in-memory
 		 * internal page and a child page of the internal page may
@@ -707,6 +704,45 @@ struct __wt_page {
 	((void *)((uint8_t *)((page)->dsk) + (o)))
 
 /*
+ * Prepare update states.
+ *
+ * Prepare update synchronization is based on the state field, which has the
+ * following possible states:
+ *
+ * WT_PREPARE_INIT:
+ *	The initial prepare state of either an update or a page_del structure,
+ *	indicating a prepare phase has not started yet.
+ *	This state has no impact on the visibility of the update's data.
+ *
+ * WT_PREPARE_INPROGRESS:
+ *	Update is in prepared phase.
+ *
+ * WT_PREPARE_LOCKED:
+ *	State is locked as state transition is in progress from INPROGRESS to
+ *	RESOLVED. Any reader of the state needs to wait for state transition to
+ *	complete.
+ *
+ * WT_PREPARE_RESOLVED:
+ *	Represents the commit state of the prepared update.
+ *
+ * State Transition:
+ * 	From uncommitted -> prepare -> commit:
+ * 	INIT --> INPROGRESS --> LOCKED --> RESOLVED
+ * 	LOCKED will be a momentary phase during timestamp update.
+ *
+ * 	From uncommitted -> prepare -> rollback:
+ * 	INIT --> INPROGRESS
+ * 	Prepare state will not be updated during rollback and will continue to
+ * 	have the state as INPROGRESS.
+ */
+#define	WT_PREPARE_INIT			0	/* Must be 0, as structures
+						   will be default initialized
+						   with 0. */
+#define	WT_PREPARE_INPROGRESS		1
+#define	WT_PREPARE_LOCKED		2
+#define	WT_PREPARE_RESOLVED		3
+
+/*
  * Page state.
  *
  * Synchronization is based on the WT_REF->state field, which has a number of
@@ -778,6 +814,12 @@ struct __wt_page {
 struct __wt_page_deleted {
 	volatile uint64_t txnid;		/* Transaction ID */
 	WT_DECL_TIMESTAMP(timestamp)
+
+	/*
+	 * The state is used for transaction prepare to manage visibility
+	 * and inheriting prepare state to update_list.
+	 */
+	volatile uint8_t prepare_state;		/* Prepare state. */
 
 	uint32_t previous_state;		/* Previous state */
 
@@ -989,16 +1031,6 @@ struct __wt_update {
 #define	WT_UPDATE_TOMBSTONE	5	/* deleted */
 	uint8_t type;			/* type (one byte to conserve memory) */
 
-	/*
-	 * The update state is used for transaction prepare to manage
-	 * visibility and transitioning update structure state safely.
-	 */
-#define	WT_UPDATE_STATE_READY		0	/* Must be 0. Default or
-						   finalized prepare */
-#define	WT_UPDATE_STATE_LOCKED		1	/* locked */
-#define	WT_UPDATE_STATE_PREPARED	2	/* prepared */
-	volatile uint8_t state;
-
 	/* If the update includes a complete value. */
 #define	WT_UPDATE_DATA_VALUE(upd)					\
 	((upd)->type == WT_UPDATE_STANDARD ||				\
@@ -1007,6 +1039,12 @@ struct __wt_update {
 #if WT_TIMESTAMP_SIZE != 8
 	WT_DECL_TIMESTAMP(timestamp)	/* unaligned uint8_t array timestamp */
 #endif
+
+	/*
+	 * The update state is used for transaction prepare to manage
+	 * visibility and transitioning update structure state safely.
+	 */
+	volatile uint8_t prepare_state;	/* Prepare state. */
 
 	/*
 	 * Zero or more bytes of value (the payload) immediately follows the

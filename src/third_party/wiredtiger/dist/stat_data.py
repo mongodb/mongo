@@ -271,6 +271,7 @@ connection_stats = [
     CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
+    CacheStat('cache_read_deleted', 'pages read into cache after truncate'),
     CacheStat('cache_read_lookaside', 'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_lookaside_delay', 'pages read into cache with skipped lookaside entries needed later'),
     CacheStat('cache_read_lookaside_skipped', 'pages read into cache skipping older lookaside entries'),
@@ -549,7 +550,6 @@ connection_stats = [
     YieldStat('page_locked_blocked', 'page acquire locked blocked'),
     YieldStat('page_read_blocked', 'page acquire read blocked'),
     YieldStat('page_sleep', 'page acquire time sleeping (usecs)'),
-    YieldStat('tree_descend_blocked', 'tree descend one level yielded for split page index update'),
     YieldStat('txn_release_blocked', 'connection close blocked waiting for transaction state stabilization'),
 ]
 
@@ -629,6 +629,7 @@ dsrc_stats = [
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
     CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_read', 'pages read into cache'),
+    CacheStat('cache_read_deleted', 'pages read into cache after truncate'),
     CacheStat('cache_read_lookaside', 'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),
     CacheStat('cache_write', 'pages written from cache'),

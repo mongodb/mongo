@@ -33,9 +33,9 @@ from wtdataset import SimpleDataSet
 def timestamp_str(t):
     return '%x' % t
 
-# test_las.py
+# test_las01.py
 # Smoke tests to ensure lookaside tables are working.
-class test_las(wttest.WiredTigerTestCase):
+class test_las01(wttest.WiredTigerTestCase):
     # Force a small cache.
     def conn_config(self):
         return 'cache_size=50MB'
@@ -93,7 +93,7 @@ class test_las(wttest.WiredTigerTestCase):
 
     def test_las(self):
         # Create a small table.
-        uri = "table:test_las"
+        uri = "table:test_las01"
         nrows = 100
         ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()

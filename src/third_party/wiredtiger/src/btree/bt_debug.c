@@ -29,7 +29,7 @@ struct __wt_dbg {
 	const char *key_format;
 	const char *value_format;
 
-	WT_ITEM *tmp;				/* Temporary space */
+	WT_ITEM *t1, *t2;			/* Temporary space */
 };
 
 static const					/* Output separator */
@@ -51,8 +51,7 @@ static int __debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int __debug_ref(WT_DBG *, WT_REF *);
 static int __debug_row_skip(WT_DBG *, WT_INSERT_HEAD *);
-static int __debug_tree(
-	WT_SESSION_IMPL *, WT_BTREE *, WT_REF *, const char *, uint32_t);
+static int __debug_tree(WT_SESSION_IMPL *, WT_REF *, const char *, uint32_t);
 static int __debug_update(WT_DBG *, WT_UPDATE *, bool);
 static int __dmsg_wrapup(WT_DBG *);
 
@@ -124,10 +123,25 @@ __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 static int
 __debug_item_key(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 {
+	WT_SESSION_IMPL *session;
+
+	session = ds->session;
+
+	/*
+	 * If the format is 'S', it's a string and our version of it may
+	 * not yet be nul-terminated.
+	 */
+	if (WT_STREQ(ds->key_format, "S") &&
+	    ((char *)data_arg)[size - 1] != '\0') {
+		WT_RET(__wt_buf_fmt(
+		    session, ds->t2, "%.*s", (int)size, (char *)data_arg));
+		data_arg = ds->t2->data;
+		size = (size_t)ds->t2->size + 1;
+	}
 	return (ds->f(ds, "\t%s%s{%s}\n",
 	    tag == NULL ? "" : tag, tag == NULL ? "" : " ",
 	    __wt_buf_set_printable_format(
-	    ds->session, data_arg, size, ds->key_format, ds->tmp)));
+	    ds->session, data_arg, size, ds->key_format, ds->t1)));
 }
 
 /*
@@ -138,10 +152,25 @@ static int
 __debug_item_value(
     WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 {
+	WT_SESSION_IMPL *session;
+
+	session = ds->session;
+
+	/*
+	 * If the format is 'S', it's a string and our version of it may
+	 * not yet be nul-terminated.
+	 */
+	if (WT_STREQ(ds->value_format, "S") &&
+	    ((char *)data_arg)[size - 1] != '\0') {
+		WT_RET(__wt_buf_fmt(
+		    session, ds->t2, "%.*s", (int)size, (char *)data_arg));
+		data_arg = ds->t2->data;
+		size = (size_t)ds->t2->size + 1;
+	}
 	return (ds->f(ds, "\t%s%s{%s}\n",
 	    tag == NULL ? "" : tag, tag == NULL ? "" : " ",
 	    __wt_buf_set_printable_format(
-	    ds->session, data_arg, size, ds->value_format, ds->tmp)));
+	    ds->session, data_arg, size, ds->value_format, ds->t1)));
 }
 
 /*
@@ -229,7 +258,8 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 
 	ds->session = session;
 
-	WT_RET(__wt_scr_alloc(session, 512, &ds->tmp));
+	WT_RET(__wt_scr_alloc(session, 512, &ds->t1));
+	WT_RET(__wt_scr_alloc(session, 512, &ds->t2));
 
 	/*
 	 * If we weren't given a file, we use the default event handler, and
@@ -245,7 +275,7 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 		ds->f = __dmsg_file;
 	}
 
-	btree = S2BT_SAFE(session);
+	btree = S2BT(session);
 	ds->key_format = btree->key_format;
 	ds->value_format = btree->value_format;
 	return (0);
@@ -264,7 +294,8 @@ __dmsg_wrapup(WT_DBG *ds)
 	session = ds->session;
 	msg = ds->msg;
 
-	__wt_scr_free(session, &ds->tmp);
+	__wt_scr_free(session, &ds->t1);
+	__wt_scr_free(session, &ds->t2);
 
 	/*
 	 * Discard the buffer -- it shouldn't have anything in it, but might
@@ -608,10 +639,18 @@ __wt_debug_tree_shape(
  */
 int
 __wt_debug_tree_all(
-    WT_SESSION_IMPL *session, WT_BTREE *btree, WT_REF *ref, const char *ofile)
+    void *session_arg, WT_BTREE *btree, WT_REF *ref, const char *ofile)
 {
-	return (__debug_tree(session,
-	    btree, ref, ofile, WT_DEBUG_TREE_LEAF | WT_DEBUG_TREE_WALK));
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)session_arg;
+	if (btree == NULL)
+		btree = S2BT(session);
+
+	WT_WITH_BTREE(session, btree, ret = __debug_tree(
+	    session, ref, ofile, WT_DEBUG_TREE_LEAF | WT_DEBUG_TREE_WALK));
+	return (ret);
 }
 
 /*
@@ -623,9 +662,18 @@ __wt_debug_tree_all(
  */
 int
 __wt_debug_tree(
-    WT_SESSION_IMPL *session, WT_BTREE *btree, WT_REF *ref, const char *ofile)
+    void *session_arg, WT_BTREE *btree, WT_REF *ref, const char *ofile)
 {
-	return (__debug_tree(session, btree, ref, ofile, WT_DEBUG_TREE_WALK));
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)session_arg;
+	if (btree == NULL)
+		btree = S2BT(session);
+
+	WT_WITH_BTREE(session, btree,
+	    ret = __debug_tree(session, ref, ofile, WT_DEBUG_TREE_WALK));
+	return (ret);
 }
 
 /*
@@ -633,18 +681,41 @@ __wt_debug_tree(
  *	Dump the in-memory information for a page.
  */
 int
-__wt_debug_page(WT_SESSION_IMPL *session, WT_REF *ref, const char *ofile)
+__wt_debug_page(
+    void *session_arg, WT_BTREE *btree, WT_REF *ref, const char *ofile)
 {
 	WT_DBG *ds, _ds;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
-	WT_ASSERT(session, S2BT_SAFE(session) != NULL);
+	session = (WT_SESSION_IMPL *)session_arg;
+	if (btree == NULL)
+		btree = S2BT(session);
 
 	ds = &_ds;
-	WT_RET(__debug_config(session, ds, ofile));
+	WT_WITH_BTREE(session, btree, ret = __debug_config(session, ds, ofile));
+	WT_RET(ret);
 
-	WT_RET(__debug_page(ds, ref, WT_DEBUG_TREE_LEAF));
+	WT_WITH_BTREE(session, btree,
+	    ret = __debug_page(ds, ref, WT_DEBUG_TREE_LEAF));
 
-	return (__dmsg_wrapup(ds));
+	WT_TRET(__dmsg_wrapup(ds));
+	return (ret);
+}
+
+/*
+ * __wt_debug_cursor_page --
+ *	Dump the in-memory information for a cursor-referenced page.
+ */
+int
+__wt_debug_cursor_page(void *cursor_arg, const char *ofile)
+{
+	WT_CURSOR *cursor;
+	WT_CURSOR_BTREE *cbt;
+
+	cursor = cursor_arg;
+	cbt = cursor_arg;
+	return (__wt_debug_page(cursor->session, cbt->btree, cbt->ref, ofile));
 }
 
 /*
@@ -656,8 +727,8 @@ __wt_debug_page(WT_SESSION_IMPL *session, WT_REF *ref, const char *ofile)
  *	in this function
  */
 static int
-__debug_tree(WT_SESSION_IMPL *session,
-    WT_BTREE *btree, WT_REF *ref, const char *ofile, uint32_t flags)
+__debug_tree(
+    WT_SESSION_IMPL *session, WT_REF *ref, const char *ofile, uint32_t flags)
 {
 	WT_DBG *ds, _ds;
 	WT_DECL_RET;
@@ -667,12 +738,12 @@ __debug_tree(WT_SESSION_IMPL *session,
 
 	/* A NULL page starts at the top of the tree -- it's a convenience. */
 	if (ref == NULL)
-		ref = &btree->root;
+		ref = &S2BT(session)->root;
 
-	WT_WITH_BTREE(session, btree, ret = __debug_page(ds, ref, flags));
-	WT_RET(ret);
+	ret = __debug_page(ds, ref, flags);
 
-	return (__dmsg_wrapup(ds));
+	WT_TRET(__dmsg_wrapup(ds));
+	return (ret);
 }
 
 /*
@@ -1189,7 +1260,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
 
 	__wt_ref_info(ref, &addr, &addr_size, NULL);
 	return (ds->f(ds, "\t" "%p %s %s\n", (void *)ref,
-	    state, __wt_addr_string(session, addr, addr_size, ds->tmp)));
+	    state, __wt_addr_string(session, addr, addr_size, ds->t1)));
 }
 
 /*
