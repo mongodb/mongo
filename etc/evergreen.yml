@@ -9590,6 +9590,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
     hang_analyzer_dump_core: false
+    scons_cache_scope: shared
   tasks:
   - name: compile
   - name: compile_all
@@ -9705,6 +9706,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
     hang_analyzer_dump_core: false
+    scons_cache_scope: shared
   tasks:
   - name: compile
   - name: compile_all
@@ -9747,6 +9749,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+    scons_cache_scope: shared
   tasks:
   - name: compile
   - name: compile_all
@@ -9864,6 +9867,7 @@ buildvariants:
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
     hang_analyzer_dump_core: false
+    scons_cache_scope: shared
   tasks:
   - name: compile
   - name: compile_all
@@ -9891,6 +9895,7 @@ buildvariants:
     build_mongoreplay: false
     hang_analyzer_dump_core: false
     test_flags: --serviceExecutor=adaptive --excludeWithAnyTags=requires_mmapv1
+    scons_cache_scope: shared
   tasks:
   - name: compile
   - name: compile_all
