@@ -409,48 +409,37 @@
         whatsmyuri: {skip: "executes locally on mongos (not sent to any remote node)"},
     };
 
-    var st = new ShardingTest({shards: 1});
+    class AllCommandsTestRunner {
+        constructor() {
+            this.st = new ShardingTest(this.getShardingTestOptions());
+            assert.commandWorked(this.st.s.adminCommand({enableSharding: dbName}));
+            this.primaryShard = this.st.shard0;
+            this.st.ensurePrimaryShard(dbName, this.primaryShard.shardName);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    let dbVersion = st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
-    st.shard0.getDB(dbName).setProfilingLevel(2);
+            this.dbVersion =
+                this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+            this.previousDbVersion = null;
 
-    let res = st.s.adminCommand({listCommands: 1});
-    assert.commandWorked(res);
-    let commands = Object.keys(res.commands);
-
-    // Use the profiler to check that the command was received with or without a databaseVersion and
-    // shardVersion as expected by the 'testCase' for the command.
-    for (let command of commands) {
-        let testCase = testCases[command];
-        assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
-        validateTestCase(testCase);
-        testCases[command].validated = true;
-
-        if (testCase.skip) {
-            print("skipping " + command + ": " + testCase.skip);
-            continue;
-        }
-
-        st.shard0.getDB(dbName).setProfilingLevel(2);
-
-        jsTest.log("testing command " + tojson(testCase.command));
-
-        if (testCase.setUp) {
-            testCase.setUp(st.s);
-        }
-
-        let commandProfile = buildCommandProfile(testCase.command, false);
-        commandProfile["command.shardVersion"] =
-            testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
-
-        if (testCase.sendsDbVersion) {
-            assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
-
-            const res = st.shard0.adminCommand({getDatabaseVersion: dbName});
+            let res = this.st.s.adminCommand({listCommands: 1});
             assert.commandWorked(res);
-            assert.eq(dbVersion, res.dbVersion);
+            this.commands = Object.keys(res.commands);
+        }
+
+        shutdown() {
+            this.st.stop();
+        }
+
+        getShardingTestOptions() {
+            throw new Error("not implemented");
+        }
+        makeShardDatabaseCacheStale() {
+            throw new Error("not implemented");
+        }
+
+        assertSentDatabaseVersion() {
+            const res = this.primaryShard.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq(this.dbVersion, res.dbVersion);
 
             // TODO: Currently, commands are profiled if they call CurOp::raiseDbProfilingLevel().
             // But, some commands do so only after calling AutoGetDb, where dbVersion is checked.
@@ -461,34 +450,110 @@
             // commandProfile["command.databaseVersion"] = dbVersion;
             // profilerHasSingleMatchingEntryOrThrow(
             //    {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
-        } else {
-            assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
+        }
 
-            const res = st.shard0.adminCommand({getDatabaseVersion: dbName});
+        assertDidNotSendDatabaseVersion(commandProfile) {
+            const res = this.primaryShard.adminCommand({getDatabaseVersion: dbName});
             assert.commandWorked(res);
             assert.eq({}, res.dbVersion);
 
             commandProfile["command.databaseVersion"] = {$exists: false};
             profilerHasSingleMatchingEntryOrThrow(
-                {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
+                {profileDB: this.primaryShard.getDB(dbName), filter: commandProfile});
         }
 
-        if (testCase.cleanUp) {
-            testCase.cleanUp(st.s);
+        runCommands() {
+            // Use the profiler to check that the command was received with or without a
+            // databaseVersion and shardVersion as expected by the 'testCase' for the command.
+            for (let command of this.commands) {
+                let testCase = testCases[command];
+                assert(testCase !== undefined,
+                       "coverage failure: must define a test case for " + command);
+                if (!testCases[command].validated) {
+                    validateTestCase(testCase);
+                    testCases[command].validated = true;
+                }
+
+                if (testCase.skip) {
+                    print("skipping " + command + ": " + testCase.skip);
+                    continue;
+                }
+
+                this.primaryShard.getDB(dbName).setProfilingLevel(2);
+
+                jsTest.log("testing command " + tojson(testCase.command));
+
+                if (testCase.setUp) {
+                    testCase.setUp(this.st.s);
+                }
+
+                let commandProfile = buildCommandProfile(testCase.command, false);
+                commandProfile["command.shardVersion"] =
+                    testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
+
+                assert.commandWorked(this.st.s.getDB(dbName).runCommand(testCase.command));
+
+                if (testCase.sendsDbVersion) {
+                    this.assertSentDatabaseVersion();
+                } else {
+                    this.assertDidNotSendDatabaseVersion(commandProfile);
+                }
+
+                if (testCase.cleanUp) {
+                    testCase.cleanUp(this.st.s);
+                }
+
+                this.makeShardDatabaseCacheStale();
+            }
+
+            // After iterating through all the existing commands, ensure there were no additional
+            // test cases
+            // that did not correspond to any mongos command.
+            for (let key of Object.keys(testCases)) {
+                assert(testCases[key].validated || testCases[key].enterpriseOnly,
+                       "you defined a test case for a command '" + key +
+                           "' that does not exist on mongos: " + tojson(testCases[key]));
+            }
+        }
+    }
+
+    class DropDatabaseTestRunner extends AllCommandsTestRunner {
+        getShardingTestOptions() {
+            return {shards: 1};
         }
 
-        // Drop the database from the shard to clear the shard's cached in-memory database info.
-        assert.commandWorked(st.shard0.getDB(dbName).runCommand({dropDatabase: 1}));
+        makeShardDatabaseCacheStale() {
+            // Drop the database from the shard to clear the shard's cached in-memory database info.
+            assert.commandWorked(this.primaryShard.getDB(dbName).runCommand({dropDatabase: 1}));
+        }
     }
 
-    // After iterating through all the existing commands, ensure there were no additional test cases
-    // that did not correspond to any mongos command.
-    for (let key of Object.keys(testCases)) {
-        assert(testCases[key].validated || testCases[key].enterpriseOnly,
-               "you defined a test case for a command '" + key +
-                   "' that does not exist on mongos: " + tojson(testCases[key]));
+    class MovePrimaryTestRunner extends AllCommandsTestRunner {
+        getShardingTestOptions() {
+            return {shards: 2};
+        }
+
+        makeShardDatabaseCacheStale() {
+            let fromShard = this.st.getPrimaryShard(dbName);
+            let toShard = this.st.getOther(fromShard);
+
+            this.primaryShard = toShard;
+            this.previousDbVersion = this.dbVersion;
+
+            assert.commandWorked(this.st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
+            this.dbVersion =
+                this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+            // The dbVersion should have changed due to the movePrimary operation.
+            assert.eq(this.dbVersion.lastMod, this.previousDbVersion.lastMod + 1);
+        }
     }
 
-    st.stop();
+    let dropDatabaseTestRunner = new DropDatabaseTestRunner();
+    dropDatabaseTestRunner.runCommands();
+    dropDatabaseTestRunner.shutdown();
 
+    let movePrimaryTestRunner = new MovePrimaryTestRunner();
+    movePrimaryTestRunner.runCommands();
+    movePrimaryTestRunner.shutdown();
 })();
