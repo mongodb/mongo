@@ -5,6 +5,14 @@
 
     const st = new ShardingTest({shards: 2});
 
+    // Gate this test to transaction supporting engines only as it uses txnNumber.
+    let shardDB = st.rs0.getPrimary().getDB("test");
+    if (!shardDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
+        jsTestLog("Do not run on storage engine that does not support transactions");
+        st.stop();
+        return;
+    }
+
     const session = st.s0.getDB("test").getMongo().startSession();
     const mongosColl = session.getDatabase("test")[jsTestName()];
 
