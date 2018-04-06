@@ -2797,11 +2797,11 @@ private:
 };
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
-    // This is optimize all arguments to this expression
+    // This is optimize all arguments to this expression.
     ExpressionNary::optimize();
 
     // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of an
-    // array
+    // array.
     if (auto constantArray =  dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
         const Value valueArray = constantArray->getValue();
         if (valueArray.nullish()) {
@@ -2819,7 +2819,6 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
             getExpressionContext()->getValueComparator().makeUnorderedValueMap<int>();
 
         for (int i = 0; i < int(arr.size()); i++) {
-            // auto pair = std::make_pair(arr[i], i);
             indexMap.emplace(arr[i], i);
         }
         return intrusive_ptr<Expression>(

@@ -1229,9 +1229,13 @@ public:
     const char* getOpName() const final;
 
 protected:
-    // Evaluates and validates the value that is being searched for and if given the start index and
-    // the end index passed to ExpressionIndexOfArray returns arguments in the form of a
-    // vector<Value>
+    /**
+     * When given 'operands' which correspond to the arguments to $indexOfArray, evaluates and
+     * validates the target value, starting index, and ending index arguments and returns their
+     * values in that order. The starting index and ending index are optional, so the returned
+     * vector will have a length between 1 and 3. Throws a UserException if the values are found to
+     * be invalid in some way, e.g. if the indexes are not numbers.
+     */
     std::vector<Value> evaluateAndValidateArguments(const Document& root,
                                                     const ExpressionVector& operands,
                                                     size_t arrayLength) const;
