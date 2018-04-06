@@ -466,7 +466,7 @@ using future_details::Future;
  * order.
  *
  * If the Future has been extracted, but no value or error has been set at the time this Promise is
- * destoyed, a error will be set with ErrorCode::BrokenPromise. This should generally be considered
+ * destroyed, a error will be set with ErrorCode::BrokenPromise. This should generally be considered
  * a programmer error, and should not be relied upon. We may make it debug-fatal in the future.
  *
  * Only one thread can use a given Promise at a time. It is legal to have different threads setting
