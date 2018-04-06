@@ -1345,7 +1345,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * globally visible, need to check the update state as well.
 		 */
 		if (F_ISSET(r, WT_REC_EVICT) &&
-		    (upd->state != WT_UPDATE_STATE_READY ||
+		    (upd->prepare_state == WT_PREPARE_LOCKED ||
+		    upd->prepare_state == WT_PREPARE_INPROGRESS ||
 		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    WT_TXNID_LE(r->last_running, txnid) :
 		    !__txn_visible_id(session, txnid)))) {
@@ -1631,10 +1632,12 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * it holds the transaction ID we care about.
 	 *
 	 * In some cases, there had better not be any updates we can't see.
+	 *
+	 * A visible update to be in READY state (i.e. not in LOCKED or
+	 * PREPARED state), for truly visible to others.
 	 */
 	if (F_ISSET(r, WT_REC_VISIBILITY_ERR) && page_del != NULL &&
-	    !__wt_txn_visible(session,
-	    page_del->txnid, WT_TIMESTAMP_NULL(&page_del->timestamp)))
+	    __wt_page_del_active(session, ref, false))
 		WT_PANIC_RET(session, EINVAL,
 		    "reconciliation illegally skipped an update");
 
@@ -1662,9 +1665,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * read into this part of the name space again, the cache read function
 	 * instantiates an entirely new page.)
 	 */
-	if (ref->addr != NULL &&
-	    (page_del == NULL || __wt_txn_visible_all(
-	    session, page_del->txnid, WT_TIMESTAMP_NULL(&page_del->timestamp))))
+	if (ref->addr != NULL && !__wt_page_del_active(session, ref, true))
 		WT_RET(__wt_ref_block_free(session, ref));
 
 	/*
@@ -1709,10 +1710,11 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * page to reference it from the parent page.
 	 *
 	 * If the delete is not visible in this checkpoint, write the original
-	 * address normally.  Otherwise, we have to write a proxy record.
+	 * address normally. Otherwise, we have to write a proxy record.
+	 * If the delete state is not ready, then delete is not visible as it
+	 * is in prepared state.
 	 */
-	if (__wt_txn_visible(
-	    session, page_del->txnid, WT_TIMESTAMP_NULL(&page_del->timestamp)))
+	if (!__wt_page_del_active(session, ref, false))
 		*statep = WT_CHILD_PROXY;
 
 	return (0);
@@ -1838,6 +1840,11 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 *
 			 * This call cannot return split/restart, we have a lock
 			 * on the parent which prevents a child page split.
+			 *
+			 * Set WT_READ_NO_WAIT because we're only interested in
+			 * the WT_REF's final state. Pages in transition might
+			 * change WT_REF state during our read, and then return
+			 * WT_NOTFOUND to us. In that case, loop and look again.
 			 */
 			ret = __wt_page_in(session, ref,
 			    WT_READ_CACHE | WT_READ_NO_EVICT |

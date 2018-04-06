@@ -419,6 +419,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_pages_queued_urgent;
 	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
+	int64_t cache_read_deleted;
 	int64_t cache_read_lookaside;
 	int64_t cache_read_lookaside_skipped;
 	int64_t cache_read_lookaside_delay;
@@ -615,7 +616,6 @@ struct __wt_connection_stats {
 	int64_t page_sleep;
 	int64_t page_del_rollback_blocked;
 	int64_t child_modify_blocked_page;
-	int64_t tree_descend_blocked;
 	int64_t txn_commit_queue_empty;
 	int64_t txn_commit_queue_tail;
 	int64_t txn_commit_queue_inserts;
@@ -736,6 +736,7 @@ struct __wt_dsrc_stats {
 	int64_t cache_eviction_deepen;
 	int64_t cache_write_lookaside;
 	int64_t cache_read;
+	int64_t cache_read_deleted;
 	int64_t cache_read_lookaside;
 	int64_t cache_pages_requested;
 	int64_t cache_eviction_pages_seen;

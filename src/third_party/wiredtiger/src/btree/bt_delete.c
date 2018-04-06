@@ -71,9 +71,13 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	*skipp = false;
 
-	/* If we have a clean page in memory, attempt to evict it. */
+	/*
+	 * If we have a clean page in memory, attempt to evict it. Do a fast
+	 * check for a dirty page, and then repeat the test once we're locked.
+	 */
 	previous_state = ref->state;
 	if ((previous_state == WT_REF_MEM || previous_state == WT_REF_LIMBO) &&
+	    !__wt_page_is_modified(ref->page) &&
 	    __wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED)) {
 		if (__wt_page_is_modified(ref->page)) {
 			ref->state = previous_state;
@@ -222,7 +226,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 		 * and if we've yielded enough times, start sleeping so we
 		 * don't burn CPU to no purpose.
 		 */
-		__wt_ref_state_yield_sleep(&yield_count, &sleep_count);
+		__wt_state_yield_sleep(&yield_count, &sleep_count);
 		WT_STAT_CONN_INCRV(session,
 		    page_del_rollback_blocked, sleep_count);
 	}
@@ -287,11 +291,7 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
 	if (!__wt_atomic_casv32(&ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (false);
 
-	skip = ref->page_del == NULL || (visible_all ?
-	    __wt_txn_visible_all(session, ref->page_del->txnid,
-		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)):
-	    __wt_txn_visible(session, ref->page_del->txnid,
-		WT_TIMESTAMP_NULL(&ref->page_del->timestamp)));
+	skip = !__wt_page_del_active(session, ref, visible_all);
 
 	/*
 	 * The page_del structure can be freed as soon as the delete is stable:
@@ -330,6 +330,7 @@ __tombstone_update_alloc(WT_SESSION_IMPL *session,
 	if (page_del != NULL) {
 		upd->txnid = page_del->txnid;
 		__wt_timestamp_set(&upd->timestamp, &page_del->timestamp);
+		upd->prepare_state = page_del->prepare_state;
 	}
 	*updp = upd;
 	return (0);
@@ -355,6 +356,9 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	btree = S2BT(session);
 	page = ref->page;
+
+	WT_STAT_CONN_INCR(session, cache_read_deleted);
+	WT_STAT_DATA_INCR(session, cache_read_deleted);
 
 	/*
 	 * Give the page a modify structure.
@@ -390,8 +394,8 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * needs to be resolved, otherwise, there may not be one (and, if the
 	 * transaction has resolved, we can ignore the page-deleted structure).
 	 */
-	page_del =
-	    __wt_btree_truncate_active(session, ref) ? ref->page_del : NULL;
+	page_del = __wt_page_del_active(session, ref, true) ?
+	    ref->page_del : NULL;
 
 	/*
 	 * Allocate the per-page update array if one doesn't already exist. (It

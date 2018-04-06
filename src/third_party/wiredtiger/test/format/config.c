@@ -159,9 +159,8 @@ config_setup(void)
 	/*
 	 * Periodically, run single-threaded so we can compare the results to
 	 * a Berkeley DB copy, as long as the thread-count isn't nailed down.
-	 * Don't do it on the first run, all our smoke tests would hit it.
 	 */
-	if (!g.replay && g.run_cnt % 20 == 19 && !config_is_perm("threads"))
+	if (!config_is_perm("threads") && mmrand(NULL, 1, 20) == 1)
 		g.c_threads = 1;
 
 	config_checkpoint();
@@ -191,12 +190,8 @@ config_setup(void)
 	/*
 	 * Turn off truncate for LSM runs (some configurations with truncate
 	 * always results in a timeout).
-	 *
-	 * WiredTiger doesn't currently support truncate and prepare at the
-	 * same time, see WT-3922. For now, pick one on each run.
 	 */
-	if (!config_is_perm("truncate"))
-		if (DATASOURCE("lsm") || mmrand(NULL, 0, 1) == 1)
+	if (!config_is_perm("truncate") && DATASOURCE("lsm"))
 			config_single("truncate=off", 0);
 
 	/* Give Helium configuration a final review. */
@@ -629,10 +624,10 @@ config_pct(void)
 
 	/*
 	 * If the delete percentage isn't nailed down, periodically set it to
-	 * 0 so salvage gets run. Don't do it on the first run, all our smoke
-	 * tests would hit it.
+	 * 0 so salvage gets run and so we can perform stricter sanity checks
+	 * on key ordering.
 	 */
-	if (!config_is_perm("delete_pct") && !g.replay && g.run_cnt % 10 == 9) {
+	if (!config_is_perm("delete_pct") && mmrand(NULL, 1, 10) == 1) {
 		list[CONFIG_DELETE_ENTRY].order = 0;
 		*list[CONFIG_DELETE_ENTRY].vp = 0;
 	}

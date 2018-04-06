@@ -578,7 +578,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	/* We do not cache any subordinate tables/files cursors. */
 	if (owner == NULL) {
 		if ((ret = __wt_cursor_cache_get(
-		    session, uri, cfg, cursorp)) == 0)
+		    session, uri, NULL, cfg, cursorp)) == 0)
 			return (0);
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -605,35 +605,37 @@ __session_open_cursor(WT_SESSION *wt_session,
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
-	if (to_dup == NULL) {
-		if ((ret = __wt_cursor_cache_get(
-		    session, uri, cfg, cursorp)) == 0)
-			goto done;
-		WT_RET_NOTFOUND_OK(ret);
-	}
-
 	statjoin = (to_dup != NULL && uri != NULL &&
 	    WT_STREQ(uri, "statistics:join"));
-	if ((to_dup == NULL && uri == NULL) ||
-	    (to_dup != NULL && uri != NULL && !statjoin))
-		WT_ERR_MSG(session, EINVAL,
-		    "should be passed either a URI or a cursor to duplicate, "
-		    "but not both");
+	if (!statjoin) {
+		if ((to_dup == NULL && uri == NULL) ||
+		    (to_dup != NULL && uri != NULL))
+			WT_ERR_MSG(session, EINVAL,
+			    "should be passed either a URI or a cursor to "
+			    "duplicate, but not both");
 
-	if (to_dup != NULL && !statjoin) {
-		uri = to_dup->uri;
-		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
-		    !WT_PREFIX_MATCH(uri, "index:") &&
-		    !WT_PREFIX_MATCH(uri, "file:") &&
-		    !WT_PREFIX_MATCH(uri, "lsm:") &&
-		    !WT_PREFIX_MATCH(uri, WT_METADATA_URI) &&
-		    !WT_PREFIX_MATCH(uri, "table:") &&
-		    __wt_schema_get_source(session, uri) == NULL)
-			WT_ERR(__wt_bad_object_type(session, uri));
+		if ((ret = __wt_cursor_cache_get(
+		    session, uri, to_dup, cfg, &cursor)) == 0)
+			goto done;
+		WT_ERR_NOTFOUND_OK(ret);
+
+		if (to_dup != NULL) {
+			uri = to_dup->uri;
+			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+			    !WT_PREFIX_MATCH(uri, "index:") &&
+			    !WT_PREFIX_MATCH(uri, "file:") &&
+			    !WT_PREFIX_MATCH(uri, "lsm:") &&
+			    !WT_PREFIX_MATCH(uri, WT_METADATA_URI) &&
+			    !WT_PREFIX_MATCH(uri, "table:") &&
+			    __wt_schema_get_source(session, uri) == NULL)
+				WT_ERR(__wt_bad_object_type(session, uri));
+		}
 	}
 
 	WT_ERR(__session_open_cursor_int(session, uri, NULL,
 	    statjoin ? to_dup : NULL, cfg, &cursor));
+
+done:
 	if (to_dup != NULL && !statjoin)
 		WT_ERR(__wt_cursor_dup_position(to_dup, cursor));
 
@@ -643,7 +645,6 @@ __session_open_cursor(WT_SESSION *wt_session,
 err:		if (cursor != NULL)
 			WT_TRET(cursor->close(cursor));
 	}
-done:
 	/*
 	 * Opening a cursor on a non-existent data source will set ret to
 	 * either of ENOENT or WT_NOTFOUND at this point. However,
@@ -687,8 +688,7 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
 	cfg[1] = NULL;
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
-		ret = __wt_schema_worker(session, uri, __wt_alter, NULL, cfg,
-		WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE)));
+		ret = __wt_schema_alter(session, uri, cfg)));
 
 err:
 	if (ret != 0)

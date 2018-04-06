@@ -2,7 +2,18 @@
 
 class Method:
     def __init__(self, config):
-        self.config = config
+        # Deal with duplicates: with complex configurations (like
+        # WT_SESSION::create), it's simpler to deal with duplicates once than
+        # manually as configurations are defined
+        self.config = []
+        lastname = None
+        for c in sorted(config):
+            if '.' in c.name:
+                raise "Bad config key '%s'" % c.name
+            if c.name == lastname:
+                continue
+            lastname = c.name
+            self.config.append(c)
 
 class Config:
     def __init__(self, name, default, desc, subconfig=None, **flags):
@@ -15,10 +26,13 @@ class Config:
     def __cmp__(self, other):
         return cmp(self.name, other.name)
 
-# Metadata shared by all schema objects
-common_meta = [
+common_runtime_config = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
+]
+
+# Metadata shared by all schema objects
+common_meta = common_runtime_config + [
     Config('collator', 'none', r'''
         configure custom collation for keys.  Permitted values are \c "none"
         or a custom collator name created with WT_CONNECTION::add_collator'''),
@@ -130,7 +144,7 @@ lsm_config = [
     ]),
 ]
 
-file_runtime_config = [
+file_runtime_config = common_runtime_config + [
     Config('access_pattern_hint', 'none', r'''
         It is recommended that workloads that consist primarily of
         updates and/or point queries specify \c random.  Workloads that

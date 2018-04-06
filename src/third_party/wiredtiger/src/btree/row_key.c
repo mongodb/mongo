@@ -408,7 +408,7 @@ switch_and_jump:	/* Switching to a forward roll. */
 		}
 
 next:		switch (direction) {
-		case  BACKWARD:
+		case BACKWARD:
 			--rip;
 			++slot_offset;
 			break;

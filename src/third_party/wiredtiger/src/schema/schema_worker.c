@@ -9,6 +9,36 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_exclusive_handle_operation --
+ *	Get exclusive access to a file and apply a function.
+ */
+int
+__wt_exclusive_handle_operation(WT_SESSION_IMPL *session,
+   const char *uri,
+   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
+   const char *cfg[], uint32_t open_flags)
+{
+	WT_DECL_RET;
+
+	/*
+	 * If the operation requires exclusive access, close
+	 * any open file handles, including checkpoints.
+	 */
+	if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
+		WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
+		    ret = __wt_conn_dhandle_close_all(
+		    session, uri, false, false));
+		WT_RET(ret);
+	}
+
+	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, open_flags));
+	WT_SAVE_DHANDLE(session, ret = file_func(session, cfg));
+	WT_TRET(__wt_session_release_dhandle(session));
+
+	return (ret);
+}
+
+/*
  * __wt_schema_worker --
  *	Get Btree handles for the object and cycle through calls to an
  *	underlying worker function with each handle.
@@ -41,25 +71,9 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
-		if (file_func != NULL) {
-			/*
-			 * If the operation requires exclusive access, close
-			 * any open file handles, including checkpoints.
-			 */
-			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
-				WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
-				    ret = __wt_conn_dhandle_close_all(
-				    session, uri, false, false));
-				WT_ERR(ret);
-			}
-
-			WT_ERR(__wt_session_get_btree_ckpt(
-			    session, uri, cfg, open_flags));
-			WT_SAVE_DHANDLE(session,
-			    ret = file_func(session, cfg));
-			WT_TRET(__wt_session_release_dhandle(session));
-			WT_ERR(ret);
-		}
+		if (file_func != NULL)
+			WT_ERR(__wt_exclusive_handle_operation(session,
+			    uri, file_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(
 		    session, uri, false, NULL, &colgroup));
