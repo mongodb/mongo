@@ -296,9 +296,27 @@ private:
     RecordId _nextId();
     void _setId(RecordId id);
     bool cappedAndNeedDelete() const;
+    RecordData _getData(const WiredTigerCursor& cursor) const;
+
+    /**
+     * Adjusts the record count and data size metadata for this record store, respectively. These
+     * functions consult the SizeRecoveryState to determine whether or not to actually change the
+     * size metadata if the server is undergoing recovery.
+     *
+     * For most record stores, we will not update the size metadata during recovery, as we trust
+     * that the values in the SizeStorer are accurate with respect to the end state of recovery.
+     * However, there are two exceptions:
+     *
+     *   1. When a record store is created as part of the recovery process. The SizeStorer will have
+     *      no information about that newly-created ident.
+     *   2. When a record store is created at startup but constains no records as of the stable
+     *      checkpoint timestamp. In this scenario, we will assume that the record store has a size
+     *      of zero and will discard all cached size metadata. This assumption is incorrect if there
+     *      are pending writes to this ident as part of the recovery process, and so we must
+     *      always adjust size metadata for these idents.
+     */
     void _changeNumRecords(OperationContext* opCtx, int64_t diff);
     void _increaseDataSize(OperationContext* opCtx, int64_t amount);
-    RecordData _getData(const WiredTigerCursor& cursor) const;
 
 
     const std::string _uri;

@@ -30,6 +30,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#define LOG_FOR_RECOVERY(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 
 #include "mongo/platform/basic.h"
 
@@ -45,6 +47,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -654,6 +657,17 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     if (_isOplog) {
         checkOplogFormatVersion(ctx, _uri);
     }
+
+    // Most record stores will not have their size metadata adjusted during replication recovery.
+    // However, if this record store was created during the recovery process, we will need to keep
+    // track of size adjustments for any writes applied to it during recovery.
+    const auto serviceCtx = getGlobalServiceContext();
+    if (inReplicationRecovery(serviceCtx)) {
+        LOG_FOR_RECOVERY(2)
+            << "Marking newly-created record store as needing size adjustment during recovery. ns: "
+            << ns() << ", ident: " << _uri;
+        sizeRecoveryState(serviceCtx).markCollectionAsAlwaysNeedsSizeAdjustment(ns());
+    }
 }
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
@@ -703,8 +717,18 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
             } while ((record = cursor->next()));
         }
     } else {
+        // We found no records in this collection; however, there may actually be documents present
+        // if writes to this collection were not included in the stable checkpoint the last time
+        // this node shut down. We set the data size and the record count to zero, but will adjust
+        // these if writes are played during startup recovery.
+        LOG_FOR_RECOVERY(2) << "Record store was empty; setting count metadata to zero but marking "
+                               "record store as needing size adjustment during recovery. ns: "
+                            << ns() << ", ident: " << _uri;
+        sizeRecoveryState(getGlobalServiceContext())
+            .markCollectionAsAlwaysNeedsSizeAdjustment(ns());
         _dataSize.store(0);
         _numRecords.store(0);
+
         // Need to start at 1 so we are always higher than RecordId::min()
         _nextIdNum.store(1);
         if (_sizeStorer)
@@ -1585,6 +1609,10 @@ private:
 };
 
 void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t diff) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(ns())) {
+        return;
+    }
+
     opCtx->recoveryUnit()->registerChange(new NumRecordsChange(this, diff));
     if (_numRecords.fetchAndAdd(diff) < 0)
         _numRecords.store(std::max(diff, int64_t(0)));
@@ -1604,6 +1632,10 @@ private:
 };
 
 void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t amount) {
+    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(ns())) {
+        return;
+    }
+
     if (opCtx)
         opCtx->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
 
