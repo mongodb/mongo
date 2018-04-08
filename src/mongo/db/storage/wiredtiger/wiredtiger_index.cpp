@@ -1163,7 +1163,7 @@ protected:
 private:
     // Called after _key has been filled in. Must not throw WriteConflictException.
     void _updateIdAndTypeBits() {
-        LOG(3) << "KeyString: [" << _key.toString() << "]";
+        TRACE_INDEX << "KeyString: [" << _key.toString() << "]";
 
         auto keySize = KeyString::getKeySize(
             _key.getBuffer(), _key.getSize(), _idx.ordering(), _key.getTypeBits());
