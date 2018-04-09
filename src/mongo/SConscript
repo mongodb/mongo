@@ -455,7 +455,6 @@ if not has_option('noshell') and usemozjs:
                     "shell/mk_wcwidth.cpp",
                     "shell/mongo-server.cpp",
                     "shell/shell_options.cpp",
-                    "shell/shell_options_init.cpp",
                     "shell/shell_utils.cpp",
                     "shell/shell_utils_extended.cpp",
                     "shell/shell_utils_launcher.cpp",
@@ -509,6 +508,7 @@ if not has_option('noshell') and usemozjs:
         [
             "shell/dbshell.cpp",
             "shell/mongodbcr.cpp",
+            "shell/shell_options_init.cpp",
         ] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=[
             "$BUILD_DIR/third_party/shim_pcrecpp",

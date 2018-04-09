@@ -39,10 +39,12 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/shell_utils.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -2447,6 +2449,89 @@ public:
     }
 };
 
+class ConvertShardKeyToHashed {
+public:
+    void check(shared_ptr<Scope> s, const mongo::BSONObj& o) {
+        s->setObject("o", o, true);
+        s->invoke("return convertShardKeyToHashed(o);", 0, 0);
+        const auto scopeShardKey = s->getNumber("__returnValue");
+
+        // Wrapping to form a proper element
+        const auto wrapO = BSON("" << o);
+        const auto e = wrapO[""];
+        const auto trueShardKey =
+            mongo::BSONElementHasher::hash64(e, mongo::BSONElementHasher::DEFAULT_HASH_SEED);
+
+        ASSERT_EQUALS(scopeShardKey, trueShardKey);
+    }
+
+    void checkWithSeed(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
+        s->setObject("o", o, true);
+        s->setNumber("seed", seed);
+        s->invoke("return convertShardKeyToHashed(o, seed);", 0, 0);
+        const auto scopeShardKey = s->getNumber("__returnValue");
+
+        // Wrapping to form a proper element
+        const auto wrapO = BSON("" << o);
+        const auto e = wrapO[""];
+        const auto trueShardKey = mongo::BSONElementHasher::hash64(e, seed);
+
+        ASSERT_EQUALS(scopeShardKey, trueShardKey);
+    }
+
+    void checkNoArgs(shared_ptr<Scope> s) {
+        s->invoke("return convertShardKeyToHashed();", 0, 0);
+    }
+
+    void checkWithExtraArg(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
+        s->setObject("o", o, true);
+        s->setNumber("seed", seed);
+        s->invoke("return convertShardKeyToHashed(o, seed, 1);", 0, 0);
+    }
+
+    void checkWithBadSeed(shared_ptr<Scope> s, const mongo::BSONObj& o) {
+        s->setObject("o", o, true);
+        s->setString("seed", "sunflower");
+        s->invoke("return convertShardKeyToHashed(o, seed);", 0, 0);
+    }
+
+    void run() {
+        shared_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+        shell_utils::installShellUtils(*s);
+
+        // Check a few elementary objects
+        check(s, BSON("" << 1));
+        check(s, BSON("" << 10.0));
+        check(s,
+              BSON(""
+                   << "Shardy"));
+        check(s, BSON("" << BSON_ARRAY(1 << 2 << 3)));
+        check(s, BSON("" << mongo::jstNULL));
+        check(s, BSON("" << mongo::BSONObj()));
+        check(s,
+              BSON("A" << 1 << "B"
+                       << "Shardy"));
+
+        // Check a few different seeds
+        checkWithSeed(s,
+                      BSON(""
+                           << "Shardy"),
+                      mongo::BSONElementHasher::DEFAULT_HASH_SEED);
+        checkWithSeed(s,
+                      BSON(""
+                           << "Shardy"),
+                      0);
+        checkWithSeed(s,
+                      BSON(""
+                           << "Shardy"),
+                      -1);
+
+        ASSERT_THROWS(checkNoArgs(s), mongo::DBException);
+        ASSERT_THROWS(checkWithExtraArg(s, BSON("" << 10.0), 0), mongo::DBException);
+        ASSERT_THROWS(checkWithBadSeed(s, BSON("" << 1)), mongo::DBException);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("js") {}
@@ -2505,6 +2590,7 @@ public:
         add<ErrorCodeFromInvoke>();
         add<ErrorWithSidecarFromInvoke>();
         add<RequiresOwnedObjects>();
+        add<ConvertShardKeyToHashed>();
 
         add<RoundTripTests::DBRefTest>();
         add<RoundTripTests::DBPointerTest>();

@@ -35,6 +35,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/hasher.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/bench.h"
@@ -185,6 +186,42 @@ BSONObj computeSHA256Block(const BSONObj& a, void* data) {
     return bob.obj();
 }
 
+/**
+ * This function computes a hash value for a document.
+ * Specifically, this is the same hash function that is used to form a hashed index,
+ * and thus used to generate shard keys for a collection.
+ *
+ * e.g.
+ * > // For a given collection prepared like so:
+ * > use mydb
+ * > db.mycollection.createIndex({ x: "hashed" })
+ * > sh.shardCollection("mydb.mycollection", { x: "hashed" })
+ * > // And a sample object like so:
+ * > var obj = { x: "Whatever key", y: 2, z: 10.0 }
+ * > // The hashed value of the shard key can be acquired from the shard key-value pair like so:
+ * > convertShardKeyToHashed({x: "Whatever key"})
+ */
+BSONObj convertShardKeyToHashed(const BSONObj& a, void* data) {
+    const auto& objEl = a[0];
+
+    uassert(10151,
+            "convertShardKeyToHashed accepts either 1 or 2 arguments",
+            a.nFields() >= 1 && a.nFields() <= 2);
+
+    // It looks like the seed is always default right now.
+    // But no reason not to allow for the future
+    auto seed = BSONElementHasher::DEFAULT_HASH_SEED;
+    if (a.nFields() > 1) {
+        auto seedEl = a[1];
+
+        uassert(10159, "convertShardKeyToHashed seed value should be a number", seedEl.isNumber());
+        seed = seedEl.numberInt();
+    }
+
+    auto key = BSONElementHasher::hash64(objEl, seed);
+    return BSON("" << key);
+}
+
 BSONObj replMonitorStats(const BSONObj& a, void* data) {
     uassert(17134,
             "replMonitorStats requires a single string argument (the ReplSet name)",
@@ -238,6 +275,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
     scope.injectNative("computeSHA256Block", computeSHA256Block);
+    scope.injectNative("convertShardKeyToHashed", convertShardKeyToHashed);
     scope.injectNative("fileExists", fileExistsJS);
 
 #ifndef MONGO_SAFE_SHELL
