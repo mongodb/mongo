@@ -5858,7 +5858,7 @@ buildvariants:
     num_jobs_available: 2
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: s390x
     packager_distro: ubuntu1604
     repo_edition: enterprise
@@ -5963,7 +5963,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
-    packager_script: packager-enterprise.py
+    packager_script: packager_enterprise.py
     packager_arch: x86_64
     packager_distro: amazon
     repo_edition: enterprise

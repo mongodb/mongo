@@ -282,7 +282,7 @@ def make_deb_repo(repo, distro, build_os):
         for directory in dirs:
             st = packager.backtick(["dpkg-scanpackages", directory, "/dev/null"])
             with open(directory + "/Packages", "w") as fh:
-                fh.wmake_deb_reporite(st)
+                fh.write(st)
             bt = packager.backtick(["gzip", "-9c", directory + "/Packages"])
             with open(directory + "/Packages.gz", "wb") as fh:
                 fh.write(bt)
