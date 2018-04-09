@@ -319,7 +319,7 @@ tasks:
       vars:
         script_flags: --ycsb-throughput-analysis reports
 
-- name: core_workloads_WT
+- name: crud_workloads_WT
   priority: 5
   depends_on:
     - name: compile
@@ -328,12 +328,68 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "core"
+        test: "crud_workloads"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
 
-- name: core_workloads_MMAPv1
+- name: mixed_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "mixed_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: misc_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "misc_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: map_reduce_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "map_reduce_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: smoke_test
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "short"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: crud_workloads_MMAPv1
   priority: 5
   depends_on:
     - name: compile
@@ -342,7 +398,53 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "core"
+        test: "crud_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: mixed_workloads_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "mixed_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: misc_workloads_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "misc_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: map_reduce_workloads_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "map_reduce_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -498,9 +600,16 @@ buildvariants:
       - "rhel70-perf-single"
   tasks:
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
 
@@ -521,9 +630,16 @@ buildvariants:
       distros:
       - rhel70
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
 
@@ -541,11 +657,18 @@ buildvariants:
       - "rhel70-perf-shard"
   tasks:
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: mongos_workloads_WT
     - name: mongos_workloads_MMAPv1
     - name: move_chunk_workloads_WT
@@ -565,11 +688,18 @@ buildvariants:
       - "rhel70-perf-replset"
   tasks:
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
 
