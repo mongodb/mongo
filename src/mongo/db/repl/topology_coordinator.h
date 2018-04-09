@@ -355,6 +355,10 @@ public:
         unsigned selfUptime;
         const OpTime& readConcernMajorityOpTime;
         const BSONObj& initialSyncStatus;
+
+        // boost::none if the storage engine does not support recovering to a
+        // timestamp. Timestamp::min() if a stable checkpoint is yet to be taken.
+        const boost::optional<Timestamp> lastStableCheckpointTimestamp;
     };
 
     // produce a reply to a status request

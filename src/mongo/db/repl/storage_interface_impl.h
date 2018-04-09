@@ -176,6 +176,9 @@ public:
                               const Timestamp& ts,
                               bool orderedCommit) override;
 
+    boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+        ServiceContext* serviceCtx) const override;
+
 private:
     const NamespaceString _rollbackIdNss;
 };

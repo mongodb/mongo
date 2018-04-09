@@ -1124,5 +1124,20 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
         28557,
         oplog.getCollection()->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
 }
+
+boost::optional<Timestamp> StorageInterfaceImpl::getLastStableCheckpointTimestamp(
+    ServiceContext* serviceCtx) const {
+    if (!supportsRecoverToStableTimestamp(serviceCtx)) {
+        return boost::none;
+    }
+
+    const auto ret = serviceCtx->getGlobalStorageEngine()->getLastStableCheckpointTimestamp();
+    if (ret == boost::none) {
+        return Timestamp::min();
+    }
+
+    return ret;
+}
+
 }  // namespace repl
 }  // namespace mongo

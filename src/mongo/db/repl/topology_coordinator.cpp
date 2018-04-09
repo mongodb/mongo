@@ -1949,6 +1949,8 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     const OpTime lastOpApplied = getMyLastAppliedOpTime();
     const OpTime lastOpDurable = getMyLastDurableOpTime();
     const BSONObj& initialSyncStatus = rsStatusArgs.initialSyncStatus;
+    const boost::optional<Timestamp>& lastStableCheckpointTimestamp =
+        rsStatusArgs.lastStableCheckpointTimestamp;
 
     if (_selfIndex == -1) {
         // We're REMOVED or have an invalid config
@@ -2046,6 +2048,11 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                 bb.appendDate("optimeDurableDate",
                               Date_t::fromDurationSinceEpoch(
                                   Seconds(it->getHeartbeatDurableOpTime().getSecs())));
+            }
+            if (lastStableCheckpointTimestamp) {
+                // Make sure to omit if the storage engine does not support recovering to a
+                // timestamp.
+                bb.append("lastStableCheckpointTimestamp", *lastStableCheckpointTimestamp);
             }
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());

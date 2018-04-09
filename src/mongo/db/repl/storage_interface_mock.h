@@ -317,6 +317,11 @@ public:
         return;
     }
 
+    boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+        ServiceContext* serviceCtx) const override {
+        return boost::none;
+    }
+
     // Testing functions.
     CreateCollectionForBulkFn createCollectionForBulkFn =
         [](const NamespaceString& nss,

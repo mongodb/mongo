@@ -620,6 +620,10 @@ boost::optional<Timestamp> KVStorageEngine::getRecoveryTimestamp() const {
     return _engine->getRecoveryTimestamp();
 }
 
+boost::optional<Timestamp> KVStorageEngine::getLastStableCheckpointTimestamp() const {
+    return _engine->getLastStableCheckpointTimestamp();
+}
+
 bool KVStorageEngine::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
 }

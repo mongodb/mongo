@@ -283,6 +283,13 @@ public:
     }
 
     /**
+     * See `StorageEngine::getLastStableCheckpointTimestamp`
+     */
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
      * See `StorageEngine::getAllCommittedTimestamp`
      */
     virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;

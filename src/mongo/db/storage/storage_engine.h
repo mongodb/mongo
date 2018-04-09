@@ -349,6 +349,16 @@ public:
     }
 
     /**
+     * Returns a timestamp that is guaranteed to be persisted to disk in a checkpoint. Returns
+     * boost::none if there is no stable checkpoint. This method should return at least the value of
+     * `getRecoveryTimestamp` if the node started from a stable checkpoint. fasserts if
+     * StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     */
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const {
+        MONGO_UNREACHABLE;
+    }
+
+    /**
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */

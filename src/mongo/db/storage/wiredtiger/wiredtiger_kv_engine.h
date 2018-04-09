@@ -180,6 +180,13 @@ public:
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
+    /**
+     * Returns a timestamp value that is at or before the last checkpoint. Everything before this
+     * value is guaranteed to be persisted on disk and replication recovery will not need to
+     * replay documents with an earlier time.
+     */
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const override;
+
     virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
 
     bool supportsReadConcernSnapshot() const final;
@@ -232,13 +239,6 @@ public:
      * refresh our oplog visiblity read-at-timestamp value.
      */
     void replicationBatchIsComplete() const override;
-
-    /**
-     * Return a timestamp value that is at or before the last checkpoint. Everything before this
-     * value is guaranteed to be persisted on disk and replication recovery will not need to
-     * replay documents with an earlier time.
-     */
-    Timestamp getLastStableCheckpointTimestamp() const;
 
     /**
      * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the

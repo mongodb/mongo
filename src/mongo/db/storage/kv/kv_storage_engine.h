@@ -125,6 +125,8 @@ public:
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
 
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const override;
+
     virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
 
     bool supportsReadConcernSnapshot() const final;

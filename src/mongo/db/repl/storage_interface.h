@@ -389,6 +389,14 @@ public:
     virtual void oplogDiskLocRegister(OperationContext* opCtx,
                                       const Timestamp& ts,
                                       bool orderedCommit) = 0;
+
+    /**
+     * Returns a timestamp that is guaranteed to be persisted on disk in a checkpoint. Returns
+     * `Timestamp::min()` if no stable checkpoint has been taken. Returns boost::none if
+     * `supportsRecoverToStableTimestamp` returns false.
+     */
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+        ServiceContext* serviceCtx) const = 0;
 };
 
 }  // namespace repl

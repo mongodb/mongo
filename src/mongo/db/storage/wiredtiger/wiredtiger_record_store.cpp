@@ -1082,7 +1082,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
         reclaimOplog(opCtx, Timestamp::max());
         return;
     }
-    reclaimOplog(opCtx, _kvEngine->getLastStableCheckpointTimestamp());
+    const auto lastStableCheckpointTimestamp = _kvEngine->getLastStableCheckpointTimestamp();
+    reclaimOplog(opCtx,
+                 lastStableCheckpointTimestamp ? *lastStableCheckpointTimestamp : Timestamp::min());
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp) {
