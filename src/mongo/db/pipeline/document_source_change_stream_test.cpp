@@ -184,7 +184,7 @@ public:
         tokenData.documentKey = docKey;
         if (!uuid.missing())
             tokenData.uuid = uuid.getUuid();
-        return ResumeToken(tokenData).toDocument();
+        return ResumeToken(tokenData).toDocument(ResumeToken::SerializationFormat::kHexString);
     }
 
     /**

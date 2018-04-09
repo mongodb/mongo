@@ -181,7 +181,7 @@ DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() 
     uassert(40585,
             str::stream()
                 << "resume of change stream was not possible, as the resume token was not found. "
-                << ResumeToken::parse(documentFromResumedStream["_id"].getDocument()).toBSON(),
+                << documentFromResumedStream["_id"].getDocument().toString(),
             _resumeStatus != ResumeStatus::kCannotResume);
 
     // If we reach this point, then we've seen the resume token.

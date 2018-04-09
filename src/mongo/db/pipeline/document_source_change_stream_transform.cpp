@@ -86,9 +86,14 @@ bool isOpTypeRelevant(const Document& d) {
 DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONObj changeStreamSpec,
+    ServerGlobalParams::FeatureCompatibility::Version fcv,
     bool isIndependentOfAnyCollection)
     : DocumentSource(expCtx),
       _changeStreamSpec(changeStreamSpec.getOwned()),
+      _resumeTokenFormat(
+          fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40
+              ? ResumeToken::SerializationFormat::kHexString
+              : ResumeToken::SerializationFormat::kBinData),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
 
     if (expCtx->ns.isCollectionlessAggregateNS()) {
@@ -296,7 +301,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     }
 
     doc.addField(DocumentSourceChangeStream::kIdField,
-                 Value(ResumeToken(resumeTokenData).toDocument()));
+                 Value(ResumeToken(resumeTokenData).toDocument(_resumeTokenFormat)));
     doc.addField(DocumentSourceChangeStream::kOperationTypeField, Value(operationType));
     doc.addField(DocumentSourceChangeStream::kClusterTimeField, Value(resumeTokenData.clusterTime));
 

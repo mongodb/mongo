@@ -68,10 +68,10 @@ public:
         if (id.missing()) {
             ResumeTokenData tokenData;
             tokenData.clusterTime = ts;
-            return ResumeToken(tokenData).toDocument();
+            return ResumeToken(tokenData).toDocument(ResumeToken::SerializationFormat::kHexString);
         }
         return ResumeToken(ResumeTokenData(ts, Value(Document{{"_id", id}}), testUuid()))
-            .toDocument();
+            .toDocument(ResumeToken::SerializationFormat::kHexString);
     }
 };
 

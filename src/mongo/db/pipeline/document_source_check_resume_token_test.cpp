@@ -66,7 +66,9 @@ protected:
      */
     void addDocument(Timestamp ts, Document docKey, UUID uuid = testUuid()) {
         _mock->queue.push_back(
-            Document{{"_id", ResumeToken(ResumeTokenData(ts, Value(docKey), uuid)).toDocument()}});
+            Document{{"_id",
+                      ResumeToken(ResumeTokenData(ts, Value(docKey), uuid))
+                          .toDocument(ResumeToken::SerializationFormat::kHexString)}});
     }
     /**
      * Pushes a document with a resume token corresponding to the given timestamp, _id string, and

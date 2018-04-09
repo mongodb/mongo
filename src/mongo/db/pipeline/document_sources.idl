@@ -42,7 +42,11 @@ types:
         bson_serialization_type: object
         description: An object representing a resume token for a change stream
         cpp_type: ResumeToken
-        serializer: ResumeToken::toBSON
+        # The IDL requires a serializer for any custom type. The serializer for this type actually
+        # needs to know which format to use though, so requires an argument which is not currently
+        # supported by the IDL. We don't expect anyone to use the IDL to serialize the type, so we
+        # just provide a dummy serializer here.
+        serializer: ResumeToken::toBSON_do_not_use
         deserializer: ResumeToken::parse
 
     # The document key element in a resume token can be any BSON element, so we need a custom type

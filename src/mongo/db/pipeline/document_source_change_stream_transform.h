@@ -40,6 +40,7 @@ class DocumentSourceChangeStreamTransform : public DocumentSource {
 public:
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         BSONObj changeStreamSpec,
+                                        ServerGlobalParams::FeatureCompatibility::Version fcv,
                                         bool isIndependentOfAnyCollection);
     Document applyTransformation(const Document& input);
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
@@ -110,6 +111,8 @@ private:
     bool isDocumentRelevant(const Document& d);
 
     BSONObj _changeStreamSpec;
+
+    ResumeToken::SerializationFormat _resumeTokenFormat;
 
     // Map of collection UUID to document key fields.
     std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;

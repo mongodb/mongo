@@ -64,6 +64,7 @@ const auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
 class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {
 public:
     void setUp() override {
+        Test::setUp();  // Will establish a feature compatibility version.
         auto service = getExpCtx()->opCtx->getServiceContext();
         repl::ReplSettings settings;
 
