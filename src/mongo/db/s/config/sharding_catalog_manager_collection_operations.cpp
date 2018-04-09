@@ -187,22 +187,21 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         BSON(ShardType::name() << primaryShardName << ShardType::draining(true))));
 
     const bool primaryDraining = (drainingCount > 0);
-    auto getPrimaryOrFirstNonDrainingShard =
-        [&opCtx, primaryShardId, primaryDraining]() {
-            if (primaryDraining) {
-                vector<ShardId> allShardIds;
-                Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
+    auto getPrimaryOrFirstNonDrainingShard = [&opCtx, primaryShardId, primaryDraining]() {
+        if (primaryDraining) {
+            vector<ShardId> allShardIds;
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
 
-                auto dbShardId = allShardIds[0];
-                if (allShardIds[0] == primaryShardId && allShardIds.size() > 1) {
-                    dbShardId = allShardIds[1];
-                }
-
-                return dbShardId;
-            } else {
-                return primaryShardId;
+            auto dbShardId = allShardIds[0];
+            if (allShardIds[0] == primaryShardId && allShardIds.size() > 1) {
+                dbShardId = allShardIds[1];
             }
-        };
+
+            return dbShardId;
+        } else {
+            return primaryShardId;
+        }
+    };
 
     if (initPoints.empty()) {
         // If no split points were specified use the shard's data distribution to determine them
