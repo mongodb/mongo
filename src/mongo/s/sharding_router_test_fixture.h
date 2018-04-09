@@ -188,7 +188,6 @@ public:
 private:
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
-    transport::TransportLayerMock* _transportLayer;
     transport::SessionHandle _transportSession;
 
     RemoteCommandTargeterFactoryMock* _targeterFactory;

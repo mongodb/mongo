@@ -38,6 +38,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -144,6 +145,7 @@ public:
                     const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
+    Future<ConnectionHandle> get(const HostAndPort& hostAndPort, Milliseconds timeout);
     void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;

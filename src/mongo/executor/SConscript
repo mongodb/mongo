@@ -157,6 +157,24 @@ env.Library(target='egress_tag_closer_manager',
             ])
 
 env.Library(
+    target='network_interface_tl',
+    source=[
+        'connection_pool_tl.cpp',
+        'network_interface_tl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/async_client',
+        '$BUILD_DIR/mongo/transport/transport_layer',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authcommon',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        'connection_pool_executor',
+        'network_interface',
+    ]
+)
+
+env.Library(
     target='network_interface_asio',
     source=[
         'connection_pool_asio.cpp',
@@ -284,6 +302,7 @@ env.Library(
     LIBDEPS=[
         'network_interface',
         'network_interface_asio',
+        'network_interface_tl',
     ],
     LIBDEPS_PRIVATE=[
         'egress_tag_closer_manager',

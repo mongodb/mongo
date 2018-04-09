@@ -113,19 +113,24 @@ public:
     ReactorTimer(const ReactorTimer&) = delete;
     ReactorTimer& operator=(const ReactorTimer&) = delete;
 
+    /*
+     * The destructor calls cancel() to ensure outstanding Futures are filled.
+     */
     virtual ~ReactorTimer() = default;
 
     /*
-     * Cancel any outstanding calls to waitFor/waitUntil. The future will have
-     * an ErrorCodes::CallbackCancelled status.
+     * Cancel any outstanding future from waitFor/waitUntil. The future will be filled with an
+     * ErrorCodes::CallbackCancelled status.
+     *
+     * If no future is outstanding, then this is a noop.
      */
     virtual void cancel() = 0;
 
     /*
-     * Returns a future that will be filled with Status::OK after the timeout has
-     * ellapsed or has been cancelled.
+     * Returns a future that will be filled with Status::OK after the timeout has ellapsed.
+     *
+     * Calling this implicitly calls cancel().
      */
-
     virtual Future<void> waitFor(Milliseconds timeout) = 0;
     virtual Future<void> waitUntil(Date_t timeout) = 0;
 };
@@ -154,8 +159,9 @@ public:
         Promise<FutureContinuationResult<Callback>> promise;
         auto future = promise.getFuture();
 
-        schedule(kPost,
-                 [ cb = std::forward<Callback>(cb), sp = promise.share() ] { sp.setWith(cb); });
+        schedule(kPost, [ cb = std::forward<Callback>(cb), sp = promise.share() ]() mutable {
+            sp.setWith(cb);
+        });
 
         return future;
     }

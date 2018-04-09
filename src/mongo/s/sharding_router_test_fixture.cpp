@@ -106,15 +106,8 @@ void ShardingTestFixture::setUp() {
     service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
     service->setTickSource(stdx::make_unique<TickSourceMock>());
 
-    {
-        auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
-        _transportLayer = tlMock.get();
-        ASSERT_OK(_transportLayer->start());
-        service->setTransportLayer(std::move(tlMock));
-    }
-
     CollatorFactoryInterface::set(service, stdx::make_unique<CollatorFactoryMock>());
-    _transportSession = transport::MockSession::create(_transportLayer);
+    _transportSession = transport::MockSession::create(nullptr);
     _client = service->makeClient("ShardingTestFixture", _transportSession);
     _opCtx = _client->makeOperationContext();
 
@@ -544,7 +537,7 @@ void ShardingTestFixture::expectFindSendBSONObjVector(const HostAndPort& configH
 }
 
 void ShardingTestFixture::setRemote(const HostAndPort& remote) {
-    _transportSession = transport::MockSession::create(remote, HostAndPort{}, _transportLayer);
+    _transportSession = transport::MockSession::create(remote, HostAndPort{}, nullptr);
 }
 
 void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,

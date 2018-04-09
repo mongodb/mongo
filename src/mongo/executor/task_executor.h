@@ -41,6 +41,7 @@
 #include "mongo/platform/hash_namespace.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

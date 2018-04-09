@@ -64,7 +64,7 @@ namespace transport {
 class ASIOReactorTimer final : public ReactorTimer {
 public:
     explicit ASIOReactorTimer(asio::io_context& ctx)
-        : _timer(std::make_shared<asio::system_timer>(ctx)) {}
+        : _timerState(std::make_shared<TimerState>(ctx)) {}
 
     ~ASIOReactorTimer() {
         // The underlying timer won't get destroyed until the last promise from _asyncWait
@@ -73,42 +73,82 @@ public:
     }
 
     void cancel() override {
-        _timer->cancel();
+        auto promise = [&] {
+            stdx::lock_guard<stdx::mutex> lk(_timerState->mutex);
+            _timerState->generation++;
+            return std::move(_timerState->finalPromise);
+        }();
+
+        if (promise) {
+            // We're worried that setting the error on the promise without unwinding the stack
+            // can lead to a deadlock, so this gets scheduled on the io_context of the timer.
+            _timerState->timer.get_io_context().post([promise = promise->share()]() mutable {
+                promise.setError({ErrorCodes::CallbackCanceled, "Timer was canceled"});
+            });
+        }
+        _timerState->timer.cancel();
     }
 
     Future<void> waitFor(Milliseconds timeout) override {
-        return _asyncWait([&] { _timer->expires_after(timeout.toSystemDuration()); });
+        return _asyncWait([&] { _timerState->timer.expires_after(timeout.toSystemDuration()); });
     }
 
     Future<void> waitUntil(Date_t expiration) override {
-        return _asyncWait([&] { _timer->expires_at(expiration.toSystemTimePoint()); });
+        return _asyncWait([&] { _timerState->timer.expires_at(expiration.toSystemTimePoint()); });
     }
 
 private:
-    template <typename Callback>
-    Future<void> _asyncWait(Callback&& cb) {
+    template <typename ArmTimerCb>
+    Future<void> _asyncWait(ArmTimerCb&& armTimer) {
         try {
-            cb();
-            Promise<void> promise;
-            auto ret = promise.getFuture();
-            _timer->async_wait(
-                [ promise = promise.share(), timer = _timer ](const std::error_code& ec) mutable {
+            cancel();
+
+            Future<void> ret;
+            uint64_t id;
+            std::tie(ret, id) = [&] {
+                stdx::lock_guard<stdx::mutex> lk(_timerState->mutex);
+                auto id = ++_timerState->generation;
+                invariant(!_timerState->finalPromise);
+                _timerState->finalPromise = std::make_unique<Promise<void>>();
+                auto future = _timerState->finalPromise->getFuture();
+                return std::make_pair(std::move(future), id);
+            }();
+
+            armTimer();
+            _timerState->timer.async_wait(
+                [ id, state = _timerState ](const std::error_code& ec) mutable {
+                    stdx::unique_lock<stdx::mutex> lk(state->mutex);
+                    if (id != state->generation) {
+                        return;
+                    }
+                    auto promise = std::move(state->finalPromise);
+                    lk.unlock();
+
                     if (ec) {
-                        promise.setError(errorCodeToStatus(ec));
+                        promise->setError(errorCodeToStatus(ec));
                     } else {
-                        promise.emplaceValue();
+                        promise->emplaceValue();
                     }
                 });
+
             return ret;
         } catch (asio::system_error& ex) {
             return Future<void>::makeReady(errorCodeToStatus(ex.code()));
         }
     }
 
-    // Destroying an asio::system_timer that has outstanding callbacks from async_wait will cause
-    // a broken promise - so this is managed by a shared ptr, so that each callback can extend the
-    // lifetime of the timer to after its been called.
-    std::shared_ptr<asio::system_timer> _timer;
+    // The timer itself and its state are stored in this struct managed by a shared_ptr so we can
+    // extend the lifetime of the timer until all callbacks to timer.async_wait have run.
+    struct TimerState {
+        explicit TimerState(asio::io_context& ctx) : timer(ctx) {}
+
+        asio::system_timer timer;
+        stdx::mutex mutex;
+        uint64_t generation = 0;
+        std::unique_ptr<Promise<void>> finalPromise;
+    };
+
+    std::shared_ptr<TimerState> _timerState;
 };
 
 class TransportLayerASIO::ASIOReactor final : public Reactor {

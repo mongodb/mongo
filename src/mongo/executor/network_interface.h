@@ -141,7 +141,8 @@ public:
      *
      * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
      * and true otherwise. If it returns Status::OK(), then the action will be executed by
-     * NetworkInterface eventually; otherwise, it will not.
+     * NetworkInterface eventually if no error occurs while waiting for the alarm; otherwise,
+     * it will not.
      *
      * "action" should not do anything that requires a lot of computation, or that might block for a
      * long time, as it may execute in a network thread.
