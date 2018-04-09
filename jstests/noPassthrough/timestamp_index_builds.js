@@ -29,7 +29,7 @@
     const nodes = rst.startSet();
     rst.initiate();
 
-    if (rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
+    if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
         // Only snapshotting storage engines require correct timestamping of index builds.
         rst.stopSet();
         return;
@@ -58,7 +58,7 @@
     nodes.forEach(node => assert.commandWorked(node.adminCommand(
                       {configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})));
 
-    assert.commandWorked(coll.createIndexes({foo: 1}, {background: true}));
+    assert.commandWorked(coll.createIndexes([{foo: 1}], {background: true}));
     rst.awaitReplication();
 
     rst.stopSet(undefined, true);
