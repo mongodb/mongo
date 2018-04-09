@@ -375,7 +375,7 @@ tasks:
       vars:
         script_flags: --ycsb-throughput-analysis reports
 
-- name: core_workloads_WT
+- name: crud_workloads_WT
   priority: 5
   depends_on:
     - name: compile
@@ -385,12 +385,96 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "core"
+        test: "crud_workloads"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
 
-- name: core_workloads_MMAPv1
+- name: mixed_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "mixed_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: misc_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "misc_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: map_reduce_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "map_reduce_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: smoke_test
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "short"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: crud_workloads_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "crud_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: mixed_workloads_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "mixed_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: misc_workloads_MMAPv1
   priority: 5
   depends_on:
     - name: compile
@@ -400,26 +484,12 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "core"
+        test: "misc_workloads"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
 
-- name: agg_query_comparison_bestbuy_WT
-  priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  commands:
-    - func: "prepare environment"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "agg_query_comparison_bestbuy"
-    - func: "deploy cluster"
-    - func: "run test"
-    - func: "analyze"
-
-- name: agg_query_comparison_bestbuy_MMAPv1
+- name: map_reduce_workloads_MMAPv1
   priority: 5
   depends_on:
     - name: compile
@@ -428,7 +498,63 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "agg_query_comparison_bestbuy"
+        test: "map_reduce_workloads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_agg_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "bestbuy_agg"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_query_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "bestbuy_query"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_agg_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "bestbuy_agg"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: bestbuy_query_MMAPv1
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "bestbuy_query"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -593,7 +719,7 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-- name: change_streams
+- name: change_streams_throughput
   priority: 5
   depends_on:
     - name: compile
@@ -602,7 +728,21 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "change_streams"
+        test: "change_streams_throughput"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
+- name: change_streams_latency
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "change_streams_latency"
     - func: "deploy cluster"
     - func: "run test"
     - func: "analyze"
@@ -659,14 +799,24 @@ buildvariants:
       - "rhel70-perf-single"
   tasks:
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
-    - name: agg_query_comparison_bestbuy_WT
-    - name: agg_query_comparison_bestbuy_MMAPv1
-    - name: change_streams
+    - name: bestbuy_agg_WT
+    - name: bestbuy_query_WT
+    - name: bestbuy_agg_MMAPv1
+    - name: bestbuy_query_MMAPv1
+    - name: change_streams_throughput
+    - name: change_streams_latency
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -688,13 +838,22 @@ buildvariants:
       distros:
       - rhel70
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
-    - name: agg_query_comparison_bestbuy_WT
-    - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: bestbuy_agg_WT
+    - name: bestbuy_query_WT
+    - name: bestbuy_agg_MMAPv1
+    - name: bestbuy_query_MMAPv1
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -709,18 +868,28 @@ buildvariants:
       - "rhel70-perf-shard"
   tasks:
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: mongos_workloads_WT
     - name: mongos_workloads_MMAPv1
     - name: move_chunk_workloads_WT
     - name: move_chunk_workloads_MMAPv1
-    - name: agg_query_comparison_bestbuy_WT
-    - name: agg_query_comparison_bestbuy_MMAPv1
-    - name: change_streams
+    - name: bestbuy_agg_WT
+    - name: bestbuy_query_WT
+    - name: bestbuy_agg_MMAPv1
+    - name: bestbuy_query_MMAPv1
+    - name: change_streams_throughput
+    - name: change_streams_latency
     - name: change_streams_multi_mongos
 
 - name: linux-3-node-replSet
@@ -736,18 +905,28 @@ buildvariants:
       - "rhel70-perf-replset"
   tasks:
     - name: industry_benchmarks_WT
-    - name: core_workloads_WT
+    - name: crud_workloads_WT
+    - name: mixed_workloads_WT
+    - name: misc_workloads_WT
+    - name: map_reduce_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
-    - name: core_workloads_MMAPv1
+    - name: crud_workloads_MMAPv1
+    - name: mixed_workloads_MMAPv1
+    - name: misc_workloads_MMAPv1
+    - name: map_reduce_workloads_MMAPv1
     - name: secondary_performance_WT
     - name: secondary_performance_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
-    - name: agg_query_comparison_bestbuy_WT
-    - name: agg_query_comparison_bestbuy_MMAPv1
-    - name: change_streams
+    - name: bestbuy_agg_WT
+    - name: bestbuy_query_WT
+    - name: bestbuy_agg_MMAPv1
+    - name: bestbuy_query_MMAPv1
+    - name: change_streams_throughput
+    - name: change_streams_latency
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
