@@ -36,6 +36,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -153,8 +154,8 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
               << FeatureCompatibilityVersionParser::toString(newVersion);
     }
 
-    // On commit, update the server parameters, and close any connections with a wire version that
-    // is below the minimum.
+    // On commit, update the server parameters, close any connections with a wire version that is
+    // below the minimum, and abort any open transactions if downgrading.
     opCtx->recoveryUnit()->onCommit([opCtx, newVersion]() {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
@@ -168,6 +169,14 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
             // Close all outgoing connections to servers with binary versions lower than ours.
             executor::EgressTagCloserManager::get(opCtx->getServiceContext())
                 .dropConnections(transport::Session::kKeepOpen);
+        }
+
+        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+            // Transactions are only allowed when the featureCompatibilityVersion is 4.0, so abort
+            // any open transactions when downgrading featureCompatibilityVersion.
+            SessionKiller::Matcher matcherAllSessions(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+            killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
         }
     });
 }
