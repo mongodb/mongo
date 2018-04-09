@@ -302,17 +302,17 @@ void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
         }
     }
 
-    invariant(
-        low == 0xffffffff,
-        str::stream() << "journal error warning views mismatch " << mmf->filename() << ' ' << hex
-                      << low
-                      << ".."
-                      << high
-                      << " len:"
-                      << high - low + 1
-                      << ". priv loc: "
-                      << (void*)(p + low)
-                      << ". Written data does not match in-memory view. Missing WriteIntent?");
+    if (low != 0xffffffff) {
+        std::stringstream ss;
+        ss << "journal error warning views mismatch " << mmf->filename() << ' ' << hex << low
+           << ".." << high << " len:" << high - low + 1;
+
+        log() << ss.str() << endl;
+        log() << "priv loc: " << (void*)(p + low) << ' ' << endl;
+
+        severe() << "Written data does not match in-memory view. Missing WriteIntent?";
+        MONGO_UNREACHABLE;
+    }
 }
 
 
