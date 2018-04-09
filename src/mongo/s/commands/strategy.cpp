@@ -41,6 +41,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/lasterror.h"
@@ -217,6 +218,10 @@ void execCommandClient(OperationContext* opCtx,
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+        uassert(ErrorCodes::InvalidOptions,
+                "readConcern level snapshot is not supported on mongos",
+                getTestCommandsEnabled());
+
         // TODO SERVER-33708.
         if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
             auto body = result->getBodyBuilder();
