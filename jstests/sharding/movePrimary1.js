@@ -2,8 +2,6 @@
     'use strict';
 
     function movePrimary() {
-        // TODO: SERVER-34093 Remove shardAsReplicaSet: false
-
         assert.commandWorked(s.getDB('test1').runCommand({dropDatabase: 1}));
         var db = s.getDB('test1');
         var c = db.foo;
@@ -56,7 +54,7 @@
                                      'attempting to use non-existent shard as primary should fail');
     }
 
-    var s = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
+    var s = new ShardingTest({shards: 2});
 
     // Set FCV to 3.6
     assert.commandWorked(s.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));

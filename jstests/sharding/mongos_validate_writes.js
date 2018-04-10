@@ -6,9 +6,7 @@
 (function() {
     'use strict';
 
-    // TODO: SERVER-34093 Remove shardAsReplicaSet: false
-    var st = new ShardingTest(
-        {shards: 2, mongos: 3, other: {shardOptions: {verbose: 2}}, shardAsReplicaSet: false});
+    var st = new ShardingTest({shards: 2, mongos: 3, other: {shardOptions: {verbose: 2}}});
 
     var mongos = st.s0;
     var staleMongosA = st.s1;
