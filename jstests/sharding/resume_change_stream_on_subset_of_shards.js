@@ -1,9 +1,7 @@
-// Designed to reproduce SERVER-32088, this tests that resuming a change stream on a sharded
-// collection where not all shards have a chunk in the collection will not work.
+// This tests resuming a change stream on a sharded collection where not all shards have a chunk in
+// the collection.
 (function() {
     "use strict";
-
-    load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
 
     // For supportsMajorityReadConcern().
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
@@ -39,7 +37,7 @@
         {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
     // Establish a change stream...
-    const changeStream = mongosColl.aggregate([{$changeStream: {}}]);
+    let changeStream = mongosColl.watch();
 
     // ... then do one write to produce a resume token...
     assert.writeOK(mongosColl.insert({_id: -2}));
@@ -59,35 +57,18 @@
         jsTestLog(`Saw insert for _id ${nextId}`);
     }
 
-    // Now try to resume the change stream. We expect this to fail until we resolve SERVER-32088,
-    // since the collection doesn't exist on the third shard, and so it will mistakenly think that
-    // it has been dropped.
-    changeStream.close();
-    ChangeStreamTest.assertChangeStreamThrowsCode({
-        db: mongosDB,
-        collName: mongosColl.getName(),
-        pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
-        expectedCode: 40615
-    });
+    // Insert another document after storing the resume token.
+    assert.writeOK(mongosColl.insert({_id: 2}));
 
-    // However, if we use the resume token to seed a whole-db or cluster-wide change stream rather
-    // than a stream on the 'test' collection itself, then we are able to resume successfully. This
-    // is because the prohibition on resuming a dropped collection's stream is due to our inability
-    // to determine what that collection's default collation was, whereas there are no default
-    // collations at the database and cluster levels.
-    const wholeDbCursor = mongosDB.watch([], {resumeAfter: resumeToken});
-    const wholeClusterCursor = mongosDB.getMongo().watch([], {resumeAfter: resumeToken});
-
-    for (let resumedCursor of[wholeDbCursor, wholeClusterCursor]) {
-        print(`Testing resumed stream on ns '${resumedCursor._ns}'`);
-        for (let nextId of[-1, 1]) {
-            assert.soon(() => resumedCursor.hasNext());
-            let next = resumedCursor.next();
-            assert.eq(next.operationType, "insert");
-            assert.eq(next.fullDocument, {_id: nextId});
-            jsTestLog(`Saw insert for _id ${nextId}`);
-        }
-    }
+    // Resume the change stream and verify that it correctly sees the next insert.  This is meant
+    // to test resuming a change stream when not all shards are aware that the collection exists,
+    // since shard 2 has no data at this point.
+    changeStream = mongosColl.watch([], {resumeAfter: resumeToken});
+    assert.soon(() => changeStream.hasNext());
+    let next = changeStream.next();
+    assert.eq(next.documentKey, {_id: -1});
+    assert.eq(next.fullDocument, {_id: -1});
+    assert.eq(next.operationType, "insert");
 
     st.stop();
 }());

@@ -5,7 +5,7 @@
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    const coll = assertDropAndRecreateCollection(db, "change_stream_invalidate_resumability");
+    let coll = assertDropAndRecreateCollection(db, "change_stream_invalidate_resumability");
 
     // Drop the collection we'll rename to _before_ starting the changeStream, so that we don't
     // get accidentally an invalidate when running on the whole DB or cluster.
@@ -19,8 +19,11 @@
 
     assert.commandWorked(coll.renameCollection(coll.getName() + "_renamed"));
 
+    // Update 'coll' to point to the renamed collection.
+    coll = db[coll.getName() + "_renamed"];
+
     // Insert another document after the rename.
-    assert.commandWorked(coll.insert({_id: 2}));
+    assert.writeOK(coll.insert({_id: 2}));
 
     // We should get 2 oplog entries of type insert and invalidate.
     assert.soon(() => cursor.hasNext());

@@ -23,7 +23,6 @@ selector:
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
   - jstests/sharding/delete_during_migrate.js
   - jstests/sharding/change_stream_chunk_migration.js
-  - jstests/sharding/change_streams_primary_shard_unaware.js
   - jstests/sharding/parallel.js
   - jstests/sharding/diffservers1.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js

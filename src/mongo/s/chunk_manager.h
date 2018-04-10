@@ -141,6 +141,10 @@ public:
         return _uuid && *_uuid == uuid;
     }
 
+    boost::optional<UUID> getUUID() const {
+        return _uuid;
+    }
+
     std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator> overlappingRanges(
         const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
 
@@ -413,6 +417,10 @@ public:
 
     RoutingTableHistory& getRoutingHistory() const {
         return *_rt;
+    }
+
+    boost::optional<UUID> getUUID() const {
+        return _rt->getUUID();
     }
 
 private:

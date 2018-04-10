@@ -96,7 +96,10 @@ struct MockMongoInterface final : public StubMongoProcessInterface {
 
 class ChangeStreamStageTest : public ChangeStreamStageTestNoSetup {
 public:
-    ChangeStreamStageTest() : ChangeStreamStageTest(nss){};
+    ChangeStreamStageTest() : ChangeStreamStageTest(nss) {
+        // Initialize the UUID on the ExpressionContext, to allow tests with a resumeToken.
+        getExpCtx()->uuid = testUuid();
+    };
 
     explicit ChangeStreamStageTest(NamespaceString nsString)
         : ChangeStreamStageTestNoSetup(nsString) {

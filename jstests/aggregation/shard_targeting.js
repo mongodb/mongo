@@ -10,11 +10,6 @@
  * - In the case of a stage which requires a primary shard merge, do not split the pipeline or
  * generate a $mergeCursors if the data required by the aggregation all resides on the primary
  * shard.
- * - In the event that a stale config exception is encountered:
- *     - If the pipeline is split but we now only need to target a single shard, coalesce the split
- *       pipeline and dispatch it to that shard.
- *     - If the pipeline is not split but we must now target more than one shard, split it and
- *       redispatch.
  *
  * Because wrapping these aggregations in a $facet stage will affect how the pipeline is targeted,
  * and will therefore invalidate the results of the test cases below, we tag this test to prevent it

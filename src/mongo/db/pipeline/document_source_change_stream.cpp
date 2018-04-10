@@ -32,7 +32,6 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
@@ -375,6 +374,42 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
 namespace {
 
 /**
+ * Throws an assertion if this pipeline might need to use a collation but it can't figure out what
+ * the collation should be. Specifically, it is only safe to resume if at least one of the following
+ * is true:
+ *      * The request has an explicit collation set, so we don't need to know if there was a default
+ *        collation on the collection.
+ *      * The request is 'collectionless', meaning it's a change stream on a whole database or a
+ *        whole cluster. Unlike individual collections, there is no concept of a default collation
+ *        at the level of an entire database or cluster.
+ *      * A collection with 'uuid' still exists, and we can figure out its default collation.
+ */
+void assertResumeAllowed(const intrusive_ptr<ExpressionContext>& expCtx, CollectionUUID uuid) {
+    if (!expCtx->collation.isEmpty()) {
+        // Explicit collation has been set, it's okay to resume.
+        return;
+    }
+
+    if (!expCtx->isSingleNamespaceAggregation()) {
+        // Change stream on a whole database or cluster, do not need to worry about collation.
+        return;
+    }
+
+    const auto cannotResumeErrMsg =
+        "Attempted to resume a stream on a collection which has been dropped. The change stream's "
+        "pipeline may need to make comparisons which should respect the collection's default "
+        "collation, which can no longer be determined. If you wish to resume this change stream "
+        "you must specify a collation with the request.";
+    // Verify that the UUID on the expression context matches the UUID in the resume token.
+    // TODO SERVER-35254: If we're on a stale mongos, this check may incorrectly reject a valid
+    // resume token since the UUID on the expression context could be for a previous version of the
+    // collection.
+    uassert(ErrorCodes::InvalidResumeToken,
+            cannotResumeErrMsg,
+            expCtx->uuid && expCtx->uuid.get() == uuid);
+}
+
+/**
  * Parses the resume options in 'spec', optionally populating the resume stage and cluster time to
  * start from.  Throws an AssertionException if not running on a replica set or multiple resume
  * options are specified.
@@ -400,18 +435,11 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
         uassert(40645,
                 "The resume token is invalid (no UUID), possibly from an invalidate.",
                 tokenData.uuid);
-        auto resumeNamespace =
-            UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(tokenData.uuid.get());
-        // If the resume token's UUID does not exist - implying that it has been dropped in the time
-        // since the resume token was generated - then we prohibit resuming the stream, because we
-        // can no longer determine whether that collection had a default collation. However, the
-        // concept of a default collation does not exist at the database or cluster levels, and we
-        // therefore skip this check for whole-database and cluster-wide change streams.
-        if (!expCtx->inMongos && expCtx->isSingleNamespaceAggregation()) {
-            uassert(40615,
-                    "The resume token UUID does not exist. Has the collection been dropped?",
-                    !resumeNamespace.isEmpty());
-        }
+
+        // Verify that the requested resume attempt is possible based on the stream type, resume
+        // token UUID, and collation.
+        assertResumeAllowed(expCtx, tokenData.uuid.get());
+
         *startFromOut = tokenData.clusterTime;
         if (expCtx->needsMerge) {
             *resumeStageOut =

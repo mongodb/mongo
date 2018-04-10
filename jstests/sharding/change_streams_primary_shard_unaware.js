@@ -152,19 +152,16 @@
         collection: mongos2Coll
     });
 
-    // Since neither the mongos nor the shard are aware that the collection is sharded, the change
-    // stream will miss the inserted document to the other shard.
-    // TODO: After SERVER-32198, the expected behavior is that the change stream will correctly
-    // resume since establishing the cursor on the restarted shard will trigger a refresh.
-    // cstMongos2.assertNextChangesEqual({
-    //     cursor: cursorMongos2,
-    //     expectedChanges: [{
-    //         documentKey: {_id: -2, a: -2},
-    //         fullDocument: {_id: -2, a: -2},
-    //         ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
-    //         operationType: "insert",
-    //     }]
-    // });
+    cstMongos2.assertNextChangesEqual({
+        cursor: cursorMongos2,
+        expectedChanges: [{
+            documentKey: {_id: -2, a: -2},
+            fullDocument: {_id: -2, a: -2},
+            ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
+            operationType: "insert",
+        }]
+    });
+
     cstMongos2.assertNextChangesEqual({
         cursor: cursorMongos2,
         expectedChanges: [{

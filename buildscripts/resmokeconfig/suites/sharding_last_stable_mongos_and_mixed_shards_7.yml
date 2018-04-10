@@ -25,7 +25,6 @@ selector:
   - jstests/sharding/zero_shard_version.js
   - jstests/sharding/remove1.js
   - jstests/sharding/multi_write_target.js
-  - jstests/sharding/change_streams.js
   - jstests/sharding/array_shard_key.js
   - jstests/sharding/validate_collection.js
   - jstests/sharding/move_chunk_wc.js

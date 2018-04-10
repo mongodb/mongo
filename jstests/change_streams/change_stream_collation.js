@@ -5,7 +5,8 @@
     "use strict";
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load("jstests/libs/change_stream_util.js");        // For 'ChangeStreamTest'.
+    load("jstests/libs/change_stream_util.js");        // For 'ChangeStreamTest' and
+                                                       // 'runCommandChangeStreamPassthroughAware'.
     load("jstests/libs/fixture_helpers.js");           // For 'isMongos'.
 
     if (FixtureHelpers.isMongos(db)) {
@@ -230,6 +231,115 @@
             assert.docEq(cursor.next(), {docId: 1});
             assert(!cursor.hasNext());
         }());
+
+        // Test that resuming a change stream on a collection that has been dropped requires the
+        // user to explicitly specify the collation. This is testing that we cannot resume if we
+        // need to retrieve the collection metadata.
+        (function() {
+            const collName = "change_stream_case_insensitive";
+            let caseInsensitiveCollection =
+                assertDropAndRecreateCollection(db, collName, {collation: caseInsensitive});
+
+            let changeStream = caseInsensitiveCollection.watch(
+                [{$match: {"fullDocument.text": "abc"}}], {collation: caseInsensitive});
+
+            assert.writeOK(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
+
+            assert.soon(() => changeStream.hasNext());
+            const next = changeStream.next();
+            assert.docEq(next.documentKey, {_id: 0});
+            const resumeToken = next._id;
+
+            // Insert a second document to see after resuming.
+            assert.writeOK(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
+
+            // Drop the collection to invalidate the stream.
+            assertDropCollection(db, collName);
+
+            // Test that a $changeStream is allowed to resume on the dropped collection if an
+            // explicit collation is provided, even if it doesn't match the original collection
+            // default collation.
+            changeStream = caseInsensitiveCollection.watch(
+                [{$match: {"fullDocument.text": "ABC"}}],
+                {resumeAfter: resumeToken, collation: {locale: "simple"}});
+
+            assert.soon(() => changeStream.hasNext());
+            assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
+
+            // Test that a pipeline without an explicit collation is not allowed to resume the
+            // change stream after the collection has been dropped. Do not modify this command in
+            // the passthrough suite(s) since whole-db and whole-cluster change streams are allowed
+            // to resume without an explicit collation.
+            assert.commandFailedWithCode(
+                runCommandChangeStreamPassthroughAware(
+                    db,
+                    {
+                      aggregate: collName,
+                      pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
+                      cursor: {},
+                    },
+                    true),  // doNotModifyInPassthroughs
+                ErrorCodes.InvalidResumeToken);
+        }());
+
+        // Test that the default collation of a new version of the collection is not applied when
+        // resuming a change stream from before a collection drop.
+        (function() {
+            const collName = "change_stream_case_insensitive";
+            let caseInsensitiveCollection =
+                assertDropAndRecreateCollection(db, collName, {collation: caseInsensitive});
+
+            let changeStream = caseInsensitiveCollection.watch(
+                [{$match: {"fullDocument.text": "abc"}}], {collation: caseInsensitive});
+
+            assert.writeOK(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
+
+            assert.soon(() => changeStream.hasNext());
+            const next = changeStream.next();
+            assert.docEq(next.documentKey, {_id: 0});
+            const resumeToken = next._id;
+
+            // Insert a second document to see after resuming.
+            assert.writeOK(caseInsensitiveCollection.insert({_id: "dropped_coll", text: "ABC"}));
+
+            // Recreate the collection with a different collation.
+            caseInsensitiveCollection = assertDropAndRecreateCollection(
+                db, caseInsensitiveCollection.getName(), {collation: {locale: "simple"}});
+            assert.writeOK(caseInsensitiveCollection.insert({_id: "new collection", text: "abc"}));
+
+            // Verify that the stream sees the insert before the drop and then is exhausted. We
+            // won't see the invalidate because the pipeline has a $match stage after the
+            // $changeStream.
+            assert.soon(() => changeStream.hasNext());
+            assert.docEq(changeStream.next().fullDocument, {_id: "dropped_coll", text: "ABC"});
+            assert(changeStream.isExhausted());
+
+            // Test that a pipeline with an explicit collation is allowed to resume from before the
+            // collection is dropped and recreated.
+            changeStream = caseInsensitiveCollection.watch(
+                [{$match: {"fullDocument.text": "ABC"}}],
+                {resumeAfter: resumeToken, collation: {locale: "fr"}});
+
+            assert.soon(() => changeStream.hasNext());
+            assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
+            assert(changeStream.isExhausted());
+
+            // Test that a pipeline without an explicit collation is not allowed to resume,
+            // even though the collection has been recreated with the same default collation as it
+            // had previously. Do not modify this command in the passthrough suite(s) since whole-db
+            // and whole-cluster change streams are allowed to resume without an explicit collation.
+            assert.commandFailedWithCode(
+                runCommandChangeStreamPassthroughAware(
+                    db,
+                    {
+                      aggregate: collName,
+                      pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
+                      cursor: {}
+                    },
+                    true),  // doNotModifyInPassthroughs
+                ErrorCodes.InvalidResumeToken);
+        }());
+
     } finally {
         if (FixtureHelpers.isMongos(db)) {
             // TODO: SERVER-33944 Change streams on sharded collection with non-simple default

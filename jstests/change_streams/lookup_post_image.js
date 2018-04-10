@@ -169,6 +169,30 @@
     assert(latestChange.hasOwnProperty("fullDocument"));
     assert.eq(latestChange.fullDocument, null);
 
+    // Test that we can resume a change stream with 'fullDocument: updateLookup' after the
+    // collection has been dropped. This is only allowed if an explicit collation is provided.
+    cursor = cst.startWatchingChanges({
+        collection: coll,
+        pipeline: [
+            {$changeStream: {resumeAfter: deleteDocResumePoint, fullDocument: "updateLookup"}},
+            {$match: {operationType: {$ne: "delete"}}}
+        ],
+        aggregateOptions: {cursor: {batchSize: 0}, collation: {locale: "simple"}}
+    });
+
+    // Check the next $changeStream entry; this is the test document inserted above.
+    latestChange = cst.getOneChange(cursor);
+    assert.eq(latestChange.operationType, "insert");
+    assert(latestChange.hasOwnProperty("fullDocument"));
+    assert.eq(latestChange.fullDocument, {_id: "fullDocument is lookup 2"});
+
+    // The next entry is the 'update' operation. Because the collection has been dropped, our
+    // attempt to look up the post-image results in a null document.
+    latestChange = cst.getOneChange(cursor);
+    assert.eq(latestChange.operationType, "update");
+    assert(latestChange.hasOwnProperty("fullDocument"));
+    assert.eq(latestChange.fullDocument, null);
+
     // Test that looking up the post image of an update after the collection has been dropped
     // and created again will result in 'fullDocument' with a value of null. This must be done
     // using getMore because new cursors cannot be established after a collection drop.

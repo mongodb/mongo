@@ -22,7 +22,6 @@ selector:
   - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
   #### Enable when 4.0 becomes last-stable.
   - jstests/sharding/change_stream_no_shards.js
-  - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/create_database.js
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   - jstests/sharding/database_versioning_safe_secondary_reads.js
@@ -69,7 +68,10 @@ selector:
   # New 4.0 feature
   - jstests/sharding/snapshot_aggregate_mongos.js
   - jstests/sharding/snapshot_find_mongos.js
+  - jstests/sharding/change_stream_invalidation.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
+  - jstests/sharding/change_streams.js
+  - jstests/sharding/change_streams_primary_shard_unaware.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/change_streams_whole_db.js
   - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
