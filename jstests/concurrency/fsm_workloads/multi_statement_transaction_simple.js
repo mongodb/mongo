@@ -61,7 +61,8 @@ var $config = (function() {
             while (transferFrom === transferTo) {
                 transferTo = Random.randInt(this.numAccounts);
             }
-            const transferAmount = Random.randInt(this.initialValue / 10);
+            // Make transferAmount nonzero so that each update will be executed
+            const transferAmount = Random.randInt(this.initialValue / 10) + 1;
             const commands = [
                 {
                   update: collName,
