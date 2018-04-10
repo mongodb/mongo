@@ -63,7 +63,7 @@ public:
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
         : ExpressionContext(
-              opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}) {}
+              opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}) {}
 
     /**
      * Sets the resolved definition for an involved namespace.

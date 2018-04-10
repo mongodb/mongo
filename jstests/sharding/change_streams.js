@@ -4,7 +4,6 @@
 
     load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
     load('jstests/aggregation/extras/utils.js');       // For assertErrorCode().
-    load('jstests/libs/change_stream_util.js');        // For ChangeStreamTest.
 
     // For supportsMajorityReadConcern().
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
@@ -129,7 +128,7 @@
                     mongosColl.getDB(), mongosColl.getName()));
     assert.soon(() => changeStream.hasNext());
     assert.eq(changeStream.next().operationType, "invalidate");
-    assert(!changeStream.hasNext(), "expected invalidation to cause the cursor to be closed");
+    assert(changeStream.isExhausted());
 
     jsTestLog("Testing aggregate command closes cursor for invalidate entries");
     // Shard the test collection on _id.
@@ -147,27 +146,48 @@
     assert.writeOK(mongosColl.insert({_id: -1}, {writeConcern: {w: "majority"}}));
     assert.writeOK(mongosColl.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
-    // Get a valid resume token that the next aggregate command can use.
     changeStream = mongosColl.aggregate([{$changeStream: {}}]);
+    assert(!changeStream.hasNext());
 
-    assert.writeOK(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
+    // Store a valid resume token before dropping the collection, to be used later in the test.
     assert.writeOK(mongosColl.insert({_id: -2}, {writeConcern: {w: "majority"}}));
+    assert.writeOK(mongosColl.insert({_id: 2}, {writeConcern: {w: "majority"}}));
 
     assert.soon(() => changeStream.hasNext());
     const resumeToken = changeStream.next()._id;
 
-    // It should not possible to resume a change stream after a collection drop, even if the
-    // invalidate has not been received.
-    assert(mongosColl.drop());
-    // Wait for the drop to actually happen.
-    assert.soon(() => !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(
-                    mongosColl.getDB(), mongosColl.getName()));
+    mongosColl.drop();
 
-    ChangeStreamTest.assertChangeStreamThrowsCode({
-        db: mongosDB,
-        collName: mongosColl.getName(),
+    assert.soon(() => changeStream.hasNext());
+    let next = changeStream.next();
+    assert.eq(next.operationType, "insert");
+    assert.eq(next.documentKey._id, 2);
+
+    assert.soon(() => changeStream.hasNext());
+    assert.eq(changeStream.next().operationType, "invalidate");
+    assert(changeStream.isExhausted());
+
+    // With an explicit collation, test that we can resume from before the collection drop.
+    changeStream = mongosColl.watch([{$project: {_id: 0}}],
+                                    {resumeAfter: resumeToken, collation: {locale: "simple"}});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "insert");
+    assert.eq(next.documentKey, {_id: 2});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "invalidate");
+    assert(changeStream.isExhausted());
+
+    // Without an explicit collation, test that we *cannot* resume from before the collection drop.
+    assert.commandFailedWithCode(mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
-        expectedCode: 40615
-    });
+        cursor: {}
+    }),
+                                 ErrorCodes.InvalidResumeToken);
+
     st.stop();
 })();

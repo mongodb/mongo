@@ -71,6 +71,8 @@
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
     assert.eq(next.operationType, "insert");
+    // TODO SERVER-34705: Extract the shard key from the resume token and include in the documentKey
+    // for inserts.
     assert.eq(next.documentKey, {_id: 2});
 
     assert.soon(() => changeStream.hasNext());
@@ -78,16 +80,49 @@
     assert.eq(next.operationType, "invalidate");
     assert(changeStream.isExhausted());
 
-    // Test that it is not possible to resume a change stream after a collection has been dropped.
-    // Once it's been dropped, we won't be able to figure out the shard key.
-    assert.soon(() => !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(
-                    mongosColl.getDB(), mongosColl.getName()));
+    // With an explicit collation, test that we can resume from before the collection drop.
+    changeStream =
+        mongosColl.watch([{$project: {_id: 0}}],
+                         {resumeAfter: resumeTokenFromFirstUpdate, collation: {locale: "simple"}});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "update");
+    assert.eq(next.documentKey, {shardKey: 1, _id: 1});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "insert");
+    assert.eq(next.documentKey, {shardKey: 2, _id: 2});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "invalidate");
+    assert(changeStream.isExhausted());
+
+    // Test that we cannot resume the change stream without specifying an explicit collation.
     assert.commandFailedWithCode(mongosDB.runCommand({
         aggregate: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
         cursor: {}
     }),
-                                 40615);
+                                 ErrorCodes.InvalidResumeToken);
+
+    // Recreate and shard the collection.
+    assert.commandWorked(mongosDB.createCollection(mongosColl.getName()));
+
+    // Shard the test collection on shardKey.
+    assert.commandWorked(
+        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+
+    // Test that resuming the change stream on the recreated collection fails since the UUID has
+    // changed.
+    assert.commandFailedWithCode(mongosDB.runCommand({
+        aggregate: mongosColl.getName(),
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdate}}],
+        cursor: {}
+    }),
+                                 ErrorCodes.InvalidResumeToken);
 
     st.stop();
 })();

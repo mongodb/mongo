@@ -45,7 +45,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregationRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
-                                     StringMap<ResolvedNamespace> resolvedNamespaces)
+                                     StringMap<ResolvedNamespace> resolvedNamespaces,
+                                     boost::optional<UUID> collUUID)
     : ExpressionContext(opCtx, collator.get()) {
     explain = request.getExplain();
     comment = request.getComment();
@@ -58,6 +59,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     collation = request.getCollation();
     _ownedCollator = std::move(collator);
     _resolvedNamespaces = std::move(resolvedNamespaces);
+    uuid = std::move(collUUID);
 }
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)

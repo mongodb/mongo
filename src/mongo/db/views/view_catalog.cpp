@@ -248,7 +248,8 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
                               // the Pipeline for validation here. We won't do anything with the
                               // pipeline that will require a real implementation.
                               std::make_shared<StubMongoProcessInterface>(),
-                              std::move(resolvedNamespaces));
+                              std::move(resolvedNamespaces),
+                              boost::none);
 
     // Save this to a variable to avoid reading the atomic variable multiple times.
     auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();

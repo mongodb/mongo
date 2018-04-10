@@ -318,6 +318,10 @@ Status runAggregate(OperationContext* opCtx,
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
     boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
 
+    // The UUID of the collection for the execution namespace of this aggregation. For change
+    // streams, this will be the UUID of the original namespace instead of the oplog namespace.
+    boost::optional<UUID> uuid;
+
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     Pipeline* unownedPipeline;
@@ -350,6 +354,9 @@ Status runAggregate(OperationContext* opCtx,
                 invariant(!collatorToUse);
                 Collection* origColl = origNssCtx.getCollection();
                 collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
+
+                // Get the collection UUID to be set on the expression context.
+                uuid = origColl ? origColl->uuid() : boost::none;
             }
         }
 
@@ -373,6 +380,11 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         Collection* collection = ctx ? ctx->getCollection() : nullptr;
+
+        // For change streams, the UUID will already have been set for the original namespace.
+        if (!liteParsedPipeline.hasChangeStream()) {
+            uuid = collection ? collection->uuid() : boost::none;
+        }
 
         // The collator may already have been set if this is a $changeStream pipeline. If not,
         // resolve the collator to either the user-specified collation or the collection default.
@@ -429,7 +441,8 @@ Status runAggregate(OperationContext* opCtx,
                                   request,
                                   std::move(*collatorToUse),
                                   std::make_shared<PipelineD::MongoDInterface>(opCtx),
-                                  uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
+                                  uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
+                                  uuid));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
         auto session = OperationContextSession::get(opCtx);
         expCtx->inSnapshotReadOrMultiDocumentTransaction =
