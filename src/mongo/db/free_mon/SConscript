@@ -1,0 +1,41 @@
+# -*- mode: python -*-
+Import("env")
+Import("get_option")
+
+env = env.Clone()
+
+fmEnv = env.Clone()
+fmEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+
+fmEnv.Library(
+    target='free_mon',
+    source=[
+        'free_mon_queue.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/ftdc/ftdc',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/third_party/shim_snappy',
+    ],
+)
+
+env.CppUnitTest(
+    target='free_mon_test',
+    source=[
+        'free_mon_queue_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/serveronly',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_d',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/concurrency',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        'free_mon',
+    ],
+)

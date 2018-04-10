@@ -20,6 +20,7 @@ env.SConscript(
         'commands',
         'concurrency',
         'exec',
+        'free_mon',
         'fts',
         'ftdc',
         'geo',
