@@ -4490,7 +4490,7 @@ tasks:
   - func: "run powercycle test"
     vars:
       <<: *powercycle_test
-      mongod_extra_options: --replSet=powercyle --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+      mongod_extra_options: --replSet=powercycle --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_replication_smalloplog
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -4510,7 +4510,7 @@ tasks:
   - func: "run powercycle test"
     vars:
       <<: *powercycle_test
-      mongod_extra_options: --replSet=powercyle --mongodOptions=\"--setParameter enableTestCommands=1 --oplogSize 20 --storageEngine wiredTiger\"
+      mongod_extra_options: --replSet=powercycle --mongodOptions=\"--setParameter enableTestCommands=1 --oplogSize 20 --storageEngine wiredTiger\"
 
 - name: powercycle_syncdelay
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
