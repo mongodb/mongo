@@ -3980,6 +3980,16 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "getFreeMonitoringStatus",
+          skipSharded: true,
+          command: {getFreeMonitoringStatus: 1},
+          testcases: [{
+              runOnDb: adminDbName,
+              roles: {clusterMonitor: 1, clusterAdmin: 1, root: 1, __system: 1},
+              privileges: [{resource: {cluster: true}, actions: ["checkFreeMonitoringStatus"]}]
+          }]
+        },
+        {
           testname: "getLastError",
           command: {getLastError: 1},
           testcases: [

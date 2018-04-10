@@ -132,4 +132,17 @@ boost::optional<BSONObj> FreeMonStorage::readClusterManagerState(OperationContex
     return swObj.getValue();
 }
 
+void FreeMonStorage::getStatus(OperationContext* opCtx, BSONObjBuilder* builder) {
+    auto state = read(opCtx);
+    if (!state) {
+        builder->append("state", "undecided");
+        return;
+    }
+
+    builder->append("state", StorageState_serializer(state->getState()));
+    builder->append("message", state->getMessage());
+    builder->append("url", state->getInformationalURL());
+    builder->append("userReminder", state->getUserReminder());
+}
+
 }  // namespace mongo

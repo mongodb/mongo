@@ -65,6 +65,11 @@ enum class FreeMonMessageType {
      */
     AsyncRegisterFail,
 
+    /**
+     * Unregister server from server command.
+     */
+    UnregisterCommand,
+
     // TODO - add metrics messages
     // MetricsCollect - Cloud wants the "wait" time to calculated when the message processing
     // starts, not ends

@@ -261,6 +261,7 @@
         },
         getCmdLineOpts: {skip: isUnrelated},
         getDiagnosticData: {skip: isUnrelated},
+        getFreeMonitoringStatus: {skip: isUnrelated},
         getLastError: {skip: isUnrelated},
         getLog: {skip: isUnrelated},
         getMore: {
@@ -473,6 +474,7 @@
         serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
         setCommittedSnapshot: {skip: isAnInternalCommand},
         setFeatureCompatibilityVersion: {skip: isUnrelated},
+        setFreeMonitoring: {skip: isUnrelated},
         setParameter: {skip: isUnrelated},
         setShardVersion: {skip: isUnrelated},
         shardCollection: {

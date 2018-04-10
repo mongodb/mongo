@@ -97,10 +97,15 @@ public:
      */
     boost::optional<Status> registerServerCommand(Milliseconds timeout);
 
-    // TODO - add these methods
-    // Status deregisterServerCommand(Milliseconds timeout);
+    /**
+     * Stop registration of mongod with remote service.
+     *
+     * As with registerServerCommand() above, but undoes registration.
+     * On complettion of this command, no further metrics will be transmitted.
+     */
+    Status unregisterServerCommand();
 
-    // void getStatus(BSONObjBuilder* builder);
+    // TODO - add these methods
     // void getServerStatus(BSONObjBuilder* builder);
 
     // void notifyObserver(const BSONObj& doc);

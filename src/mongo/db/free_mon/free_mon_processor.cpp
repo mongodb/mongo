@@ -144,6 +144,10 @@ void FreeMonProcessor::run() {
                             item.get().get()));
                     break;
                 }
+                case FreeMonMessageType::UnregisterCommand: {
+                    doUnregister(client);
+                    break;
+                }
                 default:
                     MONGO_UNREACHABLE;
             }

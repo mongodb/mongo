@@ -77,6 +77,11 @@ boost::optional<Status> FreeMonController::registerServerCommand(Milliseconds ti
     return Status::OK();
 }
 
+Status FreeMonController::unregisterServerCommand() {
+    _enqueue(FreeMonMessage::createNow(FreeMonMessageType::UnregisterCommand));
+    return Status::OK();
+}
+
 void FreeMonController::_enqueue(std::shared_ptr<FreeMonMessage> msg) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -138,6 +143,5 @@ void FreeMonController::stop() {
 
     _state = State::kDone;
 }
-
 
 }  // namespace mongo
