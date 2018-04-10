@@ -49,6 +49,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/kill_sessions_local.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repair_database_and_check_version.h"
@@ -104,6 +105,9 @@ GlobalInitializerRegisterer replicationManagerInitializer(
         auto serviceContext = context->serviceContext();
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
 
+        auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
+        LogicalClock::set(serviceContext, std::move(logicalClock));
+
         auto replCoord = std::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
         repl::setOplogCollectionName(serviceContext);
@@ -113,6 +117,7 @@ GlobalInitializerRegisterer replicationManagerInitializer(
         auto serviceContext = context->serviceContext();
 
         repl::ReplicationCoordinator::set(serviceContext, nullptr);
+        LogicalClock::set(serviceContext, nullptr);
         repl::StorageInterface::set(serviceContext, nullptr);
 
         return Status::OK();

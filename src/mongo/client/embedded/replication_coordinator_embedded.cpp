@@ -346,7 +346,7 @@ Status ReplicationCoordinatorEmbedded::checkIfWriteConcernCanBeSatisfied(
 }
 
 Status ReplicationCoordinatorEmbedded::checkReplEnabledForCommand(BSONObjBuilder*) {
-    UASSERT_NOT_IMPLEMENTED;
+    return Status(ErrorCodes::NoReplicationEnabled, "no replication on embedded");
 }
 
 HostAndPort ReplicationCoordinatorEmbedded::chooseNewSyncSource(const OpTime&) {

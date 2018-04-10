@@ -176,47 +176,6 @@ public:
     }
 } cmdReplSetRBID;
 
-class CmdReplSetGetStatus : public ReplSetCommand {
-public:
-    std::string help() const override {
-        return "Report status of a replica set from the POV of this server\n"
-               "{ replSetGetStatus : 1 }\n"
-               "http://dochub.mongodb.org/core/replicasetcommands";
-    }
-    CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus") {}
-    virtual bool run(OperationContext* opCtx,
-                     const string&,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        if (cmdObj["forShell"].trueValue())
-            LastError::get(opCtx->getClient()).disable();
-
-        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
-
-        bool includeInitialSync = false;
-        Status initialSyncStatus =
-            bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", false, &includeInitialSync);
-        if (!initialSyncStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, initialSyncStatus);
-        }
-
-        auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
-        if (includeInitialSync) {
-            responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
-        }
-        status =
-            ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(&result, responseStyle);
-        return CommandHelpers::appendCommandStatus(result, status);
-    }
-
-private:
-    ActionSet getAuthActionSet() const override {
-        return ActionSet{ActionType::replSetGetStatus};
-    }
-} cmdReplSetGetStatus;
-
 class CmdReplSetGetConfig : public ReplSetCommand {
 public:
     std::string help() const override {

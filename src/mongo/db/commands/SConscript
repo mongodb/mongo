@@ -183,6 +183,7 @@ env.Library(
 env.Library(
     target="standalone",
     source=[
+        "collection_to_capped.cpp",
         "count_cmd.cpp",
         "create_indexes.cpp",
         "current_op.cpp",
@@ -229,6 +230,22 @@ env.Library(
     ],
 )
 
+# Commands required by the shell to connect
+env.Library(
+    target="shell_protocol",
+    source=[
+        "test_commands.cpp",
+        "whats_my_uri_cmd.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
+        '$BUILD_DIR/mongo/db/commands',
+        'test_commands_enabled',
+    ],
+)
+
+
 # Commands that should only be present in mongod
 env.Library(
     target="mongod",
@@ -236,7 +253,6 @@ env.Library(
         "apply_ops_cmd.cpp",
         "clone.cpp",
         "clone_collection.cpp",
-        "collection_to_capped.cpp",
         "compact.cpp",
         "copydb.cpp",
         "copydb_start_commands.cpp",
@@ -260,7 +276,6 @@ env.Library(
         "set_feature_compatibility_version_command.cpp",
         "shutdown_d.cpp",
         "snapshot_management.cpp",
-        "test_commands.cpp",
         "top_command.cpp",
         "touch.cpp",
         "txn_cmds.cpp",
@@ -289,8 +304,9 @@ env.Library(
         'mongod_fcv',
         'mongod_fsync',
         'profile_common',
-        'standalone',
         'servers',
+        'shell_protocol',
+        'standalone',
         'test_commands_enabled',
     ],
 )

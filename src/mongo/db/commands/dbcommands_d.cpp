@@ -309,31 +309,6 @@ public:
 
 } cmdFileMD5;
 
-/* Returns client's uri */
-class CmdWhatsMyUri : public BasicCommand {
-public:
-    CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    std::string help() const override {
-        return "{whatsmyuri:1}";
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
-        return true;
-    }
-} cmdWhatsMyUri;
-
 class AvailableQueryOptions : public BasicCommand {
 public:
     AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
