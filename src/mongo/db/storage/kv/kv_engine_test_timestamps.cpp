@@ -151,21 +151,46 @@ public:
         return itCountOn(op);
     }
 
-    boost::optional<Record> readRecordCommitted(RecordId id) {
+    int itCountLocal() {
         auto op = makeOperation();
         op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            repl::ReplicationCoordinator::modeReplSet);
-        ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
+            repl::ReadConcernLevel::kLocalReadConcern, repl::ReplicationCoordinator::modeReplSet);
+        op->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(true);
+        return itCountOn(op);
+    }
+
+    boost::optional<Record> readRecordOn(OperationContext* op, RecordId id) {
         auto cursor = rs->getCursor(op);
         auto record = cursor->seekExact(id);
         if (record)
             record->data.makeOwned();
         return record;
     }
+    boost::optional<Record> readRecordCommitted(RecordId id) {
+        auto op = makeOperation();
+        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReplicationCoordinator::modeReplSet);
+        ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
+        return readRecordOn(op, id);
+    }
 
     std::string readStringCommitted(RecordId id) {
         auto record = readRecordCommitted(id);
+        ASSERT(record);
+        return std::string(record->data.data());
+    }
+
+    boost::optional<Record> readRecordLocal(RecordId id) {
+        auto op = makeOperation();
+        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
+            repl::ReadConcernLevel::kLocalReadConcern, repl::ReplicationCoordinator::modeReplSet);
+        op->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(true);
+        return readRecordOn(op, id);
+    }
+
+    std::string readStringLocal(RecordId id) {
+        auto record = readRecordLocal(id);
         ASSERT(record);
         return std::string(record->data.data());
     }
@@ -346,4 +371,76 @@ TEST_F(SnapshotManagerTests, UpdateAndDelete) {
     ASSERT(!readRecordCommitted(id));
 }
 
+TEST_F(SnapshotManagerTests, InsertAndReadOnLocalSnapshot) {
+    if (!snapshotManager)
+        return;  // This test is only for engines that DO support SnapshotManagers.
+
+    auto beforeInsert = fetchAndIncrementTimestamp();
+
+    auto id = insertRecordAndCommit();
+    auto afterInsert = fetchAndIncrementTimestamp();
+
+    // Not reading on the last local timestamp returns the most recent data.
+    auto op = makeOperation();
+    auto ru = op->recoveryUnit();
+    ru->setShouldReadAtLastAppliedTimestamp(false);
+    ASSERT_EQ(itCountOn(op), 1);
+    ASSERT(readRecordOn(op, id));
+
+    deleteRecordAndCommit(id);
+    auto afterDelete = fetchAndIncrementTimestamp();
+
+    // Reading at the local snapshot timestamps returns data in order.
+    snapshotManager->setLocalSnapshot(beforeInsert);
+    ASSERT_EQ(itCountLocal(), 0);
+    ASSERT(!readRecordLocal(id));
+
+    snapshotManager->setLocalSnapshot(afterInsert);
+    ASSERT_EQ(itCountLocal(), 1);
+    ASSERT(readRecordLocal(id));
+
+    snapshotManager->setLocalSnapshot(afterDelete);
+    ASSERT_EQ(itCountLocal(), 0);
+    ASSERT(!readRecordLocal(id));
+}
+
+TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
+    if (!snapshotManager)
+        return;  // This test is only for engines that DO support SnapshotManagers.
+
+    auto beforeInsert = fetchAndIncrementTimestamp();
+
+    auto id = insertRecordAndCommit("Aardvark");
+    auto afterInsert = fetchAndIncrementTimestamp();
+
+    updateRecordAndCommit(id, "Blue spotted stingray");
+    auto afterUpdate = fetchAndIncrementTimestamp();
+
+    // Not reading on the last local timestamp returns the most recent data.
+    auto op = makeOperation();
+    auto ru = op->recoveryUnit();
+    ru->setShouldReadAtLastAppliedTimestamp(false);
+    ASSERT_EQ(itCountOn(op), 1);
+    auto record = readRecordOn(op, id);
+    ASSERT_EQ(std::string(record->data.data()), "Blue spotted stingray");
+
+    deleteRecordAndCommit(id);
+    auto afterDelete = fetchAndIncrementTimestamp();
+
+    snapshotManager->setLocalSnapshot(beforeInsert);
+    ASSERT_EQ(itCountLocal(), 0);
+    ASSERT(!readRecordLocal(id));
+
+    snapshotManager->setLocalSnapshot(afterInsert);
+    ASSERT_EQ(itCountLocal(), 1);
+    ASSERT_EQ(readStringLocal(id), "Aardvark");
+
+    snapshotManager->setLocalSnapshot(afterUpdate);
+    ASSERT_EQ(itCountLocal(), 1);
+    ASSERT_EQ(readStringLocal(id), "Blue spotted stingray");
+
+    snapshotManager->setLocalSnapshot(afterDelete);
+    ASSERT_EQ(itCountLocal(), 0);
+    ASSERT(!readRecordLocal(id));
+}
 }  // namespace mongo

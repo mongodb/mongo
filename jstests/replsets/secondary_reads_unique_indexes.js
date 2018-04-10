@@ -35,18 +35,19 @@
     const collName = "testColl";
     let secondaryReadsTest = new SecondaryReadsTest(name);
 
+    let primaryDB = secondaryReadsTest.getPrimaryDB();
+    let secondaryDB = secondaryReadsTest.getSecondaryDB();
+
     // Setup collection.
-    secondaryReadsTest.doOnPrimary(function(db) {
-        db.runCommand({drop: collName});
-        assert.commandWorked(db.runCommand({create: collName}));
+    primaryDB.runCommand({drop: collName});
+    assert.commandWorked(primaryDB.runCommand({create: collName}));
 
-        // Create a unique index on the collection in the foreground.
-        assert.commandWorked(db.runCommand(
-            {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
-    });
+    // Create a unique index on the collection in the foreground.
+    assert.commandWorked(primaryDB.runCommand(
+        {createIndexes: collName, indexes: [{key: {x: 1}, name: "x_1", unique: true}]}));
 
-    let rst = secondaryReadsTest.getReplset();
-    rst.awaitReplication();
+    let replSet = secondaryReadsTest.getReplset();
+    replSet.awaitReplication();
 
     // We want to do updates with at least as many different documents as there are parallel batch
     // writer threads (16). Each iteration increments and decrements a uniquely indexed value, 'x'.
@@ -58,28 +59,28 @@
 
     // Do a bunch of reads using the 'x' index on the secondary.
     // No errors should be encountered on the secondary.
-    let readCmd = `while (true) {
-                       for (let x = 0; x < ${nOps}; x++) {
-                           assert.commandWorked(db.runCommand({
-                               find: "${collName}",
-                               filter: {x: x},
-                               projection: {x: 1},
-                               readConcern: {level: "local"},
-                           }));
-                       }
-                   }`;
-    secondaryReadsTest.startSecondaryReaders(nReaders, readCmd);
-
-    // Write the initial documents. Ensure they have been replicated.
-    secondaryReadsTest.doOnPrimary(function(db) {
-        for (let i = 0; i < nOps; i++) {
+    let readFn = function() {
+        for (let x = 0; x < TestData.nOps; x++) {
             assert.commandWorked(db.runCommand({
-                insert: collName,
-                documents: [{_id: i, x: i, iter: 0}],
-                writeConcern: {w: "majority"}
+                find: TestData.collName,
+                filter: {x: x},
+                projection: {x: 1},
+                readConcern: {level: "local"},
             }));
         }
-    });
+    };
+    TestData.nOps = nOps;
+    TestData.collName = collName;
+    secondaryReadsTest.startSecondaryReaders(nReaders, readFn);
+
+    // Write the initial documents. Ensure they have been replicated.
+    for (let i = 0; i < nOps; i++) {
+        assert.commandWorked(primaryDB.runCommand({
+            insert: collName,
+            documents: [{_id: i, x: i, iter: 0}],
+            writeConcern: {w: "majority"}
+        }));
+    }
 
     // Cycle the value of x in the document {_id: i, x: i} between i and i+1 each iteration.
     for (let iteration = 0; iteration < nIterations; iteration++) {
@@ -89,9 +90,7 @@
             updates[i] = {q: {_id: i}, u: {x: i, iter: iteration}};
         }
 
-        secondaryReadsTest.doOnPrimary(function(db) {
-            assert.commandWorked(db.runCommand({update: collName, updates: updates}));
-        });
+        assert.commandWorked(primaryDB.runCommand({update: collName, updates: updates}));
         updates = [];
 
         // Generate updates that increment x on each document backwards by _id to avoid conficts
@@ -105,11 +104,9 @@
             updates[i] = {q: {_id: end}, u: {x: nextX, iter: iteration}};
         }
         print("iteration " + iteration);
-        secondaryReadsTest.doOnPrimary(function(db) {
-            assert.commandWorked(db.runCommand({update: collName, updates: updates}));
-        });
+        assert.commandWorked(primaryDB.runCommand({update: collName, updates: updates}));
     }
 
-    rst.awaitReplication();
+    replSet.awaitReplication();
     secondaryReadsTest.stop();
 })();
