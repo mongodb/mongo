@@ -9,6 +9,6 @@ if env.TargetOSIs('windows'):
 env.Library(
     target='sqlite3',
     source=[
-        'sqlite3.c'
+        'sqlite/sqlite3.c'
         ],
     )
