@@ -50,8 +50,8 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -67,6 +67,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 
@@ -1806,6 +1807,105 @@ public:
     }
 };
 
+class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+        ASSERT(
+            _opCtx->getServiceContext()->getGlobalStorageEngine()->supportsReadConcernSnapshot());
+
+        NamespaceString ns("unittest.secondaryReadsDuringBatchApplicationAreAllowed");
+        reset(ns);
+        UUID uuid = UUID::gen();
+        {
+            AutoGetCollectionForRead autoColl(_opCtx, ns);
+            uuid = autoColl.getCollection()->uuid().get();
+            ASSERT_EQ(itCount(autoColl.getCollection()), 0);
+        }
+
+        // Returns true when the batch has started, meaning the applier is holding the PBWM lock.
+        // Will return false if the lock was not held.
+        Promise<bool> batchInProgressPromise;
+        // Attempt to read when in the middle of a batch.
+        stdx::packaged_task<bool()> task([&] {
+            Client::initThread(getThreadName());
+            auto readOp = cc().makeOperationContext();
+
+            // Wait for the batch to start or fail.
+            if (!batchInProgressPromise.getFuture().get()) {
+                return false;
+            }
+            AutoGetCollectionForRead autoColl(readOp.get(), ns);
+            return !readOp->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
+                                                           MODE_IS);
+        });
+        auto taskFuture = task.get_future();
+        stdx::thread taskThread{std::move(task)};
+
+        auto joinGuard = MakeGuard([&] {
+            batchInProgressPromise.emplaceValue(false);
+            taskThread.join();
+        });
+
+        // This apply operation function will block until the reader has tried acquiring a
+        // collection lock. This returns BadValue statuses instead of asserting so that the worker
+        // threads can cleanly exit and this test case fails without crashing the entire suite.
+        auto applyOperationFn = [&](OperationContext* opCtx,
+                                    std::vector<const repl::OplogEntry*>* operationsToApply,
+                                    repl::SyncTail* st,
+                                    std::vector<MultikeyPathInfo>* pathInfo) -> Status {
+            if (!_opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
+                                                        MODE_X)) {
+                return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
+            }
+
+            // Insert the document. A reader without a PBWM lock should not see it yet.
+            auto status = repl::multiSyncApply(opCtx, operationsToApply, st, pathInfo);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // Signals the reader to acquire a collection read lock.
+            batchInProgressPromise.emplaceValue(true);
+
+            // Block while holding the PBWM lock until the reader is done.
+            if (!taskFuture.get()) {
+                return {ErrorCodes::BadValue, "Client was holding PBWM lock in MODE_IS"};
+            }
+            return Status::OK();
+        };
+
+        // Make a simple insert operation.
+        BSONObj doc0 = BSON("_id" << 0 << "a" << 0);
+        auto insertOp = repl::OplogEntry(
+            BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                      << "i"
+                      << "ns"
+                      << ns.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc0));
+
+        // Apply the operation.
+        auto writerPool = repl::SyncTail::makeWriterPool(1);
+        repl::SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
+        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
+        ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
+
+        joinGuard.Dismiss();
+        taskThread.join();
+
+        // Read on the local snapshot to verify the document was inserted.
+        AutoGetCollectionForRead autoColl(_opCtx, ns);
+        assertDocumentAtTimestamp(autoColl.getCollection(), futureTs, doc0);
+    }
+};
+
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
@@ -1833,6 +1933,7 @@ public:
         // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
+        add<SecondaryReadsDuringBatchApplicationAreAllowed>();
     }
 };
 
