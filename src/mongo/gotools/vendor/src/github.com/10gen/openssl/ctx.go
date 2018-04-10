@@ -100,6 +100,12 @@ func NewCtxWithVersion(version SSLVersion) (*Ctx, error) {
 	switch version {
 	case SSLv3:
 		method = C.X_SSLv3_method()
+	case TLSv1:
+		method = C.X_TLSv1_method()
+	case TLSv1_1:
+		method = C.X_TLSv1_1_method()
+	case TLSv1_2:
+		method = C.X_TLSv1_2_method()
 	case AnyVersion:
 		method = C.X_SSLv23_method()
 	}
@@ -550,10 +556,13 @@ type Options uint
 
 const (
 	// NoCompression is only valid if you are using OpenSSL 1.0.1 or newer
-	NoCompression                      Options = C.SSL_OP_NO_COMPRESSION
-	NoSSLv2                            Options = C.SSL_OP_NO_SSLv2
-	NoSSLv3                            Options = C.SSL_OP_NO_SSLv3
-	NoTLSv1                            Options = C.SSL_OP_NO_TLSv1
+	NoCompression Options = C.SSL_OP_NO_COMPRESSION
+	NoSSLv2       Options = C.SSL_OP_NO_SSLv2
+	NoSSLv3       Options = C.SSL_OP_NO_SSLv3
+	NoTLSv1       Options = C.SSL_OP_NO_TLSv1
+	// NoTLSv1_1 and NoTLSv1_2 are only valid if you are using OpenSSL 1.0.1 or newer
+	NoTLSv1_1                          Options = C.SSL_OP_NO_TLSv1_1
+	NoTLSv1_2                          Options = C.SSL_OP_NO_TLSv1_2
 	CipherServerPreference             Options = C.SSL_OP_CIPHER_SERVER_PREFERENCE
 	NoSessionResumptionOrRenegotiation Options = C.SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION
 	NoTicket                           Options = C.SSL_OP_NO_TICKET

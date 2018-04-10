@@ -1569,10 +1569,21 @@ buildvariants:
 #######################################
 
 - name: amazonlinux64
-  display_name: Amazon Linux 64
+  display_name: Amazon Linux 64 (Go 1.8)
   run_on:
   - linux-64-amzn-test
   expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: amazon2
+  display_name: Amazon Linux 64 v2 (Go 1.8)
+  run_on:
+  - amazon2-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1582,31 +1593,31 @@ buildvariants:
 #######################################
 
 - name: debian71
-  display_name: Debian 7.1
+  display_name: Debian 7.1 (Go 1.8)
   run_on:
   - debian71-test
   expansions:
-    gorootvars: PATH="/opt/go/bin:$PATH"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
 
 - name: debian81
-  display_name: Debian 8.1
+  display_name: Debian 8.1 (Go 1.8)
   run_on:
   - debian81-test
   expansions:
-    gorootvars: PATH="/opt/go/bin:$PATH"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
 
 - name: debian92
-  display_name: Debian 9.2
+  display_name: Debian 9.2 (Go 1.8)
   run_on:
   - debian92-test
   expansions:
-    gorootvars: PATH="/opt/go/bin:$PATH"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1616,7 +1627,7 @@ buildvariants:
 #######################################
 
 - name: macOS-1012
-  display_name: MacOS 10.12
+  display_name: MacOS 10.12 (Go 1.8)
   run_on:
   - macos-1012
   expansions:
@@ -1626,11 +1637,11 @@ buildvariants:
     mongo_target: "osx-ssl"
     arch: "osx/x86_64"
     excludes: requires_many_files
-    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go'
   tasks: *macos_1012_tasks
 
 - name: macOS-1012-ssl
-  display_name: MacOS 10.12 SSL
+  display_name: MacOS 10.12 SSL (Go 1.8)
   run_on:
   - macos-1012
   expansions:
@@ -1641,7 +1652,7 @@ buildvariants:
     arch: "osx/x86_64"
     build_tags: "ssl openssl_pre_1.0"
     excludes: requires_many_files
-    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go'
   tasks: *macos_1012_ssl_tasks
 
 #######################################
@@ -1649,21 +1660,21 @@ buildvariants:
 #######################################
 
 - name: rhel62
-  display_name: RHEL 6.2
+  display_name: RHEL 6.2 (Go 1.8)
   run_on:
   - rhel62-test
   expansions:
-    gorootvars: PATH="/opt/go/bin:$PATH"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
 
 - name: rhel70
-  display_name: RHEL 7.0
+  display_name: RHEL 7.0 (Go 1.8)
   run_on:
   - rhel70
   expansions:
-    gorootvars: PATH="/opt/go/bin:$PATH"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1672,20 +1683,12 @@ buildvariants:
 #     SUSE Buildvariants              #
 #######################################
 
-- name: suse11
-  display_name: SUSE 11
-  run_on:
-  - suse11-test
-  expansions:
-    build_tags: "sasl ssl openssl_pre_1.0"
-  tasks:
-  - name: dist
-
 - name: suse12
-  display_name: SUSE 12
+  display_name: SUSE 12 (Go 1.8)
   run_on:
   - suse12-test
   expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1694,17 +1697,8 @@ buildvariants:
 #          Ubuntu Buildvariants       #
 #######################################
 
-- name: ubuntu1204
-  display_name: Ubuntu 12.04
-  run_on:
-  - ubuntu1204-test
-  expansions:
-    build_tags: "sasl ssl"
-  tasks:
-  - name: dist
-
 - name: ubuntu1404
-  display_name: Ubuntu 14.04
+  display_name: Ubuntu 14.04 (Go 1.8)
   run_on:
   - ubuntu1404-test
   expansions:
@@ -1712,6 +1706,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1404"
     mongo_edition: "targeted"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
     arch: "linux/x86_64"
     integration_test_args: integration
@@ -1719,7 +1714,7 @@ buildvariants:
   tasks: *ubuntu1404_tasks
 
 - name: ubuntu1404-ssl
-  display_name: Ubuntu 14.04 SSL
+  display_name: Ubuntu 14.04 SSL (Go 1.8)
   run_on:
   - ubuntu1404-test
   expansions:
@@ -1727,6 +1722,7 @@ buildvariants:
     <<: *mongo_ssl_startup_args
     mongo_os: "ubuntu1404"
     mongo_edition: "enterprise"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
     edition: ssl
     arch: "linux/x86_64"
@@ -1737,7 +1733,7 @@ buildvariants:
   tasks: *ubuntu1404_ssl_tasks
 
 - name: ubuntu-enterprise
-  display_name: Ubuntu 14.04 Enterprise
+  display_name: Ubuntu 14.04 Enterprise (Go 1.8)
   run_on:
   - ubuntu1404-test
   expansions:
@@ -1745,6 +1741,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1404"
     mongo_edition: "enterprise"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "ssl sasl"
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
@@ -1756,10 +1753,11 @@ buildvariants:
   tasks: *ubuntu1404_enterprise_tasks
 
 - name: ubuntu1604
-  display_name: Ubuntu 16.04
+  display_name: Ubuntu 16.04 (Go 1.8)
   run_on:
   - ubuntu1604-test
   expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
   tasks:
   - name: dist
@@ -1769,7 +1767,7 @@ buildvariants:
 #######################################
 
 - name: windows-64
-  display_name: Windows 64-bit
+  display_name: Windows 64-bit (Go 1.8)
   run_on:
   - windows-64-vs2013-test
   expansions:
@@ -1783,10 +1781,11 @@ buildvariants:
     arch: "win32/x86_64"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     integration_test_args: "integration"
+    gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go"'
   tasks: *windows_64_tasks
 
 - name: windows-64-ssl
-  display_name: Windows 64-bit SSL
+  display_name: Windows 64-bit SSL (Go 1.8)
   run_on:
   - windows-64-vs2013-compile
   expansions:
@@ -1803,13 +1802,13 @@ buildvariants:
     multiversion_override: "2.6"
     extension: .exe
     arch: "win32/x86_64"
-    gorootvars: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
+    gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go"'
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     integration_test_args: "integration,ssl"
   tasks: *windows_64_ssl_tasks
 
 - name: windows-64-enterprise
-  display_name: Windows 64-bit Enterprise
+  display_name: Windows 64-bit Enterprise (Go 1.8)
   run_on:
   - windows-64-vs2013-compile
   expansions:
@@ -1827,113 +1826,21 @@ buildvariants:
     edition: enterprise
     extension: .exe
     arch: "win32/x86_64"
-    gorootvars: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
+    gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go"'
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     integration_test_args: "integration"
   tasks: *windows_64_enterprise_tasks
 
 #######################################
-#        ZAP Buildvariants            #
+#        ARM Buildvariants            #
 #######################################
 
-- name: rhel71-ppc64le-enterprise
-  display_name: ZAP PPC64LE RHEL 7.1 Enterprise
-  run_on:
-  - rhel71-power8-test
-  expansions:
-    <<: *mongod_default_startup_args
-    <<: *mongo_default_startup_args
-    mongo_os: "rhel71"
-    mongo_edition: "enterprise"
-    mongo_arch: "ppc64le"
-    # RHEL 7.1 PPC64LE machines kerberos setup does not work for mongo-tools
-    #args: ... libsasl2; build_tags "sasl ssl"
-    args: -gccgoflags "$(pkg-config --libs --cflags libssl)"
-    build_tags: 'ssl'
-    resmoke_use_ssl: _ssl
-    gorootvars: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
-    resmoke_args: -j 4
-    excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
-    multiversion_override: "skip"
-    arch: "linux/ppc64le"
-    edition: enterprise
-    run_kinit: true
-    integration_test_args: integration
-  tasks: *rhel71_enterprise_tasks
-
-- name: rhel72-s390x-enterprise
-  display_name: ZAP s390x RHEL 7.2 Enterprise
-  run_on:
-  - rhel72-zseries-test
-  expansions:
-    <<: *mongod_default_startup_args
-    <<: *mongo_default_startup_args
-    mongo_os: "rhel72"
-    mongo_edition: "enterprise"
-    mongo_arch: "s390x"
-    args: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)"
-    build_tags: "sasl ssl"
-    resmoke_use_ssl: _ssl
-    gorootvars: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
-    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
-    resmoke_args: -j 2
-    multiversion_override: "skip"
-    arch: "linux/s390x"
-    edition: enterprise
-    run_kinit: true
-    integration_test_args: integration
-  tasks: *rhel72_enterprise_tasks
-
-- name: rhel72-s390x-enterprise-go1.7
-  display_name: ZAP s390x RHEL 7.2 Enterprise (Go 1.7)
-  run_on:
-  - rhel72-zseries-test
-  expansions:
-    <<: *mongod_default_startup_args
-    <<: *mongo_default_startup_args
-    mongo_os: "rhel72"
-    mongo_edition: "enterprise"
-    mongo_arch: "s390x"
-    args: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)"
-    build_tags: "sasl ssl"
-    resmoke_use_ssl: _ssl
-    gorootvars: 'PATH="/opt/go1.7/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.7/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
-    resmoke_args: -j 2
-    multiversion_override: "skip"
-    arch: "linux/s390x"
-    edition: enterprise
-    run_kinit: true
-    integration_test_args: integration
-  tasks: *rhel72_enterprise_tasks
-
-- name: rhel72-s390x-enterprise-go1.8
-  display_name: ZAP s390x RHEL 7.2 Enterprise (Go 1.8)
-  run_on:
-  - rhel72-zseries-test
-  expansions:
-    <<: *mongod_default_startup_args
-    <<: *mongo_default_startup_args
-    mongo_os: "rhel72"
-    mongo_edition: "enterprise"
-    mongo_arch: "s390x"
-    args: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)"
-    build_tags: "sasl ssl"
-    resmoke_use_ssl: _ssl
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
-    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
-    resmoke_args: -j 2
-    multiversion_override: "skip"
-    arch: "linux/s390x"
-    edition: enterprise
-    run_kinit: true
-    integration_test_args: integration
-  tasks: *rhel72_enterprise_tasks
-
 - name: ubuntu1604-arm64
-  display_name: ZAP ARM64 Ubuntu 16.04 SSL
+  display_name: ZAP ARM64 Ubuntu 16.04 SSL (gccgo 1.4)
   run_on:
   - ubuntu1604-arm64-small
+  stepback: false
+  batchtime: 10080 # weekly
   expansions:
     <<: *mongod_default_startup_args
     <<: *mongo_default_startup_args
@@ -1953,13 +1860,119 @@ buildvariants:
   tasks: *ubuntu1604_ssl_tasks
 
 #######################################
+#        Power Buildvariants          #
+#######################################
+
+- name: rhel71-ppc64le-enterprise
+  display_name: ZAP PPC64LE RHEL 7.1 Enterprise (Go 1.8)
+  run_on:
+  - rhel71-power8-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel71"
+    mongo_edition: "enterprise"
+    mongo_arch: "ppc64le"
+    # RHEL 7.1 PPC64LE machines kerberos setup does not work for mongo-tools
+    #args: ... libsasl2; build_tags "sasl ssl"
+    build_tags: 'ssl'
+    resmoke_use_ssl: _ssl
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
+    resmoke_args: -j 4
+    excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    multiversion_override: "skip"
+    arch: "linux/ppc64le"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *rhel71_enterprise_tasks
+
+- name: ubuntu1604-ppc64le-enterprise
+  display_name: ZAP PPC64LE Ubuntu 16.04 Enterprise (Go 1.8)
+  run_on:
+  - ubuntu1604-power8-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
+    build_tags: 'ssl sasl'
+  tasks:
+  - name: dist
+
+#######################################
+#     Z (s390x) Buildvariants         #
+#######################################
+
+- name: rhel67-s390x-enterprise
+  display_name: ZAP s390x RHEL 6.7 Enterprise (Go 1.8)
+  run_on:
+  - rhel67-zseries-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: rhel72-s390x-enterprise
+  display_name: ZAP s390x RHEL 7.2 Enterprise (Go 1.8)
+  run_on:
+  - rhel72-zseries-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel72"
+    mongo_edition: "enterprise"
+    mongo_arch: "s390x"
+    build_tags: "sasl ssl"
+    resmoke_use_ssl: _ssl
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    resmoke_args: -j 2
+    multiversion_override: "skip"
+    arch: "linux/s390x"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *rhel72_enterprise_tasks
+
+- name: suse12-s390x-enterprise
+  display_name: ZAP s390x SUSE 12 Enterprise (Go 1.8)
+  run_on:
+  - suse12-zseries-test
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: "sasl ssl"
+  tasks:
+  - name: dist
+
+- name: ubuntu1604-s390x-enterprise
+  display_name: ZAP s390x Ubuntu 16.04 Enterprise (Go 1.8)
+  run_on:
+  - ubuntu1604-zseries-small
+  stepback: false
+  batchtime: 10080 # weekly
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: "sasl ssl"
+  tasks:
+  - name: dist
+
+#######################################
 #     Experimental Buildvariants      #
 #######################################
 
 - name: ubuntu-race
   stepback: false
   batchtime: 1440 # daily
-  display_name: z Race Detector Ubuntu 14.04
+  display_name: z Race Detector Ubuntu 14.04 (Go 1.8)
   run_on:
   - ubuntu1404-test
   expansions:
@@ -1967,6 +1980,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "ubuntu1404"
     mongo_edition: "enterprise"
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     build_tags: "sasl ssl"
     arch: "linux/x86_64"
     args: "-race"

@@ -409,9 +409,8 @@ const SSL_METHOD *X_TLSv1_method() {
 	return TLSv1_method();
 }
 
-/*
 const SSL_METHOD *X_TLSv1_1_method() {
-#if defined(TLS1_1_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
+#if OPENSSL_VERSION_NUMBER > 0x10000000L
 	return TLSv1_1_method();
 #else
 	return NULL;
@@ -419,14 +418,13 @@ const SSL_METHOD *X_TLSv1_1_method() {
 }
 
 const SSL_METHOD *X_TLSv1_2_method() {
-#if defined(TLS1_2_VERSION) && !defined(OPENSSL_SYSNAME_MACOSX)
+#if OPENSSL_VERSION_NUMBER > 0x10000000L
 	return TLSv1_2_method();
 #else
 	return NULL;
 #endif
 }
 
-*/
 int X_SSL_CTX_new_index() {
 	return SSL_CTX_get_ex_new_index(0, NULL, NULL, NULL, NULL);
 }
