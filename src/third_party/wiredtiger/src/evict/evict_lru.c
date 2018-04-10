@@ -1224,13 +1224,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	    cache->evict_empty_score < WT_EVICT_SCORE_CUTOFF)
 		goto err;
 
-	/* Get some more pages to consider for eviction. */
-	if ((ret = __evict_walk(cache->walk_session, queue)) == EBUSY) {
-		ret = 0;
-		goto err;     /* An interrupt was requested, give up. */
-	}
-	WT_ERR_NOTFOUND_OK(ret);
-
 	/*
 	 * If the queue we are filling is empty, pages are being requested
 	 * faster than they are being queued.
@@ -1244,6 +1237,16 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		WT_STAT_CONN_INCR(session, cache_eviction_queue_empty);
 	} else
 		WT_STAT_CONN_INCR(session, cache_eviction_queue_not_empty);
+
+	/*
+	 * Get some more pages to consider for eviction.
+	 *
+	 * If the walk is interrupted, we still need to sort the queue: the
+	 * next walk assumes there are no entries beyond WT_EVICT_WALK_BASE.
+	 */
+	if ((ret = __evict_walk(cache->walk_session, queue)) == EBUSY)
+		ret = 0;
+	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &queue->evict_lock);

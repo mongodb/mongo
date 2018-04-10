@@ -73,6 +73,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: page written requiring lookaside records",
 	"cache: pages read into cache",
 	"cache: pages read into cache after truncate",
+	"cache: pages read into cache after truncate in prepare state",
 	"cache: pages read into cache requiring lookaside entries",
 	"cache: pages requested from the cache",
 	"cache: pages seen by eviction walk",
@@ -257,6 +258,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_write_lookaside = 0;
 	stats->cache_read = 0;
 	stats->cache_read_deleted = 0;
+	stats->cache_read_deleted_prepared = 0;
 	stats->cache_read_lookaside = 0;
 	stats->cache_pages_requested = 0;
 	stats->cache_eviction_pages_seen = 0;
@@ -438,6 +440,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_write_lookaside += from->cache_write_lookaside;
 	to->cache_read += from->cache_read;
 	to->cache_read_deleted += from->cache_read_deleted;
+	to->cache_read_deleted_prepared += from->cache_read_deleted_prepared;
 	to->cache_read_lookaside += from->cache_read_lookaside;
 	to->cache_pages_requested += from->cache_pages_requested;
 	to->cache_eviction_pages_seen += from->cache_eviction_pages_seen;
@@ -637,6 +640,8 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_write_lookaside);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_deleted += WT_STAT_READ(from, cache_read_deleted);
+	to->cache_read_deleted_prepared +=
+	    WT_STAT_READ(from, cache_read_deleted_prepared);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
 	to->cache_pages_requested +=
 	    WT_STAT_READ(from, cache_pages_requested);
@@ -849,6 +854,7 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages queued for urgent eviction during walk",
 	"cache: pages read into cache",
 	"cache: pages read into cache after truncate",
+	"cache: pages read into cache after truncate in prepare state",
 	"cache: pages read into cache requiring lookaside entries",
 	"cache: pages read into cache skipping older lookaside entries",
 	"cache: pages read into cache with skipped lookaside entries needed later",
@@ -1038,6 +1044,7 @@ static const char * const __stats_connection_desc[] = {
 	"thread-yield: data handle lock yielded",
 	"thread-yield: get reference for page index and slot time sleeping (usecs)",
 	"thread-yield: log server sync yielded for log write",
+	"thread-yield: page access yielded due to prepare state change",
 	"thread-yield: page acquire busy blocked",
 	"thread-yield: page acquire eviction blocked",
 	"thread-yield: page acquire locked blocked",
@@ -1051,6 +1058,10 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: commit timestamp queue length",
 	"transaction: number of named snapshots created",
 	"transaction: number of named snapshots dropped",
+	"transaction: prepared transactions",
+	"transaction: prepared transactions committed",
+	"transaction: prepared transactions currently active",
+	"transaction: prepared transactions rolled back",
 	"transaction: query timestamp calls",
 	"transaction: read timestamp queue insert to empty",
 	"transaction: read timestamp queue inserts to head",
@@ -1238,6 +1249,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_pages_queued_oldest = 0;
 	stats->cache_read = 0;
 	stats->cache_read_deleted = 0;
+	stats->cache_read_deleted_prepared = 0;
 	stats->cache_read_lookaside = 0;
 	stats->cache_read_lookaside_skipped = 0;
 	stats->cache_read_lookaside_delay = 0;
@@ -1427,6 +1439,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->dhandle_lock_blocked = 0;
 	stats->page_index_slot_ref_blocked = 0;
 	stats->log_server_sync_blocked = 0;
+	stats->prepared_transition_blocked_page = 0;
 	stats->page_busy_blocked = 0;
 	stats->page_forcible_evict_blocked = 0;
 	stats->page_locked_blocked = 0;
@@ -1440,6 +1453,10 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->txn_commit_queue_len = 0;
 	stats->txn_snapshots_created = 0;
 	stats->txn_snapshots_dropped = 0;
+	stats->txn_prepare = 0;
+	stats->txn_prepare_commit = 0;
+	stats->txn_prepare_active = 0;
+	stats->txn_prepare_rollback = 0;
 	stats->txn_query_ts = 0;
 	stats->txn_read_queue_empty = 0;
 	stats->txn_read_queue_head = 0;
@@ -1663,6 +1680,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_pages_queued_oldest);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_deleted += WT_STAT_READ(from, cache_read_deleted);
+	to->cache_read_deleted_prepared +=
+	    WT_STAT_READ(from, cache_read_deleted_prepared);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
 	to->cache_read_lookaside_skipped +=
 	    WT_STAT_READ(from, cache_read_lookaside_skipped);
@@ -1939,6 +1958,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, page_index_slot_ref_blocked);
 	to->log_server_sync_blocked +=
 	    WT_STAT_READ(from, log_server_sync_blocked);
+	to->prepared_transition_blocked_page +=
+	    WT_STAT_READ(from, prepared_transition_blocked_page);
 	to->page_busy_blocked += WT_STAT_READ(from, page_busy_blocked);
 	to->page_forcible_evict_blocked +=
 	    WT_STAT_READ(from, page_forcible_evict_blocked);
@@ -1960,6 +1981,10 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, txn_snapshots_created);
 	to->txn_snapshots_dropped +=
 	    WT_STAT_READ(from, txn_snapshots_dropped);
+	to->txn_prepare += WT_STAT_READ(from, txn_prepare);
+	to->txn_prepare_commit += WT_STAT_READ(from, txn_prepare_commit);
+	to->txn_prepare_active += WT_STAT_READ(from, txn_prepare_active);
+	to->txn_prepare_rollback += WT_STAT_READ(from, txn_prepare_rollback);
 	to->txn_query_ts += WT_STAT_READ(from, txn_query_ts);
 	to->txn_read_queue_empty += WT_STAT_READ(from, txn_read_queue_empty);
 	to->txn_read_queue_head += WT_STAT_READ(from, txn_read_queue_head);

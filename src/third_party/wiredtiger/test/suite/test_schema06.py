@@ -62,9 +62,9 @@ class test_schema06(wttest.WiredTigerTestCase):
         self.session.create("index:schema06:" + colname,
                             "columns=(" + colname + ")" + self.idx_config)
 
-    def drop_index(inum):
+    def drop_index(self, inum):
         colname = "s" + str(inum)
-        self.session.drop("index:main:" + colname, None)
+        self.session.drop("index:schema06:" + colname, None)
 
     def test_index_stress(self):
         self.session.create("table:schema06",
@@ -84,6 +84,8 @@ class test_schema06(wttest.WiredTigerTestCase):
                              values[3],values[4],values[5])
             cursor.insert()
         cursor.close()
+        self.drop_index(0)
+        self.drop_index(1)
 
     def check_entries(self, check_indices):
         cursor = self.session.open_cursor('table:main', None, None)

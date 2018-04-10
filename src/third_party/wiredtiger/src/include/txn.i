@@ -581,6 +581,8 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 		WT_ORDERED_READ(prepare_state, upd->prepare_state);
 		if (previous_state == prepare_state)
 			break;
+
+		WT_STAT_CONN_INCR(session, prepared_transition_blocked_page);
 	}
 
 	if (!upd_visible)

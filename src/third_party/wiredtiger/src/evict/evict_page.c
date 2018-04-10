@@ -609,10 +609,10 @@ __evict_review(
 	ret = __wt_reconcile(session, ref, NULL, flags, lookaside_retryp);
 
 	/*
-	 * If attempting eviction in service of a checkpoint, we may
-	 * successfully reconcile but then find that there are updates on the
-	 * page too new to evict.  Give up evicting in that case: checkpoint
-	 * will include the reconciled page when it visits the parent.
+	 * If attempting eviction during a checkpoint, we may successfully
+	 * reconcile but then find that there are updates on the page too new
+	 * to evict.  Give up evicting in that case: checkpoint will include
+	 * the reconciled page when it visits the parent.
 	 */
 	if (WT_SESSION_IS_CHECKPOINT(session) && !__wt_page_is_modified(page) &&
 	    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
@@ -632,6 +632,19 @@ __evict_review(
 	}
 
 	WT_RET(ret);
+
+	/*
+	 * Give up on eviction during a checkpoint if the page splits.
+	 *
+	 * We get here if checkpoint reads a page with lookaside entries: if
+	 * more of those entries are visible now than when the original
+	 * eviction happened, the page could split.  In most workloads, this is
+	 * very unlikely.  However, since checkpoint is partway through
+	 * reconciling the parent page, a split can corrupt the checkpoint.
+	 */
+	if (WT_SESSION_IS_CHECKPOINT(session) &&
+	    page->modify->rec_result == WT_PM_REC_MULTIBLOCK)
+		return (EBUSY);
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured
