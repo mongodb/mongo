@@ -926,9 +926,9 @@ var DB;
         });
     };
 
-    DB.prototype._getCollectionInfosCommand = function(filter) {
+    DB.prototype._getCollectionInfosCommand = function(filter, nameOnly = false) {
         filter = filter || {};
-        var res = this.runCommand({listCollections: 1, filter: filter});
+        var res = this.runCommand({listCollections: 1, filter: filter, nameOnly: nameOnly});
         if (res.code == 59) {
             // command doesn't exist, old mongod
             return null;
@@ -950,8 +950,8 @@ var DB;
      * collection name. An optional filter can be specified to match only collections with certain
      * metadata.
      */
-    DB.prototype.getCollectionInfos = function(filter) {
-        var res = this._getCollectionInfosCommand(filter);
+    DB.prototype.getCollectionInfos = function(filter, nameOnly = false) {
+        var res = this._getCollectionInfosCommand(filter, nameOnly);
         if (res) {
             return res;
         }
@@ -962,7 +962,7 @@ var DB;
      * Returns this database's list of collection names in sorted order.
      */
     DB.prototype.getCollectionNames = function() {
-        return this.getCollectionInfos().map(function(infoObj) {
+        return this.getCollectionInfos({}, true).map(function(infoObj) {
             return infoObj.name;
         });
     };

@@ -130,10 +130,14 @@ void _addWorkingSetMember(OperationContext* opCtx,
     root->pushBack(id);
 }
 
-BSONObj buildViewBson(const ViewDefinition& view) {
+BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     BSONObjBuilder b;
     b.append("name", view.name().coll());
     b.append("type", "view");
+
+    if (nameOnly) {
+        return b.obj();
+    }
 
     BSONObjBuilder optionsBuilder(b.subobjStart("options"));
     optionsBuilder.append("viewOn", view.viewOn().coll());
@@ -150,7 +154,8 @@ BSONObj buildViewBson(const ViewDefinition& view) {
 
 BSONObj buildCollectionBson(OperationContext* opCtx,
                             const Collection* collection,
-                            bool includePendingDrops) {
+                            bool includePendingDrops,
+                            bool nameOnly) {
 
     if (!collection) {
         return {};
@@ -172,6 +177,12 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     BSONObjBuilder b;
     b.append("name", collectionName);
     b.append("type", "collection");
+
+    if (nameOnly) {
+        return b.obj();
+    }
+
+    dassert(opCtx->lockState()->isCollectionLockedForMode(collection->ns().toString(), MODE_S));
 
     CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
 
@@ -232,6 +243,8 @@ public:
              BSONObjBuilder& result) {
         unique_ptr<MatchExpression> matcher;
 
+        const bool nameOnly = jsobj["nameOnly"].trueValue();
+
         // Check for 'filter' argument.
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
@@ -268,7 +281,7 @@ public:
             return CommandHelpers::appendCommandStatus(result, status);
         }
 
-        AutoGetDb autoDb(opCtx, dbname, MODE_S);
+        AutoGetDb autoDb(opCtx, dbname, nameOnly ? MODE_IS : MODE_S);
 
         Database* db = autoDb.getDb();
 
@@ -280,14 +293,16 @@ public:
                 for (auto&& collName : *collNames) {
                     auto nss = NamespaceString(db->name(), collName);
                     Collection* collection = db->getCollection(opCtx, nss);
-                    BSONObj collBson = buildCollectionBson(opCtx, collection, includePendingDrops);
+                    BSONObj collBson =
+                        buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
                     if (!collBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
                     }
                 }
             } else {
                 for (auto&& collection : *db) {
-                    BSONObj collBson = buildCollectionBson(opCtx, collection, includePendingDrops);
+                    BSONObj collBson =
+                        buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
                     if (!collBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
                     }
@@ -300,7 +315,7 @@ public:
                     filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
             if (!skipViews) {
                 db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
-                    BSONObj viewBson = buildViewBson(view);
+                    BSONObj viewBson = buildViewBson(view, nameOnly);
                     if (!viewBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, viewBson, matcher.get(), ws.get(), root.get());
                     }
