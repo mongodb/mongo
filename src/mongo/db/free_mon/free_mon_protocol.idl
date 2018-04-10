@@ -1,0 +1,123 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+
+enums:
+    MetricsEncoding:
+        description: "Metrics Encoding Methods"
+        type: string
+        values:
+            snappy: "snappy"
+
+    
+structs:
+    FreeMonRegistrationRequest:
+        description: "Registration Request to Cloud Server"
+        fields: 
+          version:
+            description: "Protocol version, initial version is 1"
+            type: long
+          payload:
+            description: "Payload of registration information"
+            type: object 
+          id:
+            description: "Existing Registration Id"
+            type: string
+            optional: true
+          tag:
+            description: "Tag"
+            type: array<string>
+            optional: true
+
+    FreeMonRegistrationResponse:
+        description: "Registration Response from Cloud Server"
+        fields: 
+          version:
+            description: "Protocol version, initial version is 1"
+            type: long
+          haltMetricsUploading:
+            description: "True indicates it should not proceed to metrics uploading"
+            type: bool
+          id:
+            description: "Existing Registration Id"
+            type: string
+          informationalURL:
+            description: "Informational HTTP web page for metrics"
+            type: string
+          message:
+            description: "Informational message for shell to display to user"
+            type: string
+          reportingInterval:
+            description: "Metrics Reporting interval in seconds"
+            type: long
+          userReminder:
+            description: "Informational message to display to user to remind them about the service"
+            type: string
+            optional: true
+
+            
+    FreeMonMetricsRequest:
+        description: "Metrics Request to Cloud Server"
+        fields: 
+          version:
+            description: "Protocol version, initial version is 1"
+            type: long
+          id:
+            description: "Registration Id"
+            type: string
+          encoding:
+            description: "Compression Encoding"
+            type: MetricsEncoding
+          metrics:
+            description: "Metrics Blob"
+            type: bindata_generic
+
+            
+    FreeMonMetricsResponse:
+        description: "Metrics Response from Cloud Server"
+        fields: 
+          version:
+            description: "Protocol version, initial version is 1"
+            type: long
+          haltMetricsUploading:
+            description: "True indicates it should not proceed to metrics uploading"
+            type: bool
+          permanentlyDelete:
+            description: "True indicates it permanently delete the local state"
+            type: bool
+          reportingInterval:
+            description: "Metrics Reporting interval in seconds"
+            type: long
+          id:
+            description: "Existing Registration Id"
+            type: string
+            optional: true
+          message:
+            description: "Informational message for shell to display to user"
+            type: string
+            optional: true
+          informationalURL:
+            description: "Informational HTTP web page for metrics"
+            type: string
+            optional: true
+          userReminder:
+            description: "Message to display to user to remind them about service"
+            type: string
+            optional: true

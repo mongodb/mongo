@@ -250,6 +250,9 @@ error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion");
 error_code("StaleChunkHistory", 250);
 error_code("NoSuchTransaction", 251)
 error_code("ReentrancyNotAllowed", 252)
+error_code("FreeMonHttpInFlight", 253)
+error_code("FreeMonHttpTemporaryFailure", 254)
+error_code("FreeMonHttpPermanentFailure", 255)
 
 # Error codes 4000-8999 are reserved.
 

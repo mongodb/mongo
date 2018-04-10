@@ -275,6 +275,13 @@ add_option('gcov',
     nargs=0,
 )
 
+add_option('enable-free-mon',
+    choices=["on", "off"],
+    default="off",
+    help='Disable support for Free Monitoring to avoid HTTP client library dependencies',
+    type='choice',
+)
+
 add_option('use-sasl-client',
     help='Support SASL authentication in the client library',
     nargs=0,
