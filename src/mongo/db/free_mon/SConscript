@@ -30,6 +30,7 @@ if get_option("enable-free-mon") == "on":
         target='free_mon_mongod',
         source=[
             'free_mon_mongod.cpp',
+            'free_mon_options.cpp',
             'http_client_curl.cpp',
             #'http_client_curl.cpp' if not env.TargetOSIs('windows') else 'http_client_winhttp.cpp',
         ],

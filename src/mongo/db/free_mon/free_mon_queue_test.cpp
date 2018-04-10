@@ -140,7 +140,7 @@ TEST_F(FreeMonQueueTest, TestQueueStop) {
 
     // Let our worker thread proceed
     barrier.countDownAndWait();
-    
+
     _mockThreadPool->shutdown();
     _mockThreadPool->join();
 }
