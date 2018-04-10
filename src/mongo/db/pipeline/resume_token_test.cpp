@@ -26,14 +26,18 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/pipeline/resume_token.h"
 
 #include <algorithm>
 #include <boost/optional/optional_io.hpp>
+#include <random>
 
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -162,8 +166,7 @@ TEST(ResumeToken, TestMissingTypebitsOptimization) {
     ASSERT_EQ(BSONType::NumberInt, rtNoTypeBitsData.documentKey["_id"].getType());
 }
 
-
-TEST(ResumeToken, CorruptTokens) {
+TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
     // Missing document.
     ASSERT_THROWS(ResumeToken::parse(Document()), AssertionException);
     // Missing data field.
@@ -195,34 +198,56 @@ TEST(ResumeToken, CorruptTokens) {
         ResumeToken::parse(Document{{"_data"_sd, goodData},
                                     {"_typeBits", BSONBinData(goodData.data, 0, newUUID)}}),
         AssertionException);
+}
 
+TEST(ResumeToken, FailsToDecodeInvalidKeyStringBinData) {
+    Timestamp ts(1010, 4);
+    ResumeTokenData tokenData;
+    tokenData.clusterTime = ts;
+    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument(Format::kBinData);
+    auto goodData = goodTokenDocBinData["_data"].getBinData();
     const unsigned char zeroes[] = {0, 0, 0, 0, 0};
     const unsigned char nonsense[] = {165, 85, 77, 86, 255};
+
     // Data of correct type, but empty.  This won't fail until we try to decode the data.
     auto emptyToken =
         ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 0, BinDataGeneral)}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
-    emptyToken = ResumeToken::parse(Document{{"_data"_sd, "string"_sd}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    ASSERT_THROWS_CODE(emptyToken.getData(), AssertionException, 40649);
+
+    auto incorrectType = ResumeToken::parse(Document{{"_data"_sd, "string"_sd}});
+    ASSERT_THROWS_CODE(incorrectType.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Data of correct type with a bunch of zeros.
-    auto zeroesToken =
-        ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 5, BinDataGeneral)}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    auto zeroesToken = ResumeToken::parse(
+        Document{{"_data"_sd, BSONBinData(zeroes, sizeof(zeroes), BinDataGeneral)}});
+    ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, 50811);
     zeroesToken = ResumeToken::parse(Document{{"_data"_sd, "00000"_sd}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Data of correct type with a bunch of nonsense.
-    auto nonsenseToken =
-        ResumeToken::parse(Document{{"_data"_sd, BSONBinData(nonsense, 5, BinDataGeneral)}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    auto nonsenseToken = ResumeToken::parse(
+        Document{{"_data"_sd, BSONBinData(nonsense, sizeof(nonsense), BinDataGeneral)}});
+    ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, 50811);
     nonsenseToken = ResumeToken::parse(Document{{"_data"_sd, "nonsense"_sd}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Valid data, bad typeBits; note that an all-zeros typebits is valid so it is not tested here.
     auto badTypeBitsToken = ResumeToken::parse(
-        Document{{"_data"_sd, goodData}, {"_typeBits", BSONBinData(nonsense, 5, BinDataGeneral)}});
-    ASSERT_THROWS(badTypeBitsToken.getData(), AssertionException);
+        Document{{"_data"_sd, goodData},
+                 {"_typeBits", BSONBinData(nonsense, sizeof(nonsense), BinDataGeneral)}});
+    ASSERT_THROWS_CODE(badTypeBitsToken.getData(), AssertionException, ErrorCodes::Overflow);
+
+    const unsigned char invalidString[] = {
+        60,  // CType::kStringLike
+        55,  // Non-null terminated
+    };
+    auto invalidStringToken = ResumeToken::parse(
+        Document{{"_data"_sd, BSONBinData(invalidString, sizeof(invalidString), BinDataGeneral)}});
+    ASSERT_THROWS_WITH_CHECK(
+        invalidStringToken.getData(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), 50816);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Failed to find null terminator in string");
+        });
 }
 
 TEST(ResumeToken, WrongVersionToken) {

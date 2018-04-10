@@ -305,7 +305,18 @@ public:
                              Ordering ord,
                              const TypeBits& typeBits);
     static BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
-    static BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
+    /**
+     * Decodes the given KeyString buffer into it's BSONObj representation. This is marked as
+     * noexcept since the assumption is that 'buffer' is a valid KeyString buffer and this method
+     * is not expected to throw.
+     *
+     * If the buffer provided may not be valid, use the 'safe' version instead.
+     */
+    static BSONObj toBson(const char* buffer,
+                          size_t len,
+                          Ordering ord,
+                          const TypeBits& types) noexcept;
+    static BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
 
     /**
      * Decodes a RecordId from the end of a buffer.

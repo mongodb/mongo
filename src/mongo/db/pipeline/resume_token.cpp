@@ -169,10 +169,10 @@ ResumeTokenData ResumeToken::getData() const {
             // We validate the type at parse time.
             MONGO_UNREACHABLE;
     }
-    auto internalBson = KeyString::toBson(static_cast<const char*>(keyStringBinData.data),
-                                          keyStringBinData.length,
-                                          Ordering::make(BSONObj()),
-                                          typeBits);
+    auto internalBson = KeyString::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
+                                              keyStringBinData.length,
+                                              Ordering::make(BSONObj()),
+                                              typeBits);
 
     BSONObjIterator i(internalBson);
     ResumeTokenData result;

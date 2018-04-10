@@ -50,6 +50,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -1178,6 +1179,68 @@ TEST_F(KeyStringTest, KeyWithTooManyTypeBitsCausesUassert) {
     ASSERT_THROWS_CODE(key.resetToKey(obj, ONE_ASCENDING), DBException, ErrorCodes::KeyTooLong);
 }
 
+TEST_F(KeyStringTest, ToBsonSafeShouldNotTerminate) {
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+
+    const char invalidString[] = {
+        60,  // CType::kStringLike
+        55,  // Non-null terminated
+    };
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(invalidString, sizeof(invalidString), ALL_ASCENDING, typeBits),
+        AssertionException,
+        50816);
+
+    const char invalidNumber[] = {
+        43,  // CType::kNumericPositive1ByteInt
+        1,   // Encoded integer part, least significant bit indicates there's a fractional part.
+        0,   // Since the integer part is 1 byte, the next 7 bytes are expected to be the fractional
+             // part and are needed to prevent the BufReader from overflowing.
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    };
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(invalidNumber, sizeof(invalidNumber), ALL_ASCENDING, typeBits),
+        AssertionException,
+        50810);
+}
+
+TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
+    std::mt19937 gen(newSeed());
+    std::uniform_int_distribution<> randomByte(std::numeric_limits<unsigned char>::min(),
+                                               std::numeric_limits<unsigned char>::max());
+
+    const auto interestingElements = getInterestingElements(KeyString::Version::V1);
+    for (auto elem : interestingElements) {
+        const KeyString ks(KeyString::Version::V1, elem, ALL_ASCENDING);
+
+        char* ksBuffer = (char*)ks.getBuffer();
+
+        // Select a random byte to change, except for the first byte as it will likely become an
+        // invalid CType and not test anything interesting.
+        ksBuffer[randomByte(gen) % ks.getSize() + 1] = randomByte(gen);
+
+        try {
+            KeyString::toBsonSafe(ksBuffer, ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+        } catch (const AssertionException&) {
+            // The expectation is that the randomized buffer is likely an invalid KeyString,
+            // however attempting to decode it should fail gracefully.
+        }
+
+        // Retest with descending.
+        try {
+            KeyString::toBsonSafe(ksBuffer, ks.getSize(), ONE_DESCENDING, ks.getTypeBits());
+        } catch (const AssertionException&) {
+            // The expectation is that the randomized buffer is likely an invalid KeyString,
+            // however attempting to decode it should fail gracefully.
+        }
+    }
+}
+
 namespace {
 const uint64_t kMinPerfMicros = 20 * 1000;
 const uint64_t kMinPerfSamples = 50 * 1000;
@@ -1329,4 +1392,13 @@ TEST_F(KeyStringTest, DecimalFromUniformDoublePerf) {
         }
     }
     perfTest(version, numbers);
+}
+
+DEATH_TEST(KeyStringTest, ToBsonPromotesAssertionsToTerminate, "terminate() called") {
+    const char invalidString[] = {
+        60,  // CType::kStringLike
+        55,  // Non-null terminated
+    };
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    KeyString::toBson(invalidString, sizeof(invalidString), ALL_ASCENDING, typeBits);
 }
