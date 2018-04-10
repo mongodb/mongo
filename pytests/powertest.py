@@ -1638,14 +1638,16 @@ def mongo_validate_collections(mongo):
 
 
 def mongo_validate_canary(mongo, db_name, coll_name, doc):
-    """ Validates a canary document. Returns 0 if the document exists. """
-    LOGGER.info("Validating canary document %s", doc)
-    return 0 if not doc or mongo[db_name][coll_name].find_one(doc) else 1
+    """Validate a canary document, return 0 if the document exists."""
+    if not doc:
+        return 0
+    LOGGER.info("Validating canary document using %s.%s.find_one(%s)", db_name, coll_name, doc)
+    return 0 if mongo[db_name][coll_name].find_one(doc) else 1
 
 
 def mongo_insert_canary(mongo, db_name, coll_name, doc):
-    """ Inserts a canary document with 'j' True. Returns 0 if successful. """
-    LOGGER.info("Inserting canary document %s to DB %s Collection %s", doc, db_name, coll_name)
+    """Insert a canary document with 'j' True, return 0 if successful."""
+    LOGGER.info("Inserting canary document using %s.%s.insert_one(%s)", db_name, coll_name, doc)
     coll = mongo[db_name][coll_name].with_options(
         write_concern=pymongo.write_concern.WriteConcern(j=True))
     res = coll.insert_one(doc)
