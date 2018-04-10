@@ -16,6 +16,7 @@ selector:
   - jstests/change_streams/change_stream_whole_cluster.js
   - jstests/change_streams/change_stream_whole_cluster_invalidations.js
   - jstests/change_streams/change_stream_whole_cluster_resumability.js
+  - jstests/change_streams/include_cluster_time.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

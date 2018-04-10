@@ -131,12 +131,12 @@ eventFn();`,
         event: () => assert.writeOK(db.changes.insert({_id: "wake up"}))
     });
     assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
-    assert.docEq(getMoreResponse.cursor.nextBatch[0], {
-        documentKey: {_id: "wake up"},
-        fullDocument: {_id: "wake up"},
-        ns: {db: db.getName(), coll: changesCollection.getName()},
-        operationType: "insert"
-    });
+    assert.eq(getMoreResponse.cursor.nextBatch[0].operationType,
+              "insert",
+              tojson(getMoreResponse.cursor.nextBatch[0]));
+    assert.eq(getMoreResponse.cursor.nextBatch[0].fullDocument,
+              {_id: "wake up"},
+              tojson(getMoreResponse.cursor.nextBatch[0]));
 
     // Test that an insert to an unrelated collection will not cause the change stream to wake up
     // and return an empty batch before reaching the maxTimeMS.

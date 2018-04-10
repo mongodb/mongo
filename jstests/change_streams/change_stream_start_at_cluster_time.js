@@ -13,17 +13,23 @@
     assert.writeOK(coll.insert({_id: -1}, {writeConcern: {w: "majority"}}));
     assert.writeOK(coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
-    // Perform two updates, capturing the cluster time of the first to be resumed from.
-    const res = coll.runCommand("update", {updates: [{q: {_id: -1}, u: {$set: {updated: true}}}]});
-    const resumeTime = res.$clusterTime.clusterTime;
-
+    // Perform two updates, then use a change stream to capture the cluster time of the first update
+    // to be resumed from.
+    const streamToFindClusterTime = coll.watch();
+    assert.writeOK(coll.update({_id: -1}, {$set: {updated: true}}));
     assert.writeOK(coll.update({_id: 1}, {$set: {updated: true}}));
+    assert.soon(() => streamToFindClusterTime.hasNext());
+    let next = streamToFindClusterTime.next();
+    assert.eq(next.operationType, "update");
+    assert.eq(next.documentKey, {_id: -1});
+    const clusterTimeOfFirstUpdate = next.clusterTime;
 
-    let changeStream = coll.watch([], {startAtClusterTime: {ts: resumeTime}});
+    let changeStream = coll.watch([], {startAtClusterTime: {ts: clusterTimeOfFirstUpdate}});
 
-    // Test that we see the two updates.
+    // Test that starting at the cluster time is inclusive of the first update, so we should see
+    // both updates in the new stream.
     assert.soon(() => changeStream.hasNext());
-    let next = changeStream.next();
+    next = changeStream.next();
     assert.eq(next.operationType, "update", tojson(next));
     assert.eq(next.documentKey._id, -1, tojson(next));
 
@@ -36,7 +42,10 @@
     // $_resumeAfterClusterTime.
     assert.commandFailedWithCode(db.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$changeStream: {startAtClusterTime: {ts: resumeTime}, resumeAfter: next._id}}],
+        pipeline: [{
+            $changeStream:
+                {startAtClusterTime: {ts: clusterTimeOfFirstUpdate}, resumeAfter: next._id}
+        }],
         cursor: {}
     }),
                                  40674);
@@ -45,8 +54,8 @@
         aggregate: coll.getName(),
         pipeline: [{
             $changeStream: {
-                startAtClusterTime: {ts: resumeTime},
-                $_resumeAfterClusterTime: {ts: resumeTime}
+                startAtClusterTime: {ts: clusterTimeOfFirstUpdate},
+                $_resumeAfterClusterTime: {ts: clusterTimeOfFirstUpdate}
             }
         }],
         cursor: {}

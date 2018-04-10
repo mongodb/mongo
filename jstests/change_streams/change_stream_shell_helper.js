@@ -8,7 +8,10 @@
 
     function checkNextChange(cursor, expected) {
         assert.soon(() => cursor.hasNext());
-        assert.docEq(cursor.next(), expected);
+        const nextObj = cursor.next();
+        delete nextObj._id;
+        delete nextObj.clusterTime;
+        assert.docEq(nextObj, expected);
     }
 
     function testCommandIsCalled(testFunc, checkFunc) {
@@ -63,7 +66,9 @@
         assert("_id" in change, "Got unexpected change: " + tojson(change));
         // Remember the _id of the first op to resume the stream.
         resumeToken = change._id;
+        // Remove the fields we cannot predict, then test that the change is as expected.
         delete change._id;
+        delete change.clusterTime;
         assert.docEq(change, expected);
     }
 
@@ -195,9 +200,9 @@
     });
 
     jsTestLog("Testing the cursor gets closed when the collection gets dropped");
-    singleCollCursor = coll.watch([{$project: {_id: 0}}]);
-    wholeDbCursor = db.watch([{$project: {_id: 0}}]);
-    wholeClusterCursor = db.getMongo().watch([{$project: {_id: 0}}]);
+    singleCollCursor = coll.watch([{$project: {_id: 0, clusterTime: 0}}]);
+    wholeDbCursor = db.watch([{$project: {_id: 0, clusterTime: 0}}]);
+    wholeClusterCursor = db.getMongo().watch([{$project: {_id: 0, clusterTime: 0}}]);
     assert.writeOK(coll.insert({_id: 2, x: 1}));
     expected = {
         documentKey: {_id: 2},

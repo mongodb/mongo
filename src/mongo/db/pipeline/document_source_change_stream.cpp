@@ -75,7 +75,6 @@ constexpr StringData DocumentSourceChangeStream::kNamespaceField;
 constexpr StringData DocumentSourceChangeStream::kUuidField;
 constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
 constexpr StringData DocumentSourceChangeStream::kStageName;
-constexpr StringData DocumentSourceChangeStream::kTimestampField;
 constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
 constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
 constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
@@ -688,6 +687,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         resumeTokenData.uuid = uuid.getUuid();
     doc.addField(kIdField, Value(ResumeToken(resumeTokenData).toDocument()));
     doc.addField(kOperationTypeField, Value(operationType));
+    doc.addField(kClusterTimeField, Value(resumeTokenData.clusterTime));
 
     // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
     // that as metadata.

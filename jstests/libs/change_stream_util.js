@@ -91,8 +91,9 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     /**
      * Asserts that the last observed change was the change we expect to see. This also asserts
      * that if we do not expect the cursor to be invalidated, that we do not see the cursor
-     * invalidated. Omits the observed change's resume token from the comparison, unless the
-     * expected change explicitly lists an _id field to compare against.
+     * invalidated. Omits the observed change's resume token and cluster time from the comparison,
+     * unless the expected change explicitly lists an '_id' or 'clusterTime' field to compare
+     * against.
      */
     function assertChangeIsExpected(
         expectedChanges, numChangesSeen, observedChanges, expectInvalidate) {
@@ -100,6 +101,9 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
             const lastObservedChange = Object.assign({}, observedChanges[numChangesSeen]);
             if (expectedChanges[numChangesSeen]._id == null) {
                 delete lastObservedChange._id;  // Remove the resume token, if present.
+            }
+            if (expectedChanges[numChangesSeen].clusterTime == null) {
+                delete lastObservedChange.clusterTime;  // Remove the cluster time, if present.
             }
             assert.docEq(lastObservedChange,
                          expectedChanges[numChangesSeen],
