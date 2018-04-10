@@ -103,8 +103,10 @@ Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
                                                        const std::string& dbname);
 
 struct UsersInfoArgs {
+    enum class Target { kExplicitUsers, kDB, kGlobal };
+
     std::vector<UserName> userNames;
-    bool allForDB = false;
+    Target target;
     bool showPrivileges = false;
     AuthenticationRestrictionsFormat authenticationRestrictionsFormat =
         AuthenticationRestrictionsFormat::kOmit;

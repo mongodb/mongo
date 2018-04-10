@@ -342,8 +342,12 @@ Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfo
     }
 
     if (cmdObj["usersInfo"].numberInt() == 1) {
-        parsedArgs->allForDB = true;
+        parsedArgs->target = UsersInfoArgs::Target::kDB;
+    } else if (cmdObj["usersInfo"].type() == Object &&
+               cmdObj["usersInfo"].Obj().getBoolField("forAllDBs")) {
+        parsedArgs->target = UsersInfoArgs::Target::kGlobal;
     } else if (cmdObj["usersInfo"].type() == Array) {
+        parsedArgs->target = UsersInfoArgs::Target::kExplicitUsers;
         status = parseUserNamesFromBSONArray(
             BSONArray(cmdObj["usersInfo"].Obj()), dbname, &parsedArgs->userNames);
         if (!status.isOK()) {
@@ -351,6 +355,7 @@ Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfo
         }
         std::sort(parsedArgs->userNames.begin(), parsedArgs->userNames.end());
     } else {
+        parsedArgs->target = UsersInfoArgs::Target::kExplicitUsers;
         UserName name;
         status = _parseNameFromBSONElement(cmdObj["usersInfo"],
                                            dbname,

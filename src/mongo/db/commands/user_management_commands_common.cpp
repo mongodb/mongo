@@ -419,12 +419,19 @@ Status checkAuthForUsersInfoCommand(Client* client,
         return status;
     }
 
-    if (args.allForDB) {
+    if (args.target == auth::UsersInfoArgs::Target::kDB) {
         if (!authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(dbname), ActionType::viewUser)) {
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "Not authorized to view users from the " << dbname
                                         << " database");
+        }
+    } else if (args.target == auth::UsersInfoArgs::Target::kGlobal) {
+        if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                            ActionType::viewUser)) {
+            return Status(ErrorCodes::Unauthorized,
+                          str::stream() << "Not authorized to view users from all"
+                                        << " databases");
         }
     } else {
         for (size_t i = 0; i < args.userNames.size(); ++i) {
