@@ -111,6 +111,9 @@ public:
 
     stdx::thread::id getThreadId() const override;
 
+    void updateThreadIdToCurrentThread() override;
+    void unsetThreadId() override;
+
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
         _sharedLocksShouldTwoPhaseLock = sharedLocksShouldTwoPhaseLock;
     }

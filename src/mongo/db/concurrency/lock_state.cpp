@@ -267,6 +267,16 @@ stdx::thread::id LockerImpl<IsForMMAPV1>::getThreadId() const {
 }
 
 template <bool IsForMMAPV1>
+void LockerImpl<IsForMMAPV1>::updateThreadIdToCurrentThread() {
+    _threadId = stdx::this_thread::get_id();
+}
+
+template <bool IsForMMAPV1>
+void LockerImpl<IsForMMAPV1>::unsetThreadId() {
+    _threadId = stdx::thread::id();  // Reset to represent a non-executing thread.
+}
+
+template <bool IsForMMAPV1>
 LockerImpl<IsForMMAPV1>::~LockerImpl() {
     // Cannot delete the Locker while there are still outstanding requests, because the
     // LockManager may attempt to access deleted memory. Besides it is probably incorrect

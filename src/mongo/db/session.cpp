@@ -610,6 +610,7 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
 
     _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
     _locker->releaseTicket();
+    _locker->unsetThreadId();
 
     _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
     opCtx->setRecoveryUnit(opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
@@ -641,6 +642,7 @@ void Session::TxnResources::release(OperationContext* opCtx) {
     // operation context's locker and replace it with a new empty locker.
     invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
     opCtx->swapLockState(std::move(_locker));
+    opCtx->lockState()->updateThreadIdToCurrentThread();
 
     opCtx->setRecoveryUnit(_recoveryUnit.release(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

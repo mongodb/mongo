@@ -57,6 +57,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void updateThreadIdToCurrentThread() override {
+        MONGO_UNREACHABLE;
+    }
+
+    void unsetThreadId() override {
+        MONGO_UNREACHABLE;
+    }
+
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
         MONGO_UNREACHABLE;
     }

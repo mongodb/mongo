@@ -93,6 +93,16 @@ public:
     virtual stdx::thread::id getThreadId() const = 0;
 
     /**
+     * Updates any cached thread id values to represent the current thread.
+     */
+    virtual void updateThreadIdToCurrentThread() = 0;
+
+    /**
+     * Clears any cached thread id values.
+     */
+    virtual void unsetThreadId() = 0;
+
+    /**
      * Indicate that shared locks should participate in two-phase locking for this Locker instance.
      */
     virtual void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) = 0;
