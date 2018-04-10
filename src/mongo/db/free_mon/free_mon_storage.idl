@@ -1,0 +1,57 @@
+# Copyright (C) 2017 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+enums:
+    StorageState:
+        description: "Action types"
+        type: string
+        values:
+            disabled: disabled
+            enabled: enabled
+   
+structs:
+    FreeMonStorageState:
+        description: "Persisted document in admin.system.version"
+        strict: false
+        generate_comparison_operators: true
+        fields:
+          _id:
+            description: "Key of the Free Monitoring singleton document"
+            type: "string"
+            default: '"free_monitoring"'
+          version:
+            description: "Storage version, initial version is 1"
+            type: long
+          state:
+            description: "Indicates whether it is disabled or enabled"
+            type: StorageState
+          registrationId:
+            description: "Registration Id"
+            type: string
+          informationalURL:
+            description: "Informational HTTP web page for metrics"
+            type: string
+          message:
+            description: "Informational message for shell to display to user"
+            type: string
+          userReminder:
+            description: "Message to display to user to remind them about service"
+            type: string
+
