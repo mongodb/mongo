@@ -39,10 +39,13 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/versioning.h"
 #include "mongo/util/exit.h"
@@ -172,6 +175,7 @@ public:
                 auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
                     opCtx, repl::ReadConcernLevel::kLocalReadConcern));
 
+                auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
                 for (const auto& db : allDbs.value) {
                     const auto dbVersion = Versioning::newDatabaseVersion();
 
@@ -182,7 +186,26 @@ public:
                         BSON("$set" << BSON(DatabaseType::version(dbVersion.toBSON()))),
                         false,
                         ShardingCatalogClient::kLocalWriteConcern));
+
+                    // Enumerate all collections
+                    auto collections =
+                        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
+                            opCtx,
+                            &db.getName(),
+                            nullptr,
+                            repl::ReadConcernLevel::kLocalReadConcern));
+
+                    for (const auto& coll : collections) {
+                        if (!coll.getDropped()) {
+                            uassertStatusOK(
+                                ShardingCatalogManager::get(opCtx)->upgradeChunksHistory(
+                                    opCtx, coll.getNs(), coll.getEpoch(), clusterTime));
+                        }
+                    }
                 }
+
+                // Now that new metadata are written out to disk flush the local in memory state.
+                Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
 
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
@@ -247,7 +270,25 @@ public:
                                               << "")),
                         false,
                         ShardingCatalogClient::kLocalWriteConcern));
+
+                    // Enumerate all collections
+                    auto collections =
+                        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
+                            opCtx,
+                            &db.getName(),
+                            nullptr,
+                            repl::ReadConcernLevel::kLocalReadConcern));
+
+                    for (const auto& coll : collections) {
+                        if (!coll.getDropped()) {
+                            uassertStatusOK(
+                                ShardingCatalogManager::get(opCtx)->downgradeChunksHistory(
+                                    opCtx, coll.getNs(), coll.getEpoch()));
+                        }
+                    }
                 }
+                // Now that new metadata are written out to disk flush the local in memory state.
+                Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);

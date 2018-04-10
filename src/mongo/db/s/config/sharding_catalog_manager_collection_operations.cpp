@@ -293,10 +293,12 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         chunk.setMax(max);
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
-        // TODO SERVER-33781 write history only when FCV4.0 config.
-        std::vector<ChunkHistory> initialHistory;
-        initialHistory.emplace_back(ChunkHistory(validAfter, shardIds[i % shardIds.size()]));
-        chunk.setHistory(std::move(initialHistory));
+        if (serverGlobalParams.featureCompatibility.getVersion() >=
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+            std::vector<ChunkHistory> initialHistory;
+            initialHistory.emplace_back(ChunkHistory(validAfter, shardIds[i % shardIds.size()]));
+            chunk.setHistory(std::move(initialHistory));
+        }
 
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
