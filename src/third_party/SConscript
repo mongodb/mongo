@@ -4,7 +4,7 @@ Import("env use_system_version_of_library usemozjs boostSuffix get_option")
 Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
-zlibSuffix = '-1.2.8'
+zlibSuffix = '-1.2.11'
 pcreSuffix = "-8.41"
 mozjsSuffix = '-38'
 
