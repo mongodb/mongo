@@ -35,6 +35,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
@@ -206,10 +207,12 @@ public:
 
         if (fromSelf) {
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
+            // SERVER-34431 TODO: Add calls to DatabaseShardingState::get().checkDbVersion()
+            // for source databases.
             Lock::GlobalWrite lk(opCtx);
             uassertStatusOK(cloner.copyDb(opCtx, todb, fromhost, cloneOptions, NULL));
         } else {
-            Lock::DBLock lk(opCtx, todb, MODE_X);
+            AutoGetDb autoDb(opCtx, todb, MODE_X);
             uassertStatusOK(cloner.copyDb(opCtx, todb, fromhost, cloneOptions, NULL));
         }
 

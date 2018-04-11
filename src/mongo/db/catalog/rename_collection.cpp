@@ -49,6 +49,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -152,6 +153,9 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
 
     Database* const sourceDB = dbHolder().get(opCtx, source.db());
+    if (sourceDB) {
+        DatabaseShardingState::get(sourceDB).checkDbVersion(opCtx);
+    }
     Collection* const sourceColl = sourceDB ? sourceDB->getCollection(opCtx, source) : nullptr;
     if (!sourceColl) {
         if (sourceDB && sourceDB->getViewCatalog()->lookup(opCtx, source.ns()))

@@ -39,9 +39,6 @@
         assert(testCase.skipProfilerCheck ? typeof(testCase.skipProfilerCheck) === "boolean"
                                           : true);
         assert(typeof(testCase.sendsDbVersion) === "boolean");
-        assert(testCase.willCheckDbVersionWhenFixed
-                   ? typeof(testCase.willCheckDbVersionWhenFixed) === "boolean"
-                   : true);
         assert(typeof(testCase.sendsShardVersion) === "boolean");
         assert(testCase.setUp ? typeof(testCase.setUp) === "function" : true,
                "setUp must be a function: " + tojson(testCase));
@@ -126,7 +123,6 @@
         createIndexes: {
             skipProfilerCheck: true,
             sendsDbVersion: true,
-            willCheckDbVersionWhenFixed: true,
             sendsShardVersion: false,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
@@ -403,7 +399,6 @@
             runsAgainstAdminDb: true,
             skipProfilerCheck: true,
             sendsDbVersion: true,
-            willCheckDbVersionWhenFixed: true,
             sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
@@ -411,7 +406,7 @@
             },
             command: {
                 renameCollection: dbName + "." + collName,
-                to: dbName + ". " + collName + "_renamed"
+                to: dbName + "." + collName + "_renamed"
             },
             cleanUp: function(mongosConn) {
                 assert(mongosConn.getDB(dbName).getCollection(collName + "_renamed").drop());
@@ -562,14 +557,10 @@
                     assert.commandWorked(this.st.s.getDB(dbName).runCommand(testCase.command));
                 }
 
-                // If this test case is true, the command will not check the database version
-                // because it doesn't use AutoGetDb. This will be addressed in SERVER-34370.
-                if (!testCase.willCheckDbVersionWhenFixed) {
-                    if (testCase.sendsDbVersion) {
-                        this.assertSentDatabaseVersion(testCase, commandProfile);
-                    } else {
-                        this.assertDidNotSendDatabaseVersion(testCase, commandProfile);
-                    }
+                if (testCase.sendsDbVersion) {
+                    this.assertSentDatabaseVersion(testCase, commandProfile);
+                } else {
+                    this.assertDidNotSendDatabaseVersion(testCase, commandProfile);
                 }
 
                 if (testCase.cleanUp) {
@@ -584,8 +575,7 @@
             }
 
             // After iterating through all the existing commands, ensure there were no additional
-            // test cases
-            // that did not correspond to any mongos command.
+            // test cases that did not correspond to any mongos command.
             for (let key of Object.keys(testCases)) {
                 assert(testCases[key].validated || testCases[key].enterpriseOnly,
                        "you defined a test case for a command '" + key +
