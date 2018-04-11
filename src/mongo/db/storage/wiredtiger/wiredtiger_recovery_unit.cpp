@@ -198,7 +198,12 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     _ensureSession();
-    return _session.get();
+    WiredTigerSession* session = _session.get();
+
+    // Handling queued drops can be slow, which is not desired for internal operations like FTDC
+    // sampling. Disable handling of queued drops for such sessions.
+    session->dropQueuedIdentsAtSessionEndAllowed(false);
+    return session;
 }
 
 void WiredTigerRecoveryUnit::abandonSnapshot() {
@@ -309,14 +314,19 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     // correctness. Also, note that we use the '_readAtTimestamp' to work around an oplog visibility
     // issue in cappedTruncateAfter by setting the timestamp to the maximum value.
     if (_readAtTimestamp != Timestamp::min()) {
+        invariantWTOK(session->begin_transaction(session, NULL));
+        auto rollbacker =
+            MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
         auto status =
-            _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
+            _sessionCache->snapshotManager().setTransactionReadTimestamp(_readAtTimestamp, session);
+
         if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
             uasserted(ErrorCodes::SnapshotTooOld,
                       str::stream() << "Read timestamp " << _readAtTimestamp.toString()
                                     << " is older than the oldest available timestamp.");
         }
         uassertStatusOK(status);
+        rollbacker.Dismiss();
     } else if (_isReadingFromPointInTime()) {
         // We reset _majorityCommittedSnapshot to the actual read timestamp used when the
         // transaction was started.
