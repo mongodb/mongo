@@ -7,7 +7,6 @@ import sys
 
 import gdb
 import gdb.printing
-import mongo
 
 if sys.version_info[0] >= 3:
     # GDB only permits converting a gdb.Value instance to its numerical address when using the
@@ -327,7 +326,7 @@ def get_threads_info():
             # PTID is a tuple: Process ID (PID), Lightweight Process ID (LWPID), Thread ID (TID)
             (_, lwpid, _) = thread.ptid
             thread_num = thread.num
-            thread_id = mongo.get_thread_id()
+            thread_id = get_thread_id()  # pylint: disable=undefined-variable
             if not thread_id:
                 print("Unable to retrieve thread_info for thread %d" % thread_num)
                 continue
@@ -343,7 +342,8 @@ class MongoDBShowLocks(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBShowLocks."""
-        mongo.register_mongo_command(self, "mongodb-show-locks", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(  # pylint: disable=undefined-variable
+            self, "mongodb-show-locks", gdb.COMMAND_DATA)
 
     def invoke(self, *_):
         """Invoke mongodb_show_locks."""
@@ -359,7 +359,7 @@ class MongoDBShowLocks(gdb.Command):
             print("Ignoring GDB error '%s' in mongodb_show_locks" % str(err))
 
 
-mongo.MongoDBShowLocks()  # type: ignore
+MongoDBShowLocks()
 
 
 class MongoDBWaitsForGraph(gdb.Command):
@@ -367,7 +367,8 @@ class MongoDBWaitsForGraph(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBWaitsForGraph."""
-        mongo.register_mongo_command(self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(  # pylint: disable=undefined-variable
+            self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
 
     def invoke(self, arg, *_):
         """Invoke mongodb_waitsfor_graph."""
