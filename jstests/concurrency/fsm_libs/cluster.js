@@ -195,6 +195,7 @@ var Cluster = function(options) {
     var _conns = {mongos: [], mongod: []};
     var nextConn = 0;
     var replSets = [];
+    var rst;
 
     validateClusterOptions(options);
     Object.freeze(options);
@@ -313,8 +314,6 @@ var Cluster = function(options) {
                 settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000}
             };
 
-            var rst;
-
             if (!options.useExistingConnectionAsSeed) {
                 rst = new ReplSetTest(replSetConfig);
                 rst.startSet();
@@ -422,6 +421,18 @@ var Cluster = function(options) {
             return _conns.mongos[nextConn++ % _conns.mongos.length].host;
         }
         return conn.host;
+    };
+
+    this.getReplSetName = function getReplSetName() {
+        if (this.isReplication() && !this.isSharded()) {
+            return rst.name;
+        }
+        return undefined;
+    };
+
+    this.getReplSetNumNodes = function getReplSetNumNodes() {
+        assert(this.isReplication() && !this.isSharded(), 'cluster must be a replica set');
+        return options.replication.numNodes;
     };
 
     this.isSharded = function isSharded() {

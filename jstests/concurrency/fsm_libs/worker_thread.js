@@ -25,6 +25,9 @@ var workerThread = (function() {
         var myDB;
         var configs = {};
         var connectionString = 'mongodb://' + args.host + '/?appname=tid:' + args.tid;
+        if (typeof args.replSetName !== 'undefined') {
+            connectionString += '&replicaSet=' + args.replSetName;
+        }
 
         globalAssertLevel = args.globalAssertLevel;
 
