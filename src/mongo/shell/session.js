@@ -476,10 +476,8 @@ var {
 
         let _txnOptions;
 
-        // Keep track of the first statement of a transaction, which is the only statement
-        // in which a user can specify a readConcern and writeConcern.
-        // This will eventually turn into a stmtId field.
-        let _firstStatement = false;
+        // Keep track of the next available statement id of a transaction.
+        let _nextStatementId = 0;
 
         // _txnNumber starts at -1 because when we increment it, the first transaction
         // and retryable write will both have a txnNumber of 0.
@@ -657,14 +655,31 @@ var {
             // All operations of a multi-statement transaction must specify autocommit=false.
             cmdObjUnwrapped.autocommit = false;
 
+            // Statement Id is required on all transaction operations.
+            cmdObjUnwrapped.stmtId = new NumberInt(_nextStatementId);
+
             // 'readConcern' and 'startTransaction' can only be specified on the first statement in
             // a transaction.
-            if (_firstStatement) {
+            if (_nextStatementId == 0) {
                 cmdObjUnwrapped.startTransaction = true;
                 if (_txnOptions.getTxnReadConcern() !== undefined) {
                     cmdObjUnwrapped.readConcern = _txnOptions.getTxnReadConcern();
                 }
-                _firstStatement = false;
+            }
+
+            // Reserve the statement ids for batch writes.
+            switch (cmdName) {
+                case "insert":
+                    _nextStatementId += cmdObjUnwrapped.documents.length;
+                    break;
+                case "update":
+                    _nextStatementId += cmdObjUnwrapped.updates.length;
+                    break;
+                case "delete":
+                    _nextStatementId += cmdObjUnwrapped.deletes.length;
+                    break;
+                default:
+                    _nextStatementId += 1;
             }
 
             return cmdObj;
@@ -673,7 +688,7 @@ var {
         this.startTransaction = function startTransaction(txnOptsObj) {
             _txnOptions = new TransactionOptions(txnOptsObj);
             _txnState = ServerSession.TransactionStates.kActive;
-            _firstStatement = true;
+            _nextStatementId = 0;
             _txnNumber++;
         };
 

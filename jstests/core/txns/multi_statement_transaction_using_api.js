@@ -79,5 +79,31 @@
     assert.eq({_id: "restart-txn-2"}, sessionColl.findOne({_id: "restart-txn-2"}));
     assert.eq(null, sessionColl.findOne({_id: "restart-txn-1"}));
 
+    jsTestLog("Bulk insert and update operations within transaction.");
+
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+    let bulk = sessionColl.initializeUnorderedBulkOp();
+    bulk.insert({_id: "bulk-1"});
+    bulk.insert({_id: "bulk-2"});
+    bulk.find({_id: "bulk-1"}).updateOne({$set: {status: "bulk"}});
+    bulk.find({_id: "bulk-2"}).updateOne({$set: {status: "bulk"}});
+    assert.commandWorked(bulk.execute());
+    session.commitTransaction();
+
+    assert.eq({_id: "bulk-1", status: "bulk"}, sessionColl.findOne({_id: "bulk-1"}));
+    assert.eq({_id: "bulk-2", status: "bulk"}, sessionColl.findOne({_id: "bulk-2"}));
+
+    jsTestLog("Bulk delete operations within transaction.");
+
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+    bulk = sessionColl.initializeUnorderedBulkOp();
+    bulk.find({_id: "bulk-1"}).removeOne();
+    bulk.find({_id: "bulk-2"}).removeOne();
+    assert.commandWorked(bulk.execute());
+    session.commitTransaction();
+
+    assert.eq(null, sessionColl.findOne({_id: "bulk-1"}));
+    assert.eq(null, sessionColl.findOne({_id: "bulk-2"}));
+
     session.endSession();
 }());
