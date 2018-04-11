@@ -470,19 +470,6 @@ void Session::_beginOrContinueTxn(WithLock wl,
     // be >= the active transaction number.
     _checkTxnValid(wl, txnNumber);
 
-    // Reject argument combinations that are never valid.
-    uassert(ErrorCodes::InvalidOptions,
-            "Specifying autocommit=true is not allowed.",
-            autocommit != boost::optional<bool>(true));
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Specifying startTransaction=false is not allowed.",
-            startTransaction != boost::optional<bool>(false));
-
-    uassert(ErrorCodes::InvalidOptions,
-            "Must specify autocommit=false on all operations of a multi-statement transaction.",
-            !(startTransaction == boost::optional<bool>(true) && autocommit == boost::none));
-
     //
     // Continue an active transaction.
     //

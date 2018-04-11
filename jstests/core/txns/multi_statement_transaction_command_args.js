@@ -26,6 +26,56 @@
     let sessionDb = session.getDatabase(dbName);
 
     /***********************************************************************************************
+     * Verify that fields are not accepted unless their preconditional fields are present in
+     * this hierarchy: lsid -> txnNumber -> autocommit -> startTransaction
+     * Omitted fields are commented out explicitly.
+     **********************************************************************************************/
+
+    // lsid -> txnNumber.
+    // Running a command through 'sessionDb' implicitly attaches an 'lsid' to commands,
+    // so 'testDB' is used instead.
+    jsTestLog("Try to begin a transaction with txnNumber but no lsid");
+    txnNumber++;
+    let res = assert.commandFailedWithCode(testDB.runCommand({
+        find: collName,
+        filter: {},
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        // autocommit: false,
+        // startTransaction: true
+    }),
+                                           ErrorCodes.InvalidOptions);
+    assert(res.errmsg.includes("Transaction number requires a session ID"));
+
+    // txnNumber -> autocommit
+    jsTestLog("Try to begin a transaction with autocommit but no txnNumber");
+    txnNumber++;
+    res = assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        filter: {},
+        readConcern: {level: "snapshot"},
+        // txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+        // startTransaction: true
+    }),
+                                       ErrorCodes.InvalidOptions);
+    assert(res.errmsg.includes("'autocommit' field requires a transaction number"));
+
+    // autocommit -> startTransaction
+    jsTestLog("Try to begin a transaction with startTransaction but no autocommit");
+    txnNumber++;
+    res = assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        filter: {},
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        // autocommit: false,
+        startTransaction: true
+    }),
+                                       ErrorCodes.InvalidOptions);
+    assert(res.errmsg.includes("'startTransaction' field requires 'autocommit' field"));
+
+    /***********************************************************************************************
      * Verify that the 'startTransaction' argument works correctly.
      **********************************************************************************************/
 
@@ -49,95 +99,6 @@
         autocommit: false,
         writeConcern: {w: "majority"}
     }));
-
-    jsTestLog("Try to begin a transaction with startTransaction=true and no 'autocommit' field.");
-    txnNumber++;
-
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        filter: {},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: true
-    }),
-                                 ErrorCodes.InvalidOptions);
-
-    // Committing the transaction should fail.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.NoSuchTransaction);
-
-    jsTestLog("Try to begin a transaction with startTransaction=false and autocommit=false");
-    txnNumber++;
-
-    // Try to start the transaction.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        filter: {},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: false,
-        autocommit: false
-    }),
-                                 ErrorCodes.InvalidOptions);
-
-    // Committing the transaction should fail since it was never started.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.NoSuchTransaction);
-
-    jsTestLog(
-        "Try to begin a transaction with 'startTransaction=false' without an 'autocommit' field.");
-    txnNumber++;
-
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        filter: {},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: false
-    }),
-                                 ErrorCodes.InvalidOptions);
-
-    // Committing the transaction should fail.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.NoSuchTransaction);
-
-    jsTestLog(
-        "Try to begin a transaction by omitting 'startTransaction' and setting autocommit=false");
-    txnNumber++;
-
-    // Start the transaction with an insert.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        filter: {},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false
-    }),
-                                 ErrorCodes.NoSuchTransaction);
-
-    // Committing the transaction should fail.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        autocommit: false,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Try to start an already in progress transaction.");
     txnNumber++;
@@ -170,6 +131,30 @@
         autocommit: false,
         writeConcern: {w: "majority"}
     }));
+
+    jsTestLog(
+        "Try to begin a transaction by omitting 'startTransaction' and setting autocommit=false");
+    txnNumber++;
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        filter: {},
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }),
+                                 ErrorCodes.NoSuchTransaction);
+
+    jsTestLog("Try to begin a transaction with startTransaction=false and autocommit=false");
+    txnNumber++;
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        filter: {},
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        startTransaction: false,
+        autocommit: false
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     /***********************************************************************************************
      * Setting autocommit=true or omitting autocommit on a transaction operation fails.

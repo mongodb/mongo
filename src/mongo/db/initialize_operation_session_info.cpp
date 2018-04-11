@@ -68,14 +68,16 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
 
         LogicalSessionCache* lsc = LogicalSessionCache::get(opCtx->getServiceContext());
         lsc->vivify(opCtx, opCtx->getLogicalSessionId().get());
+    } else {
+        uassert(ErrorCodes::InvalidOptions,
+                "Transaction number requires a session ID to also be specified",
+                !osi.getTxnNumber());
     }
 
     if (osi.getTxnNumber()) {
+        invariant(osi.getSessionId());
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-        uassert(ErrorCodes::IllegalOperation,
-                "Transaction number requires a sessionId to be specified",
-                opCtx->getLogicalSessionId());
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or mongos",
                 isReplSetMemberOrMongos);
@@ -83,17 +85,33 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
                 "Transaction numbers are only allowed on storage engines that support "
                 "document-level locking",
                 supportsDocLocking);
-        uassert(ErrorCodes::BadValue,
+        uassert(ErrorCodes::InvalidOptions,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);
 
         opCtx->setTxnNumber(*osi.getTxnNumber());
+    } else {
+        uassert(ErrorCodes::InvalidOptions,
+                "'autocommit' field requires a transaction number to also be specified",
+                !osi.getAutocommit());
     }
 
     if (osi.getAutocommit()) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Autocommit requires a transaction number to be specified",
-                opCtx->getTxnNumber());
+        invariant(osi.getTxnNumber());
+        uassert(ErrorCodes::InvalidOptions,
+                "Specifying autocommit=true is not allowed.",
+                !osi.getAutocommit().value());
+    } else {
+        uassert(ErrorCodes::InvalidOptions,
+                "'startTransaction' field requires 'autocommit' field to also be specified",
+                !osi.getStartTransaction());
+    }
+
+    if (osi.getStartTransaction()) {
+        invariant(osi.getAutocommit());
+        uassert(ErrorCodes::InvalidOptions,
+                "Specifying startTransaction=false is not allowed.",
+                osi.getStartTransaction().value());
     }
 
     return osi;

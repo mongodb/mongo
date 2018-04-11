@@ -695,32 +695,6 @@ TEST_F(SessionTest, ReportStashedResources) {
     session.commitTransaction(opCtx());
 }
 
-TEST_F(SessionTest, StartTransactionRequiredToStartTxn) {
-    const auto sessionId = makeLogicalSessionIdForTest();
-    Session session(sessionId);
-    session.refreshFromStorageIfNeeded(opCtx());
-
-    // Autocommit should be true by default.
-    ASSERT(session.getAutocommit());
-
-    const TxnNumber txnNum = 100;
-
-    // Must specify startTransaction=true and autocommit=false to start a transaction.
-    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, false, false),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
-
-    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, false, boost::none),
-                       AssertionException,
-                       ErrorCodes::NoSuchTransaction);
-
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
-
-    // Autocommit should be set to false and we should be in a mult-doc transaction.
-    ASSERT_FALSE(session.getAutocommit());
-    ASSERT_TRUE(session.inSnapshotReadOrMultiDocumentTransaction());
-}
-
 TEST_F(SessionTest, CannotSpecifyStartTransactionOnInProgressTxn) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);

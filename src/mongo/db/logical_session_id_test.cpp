@@ -279,7 +279,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWith
                                        true,
                                        true),
         AssertionException,
-        ErrorCodes::IllegalOperation);
+        ErrorCodes::InvalidOptions);
 }
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransactionNumber) {
