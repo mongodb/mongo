@@ -88,12 +88,13 @@
         assert.eq(4, res.cursor.nextBatch.length);
 
         // Perform a second snapshot read under a new transaction.
+        txnNumber++;
         res = assert.commandWorked(sessionDb.runCommand({
             find: collName,
             sort: {_id: 1},
             batchSize: 20,
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(txnNumber++)
+            txnNumber: NumberLong(txnNumber)
         }));
 
         // The cursor has been exhausted.

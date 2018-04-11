@@ -149,7 +149,7 @@ void DoTxnTest::setUp() {
                  true /* checkOutSession */,
                  false /* autocommit */,
                  true /* startTransaction */);
-    OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx());
+    OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "doTxn");
 }
 
 void DoTxnTest::tearDown() {

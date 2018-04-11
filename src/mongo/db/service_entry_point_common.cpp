@@ -433,7 +433,7 @@ void invokeInTransaction(OperationContext* opCtx,
         return;
     }
 
-    session->unstashTransactionResources(opCtx);
+    session->unstashTransactionResources(opCtx, invocation->definition()->getName());
     ScopeGuard guard = MakeGuard([session, opCtx]() { session->abortActiveTransaction(opCtx); });
 
     invocation->run(opCtx, replyBuilder);
