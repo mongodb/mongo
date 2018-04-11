@@ -247,5 +247,54 @@
 
     // TODO: SERVER-33690 Test the old cursor has been killed when the transaction is aborted.
 
+    jsTest.log("Aborted transaction number cannot be reused.");
+    txnNumber++;
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "abort-txn-1"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
+        autocommit: false
+    }));
+    assert.commandWorked(sessionDb.adminCommand({
+        abortTransaction: 1,
+        writeConcern: {w: "majority"},
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }));
+
+    // Cannot commit the aborted transaction.
+    assert.commandFailedWithCode(
+        sessionDb.adminCommand(
+            {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        ErrorCodes.NoSuchTransaction);
+
+    // Cannot abort the aborted transaction.
+    assert.commandFailedWithCode(
+        sessionDb.adminCommand(
+            {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}),
+        ErrorCodes.NoSuchTransaction);
+
+    // Cannot continue the aborted transaction.
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "abort-txn-2"}],
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false
+    }),
+                                 ErrorCodes.NoSuchTransaction);
+
+    // Cannot restart the aborted transaction.
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "abort-txn-2"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
+        autocommit: false
+    }),
+                                 ErrorCodes.ConflictingOperationInProgress);
+
     session.endSession();
 }());

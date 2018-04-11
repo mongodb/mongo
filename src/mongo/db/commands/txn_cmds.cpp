@@ -77,11 +77,7 @@ public:
         uassert(
             ErrorCodes::CommandFailed, "commitTransaction must be run within a session", session);
 
-        // commitTransaction is retryable.
-        if (session->transactionIsCommitted()) {
-            return true;
-        }
-
+        // TODO SERVER-33501 Change this when commitTransaction is retryable.
         uassert(ErrorCodes::NoSuchTransaction,
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());

@@ -190,7 +190,7 @@ TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
         repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
 
         // Perform initial unstash, which sets up a WriteUnitOfWork.
-        OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
+        OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx());
         ASSERT_EQUALS(originalLocker, opCtx()->lockState());
         ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
         ASSERT(opCtx()->getWriteUnitOfWork());
@@ -241,7 +241,7 @@ TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
             DirectClientSetter inDirectClient(opCtx());
             OperationContextSession innerScopedSession(opCtx(), true, boost::none, boost::none);
 
-            OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
+            OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx());
 
             // The unstash was a noop, so the OperationContext did not get a WriteUnitOfWork.
             ASSERT_EQUALS(originalLocker, opCtx()->lockState());

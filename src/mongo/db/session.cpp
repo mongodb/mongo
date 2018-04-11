@@ -599,7 +599,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     _txnResourceStash = TxnResources(opCtx);
 }
 
-void Session::unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName) {
+void Session::unstashTransactionResources(OperationContext* opCtx) {
     if (opCtx->getClient()->isInDirectClient()) {
         return;
     }
@@ -629,12 +629,6 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
         uassert(ErrorCodes::NoSuchTransaction,
                 str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been aborted.",
                 _txnState != MultiDocumentTransactionState::kAborted);
-
-        // Cannot change committed transaction but allow retrying commitTransaction command.
-        uassert(ErrorCodes::TransactionCommitted,
-                str::stream() << "Transaction " << *opCtx->getTxnNumber() << " has been committed.",
-                cmdName == "commitTransaction" ||
-                    _txnState != MultiDocumentTransactionState::kCommitted);
 
         if (_txnResourceStash) {
             // Transaction resources already exist for this transaction.  Transfer them from the
@@ -765,7 +759,8 @@ void Session::commitTransaction(OperationContext* opCtx) {
     // and migration, which do not check out the session.
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
-    invariant(_txnState != MultiDocumentTransactionState::kCommitted);
+    if (_txnState == MultiDocumentTransactionState::kCommitted)
+        return;
     _commitTransaction(std::move(lk), opCtx);
 }
 
