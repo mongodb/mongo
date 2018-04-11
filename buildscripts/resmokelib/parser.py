@@ -2,6 +2,7 @@
 
 from __future__ import absolute_import
 
+import collections
 import os
 import os.path
 
@@ -12,10 +13,13 @@ from . import config as _config
 from . import utils
 from .. import resmokeconfig
 
+ResmokeConfig = collections.namedtuple(
+    "ResmokeConfig",
+    ["list_suites", "find_suites", "dry_run", "suite_files", "test_files", "logging_config"])
 
-def parse_command_line():  # pylint: disable=too-many-statements
-    """Parse the command line arguments passed to resmoke.py."""
 
+def _make_parser():  # pylint: disable=too-many-statements
+    """Create and return the command line arguments parser."""
     parser = optparse.OptionParser()
 
     parser.add_option("--suites", dest="suite_files", metavar="SUITE1,SUITE2",
@@ -291,15 +295,23 @@ def parse_command_line():  # pylint: disable=too-many-statements
     parser.set_defaults(logger_file="console", dry_run="off", find_suites=False, list_suites=False,
                         suite_files="with_server", prealloc_journal="off", shuffle="auto",
                         stagger_jobs="off")
+    return parser
 
+
+def parse_command_line():
+    """Parses the command line arguments passed to resmoke.py."""
+    parser = _make_parser()
     options, args = parser.parse_args()
 
-    validate_options(parser, options, args)
+    _validate_options(parser, options, args)
+    _update_config_vars(options)
 
-    return options, args
+    return ResmokeConfig(list_suites=options.list_suites, find_suites=options.find_suites,
+                         dry_run=options.dry_run, suite_files=options.suite_files.split(","),
+                         test_files=args, logging_config=_get_logging_config(options.logger_file))
 
 
-def validate_options(parser, options, args):
+def _validate_options(parser, options, args):
     """Do preliminary validation on the options and error on any invalid options."""
 
     if options.shell_port is not None and options.shell_conn_string is not None:
@@ -329,13 +341,9 @@ def validate_benchmark_options():
             "results. Please use --jobs=1" % _config.JOBS)
 
 
-def get_logging_config(values):
-    """Return logging config values."""
-    return _get_logging_config(values.logger_file)
+def _update_config_vars(values):  # pylint: disable=too-many-statements
+    """Update the variables of the config module."""
 
-
-def update_config_vars(values):  # pylint: disable=too-many-statements
-    """Update config vars."""
     config = _config.DEFAULTS.copy()
 
     # Override `config` with values from command line arguments.

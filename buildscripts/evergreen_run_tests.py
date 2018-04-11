@@ -17,7 +17,7 @@ from buildscripts import resmokelib  # pylint: disable=wrong-import-position
 _TagInfo = collections.namedtuple("_TagInfo", ["tag_name", "evergreen_aware", "suite_options"])
 
 
-class Main(resmoke.Main):
+class Main(resmoke.Resmoke):
     """Execute Main class.
 
     A class for executing potentially multiple resmoke.py test suites in a way that handles
@@ -112,7 +112,7 @@ class Main(resmoke.Main):
 
         suites = []
 
-        for suite in resmoke.Main._get_suites(self):
+        for suite in resmoke.Resmoke._get_suites(self):
             if suite.test_kind != "js_test":
                 # Tags are only support for JavaScript tests, so we leave the test suite alone when
                 # running any other kind of test.
@@ -145,4 +145,6 @@ class Main(resmoke.Main):
 
 
 if __name__ == "__main__":
-    Main().run()
+    main = Main()
+    main.configure_from_command_line()
+    main.run()
