@@ -1,3 +1,8 @@
+// @tags: [
+//     # Haystack index is not available on embedded
+//     incompatible_with_embedded,
+// ]
+
 t = db.geo_haystack3;
 t.drop();
 

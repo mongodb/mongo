@@ -6,7 +6,10 @@
 //   # latter must be routed to the primary.
 //   assumes_read_preference_unchanged,
 //   requires_getmore,
-//   requires_fastcount
+//   requires_fastcount,
+//
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 
 var t = db.max_time_ms;

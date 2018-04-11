@@ -5,8 +5,14 @@
  * former operation may be routed to a secondary in the replica set, whereas the latter must be
  * routed to the primary.
  *
- * @tags: [assumes_read_preference_unchanged, requires_fastcount]
+ * @tags: [
+ *  assumes_read_preference_unchanged,
+ *  requires_fastcount,
+ *
+ *  # top command is not available on embedded
+ *  incompatible_with_embedded]
  */
+
 (function() {
     load("jstests/libs/stats.js");
 

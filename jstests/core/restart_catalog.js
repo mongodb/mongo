@@ -1,7 +1,12 @@
 /**
  * Forces the server to restart the catalog and rebuild its in-memory catalog data structures, then
  * asserts that the server works normally.
- * @tags: [assumes_read_concern_unchanged]
+ * @tags: [
+ *  assumes_read_concern_unchanged,
+ *
+ *  # restartCatalog command is not available on embedded
+ *  incompatible_with_embedded
+ * ]
  */
 (function() {
     "use strict";

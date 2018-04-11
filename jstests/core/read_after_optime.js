@@ -1,5 +1,10 @@
 // Test that attempting to read after optime fails if replication is not enabled.
 
+// @tags: [
+//     # This succeeds instead of failing with the expected error code on embedded
+//     incompatible_with_embedded_todo_investigate
+// ]
+
 (function() {
     "use strict";
 

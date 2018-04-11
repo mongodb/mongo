@@ -2,7 +2,12 @@
 * Tests that using a UUID as an argument to commands will retrieve results from the correct
 * collection.
 *
-* @tags: [requires_fastcount]
+* @tags: [
+*    requires_fastcount,
+*
+*    # parallelCollectionScan is not available on embedded
+*    incompatible_with_embedded,
+* ]
 */
 
 (function() {

@@ -1,6 +1,10 @@
 // SERVER-16676 Make sure compact doesn't leave the collection with bad indexes
 // SERVER-16967 Make sure compact doesn't crash while collections are being dropped
 // in a different database.
+// @tags: [
+//     # compact command is not available on embedded
+//     incompatible_with_embedded
+// ]
 
 (function() {
     'use strict';

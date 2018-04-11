@@ -1,6 +1,12 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount]
-
 // Test applyops upsert flag SERVER-7452
+
+// @tags: [
+//     requires_non_retryable_commands,
+//     requires_fastcount,
+//
+//     # applyOps uses the oplog that require replication support
+//     requires_replication,
+// ]
 
 var t = db.apply_ops2;
 t.drop();

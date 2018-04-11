@@ -1,4 +1,10 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount]
+// @tags: [
+//     requires_non_retryable_commands,
+//     requires_fastcount,
+//
+//     # copyDatabase is not available on embedded
+//     incompatible_with_embedded
+// ]
 
 // Basic tests for the copydb command.  These only test copying from the same server; these do not
 // test the ability of copydb to pull a database from another server (with or without auth).

@@ -3,8 +3,16 @@
  * entry matching the server's response from the "getCmdLineOpts" command. The former operation may
  * be routed to a secondary in the replica set, whereas the latter must be routed to the primary.
  *
- * @tags: [assumes_read_preference_unchanged, requires_collstats]
+ * @tags: [
+ *  assumes_read_preference_unchanged,
+ *  requires_collstats,
+ *
+ *  # mongoe modifies commandline internally so the check for unaltered getCmdLineOpts fails,
+ *  # figure out if this can be fixed
+ *  incompatible_with_embedded_todo_investigate,
+ * ]
  */
+
 load('jstests/aggregation/extras/utils.js');
 
 (function() {

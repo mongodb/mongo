@@ -1,3 +1,8 @@
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
+
 var t = db.jstests_ora;
 
 // $where

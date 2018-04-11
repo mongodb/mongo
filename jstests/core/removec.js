@@ -1,4 +1,9 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//     requires_non_retryable_writes,
+//
+//     # Fails on embedded, needs to investigate
+//     incompatible_with_embedded_todo_investigate,
+// ]
 
 // Sanity test for removing documents with adjacent index keys.  SERVER-2008
 

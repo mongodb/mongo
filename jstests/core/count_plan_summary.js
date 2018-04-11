@@ -6,6 +6,9 @@
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//
+//   # killop command is not yet available on embedded
+//   incompatible_with_embedded_todo_investigate,
 // ]
 
 var t = db.jstests_count_plan_summary;

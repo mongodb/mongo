@@ -1,6 +1,11 @@
 // Tests that large queries and updates are properly profiled.
 
 // Special db so that it can be run in parallel tests.
+// @tags: [
+//     # profile command is not available on embedded
+//     incompatible_with_embedded,
+// ]
+
 var coll = db.getSisterDB("profile2").profile2;
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));

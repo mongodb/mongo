@@ -1,6 +1,12 @@
 /**
  * Tests that long-running operations show up in currentOp and report the locks they are holding.
+ *
+ * @tags: [
+ *  # fsync command is not available on embedded
+ *  incompatible_with_embedded
+ * ]
  */
+
 (function() {
     "use strict";
     const coll = db.jstests_currentop;

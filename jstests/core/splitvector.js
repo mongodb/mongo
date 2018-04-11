@@ -1,7 +1,13 @@
-// Cannot implicitly shard accessed collections because the "splitVector" command cannot be run
-// on a sharded collection
+// @tags: [
+//     # Cannot implicitly shard accessed collections because the "splitVector" command cannot be
+//     # run on a sharded collection
+//     assumes_unsharded_collection,
+//     requires_fastcount,
+//     requires_collstats,
 //
-// @tags: [assumes_unsharded_collection, requires_fastcount, requires_collstats]
+//     # Need to investigate why this fails on embedded
+//     incompatible_with_embedded_todo_investigate,
+// ]
 
 // -------------------------
 //  SPLITVECTOR TEST UTILS

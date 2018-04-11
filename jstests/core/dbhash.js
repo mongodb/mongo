@@ -1,3 +1,7 @@
+// @tags: [
+//     # dbhash command is not available on embedded
+//     incompatible_with_embedded,
+// ]
 
 a = db.dbhasha;
 b = db.dbhashb;

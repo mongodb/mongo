@@ -1,4 +1,8 @@
 // SERVER-11781 Don't crash when converting deeply nested or cyclical JS objects to BSON.
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
 
 function test() {
     function assertTooBig(obj) {

@@ -4,7 +4,13 @@
 // stage. The former operation must be routed to the primary in a replica set, whereas the latter
 // may be routed to a secondary.
 //
-// @tags: [assumes_read_preference_unchanged, requires_collstats]
+// @tags: [
+//     assumes_read_preference_unchanged,
+//     requires_collstats,
+//
+//     # group uses javascript
+//     requires_scripting,
+// ]
 
 (function() {
     "use strict";

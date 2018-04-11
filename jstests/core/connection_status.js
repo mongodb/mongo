@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_auth]
 
 // Tests the connectionStatus command
 (function() {

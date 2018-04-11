@@ -1,5 +1,3 @@
-// @tags: [requires_non_retryable_writes]
-
 /**
  * This tests checks that repair database works and doesn't leave the database in a bad state
  * 1.) Drop "repairDB" database
@@ -7,6 +5,13 @@
  * 3.) Ensure repair works with no docs, same collection/index as above
  * 4.) Ensure repair works with 2 collections, one doc in each
  * 5.) Ensure repair works on the local db (special cases)
+ *
+ * @tags: [
+ *  requires_non_retryable_writes,
+ *
+ *  # repairDatabase command is not available on embedded
+ *  incompatible_with_embedded,
+ * ]
  */
 
 // 1. Drop db

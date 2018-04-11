@@ -1,4 +1,12 @@
-// @tags: [requires_getmore, requires_non_retryable_writes, requires_fastcount]
+// @tags: [
+//     requires_getmore,
+//     requires_non_retryable_writes,
+//     requires_fastcount,
+//
+//     # Uses $where operator
+//     requires_scripting,
+// ]
+
 (function() {
     "use strict";
 

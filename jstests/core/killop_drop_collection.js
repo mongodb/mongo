@@ -3,6 +3,14 @@
  * to complete. Interrupting a collection drop could leave the database in an inconsistent state.
  * This test confirms that killOp won't interrupt a collection drop, and that the drop occurs
  * successfully.
+ *
+ * @tags: [
+ *  # killop command is not yet available on embedded
+ *  incompatible_with_embedded_todo_investigate,
+ *
+ *  # Uses index building in background
+ *  requires_background_index,
+ * ]
  */
 (function() {
     "use strict";

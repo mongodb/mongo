@@ -1,8 +1,14 @@
-// @tags: [requires_non_retryable_commands]
-
 /**
  * SERVER-32125 Check that applyOps commands with collMod without UUID don't strip it
+ *
+ * @tags: [
+ *  requires_non_retryable_commands,
+ *
+ *  # applyOps uses the oplog that require replication support
+ *  requires_replication
+ * ]
  */
+
 (function() {
     "use strict";
     const collName = "collmod_without_uuid";

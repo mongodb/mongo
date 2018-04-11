@@ -1,4 +1,9 @@
-// @tags: [requires_fastcount]
+// @tags: [
+//     requires_fastcount,
+//
+//     # Uses $where operator
+//     requires_scripting,
+// ]
 
 t = db.find6;
 t.drop();

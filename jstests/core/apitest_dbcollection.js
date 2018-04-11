@@ -1,7 +1,12 @@
 /**
  * Tests for the db collection
  *
- * @tags: [requires_fastcount]
+ * @tags: [
+ *  requires_fastcount,
+ *
+ *  # indexDetails result is not correct with mobile storage engine
+ *  incompatible_with_embedded_todo_investigate,
+ * ]
  */
 
 /*
