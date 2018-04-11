@@ -37,7 +37,7 @@ def get_thread_id():
 
 
 def get_current_thread_name():
-    """Returns the name of the current GDB thread"""
+    """Return the name of the current GDB thread."""
     fallback_name = '"%s"' % (gdb.selected_thread().name or '')
     try:
         # This goes through the pretty printer for StringData which adds "" around the name.
@@ -176,8 +176,8 @@ class MongoDBUniqueStack(gdb.Command):
             if current_thread and current_thread.is_valid():
                 current_thread.switch()
 
-
-    def _process_thread_stack(self, arg, stacks, thread):
+    @staticmethod
+    def _process_thread_stack(arg, stacks, thread):
         """Process the thread stack."""
         thread_info = {}  # thread dict to hold per thread data
         thread_info['pthread'] = get_thread_id()

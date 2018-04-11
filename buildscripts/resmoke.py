@@ -153,7 +153,7 @@ class Resmoke(object):
                                   self._get_suite_summary(suite))
 
     def _execute_suite(self, suite):
-        """Execute a suite and return True if interrupted, False otherwise. """
+        """Execute a suite and return True if interrupted, False otherwise."""
         self._shuffle_tests(suite)
         if not suite.tests:
             self._exec_logger.info("Skipping %s, no tests to run", suite.test_kind)
@@ -235,7 +235,7 @@ class Resmoke(object):
 
 
 def main():
-    """Main function for resmoke."""
+    """Execute Main function for resmoke."""
     resmoke = Resmoke()
     resmoke.configure_from_command_line()
     resmoke.run()

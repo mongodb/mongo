@@ -197,7 +197,7 @@ class Graph(object):
 
 def find_thread(thread_dict, search_thread_id):
     """Find thread."""
-    for (lwpid, thread) in thread_dict.items():
+    for (_, thread) in thread_dict.items():
         if thread.thread_id == search_thread_id:
             return thread
     return None
@@ -262,13 +262,13 @@ def find_mutex_holder(graph, thread_dict, show):
     mutex_waiter = thread_dict[mutex_waiter_lwpid]
     if show:
         print("Mutex at {} held by {} waited on by {}".format(mutex_value, mutex_holder,
-                  mutex_waiter))
+                                                              mutex_waiter))
     if graph:
         graph.add_edge(mutex_waiter, Lock(long(mutex_value), "Mutex"))
         graph.add_edge(Lock(long(mutex_value), "Mutex"), mutex_holder)
 
 
-def find_lock_manager_holders(graph, thread_dict, show):
+def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-many-locals
     """Find lock manager holders."""
     frame = find_frame(r'mongo::LockerImpl\<.*\>::')
     if not frame:
@@ -293,8 +293,8 @@ def find_lock_manager_holders(graph, thread_dict, show):
         lock_holder_id = int(locker["_threadId"]["_M_thread"])
         lock_holder = find_thread(thread_dict, lock_holder_id)
         if show:
-            print("MongoDB Lock at {} ({}) held by {} waited on by {}".format(lock_head,
-                lock_request["mode"], lock_holder, lock_waiter))
+            print("MongoDB Lock at {} ({}) held by {} waited on by {}".format(
+                lock_head, lock_request["mode"], lock_holder, lock_waiter))
         if graph:
             graph.add_edge(lock_waiter, Lock(long(lock_head), "MongoDB lock"))
             graph.add_edge(Lock(long(lock_head), "MongoDB lock"), lock_holder)

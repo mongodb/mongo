@@ -299,7 +299,7 @@ def _make_parser():  # pylint: disable=too-many-statements
 
 
 def parse_command_line():
-    """Parses the command line arguments passed to resmoke.py."""
+    """Parse the command line arguments passed to resmoke.py."""
     parser = _make_parser()
     options, args = parser.parse_args()
 

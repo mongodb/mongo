@@ -57,9 +57,12 @@ def get_py_linter(linter_filter):
 def is_interesting_file(file_name):
     # type: (str) -> bool
     """Return true if this file should be checked."""
-    return file_name.endswith(".py") and (file_name.startswith("buildscripts/idl")
-                                          or file_name.startswith("buildscripts/linter")
-                                          or file_name.startswith("buildscripts/pylinters.py"))
+    file_blacklist = ["buildscripts/cpplint.py"]
+    directory_blacklist = ["src/third_party"]
+    if file_name in file_blacklist or file_name.startswith(tuple(directory_blacklist)):
+        return False
+    directory_list = ["buildscripts", "pytests"]
+    return file_name.endswith(".py") and file_name.startswith(tuple(directory_list))
 
 
 def _lint_files(linters, config_dict, file_names):

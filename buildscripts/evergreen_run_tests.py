@@ -145,6 +145,6 @@ class Main(resmoke.Resmoke):
 
 
 if __name__ == "__main__":
-    main = Main()
+    main = Main()  # pylint: disable=invalid-name
     main.configure_from_command_line()
     main.run()
