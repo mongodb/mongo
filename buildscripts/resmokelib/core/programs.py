@@ -40,7 +40,7 @@ def mongod_program(  # pylint: disable=too-many-branches
     # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.
     # Setting it in the .yml file overrides this.
     if "shardsvr" in kwargs and "orphanCleanupDelaySecs" not in suite_set_parameters:
-        suite_set_parameters["orphanCleanupDelaySecs"] = 0
+        suite_set_parameters["orphanCleanupDelaySecs"] = 1
 
     # The LogicalSessionCache does automatic background refreshes in the server. This is
     # race-y for tests, since tests trigger their own immediate refreshes instead. Turn off

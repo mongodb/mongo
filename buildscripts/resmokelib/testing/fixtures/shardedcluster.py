@@ -28,7 +28,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             self, logger, job_num, mongos_executable=None, mongos_options=None,
             mongod_executable=None, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
             num_shards=1, num_rs_nodes_per_shard=None, num_mongos=1, enable_sharding=None,
-            enable_balancer=True, auth_options=None, configsvr_options=None, shard_options=None):
+            enable_balancer=True, enable_autosplit=True, auth_options=None, configsvr_options=None,
+            shard_options=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
@@ -46,6 +47,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.num_mongos = num_mongos
         self.enable_sharding = utils.default_if_none(enable_sharding, [])
         self.enable_balancer = enable_balancer
+        self.enable_autosplit = enable_autosplit
         self.auth_options = auth_options
         self.configsvr_options = utils.default_if_none(configsvr_options, {})
         self.shard_options = utils.default_if_none(shard_options, {})
@@ -114,9 +116,22 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         if not self.enable_balancer:
             client.admin.command({"balancerStop": 1})
 
+        # Turn off autosplit if it is not meant to be enabled.
+        if not self.enable_autosplit:
+            wc = pymongo.WriteConcern(w="majority", wtimeout=30000)
+            coll = client.config.get_collection("settings", write_concern=wc)
+            coll.update_one({"_id": "autosplit"}, {"$set": {"enabled": False}}, upsert=True)
+
         # Inform mongos about each of the shards
         for shard in self.shards:
             self._add_shard(client, shard)
+
+        # Ensure that all CSRS nodes are up to date. This is strictly needed for tests that use
+        # multiple mongoses. In those cases, the first mongos initializes the contents of the config
+        # database, but without waiting for those writes to replicate to all the config servers then
+        # the secondary mongoses risk reading from a stale config server and seeing an empty config
+        # database.
+        self.configsvr.await_last_op_committed()
 
         # Enable sharding on each of the specified databases
         for db_name in self.enable_sharding:
@@ -155,7 +170,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             raise errors.ServerFailure(teardown_handler.get_error_message())
 
     def is_running(self):
-        """Return true if the all nodes in the cluster are all still operating."""
+        """Return true if all nodes in the cluster are all still operating."""
         return (self.configsvr is not None and self.configsvr.is_running()
                 and all(shard.is_running() for shard in self.shards)
                 and all(mongos.is_running() for mongos in self.mongos))

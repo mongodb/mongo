@@ -1147,10 +1147,6 @@ DBCollection.prototype.toString = function() {
     return this.getFullName();
 };
 
-DBCollection.prototype.toString = function() {
-    return this.getFullName();
-};
-
 DBCollection.prototype.tojson = DBCollection.prototype.toString;
 
 DBCollection.prototype.shellPrint = DBCollection.prototype.toString;

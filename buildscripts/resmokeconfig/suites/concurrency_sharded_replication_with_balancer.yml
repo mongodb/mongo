@@ -21,9 +21,6 @@ selector:
   # values:
   - jstests/concurrency/fsm_workloads/agg_match.js
 
-  # SERVER-30983 background indexes are incompatible with causal consistency
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-
   # $lookup and $graphLookup are not supported on sharded collections.
   - jstests/concurrency/fsm_workloads/agg_graph_lookup.js
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
@@ -129,7 +126,6 @@ executor:
       readMode: commands
       global_vars:
         TestData:
-          runningWithCausalConsistency: true
           usingReplicaSetShards: true
   hooks:
   - class: CheckReplDBHash
@@ -146,8 +142,6 @@ executor:
     shard_options:
       mongod_options:
         oplogSize: 1024
-      # TODO SERVER-32572 remove voting_secondaries: true
-      voting_secondaries: true
     mongod_options:
       set_parameters:
         enableTestCommands: 1

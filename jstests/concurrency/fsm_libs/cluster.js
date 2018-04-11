@@ -3,7 +3,8 @@
 /**
  * Represents a MongoDB cluster.
  */
-load('jstests/hooks/validate_collections.js');  // Loads the validateCollections function.
+load('jstests/hooks/validate_collections.js');          // For validateCollections.
+load('jstests/concurrency/fsm_libs/shard_fixture.js');  // For FSMShardingTest.
 
 var Cluster = function(options) {
     if (!(this instanceof Cluster)) {
@@ -188,6 +189,7 @@ var Cluster = function(options) {
     var conn;
 
     var st;
+    var rawST;  // The raw ShardingTest object for test suites not using resmoke fixtures.
 
     var initialized = false;
     var clusterStartTime;
@@ -209,49 +211,46 @@ var Cluster = function(options) {
 
         if (options.sharded.enabled) {
             if (options.useExistingConnectionAsSeed) {
-                // Note that depending on how SERVER-21485 is implemented, it may still not be
-                // possible to rehydrate a ShardingTest instance from an existing connection because
-                // it wouldn't be possible to discover other mongos processes running in the sharded
-                // cluster.
-                throw new Error(
-                    "Cluster cannot support 'useExistingConnectionAsSeed' option until" +
-                    ' SERVER-21485 is implemented');
-            }
-
-            // TODO: allow 'options' to specify the number of shards and mongos processes
-            var shardConfig = {
-                shards: options.sharded.numShards,
-                mongos: options.sharded.numMongos,
-                verbose: verbosityLevel,
-                other: {
-                    enableAutoSplit: options.sharded.enableAutoSplit,
-                    enableBalancer: options.sharded.enableBalancer,
-                }
-            };
-
-            // TODO: allow 'options' to specify an 'rs' config
-            if (options.replication.enabled) {
-                shardConfig.rs = {
-                    nodes: makeReplSetTestConfig(options.replication.numNodes,
-                                                 !this.shouldPerformContinuousStepdowns()),
-                    // Increase the oplog size (in MB) to prevent rollover
-                    // during write-heavy workloads
-                    oplogSize: 1024,
-                    // Set the electionTimeoutMillis to 1 day to prevent unintended elections
-                    settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000},
-                    verbose: verbosityLevel
+                st = new FSMShardingTest(`mongodb://${db.getMongo().host}`);
+            } else {
+                // TODO: allow 'options' to specify the number of shards and mongos processes
+                var shardConfig = {
+                    shards: options.sharded.numShards,
+                    mongos: options.sharded.numMongos,
+                    verbose: verbosityLevel,
+                    other: {
+                        enableAutoSplit: options.sharded.enableAutoSplit,
+                        enableBalancer: options.sharded.enableBalancer,
+                    }
                 };
-                shardConfig.rsOptions = {};
+
+                // TODO: allow 'options' to specify an 'rs' config
+                if (options.replication.enabled) {
+                    shardConfig.rs = {
+                        nodes: makeReplSetTestConfig(options.replication.numNodes,
+                                                     !this.shouldPerformContinuousStepdowns()),
+                        // Increase the oplog size (in MB) to prevent rollover
+                        // during write-heavy workloads
+                        oplogSize: 1024,
+                        // Set the electionTimeoutMillis to 1 day to prevent unintended elections
+                        settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000},
+                        verbose: verbosityLevel
+                    };
+                    shardConfig.rsOptions = {};
+                }
+
+                if (this.shouldPerformContinuousStepdowns()) {
+                    load('jstests/libs/override_methods/continuous_stepdown.js');
+                    ContinuousStepdown.configure(options.sharded.stepdownOptions);
+                }
+
+                rawST = new ShardingTest(shardConfig);
+                const hostStr = "mongodb://" + rawST._mongos.map(conn => conn.host).join(",");
+
+                st = new FSMShardingTest(hostStr);
             }
 
-            if (this.shouldPerformContinuousStepdowns()) {
-                load('jstests/libs/override_methods/continuous_stepdown.js');
-                ContinuousStepdown.configure(options.sharded.stepdownOptions);
-            }
-
-            st = new ShardingTest(shardConfig);
-
-            conn = st.s;  // mongos
+            conn = st.s(0);  // First mongos
 
             this.teardown = function teardown(opts) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
@@ -264,45 +263,50 @@ var Cluster = function(options) {
                 if (this.shouldPerformContinuousStepdowns()) {
                     TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 }
-                st.stop(opts);
+
+                if (!options.useExistingConnectionAsSeed) {
+                    rawST.stop(opts);
+                }
             };
 
             if (this.shouldPerformContinuousStepdowns()) {
                 this.startContinuousFailover = function() {
-                    st.startContinuousFailover();
+                    rawST.startContinuousFailover();
                 };
 
                 this.stopContinuousFailover = function() {
-                    st.stopContinuousFailover({waitForPrimary: true, waitForMongosRetarget: true});
+                    rawST.stopContinuousFailover(
+                        {waitForPrimary: true, waitForMongosRetarget: true});
+
+                    // Call getPrimary() to re-establish the connections in FSMShardingTest
+                    // as it is not a transparent proxy for SharingTest/rawST.
+                    st._configsvr.getPrimary();
+                    for (let rst of st._shard_rsts) {
+                        rst.getPrimary();
+                    }
                 };
             }
 
-            // Save all mongos and mongod connections
-            var i = 0;
-            var mongos = st.s0;
-            var mongod = st.d0;
-            while (mongos) {
-                _conns.mongos.push(mongos);
-                ++i;
-                mongos = st['s' + i];
-            }
-            if (options.replication) {
-                var rsTest = st.rs0;
+            // Save all mongos, mongod, and ReplSet connections (if any).
+            var i;
 
-                i = 0;
-                while (rsTest) {
-                    this._addReplicaSetConns(rsTest);
-                    replSets.push(rsTest);
-                    ++i;
-                    rsTest = st['rs' + i];
-                }
-            }
             i = 0;
-            while (mongod) {
-                _conns.mongod.push(mongod);
-                ++i;
-                mongod = st['d' + i];
+            while (st.s(i)) {
+                _conns.mongos.push(st.s(i++));
             }
+
+            i = 0;
+            while (st.d(i)) {
+                _conns.mongod.push(st.d(i++));
+            }
+
+            i = 0;
+            while (st.rs(i)) {
+                var rs = st.rs(i++);
+                this._addReplicaSetConns(rs);
+                replSets.push(rs);
+            }
+
         } else if (options.replication.enabled) {
             var replSetConfig = {
                 nodes: makeReplSetTestConfig(options.replication.numNodes,
@@ -390,12 +394,12 @@ var Cluster = function(options) {
         }
 
         var configs = [];
-        var config = st.c0;
+        var config = st.c(0);
         var i = 0;
         while (config) {
             configs.push(config);
             ++i;
-            config = st['c' + i];
+            config = st.c(i);
         }
 
         configs.forEach(function(conn) {
@@ -520,50 +524,38 @@ var Cluster = function(options) {
         var cluster = {mongos: [], config: [], shards: {}};
 
         var i = 0;
-        var mongos = st.s0;
+        var mongos = st.s(0);
         while (mongos) {
             cluster.mongos.push(mongos.name);
             ++i;
-            mongos = st['s' + i];
+            mongos = st.s(i);
         }
 
         i = 0;
-        var config = st.c0;
+        var config = st.c(0);
         while (config) {
             cluster.config.push(config.name);
             ++i;
-            config = st['c' + i];
+            config = st.c(i);
         }
 
         i = 0;
-        var shard = st.shard0;
+        var shard = st.shard(0);
         while (shard) {
             if (shard.name.includes('/')) {
-                // If the shard is a replica set, the format of st.shard0.name in ShardingTest is
+                // If the shard is a replica set, the format of st.shard(0).name in ShardingTest is
                 // "test-rs0/localhost:20006,localhost:20007,localhost:20008".
                 var [setName, shards] = shard.name.split('/');
                 cluster.shards[setName] = shards.split(',');
             } else {
-                // If the shard is a standalone mongod, the format of st.shard0.name in ShardingTest
-                // is "localhost:20006".
+                // If the shard is a standalone mongod, the format of st.shard(0).name in
+                // ShardingTest is "localhost:20006".
                 cluster.shards[shard.shardName] = [shard.name];
             }
             ++i;
-            shard = st['shard' + i];
+            shard = st.shard(i);
         }
         return cluster;
-    };
-
-    this.startBalancer = function startBalancer() {
-        assert(initialized, 'cluster must be initialized first');
-        assert(this.isSharded(), 'cluster is not sharded');
-        st.startBalancer();
-    };
-
-    this.stopBalancer = function stopBalancer() {
-        assert(initialized, 'cluster must be initialized first');
-        assert(this.isSharded(), 'cluster is not sharded');
-        st.stopBalancer();
     };
 
     this.isBalancerEnabled = function isBalancerEnabled() {
@@ -696,7 +688,7 @@ var Cluster = function(options) {
         if (this.isSharded()) {
             // Get the storage engine the sharded cluster is configured to use from one of the
             // shards since mongos won't report it.
-            adminDB = st.shard0.getDB('admin');
+            adminDB = st.shard(0).getDB('admin');
         }
 
         var res = adminDB.runCommand({getCmdLineOpts: 1});
