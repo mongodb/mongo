@@ -466,3 +466,30 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
     }
     throw new Error("failed waiting for non default clusterTime");
 };
+
+Mongo.prototype.watch = function(pipeline, options) {
+    pipeline = pipeline || [];
+    options = options || {};
+    assert(pipeline instanceof Array, "'pipeline' argument must be an array");
+    assert(options instanceof Object, "'options' argument must be an object");
+
+    let changeStreamStage = {
+        allChangesForCluster: true,
+        fullDocument: options.fullDocument || "default"
+    };
+    delete options.allChangesForCluster;
+    delete options.fullDocument;
+
+    if (options.hasOwnProperty("resumeAfter")) {
+        changeStreamStage.resumeAfter = options.resumeAfter;
+        delete options.resumeAfter;
+    }
+
+    if (options.hasOwnProperty("startAtClusterTime")) {
+        changeStreamStage.startAtClusterTime = options.startAtClusterTime;
+        delete options.startAtClusterTime;
+    }
+
+    pipeline.unshift({$changeStream: changeStreamStage});
+    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: pipeline}, options);
+};
