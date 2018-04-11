@@ -57,7 +57,6 @@ public:
             kInclusionProjection,
             kComputedProjection,
             kReplaceRoot,
-            kChangeStreamTransformation,
         };
         virtual ~TransformerInterface() = default;
         virtual Document applyTransformation(const Document& input) = 0;
@@ -104,23 +103,14 @@ public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
-
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        StageConstraints constraints(
-            StreamType::kStreaming,
-            PositionRequirement::kNone,
-            HostTypeRequirement::kNone,
-            DiskUseRequirement::kNoDiskUse,
-            (getType() == TransformerInterface::TransformerType::kChangeStreamTransformation
-                 ? FacetRequirement::kNotAllowed
-                 : FacetRequirement::kAllowed),
-            (getType() == TransformerInterface::TransformerType::kChangeStreamTransformation
-                 ? TransactionRequirement::kNotAllowed
-                 : TransactionRequirement::kAllowed),
-            (getType() == TransformerInterface::TransformerType::kChangeStreamTransformation
-                 ? ChangeStreamRequirement::kChangeStreamStage
-                 : ChangeStreamRequirement::kWhitelist));
-
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     ChangeStreamRequirement::kWhitelist);
         constraints.canSwapWithMatch = true;
         constraints.canSwapWithLimit = true;
         // This transformation could be part of a 'collectionless' change stream on an entire

@@ -86,47 +86,6 @@ public:
         const NamespaceString _nss;
     };
 
-    class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
-    public:
-        Transformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       BSONObj changeStreamSpec)
-            : _expCtx(expCtx), _changeStreamSpec(changeStreamSpec.getOwned()) {}
-        ~Transformation() = default;
-        Document applyTransformation(const Document& input) final;
-        TransformerType getType() const final {
-            return TransformerType::kChangeStreamTransformation;
-        };
-        void optimize() final{};
-        Document serializeStageOptions(
-            boost::optional<ExplainOptions::Verbosity> explain) const final;
-        DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final;
-        DocumentSource::GetModPathsReturn getModifiedPaths() const final;
-
-    private:
-        boost::intrusive_ptr<ExpressionContext> _expCtx;
-        BSONObj _changeStreamSpec;
-
-        struct DocumentKeyCacheEntry {
-            DocumentKeyCacheEntry() = default;
-
-            DocumentKeyCacheEntry(std::pair<std::vector<FieldPath>, bool> documentKeyFieldsIn)
-                : documentKeyFields(documentKeyFieldsIn.first),
-                  isFinal(documentKeyFieldsIn.second){};
-            // Fields of the document key, in order, including "_id" and the shard key if the
-            // collection is sharded. Empty until the first oplog entry with a uuid is encountered.
-            // Needed for transforming 'insert' oplog entries.
-            std::vector<FieldPath> documentKeyFields;
-
-            // Set to true if the document key fields for this entry are definitively known and will
-            // not change. This implies that either the collection has become sharded or has been
-            // dropped.
-            bool isFinal;
-        };
-
-        // Map of collection UUID to document key fields.
-        std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;
-    };
-
     // The name of the field where the document key (_id and shard key, if present) will be found
     // after the transformation.
     static constexpr StringData kDocumentKeyField = "documentKey"_sd;
@@ -141,6 +100,10 @@ public:
     // The name of the field where the namespace of the change will be located after the
     // transformation.
     static constexpr StringData kNamespaceField = "ns"_sd;
+
+    // Name of the field which stores information about updates. Only applies when OperationType
+    // is "update".
+    static constexpr StringData kUpdateDescriptionField = "updateDescription"_sd;
 
     // The name of the subfield of '_id' where the UUID of the namespace will be located after the
     // transformation.
@@ -158,6 +121,9 @@ public:
     // The name of this stage.
     static constexpr StringData kStageName = "$changeStream"_sd;
 
+    static constexpr StringData kTxnNumberField = "txnNumber"_sd;
+    static constexpr StringData kLsidField = "lsid"_sd;
+
     // The different types of operations we can use for the operation type.
     static constexpr StringData kUpdateOpType = "update"_sd;
     static constexpr StringData kDeleteOpType = "delete"_sd;
@@ -174,6 +140,8 @@ public:
     static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     Timestamp startFrom,
                                     bool startFromInclusive);
+
+    static std::string buildAllCollectionsRegex(const NamespaceString& nss);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
@@ -193,6 +161,12 @@ public:
      */
     static BSONObj replaceResumeTokenInCommand(const BSONObj originalCmdObj,
                                                const BSONObj resumeToken);
+
+    /**
+     * Helper used by various change stream stages. Used for asserting that a certain Value of a
+     * field has a certain type. Will uassert() if the field does not have the expected type.
+     */
+    static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
 
 private:
     enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
