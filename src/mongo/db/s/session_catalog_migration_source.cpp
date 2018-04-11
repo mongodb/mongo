@@ -220,13 +220,6 @@ bool SessionCatalogMigrationSource::_hasMoreOplogFromSessionCatalog() {
         !_sessionOplogIterators.empty() || _currentOplogIterator;
 }
 
-// Important: The no-op oplog entry for findAndModify should always be returned first before the
-// actual operation.
-repl::OplogEntry SessionCatalogMigrationSource::_getLastFetchedOplogFromSessionCatalog() {
-    stdx::lock_guard<stdx::mutex> lk(_sessionCloneMutex);
-    return _lastFetchedOplogBuffer.back();
-}
-
 bool SessionCatalogMigrationSource::_fetchNextOplogFromSessionCatalog(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_sessionCloneMutex);
 
@@ -257,12 +250,6 @@ bool SessionCatalogMigrationSource::_fetchNextOplogFromSessionCatalog(OperationC
 bool SessionCatalogMigrationSource::_hasNewWrites() {
     stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
     return _lastFetchedNewWriteOplog || !_newWriteOpTimeList.empty();
-}
-
-repl::OplogEntry SessionCatalogMigrationSource::_getLastFetchedNewWriteOplog() {
-    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
-    invariant(_lastFetchedNewWriteOplog);
-    return *_lastFetchedNewWriteOplog;
 }
 
 bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* opCtx) {

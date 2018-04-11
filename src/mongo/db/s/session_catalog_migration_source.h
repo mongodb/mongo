@@ -157,11 +157,6 @@ private:
     bool _fetchNextOplogFromSessionCatalog(OperationContext* opCtx);
 
     /**
-     * Returns the document that was last fetched by fetchNextOplogFromSessionCatalog.
-     */
-    repl::OplogEntry _getLastFetchedOplogFromSessionCatalog();
-
-    /**
      * Extracts oplog information from the current writeHistoryIterator to _lastFetchedOplog. This
      * handles insert/update/delete/findAndModify oplog entries.
      *
@@ -182,11 +177,6 @@ private:
      * Returns true if there were documents that were retrieved.
      */
     bool _fetchNextNewWriteOplog(OperationContext* opCtx);
-
-    /**
-     * Returns the oplog that was last fetched by fetchNextNewWriteOplog.
-     */
-    repl::OplogEntry _getLastFetchedNewWriteOplog();
 
     // Namespace for which the migration is happening
     const NamespaceString _ns;
