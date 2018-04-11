@@ -293,7 +293,7 @@ std::unique_ptr<OperationContext> ServiceContextMongoEmbedded::_newOpCtx(Client*
     }
 
     opCtx->setRecoveryUnit(getGlobalStorageEngine()->newRecoveryUnit(),
-                           OperationContext::kNotInUnitOfWork);
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     return opCtx;
 }
 

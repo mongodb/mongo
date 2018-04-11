@@ -28,9 +28,13 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
+#include <memory>
+
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
+
+class OperationContext;
 
 /**
  * The WriteUnitOfWork is an RAII type that begins a storage engine write unit of work on both the
@@ -46,6 +50,15 @@ class WriteUnitOfWork {
     MONGO_DISALLOW_COPYING(WriteUnitOfWork);
 
 public:
+    /**
+     * The RecoveryUnitState is used to ensure valid state transitions.
+     */
+    enum RecoveryUnitState {
+        kNotInUnitOfWork,   // not in a unit of work, no writes allowed
+        kActiveUnitOfWork,  // in a unit of work that still may either commit or abort
+        kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
+    };
+
     WriteUnitOfWork() = default;
 
     WriteUnitOfWork(OperationContext* opCtx);
@@ -54,16 +67,17 @@ public:
 
     /**
      * Creates a top-level WriteUnitOfWork without changing RecoveryUnit or Locker state. For use
-     * when the RecoveryUnit and Locker are already in an active state.
+     * when the RecoveryUnit and Locker are in active or failed state.
      */
-    static std::unique_ptr<WriteUnitOfWork> createForSnapshotResume(OperationContext* opCtx);
+    static std::unique_ptr<WriteUnitOfWork> createForSnapshotResume(OperationContext* opCtx,
+                                                                    RecoveryUnitState ruState);
 
     /**
      * Releases the OperationContext RecoveryUnit and Locker objects from management without
      * changing state. Allows for use of these objects beyond the WriteUnitOfWork lifespan. Prepared
-     * units of work are not allowed be released.
+     * units of work are not allowed be released. Returns the state of the RecoveryUnit.
      */
-    void release();
+    RecoveryUnitState release();
 
     /**
      * Transitions the WriteUnitOfWork to the "prepared" state. The RecoveryUnit state in the

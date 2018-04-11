@@ -535,7 +535,7 @@ void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
 }
 
 Session::TxnResources::TxnResources(OperationContext* opCtx) {
-    opCtx->getWriteUnitOfWork()->release();
+    _ruState = opCtx->getWriteUnitOfWork()->release();
     opCtx->setWriteUnitOfWork(nullptr);
 
     _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
@@ -543,7 +543,7 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
 
     _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
     opCtx->setRecoveryUnit(opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
-                           OperationContext::kNotInUnitOfWork);
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 }
@@ -561,11 +561,6 @@ Session::TxnResources::~TxnResources() {
 
 void Session::TxnResources::release(OperationContext* opCtx) {
     // Perform operations that can fail the release before marking the TxnResources as released.
-    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    uassert(ErrorCodes::InvalidOptions,
-            "Only the first command in a transaction may specify a readConcern",
-            readConcernArgs.isEmpty());
-
     _locker->reacquireTicket(opCtx);
 
     invariant(!_released);
@@ -578,11 +573,11 @@ void Session::TxnResources::release(OperationContext* opCtx) {
     opCtx->swapLockState(std::move(_locker));
 
     opCtx->setRecoveryUnit(_recoveryUnit.release(),
-                           OperationContext::RecoveryUnitState::kNotInUnitOfWork);
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
-    opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx));
+    opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx, _ruState));
 
-    // 'readConcernArgs' is a mutable reference to the ReadConcernArgs decoration on opCtx.
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     readConcernArgs = _readConcernArgs;
 }
 
@@ -665,6 +660,12 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
             // Transaction resources already exist for this transaction.  Transfer them from the
             // stash to the operation context.
             invariant(_txnState != MultiDocumentTransactionState::kNone);
+
+            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            uassert(ErrorCodes::InvalidOptions,
+                    "Only the first command in a transaction may specify a readConcern",
+                    readConcernArgs.isEmpty());
+
             _txnResourceStash->release(opCtx);
             _txnResourceStash = boost::none;
         } else {

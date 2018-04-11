@@ -57,7 +57,7 @@ public:
         Operation(ServiceContext::UniqueClient client, RecoveryUnit* ru)
             : _client(std::move(client)), _opCtx(_client->makeOperationContext()) {
             delete _opCtx->releaseRecoveryUnit();
-            _opCtx->setRecoveryUnit(ru, OperationContext::kNotInUnitOfWork);
+            _opCtx->setRecoveryUnit(ru, WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         }
 
 

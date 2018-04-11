@@ -359,6 +359,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                bool fromMigrate) {
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
     if (session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction()) {
+        // Do not add writes to the profile collection to the list of transaction operations, since
+        // these are done outside the transaction.
+        if (!opCtx->getWriteUnitOfWork()) {
+            invariant(nss.isSystemDotProfile());
+            return;
+        }
+
         for (auto iter = first; iter != last; iter++) {
             auto operation = OplogEntry::makeInsertOperation(nss, uuid, iter->doc);
             session->addTransactionOperation(opCtx, operation);

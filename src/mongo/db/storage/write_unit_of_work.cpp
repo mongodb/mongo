@@ -27,58 +27,63 @@
  */
 
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx)
-    : _opCtx(opCtx), _toplevel(opCtx->_ruState == OperationContext::kNotInUnitOfWork) {
+    : _opCtx(opCtx), _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot execute a write operation in read-only mode",
             !storageGlobalParams.readOnly);
     _opCtx->lockState()->beginWriteUnitOfWork();
     if (_toplevel) {
         _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
-        _opCtx->_ruState = OperationContext::kActiveUnitOfWork;
+        _opCtx->_ruState = RecoveryUnitState::kActiveUnitOfWork;
     }
 }
 
 WriteUnitOfWork::~WriteUnitOfWork() {
     dassert(!storageGlobalParams.readOnly);
     if (!_released && !_committed) {
-        invariant(_opCtx->_ruState != OperationContext::kNotInUnitOfWork);
+        invariant(_opCtx->_ruState != RecoveryUnitState::kNotInUnitOfWork);
         if (_toplevel) {
             _opCtx->recoveryUnit()->abortUnitOfWork();
-            _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
+            _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
         } else {
-            _opCtx->_ruState = OperationContext::kFailedUnitOfWork;
+            _opCtx->_ruState = RecoveryUnitState::kFailedUnitOfWork;
         }
         _opCtx->lockState()->endWriteUnitOfWork();
     }
 }
 
-std::unique_ptr<WriteUnitOfWork> WriteUnitOfWork::createForSnapshotResume(OperationContext* opCtx) {
+std::unique_ptr<WriteUnitOfWork> WriteUnitOfWork::createForSnapshotResume(
+    OperationContext* opCtx, RecoveryUnitState ruState) {
     auto wuow = stdx::make_unique<WriteUnitOfWork>();
     wuow->_opCtx = opCtx;
     wuow->_toplevel = true;
-    wuow->_opCtx->_ruState = OperationContext::kActiveUnitOfWork;
+    wuow->_opCtx->_ruState = ruState;
     return wuow;
 }
 
-void WriteUnitOfWork::release() {
-    invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
+WriteUnitOfWork::RecoveryUnitState WriteUnitOfWork::release() {
+    auto ruState = _opCtx->_ruState;
+    invariant(ruState == RecoveryUnitState::kActiveUnitOfWork ||
+              ruState == RecoveryUnitState::kFailedUnitOfWork);
     invariant(!_committed);
     invariant(!_prepared);
     invariant(_toplevel);
 
     _released = true;
-    _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
+    _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
+    return ruState;
 }
 
 void WriteUnitOfWork::prepare() {
     invariant(!_committed);
     invariant(!_prepared);
     invariant(_toplevel);
-    invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
+    invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
 
     _opCtx->recoveryUnit()->prepareUnitOfWork();
     _prepared = true;
@@ -87,10 +92,10 @@ void WriteUnitOfWork::prepare() {
 void WriteUnitOfWork::commit() {
     invariant(!_committed);
     invariant(!_released);
-    invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
+    invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
     if (_toplevel) {
         _opCtx->recoveryUnit()->commitUnitOfWork();
-        _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
+        _opCtx->_ruState = RecoveryUnitState::kNotInUnitOfWork;
     }
     _opCtx->lockState()->endWriteUnitOfWork();
     _committed = true;

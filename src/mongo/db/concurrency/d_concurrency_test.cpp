@@ -1530,7 +1530,7 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnit
     auto recovUnitOwned = stdx::make_unique<RecoveryUnitMock>();
     auto recovUnitBorrowed = recovUnitOwned.get();
     opCtx->setRecoveryUnit(recovUnitOwned.release(),
-                           OperationContext::RecoveryUnitState::kNotInUnitOfWork);
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     {
         Lock::GlobalLock gw1(opCtx, MODE_IS, Date_t::now());
@@ -1555,7 +1555,7 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteU
     auto recovUnitOwned = stdx::make_unique<RecoveryUnitMock>();
     auto recovUnitBorrowed = recovUnitOwned.get();
     opCtx->setRecoveryUnit(recovUnitOwned.release(),
-                           OperationContext::RecoveryUnitState::kActiveUnitOfWork);
+                           WriteUnitOfWork::RecoveryUnitState::kActiveUnitOfWork);
     opCtx->lockState()->beginWriteUnitOfWork();
 
     {

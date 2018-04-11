@@ -93,6 +93,7 @@ public:
         std::unique_ptr<Locker> _locker;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         repl::ReadConcernArgs _readConcernArgs;
+        WriteUnitOfWork::RecoveryUnitState _ruState;
     };
 
     using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;

@@ -923,8 +923,8 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
         checked_cast<WiredTigerRecoveryUnit*>(opCtx->releaseRecoveryUnit());
     invariant(realRecoveryUnit);
     WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
-    OperationContext::RecoveryUnitState const realRUstate =
-        opCtx->setRecoveryUnit(new WiredTigerRecoveryUnit(sc), OperationContext::kNotInUnitOfWork);
+    WriteUnitOfWork::RecoveryUnitState const realRUstate = opCtx->setRecoveryUnit(
+        new WiredTigerRecoveryUnit(sc), WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
 

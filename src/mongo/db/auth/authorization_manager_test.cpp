@@ -451,7 +451,7 @@ public:
     };
 
     virtual void setUp() override {
-        opCtx.setRecoveryUnit(recoveryUnit, OperationContext::kNotInUnitOfWork);
+        opCtx.setRecoveryUnit(recoveryUnit, WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         AuthorizationManagerTest::setUp();
     }
 

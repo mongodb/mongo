@@ -122,7 +122,7 @@ public:
         auto client = sc->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
         opCtx->setRecoveryUnit(harnessHelper->newRecoveryUnit().release(),
-                               OperationContext::kNotInUnitOfWork);
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 

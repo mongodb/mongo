@@ -373,10 +373,10 @@ RecoveryUnit* OperationContext::releaseRecoveryUnit() {
     return _recoveryUnit.release();
 }
 
-OperationContext::RecoveryUnitState OperationContext::setRecoveryUnit(RecoveryUnit* unit,
-                                                                      RecoveryUnitState state) {
+WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
+    RecoveryUnit* unit, WriteUnitOfWork::RecoveryUnitState state) {
     _recoveryUnit.reset(unit);
-    RecoveryUnitState oldState = _ruState;
+    WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
     _ruState = state;
     return oldState;
 }

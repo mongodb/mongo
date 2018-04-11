@@ -75,6 +75,7 @@ selector:
   - jstests/core/profile_insert.js
   - jstests/core/profile_sampling.js
   - jstests/core/profile_update.js
+  - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
   # Restarting the catalog on the sync source will cause the downstream node to copy only a subset

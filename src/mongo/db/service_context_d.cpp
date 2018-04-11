@@ -294,7 +294,7 @@ std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client
     }
 
     opCtx->setRecoveryUnit(getGlobalStorageEngine()->newRecoveryUnit(),
-                           OperationContext::kNotInUnitOfWork);
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     return opCtx;
 }
 

@@ -54,7 +54,6 @@ class CurOp;
 class ProgressMeter;
 class ServiceContext;
 class StringData;
-class WriteUnitOfWork;
 
 namespace repl {
 class UnreplicatedWritesBlock;
@@ -75,15 +74,6 @@ class OperationContext : public Decorable<OperationContext> {
     MONGO_DISALLOW_COPYING(OperationContext);
 
 public:
-    /**
-     * The RecoveryUnitState is used by WriteUnitOfWork to ensure valid state transitions.
-     */
-    enum RecoveryUnitState {
-        kNotInUnitOfWork,   // not in a unit of work, no writes allowed
-        kActiveUnitOfWork,  // in a unit of work that still may either commit or abort
-        kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
-    };
-
     OperationContext(Client* client, unsigned int opId);
 
     virtual ~OperationContext() = default;
@@ -115,7 +105,8 @@ public:
      * returned separately even though the state logically belongs to the RecoveryUnit,
      * as it is managed by the OperationContext.
      */
-    RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state);
+    WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
+                                                       WriteUnitOfWork::RecoveryUnitState state);
 
     /**
      * Interface for locking.  Caller DOES NOT own pointer.
@@ -476,7 +467,8 @@ private:
     std::unique_ptr<Locker> _locker;
 
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
-    RecoveryUnitState _ruState = kNotInUnitOfWork;
+    WriteUnitOfWork::RecoveryUnitState _ruState =
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 
     // Operations run within a transaction will hold a WriteUnitOfWork for the duration in order
     // to maintain two-phase locking.
