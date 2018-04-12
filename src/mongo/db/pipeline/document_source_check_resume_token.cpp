@@ -64,10 +64,20 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
     // than our resume token's timestamp.
     invariant(tokenDataFromResumedStream.clusterTime >= tokenDataFromClient.clusterTime);
 
-    // If the clusterTime or UUID differs from the client's token, this stream cannot be resumed.
-    if (tokenDataFromResumedStream.clusterTime != tokenDataFromClient.clusterTime ||
-        tokenDataFromResumedStream.uuid != tokenDataFromClient.uuid) {
+    // If the clusterTime differs from the client's token, this stream cannot be resumed.
+    if (tokenDataFromResumedStream.clusterTime != tokenDataFromClient.clusterTime) {
         return ResumeStatus::kCannotResume;
+    }
+    // It is acceptable for the stream UUID to differ from the client's, if this is a whole-database
+    // or cluster-wide stream and we are comparing operations from different shards at the same
+    // clusterTime. If the stream UUID sorts after the client's, however, then the stream is not
+    // resumable; we are past the point in the stream where the token should have appeared.
+    if (tokenDataFromResumedStream.uuid != tokenDataFromClient.uuid) {
+        // If we're not in mongos then this must be a replica set deployment, in which case we don't
+        // ever expect to see identical timestamps and we reject the resume attempt immediately.
+        return !expCtx->inMongos || tokenDataFromResumedStream.uuid > tokenDataFromClient.uuid
+            ? ResumeStatus::kCannotResume
+            : ResumeStatus::kCheckNextDoc;
     }
     // If all the fields match exactly, then we have found the token.
     if (ValueComparator::kInstance.evaluate(tokenDataFromResumedStream.documentKey ==

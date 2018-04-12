@@ -310,6 +310,74 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
 }
 
+TEST_F(CheckResumeTokenTest,
+       ShardedResumeSucceedsOnMongosWithSameClusterTimeIfUUIDsSortBeforeResumeToken) {
+    // On a sharded cluster, the documents observed by the pipeline during a resume attempt may have
+    // the same clusterTime if they come from different shards. If this is a whole-db or
+    // cluster-wide changeStream, then their UUIDs may legitimately differ. As long as the UUID of
+    // the current document sorts before the client's resume token, we should continue to examine
+    // the next document in the stream.
+    Timestamp resumeTimestamp(100, 1);
+    getExpCtx()->inMongos = true;
+
+    // Create an ordered array of 2 UUIDs.
+    UUID uuids[2] = {UUID::gen(), UUID::gen()};
+
+    if (uuids[0] > uuids[1]) {
+        std::swap(uuids[0], uuids[1]);
+    }
+
+    // Create the resume token using the higher-sorting UUID.
+    auto checkResumeToken =
+        createCheckResumeToken(resumeTimestamp, Document{{"_id"_sd, 1}}, uuids[1]);
+
+    // Add two documents which have the same clusterTime but a lower UUID. One of the documents has
+    // a lower docKey than the resume token, the other has a higher docKey; this demonstrates that
+    // the UUID is the discriminating factor.
+    addDocument(resumeTimestamp, {{"_id"_sd, 0}}, uuids[0]);
+    addDocument(resumeTimestamp, {{"_id"_sd, 2}}, uuids[0]);
+
+    // Add a third document that matches the resume token.
+    addDocument(resumeTimestamp, {{"_id"_sd, 1}}, uuids[1]);
+
+    // Add a fourth document with the same timestamp and UUID whose docKey sorts after the token.
+    auto expectedDocKey = Document{{"_id"_sd, 3}};
+    addDocument(resumeTimestamp, expectedDocKey, uuids[1]);
+
+    // We should skip the first two docs, swallow the resume token, and return the fourth doc.
+    const auto firstDocAfterResume = checkResumeToken->getNext();
+    const auto tokenFromFirstDocAfterResume =
+        ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
+
+    ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, resumeTimestamp);
+    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), expectedDocKey);
+}
+
+TEST_F(CheckResumeTokenTest,
+       ShardedResumeFailsOnMongosWithSameClusterTimeIfUUIDsSortAfterResumeToken) {
+    Timestamp resumeTimestamp(100, 1);
+    getExpCtx()->inMongos = true;
+
+    // Create an ordered array of 2 UUIDs.
+    UUID uuids[2] = {UUID::gen(), UUID::gen()};
+
+    if (uuids[0] > uuids[1]) {
+        std::swap(uuids[0], uuids[1]);
+    }
+
+    // Create the resume token using the lower-sorting UUID.
+    auto checkResumeToken =
+        createCheckResumeToken(resumeTimestamp, Document{{"_id"_sd, 1}}, uuids[0]);
+
+    // Add a document which has the same clusterTime and a lower docKey but a higher UUID, followed
+    // by a document which matches the resume token. This is not possible in practice, but it serves
+    // to demonstrate that the resume attempt fails even when the resume token is present.
+    addDocument(resumeTimestamp, {{"_id"_sd, 0}}, uuids[1]);
+    addDocument(resumeTimestamp, {{"_id"_sd, 1}}, uuids[0]);
+
+    ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+}
+
 /**
  * We should _error_ on the no-document case, because that means the resume token was not found.
  */
