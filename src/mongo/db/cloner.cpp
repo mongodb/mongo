@@ -1,3 +1,4 @@
+
 // cloner.cpp - copy a database (export/import basically)
 
 /**
@@ -509,7 +510,7 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     // main data
     CloneOptions opts;
     opts.slaveOk = true;
-    copy(opCtx, dbname, nss, options, idIndexSpec, nss, opts, Query(query).snapshot());
+    copy(opCtx, dbname, nss, options, idIndexSpec, nss, opts, Query(query));
 
     /* TODO : copyIndexes bool does not seem to be implemented! */
     if (!shouldCopyIndexes) {
@@ -805,9 +806,6 @@ Status Cloner::copyDb(OperationContext* opCtx,
             }
 
             LOG(1) << "\t\t cloning " << from_name << " -> " << to_name;
-            Query q;
-            if (opts.snapshot)
-                q.snapshot();
 
             copy(opCtx,
                  toDBName,
@@ -816,7 +814,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
                  params.idIndexSpec,
                  to_name,
                  opts,
-                 q);
+                 Query());
         }
     }
 

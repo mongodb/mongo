@@ -98,17 +98,6 @@ public:
      */
     Query& explain();
 
-    /** Use snapshot mode for the query.  Snapshot mode assures no duplicates are returned, or
-     * objects missed, which were present at both the start and end of the query's execution (if an
-     * object is new during the query, or deleted during the query, it may or may not be returned,
-     * even with snapshot mode).
-
-        Note that short query responses (less than 1MB) are always effectively snapshotted.
-
-        Currently, snapshot mode may not be used with sorting or explicit hints.
-    */
-    Query& snapshot();
-
     /** Queries to the Mongo database support a $where parameter option which contains
         a javascript function that is evaluated to see whether objects being queried match
         its criteria.  Use this helper to append such a function to a query object.

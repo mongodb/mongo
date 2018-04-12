@@ -142,7 +142,6 @@ public:
         cloneOptions.fromDB = fromdbElt.str();
         cloneOptions.slaveOk = cmdObj["slaveOk"].trueValue();
         cloneOptions.useReplAuth = false;
-        cloneOptions.snapshot = true;
 
         const auto todbElt = cmdObj["todb"];
         uassert(ErrorCodes::TypeMismatch,
