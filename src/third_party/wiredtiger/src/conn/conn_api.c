@@ -1086,6 +1086,41 @@ err:	/*
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 
+	/*
+	 * Perform a system-wide checkpoint so that all tables are consistent
+	 * with each other.  Do this before shutting down all the subsystems.
+	 * We have shut down all user sessions, but send in true for waiting
+	 * for internal races.
+	 */
+	if (!F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_READONLY)) {
+		s = NULL;
+		WT_TRET(__wt_open_internal_session(
+		    conn, "close_ckpt", true, 0, &s));
+		if (s != NULL) {
+			const char *checkpoint_cfg[] = {
+			    WT_CONFIG_BASE(session, WT_SESSION_checkpoint),
+			    NULL
+			};
+			wt_session = &s->iface;
+			WT_TRET(__wt_txn_checkpoint(s, checkpoint_cfg, true));
+
+			/*
+			 * Mark the metadata dirty so we flush it on close,
+			 * allowing recovery to be skipped.
+			 */
+			WT_WITH_DHANDLE(s, WT_SESSION_META_DHANDLE(s),
+			    __wt_tree_modify_set(s));
+
+			WT_TRET(wt_session->close(wt_session, config));
+		}
+	}
+
+	if (ret != 0) {
+		__wt_err(session, ret,
+		    "failure during close, disabling further writes");
+		F_SET(conn, WT_CONN_PANIC);
+	}
+
 	WT_TRET(__wt_connection_close(conn));
 
 	/* We no longer have a session, don't try to update it. */

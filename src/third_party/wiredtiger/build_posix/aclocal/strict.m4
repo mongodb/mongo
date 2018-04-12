@@ -45,6 +45,26 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	[*6.[0-9].[0-9]*])				# gcc6.X
 		w="$w -Wduplicated-cond"
 		w="$w -Wmisleading-indentation";;
+	[*7.[0-9].[0-9]*])        # gcc7.X
+		w="$w -Walloca"
+		w="$w -Walloc-zero"
+		w="$w -Wduplicated-branches"
+		w="$w -Wduplicated-cond"
+		w="$w -Wformat-overflow=2"
+		w="$w -Wformat-signedness"
+		w="$w -Wformat-truncation=2"
+		w="$w -Wno-error=format-truncation"
+		w="$w -Wno-error=format"
+		w="$w -Wno-error=implicit-fallthrough"
+		w="$w -Wno-error=maybe-uninitialized"
+		w="$w -Wno-error=unsafe-loop-optimizations"
+		w="$w -Wjump-misses-init"
+		w="$w -Wlogical-op"
+		w="$w -Wredundant-decls"
+		w="$w -Wrestrict"
+		w="$w -Wunused-const-variable=2"
+		w="$w -Wunused-macros"
+		w="$w -Wvariadic-macros";;
 	esac
 
 	wt_cv_strict_warnings="$w"
@@ -66,6 +86,9 @@ AC_DEFUN([AM_CLANG_WARNINGS], [
 	# For now, turn it off.
 	# w="$w -Wno-error=cast-qual"
 	w="$w -Wno-cast-qual"
+
+	# Turn off clang unreachable-code error
+	w="$w -Wno-error=unreachable-code"
 
 	# On Centos 7.3.1611, system header files aren't compatible with
 	# -Wdisabled-macro-expansion.

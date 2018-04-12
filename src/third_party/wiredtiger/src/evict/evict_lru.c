@@ -1452,26 +1452,23 @@ retry:	while (slot < max_entries) {
 
 		/*
 		 * Re-check the "no eviction" flag, used to enforce exclusive
-		 * access when a handle is being closed. If not set, remember
-		 * the file to visit first, next loop.
+		 * access when a handle is being closed.
 		 *
 		 * Only try to acquire the lock and simply continue if we fail;
 		 * the lock is held while the thread turning off eviction clears
 		 * the tree's current eviction point, and part of the process is
 		 * waiting on this thread to acknowledge that action.
+		 *
+		 * If a handle is being discarded, it will still be marked open,
+		 * but won't have a root page.
 		 */
 		if (btree->evict_disabled == 0 &&
 		    !__wt_spin_trylock(session, &cache->evict_walk_lock)) {
-			if (btree->evict_disabled == 0) {
+			if (btree->evict_disabled == 0 &&
+			    btree->root.page != NULL) {
 				/*
-				 * Assert the handle has a root page: eviction
-				 * should have been locked out if the tree is
-				 * being discarded or the root page is changing.
-				 * As this has not always been the case, assert
-				 * to debug that change.
+				 * Remember the file to visit first, next loop.
 				 */
-				WT_ASSERT(session, btree->root.page != NULL);
-
 				cache->evict_file_next = dhandle;
 				WT_WITH_DHANDLE(session, dhandle,
 				    ret = __evict_walk_file(
@@ -1869,6 +1866,10 @@ fast:		/* If the page can't be evicted, give up. */
 	*slotp += (u_int)(evict - start);
 	WT_STAT_CONN_INCRV(
 	    session, cache_eviction_pages_queued, (u_int)(evict - start));
+
+	__wt_verbose(session, WT_VERB_EVICTSERVER,
+	    "%s walk: seen %" PRIu64 ", queued %" PRIu64,
+	    session->dhandle->name, pages_seen, pages_queued);
 
 	/*
 	 * If we couldn't find the number of pages we were looking for, skip
@@ -2452,13 +2453,22 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	u_int pct;
 	uint64_t total_bytes, total_dirty_bytes;
 
 	conn = S2C(session);
 	total_bytes = total_dirty_bytes = 0;
+	pct = 0;				/* [-Werror=uninitialized] */
 
 	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 	WT_RET(__wt_msg(session, "cache dump"));
+
+	WT_RET(__wt_msg(session,
+	    "cache full: %s", __wt_cache_full(session) ? "yes" : "no"));
+	WT_RET(__wt_msg(session, "cache clean check: %s (%u%%)",
+	    __wt_eviction_clean_needed(session, &pct) ? "yes" : "no", pct));
+	WT_RET(__wt_msg(session, "cache dirty check: %s (%u%%)",
+	    __wt_eviction_dirty_needed(session, &pct) ? "yes" : "no", pct));
 
 	for (dhandle = NULL;;) {
 		WT_WITH_HANDLE_LIST_READ_LOCK(session,

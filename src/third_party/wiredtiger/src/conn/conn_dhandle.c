@@ -317,6 +317,9 @@ __wt_conn_btree_open(
 	WT_ASSERT(session,
 	     !F_ISSET(S2C(session), WT_CONN_CLOSING_NO_MORE_OPENS));
 
+	/* Turn off eviction. */
+	WT_RET(__wt_evict_file_exclusive_on(session));
+
 	/*
 	 * If the handle is already open, it has to be closed so it can be
 	 * reopened with a new configuration.
@@ -330,11 +333,11 @@ __wt_conn_btree_open(
 	 * in the tree that can block the close.
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
-		WT_RET(__wt_conn_btree_sync_and_close(session, false, false));
+		WT_ERR(__wt_conn_btree_sync_and_close(session, false, false));
 
 	/* Discard any previous configuration, set up the new configuration. */
 	__conn_btree_config_clear(session);
-	WT_RET(__conn_btree_config_set(session));
+	WT_ERR(__conn_btree_config_set(session));
 
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_MASK(WT_BTREE_SPECIAL_FLAGS));
@@ -373,6 +376,8 @@ __wt_conn_btree_open(
 	if (0) {
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 	}
+
+	__wt_evict_file_exclusive_off(session);
 
 	return (ret);
 }
@@ -673,8 +678,8 @@ restart:
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
+		    WT_TRET(__wt_conn_dhandle_discard_single(session, true,
+		    F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_PANIC))));
 		goto restart;
 	}
 
@@ -699,8 +704,8 @@ restart:
 	/* Close the metadata file handle. */
 	while ((dhandle = TAILQ_FIRST(&conn->dhqh)) != NULL)
 		WT_WITH_DHANDLE(session, dhandle,
-		    WT_TRET(__wt_conn_dhandle_discard_single(
-		    session, true, F_ISSET(conn, WT_CONN_IN_MEMORY))));
+		    WT_TRET(__wt_conn_dhandle_discard_single(session, true,
+		    F_ISSET(conn, WT_CONN_IN_MEMORY | WT_CONN_PANIC))));
 
 	return (ret);
 }
