@@ -965,13 +965,6 @@ functions:
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
           make PREFIX=$(pwd)/build/ LIBDIRNAME='.' install
-
-          # Add libfaketime to mongo-binaries.tgz so it gets uploaded to each of the LXC containers.
-          # The build/ prefix of the shared object will get removed when Jepsen extracts the tarball
-          # into the /opt/mongodb/ directory.
-          gzip --stdout --decompress ../mongo-binaries.tgz > mongo-binaries.tar
-          tar --append --file=mongo-binaries.tar build/libfaketime.so.1
-          gzip --stdout mongo-binaries.tar > ../mongo-binaries.tgz
     - command: shell.exec
       params:
         working_dir: src
@@ -987,45 +980,14 @@ functions:
       params:
         working_dir: src
         script: |
-          # On each LXC host do the following:
-          #   Check to see if it's running, if not try to restart it.
-          #   Copy the mongodb tarball to /root.
-          numVms=5
-          exit_failure_code=0
-          ${set_sudo}
-          for i in $(seq 1 $numVms)
-          do
-            hostn=n$i
-            hostn_log=/var/log/lxc/$hostn.log
-            $sudo lxc-wait -n $hostn -s 'RUNNING' -t 0
-            lxc_code=$?
-            lxc_restarts=0
-            # If the LXC host is not running, try 5 times to start it.
-            while [ $lxc_code -ne 0 ]
-            do
-              lxc_restarts=$((lxc_restarts+1))
-              echo "Restarting host $hostn, attempt $lxc_restarts"
-              # When restarting, increase the logging level to INFO for the LXC log.
-              $sudo lxc-start -n $hostn --logpriority=INFO --logfile=$hostn_log -d
-              $sudo lxc-wait -n $hostn -s 'RUNNING' -t 60
-              lxc_code=$?
-              if [ $lxc_restarts -eq 5 ]; then
-                break
-              fi
-            done
-            scp -o ConnectTimeout=30 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
-            exit_code=$?
-            # If the copy fails, then tail the LXC host log.
-            if [ $exit_code -ne 0 ]; then
-              echo "Copy to host $hostn failed!"
-              $sudo tail -n 100 $hostn_log
-              exit_failure_code=$exit_code
-            else
-              # Cleanup any existing logs from previous runs.
-              ssh root@$hostn "rm -f /root/mongod.log /root/stdout.log /opt/mongod/mongod.log /opt/mongod/stdout.log"
-            fi
-          done
-          exit $exit_failure_code
+          set -o errexit
+          ${activate_virtualenv}
+          $python -c 'import socket; num_nodes = 5; print("\n".join(["%s:%d" % (socket.gethostname(), port) for port in range(20000, 20000 + num_nodes)]))' > nodes.txt
+
+          if [ ${distro_id} = "ubuntu1404-jepsen" ]; then
+            ${set_sudo}
+            $sudo apt-get install -y --force-yes libc++-dev libsnmp-dev
+          fi
 
   "run jepsen test" :
     - command: shell.exec
@@ -1035,21 +997,34 @@ functions:
         working_dir: src/jepsen-mongodb
         script: |
           set -o verbose
+
+          # Set the TMPDIR environment variable to be a directory in the task's working
+          # directory so that temporary files created by processes spawned by jepsen get
+          # cleaned up after the task completes. This also ensures the spawned processes
+          # aren't impacted by limited space in the mount point for the /tmp directory.
+          # We also need to set the _JAVA_OPTIONS environment variable so that lein will
+          # recognize this as the default temp directory.
+          export TMPDIR="${workdir}/tmp"
+          mkdir -p $TMPDIR
+          export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
+
           start_time=$(date +%s)
-          lein run test --test ${jepsen_test_name}                        \
-                        --tarball "file:///root/mongo-binaries.tgz"       \
-                        --ssh-private-key ~/.ssh/id_rsa_lxc               \
-                        --clock-skew faketime                             \
-                        --libfaketime-path /opt/mongodb/libfaketime.so.1  \
-                        --mongod-conf mongod_verbose.conf                 \
-                        ${jepsen_key_time_limit}                          \
-                        ${jepsen_protocol_version}                        \
-                        ${jepsen_read_concern}                            \
-                        ${jepsen_read_with_find_and_modify}               \
-                        ${jepsen_storage_engine}                          \
-                        ${jepsen_time_limit}                              \
-                        ${jepsen_write_concern}                           \
-                        2>&1                                              \
+          lein run test --test ${jepsen_test_name}                                           \
+                        --mongodb-dir ../                                                    \
+                        --working-dir ${workdir}/src/jepsen-workdir                          \
+                        --clock-skew faketime                                                \
+                        --libfaketime-path ${workdir}/src/libfaketime/build/libfaketime.so.1 \
+                        --mongod-conf mongod_verbose.conf                                    \
+                        --virtualization none                                                \
+                        --nodes-file ../nodes.txt                                            \
+                        ${jepsen_key_time_limit}                                             \
+                        ${jepsen_protocol_version}                                           \
+                        ${jepsen_read_concern}                                               \
+                        ${jepsen_read_with_find_and_modify}                                  \
+                        ${jepsen_storage_engine}                                             \
+                        ${jepsen_time_limit}                                                 \
+                        ${jepsen_write_concern}                                              \
+                        2>&1                                                                 \
           | tee jepsen_${task_name}_${execution}.log
           end_time=$(date +%s)
           elapsed_secs=$((end_time-start_time))
@@ -2206,47 +2181,13 @@ functions:
     - *tar_code_coverage_data
     - *archive_code_coverage_data
 
-  ### Process & archive Jepsen artifacts ###
-  "gather jepsen logs": &gather_jepsen_logs
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        # For Jepsen tasks, archive the mongod log files.
-        if [ ${distro_id} = "ubuntu1404-jepsen" ]; then
-          # Copy mongod.log & stdout.log from each LXC host for archive purposes. Note that
-          # stdout.log is also generated as a result of starting mongod.
-          # The logs can reside in 1 of 2 places:
-          #   If the task completed: /root
-          #   If the task failed to complete: /opt/mongodb
-          # There may be logs in both places, but the ones in /opt/mongodb should override
-          # the ones in /root, since the logs in /root could be from a previous successful run.
-          numVms=5
-          for i in $(seq 1 $numVms)
-          do
-            hostn=n$i
-            for log_dir in /root /opt/mongodb
-            do
-              for log in mongod.log stdout.log
-              do
-                outlog="$(echo $log | cut -f1 -d '.')-n$i.log"
-                scp -q root@$hostn:$log_dir/$log $outlog 2> /dev/null
-                if [ -f $outlog ]; then
-                  echo "Copied $log_dir/$log from $hostn to $outlog"
-                fi
-              done
-            done
-          done
-        fi
-
   "tar jepsen logs": &tar_jepsen_logs
     command: archive.targz_pack
     params:
       target: "src/jepsen-mongod-logs.tgz"
-      source_dir: "src"
+      source_dir: "${workdir}/src/jepsen-workdir"
       include:
-        - "mongod*.log"
-        - "stdout*.log"
+        - "./**.log"
 
   "archive jepsen logs": &archive_jepsen_logs
     command: s3.put
@@ -2283,7 +2224,6 @@ functions:
       optional: true
 
   "save jepsen artifacts":
-    - *gather_jepsen_logs
     - *tar_jepsen_logs
     - *archive_jepsen_logs
     - *tar_jepsen_results
