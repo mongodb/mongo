@@ -309,6 +309,7 @@ env.Library(
         'db/mongodandmongos',
         'db/op_observer_d',
         'db/periodic_runner_job_abort_expired_transactions',
+        'db/periodic_runner_job_decrease_snapshot_cache_pressure',
         'db/query_exec',
         'db/repair_database',
         'db/repair_database_and_check_version',

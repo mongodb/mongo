@@ -70,7 +70,7 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
                                         period = (period < 1) ? 1 : period;
                                         period = (period > 60) ? 60 : period;
 
-                                        if (++seconds < period) {
+                                        if (++seconds <= period) {
                                             return;
                                         }
 

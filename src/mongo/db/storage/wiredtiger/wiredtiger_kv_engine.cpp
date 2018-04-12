@@ -65,6 +65,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -1153,11 +1154,6 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
     return initRsOplogBackgroundThreadCallback(ns);
 }
 
-void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
-    constexpr bool doForce = true;
-    _setOldestTimestamp(oldestTimestamp, doForce);
-}
-
 namespace {
 
 MONGO_FP_DECLARE(WTPreserveSnapshotHistoryIndefinitely);
@@ -1196,35 +1192,58 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     }
     invariant(static_cast<std::size_t>(size) < sizeof(stableTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, stableTSConfigString));
+    {
+        stdx::lock_guard<stdx::mutex> lock(_stableTimestampMutex);
+        // set_timestamp above ignores backwards in time without force.
+        if (_stableTimestamp < stableTimestamp) {
+            _stableTimestamp = stableTimestamp;
+        }
+    }
 
     if (_checkpointThread) {
         _checkpointThread->setStableTimestamp(stableTimestamp);
     }
 
-    // Communicate to WiredTiger that it can clean up timestamp data earlier than the timestamp
-    // provided.  No future queries will need point-in-time reads at a timestamp prior to the one
-    // provided here.
+    // Forward the oldest timestamp so that WiredTiger can clean up earlier timestamp data.
     if (!MONGO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
-        _setOldestTimestamp(stableTimestamp);
+        setOldestTimestampFromStable();
     }
 }
 
-void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp, bool force) {
+void WiredTigerKVEngine::setOldestTimestampFromStable() {
+    Timestamp stableTimestamp;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_stableTimestampMutex);
+        stableTimestamp = _stableTimestamp;
+    }
 
-    if (oldestTimestamp == Timestamp()) {
-        // Nothing to set yet.
+    // Calculate what the oldest_timestamp should be from the stable_timestamp. The oldest
+    // timestamp should lag behind stable by 'targetSnapshotHistoryWindowInSeconds' to create a
+    // window of available snapshots. If the lag window is not yet large enough, we will not
+    // update/forward the oldest_timestamp yet and instead return early.
+    Timestamp newOldestTimestamp = _calculateHistoryLagFromStableTimestamp(stableTimestamp);
+    if (newOldestTimestamp.isNull()) {
         return;
     }
+
     const auto oplogReadTimestamp = Timestamp(_oplogManager->getOplogReadTimestamp());
-    if (!force && !oplogReadTimestamp.isNull() && oldestTimestamp > oplogReadTimestamp) {
+    if (!oplogReadTimestamp.isNull() && newOldestTimestamp > oplogReadTimestamp) {
         // Oplog visibility is updated asynchronously from replication updating the commit point.
         // When force is not set, lag the `oldest_timestamp` to the possibly stale oplog read
         // timestamp value. This guarantees an oplog reader's `read_timestamp` can always
         // be serviced. When force is set, we respect the caller's request and do not lag the
         // oldest timestamp.
-        oldestTimestamp = oplogReadTimestamp;
+        newOldestTimestamp = oplogReadTimestamp;
     }
 
+    _setOldestTimestamp(newOldestTimestamp, false);
+}
+
+void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp) {
+    _setOldestTimestamp(newOldestTimestamp, true);
+}
+
+void WiredTigerKVEngine::_setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
     char oldestTSConfigString["force=true,oldest_timestamp=,commit_timestamp="_sd.size() +
                               (2 * 8 * 2) /* 2 timestamps of 16 hexadecimal digits each */ +
                               1 /* trailing null */];
@@ -1233,13 +1252,13 @@ void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp, bool for
         size = std::snprintf(oldestTSConfigString,
                              sizeof(oldestTSConfigString),
                              "force=true,oldest_timestamp=%llx,commit_timestamp=%llx",
-                             oldestTimestamp.asULL(),
-                             oldestTimestamp.asULL());
+                             newOldestTimestamp.asULL(),
+                             newOldestTimestamp.asULL());
     } else {
         size = std::snprintf(oldestTSConfigString,
                              sizeof(oldestTSConfigString),
                              "oldest_timestamp=%llx",
-                             oldestTimestamp.asULL());
+                             newOldestTimestamp.asULL());
     }
     if (size < 0) {
         int e = errno;
@@ -1248,12 +1267,49 @@ void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp, bool for
     }
     invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
+    {
+        stdx::lock_guard<stdx::mutex> lock(_oldestTimestampMutex);
+        // set_timestamp above ignores backwards in time without force.
+        if (force) {
+            _oldestTimestamp = newOldestTimestamp;
+        } else if (_oldestTimestamp < newOldestTimestamp) {
+            _oldestTimestamp = newOldestTimestamp;
+        }
+    }
 
     if (force) {
-        LOG(2) << "oldest_timestamp and commit_timestamp force set to " << oldestTimestamp;
+        LOG(2) << "oldest_timestamp and commit_timestamp force set to " << newOldestTimestamp;
     } else {
-        LOG(2) << "oldest_timestamp set to " << oldestTimestamp;
+        LOG(2) << "oldest_timestamp set to " << newOldestTimestamp;
     }
+}
+
+Timestamp WiredTigerKVEngine::_calculateHistoryLagFromStableTimestamp(Timestamp stableTimestamp) {
+
+    // The oldest_timestamp should lag behind the stable_timestamp by
+    // 'targetSnapshotHistoryWindowInSeconds' seconds.
+
+    if (stableTimestamp.getSecs() <
+        static_cast<unsigned>(snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load())) {
+        // The history window is larger than the timestamp history thus far. We must wait for
+        // the history to reach the window size before moving oldest_timestamp forward.
+        return Timestamp();
+    }
+
+    Timestamp calculatedOldestTimestamp(
+        stableTimestamp.getSecs() -
+            snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load(),
+        stableTimestamp.getInc());
+    {
+        stdx::lock_guard<stdx::mutex> lock(_oldestTimestampMutex);
+        if (calculatedOldestTimestamp <= _oldestTimestamp) {
+            // The stable_timestamp is not far enough ahead of the oldest_timestamp for the
+            // oldest_timestamp to be moved forward: the window is still too small.
+            return Timestamp();
+        }
+    }
+
+    return calculatedOldestTimestamp;
 }
 
 void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
@@ -1378,6 +1434,26 @@ void WiredTigerKVEngine::haltOplogManager() {
 
 void WiredTigerKVEngine::replicationBatchIsComplete() const {
     _oplogManager->triggerJournalFlush();
+}
+
+bool WiredTigerKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
+    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    invariant(session);
+
+    int64_t score = uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
+        session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_SCORE));
+
+    return (score >= snapshotWindowParams.cachePressureThreshold.load());
+}
+
+Timestamp WiredTigerKVEngine::getStableTimestamp() const {
+    stdx::lock_guard<stdx::mutex> lock(_stableTimestampMutex);
+    return _stableTimestamp;
+}
+
+Timestamp WiredTigerKVEngine::getOldestTimestamp() const {
+    stdx::lock_guard<stdx::mutex> lock(_oldestTimestampMutex);
+    return _oldestTimestamp;
 }
 
 }  // namespace mongo

@@ -509,8 +509,20 @@ void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 
-void KVStorageEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
-    _engine->setOldestTimestamp(oldestTimestamp);
+void KVStorageEngine::setOldestTimestampFromStable() {
+    _engine->setOldestTimestampFromStable();
+}
+
+void KVStorageEngine::setOldestTimestamp(Timestamp newOldestTimestamp) {
+    _engine->setOldestTimestamp(newOldestTimestamp);
+}
+
+bool KVStorageEngine::isCacheUnderPressure(OperationContext* opCtx) const {
+    return _engine->isCacheUnderPressure(opCtx);
+}
+
+void KVStorageEngine::setCachePressureForTest(int pressure) {
+    return _engine->setCachePressureForTest(pressure);
 }
 
 bool KVStorageEngine::supportsRecoverToStableTimestamp() const {

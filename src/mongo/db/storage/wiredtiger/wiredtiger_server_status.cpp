@@ -42,7 +42,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -78,6 +77,8 @@ BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
     }
 
     WiredTigerKVEngine::appendGlobalStats(bob);
+
+    WiredTigerUtil::appendSnapshotWindowSettings(_engine, session, &bob);
 
     return bob.obj();
 }

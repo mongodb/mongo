@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,34 +28,30 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-class ClockSource;
+class ServiceContext;
 
 /**
- * Creates a harness for generic KVEngine testing of all KVEngine implementations.
- *
- * A particular KVHarnessHelper implementation (with a particular KVEngine implementation) will
- * implement registerFactory() and create() such that generic unit tests can create() and test the
- * particular KVHarnessHelper implementation. This library can be pulled into a particular
- * implementation's CppUnitTest to exercise the generic test coverage on that implementation.
+ * Test fixture class for mongod tests that use the "devnull" storage engine.
  */
-class KVHarnessHelper {
+class ServiceContextDevnullTestFixture : public unittest::Test {
 public:
-    virtual ~KVHarnessHelper() {}
+    /**
+     * Initializes the devnull engine as the global storage engine.
+     * Also sets up a Client on the thread, which can be accessed via 'cc()'.
+     */
+    void setUp() override;
 
-    // returns same thing for entire life
-    virtual KVEngine* getEngine() = 0;
+    void tearDown() override;
 
-    virtual KVEngine* restartEngine() = 0;
-
-    static std::unique_ptr<KVHarnessHelper> create();
-    static void registerFactory(stdx::function<std::unique_ptr<KVHarnessHelper>()> factory);
+    /**
+     * Returns a service context, which is only valid for this instance of the test.
+     * Must not be called before setUp() or after tearDown().
+     */
+    ServiceContext* getServiceContext();
 };
 
 }  // namespace mongo

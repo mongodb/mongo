@@ -43,6 +43,15 @@
 #include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
+
+/**
+ * Sets up an OperationContext with a Recovery Unit. Uses a ServiceContextNoop.
+ *
+ * A particular HarnessHelper implementation will implement registerHarnessHelperFactory() and
+ * newHarnessHelper() such that generic unit tests can create and test that particular
+ * HarnessHelper implementation. The newRecoveryUnit() implementation dictates what RecoveryUnit
+ * implementation the OperationContext has.
+ */
 class HarnessHelper {
 public:
     virtual ~HarnessHelper() = 0;
@@ -72,9 +81,9 @@ public:
         return &_serviceContext;
     }
 
-private:
     virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
 
+private:
     ServiceContextNoop _serviceContext;
     ServiceContext::UniqueClient _client = _serviceContext.makeClient("hh");
 };

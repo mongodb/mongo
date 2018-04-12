@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,36 +26,45 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <memory>
+#include "mongo/db/service_context_devnull_test_fixture.h"
 
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/stdx/functional.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
+#include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-class ClockSource;
+void ServiceContextDevnullTestFixture::setUp() {
+    Test::setUp();
+    Client::initThread(getThreadName());
 
-/**
- * Creates a harness for generic KVEngine testing of all KVEngine implementations.
- *
- * A particular KVHarnessHelper implementation (with a particular KVEngine implementation) will
- * implement registerFactory() and create() such that generic unit tests can create() and test the
- * particular KVHarnessHelper implementation. This library can be pulled into a particular
- * implementation's CppUnitTest to exercise the generic test coverage on that implementation.
- */
-class KVHarnessHelper {
-public:
-    virtual ~KVHarnessHelper() {}
+    auto const serviceContext = getServiceContext();
+    if (!serviceContext->getStorageEngine()) {
+        // When using the 'devnull' storage engine, it is fine for the temporary directory to
+        // go away after the global storage engine is initialized.
+        unittest::TempDir tempDir("service_context_devnull_test");
+        mongo::storageGlobalParams.dbpath = tempDir.path();
+        mongo::storageGlobalParams.engine = "devnull";
+        mongo::storageGlobalParams.engineSetByUser = true;
+        createLockFile(serviceContext);
+        initializeStorageEngine(serviceContext);
+    }
+}
 
-    // returns same thing for entire life
-    virtual KVEngine* getEngine() = 0;
+void ServiceContextDevnullTestFixture::tearDown() {
+    Client::destroy();
+    Test::tearDown();
+}
 
-    virtual KVEngine* restartEngine() = 0;
-
-    static std::unique_ptr<KVHarnessHelper> create();
-    static void registerFactory(stdx::function<std::unique_ptr<KVHarnessHelper>()> factory);
-};
+ServiceContext* ServiceContextDevnullTestFixture::getServiceContext() {
+    return getGlobalServiceContext();
+}
 
 }  // namespace mongo

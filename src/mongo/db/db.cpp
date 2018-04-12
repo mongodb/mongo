@@ -95,6 +95,7 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
+#include "mongo/db/periodic_runner_job_decrease_snapshot_cache_pressure.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -601,13 +602,17 @@ ExitCode _initAndListen(int listenPort) {
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsLocal));
 
-    // Start up a background task to periodically check for and kill expired transactions.
+    // Start up a background task to periodically check for and kill expired transactions; and a
+    // background task to periodically check for and decrease cache pressure by decreasing the
+    // target size setting for the storage engine's window of available snapshots.
+    //
     // Only do this on storage engines supporting snapshot reads, which hold resources we wish to
     // release periodically in order to avoid storage cache pressure build up.
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
     if (storageEngine->supportsReadConcernSnapshot()) {
         startPeriodicThreadToAbortExpiredTransactions(serviceContext);
+        startPeriodicThreadToDecreaseSnapshotHistoryCachePressure(serviceContext);
     }
 
     // Set up the logical session cache

@@ -35,7 +35,7 @@
 namespace mongo {
 
 /**
- * Test fixture class for tests that use either the "ephemeralForTest" or "devnull" storage engines.
+ * Test fixture class for tests that use the "ephemeralForTest" storage engine.
  */
 class ServiceContextMongoDTest : public unittest::Test {
 public:

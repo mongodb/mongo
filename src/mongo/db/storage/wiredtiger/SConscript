@@ -80,6 +80,7 @@ if wiredtiger:
             'storage_wiredtiger_customization_hooks',
             ],
         LIBDEPS_PRIVATE= [
+            '$BUILD_DIR/mongo/db/snapshot_window_options',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ],
         )

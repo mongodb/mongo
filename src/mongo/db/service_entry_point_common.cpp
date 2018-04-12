@@ -70,6 +70,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/snapshot_window_util.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/rpc/factory.h"
@@ -879,6 +880,15 @@ void execCommandDatabase(OperationContext* opCtx,
             if (ShardingState::get(opCtx)->enabled()) {
                 onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
                     .ignore();
+            }
+        } else if (e.code() == ErrorCodes::SnapshotTooOld) {
+            // SnapshotTooOld errors indicate that PIT ops are failing to find an available snapshot
+            // at their specified atClusterTime. Therefore, we'll try to increase the snapshot
+            // history window that the storage engine maintains in order to increase the likelihood
+            // of successful future PIT atClusterTime requests.
+            auto engine = opCtx->getServiceContext()->getStorageEngine();
+            if (engine && engine->supportsReadConcernSnapshot()) {
+                SnapshotWindowUtil::increaseTargetSnapshotWindowSize(opCtx);
             }
         }
 

@@ -39,6 +39,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/snapshot_window_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"
@@ -589,6 +591,38 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
         delete it->second;
     }
     return Status::OK();
+}
+
+void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
+                                                  WiredTigerSession* session,
+                                                  BSONObjBuilder* bob) {
+    invariant(engine);
+    invariant(session);
+    invariant(bob);
+
+    const Timestamp& stableTimestamp = engine->getStableTimestamp();
+    const Timestamp& oldestTimestamp = engine->getOldestTimestamp();
+
+    const unsigned currentAvailableSnapshotWindow =
+        stableTimestamp.getSecs() - oldestTimestamp.getSecs();
+
+    int64_t score = uassertStatusOK(WiredTigerUtil::getStatisticsValueAs<int64_t>(
+        session->getSession(), "statistics:", "", WT_STAT_CONN_CACHE_LOOKASIDE_SCORE));
+
+    BSONObjBuilder settings(bob->subobjStart("snapshot-window-settings"));
+    settings.append("cache pressure percentage threshold",
+                    snapshotWindowParams.cachePressureThreshold.load());
+    settings.append("current cache pressure percentage", score);
+    settings.append("max target available snapshots window size in seconds",
+                    snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.load());
+    settings.append("target available snapshots window size in seconds",
+                    snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.load());
+    settings.append("current available snapshots window size in seconds",
+                    currentAvailableSnapshotWindow);
+    settings.append("latest majority snapshot timestamp available",
+                    stableTimestamp.toStringPretty());
+    settings.append("oldest majority snapshot timestamp available",
+                    oldestTimestamp.toStringPretty());
 }
 
 }  // namespace mongo

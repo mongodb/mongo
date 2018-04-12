@@ -763,6 +763,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
+        'snapshot_window_util',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/command_can_run_here',
@@ -1464,9 +1465,56 @@ env.Library(
     source=[
         'periodic_runner_job_abort_expired_transactions.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/periodic_runner',
+    LIBDEPS_PRIVATE=[
         'kill_sessions_local',
+        '$BUILD_DIR/mongo/util/periodic_runner',
+    ],
+)
+
+env.Library(
+    target='periodic_runner_job_decrease_snapshot_cache_pressure',
+    source=[
+        'periodic_runner_job_decrease_snapshot_cache_pressure.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'snapshot_window_options',
+        'snapshot_window_util',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/periodic_runner',
+    ],
+)
+
+env.Library(
+    target='snapshot_window_options',
+    source=[
+        'snapshot_window_options.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_parameters',
+    ],
+)
+
+env.Library(
+    target='snapshot_window_util',
+    source=[
+        'snapshot_window_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'snapshot_window_options',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.CppUnitTest(
+    target='snapshot_window_util_test',
+    source=[
+        'snapshot_window_util_test.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'service_context_d',
+        'service_context_devnull_test_fixture',
+        'snapshot_window_options',
+        'snapshot_window_util',
     ],
 )
 
@@ -1689,6 +1737,23 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/mongod',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'service_context_d',
+    ],
+)
+
+env.Library(
+    target= 'service_context_devnull_test_fixture',
+    source= [
+        'service_context_devnull_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        # this library is required only because of SERVER-29908
+        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull',
         '$BUILD_DIR/mongo/unittest/unittest',
         'service_context_d',
     ],

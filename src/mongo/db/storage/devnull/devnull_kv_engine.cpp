@@ -31,6 +31,7 @@
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/snapshot_window_options.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -258,4 +259,14 @@ SortedDataInterface* DevNullKVEngine::getSortedDataInterface(OperationContext* o
                                                              const IndexDescriptor* desc) {
     return new DevNullSortedDataInterface();
 }
+
+bool DevNullKVEngine::isCacheUnderPressure(OperationContext* opCtx) const {
+    return (_cachePressureForTest >= snapshotWindowParams.cachePressureThreshold.load());
 }
+
+void DevNullKVEngine::setCachePressureForTest(int pressure) {
+    invariant(pressure >= 0 && pressure <= 100);
+    _cachePressureForTest = pressure;
+}
+
+}  // namespace mongo

@@ -180,11 +180,9 @@ public:
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
-    /**
-     * This method will force the oldest timestamp to the input value. Callers must be serialized
-     * along with `setStableTimestamp`
-     */
-    void setOldestTimestamp(Timestamp oldestTimestamp);
+    virtual void setOldestTimestampFromStable() override;
+
+    virtual void setOldestTimestamp(Timestamp newOldestTimestamp) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
@@ -254,7 +252,7 @@ public:
 
     /**
      * Sets the implementation for `initRsOplogBackgroundThread` (allowing tests to skip the
-     * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefroe in
+     * background job, for example). Intended to be called from a MONGO_INITIALIZER and therefore in
      * a single threaded context.
      */
     static void setInitRsOplogBackgroundThreadCallback(stdx::function<bool(StringData)> cb);
@@ -269,6 +267,15 @@ public:
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
+    bool isCacheUnderPressure(OperationContext* opCtx) const override;
+
+    /**
+     * These are timestamp access functions for serverStatus to be able to report the actual
+     * snapshot window size.
+     */
+    Timestamp getStableTimestamp() const;
+    Timestamp getOldestTimestamp() const;
+
 private:
     class WiredTigerJournalFlusher;
     class WiredTigerCheckpointThread;
@@ -280,7 +287,22 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    void _setOldestTimestamp(Timestamp oldestTimestamp, bool force = false);
+    /**
+     * Uses the 'stableTimestamp', the 'targetSnapshotHistoryWindowInSeconds' setting and the
+     * current _oldestTimestamp to calculate what the new oldest_timestamp should be, in order to
+     * maintain a window of available snapshots on the storage engine from oldest to stable
+     * timestamp.
+     *
+     * If the returned Timestamp isNull(), oldest_timestamp should not be moved forward.
+     */
+    Timestamp _calculateHistoryLagFromStableTimestamp(Timestamp stableTimestamp);
+
+    /**
+     * Sets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through. If force is true, oldest will be set to the given input value, unmodified, even if
+     * it is backwards in time from the last oldest timestamp (accomodating initial sync).
+     */
+    void _setOldestTimestamp(Timestamp newOldestTimestamp, bool force);
 
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;
@@ -319,5 +341,13 @@ private:
     std::unique_ptr<WiredTigerSession> _backupSession;
     Timestamp _recoveryTimestamp;
     WiredTigerFileVersion _fileVersion;
+
+    // Ensures accesses to _oldestTimestamp and _stableTimestamp, respectively, are multi-core safe.
+    mutable stdx::mutex _oldestTimestampMutex;
+    mutable stdx::mutex _stableTimestampMutex;
+
+    // Tracks the stable and oldest timestamps we've set on the storage engine.
+    Timestamp _oldestTimestamp;
+    Timestamp _stableTimestamp;
 };
 }

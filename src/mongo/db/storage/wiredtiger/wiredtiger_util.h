@@ -45,6 +45,8 @@ namespace mongo {
 class BSONObjBuilder;
 class OperationContext;
 class WiredTigerConfigParser;
+class WiredTigerKVEngine;
+class WiredTigerSession;
 
 inline bool wt_keeptxnopen() {
     return false;
@@ -114,6 +116,24 @@ public:
                                     const std::string& uri,
                                     const std::string& config,
                                     BSONObjBuilder* bob);
+
+    /**
+     * Appends information about the storage engine's currently available snapshots and the settings
+     * that affect that window of maintained history.
+     *
+     * "snapshot-window-settings" : {
+     *      "cache pressure percentage threshold" : <num>,
+     *      "current cache pressure percentage" : <num>,
+     *      "max target available snapshots window size in seconds" : <num>,
+     *      "target available snapshots window size in seconds" : <num>,
+     *      "current available snapshots window size in seconds" : <num>,
+     *      "latest majority snapshot timestamp available" : <num>,
+     *      "oldest majority snapshot timestamp available" : <num>
+     * }
+     */
+    static void appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
+                                             WiredTigerSession* session,
+                                             BSONObjBuilder* bob);
 
     /**
      * Gets entire metadata string for collection/index at URI.

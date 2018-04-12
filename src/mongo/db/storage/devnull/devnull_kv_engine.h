@@ -39,6 +39,9 @@ namespace mongo {
 
 class JournalListener;
 
+/**
+ * The devnull storage engine is intended for unit and performance testing.
+ */
 class DevNullKVEngine : public KVEngine {
 public:
     virtual ~DevNullKVEngine() {}
@@ -92,6 +95,10 @@ public:
         return true;
     }
 
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const override;
+
+    virtual void setCachePressureForTest(int pressure) override;
+
     virtual int64_t getIdentSize(OperationContext* opCtx, StringData ident) {
         return 1;
     }
@@ -118,5 +125,7 @@ public:
 
 private:
     std::shared_ptr<void> _catalogInfo;
+
+    int _cachePressureForTest;
 };
 }

@@ -261,9 +261,26 @@ public:
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) {}
 
     /**
+     * See `StorageEngine::setOldestTimestampFromStable`
+     */
+    virtual void setOldestTimestampFromStable() {}
+
+    /**
      * See `StorageEngine::setOldestTimestamp`
      */
-    virtual void setOldestTimestamp(Timestamp oldestTimestamp) {}
+    virtual void setOldestTimestamp(Timestamp newOldestTimestamp) {}
+
+    /**
+     * See `StorageEngine::isCacheUnderPressure()`
+     */
+    virtual bool isCacheUnderPressure(OperationContext* opCtx) const {
+        return false;
+    }
+
+    /**
+     * See 'StorageEngine::setCachePressureForTest()'
+     */
+    virtual void setCachePressureForTest(int pressure) {}
 
     /**
      * See `StorageEngine::supportsRecoverToStableTimestamp`
