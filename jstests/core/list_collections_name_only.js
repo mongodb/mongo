@@ -6,9 +6,7 @@
     var res;
     var collObj;
 
-    mydb.foo.drop();
-    mydb.bar.drop();
-
+    assert.commandWorked(mydb.dropDatabase());
     assert.commandWorked(mydb.createCollection("foo"));
     res = mydb.runCommand({listCollections: 1, nameOnly: true});
     assert.commandWorked(res);
