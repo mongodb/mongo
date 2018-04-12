@@ -27,9 +27,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
             self, logger, job_num, mongos_executable=None, mongos_options=None,
             mongod_executable=None, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
-            num_shards=1, num_rs_nodes_per_shard=None, num_mongos=1, separate_configsvr=True,
-            enable_sharding=None, enable_balancer=True, auth_options=None, configsvr_options=None,
-            shard_options=None):
+            num_shards=1, num_rs_nodes_per_shard=None, num_mongos=1, enable_sharding=None,
+            enable_balancer=True, auth_options=None, configsvr_options=None, shard_options=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
@@ -45,7 +44,6 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.num_shards = num_shards
         self.num_rs_nodes_per_shard = num_rs_nodes_per_shard
         self.num_mongos = num_mongos
-        self.separate_configsvr = separate_configsvr
         self.enable_sharding = utils.default_if_none(enable_sharding, [])
         self.enable_balancer = enable_balancer
         self.auth_options = auth_options
@@ -60,10 +58,10 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     def setup(self):
         """Set up the sharded cluster."""
-        if self.separate_configsvr:
-            if self.configsvr is None:
-                self.configsvr = self._new_configsvr()
-            self.configsvr.setup()
+        if self.configsvr is None:
+            self.configsvr = self._new_configsvr()
+
+        self.configsvr.setup()
 
         if not self.shards:
             for i in xrange(self.num_shards):
@@ -91,17 +89,19 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         for shard in self.shards:
             shard.await_ready()
 
+        # We call self._new_mongos() and mongos.setup() in self.await_ready() function
+        # instead of self.setup() because mongos routers have to connect to a running cluster.
         if not self.mongos:
             for i in range(self.num_mongos):
                 mongos = self._new_mongos(i, self.num_mongos)
-
-                # Start up the mongos.
-                mongos.setup()
-
-                # Wait for the mongos.
-                mongos.await_ready()
-
                 self.mongos.append(mongos)
+
+        for mongos in self.mongos:
+            # Start up the mongos.
+            mongos.setup()
+
+            # Wait for the mongos.
+            mongos.await_ready()
 
         client = self.mongo_client()
         if self.auth_options is not None:
@@ -144,7 +144,6 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         for mongos in self.mongos:
             teardown_handler.teardown(mongos, "mongos")
-        self.mongos = []
 
         for shard in self.shards:
             teardown_handler.teardown(shard, "shard")
@@ -262,11 +261,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongos_logger = self.logger.new_fixture_node_logger(logger_name)
 
         mongos_options = self.mongos_options.copy()
-
-        if self.separate_configsvr:
-            mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
-        else:
-            mongos_options["configdb"] = "localhost:{}".format(self.shards[0].port)
+        mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
 
         return _MongoSFixture(mongos_logger, self.job_num, mongos_executable=self.mongos_executable,
                               mongos_options=mongos_options)
