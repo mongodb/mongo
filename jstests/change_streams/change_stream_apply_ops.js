@@ -7,8 +7,17 @@
     load("jstests/libs/change_stream_util.js");
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    function testChangeStreamsWithTransactions(watchWholeDb) {
-        let cst = new ChangeStreamTest(db);
+    var WatchMode = {
+        kCollection: 1,
+        kDb: 2,
+        kCluster: 3,
+    };
+
+    function testChangeStreamsWithTransactions(watchMode) {
+        let dbToStartTestOn = db;
+        if (watchMode == WatchMode.kCluster) {
+            dbToStartTestOn = db.getSiblingDB("admin");
+        }
 
         const otherCollName = "change_stream_apply_ops_2";
         const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
@@ -22,12 +31,16 @@
         const kDeletedDocumentId = 0;
         coll.insert({_id: kDeletedDocumentId, a: "I was here before the transaction"});
 
-        let collArg = coll;
-        if (watchWholeDb) {
-            collArg = 1;
+        let cst = new ChangeStreamTest(dbToStartTestOn);
+
+        let changeStream = null;
+        if (watchMode == WatchMode.kCluster) {
+            changeStream = cst.startWatchingAllChangesForCluster();
+        } else {
+            const collArg = (watchMode == WatchMode.kCollection ? coll : 1);
+            changeStream =
+                cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collArg});
         }
-        let changeStream =
-            cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collArg});
 
         const sessionOptions = {causalConsistency: false};
         const session = db.getMongo().startSession(sessionOptions);
@@ -38,14 +51,14 @@
         assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
         assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
 
-        // One insert on a collection that we're not watching. This should be skipped in the change
-        // stream.
+        // One insert on a collection that we're not watching. This should be skipped by the
+        // single-collection changestream.
         assert.commandWorked(
-            sessionDb[otherCollName].insert({_id: 0, a: "Doc on other collection"}));
+            sessionDb[otherCollName].insert({_id: 111, a: "Doc on other collection"}));
 
-        // One insert on a database we're not watching. Should also be skipped.
+        // This should be skipped by the single-collection and single-db changestreams.
         assert.commandWorked(session.getDatabase(otherDbName)[otherDbCollName].insert(
-            {_id: 0, a: "SHOULD NOT READ THIS"}));
+            {_id: 222, a: "Doc on other DB"}));
 
         assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
 
@@ -63,9 +76,6 @@
             ]
         }));
 
-        // Drop the collection. This will trigger an "invalidate" event.
-        assert.commandWorked(db.runCommand({drop: coll.getName()}));
-
         // Check for the first insert.
         let change = cst.getOneChange(changeStream);
         assert.eq(change.fullDocument._id, 1);
@@ -73,6 +83,8 @@
         const firstChangeTxnNumber = change.txnNumber;
         const firstChangeLsid = change.lsid;
         assert.eq(typeof firstChangeLsid, "object");
+        assert.eq(change.ns.coll, coll.getName());
+        assert.eq(change.ns.db, db.getName());
 
         // Check for the second insert.
         change = cst.getOneChange(changeStream);
@@ -80,11 +92,13 @@
         assert.eq(change.operationType, "insert", tojson(change));
         assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
         assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
+        assert.eq(change.ns.coll, coll.getName());
+        assert.eq(change.ns.db, db.getName());
 
-        if (watchWholeDb) {
+        if (watchMode >= WatchMode.kDb) {
             // We should see the insert on the other collection.
             change = cst.getOneChange(changeStream);
-            assert.eq(change.fullDocument._id, 0);
+            assert.eq(change.fullDocument._id, 111);
             assert.eq(change.operationType, "insert", tojson(change));
             assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
             assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
@@ -92,12 +106,25 @@
             assert.eq(change.ns.db, db.getName());
         }
 
+        if (watchMode >= WatchMode.kCluster) {
+            // We should see the insert on the other db.
+            change = cst.getOneChange(changeStream);
+            assert.eq(change.fullDocument._id, 222);
+            assert.eq(change.operationType, "insert", tojson(change));
+            assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
+            assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
+            assert.eq(change.ns.coll, otherDbCollName);
+            assert.eq(change.ns.db, otherDbName);
+        }
+
         // Check for the update.
         change = cst.getOneChange(changeStream);
-        assert.eq(tojson(change.updateDescription.updatedFields), tojson({"a": 1}));
         assert.eq(change.operationType, "update", tojson(change));
+        assert.eq(tojson(change.updateDescription.updatedFields), tojson({"a": 1}));
         assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
         assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
+        assert.eq(change.ns.coll, coll.getName());
+        assert.eq(change.ns.db, db.getName());
 
         // Check for the delete.
         change = cst.getOneChange(changeStream);
@@ -105,6 +132,11 @@
         assert.eq(change.operationType, "delete", tojson(change));
         assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
         assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
+        assert.eq(change.ns.coll, coll.getName());
+        assert.eq(change.ns.db, db.getName());
+
+        // Drop the collection. This will trigger an "invalidate" event.
+        assert.commandWorked(db.runCommand({drop: coll.getName()}));
 
         // The drop should have invalidated the change stream.
         cst.assertNextChangesEqual({
@@ -118,6 +150,7 @@
 
     // TODO: SERVER-34302 should allow us to simplify this test, so we're not required to
     // explicitly run both against a single collection and against the whole DB.
-    testChangeStreamsWithTransactions(false);
-    testChangeStreamsWithTransactions(true);
+    testChangeStreamsWithTransactions(WatchMode.kCollection);
+    testChangeStreamsWithTransactions(WatchMode.kDb);
+    testChangeStreamsWithTransactions(WatchMode.kCluster);
 }());

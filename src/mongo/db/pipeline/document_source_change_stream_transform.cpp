@@ -96,9 +96,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
               : ResumeToken::SerializationFormat::kBinData),
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
 
-    if (expCtx->ns.isCollectionlessAggregateNS()) {
-        _nsRegex.emplace(DocumentSourceChangeStream::buildAllCollectionsRegex(expCtx->ns));
-    }
+    _nsRegex.emplace(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns));
 }
 
 DocumentSource::StageConstraints DocumentSourceChangeStreamTransform::constraints(
@@ -308,6 +306,7 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
     // that as metadata.
     if (pExpCtx->needsMerge) {
+        // TODO SERVER-34314: Sort key may have to be _id.data in FCV 4.0.
         doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
     }
 
@@ -402,13 +401,7 @@ bool DocumentSourceChangeStreamTransform::isDocumentRelevant(const Document& d) 
     Value nsField = d["ns"];
     invariant(!nsField.missing());
 
-    if (_nsRegex) {
-        // Match all namespaces that start with db name, followed by ".", then not followed by
-        // '$' or 'system.'
-        return _nsRegex->PartialMatch(nsField.getString());
-    }
-
-    return nsField.getString() == pExpCtx->ns.ns();
+    return _nsRegex->PartialMatch(nsField.getString());
 }
 
 boost::optional<Document> DocumentSourceChangeStreamTransform::extractNextApplyOpsEntry() {

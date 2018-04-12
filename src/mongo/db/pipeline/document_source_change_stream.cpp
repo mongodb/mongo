@@ -86,6 +86,10 @@ constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
+constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
+constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
+constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
+
 namespace {
 
 static constexpr StringData kOplogMatchExplainName = "$_internalOplogMatch"_sd;
@@ -262,21 +266,43 @@ BSONObj getTxnApplyOpsFilter(BSONElement nsMatch, const NamespaceString& nss) {
 }
 }  // namespace
 
+DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChangeStreamType(
+    const NamespaceString& nss) {
+
+    // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
+    return (nss.isAdminDB()
+                ? ChangeStreamType::kAllChangesForCluster
+                : (nss.isCollectionlessAggregateNS() ? ChangeStreamType::kSingleDatabase
+                                                     : ChangeStreamType::kSingleCollection));
+}
+
+std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const NamespaceString& nss) {
+    auto type = getChangeStreamType(nss);
+    switch (type) {
+        case ChangeStreamType::kSingleCollection:
+            // Match the target namespace exactly.
+            return "^" + nss.ns() + "$";
+        case ChangeStreamType::kSingleDatabase:
+            // Match all namespaces that start with db name, followed by ".", then NOT followed by
+            // '$' or 'system.'
+            return "^" + nss.db() + kRegexAllCollections;
+        case ChangeStreamType::kAllChangesForCluster:
+            // Match all namespaces that start with any db name other than admin, config, or local,
+            // followed by ".", then NOT followed by '$' or 'system.'
+            return "^" + kRegexAllDBs + kRegexAllCollections;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+
 BSONObj DocumentSourceChangeStream::buildMatchFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Timestamp startFrom,
     bool startFromInclusive) {
     auto nss = expCtx->ns;
-    // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
-    ChangeStreamType sourceType = (nss.isAdminDB() ? ChangeStreamType::kAllChangesForCluster
-                                                   : (nss.isCollectionlessAggregateNS()
-                                                          ? ChangeStreamType::kSingleDatabase
-                                                          : ChangeStreamType::kSingleCollection));
 
-    // Regular expressions that match all oplog entries on supported databases and collections.
-    const auto regexAllCollections = R"(\.(?!(\$|system\.)))"_sd;
-    const auto regexAllDBs = "(?!(admin|config|local)).+"_sd;
-    const auto regexCmdColl = R"(\.\$cmd$)"_sd;
+    ChangeStreamType sourceType = getChangeStreamType(nss);
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
     BSONArrayBuilder invalidatingCommands;
@@ -305,7 +331,7 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
     // For cluster-wide $changeStream, match the command namespace of any database other than admin,
     // config, or local. Otherwise, match only against the target db's command namespace.
     auto cmdNsFilter = (sourceType == ChangeStreamType::kAllChangesForCluster
-                            ? BSON("ns" << BSONRegEx("^" + regexAllDBs + regexCmdColl))
+                            ? BSON("ns" << BSONRegEx("^" + kRegexAllDBs + kRegexCmdColl))
                             : BSON("ns" << nss.getCommandNS().ns()));
 
     // 1.1) Commands that are on target db(s) and one of the above invalidating commands.
@@ -332,22 +358,7 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
                                    << "migrateChunkToNewShard");
 
     // 2) Supported operations on the target namespace.
-    BSONObj nsMatch;
-    switch (sourceType) {
-        case ChangeStreamType::kSingleCollection:
-            // Match the target namespace exactly.
-            nsMatch = BSON("ns" << nss.ns());
-            break;
-        case ChangeStreamType::kSingleDatabase:
-            // Match all namespaces that start with db name, followed by ".", then NOT followed by
-            // '$' or 'system.'
-            nsMatch = BSON("ns" << BSONRegEx("^" + nss.db() + regexAllCollections));
-            break;
-        case ChangeStreamType::kAllChangesForCluster:
-            // Match all namespaces that start with any db name other than admin, config, or local,
-            // followed by ".", then NOT followed by '$' or 'system.'
-            nsMatch = BSON("ns" << BSONRegEx("^" + regexAllDBs + regexAllCollections));
-    }
+    BSONObj nsMatch = BSON("ns" << BSONRegEx(getNsRegexForChangeStream(nss)));
     auto opMatch = BSON(nsMatch["ns"] << OR(normalOpTypeMatch, chunkMigratedMatch));
 
     // 3) Look for 'applyOps' which were created as part of a transaction.
@@ -448,13 +459,6 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
 }
 
 }  // namespace
-
-std::string DocumentSourceChangeStream::buildAllCollectionsRegex(const NamespaceString& nss) {
-    // Match all namespaces that start with db name, followed by ".", then not followed by
-    // '$' or 'system.'
-    static const auto regexAllCollections = R"(\.(?!(\$|system\.)))";
-    return "^" + nss.db() + regexAllCollections;
-}
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {

@@ -144,6 +144,16 @@ public:
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 
+    enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
+
+
+    /**
+     * Helpers for Determining which regex to match a change stream against.
+     */
+    static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
+    static std::string getNsRegexForChangeStream(const NamespaceString& nss);
+
+
     /**
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries
      * to only those relevant for this $changeStream stage.
@@ -151,8 +161,6 @@ public:
     static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     Timestamp startFrom,
                                     bool startFromInclusive);
-
-    static std::string buildAllCollectionsRegex(const NamespaceString& nss);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
@@ -182,7 +190,9 @@ public:
     static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
 
 private:
-    enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
+    static constexpr StringData kRegexAllCollections = R"(\.(?!(\$|system\.)))"_sd;
+    static constexpr StringData kRegexAllDBs = "(?!(admin|config|local)).+"_sd;
+    static constexpr StringData kRegexCmdColl = R"(\.\$cmd$)"_sd;
 
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is
