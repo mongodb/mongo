@@ -247,7 +247,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     def _new_mongos(self, index, total):
         """
-        Returns a _MongoSFixture configured to be used as the mongos for a sharded cluster.
+        Return a _MongoSFixture configured to be used as the mongos for a sharded cluster.
 
         :param index: The index of the current mongos.
         :param total: The total number of mongos routers
