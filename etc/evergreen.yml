@@ -4492,7 +4492,6 @@ tasks:
 
 - name: powercycle_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: compile
   commands:
@@ -4507,13 +4506,13 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_fcv3.4_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: compile
   commands:
@@ -4528,6 +4527,7 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       client_options: --numCrudClients=20 --numFsmClients=20 --fsmWorkloadBlacklistFiles=toggle_feature_compatibility.js
@@ -4536,7 +4536,6 @@ tasks:
 
 - name: powercycle_replication_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: compile
   commands:
@@ -4551,13 +4550,13 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       mongod_extra_options: --replSet=powercyle --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_replication_smalloplog_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: compile
   commands:
@@ -4572,13 +4571,13 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       mongod_extra_options: --replSet=powercyle --mongodOptions=\"--setParameter enableTestCommands=1 --oplogSize 20 --storageEngine wiredTiger\"
 
 - name: powercycle_syncdelay_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: compile
   commands:
@@ -4593,13 +4592,13 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --syncdelay 10 --storageEngine wiredTiger\"
 
 - name: powercycle_write_concern_majority_WT
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
-  timeout_secs: 1800 # 30 minute timeout for no output
   depends_on:
   - name: compile
   commands:
@@ -4614,6 +4613,7 @@ tasks:
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
       client_options: "--numCrudClients=20 --numFsmClients=20 --writeConcern='{\"w\": \"majority\"}'"
