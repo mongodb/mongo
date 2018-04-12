@@ -310,7 +310,9 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 
             if (setField.hasField(ShardDatabaseType::enterCriticalSectionCounter.name())) {
                 AutoGetDb autoDb(opCtx, db, MODE_X);
-                DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+                if (autoDb.getDb()) {
+                    DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+                }
             }
         }
     }
@@ -352,7 +354,9 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     deleteState.documentKey, ShardDatabaseType::name.name(), &deletedDatabase));
 
         AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
-        DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+        if (autoDb.getDb()) {
+            DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+        }
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {
