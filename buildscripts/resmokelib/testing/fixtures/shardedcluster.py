@@ -157,9 +157,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     def is_running(self):
         """Return true if the all nodes in the cluster are all still operating."""
-        return (self.configsvr is not None and self.configsvr.is_running() and
-                all(shard.is_running() for shard in self.shards) and
-                all(mongos.is_running() for mongos in self.mongos))
+        return (self.configsvr is not None and self.configsvr.is_running()
+                and all(shard.is_running() for shard in self.shards)
+                and all(mongos.is_running() for mongos in self.mongos))
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
