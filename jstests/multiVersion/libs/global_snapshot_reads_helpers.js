@@ -81,6 +81,8 @@ function verifyGlobalSnapshotReads(conn, expectSuccess, expectedCode) {
                                             expectSuccess,
                                             expectedCode);
 
+    // TODO: SERVER-31767
+    return;
     // Sharded collection, all shards.
     txnNumber++;
     txnNumber = runCommandAndVerifyResponse(

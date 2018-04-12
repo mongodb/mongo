@@ -90,7 +90,9 @@ TEST_F(AtClusterTimeTest, ComputeValidValid) {
 
     auto maxTime = computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT_EQ(*maxTime, timeTwo);
+    // TODO: SERVER-31767
+    // ASSERT_EQ(*maxTime, timeTwo);
+    ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
 }
 
 TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
@@ -104,7 +106,9 @@ TEST_F(AtClusterTimeTest, ComputeValidInvalid) {
 
     auto maxTime = computeAtClusterTime(
         operationContext(), true, {shardOneId, shardTwoId}, kNss, kEmptyQuery, kEmptyCollation);
-    ASSERT_EQ(*maxTime, timeTwo);
+    // TODO: SERVER-31767
+    // ASSERT_EQ(*maxTime, timeTwo);
+    ASSERT_EQ(*maxTime, kInMemoryLogicalTime);
 }
 
 TEST_F(AtClusterTimeTest, ComputeInvalidInvalid) {
@@ -170,7 +174,10 @@ TEST_F(AtClusterTimeTargetingTest, ReturnsLatestTimeFromShard) {
 
     repl::ReadConcernArgs::get(operationContext()) =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    ASSERT_EQ(time2,
+    // TODO: SERVER-31767
+    // ASSERT_EQ(time2,
+    //           *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
+    ASSERT_EQ(kInMemoryLogicalTime,
               *computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
 }
 

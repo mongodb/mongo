@@ -582,6 +582,9 @@ boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
         return boost::none;
     }
 
+    // TODO: SERVER-31767
+    return LogicalClock::get(opCtx)->getClusterTime();
+
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     invariant(shardRegistry);
     LogicalTime highestTime;
