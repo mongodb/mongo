@@ -211,12 +211,77 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
         fassertFailedNoTrace(40115);
     }
 }
+
+void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
+    std::vector<StorageEngine::CollectionIndexNamePair> indexesToRebuild =
+        fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx));
+
+    if (!indexesToRebuild.empty() && serverGlobalParams.indexBuildRetry) {
+        log() << "note: restart the server with --noIndexBuildRetry "
+              << "to skip index rebuilds";
+    }
+
+    if (!serverGlobalParams.indexBuildRetry) {
+        log() << "  not rebuilding interrupted indexes";
+        return;
+    }
+
+    // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
+    // indexes on that collection are done at once, so we use a map to group them together.
+    StringMap<IndexNameObjs> nsToIndexNameObjMap;
+    for (auto&& indexNamespace : indexesToRebuild) {
+        NamespaceString collNss(indexNamespace.first);
+        const std::string& indexName = indexNamespace.second;
+
+        DatabaseCatalogEntry* dbce = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
+        invariant(dbce,
+                  str::stream() << "couldn't get database catalog entry for database "
+                                << collNss.db());
+        CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNss.ns());
+        invariant(cce,
+                  str::stream() << "couldn't get collection catalog entry for collection "
+                                << collNss.toString());
+
+        auto swIndexSpecs = getIndexNameObjs(
+            opCtx, dbce, cce, [&indexName](const std::string& name) { return name == indexName; });
+        if (!swIndexSpecs.isOK() || swIndexSpecs.getValue().first.empty()) {
+            fassert(40590,
+                    {ErrorCodes::InternalError,
+                     str::stream() << "failed to get index spec for index " << indexName
+                                   << " in collection "
+                                   << collNss.toString()});
+        }
+
+        auto& indexesToRebuild = swIndexSpecs.getValue();
+        invariant(indexesToRebuild.first.size() == 1 && indexesToRebuild.second.size() == 1,
+                  str::stream() << "Num Index Names: " << indexesToRebuild.first.size()
+                                << " Num Index Objects: "
+                                << indexesToRebuild.second.size());
+        auto& ino = nsToIndexNameObjMap[collNss.ns()];
+        ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
+        ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
+    }
+
+    for (const auto& entry : nsToIndexNameObjMap) {
+        NamespaceString collNss(entry.first);
+
+        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
+        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+        for (const auto& indexName : entry.second.first) {
+            log() << "Rebuilding index. Collection: " << collNss << " Index: " << indexName;
+        }
+        fassert(40592,
+                rebuildIndexesOnCollection(
+                    opCtx, dbCatalogEntry, collCatalogEntry, std::move(entry.second)));
+    }
+}
+
 }  // namespace
 
 /**
-* Return an error status if the wrong mongod version was used for these datafiles. The boolean
-* represents whether there are non-local databases.
-*/
+ * Return an error status if the wrong mongod version was used for these datafiles. The boolean
+ * represents whether there are non-local databases.
+ */
 StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
@@ -229,43 +294,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
     // Rebuilding indexes must be done before a database can be opened.
     if (!storageGlobalParams.readOnly) {
-        StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
-            storageEngine->reconcileCatalogAndIdents(opCtx);
-        fassert(40593, swIndexesToRebuild);
-
-        if (!swIndexesToRebuild.getValue().empty() && serverGlobalParams.indexBuildRetry) {
-            log() << "note: restart the server with --noIndexBuildRetry "
-                  << "to skip index rebuilds";
-        }
-
-        if (!serverGlobalParams.indexBuildRetry) {
-            log() << "  not rebuilding interrupted indexes";
-            swIndexesToRebuild.getValue().clear();
-        }
-
-        for (auto&& collIndexPair : swIndexesToRebuild.getValue()) {
-            const std::string& coll = collIndexPair.first;
-            const std::string& indexName = collIndexPair.second;
-            DatabaseCatalogEntry* dbce =
-                storageEngine->getDatabaseCatalogEntry(opCtx, NamespaceString(coll).db());
-            invariant(dbce);
-            CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(coll);
-            invariant(cce);
-
-            StatusWith<IndexNameObjs> swIndexToRebuild(
-                getIndexNameObjs(opCtx, dbce, cce, [&indexName](const std::string& str) {
-                    return str == indexName;
-                }));
-            if (!swIndexToRebuild.isOK() || swIndexToRebuild.getValue().first.empty()) {
-                severe() << "Unable to get indexes for collection. Collection: " << coll;
-                fassertFailedNoTrace(40590);
-            }
-
-            invariant(swIndexToRebuild.getValue().first.size() == 1 &&
-                      swIndexToRebuild.getValue().second.size() == 1);
-            fassert(40592,
-                    rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexToRebuild.getValue()));
-        }
+        rebuildIndexes(opCtx, storageEngine);
     }
 
     bool repairVerifiedAllCollectionsHaveUUIDs = false;
