@@ -2072,7 +2072,8 @@ Examples:
 
     # The remote mongod host comes from the ssh_user_host,
     # which may be specified as user@host.
-    ssh_user, ssh_host = get_user_host(options.ssh_user_host)
+    ssh_user_host = options.ssh_user_host
+    ssh_user, ssh_host = get_user_host(ssh_user_host)
     mongod_host = ssh_host
 
     ssh_connection_options = "{} {}".format(default_ssh_connection_options,
@@ -2098,7 +2099,7 @@ Examples:
                 address_type = "private_ip_address"
 
     # Instantiate the local handler object.
-    local_ops = LocalToRemoteOperations(user_host=options.ssh_user_host,
+    local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
                                         ssh_connection_options=ssh_connection_options,
                                         ssh_options=ssh_options, use_shell=True)
 
@@ -2340,9 +2341,11 @@ Examples:
             else:
                 ssh_user_host = "{}@{}".format(ssh_user, ssh_host)
             mongod_host = ssh_host
-            local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
-                                                ssh_connection_options=ssh_connection_options,
-                                                ssh_options=ssh_options, use_shell=True)
+
+        # Reestablish remote access after crash.
+        local_ops = LocalToRemoteOperations(user_host=ssh_user_host,
+                                            ssh_connection_options=ssh_connection_options,
+                                            ssh_options=ssh_options, use_shell=True)
 
         canary_doc = copy.deepcopy(orig_canary_doc)
 
