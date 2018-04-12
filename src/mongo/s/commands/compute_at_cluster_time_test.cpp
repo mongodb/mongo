@@ -210,5 +210,100 @@ TEST_F(AtClusterTimeTargetingTest, NonSnapshotReadConcern) {
     ASSERT_FALSE(computeAtClusterTime(operationContext(), true, shards, kNss, query, collation));
 }
 
+// Verifies that if atClusterTime is specified in the request, atClusterTime is always greater than
+// or equal to it.
+TEST_F(AtClusterTimeTargetingTest, AfterClusterTime) {
+    const auto afterClusterTime = LogicalTime(Timestamp(50, 2));
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(afterClusterTime, repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    // This cannot be true in a real cluster, but is done to verify that the chosen atClusterTime
+    // cannot be less than afterClusterTime.
+    ASSERT_GT(afterClusterTime, kInMemoryLogicalTime);
+
+    const auto s0 = ShardId("0");
+    const auto s1 = ShardId("1");
+
+    // Neither shard has a last committed optime.
+
+    // Target one shard.
+    auto computedTime =
+        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
+    // Target all shards.
+    computedTime = computeAtClusterTime(
+        operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
+    // One shard has a last committed optime.
+
+    LogicalTime time1(Timestamp(1, 1));
+    shardRegistry()->getShardNoReload(s0)->updateLastCommittedOpTime(time1);
+    ASSERT_LT(time1, afterClusterTime);
+
+    // Target one shard.
+    computedTime =
+        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
+    // Target all shards.
+    computedTime = computeAtClusterTime(
+        operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
+    // Both shards have a last committed optime.
+
+    LogicalTime time2(Timestamp(2, 1));
+    shardRegistry()->getShardNoReload(s1)->updateLastCommittedOpTime(time2);
+    ASSERT_LT(time2, afterClusterTime);
+
+    // Target one shard.
+    computedTime =
+        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+
+    // Target all shards.
+    computedTime = computeAtClusterTime(
+        operationContext(), true, {s0, s1}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_GTE(*computedTime, afterClusterTime);
+}
+
+// Verify that when afterClusterTime is given, the smallest computed atClusterTime is equal to
+// afterClusterTime.
+TEST_F(AtClusterTimeTargetingTest, AfterClusterTimeLowerBound) {
+    auto afterClusterTime = LogicalTime(kInMemoryLogicalTime);
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(afterClusterTime, repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    ASSERT_EQ(afterClusterTime, kInMemoryLogicalTime);
+
+    const auto s0 = ShardId("0");
+
+    // Target one shard without a last committed optime. The computed value should equal
+    // afterClusterTime.
+    auto computedTime =
+        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_EQ(*computedTime, afterClusterTime);
+
+    // Target one shard with a last committed optime less than afterClusterTime. The computed value
+    // should still equal afterClusterTime.
+    LogicalTime time1(Timestamp(1, 1));
+    shardRegistry()->getShardNoReload(s0)->updateLastCommittedOpTime(time1);
+    ASSERT_LT(time1, afterClusterTime);
+
+    computedTime =
+        computeAtClusterTime(operationContext(), true, {s0}, kNss, kEmptyQuery, kEmptyCollation);
+    ASSERT(computedTime);
+    ASSERT_EQ(*computedTime, afterClusterTime);
+}
+
 }  // namespace
 }  // namespace mongo

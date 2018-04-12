@@ -536,7 +536,13 @@ BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime) {
         if (el.fieldNameStringData() == repl::ReadConcernArgs::kReadConcernFieldName) {
             BSONObjBuilder readConcernBob =
                 cmdAtClusterTimeBob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
-            readConcernBob.appendElements(el.Obj());
+            for (auto&& elem : el.Obj()) {
+                // afterClusterTime cannot be specified with atClusterTime.
+                if (elem.fieldNameStringData() !=
+                    repl::ReadConcernArgs::kAfterClusterTimeFieldName) {
+                    readConcernBob.append(elem);
+                }
+            }
             readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
                                   atClusterTime.asTimestamp());
         } else {
@@ -551,9 +557,16 @@ BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atC
     invariant(readConcernObj[repl::ReadConcernArgs::kAtClusterTimeFieldName].eoo());
 
     BSONObjBuilder readConcernBob;
-    readConcernBob.appendElements(readConcernObj);
+    for (auto&& elem : readConcernObj) {
+        // afterClusterTime cannot be specified with atClusterTime.
+        if (elem.fieldNameStringData() != repl::ReadConcernArgs::kAfterClusterTimeFieldName) {
+            readConcernBob.append(elem);
+        }
+    }
+
     readConcernBob.append(repl::ReadConcernArgs::kAtClusterTimeFieldName,
                           atClusterTime.asTimestamp());
+
     return readConcernBob.obj();
 }
 
@@ -570,18 +583,14 @@ boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* o
     return shardRegistry->getShardNoReload(shardId)->getLastCommittedOpTime();
 }
 
-boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
-                                                  bool mustRunOnAll,
-                                                  const std::set<ShardId>& shardIds,
-                                                  const NamespaceString& nss,
-                                                  const BSONObj query,
-                                                  const BSONObj collation) {
+namespace {
 
-    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
-        repl::ReadConcernLevel::kSnapshotReadConcern) {
-        return boost::none;
-    }
-
+LogicalTime _computeAtClusterTime(OperationContext* opCtx,
+                                  bool mustRunOnAll,
+                                  const std::set<ShardId>& shardIds,
+                                  const NamespaceString& nss,
+                                  const BSONObj query,
+                                  const BSONObj collation) {
     // TODO: SERVER-31767
     return LogicalClock::get(opCtx)->getClusterTime();
 
@@ -623,6 +632,32 @@ boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
     }
 
     return LogicalClock::get(opCtx)->getClusterTime();
+}
+
+}  // namespace
+
+boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
+                                                  bool mustRunOnAll,
+                                                  const std::set<ShardId>& shardIds,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj query,
+                                                  const BSONObj collation) {
+
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() !=
+        repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return boost::none;
+    }
+
+    auto atClusterTime =
+        _computeAtClusterTime(opCtx, mustRunOnAll, shardIds, nss, query, collation);
+
+    // If the user passed afterClusterTime, atClusterTime must be greater than or equal to it.
+    const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
+    if (afterClusterTime && *afterClusterTime > atClusterTime) {
+        return afterClusterTime;
+    }
+
+    return atClusterTime;
 }
 
 std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,

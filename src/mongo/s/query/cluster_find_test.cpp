@@ -46,6 +46,8 @@ const NamespaceString kNss = NamespaceString("test", "coll");
 const auto kFindCmdScatterGather = BSON("find" << kNss.coll());
 const auto kFindCmdTargeted = BSON("find" << kNss.coll() << "filter" << BSON("_id" << 0));
 
+const LogicalTime kInMemoryLogicalTime(Timestamp(10, 1));
+
 using InspectionCallback = stdx::function<void(const executor::RemoteCommandRequest& request)>;
 
 BSONObj appendSnapshotReadConcern(BSONObj cmdObj) {
@@ -64,8 +66,7 @@ protected:
 
         // Set up a logical clock with an initial time.
         auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext());
-        LogicalTime initialTime(Timestamp(10, 1));
-        logicalClock->setClusterTimeFromTrustedSource(initialTime);
+        logicalClock->setClusterTimeFromTrustedSource(kInMemoryLogicalTime);
         LogicalClock::set(serviceContext(), std::move(logicalClock));
     }
 
@@ -243,6 +244,40 @@ TEST_F(ClusterFindTest, AttachesAtClusterTimeForSnapshotReadConcern) {
     // Target all shards.
     runFindCommandInspectRequests(
         appendSnapshotReadConcern(kFindCmdScatterGather), containsAtClusterTime, false);
+}
+
+TEST_F(ClusterFindTest, SnapshotReadConcernWithAfterClusterTime) {
+    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(1);
+
+    const auto afterClusterTime = LogicalTime(Timestamp(50, 2));
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(afterClusterTime, repl::ReadConcernLevel::kSnapshotReadConcern);
+
+    // This cannot be true in a real cluster, but is done to verify that the chosen atClusterTime
+    // cannot be less than afterClusterTime.
+    ASSERT_GT(afterClusterTime, kInMemoryLogicalTime);
+
+    auto containsAtClusterTimeNoAfterClusterTime =
+        [&](const executor::RemoteCommandRequest& request) {
+            ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
+            ASSERT(request.cmdObj["readConcern"]["afterClusterTime"].eoo());
+
+            // The chosen atClusterTime should be greater than or equal to the request's
+            // afterClusterTime.
+            ASSERT_GTE(LogicalTime(request.cmdObj["readConcern"]["atClusterTime"].timestamp()),
+                       afterClusterTime);
+        };
+
+    // Target one shard.
+    runFindCommandInspectRequests(
+        appendSnapshotReadConcern(kFindCmdTargeted), containsAtClusterTimeNoAfterClusterTime, true);
+
+    // Target all shards.
+    runFindCommandInspectRequests(appendSnapshotReadConcern(kFindCmdScatterGather),
+                                  containsAtClusterTimeNoAfterClusterTime,
+                                  false);
 }
 
 }  // namespace
