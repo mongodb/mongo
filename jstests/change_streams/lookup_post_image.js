@@ -178,7 +178,11 @@
         assert(latestChange.hasOwnProperty("fullDocument"));
         assert.eq(latestChange.fullDocument, null);
 
-        // Test establishing new cursors with resume token on dropped collections fails.
+        // Test that establishing new cursors with resume token on dropped collections fails for
+        // a single-collection change stream but succeeds for whole-db and cluster-wide streams.
+        const assertExpectedResult = (res) =>
+            (collToWatch == 1 ? assert.commandWorked(res)
+                              : assert.commandFailedWithCode(res, 40615));
         let res = changeStreamDB.runCommand({
             aggregate: collToWatch,
             pipeline: [
@@ -187,7 +191,7 @@
             ],
             cursor: {batchSize: 0}
         });
-        assert.commandFailedWithCode(res, 40615);
+        assertExpectedResult(res);
 
         // Test that looking up the post image of an update after the collection has been dropped
         // and created again will result in 'fullDocument' with a value of null. This must be done

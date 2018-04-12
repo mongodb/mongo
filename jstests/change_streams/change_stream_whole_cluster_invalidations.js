@@ -5,6 +5,7 @@
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
     load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     // Define two databases. We will conduct our tests by creating one collection in each.
     const testDB1 = db, testDB2 = db.getSiblingDB(`${db.getName()}_other`);
@@ -48,8 +49,8 @@
         expectInvalidate: true
     });
 
-    // Test that a cluster-wide change stream cannot be resumed using a token from a collection
-    // which has been dropped.
+    // Test that a cluster-wide change stream can be resumed using a token from a collection which
+    // has been dropped.
     db1Coll = assertDropAndRecreateCollection(testDB1, jsTestName());
 
     // Get a valid resume token that the next change stream can use.
@@ -60,20 +61,19 @@
     let change = cst.getOneChange(aggCursor, false);
     const resumeToken = change._id;
 
-    // It should not possible to resume a change stream after a collection drop, even if the
-    // invalidate has not been received.
+    // For cluster-wide streams, it is possible to resume at a point before a collection is dropped,
+    // even if the invalidation has not been received on the original stream yet.
     assertDropCollection(db1Coll, db1Coll.getName());
     // Wait for two-phase drop to complete, so that the UUID no longer exists.
     assert.soon(function() {
         return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(testDB1,
                                                                              db1Coll.getName());
     });
-    assert.commandFailedWithCode(adminDB.runCommand({
+    assert.commandWorked(adminDB.runCommand({
         aggregate: 1,
         pipeline: [{$changeStream: {resumeAfter: resumeToken, allChangesForCluster: true}}],
         cursor: {}
-    }),
-                                 40615);
+    }));
 
     // Test that invalidation entries from any database invalidate the stream.
     [db1Coll, db2Coll] =
@@ -96,15 +96,17 @@
             _idForTest++;
         }
 
-        // Renaming the collection should invalidate the change stream.
-        // TODO SERVER-34088: cannot rename collections on mongoS.
-        assert.writeOK(collToInvalidate.renameCollection("renamed_coll"));
-        cst.assertNextChangesEqual({
-            cursor: aggCursor,
-            expectedChanges: [{operationType: "invalidate"}],
-            expectInvalidate: true
-        });
-        collToInvalidate = testDB.getCollection("renamed_coll");
+        // Renaming the collection should invalidate the change stream. Skip this test when running
+        // on a sharded collection, since these cannot be renamed.
+        if (!FixtureHelpers.isSharded(collToInvalidate)) {
+            assert.writeOK(collToInvalidate.renameCollection("renamed_coll"));
+            cst.assertNextChangesEqual({
+                cursor: aggCursor,
+                expectedChanges: [{operationType: "invalidate"}],
+                expectInvalidate: true
+            });
+            collToInvalidate = testDB.getCollection("renamed_coll");
+        }
 
         // Dropping a collection should invalidate the change stream.
         aggCursor = cst.startWatchingAllChangesForCluster();

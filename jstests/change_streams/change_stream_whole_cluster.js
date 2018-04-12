@@ -9,10 +9,23 @@
     const adminDB = db.getSiblingDB("admin");
     const otherDB = db.getSiblingDB(`${db.getName()}_other`);
 
+    // Drop and recreate the collections to be used in this set of tests.
+    assertDropAndRecreateCollection(db, "t1");
+    assertDropAndRecreateCollection(otherDB, "t2");
+
+    // Test that a change stream can be opened on the admin database if {allChangesForCluster:true}
+    // is specified.
+    assertValidChangeStreamNss("admin", 1, {allChangesForCluster: true});
+    // Test that a change stream cannot be opened on the admin database if a collection is
+    // specified, even with {allChangesForCluster:true}.
+    assertInvalidChangeStreamNss("admin", "testcoll", {allChangesForCluster: true});
+    // Test that a change stream cannot be opened on a database other than admin if
+    // {allChangesForCluster:true} is specified.
+    assertInvalidChangeStreamNss(db.getName(), 1, {allChangesForCluster: true});
+
     let cst = new ChangeStreamTest(adminDB);
     let cursor = cst.startWatchingAllChangesForCluster();
 
-    assertCreateCollection(db, "t1");
     // Test that if there are no changes, we return an empty batch.
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 

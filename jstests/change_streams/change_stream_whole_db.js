@@ -7,18 +7,16 @@
                                                        // assert[Valid|Invalid]ChangeStreamNss.
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
+    // Drop and recreate the collections to be used in this set of tests.
+    assertDropAndRecreateCollection(db, "t1");
+    assertDropAndRecreateCollection(db, "t2");
+
     // Test that a single-database change stream cannot be opened on "admin", "config", or "local".
     assertInvalidChangeStreamNss("admin", 1);
     assertInvalidChangeStreamNss("config", 1);
     if (!FixtureHelpers.isMongos(db)) {
         assertInvalidChangeStreamNss("local", 1);
     }
-
-    assertDropCollection(db, "t1");
-    assertDropCollection(db, "t2");
-
-    assertCreateCollection(db, "t1");
-    assertCreateCollection(db, "t2");
 
     let cst = new ChangeStreamTest(db);
     let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});

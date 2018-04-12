@@ -130,6 +130,13 @@ public:
         return ns.isAdminDB() && ns.isCollectionlessAggregateNS();
     }
 
+    /**
+     * Returns true if this aggregation is running on a single, specific namespace.
+     */
+    bool isSingleNamespaceAggregation() const {
+        return !ns.isCollectionlessAggregateNS();
+    }
+
     const CollatorInterface* getCollator() const {
         return _collator;
     }

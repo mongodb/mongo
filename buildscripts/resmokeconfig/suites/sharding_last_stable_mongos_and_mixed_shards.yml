@@ -29,6 +29,7 @@ selector:
   - jstests/sharding/move_primary_basic.js
   - jstests/sharding/movePrimary1.js
   - jstests/sharding/mongos_validate_writes.js
+  - jstests/sharding/resume_change_stream_on_subset_of_shards.js
   # Requires fix to SERVER-31689
   - jstests/sharding/aggregation_currentop.js
   #### End "Enable when 4.0 becomes last stable"

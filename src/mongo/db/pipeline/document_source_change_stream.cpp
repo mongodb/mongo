@@ -391,7 +391,12 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
                 tokenData.uuid);
         auto resumeNamespace =
             UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(tokenData.uuid.get());
-        if (!expCtx->inMongos) {
+        // If the resume token's UUID does not exist - implying that it has been dropped in the time
+        // since the resume token was generated - then we prohibit resuming the stream, because we
+        // can no longer determine whether that collection had a default collation. However, the
+        // concept of a default collation does not exist at the database or cluster levels, and we
+        // therefore skip this check for whole-database and cluster-wide change streams.
+        if (!expCtx->inMongos && expCtx->isSingleNamespaceAggregation()) {
             uassert(40615,
                     "The resume token UUID does not exist. Has the collection been dropped?",
                     !resumeNamespace.isEmpty());
