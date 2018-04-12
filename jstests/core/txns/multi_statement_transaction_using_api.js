@@ -16,7 +16,7 @@
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb.getCollection(collName);
 
-    jsTestLog("Start transaction");
+    jsTestLog("Run CRUD ops, read ops, and commit transaction.");
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
     // Performing a read first should work when snapshot readConcern is specified.
@@ -42,7 +42,6 @@
     // Try to find a document using findOne within a transaction
     assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));
 
-    jsTestLog("Committing transaction.");
     session.commitTransaction();
 
     // Make sure the correct documents exist after committing the transaciton.
@@ -50,16 +49,35 @@
     assert.eq({_id: "insert-3", a: 2}, sessionColl.findOne({_id: "insert-3"}));
     assert.eq(null, sessionColl.findOne({_id: "insert-2"}));
 
-    jsTestLog("Start second transaction");
+    jsTestLog("Insert a doc and abort transaction.");
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
 
     assert.commandWorked(sessionColl.insert({_id: "insert-4", a: 0}));
 
-    jsTestLog("Aborting transaction.");
     session.abortTransaction();
 
     // Verify that we cannot see the document we tried to insert.
     assert.eq(null, sessionColl.findOne({_id: "insert-4"}));
+
+    //
+    // Test that calling startTransaction when a transaction is already running aborts the
+    // current transaction.
+    //
+    jsTestLog("Call startTransaction before committing or aborting the current transaction.");
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+
+    assert.commandWorked(sessionColl.insert({_id: "restart-txn-1"}));
+
+    // Try starting a new transaction without committing the previous one. This should result in
+    // the current transaction being implicitly aborted.
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+
+    assert.commandWorked(sessionColl.insert({_id: "restart-txn-2"}));
+    session.commitTransaction();
+
+    // Make sure the correct documents exist after committing the second transaction.
+    assert.eq({_id: "restart-txn-2"}, sessionColl.findOne({_id: "restart-txn-2"}));
+    assert.eq(null, sessionColl.findOne({_id: "restart-txn-1"}));
 
     session.endSession();
 }());

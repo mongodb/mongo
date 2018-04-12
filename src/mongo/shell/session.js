@@ -671,9 +671,6 @@ var {
         };
 
         this.startTransaction = function startTransaction(txnOptsObj) {
-            if (_txnState === ServerSession.TransactionStates.kActive) {
-                throw new Error("There is already an active transaction on this session.");
-            }
             _txnOptions = new TransactionOptions(txnOptsObj);
             _txnState = ServerSession.TransactionStates.kActive;
             _firstStatement = true;
