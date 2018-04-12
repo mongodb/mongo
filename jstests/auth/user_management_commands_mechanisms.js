@@ -183,20 +183,10 @@
         test.updateUser('user', {pwd: 'passEmpty', mechanisms: []});
     });
 
-    // Fail when passing a non-normalized username and producing SHA-256 creds.
-    assert.throws(function() {
-        test.createUser({user: "\u2168", pwd: 'pass', roles: jsTest.basicUserRoles});
-    });
-
     // Succeed if we're using SHA-1 only.
     test.createUser(
         {user: "\u2168", pwd: 'pass', roles: jsTest.basicUserRoles, mechanisms: ['SCRAM-SHA-1']});
     checkUser("\u2168", 'pass', true, false);
-
-    // Then fail again trying to promote that user to SHA-256.
-    assert.throws(function() {
-        test.updateUser("\u2168", {pwd: 'pass'});
-    });
 
     // Demonstrate that usersInfo returns all users with mechanisms lists
     const allUsersInfo = assert.commandWorked(test.runCommand({usersInfo: 1}));

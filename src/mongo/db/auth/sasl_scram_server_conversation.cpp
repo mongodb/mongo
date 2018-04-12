@@ -165,12 +165,6 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     ServerMechanismBase::_principalName = input[0].substr(2);
     decodeSCRAMUsername(ServerMechanismBase::_principalName);
 
-    auto swUser = saslPrep(ServerMechanismBase::ServerMechanismBase::_principalName);
-    if (!swUser.isOK()) {
-        return swUser.getStatus();
-    }
-    ServerMechanismBase::ServerMechanismBase::_principalName = std::move(swUser.getValue());
-
     if (!authzId.empty() && ServerMechanismBase::_principalName != authzId) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "SCRAM user name " << ServerMechanismBase::_principalName

@@ -4,30 +4,36 @@
     "use strict";
 
     function runTest(conn) {
-        var db = conn.getDB("admin");
-        var externalDB = conn.getDB("$external");
-
-        // Check that unknown or users produce the correct errors.
-        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}),
-                                     ErrorCodes.UserNotFound);
-
-        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "bogus"}),
-                                     ErrorCodes.BadValue);
-
-        // Enable SCRAM-SHA-256.
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-
         function checkMechs(userid, mechs) {
             const res =
                 assert.commandWorked(db.runCommand({isMaster: 1, saslSupportedMechs: userid}));
             assert.eq(mechs.sort(), res.saslSupportedMechs.sort(), tojson(res));
         }
 
+        var db = conn.getDB("admin");
+        var externalDB = conn.getDB("$external");
+
+        // Check that unknown or invalid users produce the correct errors.
+        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}),
+                                     ErrorCodes.UserNotFound);
+
+        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "bogus"}),
+                                     ErrorCodes.BadValue);
+
+        // Create a legacy user.
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
+        assert.commandWorked(db.runCommand({createUser: "legacyUser", pwd: "pwd", roles: []}));
+        checkMechs("admin.legacyUser", ["SCRAM-SHA-1"]);
+
+        // Enable SCRAM-SHA-256.
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
+
+        // Legacy users continue expressing SCRAM-SHA-1
+        checkMechs("admin.legacyUser", ["SCRAM-SHA-1"]);
+
         // Make users.
         assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: []}));
         assert.commandWorked(externalDB.runCommand({createUser: "user", roles: []}));
-        assert.commandWorked(db.runCommand(
-            {createUser: "IX", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]}));
 
         // Internal users should support scram methods.
         checkMechs("admin.user", ["SCRAM-SHA-256", "SCRAM-SHA-1"]);
@@ -39,16 +45,19 @@
             checkMechs("$external.user", []);
         }
 
-        // Check non-normalized name finds normalized user.
-        const IXchar = "\u2168";
-        const IXuserid = "admin." + IXchar;
-        checkMechs(IXuserid, ["SCRAM-SHA-256"]);
-
-        // Check that names with compatibility equivalence collide.
+        // Users with explicit mechs should only support those mechanisms
         assert.commandWorked(db.runCommand(
-            {createUser: IXchar, pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}));
-        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: IXuserid}),
-                                     ErrorCodes.BadValue);
+            {createUser: "256Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]}));
+        checkMechs("admin.256Only", ["SCRAM-SHA-256"]);
+        assert.commandWorked(db.runCommand(
+            {createUser: "1Only", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}));
+        checkMechs("admin.1Only", ["SCRAM-SHA-1"]);
+
+        // Users with normalized and unnormalized names do not conflict
+        assert.commandWorked(db.runCommand({createUser: "IX", pwd: "pwd", roles: []}));
+        checkMechs("admin.IX", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
+        assert.commandWorked(db.runCommand({createUser: "\u2168", pwd: "pwd", roles: []}));
+        checkMechs("admin.\u2168", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
     }
 
     // Test standalone.

@@ -666,13 +666,6 @@ Status buildCredentials(BSONObjBuilder* builder, const auth::CreateOrUpdateUserA
     }
 
     if (buildSCRAMSHA256) {
-        const auto swPreppedName = saslPrep(args.userName.getUser());
-        if (!swPreppedName.isOK() || (swPreppedName.getValue() != args.userName.getUser())) {
-            return {
-                ErrorCodes::BadValue,
-                "Username must be normalized according to SASLPREP rules when using SCRAM-SHA-256"};
-        }
-
         // FCV check is deferred till this point so that the suitability checks can be performed
         // regardless.
         const auto fcv = serverGlobalParams.featureCompatibility.getVersion();

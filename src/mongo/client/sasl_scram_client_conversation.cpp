@@ -90,12 +90,8 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
     binaryNonce[1] = sr->nextInt64();
     binaryNonce[2] = sr->nextInt64();
 
-    auto swUser =
-        saslPrep(_saslClientSession->getParameter(SaslClientSession::parameterUser).toString());
-    if (!swUser.isOK()) {
-        return swUser.getStatus();
-    }
-    auto user = swUser.getValue();
+    std::string user =
+        _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
 
     encodeSCRAMUsername(user);
     _clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
