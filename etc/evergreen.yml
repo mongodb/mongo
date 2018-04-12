@@ -10072,13 +10072,14 @@ buildvariants:
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
 
-- name: enterprise-rhel-70-64-bit
+- &enterprise-rhel-70-64-bit-template
+  name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
   modules:
   - enterprise
   run_on:
   - rhel70-small
-  expansions:
+  expansions: &enterprise-rhel-70-64-bit-expansions-template
     test_flags: --excludeWithAnyTags=requires_mmapv1
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -10133,6 +10134,23 @@ buildvariants:
     distros:
     - ubuntu1604-packer
   - name: push
+
+# This variant is to intentionally test uncommon features nightly
+- <<: *enterprise-rhel-70-64-bit-template
+  name: enterprise-rhel-70-64-bit-kitchen-sink
+  display_name: "~ Enterprise RHEL 7.0 (Dagger, gperftools)"
+  expansions:
+    <<: *enterprise-rhel-70-64-bit-expansions-template
+    compile_flags: --ssl --use-cpu-profiler MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    additional_targets: dagger
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel70
+  - name: compile_benchmarks
+    distros:
+    - rhel70
+  - name: jsCore
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
@@ -10721,7 +10739,7 @@ buildvariants:
 
 
 - name: enterprise-ubuntu1604-64
-  display_name: Enterprise Ubuntu 16.04 (+Dagger)
+  display_name: Enterprise Ubuntu 16.04 (GCC 5.4)
   modules:
   - enterprise
   run_on:
@@ -10745,7 +10763,6 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
-    additional_targets: dagger
   display_tasks:
   - *unittests
   tasks:
