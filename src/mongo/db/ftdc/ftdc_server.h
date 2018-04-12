@@ -81,7 +81,7 @@ void stopFTDC();
 /**
  * A simple FTDC Collector that runs Commands.
  */
-class FTDCSimpleInternalCommandCollector final : public FTDCCollectorInterface {
+class FTDCSimpleInternalCommandCollector : public FTDCCollectorInterface {
 public:
     FTDCSimpleInternalCommandCollector(StringData command,
                                        StringData name,

@@ -10,12 +10,15 @@ fmEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 fmEnv.Library(
     target='free_mon',
     source=[
+        'free_mon_processor.cpp',
         'free_mon_queue.cpp',
         'free_mon_storage.cpp',
+        'free_mon_controller.cpp',
         env.Idlc('free_mon_protocol.idl')[0],
+        env.Idlc('free_mon_commands.idl')[0],
         env.Idlc('free_mon_storage.idl')[0],
     ],
-    LIBDEPS_PRIVATE=[
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -36,6 +39,11 @@ if get_option("enable-free-mon") == "on":
         ],
         LIBDEPS=[
             'free_mon',
+            '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
+            '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         ],
         SYSLIBDEPS=[
             'libcurld' if env.TargetOSIs('windows') else 'curl',
@@ -54,6 +62,7 @@ else:
 env.CppUnitTest(
     target='free_mon_test',
     source=[
+        'free_mon_controller_test.cpp',
         'free_mon_queue_test.cpp',
         'free_mon_storage_test.cpp',
     ],

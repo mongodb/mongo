@@ -26,6 +26,8 @@
  * then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/free_mon/free_mon_mongod.h"
@@ -42,9 +44,11 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_http.h"
 #include "mongo/db/free_mon/free_mon_message.h"
 #include "mongo/db/free_mon/free_mon_network.h"
+#include "mongo/db/free_mon/free_mon_options.h"
 #include "mongo/db/free_mon/free_mon_protocol_gen.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
 #include "mongo/db/ftdc/ftdc_server.h"
@@ -56,10 +60,23 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
+const auto getFreeMonController =
+    ServiceContext::declareDecoration<std::unique_ptr<FreeMonController>>();
+
+FreeMonController* getGlobalFreeMonController() {
+    if (!hasGlobalServiceContext()) {
+        return nullptr;
+    }
+
+    return getFreeMonController(getGlobalServiceContext()).get();
+}
+
 
 /**
  * Expose cloudFreeMonitoringEndpointURL set parameter to URL for free monitoring.
@@ -74,7 +91,7 @@ public:
 
     Status setFromString(const std::string& str) final {
         // Check for http, not https here because testEnabled may not be set yet
-        if (!str.compare(0, 4, "http")) {
+        if (str.compare(0, 4, "http") != 0) {
             return Status(ErrorCodes::BadValue,
                           "ExportedFreeMonEndpointURL only supports https:// URLs");
         }
@@ -94,7 +111,8 @@ public:
         const FreeMonRegistrationRequest& req) override {
         BSONObj reqObj = req.toBSON();
 
-        return _client->postAsync(exportedExportedFreeMonEndpointURL.getURL() + "/register", reqObj)
+        return _client
+            ->postAsync(exportedExportedFreeMonEndpointURL.getLocked() + "/register", reqObj)
             .then([](std::vector<uint8_t> blob) {
 
                 if (blob.empty()) {
@@ -119,7 +137,8 @@ public:
     Future<FreeMonMetricsResponse> sendMetricsAsync(const FreeMonMetricsRequest& req) override {
         BSONObj reqObj = req.toBSON();
 
-        return _client->postAsync(exportedExportedFreeMonEndpointURL.getURL() + "/metrics", reqObj)
+        return _client
+            ->postAsync(exportedExportedFreeMonEndpointURL.getLocked() + "/metrics", reqObj)
             .then([](std::vector<uint8_t> blob) {
 
                 if (blob.empty()) {
@@ -145,6 +164,76 @@ private:
     std::unique_ptr<FreeMonHttpClientInterface> _client;
 };
 
+/**
+ * Collect the mms-automation state document from local.clustermanager during registration.
+ */
+class FreeMonLocalClusterManagerCollector : public FreeMonCollectorInterface {
+public:
+    std::string name() const final {
+        return "clustermanager";
+    }
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) {
+        auto optionalObj = FreeMonStorage::readClusterManagerState(opCtx);
+        if (optionalObj.is_initialized()) {
+            builder.appendElements(optionalObj.get());
+        }
+    }
+};
+
+/**
+ * Get the "storageEngine" section of "serverStatus" during registration.
+ */
+class FreeMonLocalStorageEngineStatusCollector : public FTDCSimpleInternalCommandCollector {
+public:
+    FreeMonLocalStorageEngineStatusCollector()
+        : FTDCSimpleInternalCommandCollector(
+              "serverStatus",
+              "serverStatus",
+              "",
+              // Try to filter server status to make it cheaper to collect. Harmless if we gather
+              // extra
+              BSON("serverStatus" << 1 << "storageEngine" << true << "extra_info" << false
+                                  << "opLatencies"
+                                  << false
+                                  << "opcountersRepl"
+                                  << false
+                                  << "opcounters"
+                                  << false
+                                  << "transactions"
+                                  << false
+                                  << "connections"
+                                  << false
+                                  << "network"
+                                  << false
+                                  << "tcMalloc"
+                                  << false
+                                  << "network"
+                                  << false
+                                  << "wiredTiger"
+                                  << false
+                                  << "sharding"
+                                  << false
+                                  << "metrics"
+                                  << false)) {}
+
+    std::string name() const final {
+        return "storageEngine";
+    }
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) {
+        BSONObjBuilder localBuilder;
+
+        FTDCSimpleInternalCommandCollector::collect(opCtx, localBuilder);
+
+        BSONObj obj = localBuilder.obj();
+
+        builder.appendElements(obj["storageEngine"].Obj());
+    }
+};
+
+}  // namespace
+
 
 auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
     ThreadPool::Options tpOptions;
@@ -158,10 +247,59 @@ auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
         executor::makeNetworkInterface("NetworkInterfaceASIO-FreeMon"));
 }
 
-}  // namespace
+void registerCollectors(FreeMonController* controller) {
+    // These are collected only at registration
+    //
+    // CmdBuildInfo
+    controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        "buildInfo", "buildInfo", "", BSON("buildInfo" << 1)));
 
+    // HostInfoCmd
+    controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        "hostInfo", "hostInfo", "", BSON("hostInfo" << 1)));
+
+    // Add storageEngine section from serverStatus
+    controller->addRegistrationCollector(
+        stdx::make_unique<FreeMonLocalStorageEngineStatusCollector>());
+
+    // Gather one document from local.clustermanager
+    controller->addRegistrationCollector(stdx::make_unique<FreeMonLocalClusterManagerCollector>());
+
+    // These are periodically for metrics upload
+    //
+    controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        "getDiagnosticData", "diagnosticData", "", BSON("getDiagnosticData" << 1)));
+
+    // These are collected at registration and as metrics periodically
+    //
+    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
+        repl::ReplicationCoordinator::modeNone) {
+        // CmdReplSetGetConfig
+        controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+            "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
+
+        controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+            "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
+    }
+
+    controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        "isMaster", "isMaster", "", BSON("isMaster" << 1)));
+
+    controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
+        "isMaster", "isMaster", "", BSON("isMaster" << 1)));
+}
 
 void startFreeMonitoring(ServiceContext* serviceContext) {
+    if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOff) {
+        return;
+    }
+
+    // Check for http, not https here because testEnabled may not be set yet
+    if (!getTestCommandsEnabled()) {
+        uassert(50774,
+                "ExportedFreeMonEndpointURL only supports https:// URLs",
+                exportedExportedFreeMonEndpointURL.getLocked().compare(0, 5, "https") == 0);
+    }
 
     auto executor = makeTaskExecutor(serviceContext);
 
@@ -175,12 +313,46 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
 
     auto network =
         std::unique_ptr<FreeMonNetworkInterface>(new FreeMonNetworkHttp(std::move(http)));
+
+    auto controller = stdx::make_unique<FreeMonController>(std::move(network));
+
+    registerCollectors(controller.get());
+
+    // Install the new controller
+    auto& staticFreeMon = getFreeMonController(serviceContext);
+
+    staticFreeMon = std::move(controller);
+
+    RegistrationType registrationType = RegistrationType::DoNotRegister;
+    if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOn) {
+        // If replication is enabled, we may need to register on becoming primary
+        if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
+            repl::ReplicationCoordinator::modeNone) {
+            registrationType = RegistrationType::RegisterAfterOnTransitionToPrimary;
+        } else {
+            registrationType = RegistrationType::RegisterOnStart;
+        }
+    }
+
+    staticFreeMon->start(registrationType);
 }
 
-void stopFreeMonitoring() {}
+void stopFreeMonitoring() {
+    if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOff) {
+        return;
+    }
+
+    auto controller = getGlobalFreeMonController();
+
+    if (controller != nullptr) {
+        controller->stop();
+    }
+}
+
+FreeMonController* FreeMonController::get(ServiceContext* serviceContext) {
+    return getFreeMonController(serviceContext).get();
+}
 
 FreeMonHttpClientInterface::~FreeMonHttpClientInterface() = default;
-
-FreeMonNetworkInterface::~FreeMonNetworkInterface() = default;
 
 }  // namespace mongo

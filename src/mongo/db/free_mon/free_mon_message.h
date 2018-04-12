@@ -31,6 +31,7 @@
 #include <condition_variable>
 #include <vector>
 
+#include "mongo/db/free_mon/free_mon_protocol_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
@@ -71,6 +72,26 @@ enum class FreeMonMessageType {
     // TODO - add replication messages
     // OnPrimary,
     // OpObserver,
+};
+
+/**
+ * Supported types of registration that occur on server startup.
+ */
+enum class RegistrationType {
+    /**
+    * Do not register on start because it was not configured via commandline/config file.
+    */
+    DoNotRegister,
+
+    /**
+    * Register immediately on start since we are a standalone.
+    */
+    RegisterOnStart,
+
+    /**
+    * Register after transition to becoming primary because we are in a replica set.
+    */
+    RegisterAfterOnTransitionToPrimary,
 };
 
 /**
@@ -125,5 +146,168 @@ private:
     Date_t _deadline;
 };
 
+
+/**
+ * Most messages have a simple payload, and this template ensures we create type-safe messages for
+ * each message type without copy-pasting repeatedly.
+ */
+template <FreeMonMessageType typeT>
+struct FreeMonPayloadForMessage {
+    using payload_type = void;
+};
+
+template <>
+struct FreeMonPayloadForMessage<FreeMonMessageType::AsyncRegisterComplete> {
+    using payload_type = FreeMonRegistrationResponse;
+};
+
+template <>
+struct FreeMonPayloadForMessage<FreeMonMessageType::RegisterServer> {
+    using payload_type = std::pair<RegistrationType, std::vector<std::string>>;
+};
+
+template <>
+struct FreeMonPayloadForMessage<FreeMonMessageType::AsyncRegisterFail> {
+    using payload_type = Status;
+};
+
+/**
+ * Message with a generic payload based on the type of message.
+ */
+template <FreeMonMessageType typeT>
+class FreeMonMessageWithPayload : public FreeMonMessage {
+public:
+    using payload_type = typename FreeMonPayloadForMessage<typeT>::payload_type;
+
+    /**
+     * Create a message that should processed immediately.
+     */
+    static std::shared_ptr<FreeMonMessageWithPayload> createNow(payload_type t) {
+        return std::make_shared<FreeMonMessageWithPayload>(t, Date_t::min());
+    }
+
+    /**
+     * Get message payload.
+     */
+    const payload_type& getPayload() const {
+        return _t;
+    }
+
+public:
+    FreeMonMessageWithPayload(payload_type t, Date_t deadline)
+        : FreeMonMessage(typeT, deadline), _t(std::move(t)) {}
+
+private:
+    // Message payload
+    payload_type _t;
+};
+
+/**
+ * Single-shot class that encapsulates a Status and allows a caller to wait for a time.
+ *
+ * Basically, a single producer, single consumer queue with one event.
+ */
+class WaitableResult {
+public:
+    WaitableResult() : _status(Status::OK()) {}
+
+    /**
+     * Set Status and signal waiter.
+     */
+    void set(Status status) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+        invariant(!_set);
+        if (!_set) {
+            _set = true;
+            _status = std::move(status);
+            _condvar.notify_one();
+        }
+    }
+
+    /**
+     * Waits for duration until status has been set.
+     *
+     * Returns boost::none on timeout.
+     */
+    boost::optional<Status> wait_for(Milliseconds duration) {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+
+        if (!_condvar.wait_for(lock, duration.toSystemDuration(), [this]() { return _set; })) {
+            return {};
+        }
+
+        return _status;
+    }
+
+private:
+    // Condition variable to signal consumer
+    std::condition_variable _condvar;
+
+    // Lock for condition variable and to protect state
+    std::mutex _mutex;
+
+    // Indicates whether _status has been set
+    bool _set{false};
+
+    // Provided status
+    Status _status;
+};
+
+/**
+ * Custom waitable message for Register Command message.
+ */
+class FreeMonRegisterCommandMessage : public FreeMonMessage {
+public:
+    /**
+     * Create a message that should processed immediately.
+     */
+    static std::shared_ptr<FreeMonRegisterCommandMessage> createNow(
+        const std::vector<std::string>& tags) {
+        return std::make_shared<FreeMonRegisterCommandMessage>(tags, Date_t::min());
+    }
+
+    /**
+     * Create a message that should processed after the specified deadline.
+     */
+    static std::shared_ptr<FreeMonRegisterCommandMessage> createWithDeadline(
+        const std::vector<std::string>& tags, Date_t deadline) {
+        return std::make_shared<FreeMonRegisterCommandMessage>(tags, deadline);
+    }
+
+    /**
+     * Get tags.
+     */
+    const std::vector<std::string>& getTags() const {
+        return _tags;
+    }
+
+    /**
+     * Set Status and signal waiter.
+     */
+    void setStatus(Status status) {
+        _waitable.set(std::move(status));
+    }
+
+    /**
+     * Waits for duration until status has been set.
+     *
+     * Returns boost::none on timeout.
+     */
+    boost::optional<Status> wait_for(Milliseconds duration) {
+        return _waitable.wait_for(duration);
+    }
+
+public:
+    FreeMonRegisterCommandMessage(std::vector<std::string> tags, Date_t deadline)
+        : FreeMonMessage(FreeMonMessageType::RegisterCommand, deadline), _tags(std::move(tags)) {}
+
+private:
+    // WaitaleResult to notify caller
+    WaitableResult _waitable{};
+
+    // Tags
+    const std::vector<std::string> _tags;
+};
 
 }  // namespace mongo
