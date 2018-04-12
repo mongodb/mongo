@@ -69,7 +69,17 @@ public:
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
-            return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
+            if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
+                // Watching a whole cluster.
+                return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
+            } else if (_nss.isCollectionlessAggregateNS()) {
+                // Watching a whole database.
+                return {Privilege(ResourcePattern::forDatabaseName(_nss.db()), actions)};
+            } else {
+                // Watching a single collection. Note if this is in the admin database it will fail
+                // at parse time.
+                return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
+            }
         }
 
         void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
