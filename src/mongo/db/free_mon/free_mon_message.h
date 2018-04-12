@@ -32,6 +32,8 @@
 #include <vector>
 
 #include "mongo/db/free_mon/free_mon_protocol_gen.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
@@ -242,10 +244,10 @@ public:
 
 private:
     // Condition variable to signal consumer
-    std::condition_variable _condvar;
+    stdx::condition_variable _condvar;
 
     // Lock for condition variable and to protect state
-    std::mutex _mutex;
+    stdx::mutex _mutex;
 
     // Indicates whether _status has been set
     bool _set{false};
