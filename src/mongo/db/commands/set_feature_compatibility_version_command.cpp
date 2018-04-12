@@ -177,7 +177,7 @@ public:
 
                 auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
                 for (const auto& db : allDbs.value) {
-                    const auto dbVersion = Versioning::newDatabaseVersion();
+                    const auto dbVersion = databaseVersion::makeNew();
 
                     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
                         opCtx,

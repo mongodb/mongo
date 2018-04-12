@@ -206,7 +206,7 @@ void ConfigServerCatalogCacheLoader::getDatabase(
             auto swDbt = [&]() -> StatusWith<DatabaseType> {
                 try {
 
-                    const auto dbVersion = Versioning::newDatabaseVersion();
+                    const auto dbVersion = databaseVersion::makeNew();
                     DatabaseType dbt(std::move(name), ShardId("PrimaryShard"), false, dbVersion);
                     return dbt;
                 } catch (const DBException& ex) {

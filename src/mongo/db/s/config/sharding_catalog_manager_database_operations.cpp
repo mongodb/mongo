@@ -123,7 +123,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 ||
         serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-        dbVersion = Versioning::newDatabaseVersion();
+        dbVersion = databaseVersion::makeNew();
     }
 
     // Insert an entry for the new database into the sharding catalog.
@@ -240,7 +240,7 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                           << dbType.toBSON(),
             currentDatabaseVersion != boost::none);
 
-    newDbType.setVersion(Versioning::incrementDatabaseVersion(*currentDatabaseVersion));
+    newDbType.setVersion(databaseVersion::makeIncremented(*currentDatabaseVersion));
 
     auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
     updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion->toBSON());

@@ -707,7 +707,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
             serverGlobalParams.featureCompatibility.getVersion() ==
                 ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-            dbt.setVersion(Versioning::newDatabaseVersion());
+            dbt.setVersion(databaseVersion::makeNew());
         }
 
         Status status = Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbt);

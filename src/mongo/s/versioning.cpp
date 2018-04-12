@@ -33,19 +33,21 @@
 #include "mongo/s/database_version_gen.h"
 
 namespace mongo {
+namespace databaseVersion {
 
-DatabaseVersion Versioning::newDatabaseVersion() {
+DatabaseVersion makeNew() {
     DatabaseVersion dbv;
     dbv.setLastMod(1);
     dbv.setUuid(UUID::gen());
     return dbv;
 }
 
-DatabaseVersion Versioning::incrementDatabaseVersion(const DatabaseVersion& v) {
+DatabaseVersion makeIncremented(const DatabaseVersion& v) {
     DatabaseVersion dbv;
     dbv.setLastMod(v.getLastMod() + 1);
     dbv.setUuid(v.getUuid());
     return dbv;
 }
 
+}  // namespace databaseVersion
 }  // namespace mongo

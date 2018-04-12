@@ -26,16 +26,13 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
 
 namespace mongo {
+namespace databaseVersion {
 
-class Versioning {
-public:
-    static DatabaseVersion newDatabaseVersion();
+DatabaseVersion makeNew();
+DatabaseVersion makeIncremented(const DatabaseVersion& v);
 
-    static DatabaseVersion incrementDatabaseVersion(const DatabaseVersion& v);
-};
-
+}  // namespace databaseVersion
 }  // namespace mongo
