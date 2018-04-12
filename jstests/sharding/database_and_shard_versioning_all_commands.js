@@ -576,6 +576,10 @@
                     testCase.cleanUp(this.st.s);
                 }
 
+                // Clear the profiler collection in between testing each command.
+                this.primaryShard.getDB(dbName).setProfilingLevel(0);
+                assert(this.primaryShard.getDB(dbName).getCollection("system.profile").drop());
+
                 this.makeShardDatabaseCacheStale();
             }
 

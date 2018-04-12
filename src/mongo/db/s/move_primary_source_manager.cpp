@@ -120,8 +120,6 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
             _clonedColls.push_back(NamespaceString(elem.String()));
         }
     }
-    _shardedCollectionsExistOnDb =
-        cloneCommandResponse.getValue().response["shardedCollectionsExistOnDb"].Bool();
 
     _state = kCloneCompleted;
     scopedGuard.Dismiss();
@@ -277,9 +275,6 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
                                   << "version also failed"));
     }
 
-    // TODO: SERVER-33099
-    // Attempt to force a refresh of database metadata
-
     _state = kCommitted;
 
     _cleanup(opCtx);
@@ -302,34 +297,14 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kNeedCleanStaleData);
 
+    // Only drop the cloned (unsharded) collections.
     DBDirectClient client(opCtx);
-
-    if (!_shardedCollectionsExistOnDb) {
-        log() << "movePrimary dropping database on " << _fromShard << ", no sharded collections in "
-              << _dbname;
-
-        BSONObj dropDbResult;
-        client.runCommand(_dbname.toString(), BSON("dropDatabase" << 1), dropDbResult);
-
-        Status dropStatus = getStatusFromCommandResult(dropDbResult);
+    for (auto& coll : _clonedColls) {
+        BSONObj dropCollResult;
+        client.runCommand(_dbname.toString(), BSON("drop" << coll.coll()), dropCollResult);
+        Status dropStatus = getStatusFromCommandResult(dropCollResult);
         if (!dropStatus.isOK()) {
-            log() << "movePrimary could not drop the database " << _dbname << " on " << _fromShard;
-            return dropStatus;
-        }
-
-    } else {
-        // Sharded collections exist on the old primary, so drop only the cloned (unsharded)
-        // collections.
-        for (auto& coll : _clonedColls) {
-            log() << "dropping this collection: " << coll;
-            BSONObj dropCollResult;
-            client.runCommand(_dbname.toString(), BSON("drop" << coll.coll()), dropCollResult);
-
-            Status dropStatus = getStatusFromCommandResult(dropCollResult);
-            if (!dropStatus.isOK()) {
-                log() << "movePrimary could not drop the cloned collection" << coll << " on "
-                      << _fromShard;
-            }
+            log() << "failed to drop cloned collection " << coll << causedBy(redact(dropStatus));
         }
     }
 
