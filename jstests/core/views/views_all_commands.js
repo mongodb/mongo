@@ -87,6 +87,8 @@
         _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
         _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+        _cpuProfilerStart: {skip: isAnInternalCommand},
+        _cpuProfilerStop: {skip: isAnInternalCommand},
         _flushDatabaseCacheUpdates: {skip: isUnrelated},
         _flushRoutingTableCacheUpdates: {skip: isUnrelated},
         _getNextSessionMods: {skip: isAnInternalCommand},
