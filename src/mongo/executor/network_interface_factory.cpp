@@ -40,7 +40,7 @@
 #include "mongo/executor/async_timer_asio.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
-#include "mongo/executor/network_interface_asio.h"
+#include "mongo/executor/network_interface_tl.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -57,27 +57,15 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::unique_ptr<NetworkConnectionHook> hook,
     std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
     ConnectionPool::Options connPoolOptions) {
-    NetworkInterfaceASIO::Options options{};
-    options.instanceName = std::move(instanceName);
-    options.networkConnectionHook = std::move(hook);
-    options.metadataHook = std::move(metadataHook);
-    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
-    options.connectionPoolOptions = connPoolOptions;
-    if (!options.connectionPoolOptions.egressTagCloserManager && hasGlobalServiceContext()) {
-        options.connectionPoolOptions.egressTagCloserManager =
+
+    if (!connPoolOptions.egressTagCloserManager && hasGlobalServiceContext()) {
+        connPoolOptions.egressTagCloserManager =
             &EgressTagCloserManager::get(getGlobalServiceContext());
     }
 
-#ifdef MONGO_CONFIG_SSL
-    if (SSLManagerInterface* manager = getSSLManager()) {
-        options.streamFactory = stdx::make_unique<AsyncSecureStreamFactory>(manager);
-    }
-#endif
-
-    if (!options.streamFactory)
-        options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
-
-    return stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
+    auto svcCtx = hasGlobalServiceContext() ? getGlobalServiceContext() : nullptr;
+    return std::make_unique<NetworkInterfaceTL>(
+        instanceName, connPoolOptions, svcCtx, std::move(hook), std::move(metadataHook));
 }
 
 }  // namespace executor
