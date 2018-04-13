@@ -82,13 +82,15 @@ function verifyGlobalSnapshotReads(conn, expectSuccess, expectedCode) {
                                             expectedCode);
 
     // TODO: SERVER-31767
-    return;
-    // Sharded collection, all shards.
-    txnNumber++;
-    txnNumber = runCommandAndVerifyResponse(
-        shardedDb,
-        txnNumber,
-        {find: "sharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber)},
-        expectSuccess,
-        expectedCode);
+    const server_31767_fixed = false;
+    if (server_31767_fixed) {
+        // Sharded collection, all shards.
+        txnNumber++;
+        txnNumber = runCommandAndVerifyResponse(
+            shardedDb,
+            txnNumber,
+            {find: "sharded", readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber)},
+            expectSuccess,
+            expectedCode);
+    }
 }
