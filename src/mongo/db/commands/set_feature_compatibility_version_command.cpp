@@ -173,10 +173,15 @@ public:
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
-                    opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+                                                  opCtx, repl::ReadConcernLevel::kLocalReadConcern))
+                                  .value;
+
+                // The 'config' dataabase contains the sharded 'config.system.sessions' collection,
+                // but does not have an entry in config.databases.
+                allDbs.emplace_back("config", ShardId("config"), true);
 
                 auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-                for (const auto& db : allDbs.value) {
+                for (const auto& db : allDbs) {
                     const auto dbVersion = databaseVersion::makeNew();
 
                     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
@@ -258,10 +263,15 @@ public:
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
 
-                const auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
-                    opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+                auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
+                                                  opCtx, repl::ReadConcernLevel::kLocalReadConcern))
+                                  .value;
 
-                for (const auto& db : allDbs.value) {
+                // The 'config' dataabase contains the sharded 'config.system.sessions' collection,
+                // but does not have an entry in config.databases.
+                allDbs.emplace_back("config", ShardId("config"), true);
+
+                for (const auto& db : allDbs) {
                     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
                         opCtx,
                         DatabaseType::ConfigNS,
