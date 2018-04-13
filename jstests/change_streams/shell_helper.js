@@ -6,6 +6,7 @@
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+    load("jstests/libs/change_stream_util.js");        // For assertInvalidateOp.
 
     const coll = assertDropAndRecreateCollection(db, "change_stream_shell_helper");
 
@@ -162,14 +163,12 @@
     assert(!changeStreamCursor.isClosed());
     assert(!changeStreamCursor.isExhausted());
 
-    // Dropping the collection should invalidate any open change streams.
+    // Dropping the collection should trigger a drop notification.
     assertDropCollection(db, coll.getName());
     assert.soon(() => changeStreamCursor.hasNext());
-    assert(changeStreamCursor.isClosed());
     assert(!changeStreamCursor.isExhausted());
-    expected = {operationType: "invalidate"};
+    expected = {operationType: "drop", ns: {db: db.getName(), coll: coll.getName()}};
     checkNextChange(changeStreamCursor, expected);
-    assert(!changeStreamCursor.hasNext());
-    assert(changeStreamCursor.isClosed());
-    assert(changeStreamCursor.isExhausted());
+    // For single collection change streams, the drop should invalidate the stream.
+    assertInvalidateOp({cursor: changeStreamCursor, opType: "drop"});
 }());

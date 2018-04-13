@@ -24,7 +24,7 @@ selector:
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/inserts_consistent.js
   - jstests/sharding/not_allowed_on_sharded_collection_cmd.js
-  - jstests/sharding/change_stream_invalidation.js
+  - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/mapReduce_outSharded.js
   - jstests/sharding/autosplit.js
   - jstests/sharding/accurate_count_with_predicate.js

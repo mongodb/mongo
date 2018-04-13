@@ -1,9 +1,11 @@
-// Tests invalidation of change streams on sharded collections.
+// Tests metadata notifications of change streams on sharded collections.
+// Legacy getMore fails after dropping the database that the original cursor is on.
+// @tags: [requires_find_command]
 (function() {
     "use strict";
 
+    load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
     load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
-    load('jstests/libs/write_concern_util.js');        // For stopReplicationOnSecondaries.
 
     // For supportsMajorityReadConcern.
     load('jstests/multiVersion/libs/causal_consistency_helpers.js');
@@ -53,10 +55,11 @@
     assert.writeOK(mongosColl.update({shardKey: 1, _id: 1}, {$set: {updated: true}}));
     assert.writeOK(mongosColl.insert({shardKey: 2, _id: 2}));
 
-    // Drop the collection and test that we return "invalidate" entry and close the cursor.
+    // Drop the collection and test that we return a "drop" entry, followed by an "invalidate"
+    // entry.
     mongosColl.drop();
 
-    // Test that we see the two writes that happened before the invalidation.
+    // Test that we see the two writes that happened before the collection drop.
     assert.soon(() => changeStream.hasNext());
     let next = changeStream.next();
     assert.eq(next.operationType, "update");
@@ -72,6 +75,11 @@
     next = changeStream.next();
     assert.eq(next.operationType, "insert");
     assert.eq(next.documentKey, {_id: 2});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "drop");
+    assert.eq(next.ns, {db: mongosDB.getName(), coll: mongosColl.getName()});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
@@ -92,6 +100,11 @@
     next = changeStream.next();
     assert.eq(next.operationType, "insert");
     assert.eq(next.documentKey, {shardKey: 2, _id: 2});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "drop");
+    assert.eq(next.ns, {db: mongosDB.getName(), coll: mongosColl.getName()});
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
@@ -121,6 +134,25 @@
         cursor: {}
     }),
                                  ErrorCodes.InvalidResumeToken);
+
+    // Recreate the collection as unsharded and open a change stream on it.
+    assertDropAndRecreateCollection(mongosDB, mongosColl.getName());
+
+    changeStream = mongosColl.watch();
+
+    // Drop the database and verify that the stream returns a collection drop followed by an
+    // invalidate.
+    assert.commandWorked(mongosDB.dropDatabase());
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "drop");
+    assert.eq(next.ns, {db: mongosDB.getName(), coll: mongosColl.getName()});
+
+    assert.soon(() => changeStream.hasNext());
+    next = changeStream.next();
+    assert.eq(next.operationType, "invalidate");
+    assert(changeStream.isExhausted());
 
     st.stop();
 })();

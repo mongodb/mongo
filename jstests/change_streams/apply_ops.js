@@ -20,8 +20,12 @@
     coll.insert({_id: kDeletedDocumentId, a: "I was here before the transaction"});
 
     let cst = new ChangeStreamTest(db);
-    let changeStream = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}], collection: coll});
+    let changeStream = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}],
+        collection: coll,
+        doNotModifyInPassthroughs:
+            true  // A collection drop only invalidates single-collection change streams.
+    });
 
     const sessionOptions = {causalConsistency: false};
     const session = db.getMongo().startSession(sessionOptions);
@@ -93,12 +97,21 @@
           lsid: session.getSessionId(),
           txnNumber: NumberLong(session._txnNumber),
         },
-        {operationType: "invalidate"},
+        {
+          operationType: "drop",
+          ns: {db: db.getName(), coll: coll.getName()},
+        },
     ];
 
     // Verify that the stream returns the expected sequence of changes.
-    const changes = cst.assertNextChangesEqual(
-        {cursor: changeStream, expectedChanges: expectedChanges, expectInvalidate: true});
+    const changes =
+        cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
+    // Single collection change stream should also be invalidated by the drop.
+    cst.assertNextChangesEqual({
+        cursor: changeStream,
+        expectedChanges: [{operationType: "invalidate"}],
+        expectInvalidate: true
+    });
 
     // Obtain the clusterTime from the first change.
     const startTime = changes[0].clusterTime;
@@ -119,8 +132,7 @@
         pipeline: [{$changeStream: {startAtOperationTime: startTime}}, {$project: {"lsid.uid": 0}}],
         collection: 1
     });
-    cst.assertNextChangesEqual(
-        {cursor: changeStream, expectedChanges: expectedChanges, expectInvalidate: true});
+    cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
 
     // Add an entry for the insert on otherDb.otherDbColl into expectedChanges.
     expectedChanges.splice(3, 0, {
@@ -142,8 +154,7 @@
         ],
         collection: 1
     });
-    cst.assertNextChangesEqual(
-        {cursor: changeStream, expectedChanges: expectedChanges, expectInvalidate: true});
+    cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
 
     cst.cleanUp();
 }());

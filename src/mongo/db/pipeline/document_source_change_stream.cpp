@@ -78,10 +78,14 @@ constexpr StringData DocumentSourceChangeStream::kStageName;
 constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
 constexpr StringData DocumentSourceChangeStream::kTxnNumberField;
 constexpr StringData DocumentSourceChangeStream::kLsidField;
+constexpr StringData DocumentSourceChangeStream::kRenameTargetNssField;
 constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
 constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
+constexpr StringData DocumentSourceChangeStream::kDropCollectionOpType;
+constexpr StringData DocumentSourceChangeStream::kRenameCollectionOpType;
+constexpr StringData DocumentSourceChangeStream::kDropDatabaseOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
@@ -202,6 +206,7 @@ private:
         : DocumentSource(expCtx) {}
 
     bool _shouldCloseCursor = false;
+    boost::optional<Document> _queuedInvalidate;
 };
 
 DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
@@ -210,6 +215,11 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
     // Close cursor if we have returned an invalidate entry.
     if (_shouldCloseCursor) {
         uasserted(ErrorCodes::CloseChangeStream, "Change stream has been invalidated");
+    }
+
+    if (_queuedInvalidate) {
+        _shouldCloseCursor = true;
+        return DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
     }
 
     auto nextInput = pSource->getNext();
@@ -226,6 +236,22 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
         // filtered/transformed by further stages in the pipeline, then throw an exception
         // to close the cursor on the next call to getNext().
         _shouldCloseCursor = true;
+    }
+
+    // Check if this is an invalidating command and the next entry should be an "invalidate".
+    // TODO SERVER-35029: For whole-db change streams, only a database drop will invalidate the
+    // stream.
+    const auto invalidatingCommand = pExpCtx->isSingleNamespaceAggregation()
+        ? (operationType == DocumentSourceChangeStream::kDropCollectionOpType ||
+           operationType == DocumentSourceChangeStream::kRenameCollectionOpType)
+        : false;
+
+    if (invalidatingCommand) {
+        _queuedInvalidate = Document{
+            {DocumentSourceChangeStream::kIdField, doc[DocumentSourceChangeStream::kIdField]},
+            {DocumentSourceChangeStream::kClusterTimeField,
+             doc[DocumentSourceChangeStream::kClusterTimeField]},
+            {DocumentSourceChangeStream::kOperationTypeField, "invalidate"_sd}};
     }
 
     return nextInput;
@@ -304,27 +330,28 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
     ChangeStreamType sourceType = getChangeStreamType(nss);
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
-    BSONArrayBuilder invalidatingCommands;
-    invalidatingCommands.append(BSON("o.dropDatabase" << 1));
+    BSONArrayBuilder relevantCommands;
 
     if (sourceType == ChangeStreamType::kSingleCollection) {
-        invalidatingCommands.append(BSON("o.drop" << nss.coll()));
-        invalidatingCommands.append(BSON("o.renameCollection" << nss.ns()));
+        relevantCommands.append(BSON("o.drop" << nss.coll()));
+        // Generate 'rename' entries if the change stream is open on the source or target namespace.
+        relevantCommands.append(BSON("o.renameCollection" << nss.ns()));
+        relevantCommands.append(BSON("o.to" << nss.ns()));
         if (expCtx->collation.isEmpty()) {
             // If the user did not specify a collation, they should be using the collection's
             // default collation. So a "create" command which has any collation present would
             // invalidate the change stream, since that must mean the stream was created before the
             // collection existed and used the simple collation, which is no longer the default.
-            invalidatingCommands.append(
+            relevantCommands.append(
                 BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
         }
     } else {
-        // For change streams on an entire database, the stream is invalidated if any collections in
-        // that database are dropped or renamed. For cluster-wide streams, drops or renames of any
-        // collection in any database (aside from the internal databases admin, config and local)
-        // will invalidate the stream.
-        invalidatingCommands.append(BSON("o.drop" << BSON("$exists" << true)));
-        invalidatingCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
+        // For change streams on an entire database, include notifications for individual collection
+        // drops and renames which will not invalidate the stream. Also include the 'dropDatabase'
+        // command which will invalidate the stream.
+        relevantCommands.append(BSON("o.drop" << BSON("$exists" << true)));
+        relevantCommands.append(BSON("o.dropDatabase" << BSON("$exists" << true)));
+        relevantCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
     }
 
     // For cluster-wide $changeStream, match the command namespace of any database other than admin,
@@ -333,9 +360,9 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
                             ? BSON("ns" << BSONRegEx("^" + kRegexAllDBs + kRegexCmdColl))
                             : BSON("ns" << nss.getCommandNS().ns()));
 
-    // 1.1) Commands that are on target db(s) and one of the above invalidating commands.
+    // 1.1) Commands that are on target db(s) and one of the above supported commands.
     auto commandsOnTargetDb =
-        BSON("$and" << BSON_ARRAY(cmdNsFilter << BSON("$or" << invalidatingCommands.arr())));
+        BSON("$and" << BSON_ARRAY(cmdNsFilter << BSON("$or" << relevantCommands.arr())));
 
     // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
     auto renameDropTarget = (sourceType == ChangeStreamType::kAllChangesForCluster

@@ -312,7 +312,8 @@
             // $changeStream.
             assert.soon(() => changeStream.hasNext());
             assert.docEq(changeStream.next().fullDocument, {_id: "dropped_coll", text: "ABC"});
-            assert(changeStream.isExhausted());
+            // Only single-collection streams will be exhausted from the drop.
+            assert(changeStream.isExhausted() || isChangeStreamPassthrough());
 
             // Test that a pipeline with an explicit collation is allowed to resume from before the
             // collection is dropped and recreated.
@@ -322,7 +323,8 @@
 
             assert.soon(() => changeStream.hasNext());
             assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
-            assert(changeStream.isExhausted());
+            // Only single-collection streams will be exhausted from the drop.
+            assert(changeStream.isExhausted() || isChangeStreamPassthrough());
 
             // Test that a pipeline without an explicit collation is not allowed to resume,
             // even though the collection has been recreated with the same default collation as it

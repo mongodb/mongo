@@ -120,12 +120,15 @@
     changeStream = mongosColl.aggregate([{$changeStream: {}}, {$project: {"_id.clusterTime": 0}}]);
     assert(!changeStream.hasNext());
 
-    // Drop the collection and test that we return "invalidate" entry and close the cursor.
+    // Drop the collection and test that we return a "drop" followed by an "invalidate" entry and
+    // close the cursor.
     jsTestLog("Testing getMore command closes cursor for invalidate entries");
     mongosColl.drop();
     // Wait for the drop to actually happen.
     assert.soon(() => !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(
                     mongosColl.getDB(), mongosColl.getName()));
+    assert.soon(() => changeStream.hasNext());
+    assert.eq(changeStream.next().operationType, "drop");
     assert.soon(() => changeStream.hasNext());
     assert.eq(changeStream.next().operationType, "invalidate");
     assert(changeStream.isExhausted());
@@ -164,8 +167,10 @@
     assert.eq(next.documentKey._id, 2);
 
     assert.soon(() => changeStream.hasNext());
+    assert.eq(changeStream.next().operationType, "drop");
+
+    assert.soon(() => changeStream.hasNext());
     assert.eq(changeStream.next().operationType, "invalidate");
-    assert(changeStream.isExhausted());
 
     // With an explicit collation, test that we can resume from before the collection drop.
     changeStream = mongosColl.watch([{$project: {_id: 0}}],
@@ -177,9 +182,10 @@
     assert.eq(next.documentKey, {_id: 2});
 
     assert.soon(() => changeStream.hasNext());
-    next = changeStream.next();
-    assert.eq(next.operationType, "invalidate");
-    assert(changeStream.isExhausted());
+    assert.eq(changeStream.next().operationType, "drop");
+
+    assert.soon(() => changeStream.hasNext());
+    assert.eq(changeStream.next().operationType, "invalidate");
 
     // Without an explicit collation, test that we *cannot* resume from before the collection drop.
     assert.commandFailedWithCode(mongosDB.runCommand({

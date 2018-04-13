@@ -2,6 +2,7 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/change_stream_util.js");        // For assertInvalidateOp.
     load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 
     // Drop and recreate the collections to be used in this set of tests.
@@ -47,8 +48,10 @@
 
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
-    assert.eq(next.operationType, "invalidate");
+    assert.eq(next.operationType, "drop");
     assert.lte(next.clusterTime, dropClusterTime);
+
+    assertInvalidateOp({cursor: changeStream, opType: "drop"});
 
     changeStream.close();
 }());

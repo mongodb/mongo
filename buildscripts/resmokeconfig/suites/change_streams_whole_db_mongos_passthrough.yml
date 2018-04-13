@@ -8,9 +8,11 @@ selector:
   # to work against a mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   # TODO: SERVER-32088 should fix resuming a change stream when not all shards have data.
-  - jstests/change_streams/change_stream_shell_helper.js
+  - jstests/change_streams/shell_helper.js
   - jstests/change_streams/lookup_post_image.js
   - jstests/change_streams/include_cluster_time.js
+  # Only relevant for single-collection change streams.
+  - jstests/change_streams/metadata_notifications.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

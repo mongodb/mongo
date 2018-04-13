@@ -6,9 +6,8 @@
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 
     // Create two databases, with one collection in each.
-    const testDBs = [db, db.getSiblingDB(`${db.getName()}_other`)];
-    const[db1Coll, db2Coll] =
-        testDBs.map((db) => assertDropAndRecreateCollection(db, jsTestName()));
+    const testDBs = [db, db.getSiblingDB(jsTestName() + "_other")];
+    const[db1Coll, db2Coll] = testDBs.map((db) => assertDropAndRecreateCollection(db, "test"));
     const adminDB = db.getSiblingDB("admin");
 
     let cst = new ChangeStreamTest(adminDB);
