@@ -155,29 +155,5 @@
     runTest({useCausalConsistency: true, readFromSecondary: false, establishCursorCmd: aggCmd});
     runTest({useCausalConsistency: false, readFromSecondary: true, establishCursorCmd: aggCmd});
     runTest({useCausalConsistency: true, readFromSecondary: true, establishCursorCmd: aggCmd});
-
-    // Test snapshot reads using parallelCollectionScan.
-    let parallelCollScanCmd = {parallelCollectionScan: collName, numCursors: 1};
-    runTest({
-        useCausalConsistency: false,
-        readFromSecondary: false,
-        establishCursorCmd: parallelCollScanCmd
-    });
-    runTest({
-        useCausalConsistency: true,
-        readFromSecondary: false,
-        establishCursorCmd: parallelCollScanCmd
-    });
-    runTest({
-        useCausalConsistency: false,
-        readFromSecondary: true,
-        establishCursorCmd: parallelCollScanCmd
-    });
-    runTest({
-        useCausalConsistency: true,
-        readFromSecondary: true,
-        establishCursorCmd: parallelCollScanCmd
-    });
-
     rst.stopSet();
 })();

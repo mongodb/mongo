@@ -337,38 +337,7 @@
         assert.eq(res.count, 4);
     }, {"command.group.ns": "coll"}, {"command.group.ns": "coll"});
 
-    // Test getMore on a parallelCollectionScan established cursor. We skip testing for
-    // parallelCollectionScan itself as it returns a cursor only and may not hit an interrupt point.
-    testCommand(function() {
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
-        let res = assert.commandWorked(db.runCommand({
-            parallelCollectionScan: "coll",
-            numCursors: 1,
-            readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
-        assert(res.hasOwnProperty("cursors"));
-        assert.eq(res.cursors.length, 1, tojson(res));
-        assert(res.cursors[0].hasOwnProperty("cursor"), tojson(res));
-        const cursorId = res.cursors[0].cursor.id;
-
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
-        res = assert.commandWorked(db.runCommand({
-            getMore: NumberLong(cursorId),
-            collection: "coll",
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
-        assert(res.hasOwnProperty("cursor"), tojson(res));
-        assert(res.cursor.hasOwnProperty("nextBatch"), tojson(res));
-        assert.eq(res.cursor.nextBatch.length, TestData.numDocs, tojson(res));
-    }, {"originatingCommand.parallelCollectionScan": "coll"}, {op: "getmore"});
-
     // Test update.
-    // TODO SERVER-33412: Perform writes under autocommit:false transaction.
     // TODO SERVER-33548: We cannot provide a 'profilerFilter' because profiling is turned off for
     // batch write commands in transactions.
     testCommand(function() {
@@ -377,7 +346,17 @@
             updates:
                 [{q: {}, u: {$set: {updated: true}}}, {q: {new: 1}, u: {$set: {updated: true}}}],
             readConcern: {level: "snapshot"},
+            startTransaction: true,
+            autocommit: false,
+            stmtId: NumberInt(0),
             lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert.commandWorked(db.adminCommand({
+            commitTransaction: 1,
+            autocommit: false,
+            lsid: TestData.sessionId,
+            stmtId: NumberInt(1),
             txnNumber: NumberLong(TestData.txnNumber)
         }));
         // Only update one existing doc committed before the transaction.
@@ -393,7 +372,17 @@
             delete: "coll",
             deletes: [{q: {}, limit: 1}, {q: {new: 1}, limit: 1}],
             readConcern: {level: "snapshot"},
+            startTransaction: true,
+            autocommit: false,
+            txnNumber: NumberLong(TestData.txnNumber),
+            stmtId: NumberInt(0),
+            lsid: TestData.sessionId
+        }));
+        assert.commandWorked(db.adminCommand({
+            commitTransaction: 1,
+            autocommit: false,
             lsid: TestData.sessionId,
+            stmtId: NumberInt(1),
             txnNumber: NumberLong(TestData.txnNumber)
         }));
         // Only remove one existing doc committed before the transaction.
@@ -401,15 +390,24 @@
     }, {op: "remove"}, null, true);
 
     // Test findAndModify.
-    // TODO SERVER-33412: Perform writes under autocommit:false transaction.
     testCommand(function() {
         const res = assert.commandWorked(db.runCommand({
             findAndModify: "coll",
             query: {new: 1},
             update: {$set: {findAndModify: 1}},
             readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
+            startTransaction: true,
+            autocommit: false,
             txnNumber: NumberLong(TestData.txnNumber),
+            stmtId: NumberInt(0),
+            lsid: TestData.sessionId,
+        }));
+        assert.commandWorked(db.adminCommand({
+            commitTransaction: 1,
+            autocommit: false,
+            lsid: TestData.sessionId,
+            stmtId: NumberInt(1),
+            txnNumber: NumberLong(TestData.txnNumber)
         }));
         assert(res.hasOwnProperty("lastErrorObject"));
         assert.eq(res.lastErrorObject.n, 0, tojson(res));
@@ -422,8 +420,18 @@
             query: {new: 1},
             update: {$set: {findAndModify: 1}},
             readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
+            startTransaction: true,
+            autocommit: false,
             txnNumber: NumberLong(TestData.txnNumber),
+            stmtId: NumberInt(0),
+            lsid: TestData.sessionId,
+        }));
+        assert.commandWorked(db.adminCommand({
+            commitTransaction: 1,
+            autocommit: false,
+            lsid: TestData.sessionId,
+            stmtId: NumberInt(1),
+            txnNumber: NumberLong(TestData.txnNumber)
         }));
         assert(res.hasOwnProperty("lastErrorObject"));
         assert.eq(res.lastErrorObject.n, 0, tojson(res));

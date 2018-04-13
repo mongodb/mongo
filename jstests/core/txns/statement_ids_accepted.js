@@ -265,15 +265,6 @@
         stmtId: NumberInt(0)
     }));
 
-    jsTestLog("Check that parallelCollectionScan accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        parallelCollectionScan: collName,
-        numCursors: 2,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-    }));
-
     jsTestLog("Check that prepareTransaction accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         find: collName,

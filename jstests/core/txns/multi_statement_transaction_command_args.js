@@ -172,8 +172,30 @@
     }));
 
     /***********************************************************************************************
-     * Setting autocommit=true or omitting autocommit on a non-initial transaction operation fails.
+     * Setting autocommit=true or omitting autocommit on a transaction operation fails.
      **********************************************************************************************/
+
+    jsTestLog("Run an initial transaction operation with autocommit=true");
+    txnNumber++;
+
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        filter: {},
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        startTransaction: true,
+        autocommit: true
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    // Committing the transaction should fail.
+    assert.commandFailedWithCode(sessionDb.adminCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+        autocommit: false,
+        writeConcern: {w: "majority"}
+    }),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Run a non-initial transaction operation with autocommit=true");
     txnNumber++;

@@ -484,6 +484,13 @@ bool runCommandImpl(OperationContext* opCtx,
         invokeInTransaction(opCtx, invocation, &crb);
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
+        auto session = OperationContextSession::get(opCtx);
+        uassert(ErrorCodes::InvalidOptions,
+                "writeConcern is not allowed within a multi-statement transaction",
+                wcResult.usedDefault || !session || !session->inMultiDocumentTransaction() ||
+                    invocation->definition()->getName() == "commitTransaction" ||
+                    invocation->definition()->getName() == "abortTransaction" ||
+                    invocation->definition()->getName() == "doTxn");
 
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
@@ -748,8 +755,12 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot in only valid in multi-statement transactions",
-                    getTestCommandsEnabled() ||
+                    "readConcern level snapshot is only valid in multi-statement transactions",
+                    // With test commands enabled, a read command with readConcern snapshot is
+                    // a valid snapshot read.
+                    (getTestCommandsEnabled() &&
+                     invocation->definition()->getReadWriteType() ==
+                         BasicCommand::ReadWriteType::kRead) ||
                         (autocommitVal != boost::none && *autocommitVal == false));
             uassert(ErrorCodes::InvalidOptions,
                     "readConcern level snapshot requires a session ID",

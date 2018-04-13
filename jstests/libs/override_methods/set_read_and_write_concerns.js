@@ -56,6 +56,7 @@
         "_configsvrUpdateZoneKeyRange",
         "_mergeAuthzCollections",
         "_recvChunkStart",
+        "abortTransaction",
         "appendOplogNote",
         "applyOps",
         "aggregate",
@@ -65,6 +66,7 @@
         "cloneCollection",
         "cloneCollectionAsCapped",
         "collMod",
+        "commitTransaction",
         "convertToCapped",
         "copydb",
         "create",
@@ -103,6 +105,9 @@
         "updateUser",
     ]);
 
+    const kCommandsSupportingWriteConcernInTransaction =
+        new Set(["doTxn", "abortTransaction", "commitTransaction"]);
+
     function runCommandWithReadAndWriteConcerns(
         conn, dbName, commandName, commandObj, func, makeFuncArgs) {
         if (typeof commandObj !== "object" || commandObj === null) {
@@ -126,6 +131,13 @@
         let shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
         let shouldForceWriteConcern = kCommandsSupportingWriteConcern.has(commandName);
 
+        // All commands in a multi-document transaction have the autocommit property.
+        if (commandObj.hasOwnProperty("autocommit")) {
+            shouldForceReadConcern = false;
+            if (!kCommandsSupportingWriteConcernInTransaction.has(commandName)) {
+                shouldForceWriteConcern = false;
+            }
+        }
         if (commandName === "aggregate") {
             if (OverrideHelpers.isAggregationWithListLocalCursorsStage(commandName,
                                                                        commandObjUnwrapped)) {
