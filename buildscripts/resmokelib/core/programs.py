@@ -54,7 +54,7 @@ def mongod_program(  # pylint: disable=too-many-branches
     # be reliable for our tests. Setting it to 3 hours, so that it is longer than the 2 hours we
     # allow JS tests to run before timing them out.
     if "transactionLifetimeLimitSeconds" not in suite_set_parameters:
-        suite_set_parameters["transactionLifetimeLimitSeconds"] = 3 * 60 * 60;
+        suite_set_parameters["transactionLifetimeLimitSeconds"] = 3 * 60 * 60
 
     # The periodic no-op writer writes an oplog entry of type='n' once every 10 seconds. This has
     # the potential to mask issues such as SERVER-31609 because it allows the operationTime of
