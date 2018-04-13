@@ -29,6 +29,7 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
+      syncdelay: 5
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
