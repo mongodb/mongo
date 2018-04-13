@@ -34,7 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/s/versioning.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

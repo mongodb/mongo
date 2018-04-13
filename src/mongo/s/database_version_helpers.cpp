@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/versioning.h"
+#include "mongo/s/database_version_helpers.h"
 
 #include "mongo/s/database_version_gen.h"
 
