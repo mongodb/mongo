@@ -381,9 +381,10 @@ TEST_F(OplogFetcherTest,
     ASSERT_OK(oqMetadata.writeToMetadata(&bob));
     auto metadataObj = bob.obj();
 
+    auto entry = makeNoopOplogEntry({123LL, staleOpTime});
     ASSERT_EQUALS(
         ErrorCodes::InvalidSyncSource,
-        processSingleBatch({makeCursorResponse(0, {}), metadataObj, Milliseconds(0)}, false)
+        processSingleBatch({makeCursorResponse(0, {entry}), metadataObj, Milliseconds(0)}, false)
             ->getStatus());
     ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
     ASSERT(lastEnqueuedDocuments.empty());
