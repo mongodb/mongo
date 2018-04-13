@@ -48,7 +48,7 @@ LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _ser
 Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
                                                      BSONObjBuilder* metadataBob) {
     auto validator = LogicalTimeValidator::get(_service);
-    if (!validator) {
+    if (!validator || !LogicalClock::get(_service)->isEnabled()) {
         return Status::OK();
     }
 
@@ -70,7 +70,8 @@ Status LogicalTimeMetadataHook::readReplyMetadata(OperationContext* opCtx,
 
     // LogicalTimeMetadata is default constructed if no cluster time metadata was sent, so a
     // default constructed SignedLogicalTime should be ignored.
-    if (signedTime.getTime() == LogicalTime::kUninitialized) {
+    if (signedTime.getTime() == LogicalTime::kUninitialized ||
+        !LogicalClock::get(_service)->isEnabled()) {
         return Status::OK();
     }
 

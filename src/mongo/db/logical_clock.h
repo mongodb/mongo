@@ -82,6 +82,16 @@ public:
      */
     void setClusterTimeFromTrustedSource(LogicalTime newTime);
 
+    /**
+     *  Returns true if the clock is enabled and can be used.
+     */
+    bool isEnabled() const;
+
+    /**
+     * Passing "true" enables the clock.
+     */
+    void setEnabled(bool isEnabled);
+
 private:
     /**
      * Rate limiter for advancing cluster time. Rejects newTime if its seconds value is more than
@@ -91,9 +101,10 @@ private:
 
     ServiceContext* const _service;
 
-    // The mutex protects _clusterTime.
-    stdx::mutex _mutex;
+    // The mutex protects _clusterTime and _isEnabled.
+    mutable stdx::mutex _mutex;
     LogicalTime _clusterTime;
+    bool _isEnabled{true};
 };
 
 }  // namespace mongo
