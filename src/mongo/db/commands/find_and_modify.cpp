@@ -335,10 +335,6 @@ public:
 
         const auto session = OperationContextSession::get(opCtx);
         const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
-        uassert(50781,
-                str::stream() << "Cannot write to system collection " << nsString.ns()
-                              << " within a transaction.",
-                !(inTransaction && nsString.isSystem()));
 
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
         uassert(50777,

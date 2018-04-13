@@ -311,11 +311,6 @@ public:
         const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
 
         const auto batch = InsertOp::parse(request);
-        uassert(50784,
-                str::stream() << "Cannot write to system collection " << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && batch.getNamespace().isSystem()));
-
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(50780,
                 str::stream() << "Cannot write to unreplicated collection "
@@ -356,11 +351,6 @@ public:
         const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
 
         const auto batch = UpdateOp::parse(request);
-        uassert(50783,
-                str::stream() << "Cannot write to system collection " << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && batch.getNamespace().isSystem()));
-
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(50779,
                 str::stream() << "Cannot write to unreplicated collection "
@@ -435,11 +425,6 @@ public:
         const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
 
         const auto batch = DeleteOp::parse(request);
-        uassert(50782,
-                str::stream() << "Cannot write to system collection " << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && batch.getNamespace().isSystem()));
-
         const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(50778,
                 str::stream() << "Cannot write to unreplicated collection "
