@@ -595,9 +595,10 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
                 // active it is possible that the task number we are waiting on will never actually
                 // be written. Because of this we move the task number to the drop which can only be
                 // in the active task or in the one after the active.
-                if (activeTask.dropped) {
+                if (!activeTask.dbType) {
+                    // The task is for a drop.
                     taskNumToWait = activeTask.taskNum;
-                } else if (secondTaskIt != taskList.end() && secondTaskIt->dropped) {
+                } else if (secondTaskIt != taskList.end() && !secondTaskIt->dbType) {
                     taskNumToWait = secondTaskIt->taskNum;
                 } else {
                     return;
@@ -746,30 +747,11 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
     StringData dbName,
     long long termScheduled,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
-
-    // Get the max version the loader has.
-    boost::optional<DatabaseVersion> maxLoaderVersion = [&] {
-        {
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            auto taskListIt = _dbTaskLists.find(dbName.toString());
-
-            if (taskListIt != _dbTaskLists.end() &&
-                taskListIt->second.hasTasksFromThisTerm(termScheduled)) {
-                // Enqueued tasks have the latest metadata
-                return taskListIt->second.getHighestVersionEnqueued();
-            }
-        }
-
-        return getPersistedMaxDbVersion(opCtx, dbName);
-    }();
-
-    auto remoteRefreshCallbackFn =
-        [ this, name = dbName.toString(), maxLoaderVersion, termScheduled, callbackFn ](
-            OperationContext * opCtx, StatusWith<DatabaseType> swDatabaseType) {
-
+    auto remoteRefreshCallbackFn = [ this, name = dbName.toString(), termScheduled, callbackFn ](
+        OperationContext * opCtx, StatusWith<DatabaseType> swDatabaseType) {
         if (swDatabaseType == ErrorCodes::NamespaceNotFound) {
             Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
-                opCtx, name, dbTask{swDatabaseType, maxLoaderVersion, termScheduled});
+                opCtx, name, dbTask{swDatabaseType, termScheduled});
             if (!scheduleStatus.isOK()) {
                 callbackFn(opCtx, scheduleStatus);
                 return;
@@ -779,20 +761,15 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
                   << " and found the database has been dropped.";
 
         } else if (swDatabaseType.isOK()) {
-            auto& dbType = swDatabaseType.getValue();
-
-            if (!bool(maxLoaderVersion) || (dbType.getVersion() > maxLoaderVersion.get())) {
-
-                Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
-                    opCtx, name, dbTask{swDatabaseType, maxLoaderVersion, termScheduled});
-                if (!scheduleStatus.isOK()) {
-                    callbackFn(opCtx, scheduleStatus);
-                    return;
-                }
+            Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
+                opCtx, name, dbTask{swDatabaseType, termScheduled});
+            if (!scheduleStatus.isOK()) {
+                callbackFn(opCtx, scheduleStatus);
+                return;
             }
 
             log() << "Cache loader remotely refreshed for database " << name << " and found "
-                  << dbType.toBSON();
+                  << swDatabaseType.getValue().toBSON();
         }
 
         // Complete the callbackFn work.
@@ -1112,7 +1089,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
     lock.unlock();
 
     // Check if this is a drop task
-    if (task.dropped) {
+    if (!task.dbType) {
         // The database was dropped. The persisted metadata for the collection must be cleared.
         uassertStatusOKWithContext(deleteDatabasesEntry(opCtx, dbName),
                                    str::stream() << "Failed to clear persisted metadata for db '"
@@ -1121,7 +1098,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
         return;
     }
 
-    uassertStatusOKWithContext(persistDbVersion(opCtx, task.databaseType.get()),
+    uassertStatusOKWithContext(persistDbVersion(opCtx, *task.dbType),
                                str::stream() << "Failed to update the persisted metadata for db '"
                                              << dbName.toString()
                                              << "'. Will be retried.");
@@ -1186,17 +1163,12 @@ ShardServerCatalogCacheLoader::collAndChunkTask::collAndChunkTask(
 }
 
 ShardServerCatalogCacheLoader::dbTask::dbTask(StatusWith<DatabaseType> swDatabaseType,
-                                              boost::optional<DatabaseVersion> minimumVersion,
                                               long long currentTerm)
-    : taskNum(taskIdGenerator.fetchAndAdd(1)),
-      minVersion(minimumVersion),
-      termCreated(currentTerm) {
+    : taskNum(taskIdGenerator.fetchAndAdd(1)), termCreated(currentTerm) {
     if (swDatabaseType.isOK()) {
-        databaseType = std::move(swDatabaseType.getValue());
-        maxVersion = databaseType->getVersion();
+        dbType = std::move(swDatabaseType.getValue());
     } else {
         invariant(swDatabaseType == ErrorCodes::NamespaceNotFound);
-        dropped = true;
     }
 }
 
@@ -1240,23 +1212,18 @@ void ShardServerCatalogCacheLoader::DbTaskList::addTask(dbTask task) {
         return;
     }
 
-    if (task.dropped) {
-        invariant(_tasks.back().maxVersion == task.minVersion);
-
-        // As an optimization, on collection drop, clear any pending tasks in order to prevent any
+    if (!task.dbType) {
+        // As an optimization, on database drop, clear any pending tasks in order to prevent any
         // throw-away work from executing. Because we have no way to differentiate whether the
         // active tasks is currently being operated on by a thread or not, we must leave the front
         // intact.
         _tasks.erase(std::next(_tasks.begin()), _tasks.end());
 
         // No need to schedule a drop if one is already currently active.
-        if (!_tasks.front().dropped) {
+        if (_tasks.front().dbType) {
             _tasks.emplace_back(std::move(task));
         }
     } else {
-        // Tasks must have contiguous versions, unless a complete reload occurs.
-        invariant(!bool(task.minVersion) ||
-                  (_tasks.back().maxVersion.get() == task.minVersion.get()));
         _tasks.emplace_back(std::move(task));
     }
 }
@@ -1304,12 +1271,6 @@ ChunkVersion ShardServerCatalogCacheLoader::CollAndChunkTaskList::getHighestVers
     const {
     invariant(!_tasks.empty());
     return _tasks.back().maxQueryVersion;
-}
-
-boost::optional<DatabaseVersion>
-ShardServerCatalogCacheLoader::DbTaskList::getHighestVersionEnqueued() const {
-    invariant(!_tasks.empty());
-    return _tasks.back().maxVersion;
 }
 
 CollectionAndChangedChunks

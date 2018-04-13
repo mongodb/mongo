@@ -169,33 +169,15 @@ private:
          *
          * Note: swDatabaseType must always be NamespaceNotFound or OK, otherwise the constructor
          * will invariant because there is no task to complete.
-         *
-         * 'databaseType' is only initialized if 'dropped' is false.
-         * 'minimumVersion' sets 'minVersion'.
-         * 'maxVersion' is either set to the db version in 'databaseType' or boost::none.
          */
-        dbTask(StatusWith<DatabaseType> swDatabaseType,
-               boost::optional<DatabaseVersion> minimumVersion,
-               long long currentTerm);
+        dbTask(StatusWith<DatabaseType> swDatabaseType, long long currentTerm);
 
         // Always-incrementing task number to uniquely identify different tasks
         uint64_t taskNum;
 
-        // Database metadata update to be applied to the shard persisted metadata store.
-        boost::optional<DatabaseType> databaseType;
-
-        // The highest version that the loader had before going to the config server's metadata
-        // store for the updated db version.
-        // Used by the dbTaskList below to enforce consistent updates are applied.
-        boost::optional<DatabaseVersion> minVersion;
-
-        // Either the highest database version in 'databaseType' or the same as
-        // 'minVersion' if 'dropped' is true.
-        // Used by the DbTaskList below to enforce consistent updates are applied.
-        boost::optional<DatabaseVersion> maxVersion;
-
-        // Indicates whether the database metadata must be cleared.
-        bool dropped{false};
+        // If boost::none, indicates this task is for a drop. Otherwise, contains the refreshed
+        // database entry.
+        boost::optional<DatabaseType> dbType;
 
         // The term in which the loader scheduled this task.
         uint32_t termCreated;
@@ -288,13 +270,7 @@ private:
 
     /**
      * A list (work queue) of updates to apply to the shard persisted metadata store for a specific
-     * database. Enforces that tasks that are added to the list are either consistent:
-     *
-     *     tasks[i].minVersion == tasks[i-1].maxVersion.
-     *
-     * or applying a complete update from the minumum version, where
-     *
-     *     minVersion == boost::none.
+     * database.
      */
     class DbTaskList {
     public:
@@ -351,11 +327,6 @@ private:
          * the current/new term specified by 'term'.
          */
         bool hasTasksFromThisTerm(long long term) const;
-
-        /**
-         * Gets the last task's highest version -- this is the most up to date version.
-         */
-        boost::optional<DatabaseVersion> getHighestVersionEnqueued() const;
 
     private:
         std::list<dbTask> _tasks{};
