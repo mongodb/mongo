@@ -141,6 +141,27 @@ public:
     static BatchedCommandRequest cloneInsertWithIds(BatchedCommandRequest origCmdRequest);
 
 private:
+    template <typename Req, typename F, typename... As>
+    static decltype(auto) _visitImpl(Req&& r, F&& f, As&&... as) {
+        switch (r._batchType) {
+            case BatchedCommandRequest::BatchType_Insert:
+                return std::forward<F>(f)(*r._insertReq, std::forward<As>(as)...);
+            case BatchedCommandRequest::BatchType_Update:
+                return std::forward<F>(f)(*r._updateReq, std::forward<As>(as)...);
+            case BatchedCommandRequest::BatchType_Delete:
+                return std::forward<F>(f)(*r._deleteReq, std::forward<As>(as)...);
+        }
+        MONGO_UNREACHABLE;
+    }
+    template <typename... As>
+    decltype(auto) _visit(As&&... as) {
+        return _visitImpl(*this, std::forward<As>(as)...);
+    }
+    template <typename... As>
+    decltype(auto) _visit(As&&... as) const {
+        return _visitImpl(*this, std::forward<As>(as)...);
+    }
+
     BatchType _batchType;
 
     std::unique_ptr<write_ops::Insert> _insertReq;
