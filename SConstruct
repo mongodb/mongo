@@ -2754,7 +2754,7 @@ def doConfigure(myenv):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
         sslLinkDependencies = ["crypto", "dl"]
-        if conf.env.TargetOSIs('FreeBSD'):
+        if conf.env.TargetOSIs('freebsd'):
             sslLinkDependencies = ["crypto"]
         if conf.env.TargetOSIs('windows'):
             sslLibName = "ssleay32"
