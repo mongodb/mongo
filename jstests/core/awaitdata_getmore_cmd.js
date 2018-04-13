@@ -154,24 +154,31 @@
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 0);
 
-    // getMore should time out if we insert a non-matching document.
-    let insertshell = startParallelShell(function() {
+    // Test that a getMore command on a tailable, awaitData cursor does not return a new batch to
+    // the user if a document was inserted, but it did not match the filter.
+    const getMoreMaxTimeMS = 60000;
+    let insertshell = startParallelShell(() => {
         // Signal to the original shell that the parallel shell has successfully started.
         assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
+
         // Wait for the parent shell to start watching for the next document.
         assert.soon(
-            function() {
-                return db.currentOp({
-                             op: "getmore",
-                             "command.collection": "await_data",
-                             "originatingCommand.comment": "uniquifier_comment"
-                         }).inprog.length == 1;
-            },
-            function() {
-                return tojson(db.currentOp().inprog);
-            });
+            () => db.currentOp({op: "getmore", "originatingCommand.comment": "uniquifier_comment"})
+                      .inprog.length == 1,
+            () => tojson(db.currentOp().inprog));
+
         // Now write a non-matching document to the collection.
-        assert.writeOK(db.await_data.insert({x: 0}));
+        assert.writeOK(db.await_data.insert({_id: "no match", x: 0}));
+
+        // Make sure the getMore has not ended after a while.
+        sleep(2000);
+        assert.eq(db.currentOp({op: "getmore", "originatingCommand.comment": "uniquifier_comment"})
+                      .inprog.length,
+                  1,
+                  tojson(db.currentOp().inprog));
+
+        // Now write a matching document to wake it up.
+        assert.writeOK(db.await_data.insert({_id: "match", x: 1}));
     });
 
     // Wait until we receive confirmation that the parallel shell has started.
@@ -181,27 +188,8 @@
     // write a non-matching document into the collection. Confirm that we do not receive this
     // document and that we subsequently time out.
     now = new Date();
-    cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 4000});
-    assert.commandWorked(cmdRes);
-    assert.gt(cmdRes.cursor.id, NumberLong(0));
-    assert.eq(cmdRes.cursor.ns, coll.getFullName());
-    assert.eq(cmdRes.cursor.nextBatch.length, 0);
-    assert.gte((new Date()) - now,
-               // SERVER-31502 Add some leniency here since our server-side wait may be woken up
-               // spuriously.
-               3900,
-               "Insert not matching filter caused awaitData getMore to return prematurely.");
-    insertshell();
-
-    // getMore should succeed if we insert a non-matching document followed by a matching one.
-    insertshell = startParallelShell(function() {
-        assert.writeOK(db.await_data.insert({x: 0}));
-        assert.writeOK(db.await_data.insert({_id: "match", x: 1}));
-        jsTestLog("Written");
-    });
-
-    cmdRes =
-        db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 5 * 60 * 1000});
+    cmdRes = db.runCommand(
+        {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: getMoreMaxTimeMS});
     assert.commandWorked(cmdRes);
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
