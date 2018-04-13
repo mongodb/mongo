@@ -3603,6 +3603,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: change_streams_mongos_sessions_passthrough
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_mongos_sessions_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: change_streams_mongos_passthrough
   depends_on:
   - name: change_streams
@@ -6529,6 +6540,7 @@ buildvariants:
   - name: auth
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_secondary_reads
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
@@ -6719,6 +6731,7 @@ buildvariants:
   - name: causally_consistent_jscore_passthrough_auth
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
@@ -7810,6 +7823,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
@@ -8625,6 +8639,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
@@ -9248,6 +9263,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_secondary_reads
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
@@ -9784,6 +9800,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_secondary_reads
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
@@ -11343,6 +11360,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
@@ -11974,6 +11992,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_secondary_reads
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough
@@ -12147,6 +12166,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: change_streams
   - name: change_streams_mongos_passthrough
+  - name: change_streams_mongos_sessions_passthrough
   - name: change_streams_secondary_reads
   - name: change_streams_sharded_collections_passthrough
   - name: change_streams_whole_db_passthrough

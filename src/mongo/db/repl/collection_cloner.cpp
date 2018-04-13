@@ -248,8 +248,17 @@ void CollectionCloner::shutdown() {
 
 void CollectionCloner::_cancelRemainingWork_inlock() {
     if (_arm) {
-        Client::initThreadIfNotAlready();
-        _killArmHandle = _arm->kill(cc().getOperationContext());
+        // This method can be called from a callback from either a TaskExecutor or a TaskRunner. The
+        // TaskExecutor should never have an OperationContext attached to the Client, and the
+        // TaskRunner should always have an OperationContext attached. Unfortunately, we don't know
+        // which situation we're in, so have to handle both.
+        auto& client = cc();
+        if (auto opCtx = client.getOperationContext()) {
+            _killArmHandle = _arm->kill(opCtx);
+        } else {
+            auto newOpCtx = client.makeOperationContext();
+            _killArmHandle = _arm->kill(newOpCtx.get());
+        }
     }
     _countScheduler.shutdown();
     _listIndexesFetcher.shutdown();
@@ -628,9 +637,10 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
     if (_collectionCloningBatchSize > 0) {
         armParams.setBatchSize(_collectionCloningBatchSize);
     }
-    Client::initThreadIfNotAlready();
-    _arm = stdx::make_unique<AsyncResultsMerger>(
-        cc().getOperationContext(), _executor, std::move(armParams));
+    auto opCtx = cc().makeOperationContext();
+    _arm = stdx::make_unique<AsyncResultsMerger>(opCtx.get(), _executor, std::move(armParams));
+    _arm->detachFromOperationContext();
+    opCtx.reset();
 
     // This completion guard invokes _finishCallback on destruction.
     auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };
@@ -643,7 +653,6 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
     // outside the mutex. This is a necessary condition to invoke _finishCallback.
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     Status scheduleStatus = _scheduleNextARMResultsCallback(onCompletionGuard);
-    _arm->detachFromOperationContext();
     if (!scheduleStatus.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, scheduleStatus);
         return;
@@ -667,9 +676,10 @@ StatusWith<std::vector<BSONElement>> CollectionCloner::_parseParallelCollectionS
 }
 
 Status CollectionCloner::_bufferNextBatchFromArm(WithLock lock) {
-    Client::initThreadIfNotAlready();
-    auto opCtx = cc().getOperationContext();
-    _arm->reattachToOperationContext(opCtx);
+    // We expect this callback to execute in a thread from a TaskExecutor which will not have an
+    // OperationContext populated. We must make one ourselves.
+    auto opCtx = cc().makeOperationContext();
+    _arm->reattachToOperationContext(opCtx.get());
     while (_arm->ready()) {
         auto armResultStatus = _arm->nextReady();
         if (!armResultStatus.getStatus().isOK()) {
@@ -690,8 +700,10 @@ Status CollectionCloner::_bufferNextBatchFromArm(WithLock lock) {
 
 Status CollectionCloner::_scheduleNextARMResultsCallback(
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    Client::initThreadIfNotAlready();
-    _arm->reattachToOperationContext(cc().getOperationContext());
+    // We expect this callback to execute in a thread from a TaskExecutor which will not have an
+    // OperationContext populated. We must make one ourselves.
+    auto opCtx = cc().makeOperationContext();
+    _arm->reattachToOperationContext(opCtx.get());
     auto nextEvent = _arm->nextEvent();
     _arm->detachFromOperationContext();
     if (!nextEvent.isOK()) {
