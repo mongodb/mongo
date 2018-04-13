@@ -45,6 +45,18 @@
     assert.commandWorked(res);
     assert.docEq([{_id: "insert-1"}], res.cursor.firstBatch);
 
+    // Read with aggregation also returns the document.
+    res = sessionDb.runCommand({
+        aggregate: collName,
+        pipeline: [{$match: {_id: "insert-1"}}],
+        cursor: {},
+        txnNumber: NumberLong(txnNumber),
+        stmtId: NumberInt(stmtId++),
+        autocommit: false
+    });
+    assert.commandWorked(res);
+    assert.docEq([{_id: "insert-1"}], res.cursor.firstBatch);
+
     // Insert a doc within a transaction.
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,

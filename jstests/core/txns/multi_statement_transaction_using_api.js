@@ -42,6 +42,11 @@
     // Try to find a document using findOne within a transaction
     assert.eq({_id: "insert-1", a: 1}, sessionColl.findOne({_id: "insert-1"}));
 
+    // Find a document with the aggregation shell helper within a transaction.
+    cursor = sessionColl.aggregate({$match: {_id: "insert-1"}});
+    assert.docEq({_id: "insert-1", a: 1}, cursor.next());
+    assert(!cursor.hasNext());
+
     session.commitTransaction();
 
     // Make sure the correct documents exist after committing the transaciton.
