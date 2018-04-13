@@ -4,6 +4,8 @@
 
 // Basic functional tests for the listIndexes command.
 
+load("jstests/libs/fixture_helpers.js");
+
 (function() {
     "use strict";
 
@@ -149,12 +151,17 @@
     assert(!cursor.hasNext());
 
     //
-    // Test on collection with no indexes.
+    // Test on collection with no indexes.  The local database is not accessible via mongos.
     //
 
-    coll.drop();
-    assert.commandWorked(coll.getDB().createCollection(coll.getName(), {autoIndexId: false}));
-    assert.eq([], cursorGetIndexNames(getListIndexesCursor(coll)));
+    if (!FixtureHelpers.isMongos(db)) {
+        let localColl = db.getSiblingDB("local").getCollection("list_indexes1");
+        localColl.drop();
+        assert.commandWorked(
+            localColl.getDB().createCollection(localColl.getName(), {autoIndexId: false}));
+        assert.eq([], cursorGetIndexNames(getListIndexesCursor(localColl)));
+        localColl.drop();
+    }
 
     //
     // Test killCursors against a listCollections cursor.

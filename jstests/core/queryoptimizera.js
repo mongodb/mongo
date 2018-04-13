@@ -30,11 +30,12 @@ t.drop();
 
 notCappedCollectionName = testCollectionName + '_notCapped';
 
-notCapped = db[notCappedCollectionName];
+notCapped = db.getSiblingDB("local").getCollection(notCappedCollectionName);
 notCapped.drop();
 
-db.createCollection(testCollectionName, {capped: true, size: 1000});
-db.createCollection(notCappedCollectionName, {autoIndexId: false});
+assert.commandWorked(db.createCollection(testCollectionName, {capped: true, size: 1000}));
+assert.commandWorked(
+    notCapped.getDB().createCollection(notCappedCollectionName, {autoIndexId: false}));
 
 t.insert({});
 notCapped.insert({});

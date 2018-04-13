@@ -523,4 +523,30 @@ TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
     }
 }
 
+TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex) {
+    writeConflictRetry(
+        _opCtx.get(),
+        "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",
+        _nss.ns(),
+        [this] {
+            AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+            auto db = autoDb.getDb();
+            ASSERT_TRUE(db);
+
+            WriteUnitOfWork wuow(_opCtx.get());
+
+            CollectionOptions options;
+            options.setNoIdIndex();
+
+            ASSERT_THROWS_CODE_AND_WHAT(
+                db->createCollection(_opCtx.get(), _nss.ns(), options),
+                AssertionException,
+                50001,
+                (StringBuilder() << "autoIndexId:false is not allowed for collection " << _nss.ns()
+                                 << " because it can be replicated")
+                    .stringData());
+        });
+}
+
+
 }  // namespace

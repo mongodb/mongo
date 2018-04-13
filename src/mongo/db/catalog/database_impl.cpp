@@ -822,6 +822,13 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                     opCtx,
                     !idIndex.isEmpty() ? idIndex
                                        : ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));
+            } else {
+                // autoIndexId: false is only allowed on unreplicated collections.
+                uassert(50001,
+                        str::stream() << "autoIndexId:false is not allowed for collection "
+                                      << nss.ns()
+                                      << " because it can be replicated",
+                        !nss.isReplicated());
             }
         }
 

@@ -428,7 +428,8 @@ void State::prepTempCollection() {
             options.temp = true;
             options.uuid.emplace(UUID::gen());
 
-            incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
+            incColl = incCtx.db()->createCollection(
+                _opCtx, _config.incLong.ns(), options, false /* force no _id index */);
             invariant(incColl);
 
             auto rawIndexSpec =
@@ -460,7 +461,6 @@ void State::prepTempCollection() {
         Collection* const finalColl = finalCtx.getCollection();
         if (finalColl) {
             finalOptions = finalColl->getCatalogEntry()->getCollectionOptions(_opCtx);
-
             if (_config.finalOutputCollUUID) {
                 // The final output collection's UUID is passed from mongos if the final output
                 // collection is sharded. If a UUID was sent, ensure it matches what's on this
@@ -516,7 +516,14 @@ void State::prepTempCollection() {
         // preserved.
         options.uuid.emplace(_config.finalOutputCollUUID ? *_config.finalOutputCollUUID
                                                          : UUID::gen());
-        tempColl = tempCtx.db()->createCollection(_opCtx, _config.tempNamespace.ns(), options);
+
+        // Override createCollection's prohibition on creating new replicated collections without an
+        // _id index.
+        bool buildIdIndex = (options.autoIndexId == CollectionOptions::YES ||
+                             options.autoIndexId == CollectionOptions::DEFAULT);
+
+        tempColl = tempCtx.db()->createCollection(
+            _opCtx, _config.tempNamespace.ns(), options, buildIdIndex);
 
         for (vector<BSONObj>::iterator it = indexesToInsert.begin(); it != indexesToInsert.end();
              ++it) {

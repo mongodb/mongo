@@ -18,7 +18,6 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
   # Skip any tests that require privileges for non test databases.
-  - jstests/core/copydatabase_no_id_index.js
   - jstests/core/copydb.js
   - jstests/core/system_profile.js
   # The following tests fail because a certain command or functionality is not supported on
@@ -45,7 +44,10 @@ selector:
   - jstests/core/geo_update_btree2.js  # notablescan.
   - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
   - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
+  - jstests/core/index_id_options.js  # "local" database.
+  - jstests/core/index9.js  # "local" database.
   - jstests/core/profile*.js  # profiling.
+  - jstests/core/queryoptimizera.js  # "local" database. 
   - jstests/core/repair_database.js # repairDatabase
   - jstests/core/repair_database_input_validation.js # repairDatabase
   - jstests/core/repair_server12955.js # repairDatabase

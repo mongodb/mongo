@@ -182,11 +182,10 @@ if (typeof _threadInject != "undefined") {
 
             "connections_opened.js",  // counts connections, globally
             "opcounters_write_cmd.js",
-            "set_param1.js",                  // changes global state
-            "geo_update_btree2.js",           // SERVER-11132 test disables table scans
-            "update_setOnInsert.js",          // SERVER-9982
-            "max_time_ms.js",                 // Sensitive to query execution time, by design
-            "collection_info_cache_race.js",  // Requires collection exists
+            "set_param1.js",          // changes global state
+            "geo_update_btree2.js",   // SERVER-11132 test disables table scans
+            "update_setOnInsert.js",  // SERVER-9982
+            "max_time_ms.js",         // Sensitive to query execution time, by design
 
             // This overwrites MinKey/MaxKey's singleton which breaks
             // any other test that uses MinKey/MaxKey

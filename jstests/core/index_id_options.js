@@ -14,7 +14,9 @@
 
     load("jstests/libs/get_index_helpers.js");
 
-    var coll = db.index_id_options;
+    // Must use local db for testing because autoIndexId:false collections are not allowed in
+    // replicated databases.
+    var coll = db.getSiblingDB("local").index_id_options;
 
     // _id indexes must have key pattern {_id: 1}.
     coll.drop();

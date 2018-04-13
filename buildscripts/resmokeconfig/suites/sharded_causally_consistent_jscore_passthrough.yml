@@ -20,7 +20,6 @@ selector:
   - jstests/core/currentop.js  # uses fsync.
   - jstests/core/auth_copydb.js # copyDatabase.
   - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
-  - jstests/core/copydatabase_no_id_index.js # copyDatabase.
   - jstests/core/copydb.js # copyDatabase.
   - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
@@ -34,8 +33,11 @@ selector:
   - jstests/core/geo_update_btree2.js  # notablescan.
   - jstests/core/index_bigkeys_nofail.js  # failIndexKeyTooLong.
   - jstests/core/index_bigkeys_validation.js  # failIndexKeyTooLong.
+  - jstests/core/index_id_options.js  # "local" database.
+  - jstests/core/index9.js  # "local" database.
   - jstests/core/mr_replaceIntoDB.js  # MapReduceResult, SERVER-20495.
   - jstests/core/profile*.js  # profiling.
+  - jstests/core/queryoptimizera.js  # "local" database.
   - jstests/core/rename*.js # renameCollection.
   - jstests/core/repair_database.js # repairDatabase
   - jstests/core/repair_database_input_validation.js # repairDatabase
@@ -55,7 +57,6 @@ selector:
   # The following tests fail because they count indexes. These counts do not take into account the
   # additional hashed shard key indexes that are automatically added by this passthrough.
   - jstests/core/bad_index_plugin.js
-  - jstests/core/collection_info_cache_race.js
   - jstests/core/create_indexes.js
   - jstests/core/indexOtherNamespace.js
   - jstests/core/list_indexes_non_existent_ns.js

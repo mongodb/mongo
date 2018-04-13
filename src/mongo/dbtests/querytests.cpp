@@ -1393,10 +1393,14 @@ class ClientCursorTest : public CollectionBase {
 class FindingStart : public CollectionBase {
 public:
     FindingStart() : CollectionBase("findingstart") {}
+    static const char* ns() {
+        return "local.querytests.findingstart";
+    }
 
     void run() {
         BSONObj info;
-        ASSERT(_client.runCommand("unittests",
+        // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
+        ASSERT(_client.runCommand("local",
                                   BSON("create"
                                        << "querytests.findingstart"
                                        << "capped"
@@ -1441,18 +1445,23 @@ public:
                 ASSERT_EQUALS((j > min ? j : min), next["ts"].timestamp().getInc());
             }
         }
+        ASSERT(_client.dropCollection(ns()));
     }
 };
 
 class FindingStartPartiallyFull : public CollectionBase {
 public:
     FindingStartPartiallyFull() : CollectionBase("findingstart") {}
+    static const char* ns() {
+        return "local.querytests.findingstart";
+    }
 
     void run() {
         size_t startNumCursors = numCursorsOpen();
 
         BSONObj info;
-        ASSERT(_client.runCommand("unittests",
+        // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
+        ASSERT(_client.runCommand("local",
                                   BSON("create"
                                        << "querytests.findingstart"
                                        << "capped"
@@ -1489,6 +1498,7 @@ public:
         }
 
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
+        ASSERT(_client.dropCollection(ns()));
     }
 };
 
@@ -1499,6 +1509,9 @@ public:
 class FindingStartStale : public CollectionBase {
 public:
     FindingStartStale() : CollectionBase("findingstart") {}
+    static const char* ns() {
+        return "local.querytests.findingstart";
+    }
 
     void run() {
         size_t startNumCursors = numCursorsOpen();
@@ -1509,7 +1522,8 @@ public:
         ASSERT(!c0->more());
 
         BSONObj info;
-        ASSERT(_client.runCommand("unittests",
+        // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
+        ASSERT(_client.runCommand("local",
                                   BSON("create"
                                        << "querytests.findingstart"
                                        << "capped"
@@ -1535,6 +1549,8 @@ public:
 
         // Check that no persistent cursors outlast our queries above.
         ASSERT_EQUALS(startNumCursors, numCursorsOpen());
+
+        ASSERT(_client.dropCollection(ns()));
     }
 };
 
