@@ -233,21 +233,6 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='scoped_db_conn_test',
-    source=[
-        'scoped_db_conn_test.cpp',
-    ],
-    LIBDEPS=[
-        'clientdriver',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/transport/transport_layer_legacy',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/version_impl',
-    ],
-)
-
 env.Library(
     target='fetcher',
     source=[
