@@ -49,5 +49,9 @@ DatabaseVersion makeIncremented(const DatabaseVersion& v) {
     return dbv;
 }
 
+bool equal(const DatabaseVersion& dbv1, const DatabaseVersion& dbv2) {
+    return dbv1.getUuid() == dbv2.getUuid() && dbv1.getLastMod() == dbv2.getLastMod();
+}
+
 }  // namespace databaseVersion
 }  // namespace mongo

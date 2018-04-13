@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/versioning.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -106,7 +107,7 @@ void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
             _dbVersion);
     uassert(StaleDbRoutingVersion(dbName, *clientDbVersion, *_dbVersion),
             "dbVersion mismatch",
-            *clientDbVersion == *_dbVersion);
+            databaseVersion::equal(*clientDbVersion, *_dbVersion));
 }
 
 MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager() {

@@ -42,6 +42,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/versioning.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -298,7 +299,8 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
     } else if (itDbEntry->second->needsRefresh) {
         // Refresh has been scheduled for the database already
         return;
-    } else if (!itDbEntry->second->dbt || itDbEntry->second->dbt->getVersion() == databaseVersion) {
+    } else if (!itDbEntry->second->dbt || !itDbEntry->second->dbt->getVersion() ||
+               databaseVersion::equal(*itDbEntry->second->dbt->getVersion(), databaseVersion)) {
         // If the versions match, the cached database info is stale, so mark it as needs refresh.
         log() << "Marking cached database entry for '" << dbName << "' as stale";
         itDbEntry->second->needsRefresh = true;

@@ -33,6 +33,7 @@ namespace databaseVersion {
 
 DatabaseVersion makeNew();
 DatabaseVersion makeIncremented(const DatabaseVersion& v);
+bool equal(const DatabaseVersion& dbv1, const DatabaseVersion& dbv2);
 
 }  // namespace databaseVersion
 }  // namespace mongo
