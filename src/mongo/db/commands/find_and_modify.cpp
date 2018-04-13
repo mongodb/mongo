@@ -333,6 +333,16 @@ public:
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 
+        const auto session = OperationContextSession::get(opCtx);
+        const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
+
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+        uassert(50777,
+                str::stream() << "Cannot write to unreplicated collection " << nsString.ns()
+                              << " within a transaction.",
+                !(inTransaction && replCoord->isOplogDisabledFor(opCtx, nsString)));
+
+
         const auto stmtId = 0;
         if (opCtx->getTxnNumber()) {
             auto session = OperationContextSession::get(opCtx);
@@ -447,9 +457,6 @@ public:
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
                 if (!collection && args.isUpsert()) {
-                    auto session = OperationContextSession::get(opCtx);
-                    auto inTransaction =
-                        session && session->inSnapshotReadOrMultiDocumentTransaction();
                     uassert(ErrorCodes::NamespaceNotFound,
                             str::stream() << "Cannot create namespace " << nsString.ns()
                                           << " in multi-document transaction.",
