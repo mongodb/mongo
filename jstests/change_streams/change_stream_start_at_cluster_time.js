@@ -1,11 +1,9 @@
 // Tests resuming change streams based on cluster time.
 (function() {
     "use strict";
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    const coll = db[jsTestName()];
-    coll.drop();
-
-    assert.commandWorked(db.createCollection(coll.getName()));
+    const coll = assertDropAndRecreateCollection(db, jsTestName());
 
     const testStartTime = db.runCommand({isMaster: 1}).$clusterTime.clusterTime;
 

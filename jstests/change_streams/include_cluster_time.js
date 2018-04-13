@@ -2,7 +2,10 @@
 (function() {
     "use strict";
 
-    const coll = db.include_cluster_time;
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+
+    // Drop and recreate the collections to be used in this set of tests.
+    const coll = assertDropAndRecreateCollection(db, "include_cluster_time");
 
     const collectionStream = coll.watch();
     const dbStream =

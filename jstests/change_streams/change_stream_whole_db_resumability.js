@@ -5,10 +5,9 @@
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 
-    const coll = db[jsTestName() + "resume_coll"];
-    const otherColl = db[jsTestName() + "resume_coll_other"];
-    coll.drop();
-    otherColl.drop();
+    // Drop and recreate the collections to be used in this set of tests.
+    const coll = assertDropAndRecreateCollection(db, jsTestName() + "resume_coll");
+    const otherColl = assertDropAndRecreateCollection(db, jsTestName() + "resume_coll_other");
 
     let cst = new ChangeStreamTest(db);
     let resumeCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
