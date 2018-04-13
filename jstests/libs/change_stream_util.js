@@ -7,10 +7,36 @@
 // the same as calling db.runCommand. If a passthrough is active and has defined a function
 // 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual
 // streams to explicitly exempt themselves from being modified by the passthrough.
+function isChangeStreamPassthrough() {
+    return typeof changeStreamPassthroughAwareRunCommand != 'undefined';
+}
 const runCommandChangeStreamPassthroughAware =
-    (typeof changeStreamPassthroughAwareRunCommand === 'undefined'
-         ? ((db, cmdObj) => db.runCommand(cmdObj))
-         : changeStreamPassthroughAwareRunCommand);
+    (!isChangeStreamPassthrough() ? ((db, cmdObj) => db.runCommand(cmdObj))
+                                  : changeStreamPassthroughAwareRunCommand);
+
+/**
+ * Asserts that the given opType triggers an invalidate entry depending on the type of change
+ * stream.
+ *     - single collection streams: drop, rename, and dropDatabase.
+ *     - whole DB streams: dropDatabase.
+ *     - whole cluster streams: none.
+ */
+function assertInvalidateOp({cursor, opType}) {
+    if (!isChangeStreamPassthrough()) {
+        // All metadata operations will invalidate a single-collection change stream.
+        assert.soon(() => cursor.hasNext());
+        assert.eq(cursor.next().operationType, "invalidate");
+        assert(cursor.isExhausted());
+        assert(cursor.isClosed());
+    } else {
+        // Collection drops do not validate whole-db/cluster change streams.
+        if (opType == "drop") {
+            return;
+        }
+
+        // TODO SERVER-35029: Database drops should only invalidate whole-db change streams.
+    }
+}
 
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.

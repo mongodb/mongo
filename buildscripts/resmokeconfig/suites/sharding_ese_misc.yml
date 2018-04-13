@@ -242,7 +242,7 @@ selector:
   - jstests/sharding/accurate_count_with_predicate.js
   - jstests/sharding/migration_sets_fromMigrate_flag.js
   - jstests/sharding/remove3.js
-  - jstests/sharding/change_stream_invalidation.js
+  - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/autosplit.js
   - jstests/sharding/basic_merge.js
   - jstests/sharding/merge_chunks_compound_shard_key.js

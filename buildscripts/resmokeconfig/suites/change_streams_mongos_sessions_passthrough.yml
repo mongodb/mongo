@@ -7,10 +7,6 @@ selector:
   # This test exercises an internal detail of mongos<->mongod communication and is not expected to
   # work against a mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
-  # TODO: SERVER-32088 should fix resuming a change stream when not all shards have data.
-  - jstests/change_streams/change_stream_shell_helper.js
-  - jstests/change_streams/include_cluster_time.js
-  - jstests/change_streams/lookup_post_image.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

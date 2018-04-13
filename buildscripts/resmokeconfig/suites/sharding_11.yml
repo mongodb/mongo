@@ -36,7 +36,7 @@ selector:
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
   - jstests/sharding/sharded_limit_batchsize.js
   - jstests/sharding/migration_sets_fromMigrate_flag.js
-  - jstests/sharding/change_stream_invalidation.js
+  - jstests/sharding/change_stream_metadata_notifications.js
   - jstests/sharding/bulk_insert.js
   - jstests/sharding/multi_mongos2a.js
   - jstests/sharding/movechunk_commit_changelog_stats.js

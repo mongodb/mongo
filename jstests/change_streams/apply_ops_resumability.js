@@ -88,6 +88,10 @@
         },
     ];
 
+    //
+    // Test behavior of single-collection change streams with apply ops.
+    //
+
     // Verify that the stream returns the expected sequence of changes.
     const changes =
         cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
@@ -115,13 +119,28 @@
     let otherCursor = cst.startWatchingChanges({
         pipeline:
             [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
-        collection: coll
+        collection: coll,
+        doNotModifyInPassthroughs: true  // A collection drop only invalidates single-collection
+                                         // change streams.
     });
     cst.assertNextChangesEqual({cursor: otherCursor, expectedChanges: expectedChanges.slice(3)});
 
-    // Drop the collection. This will trigger an "invalidate" event at the end of the stream.
+    // Drop the collection. This will trigger a "drop" followed by an "invalidate" for the single
+    // collection change stream.
     assert.commandWorked(db.runCommand({drop: coll.getName()}));
-    expectedChanges.push({operationType: "invalidate"});
+    let change = cst.getOneChange(otherCursor);
+    assert.eq(change.operationType, "drop");
+    assert.eq(change.ns, {db: db.getName(), coll: coll.getName()});
+    change = cst.getOneChange(otherCursor, true);
+    assert.eq(change.operationType, "invalidate");
+
+    //
+    // Test behavior of whole-db change streams with apply ops.
+    //
+
+    // For a whole-db or whole-cluster change stream, the collection drop should return a single
+    // "drop" entry and not invalidate the stream.
+    expectedChanges.push({operationType: "drop", ns: {db: db.getName(), coll: coll.getName()}});
 
     // Add an entry for the insert on db.otherColl into expectedChanges.
     expectedChanges.splice(3, 0, {
@@ -139,10 +158,9 @@
     changeStream = cst.startWatchingChanges({
         pipeline:
             [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
-        collection: 1
+        collection: 1,
     });
-    cst.assertNextChangesEqual(
-        {cursor: changeStream, expectedChanges: expectedChanges.slice(3), expectInvalidate: true});
+    cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges.slice(3)});
 
     // Add an entry for the insert on otherDb.otherDbColl into expectedChanges.
     expectedChanges.splice(4, 0, {
@@ -154,9 +172,9 @@
         txnNumber: NumberLong(session._txnNumber),
     });
 
-    // Verify that a whole-db stream can be resumed from the middle of the transaction, and that it
-    // will see all subsequent changes including the insert on the other collection and the changes
-    // on the other DB.
+    // Verify that a whole-cluster stream can be resumed from the middle of the transaction, and
+    // that it will see all subsequent changes including the insert on the other collection and the
+    // changes on the other DB.
     cst = new ChangeStreamTest(db.getSiblingDB("admin"));
     changeStream = cst.startWatchingChanges({
         pipeline: [
@@ -165,8 +183,7 @@
         ],
         collection: 1
     });
-    cst.assertNextChangesEqual(
-        {cursor: changeStream, expectedChanges: expectedChanges.slice(3), expectInvalidate: true});
+    cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges.slice(3)});
 
     cst.cleanUp();
 }());

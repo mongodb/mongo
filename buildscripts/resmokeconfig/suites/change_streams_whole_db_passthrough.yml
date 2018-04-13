@@ -3,6 +3,9 @@ test_kind: js_test
 selector:
   roots:
   - jstests/change_streams/**/*.js
+  exclude_files:
+  # Only relevant for single-collection change streams.
+  - jstests/change_streams/metadata_notifications.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

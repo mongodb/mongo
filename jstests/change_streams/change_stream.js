@@ -160,17 +160,6 @@
     assertDropCollection(db, db.dropping.getName());
     // Should still see the previous change from t2, shouldn't see anything about 'dropping'.
 
-    // Test collection renaming. Sharded collections cannot be renamed.
-    if (!FixtureHelpers.isSharded(db.t2)) {
-        jsTestLog("Testing rename");
-        assertDropCollection(db, "t3");
-        t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
-        assert.writeOK(db.t2.renameCollection("t3"));
-        expected = {operationType: "invalidate"};
-        cst.assertNextChangesEqual(
-            {cursor: t2cursor, expectedChanges: [expected], expectInvalidate: true});
-    }
-
     jsTestLog("Testing insert that looks like rename");
     assertDropCollection(db, "dne1");
     assertDropCollection(db, "dne2");

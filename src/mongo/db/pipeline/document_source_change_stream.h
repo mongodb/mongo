@@ -135,11 +135,17 @@ public:
     static constexpr StringData kTxnNumberField = "txnNumber"_sd;
     static constexpr StringData kLsidField = "lsid"_sd;
 
+    // The target namespace of a rename operation.
+    static constexpr StringData kRenameTargetNssField = "to"_sd;
+
     // The different types of operations we can use for the operation type.
     static constexpr StringData kUpdateOpType = "update"_sd;
     static constexpr StringData kDeleteOpType = "delete"_sd;
     static constexpr StringData kReplaceOpType = "replace"_sd;
     static constexpr StringData kInsertOpType = "insert"_sd;
+    static constexpr StringData kDropCollectionOpType = "drop"_sd;
+    static constexpr StringData kRenameCollectionOpType = "rename"_sd;
+    static constexpr StringData kDropDatabaseOpType = "dropDatabase"_sd;
     static constexpr StringData kInvalidateOpType = "invalidate"_sd;
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;

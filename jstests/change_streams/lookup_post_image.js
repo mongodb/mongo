@@ -236,7 +236,11 @@
     });
     latestChange = cst.getOneChange(cursor);
     assert.eq(latestChange.operationType, "insert");
-    latestChange = cst.getOneChange(cursor, true);
-    assert.eq(latestChange.operationType, "invalidate");
-    assert(!latestChange.hasOwnProperty("fullDocument"));
+    latestChange = cst.getOneChange(cursor);
+    assert.eq(latestChange.operationType, "drop");
+    // Only single-collection change streams will be invalidated by the drop.
+    if (!isChangeStreamPassthrough()) {
+        latestChange = cst.getOneChange(cursor, true);
+        assert.eq(latestChange.operationType, "invalidate");
+    }
 }());

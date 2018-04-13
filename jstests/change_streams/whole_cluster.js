@@ -7,8 +7,9 @@
                                                        // assert[Valid|Invalid]ChangeStreamNss.
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
+    db = db.getSiblingDB(jsTestName());
     const adminDB = db.getSiblingDB("admin");
-    const otherDB = db.getSiblingDB(`${db.getName()}_other`);
+    const otherDB = db.getSiblingDB(jsTestName() + "_other");
 
     // Drop and recreate the collections to be used in this set of tests.
     assertDropAndRecreateCollection(db, "t1");
@@ -118,10 +119,17 @@
         assertDropCollection(db.getSiblingDB(dbName), "test");
     });
 
-    // Dropping either database should invalidate the change stream.
+    // Dropping a database should generate drop entries for each collection followed by an
+    // invalidate.
+    // TODO SERVER-35029: This test should not invalidate the stream once there's support for
+    // returning a notification for the dropDatabase command.
     assert.commandWorked(otherDB.dropDatabase());
-    expected = {operationType: "invalidate"};
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
+    expected = [
+        {operationType: "drop", ns: {db: otherDB.getName(), coll: "t2"}},
+        {operationType: "invalidate"}
+    ];
+
+    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
 
     // Drop the remaining databases and clean up the test.
     assert.commandWorked(db.dropDatabase());

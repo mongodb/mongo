@@ -292,10 +292,28 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
                 invariant(nextDoc);
 
                 return applyTransformation(*nextDoc);
+            } else if (!input.getNestedField("o.drop").missing()) {
+                operationType = DocumentSourceChangeStream::kDropCollectionOpType;
+
+                // The "o.drop" field will contain the actual collection name.
+                nss = NamespaceString(nss.db(), input.getNestedField("o.drop").getString());
+            } else if (!input.getNestedField("o.renameCollection").missing()) {
+                operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
+
+                // The "o.renameCollection" field contains the namespace of the original collection.
+                nss = NamespaceString(input.getNestedField("o.renameCollection").getString());
+
+                // The "o.to" field contains the target namespace for the rename.
+                const auto renameTargetNss =
+                    NamespaceString(input.getNestedField("o.to").getString());
+                doc.addField(DocumentSourceChangeStream::kRenameTargetNssField,
+                             Value(Document{{"db", renameTargetNss.db()},
+                                            {"coll", renameTargetNss.coll()}}));
+            } else {
+                // All other commands will invalidate the stream.
+                operationType = DocumentSourceChangeStream::kInvalidateOpType;
             }
-            // Any command that makes it through our filter is an invalidating command such as a
-            // drop.
-            operationType = DocumentSourceChangeStream::kInvalidateOpType;
+
             // Make sure the result doesn't have a document key.
             documentKey = Value();
             break;
