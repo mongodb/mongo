@@ -60,7 +60,8 @@ public:
 
         // Set up ReplicationCoordinator and create oplog.
         repl::ReplicationCoordinator::set(
-            service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service));
+            service,
+            stdx::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
         repl::setOplogCollectionName(service);
         repl::createOplog(opCtx.get());
 
@@ -77,6 +78,16 @@ protected:
         auto opEntry = unittest::assertGet(oplogIter->next());
         ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus());
         return opEntry.first;
+    }
+
+private:
+    // Creates a reasonable set of ReplSettings for most tests.  We need to be able to
+    // override this to create a larger oplog.
+    virtual repl::ReplSettings createReplSettings() {
+        repl::ReplSettings settings;
+        settings.setOplogSizeBytes(5 * 1024 * 1024);
+        settings.setReplSetString("mySet/node1:12345");
+        return settings;
     }
 };
 
@@ -360,6 +371,62 @@ TEST_F(OpObserverSessionCatalogTest,
     OpObserver::RollbackObserverInfo rbInfo;
     opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     ASSERT(session->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+}
+
+/**
+ * Test fixture with sessions and an extra-large oplog for testing large transactions.
+ */
+class OpObserverLargeTransactionTest : public OpObserverSessionCatalogTest {
+private:
+    repl::ReplSettings createReplSettings() override {
+        repl::ReplSettings settings;
+        // We need an oplog comfortably large enough to hold an oplog entry that exceeds the BSON
+        // size limit.  Otherwise we will get the wrong error code when trying to write one.
+        settings.setOplogSizeBytes(BSONObjMaxInternalSize + 2 * 1024 * 1024);
+        settings.setReplSetString("mySet/node1:12345");
+        return settings;
+    }
+};
+
+// Tests that a transaction aborts if it becomes too large only during the commit.
+TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString nss("testDB", "testColl");
+
+    // Create a session.
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    auto sessionId = makeLogicalSessionIdForTest();
+    auto session = sessionCatalog->getOrCreateSession(opCtx.get(), sessionId);
+    auto uuid = CollectionUUID::gen();
+
+    // Simulate adding transaction data to a session.
+    const TxnNumber txnNum = 0;
+    opCtx->setLogicalSessionId(sessionId);
+    opCtx->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx.get(),
+                                      true /* checkOutSession */,
+                                      false /* autocommit */,
+                                      true /* startTransaction*/);
+
+    session->unstashTransactionResources(opCtx.get(), "insert");
+
+    // This size is crafted such that two operations of this size are not too big to fit in a single
+    // oplog entry, but two operations plus oplog overhead are too big to fit in a single oplog
+    // entry.
+    constexpr size_t kHalfTransactionSize = BSONObjMaxInternalSize / 2 - 175;
+    std::unique_ptr<uint8_t[]> halfTransactionData(new uint8_t[kHalfTransactionSize]());
+    auto operation = repl::OplogEntry::makeInsertOperation(
+        nss,
+        uuid,
+        BSON(
+            "_id" << 0 << "data"
+                  << BSONBinData(halfTransactionData.get(), kHalfTransactionSize, BinDataGeneral)));
+    session->addTransactionOperation(opCtx.get(), operation);
+    session->addTransactionOperation(opCtx.get(), operation);
+    ASSERT_THROWS_CODE(opObserver.onTransactionCommit(opCtx.get()),
+                       AssertionException,
+                       ErrorCodes::TransactionTooLarge);
 }
 
 TEST_F(OpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolledBack) {

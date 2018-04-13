@@ -884,10 +884,19 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
     // Until we support multiple oplog entries per transaction, prevOpTime should always be null.
     invariant(oplogLink.prevOpTime.isNull());
 
-    auto applyOpCmd = applyOpsBuilder.done();
-    auto times = replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink);
+    try {
+        auto applyOpCmd = applyOpsBuilder.done();
+        auto times = replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink);
 
-    onWriteOpCompleted(opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
+        onWriteOpCompleted(
+            opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
+    } catch (const AssertionException& e) {
+        // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
+        uassert(ErrorCodes::TransactionTooLarge,
+                e.reason(),
+                e.code() != ErrorCodes::BSONObjectTooLarge);
+        throw;
+    }
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {

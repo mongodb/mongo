@@ -1092,5 +1092,32 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndMigration) {
                        ErrorCodes::ConflictingOperationInProgress);
 }
 
+// Tests that a transaction aborts if it becomes too large before trying to commit it.
+TEST_F(SessionTest, TransactionTooLargeWhileBuilding) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 28;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+
+    session.unstashTransactionResources(opCtx(), "insert");
+
+    // Two 6MB operations should succeed; three 6MB operations should fail.
+    constexpr size_t kBigDataSize = 6 * 1024 * 1024;
+    std::unique_ptr<uint8_t[]> bigData(new uint8_t[kBigDataSize]());
+    auto operation = repl::OplogEntry::makeInsertOperation(
+        kNss,
+        kUUID,
+        BSON("_id" << 0 << "data" << BSONBinData(bigData.get(), kBigDataSize, BinDataGeneral)));
+    session.addTransactionOperation(opCtx(), operation);
+    session.addTransactionOperation(opCtx(), operation);
+    ASSERT_THROWS_CODE(session.addTransactionOperation(opCtx(), operation),
+                       AssertionException,
+                       ErrorCodes::TransactionTooLarge);
+}
+
 }  // namespace
 }  // namespace mongo

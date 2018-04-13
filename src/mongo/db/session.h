@@ -443,6 +443,9 @@ private:
     // transaction.  Not used for retryable writes.
     std::vector<repl::ReplOperation> _transactionOperations;
 
+    // Total size in bytes of all operations within the _transactionOperations vector.
+    size_t _transactionOperationBytes = 0;
+
     // For the active txn, tracks which statement ids have been committed and at which oplog
     // opTime. Used for fast retryability check and retrieving the previous write's data without
     // having to scan through the oplog.

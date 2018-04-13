@@ -786,6 +786,7 @@ void Session::_abortTransaction(WithLock wl) {
         return;
     }
     _txnResourceStash = boost::none;
+    _transactionOperationBytes = 0;
     _transactionOperations.clear();
     _txnState = MultiDocumentTransactionState::kAborted;
 }
@@ -825,6 +826,17 @@ void Session::addTransactionOperation(OperationContext* opCtx,
     invariant(!_autocommit && _activeTxnNumber != kUninitializedTxnNumber);
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
     _transactionOperations.push_back(operation);
+    _transactionOperationBytes += repl::OplogEntry::getReplOperationSize(operation);
+    // _transactionOperationBytes is based on the in-memory size of the operation.  With overhead,
+    // we expect the BSON size of the operation to be larger, so it's possible to make a transaction
+    // just a bit too large and have it fail only in the commit.  It's still useful to fail early
+    // when possible (e.g. to avoid exhausting server memory).
+    uassert(ErrorCodes::TransactionTooLarge,
+            str::stream() << "Total size of all transaction operations must be less than "
+                          << BSONObjMaxInternalSize
+                          << ". Actual size is "
+                          << _transactionOperationBytes,
+            _transactionOperationBytes <= BSONObjMaxInternalSize);
 }
 
 std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
@@ -836,6 +848,7 @@ std::vector<repl::ReplOperation> Session::endTransactionAndRetrieveOperations(
     _checkIsActiveTransaction(lk, *opCtx->getTxnNumber(), true);
 
     invariant(!_autocommit);
+    _transactionOperationBytes = 0;
     return std::move(_transactionOperations);
 }
 
