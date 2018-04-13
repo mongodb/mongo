@@ -173,9 +173,19 @@ void WiredTigerRecoveryUnit::_ensureSession() {
 
 bool WiredTigerRecoveryUnit::waitUntilDurable() {
     invariant(!_inUnitOfWork);
-    // _session may be nullptr. We cannot _ensureSession() here as that needs shutdown protection.
     const bool forceCheckpoint = false;
     const bool stableCheckpoint = false;
+    _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
+    return true;
+}
+
+bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable() {
+    invariant(!_inUnitOfWork);
+    const bool forceCheckpoint = true;
+    const bool stableCheckpoint = true;
+    // Calling `waitUntilDurable` with `forceCheckpoint` set to false only performs a log
+    // (journal) flush, and thus has no effect on unjournaled writes. Setting `forceCheckpoint` to
+    // true will lock in stable writes to unjournaled tables.
     _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
     return true;
 }

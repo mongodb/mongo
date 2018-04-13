@@ -2049,11 +2049,6 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                               Date_t::fromDurationSinceEpoch(
                                   Seconds(it->getHeartbeatDurableOpTime().getSecs())));
             }
-            if (lastStableCheckpointTimestamp) {
-                // Make sure to omit if the storage engine does not support recovering to a
-                // timestamp.
-                bb.append("lastStableCheckpointTimestamp", *lastStableCheckpointTimestamp);
-            }
             bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
             bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
             Milliseconds ping = _getPing(itConfig.getHostAndPort());
@@ -2114,6 +2109,10 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     appendOpTime(&optimes, "appliedOpTime", lastOpApplied, _rsConfig.getProtocolVersion());
     appendOpTime(&optimes, "durableOpTime", lastOpDurable, _rsConfig.getProtocolVersion());
     response->append("optimes", optimes.obj());
+    if (lastStableCheckpointTimestamp) {
+        // Make sure to omit if the storage engine does not support recovering to a timestamp.
+        response->append("lastStableCheckpointTimestamp", *lastStableCheckpointTimestamp);
+    }
 
     if (!initialSyncStatus.isEmpty()) {
         response->append("initialSyncStatus", initialSyncStatus);

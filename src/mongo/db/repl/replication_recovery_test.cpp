@@ -667,12 +667,15 @@ TEST_F(ReplicationRecoveryTest, RecoveryDoesNotApplyOperationsIfAppliedThroughIs
 
     _setUpOplog(opCtx, getStorageInterface(), {5});
 
-    recovery.recoverFromOplog(opCtx, boost::none);
+    const boost::optional<Timestamp> recoverTimestamp = boost::none;
+    recovery.recoverFromOplog(opCtx, recoverTimestamp);
 
     _assertDocsInOplog(opCtx, {5});
     _assertDocsInTestCollection(opCtx, {});
     ASSERT(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
-    ASSERT(getConsistencyMarkers()->getAppliedThrough(opCtx).isNull());
+    // In 4.0 with RTT, recovering without a `recoverTimestamp` will set `appliedThrough` to the
+    // top of oplog.
+    ASSERT_EQ(OpTime(Timestamp(5, 5), 1), getConsistencyMarkers()->getAppliedThrough(opCtx));
 }
 
 DEATH_TEST_F(ReplicationRecoveryTest,

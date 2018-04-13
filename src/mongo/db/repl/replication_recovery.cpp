@@ -151,6 +151,28 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
               << ", through the top of the oplog: " << topOfOplog;
         _applyToEndOfOplog(opCtx, appliedThrough.getTimestamp(), topOfOplog.getTimestamp());
     }
+
+    // `_recoverFromUnstableCheckpoint` is only expected to be called on startup.
+    _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                               topOfOplog.getTimestamp());
+
+    // Ensure the `appliedThrough` is set to the top of oplog, specifically if the node was
+    // previously running as a primary. If a crash happens before the first stable checkpoint on
+    // upgrade, replication recovery will know it must apply from this point and not assume the
+    // datafiles contain any writes that were taken before the crash.
+    _consistencyMarkers->setAppliedThrough(opCtx, topOfOplog);
+
+    // Force the set `appliedThrough` to become durable on disk in a checkpoint. This method would
+    // typically take a stable checkpoint, but because we're starting up from a checkpoint that
+    // has no checkpoint timestamp, the stable checkpoint "degrades" into an unstable checkpoint.
+    //
+    // Not waiting for checkpoint durability here can result in a scenario where the node takes
+    // writes and persists them to the oplog, but crashes before a stable checkpoint persists a
+    // "recovery timestamp". The typical startup path for data-bearing nodes with 4.0 is to use
+    // the recovery timestamp to determine where to play oplog forward from. As this method shows,
+    // when a recovery timestamp does not exist, the applied through is used to determine where to
+    // start playing oplog entries from.
+    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable();
 }
 
 void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,

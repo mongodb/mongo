@@ -1895,7 +1895,8 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
             _replExecutor->now(),
             static_cast<unsigned>(time(0) - serverGlobalParams.started),
             _getCurrentCommittedSnapshotOpTime_inlock(),
-            initialSyncProgress},
+            initialSyncProgress,
+            _storage->getLastStableCheckpointTimestamp(_service)},
         response,
         &result);
     return result;

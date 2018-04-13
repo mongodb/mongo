@@ -69,6 +69,8 @@ public:
 
     bool waitUntilDurable() override;
 
+    bool waitUntilUnjournaledWritesDurable() override;
+
     void registerChange(Change* change) override;
 
     void abandonSnapshot() override;
