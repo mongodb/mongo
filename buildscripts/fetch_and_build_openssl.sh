@@ -15,7 +15,7 @@ OPENSSL_VERSION=1.1.0h
 OPENSSL_NAME=openssl-${OPENSSL_VERSION}
 OPENSSL_TARBALL=${OPENSSL_NAME}.tar.gz
 mkdir -p openssl
-curl -L -o openssl/${OPENSSL_TARBALL} https://www.openssl.org/source/${OPENSSL_TARBALL}
+curl -L -o openssl/${OPENSSL_TARBALL} https://s3.amazonaws.com/boxes.10gen.com/build/${OPENSSL_TARBALL}
 LOCAL_HASH="$(${PYTHON} buildscripts/sha256sum.py openssl/${OPENSSL_TARBALL})"
 echo ${LOCAL_HASH}
 
