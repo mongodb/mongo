@@ -179,6 +179,24 @@ public:
     StatusWith<executor::TaskExecutor::EventHandle> nextEvent();
 
     /**
+     * Schedules a getMore on any remote hosts which:
+     *  - Do not have an error status set already.
+     *  - Don't already have a request outstanding.
+     *  - We don't currently have any results buffered.
+     *  - Are not exhausted (have a non-zero cursor id).
+     * Returns an error if any of the remotes responded with an error, or if we encounter an error
+     * while scheduling the getMore requests..
+     *
+     * In most cases users should call nextEvent() instead of this method, but this can be necessary
+     * if the caller of nextEvent() calls detachFromOperationContext() before the event is signaled.
+     * In such cases, the ARM cannot schedule getMores itself, and will need to be manually prompted
+     * after calling reattachToOperationContext().
+     *
+     * It is illegal to call this method if the ARM is not attached to an OperationContext.
+     */
+    Status scheduleGetMores();
+
+    /**
      * Adds the specified shard cursors to the set of cursors to be merged.  The results from the
      * new cursors will be returned as normal through nextReady().
      */
@@ -367,6 +385,12 @@ private:
      * Returns true if this async cursor is waiting to receive another batch from a remote.
      */
     bool _haveOutstandingBatchRequests(WithLock);
+
+
+    /**
+     * Schedules a getMore on any remote hosts which we need another batch from.
+     */
+    Status _scheduleGetMores(WithLock);
 
     /**
      * Schedules a killCursors command to be run on all remote hosts that have open cursors.

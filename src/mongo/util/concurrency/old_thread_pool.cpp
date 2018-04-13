@@ -60,6 +60,8 @@ OldThreadPool::OldThreadPool(const DoNotStartThreadsTag&,
                              const std::string& threadNamePrefix)
     : _pool(makeOptions(nThreads, threadNamePrefix)) {}
 
+OldThreadPool::OldThreadPool(ThreadPool::Options options) : _pool(std::move(options)) {}
+
 std::size_t OldThreadPool::getNumThreads() const {
     return _pool.getStats().numThreads;
 }

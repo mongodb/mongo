@@ -21,38 +21,41 @@
         // the getMore to run. To prevent this from happening, the main thread waits for an insert
         // into "sentinel", to signal that the parallel shell has started and is waiting for the
         // getMore to appear in currentOp.
-        const shellSentinelCollection = assertDropAndRecreateCollection(db, "shell_sentinel");
-
         const port =
             (collection.stats().sharded ? collection.getMongo().port
                                         : FixtureHelpers.getPrimaryForNodeHostingDatabase(db).port);
 
+        const sentinelCountBefore = shellSentinelCollection.find().itcount();
+
         const awaitShellDoingEventDuringGetMore = startParallelShell(`
-// Signal that the parallel shell has started.
-assert.writeOK(db.getCollection("${ shellSentinelCollection.getName() }").insert({}));
-
-// Wait for the getMore to appear in currentOp.
-assert.soon(function() {
-    return db.currentOp({
-                 op: "getmore",
-                 "command.collection": "${collection.getName()}",
-                 "originatingCommand.comment": "${identifyingComment}",
-             }).inprog.length > 0;
-});
-
-const eventFn = ${ event.toString() };
-eventFn();`,
+            // Wait for the getMore to appear in currentOp.
+            assert.soon(function() {
+                return db.currentOp({
+                             op: "getmore",
+                             "originatingCommand.comment": "${identifyingComment}",
+                         }).inprog.length > 0;
+            });
+            const eventFn = ${event.toString()};
+            eventFn();
+            //Signal that the parallel shell has completed its event function.
+            assert.writeOK(db.getCollection("${shellSentinelCollection.getName()}").insert({}));`,
                                                                      port);
 
-        // Wait for the shell to start.
-        assert.soon(() => shellSentinelCollection.findOne() != null);
-
         // Run and time the getMore.
-        const startTime = (new Date()).getTime();
-        const result = assert.commandWorked(db.runCommand(
-            {getMore: awaitDataCursorId, collection: collection.getName(), maxTimeMS: maxTimeMS}));
+        let startTime, result, elapsedMs;
+        assert.soon(function() {
+            startTime = (new Date()).getTime();
+            result = assert.commandWorked(db.runCommand({
+                getMore: awaitDataCursorId,
+                collection: collection.getName(),
+                maxTimeMS: maxTimeMS
+            }));
+            elapsedMs = (new Date()).getTime() - startTime;
+            return result.cursor.nextBatch.length > 0 ||
+                shellSentinelCollection.find().itcount() > sentinelCountBefore;
+        });
         awaitShellDoingEventDuringGetMore();
-        return {result: result, elapsedMs: (new Date()).getTime() - startTime};
+        return {result: result, elapsedMs: elapsedMs};
     }
 
     /**
@@ -107,7 +110,10 @@ eventFn();`,
         return result;
     }
 
+    // Refresh all collections which will be required in the course of this test.
+    const shellSentinelCollection = assertDropAndRecreateCollection(db, "shell_sentinel");
     const changesCollection = assertDropAndRecreateCollection(db, "changes");
+    const unrelatedCollection = assertDropCollection(db, "unrelated_collection");
 
     // Start a change stream cursor.
     const wholeCollectionStreamComment = "change stream on entire collection";
@@ -131,16 +137,15 @@ eventFn();`,
         event: () => assert.writeOK(db.changes.insert({_id: "wake up"}))
     });
     assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
-    assert.docEq(getMoreResponse.cursor.nextBatch[0], {
-        documentKey: {_id: "wake up"},
-        fullDocument: {_id: "wake up"},
-        ns: {db: db.getName(), coll: changesCollection.getName()},
-        operationType: "insert"
-    });
+    assert.eq(getMoreResponse.cursor.nextBatch[0].operationType,
+              "insert",
+              tojson(getMoreResponse.cursor.nextBatch[0]));
+    assert.eq(getMoreResponse.cursor.nextBatch[0].fullDocument,
+              {_id: "wake up"},
+              tojson(getMoreResponse.cursor.nextBatch[0]));
 
     // Test that an insert to an unrelated collection will not cause the change stream to wake up
     // and return an empty batch before reaching the maxTimeMS.
-    assertDropCollection(db, "unrelated_collection");
     assertEventDoesNotWakeCursor({
         collection: changesCollection,
         awaitDataCursorId: changeCursorId,

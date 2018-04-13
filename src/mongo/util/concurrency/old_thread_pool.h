@@ -53,6 +53,7 @@ public:
     explicit OldThreadPool(const DoNotStartThreadsTag&,
                            int nThreads = 8,
                            const std::string& threadNamePrefix = "");
+    explicit OldThreadPool(ThreadPool::Options options);
 
     std::size_t getNumThreads() const;
     ThreadPool::Stats getStats() const;

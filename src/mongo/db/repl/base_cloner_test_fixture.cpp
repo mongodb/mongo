@@ -104,14 +104,33 @@ BSONObj BaseClonerTest::createListIndexesResponse(CursorId cursorId, const BSONA
     return createListIndexesResponse(cursorId, specs, "firstBatch");
 }
 
+namespace {
+struct EnsureClientHasBeenInitialized : public executor::ThreadPoolMock::Options {
+    EnsureClientHasBeenInitialized() : executor::ThreadPoolMock::Options() {
+        onCreateThread = []() { Client::initThread("CollectionClonerTestThread"); };
+    }
+};
+}  // namespace
+
 BaseClonerTest::BaseClonerTest()
-    : _mutex(), _setStatusCondition(), _status(getDetectableErrorStatus()) {}
+    : ThreadPoolExecutorTest(EnsureClientHasBeenInitialized()),
+      _mutex(),
+      _setStatusCondition(),
+      _status(getDetectableErrorStatus()) {}
 
 void BaseClonerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     clear();
     launchExecutorThread();
-    dbWorkThreadPool = stdx::make_unique<OldThreadPool>(1);
+
+    Client::initThread("CollectionClonerTest");
+    ThreadPool::Options options;
+    options.minThreads = 1U;
+    options.maxThreads = 1U;
+    options.onCreateThread = [](StringData threadName) { Client::initThread(threadName); };
+    dbWorkThreadPool = stdx::make_unique<OldThreadPool>(options);
+    dbWorkThreadPool->startThreads();
+
     storageInterface.reset(new StorageInterfaceMock());
 }
 
@@ -122,6 +141,7 @@ void BaseClonerTest::tearDown() {
     storageInterface.reset();
     dbWorkThreadPool->join();
     dbWorkThreadPool.reset();
+    Client::releaseCurrent();
 }
 
 void BaseClonerTest::clear() {

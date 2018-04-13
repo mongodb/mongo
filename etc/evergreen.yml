@@ -3410,6 +3410,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: change_streams_mongos_sessions_passthrough_WT
+  depends_on:
+  - name: change_streams_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_mongos_sessions_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: change_streams_mongos_passthrough_WT
   depends_on:
   - name: change_streams_WT
@@ -5502,6 +5513,7 @@ buildvariants:
   - name: auth_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_secondary_reads_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: dbtest_WT
@@ -5628,6 +5640,7 @@ buildvariants:
   - name: causally_consistent_jscore_passthrough_auth_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT
   - name: concurrency_replication_WT
@@ -6447,6 +6460,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -7002,6 +7016,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT
   - name: concurrency_replication_WT
@@ -7212,6 +7227,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_secondary_reads_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT
@@ -7576,6 +7592,7 @@ buildvariants:
   - name: bulk_gle_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_secondary_reads_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT
@@ -9018,6 +9035,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
     distros:
@@ -9399,6 +9417,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_secondary_reads_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT
@@ -9557,6 +9576,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_mongos_sessions_passthrough_WT
   - name: change_streams_secondary_reads_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT

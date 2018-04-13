@@ -326,6 +326,7 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
 }
 
 Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
+    invariant(_opCtx, "Cannot schedule a getMore without an OperationContext");
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
@@ -364,6 +365,32 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
     return Status::OK();
 }
 
+Status AsyncResultsMerger::scheduleGetMores() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _scheduleGetMores(lk);
+}
+
+Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
+    // Schedule remote work on hosts for which we need more results.
+    for (size_t i = 0; i < _remotes.size(); ++i) {
+        auto& remote = _remotes[i];
+
+        if (!remote.status.isOK()) {
+            return remote.status;
+        }
+
+        if (!remote.hasNext() && !remote.exhausted() && !remote.cbHandle.isValid()) {
+            // If this remote is not exhausted and there is no outstanding request for it, schedule
+            // work to retrieve the next batch.
+            auto nextBatchStatus = _askForNextBatch(lk, i);
+            if (!nextBatchStatus.isOK()) {
+                return nextBatchStatus;
+            }
+        }
+    }
+    return Status::OK();
+}
+
 /*
  * Note: When nextEvent() is called to do retries, only the remotes with retriable errors will
  * be rescheduled because:
@@ -388,22 +415,9 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
                       "nextEvent() called before an outstanding event was signaled");
     }
 
-    // Schedule remote work on hosts for which we need more results.
-    for (size_t i = 0; i < _remotes.size(); ++i) {
-        auto& remote = _remotes[i];
-
-        if (!remote.status.isOK()) {
-            return remote.status;
-        }
-
-        if (!remote.hasNext() && !remote.exhausted() && !remote.cbHandle.isValid()) {
-            // If this remote is not exhausted and there is no outstanding request for it, schedule
-            // work to retrieve the next batch.
-            auto nextBatchStatus = _askForNextBatch(lk, i);
-            if (!nextBatchStatus.isOK()) {
-                return nextBatchStatus;
-            }
-        }
+    auto getMoresStatus = _scheduleGetMores(lk);
+    if (!getMoresStatus.isOK()) {
+        return getMoresStatus;
     }
 
     auto eventStatus = _executor->makeEvent();
@@ -570,9 +584,11 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     if (_params->tailableMode == TailableMode::kTailable && !remote.hasNext()) {
         invariant(_remotes.size() == 1);
         _eofNext = true;
-    } else if (!remote.hasNext() && !remote.exhausted() && _lifecycleState == kAlive) {
+    } else if (!remote.hasNext() && !remote.exhausted() && _lifecycleState == kAlive && _opCtx) {
         // If this is normal or tailable-awaitData cursor and we still don't have anything buffered
         // after receiving this batch, we can schedule work to retrieve the next batch right away.
+        // Be careful only to do this when '_opCtx' is non-null, since it is illegal to schedule a
+        // remote command on a user's behalf without a non-null OperationContext.
         remote.status = _askForNextBatch(lk, remoteIndex);
     }
 }

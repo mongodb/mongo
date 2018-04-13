@@ -102,6 +102,18 @@ StatusWith<EventHandle> RouterStageMerge::getNextEvent() {
     // If we abandoned a previous event due to a mongoS-side timeout, wait for it first.
     if (_leftoverEventFromLastTimeout) {
         invariant(_params->tailableMode == TailableMode::kTailableAndAwaitData);
+        // If we have an outstanding event from last time, then we might have to manually schedule
+        // some getMores for the cursors. If a remote response came back while we were between
+        // getMores (from the user to mongos), the response may have been an empty batch, and the
+        // ARM would not be able to ask for the next batch immediately since it is not attached to
+        // an OperationContext. Now that we have a valid OperationContext, we schedule the getMores
+        // ourselves.
+        Status getMoreStatus = _arm.scheduleGetMores();
+        if (!getMoreStatus.isOK()) {
+            return getMoreStatus;
+        }
+
+        // Return the leftover event and clear '_leftoverEventFromLastTimeout'.
         auto event = _leftoverEventFromLastTimeout;
         _leftoverEventFromLastTimeout = EventHandle();
         return event;
