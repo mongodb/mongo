@@ -198,9 +198,26 @@ private:
         // unset if the cache entry has never been loaded, or should not be relied on).
         bool needsRefresh{true};
 
+        // Contains a notification to be waited on for the refresh to complete (only available if
+        // needsRefresh is true)
+        std::shared_ptr<Notification<Status>> refreshCompletionNotification;
+
+        // Until SERVER-34061 goes in, after a database refresh, one thread should also load the
+        // sharded collections. In case multiple threads were queued up on the refresh, this bool
+        // ensures only the first loads the collections.
+        bool mustLoadShardedCollections{true};
+
         // Contains the cached info about the database (only available if needsRefresh is false)
         boost::optional<DatabaseType> dbt;
     };
+
+    /**
+     * Non-blocking call which schedules an asynchronous refresh for the specified database. The
+     * database entry must be in the 'needsRefresh' state.
+     */
+    void _scheduleDatabaseRefresh(WithLock,
+                                  const StringData dbName,
+                                  std::shared_ptr<DatabaseInfoEntry> dbEntry);
 
     /**
      * Non-blocking call which schedules an asynchronous refresh for the specified namespace. The

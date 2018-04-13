@@ -68,6 +68,7 @@ selector:
   - jstests/sharding/split_large_key.js
   - jstests/sharding/balancer_window.js
   # No retries on direct writes to the config/admin databases on the config servers
+  - jstests/sharding/database_versioning_safe_secondary_reads.js
   - jstests/sharding/listDatabases.js
   - jstests/sharding/bulk_insert.js
   - jstests/sharding/printShardingStatus.js

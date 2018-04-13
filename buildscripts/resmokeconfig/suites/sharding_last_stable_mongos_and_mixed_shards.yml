@@ -13,6 +13,7 @@ selector:
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/create_database.js
   - jstests/sharding/database_and_shard_versioning_all_commands.js
+  - jstests/sharding/database_versioning_safe_secondary_reads.js
   - jstests/sharding/dump_coll_metadata.js
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js

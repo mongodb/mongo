@@ -42,7 +42,6 @@
 namespace mongo {
 
 using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunks;
-MONGO_FP_DECLARE(callShardServerCallbackFn);
 
 namespace {
 
@@ -198,25 +197,24 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
 void ConfigServerCatalogCacheLoader::getDatabase(
     StringData dbName,
     stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    uassertStatusOK(_threadPool.schedule([ name = dbName.toString(), callbackFn ]() noexcept {
+        auto opCtx = Client::getCurrent()->makeOperationContext();
 
-    if (MONGO_FAIL_POINT(callShardServerCallbackFn)) {
-        uassertStatusOK(_threadPool.schedule([ name = dbName.toString(), callbackFn ]() noexcept {
-            auto opCtx = Client::getCurrent()->makeOperationContext();
+        auto swDbt = [&]() -> StatusWith<DatabaseType> {
+            try {
+                return uassertStatusOK(
+                           Grid::get(opCtx.get())
+                               ->catalogClient()
+                               ->getDatabase(
+                                   opCtx.get(), name, repl::ReadConcernLevel::kMajorityReadConcern))
+                    .value;
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        }();
 
-            auto swDbt = [&]() -> StatusWith<DatabaseType> {
-                try {
-
-                    const auto dbVersion = databaseVersion::makeNew();
-                    DatabaseType dbt(std::move(name), ShardId("PrimaryShard"), false, dbVersion);
-                    return dbt;
-                } catch (const DBException& ex) {
-                    return ex.toStatus();
-                }
-            }();
-
-            callbackFn(opCtx.get(), swDbt);
-        }));
-    }
+        callbackFn(opCtx.get(), std::move(swDbt));
+    }));
 }
 
 }  // namespace mongo
