@@ -56,10 +56,8 @@
         assert.eq(200, coll.find().itcount());
     }
 
-    // Perform a majority write to ensure all nodes have a stable timestamp.
-    assert.commandWorked(getColl(rst.getPrimary()).insert({x: "ensure majority point"}, {
-        writeConcern: {w: "majority"}
-    }));
+    // Upgrade to FCV 4.0 so we persist stable timestamps across clean shutdown.
+    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: "4.0"}));
 
     // Restart the replica set to load off of a stable checkpoint.
     rst.stopSet(undefined, true);
