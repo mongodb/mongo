@@ -164,7 +164,6 @@ pre_msi_cmd = env.Command(pre_msi,
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongo.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongod.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongos.exe')
-env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/mongoperf.exe')
 env.Depends(pre_msi_cmd, '$BUILD_DIR/mongo/installer/msi/ca/mongoca.dll')
 env.Depends(pre_msi_cmd, '#src/mongo/installer/compass/Install-Compass.ps1')
 

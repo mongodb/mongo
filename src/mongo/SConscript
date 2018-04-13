@@ -374,26 +374,6 @@ else:
 # tools
 rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles" ]
 
-# mongoperf
-mongoperf = env.Program(
-    target="mongoperf",
-    source=[
-        "client/examples/mongoperf.cpp",
-    ] + env.WindowsResourceFile("client/examples/mongoperf.rc"),
-    LIBDEPS=[
-        "base",
-        "db/serveronly",
-        "db/storage/mmap_v1/logfile",
-        "db/storage/mmap_v1/mmap",
-    ],
-    INSTALL_ALIAS=[
-        'tools',
-    ],
-)
-
-if not hygienic:
-    env.Install('#/', mongoperf)
-
 if env.TargetOSIs('windows'):
     generatedServerManifest = env.Substfile(
         's/server.manifest.in',
@@ -634,9 +614,7 @@ if has_option("use-new-tools"):
         installExternalBinary(env, "%s/%s" % (toolsRoot, "mongoreplay"))
 
 # legacy tools
-installBinary(env, "mongoperf")
 if not hygienic:
-    env.Alias("tools", '#/' + add_exe("mongoperf"))
     env.Alias("tools", "#/" + add_exe("mongobridge"))
 
 installBinary( env, "mongod" )
