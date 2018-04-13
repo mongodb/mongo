@@ -22,9 +22,7 @@ env.Library(
 env.Library(
     target='network',
     source=[
-        "listen.cpp",
         "message.cpp",
-        "message_port.cpp",
         "op_msg.cpp",
         "private/socket_poll.cpp",
         "private/ssl_expiration.cpp",

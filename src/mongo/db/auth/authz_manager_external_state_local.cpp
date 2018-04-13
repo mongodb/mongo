@@ -42,6 +42,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 

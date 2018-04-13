@@ -51,7 +51,6 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/net/message_port.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)

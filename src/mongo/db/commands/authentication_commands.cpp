@@ -55,6 +55,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/text.h"
 
 namespace mongo {

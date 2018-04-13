@@ -158,7 +158,7 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/listen.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"

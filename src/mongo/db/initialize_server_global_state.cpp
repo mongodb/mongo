@@ -65,7 +65,6 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/listen.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
@@ -366,7 +365,6 @@ MONGO_INITIALIZER(MungeUmask)(InitializerContext*) {
 #endif
 
 bool initializeServerGlobalState() {
-    Listener::globalTicketHolder.resize(serverGlobalParams.maxConns).transitional_ignore();
 
 #ifndef _WIN32
     if (!serverGlobalParams.noUnixSocket && !fs::is_directory(serverGlobalParams.socket)) {

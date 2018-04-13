@@ -39,6 +39,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/protocol.h"

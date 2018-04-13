@@ -54,7 +54,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/listen.h"  // For DEFAULT_MAX_CONN
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 
