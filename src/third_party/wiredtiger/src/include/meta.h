@@ -28,6 +28,9 @@
 
 #define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/
 
+#define	WT_SYSTEM_PREFIX	"system:"		/* System URI prefix */
+#define	WT_SYSTEM_CKPT_URI	"system:checkpoint"	/* Checkpoint URI */
+
 /*
  * Optimize comparisons against the metafile URI, flag handles that reference
  * the metadata file.

@@ -1055,9 +1055,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
 	WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
-	if (cval.val != 0 && conn->txn_global.has_stable_timestamp) {
+	if (cval.val != 0) {
 		ckpt_cfg = "use_timestamp=true";
-		F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
+		if (conn->txn_global.has_stable_timestamp)
+			F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
 	}
 
 err:	/*

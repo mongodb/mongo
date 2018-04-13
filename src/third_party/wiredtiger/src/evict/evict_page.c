@@ -121,16 +121,24 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	bool clean_page, inmem_split, tree_dead;
+	bool clean_page, inmem_split, local_gen, tree_dead;
 
 	conn = S2C(session);
 	page = ref->page;
+	local_gen = false;
 
 	__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
-	/* Enter the eviction generation. */
-	__wt_session_gen_enter(session, WT_GEN_EVICT);
+	/*
+	 * Enter the eviction generation. If we re-enter eviction, leave the
+	 * previous eviction generation (which must be as low as the current
+	 * generation), untouched.
+	 */
+	if (__wt_session_gen(session, WT_GEN_EVICT) == 0) {
+		local_gen = true;
+		__wt_session_gen_enter(session, WT_GEN_EVICT);
+	}
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -221,8 +229,9 @@ err:		if (!closing)
 		WT_STAT_DATA_INCR(session, cache_eviction_fail);
 	}
 
-done:	/* Leave the eviction generation. */
-	__wt_session_gen_leave(session, WT_GEN_EVICT);
+done:	/* Leave any local eviction generation. */
+	if (local_gen)
+		__wt_session_gen_leave(session, WT_GEN_EVICT);
 
 	return (ret);
 }

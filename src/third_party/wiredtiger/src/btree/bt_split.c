@@ -402,8 +402,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	root_decr = root_incr = 0;
 	complete = WT_ERR_RETURN;
 
-	/* The root page will be marked dirty, make sure that will succeed. */
+	/* Mark the root page dirty. */
 	WT_RET(__wt_page_modify_init(session, root));
+	__wt_page_modify_set(session, root);
 
 	/*
 	 * Our caller is holding the root page locked to single-thread splits,
@@ -574,10 +575,9 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	root_decr += size;
 
-	/* Adjust the root's memory footprint and mark it dirty. */
+	/* Adjust the root's memory footprint. */
 	__wt_cache_page_inmem_incr(session, root, root_incr);
 	__wt_cache_page_inmem_decr(session, root, root_decr);
-	__wt_page_modify_set(session, root);
 
 err:	switch (complete) {
 	case WT_ERR_RETURN:
@@ -629,8 +629,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	empty_parent = false;
 	complete = WT_ERR_RETURN;
 
-	/* The parent page will be marked dirty, make sure that will succeed. */
+	/* Mark the page dirty. */
 	WT_RET(__wt_page_modify_init(session, parent));
+	__wt_page_modify_set(session, parent);
 
 	/*
 	 * We've locked the parent, which means it cannot split (which is the
@@ -862,10 +863,9 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	WT_TRET(__split_safe_free(session, split_gen, exclusive, pindex, size));
 	parent_decr += size;
 
-	/* Adjust the parent's memory footprint and mark it dirty. */
+	/* Adjust the parent's memory footprint. */
 	__wt_cache_page_inmem_incr(session, parent, parent_incr);
 	__wt_cache_page_inmem_decr(session, parent, parent_decr);
-	__wt_page_modify_set(session, parent);
 
 err:	__wt_scr_free(session, &scr);
 	/*
@@ -929,8 +929,9 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_STAT_CONN_INCR(session, cache_eviction_split_internal);
 	WT_STAT_DATA_INCR(session, cache_eviction_split_internal);
 
-	/* The page will be marked dirty, make sure that will succeed. */
+	/* Mark the page dirty. */
 	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(session, page);
 
 	btree = S2BT(session);
 	alloc_index = replace_index = NULL;
@@ -1136,10 +1137,9 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_TRET(__split_safe_free(session, split_gen, false, pindex, size));
 	page_decr += size;
 
-	/* Adjust the page's memory footprint, and mark it dirty. */
+	/* Adjust the page's memory footprint. */
 	__wt_cache_page_inmem_incr(session, page, page_incr);
 	__wt_cache_page_inmem_decr(session, page, page_decr);
-	__wt_page_modify_set(session, page);
 
 err:	switch (complete) {
 	case WT_ERR_RETURN:
