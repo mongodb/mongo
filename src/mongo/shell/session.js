@@ -242,6 +242,12 @@ var {
                 }
             }
 
+            // If startTransaction was called on the session, attach txn number and readConcern.
+            // TODO: SERVER-34170 guard this code with a wire version check.
+            if (driverSession._serverSession.isInActiveTransaction()) {
+                cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
+            }
+
             // TODO SERVER-31868: A user should get back an error if they attempt to advance the
             // DriverSession's operationTime manually when talking to a stand-alone mongod. Removing
             // the `(client.isReplicaSetMember() || client.isMongos())` condition will also involve
@@ -251,7 +257,12 @@ var {
                 (client.isReplicaSetMember() || client.isMongos()) &&
                 (driverSession.getOptions().isCausalConsistency() ||
                  client.isCausalConsistency()) &&
-                canUseReadConcern(cmdObj)) {
+                canUseReadConcern(cmdObj) &&
+                (!driverSession._serverSession.isInActiveTransaction() ||
+                 driverSession._serverSession.isFirstStatement())) {
+                // When we are in a transaction, we must only attach an afterClusterTime to the
+                // first statement because readConcern is not allowed in subsequent statements.
+
                 // `driverSession.getOperationTime()` is the smallest time needed for performing a
                 // causally consistent read using the current session. Note that
                 // `client.getClusterTime()` is no smaller than the operation time and would
@@ -268,12 +279,6 @@ var {
                 driverSession.getOptions().shouldRetryWrites() &&
                 driverSession._serverSession.canRetryWrites(cmdObj)) {
                 cmdObj = driverSession._serverSession.assignTransactionNumber(cmdObj);
-            }
-
-            // If startTransaction was called on the session, attach txn number and readConcern.
-            // TODO: SERVER-34170 guard this code with a wire version check.
-            if (driverSession._serverSession.isInActiveTransaction()) {
-                cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
             }
 
             return cmdObj;
@@ -491,6 +496,10 @@ var {
             return _txnState === ServerSession.TransactionStates.kActive;
         };
 
+        this.isFirstStatement = function isFirstStatement() {
+            return _nextStatementId === 0;
+        };
+
         this.getLastUsed = function getLastUsed() {
             return _lastUsed;
         };
@@ -663,6 +672,7 @@ var {
             if (_nextStatementId == 0) {
                 cmdObjUnwrapped.startTransaction = true;
                 if (_txnOptions.getTxnReadConcern() !== undefined) {
+                    // Override the readConcern with the one specified during startTransaction.
                     cmdObjUnwrapped.readConcern = _txnOptions.getTxnReadConcern();
                 }
             }
@@ -907,6 +917,10 @@ var {
                       },
 
                       isInActiveTransaction: function isInActiveTransaction() {
+                          return false;
+                      },
+
+                      isFirstStatement: function isFirstStatement() {
                           return false;
                       },
 
