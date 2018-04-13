@@ -377,8 +377,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     ss << "config_base=false,";
     ss << "statistics=(fast),";
 
-    // We are still using MongoDB's cursor cache, don't double up.
-    ss << "cache_cursors=false,";
+    if (!WiredTigerSessionCache::isEngineCachingCursors()) {
+        ss << "cache_cursors=false,";
+    }
 
     // The setting may have a later setting override it if not using the journal.  We make it
     // unconditional here because even nojournal may need this setting if it is a transition
