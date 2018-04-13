@@ -33,6 +33,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -154,11 +156,29 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
               << FeatureCompatibilityVersionParser::toString(newVersion);
     }
 
-    // On commit, update the server parameters, close any connections with a wire version that is
-    // below the minimum, and abort any open transactions if downgrading.
     opCtx->recoveryUnit()->onCommit([opCtx, newVersion]() {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
+
+        if (newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
+            // Clear the in-memory cached database versions on downgrade, so that we do not check
+            // databaseVersion in FCV 3.6 (it would be meaningless, since databases do not have
+            // versions in FCV 3.6).
+            // TODO: Once SERVER-34431 goes in, just clear the DatabaseShardingStateMap.
+            std::vector<std::string> dbNames;
+            getGlobalServiceContext()->getGlobalStorageEngine()->listDatabases(&dbNames);
+            for (const auto& dbName : dbNames) {
+                if (dbName == "admin") {
+                    // The 'admin' database is already locked, since the FCV document is in
+                    // admin.system.version. Just skip 'admin', since it is not versioned.
+                    continue;
+                }
+                AutoGetDb autoDb(opCtx, dbName, MODE_X);
+                if (autoDb.getDb()) {
+                    DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+                }
+            }
+        }
 
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
             // Close all incoming connections from internal clients with binary versions lower than
