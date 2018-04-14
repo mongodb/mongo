@@ -332,9 +332,6 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     // Dismissed on success
     auto tmpCollectionDropper = MakeGuard([&] {
-        // Ensure that we don't trigger an exception when attempting to take locks.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
         BSONObjBuilder unusedResult;
         auto status =
             dropCollection(opCtx,
