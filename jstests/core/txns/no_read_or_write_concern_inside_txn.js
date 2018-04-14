@@ -1,6 +1,8 @@
 /**
  * Verify that readConcern and writeConcern are not allowed in transactions other than the
  * first statement (for readConcern) and the commit (for writeConcern)
+ *
+ * @tags: [uses_transactions]
  */
 
 (function() {

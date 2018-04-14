@@ -1,5 +1,7 @@
 /**
  * Verify that readConcern: snapshot is not permitted on writes outside transactions.
+ *
+ * @tags: [uses_transactions]
  */
 
 (function() {
