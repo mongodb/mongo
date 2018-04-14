@@ -1,6 +1,8 @@
 /**
  * This tests that nodes upgrading from 3.6 to 4.0 can recover without data loss if the 4.0 binary
  * crashes before taking a stable checkpoint.
+ *
+ * @tags: [requires_replication, requires_persistence]
  */
 (function() {
     "use strict";
@@ -13,6 +15,12 @@
 
     rst.startSet();
     rst.initiate();
+
+    if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapshotReadConcern) {
+        // Only snapshotting storage engines require correct timestamping of index builds.
+        rst.stopSet();
+        return;
+    }
 
     function getColl(conn) {
         return conn.getDB("test").getCollection("foo");
