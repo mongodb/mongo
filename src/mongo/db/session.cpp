@@ -34,6 +34,7 @@
 
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -314,6 +315,16 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
                                  boost::optional<bool> startTransaction) {
     if (opCtx->getClient()->isInDirectClient()) {
         return;
+    }
+
+    // If the command specified a read preference that allows it to run on a secondary, and it is
+    // trying to execute an operation on a multi-statement transaction, then we throw an error.
+    // Transactions are only allowed to be run on a primary.
+    if (!getTestCommandsEnabled()) {
+        uassert(50789,
+                "readPreference=primary is the only allowed readPreference for multi-statement "
+                "transactions.",
+                !(autocommit && ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
     }
 
     invariant(!opCtx->lockState()->isLocked());

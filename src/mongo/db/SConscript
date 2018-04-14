@@ -625,6 +625,7 @@ env.Library(
         'repl/oplog_entry',
         's/sharding_api_d',
         'views/views',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
     ],
     LIBDEPS_PRIVATE=[
         'commands/server_status',
@@ -1781,6 +1782,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'query_exec',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
+        '$BUILD_DIR/mongo/client/read_preference'
     ],
 )
 
