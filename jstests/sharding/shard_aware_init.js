@@ -128,20 +128,17 @@
         newMongodOptions.shardsvr = '';
         newMongodOptions.replSet = rsName;
         assert.throws(function() {
-            mongodConn = MongoRunner.runMongod(newMongodOptions);
-            waitForMaster(mongodConn);
+            var connToCrashedMongod = MongoRunner.runMongod(newMongodOptions);
+            waitForMaster(connToCrashedMongod);
         });
+
+        // We call MongoRunner.stopMongod() using a former connection to the server that is
+        // configured with the same port in order to be able to assert on the server's exit code.
+        MongoRunner.stopMongod(mongodConn, undefined, {allowedExitCode: MongoRunner.EXIT_UNCAUGHT});
 
         //
         // Test that it is possible to fix the invalid shardIdentity doc by not passing --shardsvr
         //
-
-        // If mongodConn is not null, the server terminated after MongoRunner.runMongod() had
-        // returned. So we call stopMongod again to clean up the registry in shell_util_launcher.cpp
-        if (mongodConn) {
-            MongoRunner.stopMongod(mongodConn);
-        }
-
         mongodConn = restartAndFixShardIdentityDoc(newMongodOptions);
         res = mongodConn.getDB('admin').runCommand({shardingState: 1});
         assert(res.enabled);

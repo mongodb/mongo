@@ -58,5 +58,6 @@
               "If the Timestamps differ, the server may be filling in the null timestamps");
 
     assert.throws(() => rst.restart(0));  // Restart in replSet mode again.
+    rst.stop(0, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
     rst.stopSet();
 })();

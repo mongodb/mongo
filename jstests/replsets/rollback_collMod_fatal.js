@@ -63,8 +63,12 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // Restarts B, which should attempt rollback but then fassert.
 clearRawMongoProgramOutput();
-b_conn = replTest.start(BID, {waitForConnect: true}, true /*restart*/);
-
+try {
+    b_conn = replTest.start(BID, {waitForConnect: true}, true /*restart*/);
+} catch (e) {
+    // We swallow the exception from ReplSetTest#start() because it means that the server
+    // fassert()'d before the mongo shell could connect to it.
+}
 // Wait for node B to fassert
 assert.soon(function() {
     try {
