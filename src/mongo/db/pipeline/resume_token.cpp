@@ -194,11 +194,11 @@ ResumeTokenData ResumeToken::getData() const {
         case BSONType::String: {
             // Next comes the resume token version.
             auto versionElt = i.next();
-            uassert(50790,
+            uassert(50796,
                     "Resume Token does not contain applyOpsIndex",
                     versionElt.type() == BSONType::NumberInt);
             result.version = versionElt.numberInt();
-            uassert(50791, "Invalid Resume Token: only supports version 0", result.version == 0);
+            uassert(50795, "Invalid Resume Token: only supports version 0", result.version == 0);
 
             // The new format has applyOpsIndex next.
             auto applyOpsElt = i.next();
