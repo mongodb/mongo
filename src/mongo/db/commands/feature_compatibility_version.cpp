@@ -43,6 +43,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -50,6 +51,8 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 
@@ -160,10 +163,11 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
 
-        if (newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
-            // Clear the in-memory cached database versions on downgrade, so that we do not check
-            // databaseVersion in FCV 3.6 (it would be meaningless, since databases do not have
-            // versions in FCV 3.6).
+        if (ShardingState::get(opCtx)->enabled() &&
+            (newVersion ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36 ||
+             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40)) {
+            // Clear the in-memory cached database versions and collections metadata.
             // TODO: Once SERVER-34431 goes in, just clear the DatabaseShardingStateMap.
             std::vector<std::string> dbNames;
             getGlobalServiceContext()->getGlobalStorageEngine()->listDatabases(&dbNames);
@@ -176,8 +180,14 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
                 AutoGetDb autoDb(opCtx, dbName, MODE_X);
                 if (autoDb.getDb()) {
                     DatabaseShardingState::get(autoDb.getDb()).setDbVersion(opCtx, boost::none);
+                    for (const auto& collection : *autoDb.getDb()) {
+                        CollectionShardingState::get(opCtx, collection->ns())
+                            ->refreshMetadata(opCtx, nullptr);
+                    }
                 }
             }
+
+            Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
         }
 
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {

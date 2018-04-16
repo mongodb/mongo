@@ -20,6 +20,22 @@
         }
     }
 
+    function checkCachedChunksEntry(conn, ns, authoritativeEntry) {
+        const res = conn.getDB("config").runCommand({find: "cache.chunks." + ns});
+        assert.commandWorked(res);
+        const cacheEntry = res.cursor.firstBatch[0];
+        if (authoritativeEntry === undefined) {
+            assert.eq(undefined, cacheEntry);
+        } else {
+            if (authoritativeEntry.hasOwnProperty("history")) {
+                assert(cacheEntry.hasOwnProperty("history"),
+                       conn + "did not have expected on-disk cached history for " + ns);
+            } else {
+                assert(!cacheEntry.hasOwnProperty("history"),
+                       conn + "did have unexpected on-disk cached history for " + ns);
+            }
+        }
+    }
     const st = new ShardingTest({shards: 2});
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
@@ -43,6 +59,13 @@
     assert.neq(null, ns1EntryOriginal.uuid);
     assert.neq(null, ns2EntryOriginal.uuid);
 
+    const ns1ChunkEntryOriginal = st.s.getDB("config").getCollection("chunks").findOne({ns: ns1});
+    const ns2ChunkEntryOriginal = st.s.getDB("config").getCollection("chunks").findOne({ns: ns2});
+    assert.neq(null, ns1ChunkEntryOriginal);
+    assert(!ns1ChunkEntryOriginal.hasOwnProperty("history"));
+    assert.neq(null, ns2ChunkEntryOriginal);
+    assert(!ns2ChunkEntryOriginal.hasOwnProperty("history"));
+
     // Force each shard to refresh for the collection it owns to ensure it writes a cache entry.
 
     assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1}));
@@ -52,6 +75,11 @@
     checkCachedCollectionEntry(st.shard0, ns2, undefined);
     checkCachedCollectionEntry(st.shard1, ns1, undefined);
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
+
+    checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryOriginal);
+    checkCachedChunksEntry(st.shard0, ns2, undefined);
+    checkCachedChunksEntry(st.shard1, ns1, undefined);
+    checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryOriginal);
 
     // Simulate that the cache entry was written without a UUID (SERVER-33356).
     assert.writeOK(st.shard0.getDB("config")
@@ -73,16 +101,34 @@
     assert.docEq(ns1EntryFCV40, ns1EntryOriginal);
     assert.docEq(ns2EntryFCV40, ns2EntryOriginal);
 
-    // TODO (SERVER-33783): Add 'syncFromConfig: false' once the cached collection state is cleared
-    // on shards on setFCV.
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1}));
-    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2}));
+    const ns1ChunkEntryFCV40 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns1});
+    const ns2ChunkEntryFCV40 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns2});
+    assert.neq(null, ns1ChunkEntryFCV40);
+    assert(ns1ChunkEntryFCV40.hasOwnProperty("history"));
+    assert.neq(null, ns2ChunkEntryFCV40);
+    assert(ns2ChunkEntryFCV40.hasOwnProperty("history"));
+
+    st.s.getDB(db1Name).getCollection(collName).findOne();
+    st.s.getDB(db2Name).getCollection(collName).findOne();
+
+    // We wait for the refresh triggered by the finds to persist the new cache entry to disk,
+    // because it's done asynchronously.
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1, syncFromConfig: false}));
+    assert.commandWorked(
+        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2, syncFromConfig: false}));
 
     // The shards' collection caches should have been updated with UUIDs.
     checkCachedCollectionEntry(st.shard0, ns1, ns1EntryOriginal);
     checkCachedCollectionEntry(st.shard0, ns2, undefined);
     checkCachedCollectionEntry(st.shard1, ns1, undefined);
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
+
+    // The shards' chunk caches should have been updated with histories.
+    checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryFCV40);
+    checkCachedChunksEntry(st.shard0, ns2, undefined);
+    checkCachedChunksEntry(st.shard1, ns1, undefined);
+    checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryFCV40);
 
     //
     // setFCV 3.6 (downgrade)
@@ -96,10 +142,20 @@
     assert.docEq(ns1EntryFCV36, ns1EntryOriginal);
     assert.docEq(ns2EntryFCV36, ns2EntryOriginal);
 
-    // TODO (SERVER-33783): Add 'syncFromConfig: false' once the cached collection state is cleared
-    // on shards on setFCV.
-    assert.commandWorked(st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1}));
-    assert.commandWorked(st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2}));
+    const ns1ChunkEntryFCV36 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns1});
+    const ns2ChunkEntryFCV36 = st.s.getDB("config").getCollection("chunks").findOne({ns: ns2});
+    assert.neq(null, ns1ChunkEntryFCV36);
+    assert(!ns1ChunkEntryFCV36.hasOwnProperty("history"));
+    assert.neq(null, ns2ChunkEntryFCV36);
+    assert(!ns2ChunkEntryFCV36.hasOwnProperty("history"));
+
+    st.s.getDB(db1Name).getCollection(collName).findOne();
+    st.s.getDB(db2Name).getCollection(collName).findOne();
+
+    assert.commandWorked(
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns1, syncFromConfig: false}));
+    assert.commandWorked(
+        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns2, syncFromConfig: false}));
 
     // Also refresh the sessions collection so that the UUID consistency check at the end of
     // ShardingTest, which will check for its UUID on the shards, passes.
@@ -113,6 +169,12 @@
     checkCachedCollectionEntry(st.shard0, ns2, undefined);
     checkCachedCollectionEntry(st.shard1, ns1, undefined);
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
+
+    // The shards' chunk caches should have been updated with histories removed.
+    checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryFCV36);
+    checkCachedChunksEntry(st.shard0, ns2, undefined);
+    checkCachedChunksEntry(st.shard1, ns1, undefined);
+    checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryFCV36);
 
     st.stop();
 })();
