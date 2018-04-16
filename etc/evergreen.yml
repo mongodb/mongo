@@ -2686,6 +2686,7 @@ tasks:
           - "./test*"
           - "./dbtest*"
           - "./mongobridge*"
+          - "./mongoe*"
           - "buildscripts/**"
           - "*Example"
           - "*Test"
@@ -3750,6 +3751,15 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=core --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_mobile
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core --mongod=./mongoe --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -9107,6 +9117,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+    additional_targets: mongoe
   tasks:
   - name: compile
     distros:
@@ -9135,6 +9146,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
+  - name: jsCore_mobile
   - name: jsCore_op_query
   - name: jsonSchema
   - name: jstestfuzz
@@ -9169,6 +9181,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: burn_in_tests
+  - name: jsCore_mobile
 
 - name: enterprise-osx-1010-mobile
   display_name: Enterprise OS X 10.10 (mobile)
@@ -9202,6 +9215,7 @@ buildvariants:
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
+    additional_targets: mongoe
   tasks:
   - name: compile
   - name: compile_all
@@ -9225,6 +9239,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
+  - name: jsCore_mobile
   - name: jsCore_op_query
   - name: jsonSchema
   - name: jstestfuzz
