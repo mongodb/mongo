@@ -18,7 +18,7 @@ class PyTestCase(interface.TestCase):
         """Execute the test."""
         suite = unittest.defaultTestLoader.loadTestsFromName(self.test_module_name)
         result = unittest.TextTestRunner().run(suite)
-        if result.failures:
+        if not result.wasSuccessful():
             msg = "Python test {} failed".format(self.test_name)
             raise self.failureException(msg)
 

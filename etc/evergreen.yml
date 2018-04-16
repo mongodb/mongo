@@ -726,6 +726,7 @@ functions:
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
           pip install boto3==1.5.27
+          pip install mock==2.0.0
 
           # Set the TMPDIR environment variable to be a directory in the task's working
           # directory so that temporary files created by processes spawned by resmoke.py get
