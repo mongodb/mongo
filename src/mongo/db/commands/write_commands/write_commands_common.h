@@ -31,7 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/util/net/op_msg.h"
 
 /**
@@ -41,12 +41,15 @@
 namespace mongo {
 namespace auth {
 
-/**
- * Throws if write command shouldn't proceed.
- */
-void checkAuthForWriteCommand(AuthorizationSession* authzSession,
-                              BatchedCommandRequest::BatchType cmdType,
-                              const OpMsgRequest& request);
+void checkAuthForInsertCommand(AuthorizationSession* authzSession,
+                               bool withDocumentValidationBypass,
+                               const write_ops::Insert& op);
+void checkAuthForUpdateCommand(AuthorizationSession* authzSession,
+                               bool withDocumentValidationBypass,
+                               const write_ops::Update& op);
+void checkAuthForDeleteCommand(AuthorizationSession* authzSession,
+                               bool withDocumentValidationBypass,
+                               const write_ops::Delete& op);
 
 }  // namespace auth
 }  // namespace mongo

@@ -39,6 +39,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -46,78 +47,88 @@ namespace auth {
 namespace {
 
 /**
- * Helper to extract the namespace being indexed from a raw BSON write command.
- *
+ * Extracts the namespace being indexed from a raw BSON write command.
  * TODO: Remove when we have parsing hooked before authorization.
  */
-NamespaceString getIndexedNss(const std::vector<BSONObj>& documentsToInsert) {
-    uassert(ErrorCodes::FailedToParse, "index write batch is empty", !documentsToInsert.empty());
-    std::string nsToIndex = documentsToInsert.front()["ns"].str();
+NamespaceString _getIndexedNss(const std::vector<BSONObj>& documents) {
+    uassert(ErrorCodes::FailedToParse, "index write batch is empty", !documents.empty());
+    std::string ns = documents.front()["ns"].str();
     uassert(ErrorCodes::FailedToParse,
             "index write batch contains an invalid index descriptor",
-            !nsToIndex.empty());
+            !ns.empty());
     uassert(ErrorCodes::FailedToParse,
             "index write batches may only contain a single index descriptor",
-            documentsToInsert.size() == 1);
-    return NamespaceString(std::move(nsToIndex));
+            documents.size() == 1);
+    return NamespaceString(std::move(ns));
+}
+
+void fillPrivileges(const write_ops::Insert& op,
+                    std::vector<Privilege>* privileges,
+                    ActionSet* actions) {
+    if (op.getNamespace().isSystemDotIndexes()) {
+        // Special-case indexes until we have a command
+        privileges->push_back(
+            Privilege(ResourcePattern::forExactNamespace(_getIndexedNss(op.getDocuments())),
+                      ActionType::createIndex));
+        return;
+    }
+    actions->addAction(ActionType::insert);
+}
+
+void fillPrivileges(const write_ops::Update& op,
+                    std::vector<Privilege>* privileges,
+                    ActionSet* actions) {
+    actions->addAction(ActionType::update);
+    // Upsert also requires insert privs
+    const auto& updates = op.getUpdates();
+    if (std::any_of(updates.begin(), updates.end(), [](auto&& x) { return x.getUpsert(); })) {
+        actions->addAction(ActionType::insert);
+    }
+}
+
+void fillPrivileges(const write_ops::Delete& op,
+                    std::vector<Privilege>* privileges,
+                    ActionSet* actions) {
+    actions->addAction(ActionType::remove);
+}
+
+template <typename Op>
+void checkAuthorizationImpl(AuthorizationSession* authzSession,
+                            bool withDocumentValidationBypass,
+                            const Op& op) {
+    std::vector<Privilege> privileges;
+    ActionSet actions;
+    if (withDocumentValidationBypass) {
+        actions.addAction(ActionType::bypassDocumentValidation);
+    }
+    fillPrivileges(op, &privileges, &actions);
+    if (!actions.empty()) {
+        privileges.push_back(
+            Privilege(ResourcePattern::forExactNamespace(op.getNamespace()), actions));
+    }
+    uassert(ErrorCodes::Unauthorized,
+            "unauthorized",
+            authzSession->isAuthorizedForPrivileges(privileges));
 }
 
 }  // namespace
 
-void checkAuthForWriteCommand(AuthorizationSession* authzSession,
-                              BatchedCommandRequest::BatchType cmdType,
-                              const OpMsgRequest& request) {
-    std::vector<Privilege> privileges;
-    ActionSet actionsOnCommandNSS;
+void checkAuthForInsertCommand(AuthorizationSession* authzSession,
+                               bool withDocumentValidationBypass,
+                               const write_ops::Insert& op) {
+    checkAuthorizationImpl(authzSession, withDocumentValidationBypass, op);
+}
 
-    if (shouldBypassDocumentValidationForCommand(request.body)) {
-        actionsOnCommandNSS.addAction(ActionType::bypassDocumentValidation);
-    }
+void checkAuthForUpdateCommand(AuthorizationSession* authzSession,
+                               bool withDocumentValidationBypass,
+                               const write_ops::Update& op) {
+    checkAuthorizationImpl(authzSession, withDocumentValidationBypass, op);
+}
 
-    NamespaceString cmdNSS;
-
-    switch (cmdType) {
-        case BatchedCommandRequest::BatchType_Insert: {
-            auto op = write_ops::Insert::parse(IDLParserErrorContext("insert"), request);
-            cmdNSS = op.getNamespace();
-            if (!op.getNamespace().isSystemDotIndexes()) {
-                actionsOnCommandNSS.addAction(ActionType::insert);
-            } else {
-                // Special-case indexes until we have a command
-                auto nssToIndex = getIndexedNss(op.getDocuments());
-                privileges.push_back(Privilege(ResourcePattern::forExactNamespace(nssToIndex),
-                                               ActionType::createIndex));
-            }
-            break;
-        }
-        case BatchedCommandRequest::BatchType_Update: {
-            auto op = write_ops::Update::parse(IDLParserErrorContext("update"), request);
-            cmdNSS = op.getNamespace();
-            actionsOnCommandNSS.addAction(ActionType::update);
-            // Upsert also requires insert privs
-            const auto& updates = op.getUpdates();
-            if (std::any_of(
-                    updates.begin(), updates.end(), [](auto&& x) { return x.getUpsert(); })) {
-                actionsOnCommandNSS.addAction(ActionType::insert);
-            }
-            break;
-        }
-        case BatchedCommandRequest::BatchType_Delete: {
-            auto op = write_ops::Delete::parse(IDLParserErrorContext("delete"), request);
-            cmdNSS = op.getNamespace();
-            actionsOnCommandNSS.addAction(ActionType::remove);
-            break;
-        }
-    }
-
-    if (!actionsOnCommandNSS.empty()) {
-        privileges.push_back(
-            Privilege(ResourcePattern::forExactNamespace(cmdNSS), actionsOnCommandNSS));
-    }
-
-    uassert(ErrorCodes::Unauthorized,
-            "unauthorized",
-            authzSession->isAuthorizedForPrivileges(privileges));
+void checkAuthForDeleteCommand(AuthorizationSession* authzSession,
+                               bool withDocumentValidationBypass,
+                               const write_ops::Delete& op) {
+    checkAuthorizationImpl(authzSession, withDocumentValidationBypass, op);
 }
 
 }  // namespace auth
