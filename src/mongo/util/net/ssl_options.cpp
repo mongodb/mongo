@@ -104,18 +104,20 @@ Status storeDisabledProtocols(const std::string& disabledProtocols,
     // Map the tokens to their enum values, and push them onto the list of disabled protocols.
     for (const std::string& token : tokens) {
         auto mappedToken = validConfigs.find(token);
-
-        if ((mappedToken == validConfigs.end()) &&
-            (mode == DisabledProtocolsMode::kAcceptNegativePrefix)) {
-            // We allow "noTLS1_0" style on the server for backward compatibility.
-            mappedToken = validNoConfigs.find(token);
-        }
-
         if (mappedToken != validConfigs.end()) {
             sslGlobalParams.sslDisabledProtocols.push_back(mappedToken->second);
-        } else {
-            return Status(ErrorCodes::BadValue, "Unrecognized disabledProtocols '" + token + "'");
+            continue;
         }
+
+        if (mode == DisabledProtocolsMode::kAcceptNegativePrefix) {
+            auto mappedNoToken = validNoConfigs.find(token);
+            if (mappedNoToken != validNoConfigs.end()) {
+                sslGlobalParams.sslDisabledProtocols.push_back(mappedNoToken->second);
+                continue;
+            }
+        }
+
+        return Status(ErrorCodes::BadValue, "Unrecognized disabledProtocols '" + token + "'");
     }
 
     return Status::OK();
