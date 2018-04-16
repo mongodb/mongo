@@ -65,11 +65,13 @@
     assert.soon(function() {
         return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, collAgg.getName());
     });
-    assert.commandFailed(db.runCommand({
-        aggregate: collAgg.getName(),
+    ChangeStreamTest.assertChangeStreamThrowsCode({
+        db: db,
+        collName: collAgg.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
-        cursor: {}
-    }));
+        expectedCode: 40615,
+        doNotModifyInPassthroughs: true
+    });
 
     // Test that it is possible to open a new change stream cursor on a collection that does not
     // exist.

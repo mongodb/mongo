@@ -49,6 +49,7 @@ executor:
         var testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/set_read_preference_secondary.js');
+        load('jstests/libs/override_methods/implicit_whole_db_changestreams.js');
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections

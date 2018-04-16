@@ -4,13 +4,8 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
-  # This test exercises an internal detail of mongos<->mongod communication and is not expected
-  # to work against a mongos.
+  # Exercises an internal detail of mongos<->mongod communication. Not expected to work on mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
-  # TODO: SERVER-32088 should fix resuming a change stream when not all shards have data.
-  - jstests/change_streams/change_stream_shell_helper.js
-  - jstests/change_streams/lookup_post_image.js
-  - jstests/change_streams/include_cluster_time.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the
@@ -39,7 +34,11 @@ executor:
         TestData:
           defaultReadConcernLevel: majority
           enableMajorityReadConcern: ''
-      eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
+        load('jstests/libs/override_methods/implicit_whole_db_changestreams.js');
       readMode: commands
   hooks:
   - class: CheckReplDBHash
@@ -48,9 +47,6 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    # Use two shards to make sure we will only talk to the primary shard for the database and will
-    # not delay changes to wait for notifications or a clock advancement from other shards.
-    num_shards: 2
     mongos_options:
       bind_ip_all: ''
       set_parameters:
@@ -60,12 +56,10 @@ executor:
       nopreallocj: ''
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
+        writePeriodicNoops: 1
         periodicNoopIntervalSecs: 1
-        writePeriodicNoops: true
+        numInitialSyncAttempts: 1
     num_rs_nodes_per_shard: 1
-    # TODO SERVER-34138: This suite doesn't actually shard any collections, but enabling sharding
-    # will prevent read commands against non-existent databases from unconditionally returning a
-    # CursorId of 0.
+    num_shards: 2
     enable_sharding:
     - test

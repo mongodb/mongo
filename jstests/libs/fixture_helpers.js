@@ -60,6 +60,13 @@ var FixtureHelpers = (function() {
     }
 
     /**
+     * Returns the resolved view definition for 'collName' if it is a view, 'undefined' otherwise.
+     */
+    function getViewDefinition(db, collName) {
+        return db.getCollectionInfos({type: "view", name: collName}).shift();
+    }
+
+    /**
      * Returns the number of shards that 'coll' has any chunks on. Returns 1 if the collection is
      * not sharded. Note that if the balancer is enabled then the number of shards with chunks for
      * this collection can change at any moment.
@@ -116,6 +123,7 @@ var FixtureHelpers = (function() {
     return {
         isMongos: isMongos,
         isSharded: isSharded,
+        getViewDefinition: getViewDefinition,
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,

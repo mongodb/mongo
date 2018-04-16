@@ -3,6 +3,15 @@
  * opened cursors and kills them on cleanup.
  */
 
+// Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
+// the same as calling db.runCommand. If a passthrough is active and has defined a function
+// 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual
+// streams to explicitly exempt themselves from being modified by the passthrough.
+const runCommandChangeStreamPassthroughAware =
+    (typeof changeStreamPassthroughAwareRunCommand === 'undefined'
+         ? ((db, cmdObj) => db.runCommand(cmdObj))
+         : changeStreamPassthroughAwareRunCommand);
+
 function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     load("jstests/libs/namespace_utils.js");  // For getCollectionNameFromFullNamespace.
 
@@ -17,10 +26,14 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
     /**
      * Starts a change stream cursor with the given pipeline on the given collection. It uses
      * the 'aggregateOptions' if provided and saves the cursor so that it can be cleaned up later.
+     * If 'doNotModifyInPassthroughs' is 'true' and the test is running in a $changeStream
+     * upconversion passthrough, then this stream will not be modified and will run as though no
+     * passthrough were active.
      *
      * Returns the cursor returned by the 'aggregate' command.
      */
-    self.startWatchingChanges = function({pipeline, collection, aggregateOptions}) {
+    self.startWatchingChanges = function(
+        {pipeline, collection, aggregateOptions, doNotModifyInPassthroughs}) {
         aggregateOptions = aggregateOptions || {};
         aggregateOptions.cursor = aggregateOptions.cursor || {batchSize: 1};
 
@@ -30,8 +43,10 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
                collection === 1);
         const collName = (collection instanceof DBCollection ? collection.getName() : collection);
 
-        let res = assert.commandWorked(_db.runCommand(
-            Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions)));
+        let res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
+            _db,
+            Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions),
+            doNotModifyInPassthroughs));
         assert.neq(res.cursor.id, 0);
         _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
         return res.cursor;
@@ -218,13 +233,17 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
  * Asserts that the given pipeline will eventually return an error with the provided code,
  * either in the initial aggregate, or a subsequent getMore. Throws an exception if there are
  * any results from running the pipeline, or if it doesn't throw an error within the window of
- * assert.soon().
+ * assert.soon().  If 'doNotModifyInPassthroughs' is 'true' and the test is running in a
+ * $changeStream upconversion passthrough, then this stream will not be modified and will run as
+ * though no passthrough were active.
  */
 ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrowsCode(
-    {db, collName, pipeline, expectedCode}) {
+    {db, collName, pipeline, expectedCode, doNotModifyInPassthroughs}) {
     try {
-        const res = assert.commandWorked(
-            db.runCommand({aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}}));
+        const res = assert.commandWorked(runCommandChangeStreamPassthroughAware(
+            db,
+            {aggregate: collName, pipeline: pipeline, cursor: {batchSize: 1}},
+            doNotModifyInPassthroughs));
 
         // Extract the collection name from the cursor since the change stream may be on the whole
         // database. The 'collName' parameter will be the integer 1 in that case and the getMore

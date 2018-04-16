@@ -19,9 +19,14 @@
     assertDropCollection(db, caseInsensitiveCollection);
 
     // Test that you can open a change stream before the collection exists, and it will use the
-    // simple collation.
-    const simpleCollationStream = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: caseInsensitiveCollection});
+    // simple collation. Tag this stream as 'doNotModifyInPassthroughs', since whole-db and
+    // cluster-wide streams do not adhere to the same collation rules that we will be testing with
+    // this cursor.
+    const simpleCollationStream = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {}}],
+        collection: caseInsensitiveCollection,
+        doNotModifyInPassthroughs: true
+    });
 
     // Create the collection with a non-default collation - this should invalidate the stream we
     // opened before it existed.
@@ -33,22 +38,25 @@
         expectInvalidate: true
     });
 
+    const caseInsensitivePipeline = [
+        {$changeStream: {}},
+        {$match: {"fullDocument.text": "abc"}},
+        {$project: {docId: "$documentKey._id"}}
+    ];
+
+    // Test that $changeStream will implicitly adopt the default collation of the collection on
+    // which it is run. Tag this stream as 'doNotModifyInPassthroughs', since whole-db and
+    // cluster-wide streams do not have default collations.
     const implicitCaseInsensitiveStream = cst.startWatchingChanges({
-        pipeline: [
-            {$changeStream: {}},
-            {$match: {"fullDocument.text": "abc"}},
-            // Be careful not to use _id in this projection, as startWatchingChanges() will exclude
-            // it by default, assuming it is the resume token.
-            {$project: {docId: "$documentKey._id"}}
-        ],
-        collection: caseInsensitiveCollection
+        pipeline: caseInsensitivePipeline,
+        collection: caseInsensitiveCollection,
+        doNotModifyInPassthroughs: true
     });
-    const explicitCaseInsensitiveStream = cst.startWatchingChanges({
-        pipeline: [
-            {$changeStream: {}},
-            {$match: {"fullDocument.text": "abc"}},
-            {$project: {docId: "$documentKey._id"}}
-        ],
+    // Test that a collation can be explicitly specified for the $changeStream. This does not need
+    // to be tagged 'doNotModifyInPassthroughs', since whole-db and cluster-wide changeStreams will
+    // use an explicit collation if present.
+    let explicitCaseInsensitiveStream = cst.startWatchingChanges({
+        pipeline: caseInsensitivePipeline,
         collection: caseInsensitiveCollection,
         aggregateOptions: {collation: caseInsensitive}
     });
@@ -65,8 +73,20 @@
     const similarNameCollection = assertDropAndRecreateCollection(
         db, "cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe", {collation: {locale: "en_US"}});
 
-    assert.writeOK(similarNameCollection.insert({_id: 0, text: "aBc"}));
+    // We must recreate the explicitCaseInsensitiveStream and set 'doNotModifyInPassthroughs'.
+    // Whole-db and cluster-wide streams use the simple collation while scanning the oplog, but do
+    // not filter the oplog by collection name. The subsequent $match stage which we inject into the
+    // pipeline to filter for a specific collection will obey the pipeline's case-insensitive
+    // collation, meaning that 'cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe' will match
+    // 'change_stream_case_insensitive'.
+    explicitCaseInsensitiveStream = cst.startWatchingChanges({
+        pipeline: caseInsensitivePipeline,
+        collection: caseInsensitiveCollection,
+        aggregateOptions: {collation: caseInsensitive},
+        doNotModifyInPassthroughs: true
+    });
 
+    assert.writeOK(similarNameCollection.insert({_id: 0, text: "aBc"}));
     assert.writeOK(caseInsensitiveCollection.insert({_id: 2, text: "ABC"}));
 
     // The existing stream should not see the first insert (to the other collection), but should see
