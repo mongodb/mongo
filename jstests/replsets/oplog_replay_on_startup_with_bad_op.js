@@ -61,5 +61,10 @@
               "If the Timestamps differ, the server may be filling in the null timestamps");
 
     assert.throws(() => rst.restart(0));  // Restart in replSet mode again.
+
+    // fassert() calls std::abort(), which returns a different exit code for Windows vs. other
+    // platforms.
+    const exitCode = _isWindows() ? MongoRunner.EXIT_ABRUPT : MongoRunner.EXIT_ABORT;
+    rst.stop(0, undefined, {allowedExitCode: exitCode});
     rst.stopSet();
 })();

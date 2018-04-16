@@ -108,6 +108,7 @@
             conn = rst.restart(0);  // Restart in replSet mode again.
         } catch (e) {
             assert.eq(expectedState, 'FATAL', 'node failed to restart: ' + e);
+            rst.stop(0, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
             return;
         }
 

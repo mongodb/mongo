@@ -61,9 +61,14 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // Restarts B, which should attempt rollback but then fassert.
 clearRawMongoProgramOutput();
-// Don't wait for a connection to the node after startup, since it might roll back and crash
-// immediately.
-replTest.start(BID, {waitForConnect: false}, true /*restart*/);
+
+try {
+    b_conn = replTest.start(BID, {waitForConnect: true}, true /*restart*/);
+} catch (e) {
+    // We swallow the exception from ReplSetTest#start() because it means that the server
+    // fassert()'d before the mongo shell could connect to it.
+}
+
 assert.soon(function() {
     return rawMongoProgramOutput().match("Cannot roll back a collMod command");
 }, "B failed to fassert");

@@ -72,9 +72,13 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 jsTestLog("Restarting node B (" + b_conn.host + ") and waiting for it to fassert.");
 clearRawMongoProgramOutput();
 
-// Don't wait for a connection to the node after startup, since it might roll back and crash
-// immediately.
-replTest.start(BID, {waitForConnect: false}, true /*restart*/);
+try {
+    replTest.start(BID, {waitForConnect: true}, true /*restart*/);
+} catch (e) {
+    // We swallow the exception from ReplSetTest#start() because it means that the server
+    // fassert()'d before the mongo shell could connect to it.
+}
+
 var msg = RegExp("Can't roll back this command yet: ");
 assert.soon(function() {
     return rawMongoProgramOutput().match(msg);
