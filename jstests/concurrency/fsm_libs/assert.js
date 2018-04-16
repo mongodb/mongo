@@ -44,13 +44,20 @@ if (typeof globalAssertLevel === 'undefined') {
 var assertWithLevel = function(level) {
     assert(AssertLevel.isAssertLevel(level), 'expected AssertLevel as first argument');
 
-    function quietlyDoAssert(msg) {
+    function quietlyDoAssert(msg, obj) {
         // eval if msg is a function
         if (typeof msg === 'function') {
             msg = msg();
         }
 
-        throw new Error(msg);
+        var ex;
+        if (obj) {
+            ex = _getErrorWithCode(obj, msg);
+        } else {
+            ex = new Error(msg);
+        }
+
+        throw ex;
     }
 
     function wrapAssertFn(fn, args) {

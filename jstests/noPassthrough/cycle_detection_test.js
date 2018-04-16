@@ -76,4 +76,15 @@
         graph.addEdge(w, z);
         assert.eq([w, z], graph.findCycle());
     })();
+
+    (function testGraphMinimizesCycleUsingNonReferentialEquality() {
+        const graph = new Graph();
+        graph.addEdge({a: 1}, {a: 2});
+        graph.addEdge({a: 2}, {a: 3});
+        graph.addEdge({a: 3}, {a: 4});
+        graph.addEdge({a: 4}, {a: 5});
+        graph.addEdge({a: 5}, {a: 3});
+
+        assert.eq([{a: 3}, {a: 4}, {a: 5}, {a: 3}], graph.findCycle());
+    })();
 })();

@@ -85,8 +85,9 @@ function Graph() {
                 if (result.length > 1) {
                     // A cycle has been detected during the recursive call to doDepthFirstSearch().
                     // Unless we've already closed the loop, the (node, otherNode) edge must be part
-                    // of it.
-                    if (result[0] !== result[result.length - 1]) {
+                    // of it. Note that we use friendlyEqual() to match the definition of sameness
+                    // as the mongo shell's Map type.
+                    if (!friendlyEqual(result[0], result[result.length - 1])) {
                         result.unshift(node);
                     }
                     return result;
