@@ -153,18 +153,32 @@ public:
     void registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
     Collection* removeUUIDCatalogEntry(CollectionUUID uuid);
 
-    /* This function gets the Collection* pointer that corresponds to
+    /**
+     * This function gets the Collection* pointer that corresponds to
      * CollectionUUID uuid. The required locks should be obtained prior
      * to calling this function, or else the found Collection pointer
      * might no longer be valid when the call returns.
      */
     Collection* lookupCollectionByUUID(CollectionUUID uuid) const;
 
-    /* This function gets the NamespaceString from the Collection* pointer that
+    /**
+     * This function gets the NamespaceString from the Collection* pointer that
      * corresponds to CollectionUUID uuid. If there is no such pointer, an empty
-     * NamespaceString is returned.
+     * NamespaceString is returned. See onCloseCatalog/onOpenCatalog for more info.
      */
     NamespaceString lookupNSSByUUID(CollectionUUID uuid) const;
+
+    /**
+     * Puts the catalog in closed state. In this state, the lookupNSSByUUID method will fall back
+     * to the pre-close state to resolve queries for currently unknown UUIDs. This allows
+     * authorization, which needs to do lookups outside of database locks, to proceed.
+     */
+    void onCloseCatalog();
+
+    /**
+     * Puts the catatlog back in open state, removing the pre-close state. See onCloseCatalog.
+     */
+    void onOpenCatalog();
 
     /**
      * Return the UUID lexicographically preceding `uuid` in the database named by `db`.
@@ -185,6 +199,13 @@ private:
                                                            const stdx::lock_guard<stdx::mutex>&);
 
     mutable mongo::stdx::mutex _catalogLock;
+    /**
+     * When present, indicates that the catalog is in closed state, and contains a map from UUID
+     * to pre-close NSS. See also onCloseCatalog.
+     */
+    boost::optional<
+        mongo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
+        _shadowCatalog;
 
     /**
      * Map from database names to ordered `vector`s of their UUIDs.

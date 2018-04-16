@@ -46,6 +46,13 @@ namespace catalog {
 void closeCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
+    // Closing UUID Catalog: only lookupNSSByUUID will fall back to using pre-closing state to
+    // allow authorization for currently unknown UUIDs. This is needed because authorization needs
+    // to work before acquiring locks, and might otherwise spuriously regard a UUID as unknown
+    // while reloading the catalog.
+    UUIDCatalog::get(opCtx).onCloseCatalog();
+    LOG(1) << "closeCatalog: closing UUID catalog";
+
     // Close all databases.
     log() << "closeCatalog: closing all databases";
     constexpr auto reason = "closing databases for closeCatalog";
@@ -166,6 +173,10 @@ void openCatalog(OperationContext* opCtx) {
             }
         }
     }
+    // Opening UUID Catalog: The UUID catalog is now in sync with the storage engine catalog. Clear
+    // the pre-closing state.
+    UUIDCatalog::get(opCtx).onOpenCatalog();
+    LOG(1) << "openCatalog: finished reloading UUID catalog";
 }
 }  // namespace catalog
 }  // namespace mongo
