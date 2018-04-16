@@ -122,6 +122,7 @@ void DocumentSourceChangeStreamTransform::initializeTransactionContext(const Doc
 
     checkValueType(input["o"], "o", BSONType::Object);
     Value applyOps = input.getNestedField("o.applyOps");
+
     checkValueType(applyOps, "applyOps", BSONType::Array);
     invariant(applyOps.getArrayLength() > 0);
 
@@ -131,7 +132,36 @@ void DocumentSourceChangeStreamTransform::initializeTransactionContext(const Doc
     Value txnNumber = input["txnNumber"];
     checkValueType(txnNumber, "txnNumber", BSONType::NumberLong);
 
-    _txnContext.emplace(applyOps, lsid.getDocument(), txnNumber.getLong());
+    Value ts = input[repl::OplogEntry::kTimestampFieldName];
+    Timestamp clusterTime = ts.getTimestamp();
+
+    _txnContext.emplace(applyOps, clusterTime, lsid.getDocument(), txnNumber.getLong());
+}
+
+ResumeTokenData DocumentSourceChangeStreamTransform::getResumeToken(Value ts,
+                                                                    Value uuid,
+                                                                    Value documentKey) {
+    ResumeTokenData resumeTokenData;
+    if (_txnContext) {
+        // We're in the middle of unwinding an 'applyOps'.
+
+        // Use the clusterTime from the higher level applyOps
+        resumeTokenData.clusterTime = _txnContext->clusterTime;
+
+        // 'pos' points to the _next_ applyOps index, so we must subtract one to get the index of
+        // the entry being examined right now.
+        invariant(_txnContext->pos >= 1);
+        resumeTokenData.applyOpsIndex = _txnContext->pos - 1;
+    } else {
+        resumeTokenData.clusterTime = ts.getTimestamp();
+        resumeTokenData.applyOpsIndex = 0;
+    }
+
+    resumeTokenData.documentKey = documentKey;
+    if (!uuid.missing())
+        resumeTokenData.uuid = uuid.getUuid();
+
+    return resumeTokenData;
 }
 
 Document DocumentSourceChangeStreamTransform::applyTransformation(const Document& input) {
@@ -277,21 +307,11 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
         documentKey = Value();
     }
 
-    // Note that 'documentKey' and/or 'uuid' might be missing, in which case the missing fields will
-    // not appear in the output.
-    ResumeTokenData resumeTokenData;
-    if (_txnContext) {
-        // We're in the middle of unwinding an 'applyOps'.
+    // Note that 'documentKey' and/or 'uuid' might be missing, in which case they will not appear
+    // in the output.
+    ResumeTokenData resumeTokenData = getResumeToken(ts, uuid, documentKey);
 
-        // TODO: SERVER-34314
-        // For now we return an empty resumeToken.
-    } else {
-        resumeTokenData.clusterTime = ts.getTimestamp();
-        resumeTokenData.documentKey = documentKey;
-        if (!uuid.missing())
-            resumeTokenData.uuid = uuid.getUuid();
-    }
-
+    // Add some additional fields only relevant to transactions.
     if (_txnContext) {
         doc.addField(DocumentSourceChangeStream::kTxnNumberField,
                      Value(static_cast<long long>(_txnContext->txnNumber)));
@@ -306,7 +326,6 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
     // that as metadata.
     if (pExpCtx->needsMerge) {
-        // TODO SERVER-34314: Sort key may have to be _id.data in FCV 4.0.
         doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
     }
 

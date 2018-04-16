@@ -61,21 +61,30 @@ public:
 
 protected:
     /**
-     * Pushes a document with a resume token corresponding to the given timestamp, docKey, and
-     * namespace into the mock queue.
+     * Pushes a document with a resume token corresponding to the given timestamp, version,
+     * applyOpsIndex, docKey, and namespace into the mock queue.
      */
-    void addDocument(Timestamp ts, Document docKey, UUID uuid = testUuid()) {
+    void addDocument(
+        Timestamp ts, int version, std::size_t applyOpsIndex, Document docKey, UUID uuid) {
         _mock->queue.push_back(
             Document{{"_id",
-                      ResumeToken(ResumeTokenData(ts, Value(docKey), uuid))
+                      ResumeToken(ResumeTokenData(ts, version, applyOpsIndex, Value(docKey), uuid))
                           .toDocument(ResumeToken::SerializationFormat::kHexString)}});
+    }
+
+    /**
+     * Pushes a document with a resume token corresponding to the given timestamp, version,
+     * applyOpsIndex, docKey, and namespace into the mock queue.
+     */
+    void addDocument(Timestamp ts, Document docKey, UUID uuid = testUuid()) {
+        addDocument(ts, 0, 0, docKey, uuid);
     }
     /**
      * Pushes a document with a resume token corresponding to the given timestamp, _id string, and
      * namespace into the mock queue.
      */
     void addDocument(Timestamp ts, std::string id, UUID uuid = testUuid()) {
-        addDocument(ts, Document{{"_id", id}}, uuid);
+        addDocument(ts, 0, 0, Document{{"_id", id}}, uuid);
     }
 
     void addPause() {
@@ -87,19 +96,34 @@ protected:
      * namespace.
      */
     intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
-        Timestamp ts, boost::optional<Document> docKey, UUID uuid = testUuid()) {
-        ResumeToken token(ResumeTokenData(ts, docKey ? Value(*docKey) : Value(), uuid));
+        Timestamp ts,
+        int version,
+        std::size_t applyOpsIndex,
+        boost::optional<Document> docKey,
+        UUID uuid) {
+        ResumeToken token(
+            ResumeTokenData(ts, version, applyOpsIndex, docKey ? Value(*docKey) : Value(), uuid));
         auto checkResumeToken = DocumentSourceEnsureResumeTokenPresent::create(getExpCtx(), token);
         checkResumeToken->setSource(_mock.get());
         return checkResumeToken;
     }
+
+    /**
+     * Convenience method to create the class under test with a given timestamp, docKey, and
+     * namespace.
+     */
+    intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
+        Timestamp ts, boost::optional<Document> docKey, UUID uuid = testUuid()) {
+        return createCheckResumeToken(ts, 0, 0, docKey, uuid);
+    }
+
     /**
      * Convenience method to create the class under test with a given timestamp, _id string, and
      * namespace.
      */
     intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> createCheckResumeToken(
         Timestamp ts, StringData id, UUID uuid = testUuid()) {
-        return createCheckResumeToken(ts, Document{{"_id", id}}, uuid);
+        return createCheckResumeToken(ts, 0, 0, Document{{"_id", id}}, uuid);
     }
 
     /**
@@ -378,6 +402,40 @@ TEST_F(CheckResumeTokenTest,
     addDocument(resumeTimestamp, {{"_id"_sd, 1}}, uuids[0]);
 
     ASSERT_THROWS_CODE(checkResumeToken->getNext(), AssertionException, 40585);
+}
+
+TEST_F(CheckResumeTokenTest, ShouldSkipResumeTokensWithEarlierApplyOpsIndex) {
+    Timestamp resumeTimestamp(100, 1);
+
+    // Create an ordered array of 3 UUIDs.
+    std::vector<UUID> uuids = {UUID::gen(), UUID::gen(), UUID::gen()};
+
+    std::sort(uuids.begin(), uuids.end());
+
+    auto checkResumeToken =
+        createCheckResumeToken(resumeTimestamp, 0, 2, Document{{"_id"_sd, 1}}, uuids[1]);
+
+    // Add two documents which have the same clusterTime and version but a lower applyOps index. One
+    // of the documents has a lower uuid than the resume token, the other has a higher uuid; this
+    // demonstrates that the applyOps index is the discriminating factor.
+    addDocument(resumeTimestamp, 0, 0, {{"_id"_sd, 0}}, uuids[0]);
+    addDocument(resumeTimestamp, 0, 1, {{"_id"_sd, 2}}, uuids[2]);
+
+    // Add a third document that matches the resume token.
+    addDocument(resumeTimestamp, 0, 2, {{"_id"_sd, 1}}, uuids[1]);
+
+    // Add a fourth document with the same timestamp and version whose applyOps sorts after the
+    // resume token.
+    auto expectedDocKey = Document{{"_id"_sd, 3}};
+    addDocument(resumeTimestamp, 0, 3, expectedDocKey, uuids[1]);
+
+    // We should skip the first two docs, swallow the resume token, and return the fourth doc.
+    const auto firstDocAfterResume = checkResumeToken->getNext();
+    const auto tokenFromFirstDocAfterResume =
+        ResumeToken::parse(firstDocAfterResume.getDocument()["_id"].getDocument()).getData();
+
+    ASSERT_EQ(tokenFromFirstDocAfterResume.clusterTime, resumeTimestamp);
+    ASSERT_DOCUMENT_EQ(tokenFromFirstDocAfterResume.documentKey.getDocument(), expectedDocKey);
 }
 
 /**

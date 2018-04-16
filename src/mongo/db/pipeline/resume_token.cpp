@@ -104,11 +104,14 @@ ResumeToken::ResumeToken(const Document& resumeDoc) {
                                     _typeBits.getBinData().type == BinDataGeneral));
 }
 
-// We encode the resume token as a KeyString with the sequence: clusterTime, uuid, documentKey.
+// We encode the resume token as a KeyString with the sequence:
+// clusterTime, version, applyOpsIndex, uuid, documentKey
 // Only the clusterTime is required.
 ResumeToken::ResumeToken(const ResumeTokenData& data) {
     BSONObjBuilder builder;
     builder.append("", data.clusterTime);
+    builder.append("", data.version);
+    builder.appendNumber("", data.applyOpsIndex);
     uassert(50788,
             "Unexpected resume token with a documentKey but no UUID",
             data.uuid || data.documentKey.missing());
@@ -189,6 +192,30 @@ ResumeTokenData ResumeToken::getData() const {
             break;
         }
         case BSONType::String: {
+            // Next comes the resume token version.
+            auto versionElt = i.next();
+            uassert(50790,
+                    "Resume Token does not contain applyOpsIndex",
+                    versionElt.type() == BSONType::NumberInt);
+            result.version = versionElt.numberInt();
+            uassert(50791, "Invalid Resume Token: only supports version 0", result.version == 0);
+
+            // The new format has applyOpsIndex next.
+            auto applyOpsElt = i.next();
+            uassert(50793,
+                    "Resume Token does not contain applyOpsIndex",
+                    applyOpsElt.type() == BSONType::NumberInt);
+            const int applyOpsInd = applyOpsElt.numberInt();
+            uassert(50794,
+                    "Invalid Resume Token: applyOpsIndex should be non-negative",
+                    applyOpsInd >= 0);
+            result.applyOpsIndex = applyOpsInd;
+
+            // The the UUID and documentKey are not required.
+            if (!i.more()) {
+                return result;
+            }
+
             // In the new format, the UUID comes first, then the documentKey.
             result.uuid = uassertStatusOK(UUID::parse(i.next()));
             if (i.more()) {

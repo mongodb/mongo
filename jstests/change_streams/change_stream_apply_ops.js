@@ -80,6 +80,8 @@
         let change = cst.getOneChange(changeStream);
         assert.eq(change.fullDocument._id, 1);
         assert.eq(change.operationType, "insert", tojson(change));
+        const firstChangeClusterTime = change.clusterTime;
+        assert(firstChangeClusterTime instanceof Timestamp, tojson(change));
         const firstChangeTxnNumber = change.txnNumber;
         const firstChangeLsid = change.lsid;
         assert.eq(typeof firstChangeLsid, "object");
@@ -90,6 +92,7 @@
         change = cst.getOneChange(changeStream);
         assert.eq(change.fullDocument._id, 2);
         assert.eq(change.operationType, "insert", tojson(change));
+        assert.eq(firstChangeClusterTime, change.clusterTime);
         assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
         assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
         assert.eq(change.ns.coll, coll.getName());
@@ -100,6 +103,7 @@
             change = cst.getOneChange(changeStream);
             assert.eq(change.fullDocument._id, 111);
             assert.eq(change.operationType, "insert", tojson(change));
+            assert.eq(firstChangeClusterTime, change.clusterTime);
             assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
             assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
             assert.eq(change.ns.coll, otherCollName);
@@ -111,6 +115,7 @@
             change = cst.getOneChange(changeStream);
             assert.eq(change.fullDocument._id, 222);
             assert.eq(change.operationType, "insert", tojson(change));
+            assert.eq(firstChangeClusterTime, change.clusterTime);
             assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
             assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
             assert.eq(change.ns.coll, otherDbCollName);
@@ -121,6 +126,7 @@
         change = cst.getOneChange(changeStream);
         assert.eq(change.operationType, "update", tojson(change));
         assert.eq(tojson(change.updateDescription.updatedFields), tojson({"a": 1}));
+        assert.eq(firstChangeClusterTime, change.clusterTime);
         assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
         assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
         assert.eq(change.ns.coll, coll.getName());
@@ -130,6 +136,7 @@
         change = cst.getOneChange(changeStream);
         assert.eq(change.documentKey._id, kDeletedDocumentId);
         assert.eq(change.operationType, "delete", tojson(change));
+        assert.eq(firstChangeClusterTime, change.clusterTime);
         assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
         assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
         assert.eq(change.ns.coll, coll.getName());
