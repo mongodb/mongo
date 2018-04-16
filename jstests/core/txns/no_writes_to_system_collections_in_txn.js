@@ -24,20 +24,20 @@
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50784);
+    assert.commandFailedWithCode(systemColl.insert({name: "new"}), 50791);
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandFailedWithCode(systemColl.update({name: 0}, {$set: {name: "jungsoo"}}), 50783);
+    assert.commandFailedWithCode(systemColl.update({name: 0}, {$set: {name: "jungsoo"}}), 50791);
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(
-        systemColl.update({name: "nonexistent"}, {$set: {name: "jungsoo"}}, {upsert: true}), 50783);
+        systemColl.update({name: "nonexistent"}, {$set: {name: "jungsoo"}}, {upsert: true}), 50791);
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandFailedWithCode(systemColl.remove({name: 0}), 50782);
+    assert.commandFailedWithCode(systemColl.remove({name: 0}), 50791);
     assert.throws(() => session.abortTransaction());
 
     assert.commandWorked(systemColl.remove({_id: {$exists: true}}));

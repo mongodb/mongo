@@ -232,6 +232,7 @@ private:
     void run(OperationContext* opCtx, CommandReplyBuilder* result) final {
         try {
             try {
+                _transactionChecks(opCtx);
                 BSONObjBuilder bob = result->getBodyBuilder();
                 command()->runImpl(opCtx, *_request, bob);
                 CommandHelpers::extractOrAppendOk(bob);
@@ -282,6 +283,21 @@ private:
         return static_cast<const WriteCommand*>(definition());
     }
 
+    void _transactionChecks(OperationContext* opCtx) const {
+        auto session = OperationContextSession::get(opCtx);
+        if (!session || !session->inSnapshotReadOrMultiDocumentTransaction())
+            return;
+        uassert(50791,
+                str::stream() << "Cannot write to system collection " << ns().toString()
+                              << " within a transaction.",
+                !ns().isSystem());
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassert(50790,
+                str::stream() << "Cannot write to unreplicated collection " << ns().toString()
+                              << " within a transaction.",
+                !replCoord->isOplogDisabledFor(opCtx, ns()));
+    }
+
     const OpMsgRequest* _request;
     NamespaceString _ns;
 };
@@ -307,22 +323,7 @@ public:
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
                  BSONObjBuilder& result) const final {
-        const auto session = OperationContextSession::get(opCtx);
-        const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
-
         const auto batch = InsertOp::parse(request);
-        uassert(50784,
-                str::stream() << "Cannot write to system collection " << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && batch.getNamespace().isSystem()));
-
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        uassert(50780,
-                str::stream() << "Cannot write to unreplicated collection "
-                              << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && replCoord->isOplogDisabledFor(opCtx, batch.getNamespace())));
-
         auto reply = performInserts(opCtx, batch);
         serializeReply(opCtx,
                        ReplyStyle::kNotUpdate,
@@ -352,22 +353,7 @@ public:
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
                  BSONObjBuilder& result) const final {
-        const auto session = OperationContextSession::get(opCtx);
-        const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
-
         const auto batch = UpdateOp::parse(request);
-        uassert(50783,
-                str::stream() << "Cannot write to system collection " << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && batch.getNamespace().isSystem()));
-
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        uassert(50779,
-                str::stream() << "Cannot write to unreplicated collection "
-                              << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && replCoord->isOplogDisabledFor(opCtx, batch.getNamespace())));
-
         auto reply = performUpdates(opCtx, batch);
         serializeReply(opCtx,
                        ReplyStyle::kUpdate,
@@ -431,22 +417,7 @@ public:
     void runImpl(OperationContext* opCtx,
                  const OpMsgRequest& request,
                  BSONObjBuilder& result) const final {
-        const auto session = OperationContextSession::get(opCtx);
-        const auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
-
         const auto batch = DeleteOp::parse(request);
-        uassert(50782,
-                str::stream() << "Cannot write to system collection " << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && batch.getNamespace().isSystem()));
-
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        uassert(50778,
-                str::stream() << "Cannot write to unreplicated collection "
-                              << batch.getNamespace().ns()
-                              << " within a transaction.",
-                !(inTransaction && replCoord->isOplogDisabledFor(opCtx, batch.getNamespace())));
-
         auto reply = performDeletes(opCtx, batch);
         serializeReply(opCtx,
                        ReplyStyle::kNotUpdate,

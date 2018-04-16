@@ -26,21 +26,21 @@
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandFailedWithCode(unreplicatedColl.insert({_id: "new"}), 50780);
+    assert.commandFailedWithCode(unreplicatedColl.insert({_id: "new"}), 50790);
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(unreplicatedColl.update({_id: 0}, {$set: {name: "jungsoo"}}),
-                                 50779);
+                                 50790);
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(
         unreplicatedColl.update({_id: "nonexistent"}, {$set: {name: "jungsoo"}}, {upsert: true}),
-        50779);
+        50790);
     assert.throws(() => session.abortTransaction());
 
     session.startTransaction({readConcern: {level: "snapshot"}});
-    assert.commandFailedWithCode(unreplicatedColl.remove({_id: 0}), 50778);
+    assert.commandFailedWithCode(unreplicatedColl.remove({_id: 0}), 50790);
     assert.throws(() => session.abortTransaction());
 }());
