@@ -1,7 +1,10 @@
 /**
  * Tests for the db collection
  *
- * @tags: [requires_fastcount]
+ * @tags: [
+ *  requires_fastcount,
+ *  requires_collstats,
+ * ]
  */
 
 /*
