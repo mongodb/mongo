@@ -409,8 +409,6 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     _indexName = descriptor->indexName();
     _indexNamespace = descriptor->indexNamespace();
 
-    /// ----------   setup on disk structures ----------------
-
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(_opCtx)) {
         isBackgroundSecondaryBuild =
@@ -418,13 +416,22 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
             replCoord->getMemberState().secondary() && _spec["background"].trueValue();
     }
 
+    // Setup on-disk structures.
     Status status = _collection->getCatalogEntry()->prepareForIndexBuild(
         _opCtx, descriptor.get(), isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 
+    if (isBackgroundSecondaryBuild) {
+        _opCtx->recoveryUnit()->onCommit([&] {
+            auto commitTs = _opCtx->recoveryUnit()->getCommitTimestamp();
+            if (!commitTs.isNull()) {
+                _collection->setMinimumVisibleSnapshot(commitTs);
+            }
+        });
+    }
+
     auto* const descriptorPtr = descriptor.get();
-    /// ----------   setup in memory structures  ----------------
     const bool initFromDisk = false;
     _entry = IndexCatalogImpl::_setupInMemoryStructures(
         _catalog, _opCtx, std::move(descriptor), initFromDisk);
