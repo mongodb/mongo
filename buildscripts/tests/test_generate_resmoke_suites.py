@@ -458,3 +458,90 @@ class SuiteTest(unittest.TestCase):
         self.assertIn({"runtime": 23, "name": "variant1"}, model["variants"])
         self.assertIn({"runtime": 24, "name": "variant2"}, model["variants"])
         self.assertIn({"runtime": 20, "name": "variant3"}, model["variants"])
+
+
+class GetSetOfTestDirsTest(unittest.TestCase):
+    def test_with_repeated_directories(self):
+        test_list = [
+            "dir0/subdir0/test0",
+            "dir0/subdir0/test1",
+            "dir0/subdir0/test2",
+            "dir0/subdir0/test3",
+        ]
+
+        directory_set = grs.get_set_of_test_dir(test_list)
+
+        self.assertEqual(len(directory_set), 1)
+        self.assertIn("dir0/subdir0", directory_set)
+
+    def test_with_different_directories(self):
+        test_list = [
+            "dir0/subdir0/test0",
+            "dir0/subdir1/test1",
+            "dir1/subdir0/test2",
+            "dir0/subdir0/test3",
+        ]
+
+        directory_set = grs.get_set_of_test_dir(test_list)
+
+        self.assertEqual(len(directory_set), 3)
+        self.assertIn("dir0/subdir0", directory_set)
+        self.assertIn("dir1/subdir0", directory_set)
+        self.assertIn("dir0/subdir1", directory_set)
+
+
+class GetMiscModelTest(unittest.TestCase):
+    def test_model_with_test_in_same_dir(self):
+        test_list = [
+            "dir0/subdir0/test0",
+            "dir0/subdir0/test1",
+            "dir0/subdir0/test2",
+            "dir0/subdir0/test3",
+        ]
+
+        model = grs.get_misc_model(test_list)
+
+        self.assertIn("test_names", model)
+        self.assertEqual(len(model["test_names"]), 1)
+        self.assertIn("dir0/subdir0/*.js", model["test_names"])
+
+        self.assertIn("excluded_tests", model)
+        self.assertEqual(len(model["excluded_tests"]), 4)
+        self.assertIn("dir0/subdir0/test0", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test1", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test2", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test3", model["excluded_tests"])
+
+    def test_model_with_test_in_different_dirs(self):
+        test_list = [
+            "dir0/subdir0/test0",
+            "dir0/subdir1/test1",
+            "dir1/subdir0/test2",
+            "dir0/subdir0/test3",
+        ]
+
+        model = grs.get_misc_model(test_list)
+
+        self.assertIn("test_names", model)
+        self.assertEqual(len(model["test_names"]), 3)
+        self.assertIn("dir0/subdir0/*.js", model["test_names"])
+        self.assertIn("dir0/subdir1/*.js", model["test_names"])
+        self.assertIn("dir1/subdir0/*.js", model["test_names"])
+
+        self.assertIn("excluded_tests", model)
+        self.assertEqual(len(model["excluded_tests"]), 4)
+        self.assertIn("dir0/subdir0/test0", model["excluded_tests"])
+        self.assertIn("dir0/subdir1/test1", model["excluded_tests"])
+        self.assertIn("dir1/subdir0/test2", model["excluded_tests"])
+        self.assertIn("dir0/subdir0/test3", model["excluded_tests"])
+
+    def test_model_includes_extra_data(self):
+        test_list = ["dir0/subdir0/test0"]
+        extra_data = {
+            "extra": "data",
+        }
+
+        model = grs.get_misc_model(test_list, extra_data)
+
+        self.assertIn("extra", model)
+        self.assertEqual(model["extra"], "data")

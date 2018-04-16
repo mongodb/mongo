@@ -12,6 +12,7 @@ import argparse
 import datetime
 import itertools
 import logging
+import os
 import sys
 
 from collections import defaultdict
@@ -223,12 +224,36 @@ def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds):
     return suites
 
 
+def get_set_of_test_dir(test_list):
+    """Get the set of directories used by test_list."""
+    return set([os.path.dirname(test) for test in test_list])
+
+
+def get_misc_model(test_list, extra_model_data=None):
+    """Build a model that will run any missing tests."""
+    test_dirs = get_set_of_test_dir(test_list)
+    model = {
+        "test_names": [test_dir + "/*.js" for test_dir in test_dirs],
+        "excluded_tests": test_list,
+    }
+
+    if extra_model_data:
+        model.update(extra_model_data)
+
+    return model
+
+
 def render_template(model, task, index):
     """Render the specified model as a yml file in the test suites directory."""
     template_file = "{dir}/{task}.yml.j2".format(dir=TEMPLATES_DIR, task=task)
     target_file = "{dir}/{task}_{index}.yml".format(dir=TEST_SUITE_DIR, task=task, index=index)
 
-    with open(template_file, "r") as inp, open(target_file, "w") as out:
+    render(model, template_file, target_file)
+
+
+def render(model, source, destination):
+    """Render the specified model with the template at `source` to the file `destination`."""
+    with open(source, "r") as inp, open(destination, "w") as out:
         template = Template(inp.read(), trim_blocks=True)
         out.write(template.render(model))
 
@@ -284,6 +309,7 @@ class Main(object):
         self.deps = deps
         self.options = {}
         self.commit_range = None
+        self.test_list = []
 
     def parse_commandline(self):
         """Parse the command line options and return the parsed data."""
@@ -324,22 +350,32 @@ class Main(object):
                                                                     start_date)
         return get_test_history(self.deps.evergreen, target, task, self.commit_range, variants)
 
-    @staticmethod
-    def calculate_suites(data, execution_time_secs):
+    def calculate_suites(self, data, execution_time_secs):
         """Divide test into suites that can be run in less than the specified execution time."""
         tests = organize_executions_by_test(data)
-        sorted_tests = sort_list_of_test_by_max_runtime(tests)
-        return divide_tests_into_suites_by_maxtime(tests, sorted_tests, execution_time_secs)
+        self.test_list = sort_list_of_test_by_max_runtime(tests)
+        return divide_tests_into_suites_by_maxtime(tests, self.test_list, execution_time_secs)
 
     def render_suites(self, suites, task):
         """Render the given suites into yml files that can be used by resmoke.py."""
-        extra_model_data = {
+        for idx, suite in enumerate(suites):
+            render_template(suite.get_model(self.extra_model_data()), task, idx)
+
+    def render_misc_suite(self, task):
+        """Render a misc suite to run any tests that might be added to the task directory."""
+        model = get_misc_model(self.test_list, self.extra_model_data())
+        source = "{dir}/{task}.yml.j2".format(dir=TEMPLATES_DIR, task=task)
+        target = "{dir}/{task}_misc.yml".format(dir=TEST_SUITE_DIR, task=task)
+
+        render(model, source, target)
+
+    def extra_model_data(self):
+        """Build extra data to include in the model."""
+        return {
             "options": self.options,
             "start_commit": self.commit_range.start,
             "end_commit": self.commit_range.end,
         }
-        for idx, suite in enumerate(suites):
-            render_template(suite.get_model(extra_model_data), task, idx)
 
     def main(self):
         """Generate resmoke suites that run within a specified target execution time."""
@@ -368,6 +404,7 @@ class Main(object):
         LOGGER.debug("Creating %d suites", len(suites))
 
         self.render_suites(suites, task)
+        self.render_misc_suite(task)
 
 
 if __name__ == "__main__":

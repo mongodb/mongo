@@ -7,14 +7,22 @@
 test_kind: js_test
 
 selector:
+{% if variants is defined %}
   # The following tests take approximately
 {% for variant in variants %}
   #   {{ variant.runtime }} minutes to run on {{ variant.name }}
 {% endfor %}
+{% endif %}
   roots:
 {% for test in test_names %}
   - {{ test }}
 {% endfor %}
+{% if excluded_tests is defined %}
+  exclude_files:
+{% for test in excluded_tests %}
+  - {{ test }}
+{% endfor %}
+{% endif %}
 
 executor:
   config:
