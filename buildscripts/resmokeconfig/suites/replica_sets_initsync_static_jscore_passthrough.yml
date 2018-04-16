@@ -11,9 +11,6 @@ selector:
   - jstests/core/capped_update.js
   # Having duplicate namespaces is not supported and will cause initial sync to fail.
   - jstests/core/views/duplicate_ns.js
-  # Restarting the catalog on the sync source will cause the downstream node to copy only a subset
-  # of the required data.
-  - jstests/core/restart_catalog.js
 
 run_hook_interval: &run_hook_interval 20
 executor:
