@@ -1236,9 +1236,17 @@ protected:
      * vector will have a length between 1 and 3. Throws a UserException if the values are found to
      * be invalid in some way, e.g. if the indexes are not numbers.
      */
-    std::vector<Value> evaluateAndValidateArguments(const Document& root,
-                                                    const ExpressionVector& operands,
-                                                    size_t arrayLength) const;
+    struct Arguments {
+        Arguments(Value targetOfSearch, int startIndex, int endIndex)
+            : targetOfSearch(targetOfSearch), startIndex(startIndex), endIndex(endIndex) {}
+
+        Value targetOfSearch;
+        int startIndex;
+        int endIndex;
+    };
+    Arguments evaluateAndValidateArguments(const Document& root,
+                                           const ExpressionVector& operands,
+                                           size_t arrayLength) const;
 
 private:
     class Optimized;

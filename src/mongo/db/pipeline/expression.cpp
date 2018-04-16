@@ -2731,9 +2731,9 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
             arrayArg.isArray());
 
     std::vector<Value> array = arrayArg.getArray();
-    std::vector<Value> operands = evaluateAndValidateArguments(root, vpOperand, array.size());
-    for (int i = operands[1].getInt(); i < operands[2].getInt(); i++) {
-        if (getExpressionContext()->getValueComparator().evaluate(array[i] == operands[0])) {
+    auto args = evaluateAndValidateArguments(root, vpOperand, array.size());
+    for (int i = args.startIndex; i < args.endIndex; i++) {
+        if (getExpressionContext()->getValueComparator().evaluate(array[i] == args.targetOfSearch)) {
             return Value(static_cast<int>(i));
         }
     }
@@ -2741,19 +2741,17 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
     return Value(-1);
 }
 
-vector<Value> ExpressionIndexOfArray::evaluateAndValidateArguments(const Document& root,
+ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArguments(const Document& root,
                                                 const ExpressionVector& operands,
                                                 size_t arrayLength) const {
-    std::vector<Value> deps;
-    deps.push_back(operands[1]->evaluate(root));
-
+    
     int startIndex = 0;
     if (operands.size() > 2) {
         Value startIndexArg = operands[2]->evaluate(root);
         uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
         startIndex = static_cast<int>(startIndexArg.coerceToInt());
     }
-    deps.push_back(Value(startIndex));
+    
 
     int endIndex = arrayLength;
     if (operands.size() > 3) {
@@ -2762,8 +2760,8 @@ vector<Value> ExpressionIndexOfArray::evaluateAndValidateArguments(const Documen
         // Don't let 'endIndex' exceed the length of the array.
         endIndex = std::min(arrayLength, static_cast<size_t>(endIndexArg.coerceToInt()));
     }
-    deps.push_back(Value(endIndex));
-    return deps;
+    
+    return ExpressionIndexOfArray::Arguments(vpOperand[1]->evaluate(root), startIndex, endIndex);
 }
 /**
  * This class handles the case where IndexOfArray is given an ExpressionConstant
@@ -2780,12 +2778,10 @@ public:
     }
 
     virtual Value evaluate(const Document& root) const {
-        std::vector<Value> operands = evaluateAndValidateArguments(root, vpOperand, _indexMap.size());
-        auto index = _indexMap.find(operands[0]);
-        auto comparator = getExpressionContext()->getValueComparator();
-        Value vIndex = Value(index->second);
-        if (index != _indexMap.end() && comparator.evaluate(Value(index->second) >= operands[1]) &&
-            comparator.evaluate(Value(index->second) < operands[2])) {
+        auto args = evaluateAndValidateArguments(root, vpOperand, _indexMap.size());
+        auto index = _indexMap.find(args.targetOfSearch);
+        if (index != _indexMap.end() && index->second >= args.startIndex &&
+            index->second < args.endIndex) {
             return Value(index->second);
         } else {
             // If the item we are searching is not found or if not found in given range return -1.
@@ -2798,9 +2794,11 @@ private:
 };
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
-    // This is optimize all arguments to this expression.
-    ExpressionNary::optimize();
-
+    // This will optimize all arguments to this expression.
+    auto optimized = ExpressionNary::optimize();
+    if(optimized.get() != this){
+        return optimized;
+    }
     // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of an
     // array.
     if (auto constantArray =  dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
@@ -2820,7 +2818,8 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
             getExpressionContext()->getValueComparator().makeUnorderedValueMap<int>();
 
         for (int i = 0; i < int(arr.size()); i++) {
-            indexMap.emplace(arr[i], i);
+            if(indexMap.find(arr[i]) == indexMap.end())
+                indexMap.emplace(arr[i], i);
         }
         return intrusive_ptr<Expression>(
             new Optimized(getExpressionContext(), indexMap, vpOperand));

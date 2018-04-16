@@ -2208,7 +2208,7 @@ TEST(ExpressionPowTest, NegativeOneRaisedToNegativeOddExponentShouldOutPutNegati
                           });
 }
 
-TEST(ExpressionArrayTest, ExpressionArrayWithAllConstantValuesShouldOptimizeToExpressionConstant) {
+TEST(ExpressionArray, ExpressionArrayWithAllConstantValuesShouldOptimizeToExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -2229,7 +2229,7 @@ TEST(ExpressionArrayTest, ExpressionArrayWithAllConstantValuesShouldOptimizeToEx
     ASSERT_FALSE(notExprConstant);
 }
 
-TEST(ExpressionArrayTest, ExpressionArrayShouldOptimizeSubExpressionToExpressionConstant) {
+TEST(ExpressionArray, ExpressionArrayShouldOptimizeSubExpressionToExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -2251,28 +2251,24 @@ TEST(ExpressionIndexOfArray, ExpressionIndexOfArrayShouldOptimizeArguments) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
     auto expIndexOfArray = Expression::parseExpression(
-        expCtx,
-        BSON("$indexOfArray" << BSON_ARRAY(BSON_ARRAY(BSON("$add" << BSON_ARRAY(1 << 1)) << 1 << 1)
-                                           // Value we are searching for.
-                                           << BSON("$add" << BSON_ARRAY(1 << 1))
-                                           // Start index.
-                                           << BSON("$add" << BSON_ARRAY(1 << 1))
-                                           // End index.
-                                           << BSON("$add" << BSON_ARRAY(1 << 1)))),
+        expCtx,  // 2, 1, 1
+        BSON("$indexOfArray" << BSON_ARRAY(
+                 BSON_ARRAY(BSON("$add" << BSON_ARRAY(1 << 1)) << 1 << 1 << 2)
+                 // Value we are searching for = 2.
+                 << BSON("$add" << BSON_ARRAY(1 << 1))
+                 // Start index = 1.
+                 << BSON("$add" << BSON_ARRAY(0 << 1))
+                 // End index = 4.
+                 << BSON("$add" << BSON_ARRAY(1 << 3)))),
         expCtx->variablesParseState);
     auto argsOptimizedToConstants = expIndexOfArray->optimize();
-    auto shouldBeIndexOfArray = dynamic_cast<ExpressionIndexOfArray*>(argsOptimizedToConstants.get());
+    auto shouldBeIndexOfArray = dynamic_cast<ExpressionConstant*>(argsOptimizedToConstants.get());
     ASSERT_TRUE(shouldBeIndexOfArray);
-
-    auto optimizedArgs = shouldBeIndexOfArray->getOperandList();
-    // All arguments should be ExpressionConstants.
-    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[0].get()));
-    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[1].get()));
-    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[2].get()));
-    ASSERT_TRUE(dynamic_cast<ExpressionConstant*>(optimizedArgs[3].get()));
+    ASSERT_VALUE_EQ(Value(3), shouldBeIndexOfArray->getValue());
 }
 
-TEST(ExpressionIndexOfArray, ExpressionIndexOfArrayShouldOptimizeNullishInputArrayToExpressionConstant) {
+TEST(ExpressionIndexOfArray,
+     ExpressionIndexOfArrayShouldOptimizeNullishInputArrayToExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -2283,7 +2279,8 @@ TEST(ExpressionIndexOfArray, ExpressionIndexOfArrayShouldOptimizeNullishInputArr
     ASSERT_TRUE(isExpIndexOfArray);
 
     auto nullishValueOptimizedToExpConstant = isExpIndexOfArray->optimize();
-    auto shouldBeExpressionConstant = dynamic_cast<ExpressionConstant*>(nullishValueOptimizedToExpConstant.get());
+    auto shouldBeExpressionConstant =
+        dynamic_cast<ExpressionConstant*>(nullishValueOptimizedToExpConstant.get());
     ASSERT_TRUE(shouldBeExpressionConstant);
     // Nullish input array should become a Value(BSONNULL).
     ASSERT_VALUE_EQ(Value(BSONNULL), shouldBeExpressionConstant->getValue());
@@ -2297,42 +2294,66 @@ TEST(ExpressionIndexOfArray,
     auto expIndexOfArray =
         Expression::parseExpression(expCtx,
                                     // Search for 2.
-                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , 2] }"),
+                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x'] }"),
                                     expCtx->variablesParseState);
     auto optimizedIndexOfArray = expIndexOfArray->optimize();
-    ASSERT_VALUE_EQ(Value(2), optimizedIndexOfArray->evaluate(Document()));
-
+    ASSERT_VALUE_EQ(Value(1), optimizedIndexOfArray->evaluate(Document{{"x", 1}}));
     auto IndexNotFound =
         Expression::parseExpression(expCtx,
-                                    // Search for 10.
-                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , 10] }"),
+                                    // Search for 'x'.
+                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x'] }"),
                                     expCtx->variablesParseState);
     auto optimizedIndexNotFound = IndexNotFound->optimize();
     // Should evaluate to -1 if not found.
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document()));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 10}}));
 }
 
 TEST(ExpressionIndexOfArray,
      OptimizedExpressionIndexOfArrayWithConstantArgumentsShouldEvaluateProperlyWithRange) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
-    auto expIndexOfArray =
-        Expression::parseExpression(expCtx,
-                                    // Search for 4 between 3(inclusive) and 5 (exclusive).
-                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , 4, 3, 5] }"),
-                                    expCtx->variablesParseState);
+    auto expIndexOfArray = Expression::parseExpression(
+        expCtx,
+        // Search for 4 between 3 and 5.
+        fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x', 3, 5] }"),
+        expCtx->variablesParseState);
     auto optimizedIndexOfArray = expIndexOfArray->optimize();
-    ASSERT_VALUE_EQ(Value(4), optimizedIndexOfArray->evaluate(Document()));
+    ASSERT_VALUE_EQ(Value(4), optimizedIndexOfArray->evaluate(Document{{"x", 4}}));
 
-    auto IndexNotFoundInRange =
-        Expression::parseExpression(expCtx,
-                                    // Search for 0 between 3(inclusive) and 5 (exclusive).
-                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , 0, 3, 5] }"),
-                                    expCtx->variablesParseState);
+    auto IndexNotFoundInRange = Expression::parseExpression(
+        expCtx,
+        // Search for 0 between 3 and 5.
+        fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x', 3, 5] }"),
+        expCtx->variablesParseState);
     auto optimizedIndexNotFoundInRange = IndexNotFoundInRange->optimize();
     // Should evaluate to -1 if not found in range.
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFoundInRange->evaluate(Document()));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFoundInRange->evaluate(Document{{"x", 0}}));
 }
+
+TEST(ExpressionIndexOfArray,
+     OptimizedExpressionIndexOfArrayWithConstantArrayShouldEvaluateProperlyWithDuplicateValues) {
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto expIndexOfArrayWithDuplicateValues =
+        Expression::parseExpression(expCtx,
+                                    // Search for 4 between 3 and 5.
+                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 2, 3, 4, 5] , '$x'] }"),
+                                    expCtx->variablesParseState);
+    auto optimizedIndexOfArrayWithDuplicateValues = expIndexOfArrayWithDuplicateValues->optimize();
+    ASSERT_VALUE_EQ(Value(2),
+                    optimizedIndexOfArrayWithDuplicateValues->evaluate(Document{{"x", 2}}));
+
+    auto expIndexInRangeWithhDuplicateValues = Expression::parseExpression(
+        expCtx,
+        // Search for 2 between 2 and 4
+        fromjson("{ $indexOfArray : [ [0, 1, 2, 2, 4, 5] , '$x', 2, 4] }"),
+        expCtx->variablesParseState);
+    auto optimizedIndexInRangeWithDuplcateValues = expIndexInRangeWithhDuplicateValues->optimize();
+    // Should evaluate to 2
+    ASSERT_VALUE_EQ(Value(2),
+                    optimizedIndexInRangeWithDuplcateValues->evaluate(Document{{"x", 2}}));
+}
+
 
 namespace FieldPath {
 
