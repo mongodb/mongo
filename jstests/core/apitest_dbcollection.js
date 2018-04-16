@@ -3,6 +3,7 @@
  *
  * @tags: [
  *  requires_fastcount,
+ *  requires_collstats,
  *
  *  # indexDetails result is not correct with mobile storage engine.
  *  # TODO SERVER-34579

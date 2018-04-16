@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands, requires_auth]
+// @tags: [requires_non_retryable_commands, requires_auth, assumes_write_concern_unchanged]
 
 var mydb = db.getSiblingDB('auth1_db');
 mydb.dropAllUsers();

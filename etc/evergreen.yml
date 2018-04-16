@@ -4240,6 +4240,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: secondary_reads_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=secondary_reads_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets
   commands:
   - func: "do setup"
@@ -9588,6 +9599,9 @@ buildvariants:
   - name: write_concern_majority_passthrough
     distros:
     - rhel62-large
+  - name: secondary_reads_passthrough
+    distros:
+    - rhel62-large
   - name: package
     distros:
     - ubuntu1604-packer
@@ -9717,6 +9731,7 @@ buildvariants:
   - name: update_fuzzer
   - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
@@ -10089,6 +10104,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
   - name: push
     distros:
     - rhel70-small
@@ -10195,6 +10211,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
   - name: push
     distros:
     - rhel70-small
@@ -10292,6 +10309,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
   - name: push
     distros:
     - rhel62-large
@@ -10621,6 +10639,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
   - name: push
     distros:
     - suse12-test
@@ -11273,6 +11292,7 @@ buildvariants:
   - name: update_fuzzer
   - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: enterprise-rhel-62-64-bit-mobile
   display_name: Enterprise RHEL 6.2 (mobile)
@@ -11653,6 +11673,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -11739,6 +11760,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
@@ -11897,6 +11919,7 @@ buildvariants:
   - name: update_fuzzer
   - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -12067,6 +12090,7 @@ buildvariants:
   - name: update_fuzzer
   - name: update_fuzzer_replication
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: ubuntu1604-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
@@ -12195,6 +12219,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: write_concern_majority_passthrough
+  - name: secondary_reads_passthrough
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"

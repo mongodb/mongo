@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_commands, requires_auth]
+// @tags: [
+//      requires_non_retryable_commands,
+//      requires_auth,
+//      assumes_write_concern_unchanged
+//      ]
 
 // Ensure that inserts and updates of the system.users collection validate the schema of inserted
 // documents.
