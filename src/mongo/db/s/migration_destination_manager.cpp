@@ -404,6 +404,8 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
         opCtx->checkForInterrupt();
 
         auto res = fetchBatchFn(opCtx);
+
+        opCtx->checkForInterrupt();
         batches.push(res.getOwned(), opCtx);
         auto arr = res["objects"].Obj();
         if (arr.isEmpty()) {
