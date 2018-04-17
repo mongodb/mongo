@@ -90,13 +90,6 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     fassert(40290, topOfOplogSW);
     const auto topOfOplog = topOfOplogSW.getValue();
 
-    const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
-    invariant(!stableTimestamp || appliedThrough.isNull() ||
-                  *stableTimestamp == appliedThrough.getTimestamp(),
-              str::stream() << "Stable timestamp " << stableTimestamp->toString()
-                            << " does not equal appliedThrough timestamp "
-                            << appliedThrough.toString());
-
     // If we were passed in a stable timestamp, we are in rollback recovery and should recover from
     // that stable timestamp. Otherwise, we're recovering at startup. If this storage engine
     // supports recover to stable timestamp, we ask it for the recovery timestamp. If the storage
@@ -108,6 +101,13 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     if (!stableTimestamp && supportsRecoverToStableTimestamp) {
         stableTimestamp = _storageInterface->getRecoveryTimestamp(opCtx->getServiceContext());
     }
+
+    const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
+    invariant(!stableTimestamp || appliedThrough.isNull() ||
+                  *stableTimestamp == appliedThrough.getTimestamp(),
+              str::stream() << "Stable timestamp " << stableTimestamp->toString()
+                            << " does not equal appliedThrough timestamp "
+                            << appliedThrough.toString());
 
     if (stableTimestamp) {
         invariant(supportsRecoverToStableTimestamp);

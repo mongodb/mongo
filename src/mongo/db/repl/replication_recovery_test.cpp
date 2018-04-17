@@ -532,26 +532,18 @@ TEST_F(ReplicationRecoveryTest,
     testRecoveryToStableAppliesDocumentsWithNoAppliedThrough(false);
 }
 
-TEST_F(ReplicationRecoveryTest,
-       RecoveryAppliesDocumentsWithUnmatchedAppliedThroughAndStableCheckpointIsBehind) {
+DEATH_TEST_F(ReplicationRecoveryTest,
+             RecoveryFailsWithUnmatchedAppliedThrough,
+             "Invariant failure") {
     ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
     auto opCtx = getOperationContext();
 
     _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
 
-    // Fake applying op 3, which will be reapplied.
     auto appliedThroughTS = Timestamp(4, 4);
     getConsistencyMarkers()->setAppliedThrough(opCtx, OpTime(appliedThroughTS, 1));
-    ASSERT_OK(getStorageInterface()->insertDocument(opCtx, testNs, {_makeInsertDocument(3)}, 1));
-    _assertDocsInTestCollection(opCtx, {3});
-
     getStorageInterfaceRecovery()->setRecoveryTimestamp(Timestamp(2, 2));
     recovery.recoverFromOplog(opCtx, boost::none);
-
-    _assertDocsInOplog(opCtx, {1, 2, 3, 4, 5});
-    _assertDocsInTestCollection(opCtx, {3, 4, 5});
-    ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
-    ASSERT_EQ(getConsistencyMarkers()->getAppliedThrough(opCtx), OpTime(Timestamp(5, 5), 1));
 }
 
 TEST_F(ReplicationRecoveryTest, RecoveryIgnoresDroppedCollections) {
