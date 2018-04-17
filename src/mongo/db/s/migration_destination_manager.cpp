@@ -381,6 +381,8 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
         txn->checkForInterrupt();
 
         auto res = fetchBatchFn(txn);
+
+        txn->checkForInterrupt();
         batches.push(res.getOwned(), txn);
         auto arr = res["objects"].Obj();
         if (arr.isEmpty()) {
