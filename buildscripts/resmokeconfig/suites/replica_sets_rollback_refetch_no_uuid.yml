@@ -17,7 +17,6 @@ selector:
   - jstests/replsets/double_rollback_early.js
   - jstests/replsets/rollback_creates_rollback_directory.js
   - jstests/replsets/rollback_auth.js
-  - jstests/replsets/rollback_too_new.js
   - jstests/replsets/rollback_views.js
   - jstests/replsets/rollback_with_socket_error_then_steady_state.js
   - jstests/replsets/read_committed_after_rollback.js
