@@ -1808,6 +1808,7 @@ void filterKeyFromKeyString(uint8_t ctype,
             switch (encoded >> 62) {
                 case 0x0: {
                     // Teeny tiny decimal, smaller magnitude than 2**(-1074)
+                    (void)readType<uint64_t>(reader, inverted);
                     break;
                 }
                 case 0x1:
