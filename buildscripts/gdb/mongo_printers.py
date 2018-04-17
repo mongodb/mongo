@@ -200,7 +200,9 @@ class DecorablePrinter(object):
         # TODO: abstract out navigating a std::vector
         self.start = decl_vector["_M_impl"]["_M_start"]
         finish = decl_vector["_M_impl"]["_M_finish"]
-        decinfo_t = gdb.lookup_type('mongo::DecorationRegistry::DecorationInfo')
+        decorable_t = val.type.template_argument(0)
+        decinfo_t = gdb.lookup_type(
+            'mongo::DecorationRegistry<{}>::DecorationInfo'.format(decorable_t))
         self.count = int((int(finish) - int(self.start)) / decinfo_t.sizeof)
 
     @staticmethod
@@ -223,7 +225,7 @@ class DecorablePrinter(object):
             # In order to get the type stored in the decorable, we examine the type of its
             # constructor, and do some string manipulations.
             # TODO: abstract out navigating a std::function
-            type_name = str(descriptor["constructor"]["_M_functor"]["_M_unused"]["_M_object"])
+            type_name = str(descriptor["constructor"])
             type_name = type_name[0:len(type_name) - 1]
             type_name = type_name[0:type_name.rindex(">")]
             type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
