@@ -26,12 +26,13 @@
  *    it in the license file.
  */
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define LOG_FOR_RECOVERY(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kStorageRecovery)
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/replication_recovery.h"
 
-#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -228,6 +229,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     BSONObj entry;
     while (cursor->more()) {
         entry = cursor->nextSafe();
+        LOG_FOR_RECOVERY(2) << "Applying op during replication recovery: " << redact(entry);
         fassert(40294, SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
 
         auto oplogEntry = fassert(50763, OplogEntry::parse(entry));
