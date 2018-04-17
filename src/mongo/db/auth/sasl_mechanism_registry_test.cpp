@@ -229,12 +229,12 @@ TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
 
     BSONObjBuilder builder;
 
-    ASSERT_THROWS(
-        registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                                BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                                << "test.noSuchUser"),
-                                                &builder),
-        AssertionException);
+    registry.advertiseMechanismNamesForUser(opCtx.get(),
+                                            BSON("isMaster" << 1 << "saslSupportedMechs"
+                                                            << "test.noSuchUser"),
+                                            &builder);
+
+    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
 }
 
 TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {

@@ -13,10 +13,12 @@
         var db = conn.getDB("admin");
         var externalDB = conn.getDB("$external");
 
-        // Check that unknown or invalid users produce the correct errors.
-        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}),
-                                     ErrorCodes.UserNotFound);
+        // Check that unknown users do not interrupt isMaster
+        let res =
+            assert.commandWorked(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}));
+        assert.eq(undefined, res.saslSupportedMechs);
 
+        // Check that invalid usernames produce the correct error code
         assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "bogus"}),
                                      ErrorCodes.BadValue);
 

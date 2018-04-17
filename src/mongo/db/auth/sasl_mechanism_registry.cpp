@@ -25,6 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
 
 #include "mongo/platform/basic.h"
 
@@ -34,6 +35,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/util/icu.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
@@ -89,7 +91,14 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
                 authManager->releaseUser(user);
             }
         });
-        uassertStatusOK(status);
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::UserNotFound) {
+                log() << "Supported SASL mechanisms requested for unknown user '" << userName
+                      << "'";
+                return;
+            }
+            uassertStatusOK(status);
+        }
 
         BSONArrayBuilder mechanismsBuilder;
         auto& map = _getMapRef(userName.getDB());
