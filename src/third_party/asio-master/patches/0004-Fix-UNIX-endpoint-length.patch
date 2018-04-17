@@ -1,0 +1,25 @@
+diff --git a/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp b/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp
+index af02feada1..e7e2f2e961 100644
+--- a/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp
++++ b/src/third_party/asio-master/asio/include/asio/local/detail/impl/endpoint.ipp
+@@ -110,12 +110,15 @@ void endpoint::init(const char* path_name, std::size_t path_length)
+   data_.local.sun_family = AF_UNIX;
+   if (path_length > 0)
+     memcpy(data_.local.sun_path, path_name, path_length);
+-  path_length_ = path_length;
+ 
+-  // NUL-terminate normal path names. Names that start with a NUL are in the
+-  // UNIX domain protocol's "abstract namespace" and are not NUL-terminated.
+-  if (path_length > 0 && data_.local.sun_path[0] == 0)
+-    data_.local.sun_path[path_length] = 0;
++  // For anonymous (zero-length path) or abstract namespace sockets, the path_length_ is just
++  // the length of the buffer passed in.
++  path_length_ = path_length;
++  // Otherwise it's a normal UNIX path, and the size must include the null terminator.
++  if (path_length > 0 && data_.local.sun_path[0] != 0)
++  {
++      path_length_ += 1;
++  }
+ }
+ 
+ } // namespace detail
