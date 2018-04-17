@@ -53,8 +53,7 @@ public:
 
             ASSERT_EQ(configHost, request.target);
             auto cmdName = request.cmdObj.firstElement().fieldName();
-
-            ASSERT_EQ(ConfigsvrCreateCollection::kNsFieldName, cmdName);
+            ASSERT_EQ(ConfigsvrCreateCollection::kCommandName, cmdName);
 
             ASSERT_EQ("admin", request.dbname);
             ASSERT_EQ(expectedNss.ns(), request.cmdObj.firstElement().String());

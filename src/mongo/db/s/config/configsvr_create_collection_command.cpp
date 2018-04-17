@@ -45,21 +45,63 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::set;
-using std::string;
-
 namespace {
 
 /**
  * Internal sharding command run on config servers to create a new collection with unassigned shard
  * key. Call with { _configsvrCreateCollection: <string collName>, <other create options ...> }
  */
-class ConfigSvrCreateCollectionCommand : public BasicCommand {
+class ConfigSvrCreateCollectionCommand final
+    : public TypedCommand<ConfigSvrCreateCollectionCommand> {
 public:
-    ConfigSvrCreateCollectionCommand() : BasicCommand("_configsvrCreateCollection") {}
+    using Request = ConfigsvrCreateCollection;
 
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrCreateCollection can only be run on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "createCollection must be called with majority writeConcern",
+                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            CollectionOptions options;
+            if (auto requestOptions = request().getOptions()) {
+                uassertStatusOK(options.parse(*requestOptions));
+            }
+
+            auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
+            auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+                opCtx, ns().db(), "createCollection", DistLockManager::kDefaultLockTimeout));
+            auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
+                opCtx, ns().ns(), "createCollection", DistLockManager::kDefaultLockTimeout));
+
+            ShardingCatalogManager::get(opCtx)->createCollection(opCtx, ns(), options);
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
+        }
+    };
+
+private:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -68,68 +110,10 @@ public:
         return true;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
     std::string help() const override {
         return "Internal command, which is exported by the sharding config server. Do not call "
                "directly. Create a collection.";
     }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        return Status::OK();
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname_unused,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrCreateCollection can only be run on config servers"));
-        }
-
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "createCollection must be called with majority writeConcern, got "
-                              << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
-        auto createCmd = ConfigsvrCreateCollection::parse(
-            IDLParserErrorContext("ConfigsvrCreateCollection"), cmdObj);
-
-        CollectionOptions options;
-        if (auto requestOptions = createCmd.getOptions()) {
-            uassertStatusOK(options.parse(*requestOptions));
-        }
-
-        auto const catalogClient = Grid::get(opCtx)->catalogClient();
-        const NamespaceString nss(parseNs(dbname_unused, cmdObj));
-
-        auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
-            opCtx, nss.db(), "createCollection", DistLockManager::kDefaultLockTimeout));
-        auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
-            opCtx, nss.ns(), "createCollection", DistLockManager::kDefaultLockTimeout));
-
-        ShardingCatalogManager::get(opCtx)->createCollection(opCtx, createCmd.getNs(), options);
-
-        return true;
-    }
-
 } configsvrCreateCollectionCmd;
 
 }  // namespace

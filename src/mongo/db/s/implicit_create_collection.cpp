@@ -105,15 +105,15 @@ public:
             return ex.toStatus();
         }
 
-        ConfigsvrCreateCollection configCreateCmd;
-        configCreateCmd.setNs(_ns);
+        ConfigsvrCreateCollection configCreateCmd(_ns);
+        configCreateCmd.setDbName(NamespaceString::kAdminDb);
 
         auto statusWith =
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON()),
+                NamespaceString::kAdminDb.toString(),
+                CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON({})),
                 Shard::RetryPolicy::kIdempotent);
 
         if (!statusWith.isOK()) {

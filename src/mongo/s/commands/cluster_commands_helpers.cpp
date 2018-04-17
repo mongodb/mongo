@@ -501,8 +501,8 @@ bool appendEmptyResultSet(OperationContext* opCtx,
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName) {
     auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
-        ConfigsvrCreateDatabase configCreateDatabaseRequest;
-        configCreateDatabaseRequest.set_configsvrCreateDatabase(dbName);
+        ConfigsvrCreateDatabase configCreateDatabaseRequest(dbName.toString());
+        configCreateDatabaseRequest.setDbName(NamespaceString::kAdminDb);
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -512,7 +512,7 @@ StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, Stri
                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                 "admin",
                                 CommandHelpers::appendMajorityWriteConcern(
-                                    configCreateDatabaseRequest.toBSON()),
+                                    configCreateDatabaseRequest.toBSON({})),
                                 Shard::RetryPolicy::kIdempotent))
                 .commandStatus;
 
