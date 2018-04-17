@@ -86,22 +86,21 @@ public:
                      BSONObjBuilder& result) {
         auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMongosCommand(cmdObj));
 
-        // Force a reload of this node's shard list cache at the end of this command.
-        ON_BLOCK_EXIT([opCtx] {
-            if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
-                Grid::get(opCtx)->shardRegistry()->reload(opCtx);
-            }
-        });
-
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+
+        // Force a reload of this node's shard list cache at the end of this command.
+        auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             kPrimaryOnlyReadPreference,
             "admin",
             Command::appendMajorityWriteConcern(
                 Command::appendPassthroughFields(cmdObj, parsedRequest.toCommandForConfig())),
-            Shard::RetryPolicy::kIdempotent));
+            Shard::RetryPolicy::kIdempotent);
 
+        if (!Grid::get(opCtx)->shardRegistry()->reload(opCtx)) {
+            Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+        }
+        auto cmdResponse = uassertStatusOK(cmdResponseWithStatus);
         Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
