@@ -23,3 +23,8 @@ openssl x509 -req -sha256 -in roles.csr -days 3650 -out roles.pem -extfile opens
 openssl rsa -in roles.key -out roles2.key
 
 cat roles.pem roles2.key > roles_final.pem
+
+
+Example Commands for UTF-8
+--------------------------
+openssl req -new -utf8 -nameopt multiline,utf8  -config .\jstests\libs\client_utf8.cnf -newkey rsa:2048 -nodes -keyout roles.key -out roles.csr

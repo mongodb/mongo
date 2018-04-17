@@ -226,5 +226,12 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
  */
 std::string removeFQDNRoot(std::string name);
 
+/**
+ * Escape a string per RGC 2253
+ *
+ * See "2.4 Converting an AttributeValue from ASN.1 to a String" in RFC 2243
+ */
+std::string escapeRfc2253(StringData str);
+
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

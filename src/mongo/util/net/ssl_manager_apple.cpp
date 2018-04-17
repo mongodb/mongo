@@ -342,7 +342,7 @@ StatusWith<std::string> extractSubjectName(::CFDictionaryRef dict) {
             return swValueStr.getStatus();
         }
 
-        ret << swLabelStr.getValue() << '=' << swValueStr.getValue();
+        ret << swLabelStr.getValue() << '=' << escapeRfc2253(swValueStr.getValue());
         if (i > 1) {
             ret << ",";
         }

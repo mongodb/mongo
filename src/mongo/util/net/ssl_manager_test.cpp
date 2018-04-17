@@ -245,6 +245,21 @@ TEST(SSLManager, MongoDBRolesParser) {
         ASSERT_EQ(roles[1].getDB(), "admin");
     }
 }
+
+TEST(SSLManager, EscapeRFC2253) {
+    ASSERT_EQ(escapeRfc2253("abc"), "abc");
+    ASSERT_EQ(escapeRfc2253(" abc"), "\\ abc");
+    ASSERT_EQ(escapeRfc2253("#abc"), "\\#abc");
+    ASSERT_EQ(escapeRfc2253("a,c"), "a\\,c");
+    ASSERT_EQ(escapeRfc2253("a+c"), "a\\+c");
+    ASSERT_EQ(escapeRfc2253("a\"c"), "a\\\"c");
+    ASSERT_EQ(escapeRfc2253("a\\c"), "a\\\\c");
+    ASSERT_EQ(escapeRfc2253("a<c"), "a\\<c");
+    ASSERT_EQ(escapeRfc2253("a>c"), "a\\>c");
+    ASSERT_EQ(escapeRfc2253("a;c"), "a\\;c");
+    ASSERT_EQ(escapeRfc2253("abc "), "abc\\ ");
+}
+
 #endif
 
 //  // namespace

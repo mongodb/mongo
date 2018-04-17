@@ -217,39 +217,6 @@ using UniqueCertChainEngine = AutoHandle<HCERTCHAINENGINE, CertChainEngineFree>;
  */
 using UniqueCertificateWithPrivateKey = std::tuple<UniqueCertificate, UniqueCryptProvider>;
 
-// MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
-std::string getCertificateSubjectName(PCCERT_CONTEXT cert) {
-    DWORD needed =
-        CertNameToStrW(cert->dwCertEncodingType,
-                       &(cert->pCertInfo->Subject),
-                       CERT_X500_NAME_STR | CERT_NAME_STR_CRLF_FLAG | CERT_NAME_STR_REVERSE_FLAG,
-                       NULL,
-                       0);
-    uassert(
-        50753, str::stream() << "CertNameToStr size query failed with: " << needed, needed != 0);
-
-    auto nameBuf = std::make_unique<wchar_t[]>(needed);
-    DWORD cbConverted =
-        CertNameToStrW(cert->dwCertEncodingType,
-                       &(cert->pCertInfo->Subject),
-                       CERT_X500_NAME_STR | CERT_NAME_STR_CRLF_FLAG | CERT_NAME_STR_REVERSE_FLAG,
-                       nameBuf.get(),
-                       needed);
-    uassert(50754,
-            str::stream() << "CertNameToStr retrieval failed with unexpected return: "
-                          << cbConverted,
-            needed == cbConverted);
-
-    // Windows converts the names as RFC 1799 (x.509) instead of RFC 2253 (LDAP)
-    std::wstring str(nameBuf.get());
-
-    // Windows uses "S" instead of "ST" for stateOrProvinceName (2.5.4.8) OID so we massage the
-    // string here.
-    boost::replace_all(str, L"\r\nS=", L",ST=");
-    boost::replace_all(str, L"\r\n", L",");
-
-    return toUtf8String(str.c_str());
-}
 
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(PCCERT_CONTEXT cert) {
     PCERT_EXTENSION extension = CertFindExtension(mongodbRolesOID.identifier.c_str(),
@@ -1390,11 +1357,95 @@ unsigned long long FiletimeToEpocMillis(FILETIME ft) {
     return ns100 / 1000;
 }
 
+StatusWith<std::string> mapSubjectLabel(LPSTR label) {
+    if (strcmp(label, szOID_COMMON_NAME) == 0) {
+        return {"CN"};
+    } else if (strcmp(label, szOID_COUNTRY_NAME) == 0) {
+        return {"C"};
+    } else if (strcmp(label, szOID_STATE_OR_PROVINCE_NAME) == 0) {
+        return {"ST"};
+    } else if (strcmp(label, szOID_LOCALITY_NAME) == 0) {
+        return {"L"};
+    } else if (strcmp(label, szOID_ORGANIZATION_NAME) == 0) {
+        return {"O"};
+    } else if (strcmp(label, szOID_ORGANIZATIONAL_UNIT_NAME) == 0) {
+        return {"OU"};
+    } else if (strcmp(label, szOID_STREET_ADDRESS) == 0) {
+        return {"STREET"};
+    } else if (strcmp(label, szOID_DOMAIN_COMPONENT) == 0) {
+        return {"DC"};
+    } else if (strcmp(label, "0.9.2342.19200300.100.1.1") == 0) {
+        return {"UID"};
+    }
+
+    // RFC 2253 specifies #hexstring encoding for unknown OIDs,
+    // however for backward compatibility purposes, we omit these.
+    return {ErrorCodes::InvalidSSLConfiguration, str::stream() << "Unknown OID: " << label};
+}
+
+// MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
+StatusWith<std::string> getCertificateSubjectName(PCCERT_CONTEXT cert) {
+
+    auto swBlob =
+        decodeObject(X509_NAME, cert->pCertInfo->Subject.pbData, cert->pCertInfo->Subject.cbData);
+
+    if (!swBlob.isOK()) {
+        return swBlob.getStatus();
+    }
+
+    PCERT_NAME_INFO nameInfo = reinterpret_cast<PCERT_NAME_INFO>(swBlob.getValue().data());
+
+    StringBuilder output;
+
+    bool addComma = false;
+
+    // Iterate in reverse order
+    for (int64_t i = nameInfo->cRDN - 1; i >= 0; i--) {
+        for (DWORD j = 0; j < nameInfo->rgRDN[i].cRDNAttr; j++) {
+            CERT_RDN_ATTR& rdnAttribute = nameInfo->rgRDN[i].rgRDNAttr[j];
+
+            DWORD needed =
+                CertRDNValueToStrW(rdnAttribute.dwValueType, &rdnAttribute.Value, NULL, 0);
+
+            std::wstring wstr;
+            wstr.resize(needed - 1);
+            DWORD converted = CertRDNValueToStrW(rdnAttribute.dwValueType,
+                                                 &rdnAttribute.Value,
+                                                 const_cast<wchar_t*>(wstr.data()),
+                                                 needed);
+            invariant(needed == converted);
+
+            auto swLabel = mapSubjectLabel(rdnAttribute.pszObjId);
+            if (!swLabel.isOK()) {
+                return swLabel.getStatus();
+            }
+
+            if (addComma) {
+                output << ',';
+            }
+
+            output << swLabel.getValue();
+            output << '=';
+            output << escapeRfc2253(toUtf8String(wstr));
+
+            addComma = true;
+        }
+    }
+
+    return output.str();
+}
+
 Status SSLManagerWindows::_validateCertificate(PCCERT_CONTEXT cert,
                                                std::string* subjectName,
                                                Date_t* serverCertificateExpirationDate) {
 
-    *subjectName = getCertificateSubjectName(cert);
+    auto swCert = getCertificateSubjectName(cert);
+
+    if (!swCert.isOK()) {
+        return swCert.getStatus();
+    }
+
+    *subjectName = swCert.getValue();
 
     if (serverCertificateExpirationDate != nullptr) {
         FILETIME currentTime;
@@ -1629,7 +1680,13 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
         }
     }
 
-    std::string peerSubjectName = getCertificateSubjectName(cert);
+    auto swCert = getCertificateSubjectName(cert);
+
+    if (!swCert.isOK()) {
+        return swCert.getStatus();
+    }
+
+    std::string peerSubjectName = swCert.getValue();
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
 
     // On the server side, parse the certificate for roles
