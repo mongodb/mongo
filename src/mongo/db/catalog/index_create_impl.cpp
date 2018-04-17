@@ -100,6 +100,7 @@ using std::endl;
 MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuildUnlocked);
+MONGO_FP_DECLARE(slowBackgroundIndexBuild);
 
 AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
 
@@ -382,9 +383,9 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             if (_allowInterruption)
                 _opCtx->checkForInterrupt();
 
-            if (!(retries || (PlanExecutor::ADVANCED == state))) {
-                // The only reason we are still in the loop is hangAfterStartingIndexBuild.
-                log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
+            if (!(retries || PlanExecutor::ADVANCED == state) ||
+                MONGO_FAIL_POINT(slowBackgroundIndexBuild)) {
+                log() << "Hanging index build due to failpoint";
                 invariant(_allowInterruption);
                 sleepmillis(1000);
                 continue;
@@ -443,10 +444,9 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
         }
     }
 
-    uassert(28550,
-            "Unable to complete index build due to collection scan failure: " +
-                WorkingSetCommon::toStatusString(objToIndex.value()),
-            state == PlanExecutor::IS_EOF);
+    if (state != PlanExecutor::IS_EOF) {
+        return WorkingSetCommon::getMemberObjectStatus(objToIndex.value());
+    }
 
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
         // Unlock before hanging so replication recognizes we've completed.

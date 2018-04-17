@@ -303,7 +303,8 @@
                         }
 
                         // Thrown when an index build is interrupted during its collection scan.
-                        if ((cmdName === "createIndexes" && res.code === 28550)) {
+                        if (cmdName === "createIndexes" &&
+                            res.codeName === "InterruptedDueToReplStateChange") {
                             print("=-=-=-= Retrying because of interrupted collection scan: " +
                                   cmdName + ", retries remaining: " + numRetries);
                             continue;
