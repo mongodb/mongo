@@ -75,15 +75,18 @@
     jsTestLog("Running aggregations in transactions that are expected to throw and fail.");
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.throws(() => coll.aggregate({$currentOp: {allUsers: true, localOps: true}}).next());
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.throws(
         () => coll.aggregate({$collStats: {latencyStats: {histograms: true}, storageStats: {}}})
                   .next());
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.throws(() => coll.aggregate({$indexStats: {}}).next());
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 }());

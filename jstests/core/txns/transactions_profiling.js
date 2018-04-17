@@ -134,9 +134,8 @@
     assert.eq(profileObj.op, "remove", tojson(profileObj));
     assert.eq(profileObj.ndeleted, 0, tojson(profileObj));
     assert.eq(profileObj.errCode, ErrorCodes.WriteConflict, tojson(profileObj));
-    assert.throws(function() {
-        session.abortTransaction();
-    });
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Test findAndModify with a write conflict.");
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
@@ -158,9 +157,8 @@
     assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
     assert.eq(profileObj.command.findandmodify, sessionColl.getName(), tojson(profileObj));
     assert.eq(profileObj.errCode, ErrorCodes.WriteConflict, tojson(profileObj));
-    assert.throws(function() {
-        session.abortTransaction();
-    });
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Test insert with a write conflict.");
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
@@ -180,9 +178,8 @@
     assert.eq(profileObj.op, "insert", tojson(profileObj));
     assert.eq(profileObj.ninserted, 0, tojson(profileObj));
     assert.eq(profileObj.errCode, ErrorCodes.WriteConflict, tojson(profileObj));
-    assert.throws(function() {
-        session.abortTransaction();
-    });
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     jsTestLog("Test update with a write conflict.");
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
@@ -200,9 +197,8 @@
     assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
     assert.eq(profileObj.op, "update", tojson(profileObj));
     assert.eq(profileObj.errCode, ErrorCodes.WriteConflict, tojson(profileObj));
-    assert.throws(function() {
-        session.abortTransaction();
-    });
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.endSession();
 

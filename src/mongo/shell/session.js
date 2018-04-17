@@ -841,7 +841,16 @@ var {
             };
 
             this.abortTransaction = function abortTransaction() {
-                assert.commandWorked(this._serverSession.abortTransaction(this));
+                // Intentionally ignore command result.
+                this._serverSession.abortTransaction(this);
+            };
+
+            this.commitTransaction_forTesting = function commitTransaction_forTesting() {
+                return this._serverSession.commitTransaction(this);
+            };
+
+            this.abortTransaction_forTesting = function abortTransaction_forTesting() {
+                return this._serverSession.abortTransaction(this);
             };
         };
     }

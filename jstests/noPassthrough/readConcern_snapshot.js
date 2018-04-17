@@ -160,7 +160,7 @@
     assert.commandFailedWithCode(
         sessionDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
         50767);
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
     session.endSession();
 
     // TODO: SERVER-34113 Remove this test when we completely remove snapshot

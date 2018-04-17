@@ -54,7 +54,7 @@
     assert.eq(initialDoc, sessionDb[collName].findOne({}));
 
     jsTestLog("Make sure we can abort the transaction on the secondary.");
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     session.endSession();
     rst.stopSet();

@@ -59,7 +59,7 @@
 
     assert.commandWorked(sessionColl.insert({_id: "insert-4", a: 0}));
 
-    session.abortTransaction();
+    assert.commandWorked(session.abortTransaction_forTesting());
 
     // Verify that we cannot see the document we tried to insert.
     assert.eq(null, sessionColl.findOne({_id: "insert-4"}));

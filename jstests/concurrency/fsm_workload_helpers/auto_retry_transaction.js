@@ -43,17 +43,12 @@ var {withTxnAndAutoRetryOnWriteConflict} = (function() {
                 // WriteConflict error response. We therefore suppress its doassert() output.
                 quietly(() => session.commitTransaction());
             } catch (e) {
-                try {
-                    // abortTransaction() calls assert.commandWorked(), which may fail with a
-                    // WriteConflict error response. We therefore suppress its doassert() output.
-                    quietly(() => session.abortTransaction());
-                } catch (e) {
-                    // We ignore the error from abortTransaction() because the transaction may have
-                    // implicitly been aborted by the server already and will therefore return a
-                    // NoSuchTransaction error response. We need to call abortTransaction() in order
-                    // to update the mongo shell's state such that it agrees no transaction is
-                    // currently in progress on this session.
-                }
+                // Use the version of abortTransaction() that ignores errors. We ignore the error
+                // from abortTransaction because the transaction may have implicitly been aborted by
+                // the server already and will therefore return a NoSuchTransaction error response.
+                // We need to call abortTransaction() in order to update the mongo shell's state
+                // such that it agrees no transaction is currently in progress on this session.
+                session.abortTransaction();
 
                 if (e.code !== ErrorCodes.WriteConflict) {
                     throw e;

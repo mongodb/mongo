@@ -33,10 +33,8 @@
         assert.commandWorked(testDB.runCommand({drop: collName}));
 
         jsTestLog("Test that committing the transaction fails, since it was aborted.");
-        let error = assert.throws(function() {
-            session.commitTransaction();
-        });
-        assert.eq(error.code, ErrorCodes.NoSuchTransaction, tojson(error));
+        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
     } finally {
         jsTestLog("Restore the original featureCompatibilityVersion.");
         assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));

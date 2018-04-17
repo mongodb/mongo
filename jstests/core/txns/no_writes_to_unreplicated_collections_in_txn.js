@@ -18,29 +18,35 @@
     session.startTransaction({readConcern: {level: "snapshot"}});
     let error = assert.throws(() => unreplicatedColl.findAndModify({query: {}, update: {}}));
     assert.commandFailedWithCode(error, 50777);
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     error = assert.throws(() => unreplicatedColl.findAndModify({query: {}, remove: true}));
     assert.commandFailedWithCode(error, 50777);
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(unreplicatedColl.insert({_id: "new"}), 50790);
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(unreplicatedColl.update({_id: 0}, {$set: {name: "jungsoo"}}),
                                  50790);
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(
         unreplicatedColl.update({_id: "nonexistent"}, {$set: {name: "jungsoo"}}, {upsert: true}),
         50790);
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandFailedWithCode(unreplicatedColl.remove({_id: 0}), 50790);
-    assert.throws(() => session.abortTransaction());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
 }());
