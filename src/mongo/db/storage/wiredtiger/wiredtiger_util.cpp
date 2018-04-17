@@ -480,9 +480,9 @@ bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
         return false;
     }
 
-    if (ns.coll() == "replset.checkpointTimestamp" || ns.coll() == "replset.minvalid") {
-        // Of local collections, these two are derived from the state of the data and therefore
-        // are not logged.
+    if (ns.coll() == "replset.minvalid") {
+        // Of local collections, this is derived from the state of the data and therefore
+        // not logged.
         return false;
     }
 

@@ -336,11 +336,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
-                " the checkpointTimestamp document, or the latest oplog entry from the mongod on"
-                " port %d", secondary.port)
+                " or the latest oplog entry from the mongod on port %d", secondary.port)
             raise errors.ServerFailure(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
-                " the checkpointTimestamp document, or the latest oplog entry from the mongod on"
+                " or the latest oplog entry from the mongod on"
                 " port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.

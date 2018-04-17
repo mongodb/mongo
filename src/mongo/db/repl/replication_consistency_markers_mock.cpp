@@ -111,17 +111,6 @@ OpTime ReplicationConsistencyMarkersMock::getAppliedThrough(OperationContext* op
     return _appliedThrough;
 }
 
-void ReplicationConsistencyMarkersMock::writeCheckpointTimestamp(OperationContext* opCtx,
-                                                                 const Timestamp& timestamp) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    _checkpointTimestamp = timestamp;
-}
-
-Timestamp ReplicationConsistencyMarkersMock::getCheckpointTimestamp(OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
-    return _checkpointTimestamp;
-}
-
 Status ReplicationConsistencyMarkersMock::createInternalCollections(OperationContext* opCtx) {
     return Status::OK();
 }

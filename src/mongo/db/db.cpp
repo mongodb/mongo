@@ -850,26 +850,6 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
-            // If we are fully downgraded, drop the 'checkpointTimestamp' collection. Otherwise a
-            // 3.6 binary can apply operations without updating the 'checkpointTimestamp',
-            // corrupting data.
-            log(LogComponent::kReplication)
-                << "shutdown: removing checkpointTimestamp collection...";
-            Status status =
-                repl::StorageInterface::get(serviceContext)
-                    ->dropCollection(opCtx,
-                                     NamespaceString(repl::ReplicationConsistencyMarkersImpl::
-                                                         kDefaultCheckpointTimestampNamespace));
-            if (!status.isOK()) {
-                warning(LogComponent::kReplication)
-                    << "shutdown: dropping checkpointTimestamp collection failed: "
-                    << redact(status.toString());
-            }
-        }
-
         // This can wait a long time while we drain the secondary's apply queue, especially if it
         // is building an index.
         repl::ReplicationCoordinator::get(serviceContext)->shutdown(opCtx);

@@ -257,31 +257,6 @@ public:
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
     }
 
-    void assertCheckpointTimestampDocumentAtTimestamp(
-        Collection* coll,
-        const Timestamp& ts,
-        const repl::CheckpointTimestampDocument& expectedDoc) {
-        auto recoveryUnit = _opCtx->recoveryUnit();
-        recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(ts));
-        auto doc = repl::CheckpointTimestampDocument::parse(
-            IDLParserErrorContext("CheckpointTimestampDocument"), findOne(coll));
-        ASSERT_EQ(expectedDoc.getCheckpointTimestamp(), doc.getCheckpointTimestamp())
-            << "checkpoint timestamps weren't equal at " << ts.toString()
-            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
-        ASSERT_EQ(expectedDoc.get_id(), doc.get_id())
-            << "checkpoint timestamp ids weren't equal at " << ts.toString()
-            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
-    }
-
-    void assertEmptyCollectionAtTimestamp(Collection* coll, const Timestamp& ts) {
-        auto recoveryUnit = _opCtx->recoveryUnit();
-        recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(ts));
-        ASSERT_EQ(0, itCount(coll)) << "collection " << coll->ns() << " isn't empty at "
-                                    << ts.toString() << ". One document is " << findOne(coll);
-    }
-
     void assertDocumentAtTimestamp(Collection* coll,
                                    const Timestamp& ts,
                                    const BSONObj& expectedDoc) {

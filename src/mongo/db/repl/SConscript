@@ -286,7 +286,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         'optime',
         'repl_coordinator_interface',
         'replication_consistency_markers_idl',
