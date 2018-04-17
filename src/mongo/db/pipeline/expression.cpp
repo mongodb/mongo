@@ -2760,7 +2760,7 @@ ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArg
         // Don't let 'endIndex' exceed the length of the array.
         endIndex = std::min(arrayLength, static_cast<size_t>(endIndexArg.coerceToInt()));
     }
-    
+
     return ExpressionIndexOfArray::Arguments(vpOperand[1]->evaluate(root), startIndex, endIndex);
 }
 /**
@@ -2771,7 +2771,7 @@ ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArg
 class ExpressionIndexOfArray::Optimized : public ExpressionIndexOfArray {
 public:
     Optimized(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-              const ValueUnorderedMap<int>& indexMap,
+              const ValueUnorderedMap<vector<int>>& indexMap,
               const ExpressionVector& operands)
         : ExpressionIndexOfArray(expCtx), _indexMap(std::move(indexMap)) {
         vpOperand = operands;
@@ -2779,18 +2779,23 @@ public:
 
     virtual Value evaluate(const Document& root) const {
         auto args = evaluateAndValidateArguments(root, vpOperand, _indexMap.size());
-        auto index = _indexMap.find(args.targetOfSearch);
-        if (index != _indexMap.end() && index->second >= args.startIndex &&
-            index->second < args.endIndex) {
-            return Value(index->second);
+        auto indexVec = _indexMap.find(args.targetOfSearch);
+        if (indexVec != _indexMap.end()) {
+            // Search through the vector of indecies for first index in our range.
+            for (auto index : indexVec->second) {
+                if (index >= args.startIndex && index < args.endIndex) {
+                    return Value(index);
+                }
+            }
+            // the value we are searching for exists but is not in our range.
+            return Value(-1);
         } else {
-            // If the item we are searching is not found or if not found in given range return -1.
             return Value(-1);
         }
     }
 
 private:
-    const ValueUnorderedMap<int> _indexMap;
+    const ValueUnorderedMap<vector<int>> _indexMap;
 };
 
 intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
@@ -2813,13 +2818,18 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
                 valueArray.isArray());
 
         auto arr = valueArray.getArray();
-
-        ValueUnorderedMap<int> indexMap =
-            getExpressionContext()->getValueComparator().makeUnorderedValueMap<int>();
+        // To handle the case of duplicate values the values need to map to a vector of indecies.
+        ValueUnorderedMap<vector<int>> indexMap =
+            getExpressionContext()->getValueComparator().makeUnorderedValueMap<vector<int>>();
 
         for (int i = 0; i < int(arr.size()); i++) {
-            if(indexMap.find(arr[i]) == indexMap.end())
-                indexMap.emplace(arr[i], i);
+            if(indexMap.find(arr[i]) == indexMap.end()){
+               indexMap.emplace(arr[i], vector<int>());
+               indexMap[arr[i]].push_back(i); 
+            }
+            else {
+                indexMap[arr[i]].push_back(i);
+            }
         }
         return intrusive_ptr<Expression>(
             new Optimized(getExpressionContext(), indexMap, vpOperand));

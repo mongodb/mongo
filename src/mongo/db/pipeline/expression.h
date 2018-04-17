@@ -1229,13 +1229,6 @@ public:
     const char* getOpName() const final;
 
 protected:
-    /**
-     * When given 'operands' which correspond to the arguments to $indexOfArray, evaluates and
-     * validates the target value, starting index, and ending index arguments and returns their
-     * values in that order. The starting index and ending index are optional, so the returned
-     * vector will have a length between 1 and 3. Throws a UserException if the values are found to
-     * be invalid in some way, e.g. if the indexes are not numbers.
-     */
     struct Arguments {
         Arguments(Value targetOfSearch, int startIndex, int endIndex)
             : targetOfSearch(targetOfSearch), startIndex(startIndex), endIndex(endIndex) {}
@@ -1244,6 +1237,14 @@ protected:
         int startIndex;
         int endIndex;
     };
+    /**
+     * When given 'operands' which correspond to the arguments to $indexOfArray, evaluates and
+     * validates the target value, starting index, and ending index arguments and returns their
+     * values as a Arguments struct. The starting index and ending index are optional, so as default
+     * 'startIndex' will be 0 and 'endIndex' will be the length of the input array. Throws a
+     * UserException if the values are found to be invalid in some way, e.g. if the indexes are not
+     * numbers.
+     */
     Arguments evaluateAndValidateArguments(const Document& root,
                                            const ExpressionVector& operands,
                                            size_t arrayLength) const;

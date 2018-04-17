@@ -2345,12 +2345,12 @@ TEST(ExpressionIndexOfArray,
 
     auto expIndexInRangeWithhDuplicateValues = Expression::parseExpression(
         expCtx,
-        // Search for 2 between 2 and 4
-        fromjson("{ $indexOfArray : [ [0, 1, 2, 2, 4, 5] , '$x', 2, 4] }"),
+        // Search for 2 between 4 and 6.
+        fromjson("{ $indexOfArray : [ [0, 1, 2, 2, 2, 2, 4, 5] , '$x', 4, 6] }"),
         expCtx->variablesParseState);
     auto optimizedIndexInRangeWithDuplcateValues = expIndexInRangeWithhDuplicateValues->optimize();
-    // Should evaluate to 2
-    ASSERT_VALUE_EQ(Value(2),
+    // Should evaluate to 4.
+    ASSERT_VALUE_EQ(Value(4),
                     optimizedIndexInRangeWithDuplcateValues->evaluate(Document{{"x", 2}}));
 }
 
