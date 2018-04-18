@@ -1101,8 +1101,8 @@ err:	/*
 	 */
 	F_SET(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 
-	/* Shut down transactions (wait for in-flight operations to complete. */
-	WT_TRET(__wt_txn_global_shutdown(session));
+	/* Wait for in-flight operations to complete. */
+	WT_TRET(__wt_txn_activity_drain(session));
 
 	/*
 	 * Perform a system-wide checkpoint so that all tables are consistent
@@ -1134,6 +1134,9 @@ err:	/*
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 	}
+
+	/* Shut down the global transaction state. */
+	__wt_txn_global_shutdown(session);
 
 	if (ret != 0) {
 		__wt_err(session, ret,

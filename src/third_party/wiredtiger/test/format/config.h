@@ -274,6 +274,10 @@ static CONFIG c[] = {
 	  "minimum gain before prefix compression is used",
 	  0x0, 0, 8, 256, &g.c_prefix_compression_min, NULL },
 
+	{ "prepare",
+	  "configure transaction prepare",			/* 5% */
+	  C_BOOL, 5, 0, 0, &g.c_prepare, NULL },
+
 	{ "quiet",
 	  "quiet run (same as -q)",
 	  C_IGNORE|C_BOOL, 0, 0, 1, &g.c_quiet, NULL },

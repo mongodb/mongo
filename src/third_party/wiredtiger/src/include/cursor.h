@@ -89,7 +89,13 @@ struct __wt_cursor_backup {
 struct __wt_cursor_btree {
 	WT_CURSOR iface;
 
+	/*
+	 * The btree field is safe to use when the cursor is open.  When the
+	 * cursor is cached, the btree may be closed, so it is only safe
+	 * initially to look at the underlying data handle.
+	 */
 	WT_BTREE *btree;		/* Enclosing btree */
+	WT_DATA_HANDLE *dhandle;	/* Data handle for the btree */
 
 	/*
 	 * The following fields are set by the search functions as a precursor

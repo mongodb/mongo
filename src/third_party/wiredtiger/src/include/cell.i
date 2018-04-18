@@ -721,6 +721,27 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 }
 
 /*
+ * __wt_cell_unpack_empty_value --
+ *	Create an unpacked cell that looks like zero-length row-store value.
+ */
+static inline void
+__wt_cell_unpack_empty_value(WT_CELL_UNPACK *unpack)
+{
+	/*
+	 * Row-store doesn't store zero-length values on pages, but this allows
+	 * us to pretend.
+	 */
+	unpack->cell = NULL;
+	unpack->v = 0;
+	unpack->data = "";
+	unpack->size = 0;
+	unpack->__len = 0;
+	unpack->prefix = 0;
+	unpack->raw = unpack->type = WT_CELL_VALUE;
+	unpack->ovfl = 0;
+}
+
+/*
  * __cell_data_ref --
  *	Set a buffer to reference the data from an unpacked cell.
  */

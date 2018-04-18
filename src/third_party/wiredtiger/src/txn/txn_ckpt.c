@@ -385,8 +385,13 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	/* Give up if scrubbing is disabled. */
-	if (cache->eviction_checkpoint_target < DBL_EPSILON ||
+	/*
+	 * Give up if scrubbing is disabled, including when checkpointing with
+	 * a timestamp on close (we can't evict dirty pages in that case, so
+	 * scrubbing cannot help).
+	 */
+	if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) ||
+	    cache->eviction_checkpoint_target < DBL_EPSILON ||
 	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
 		return;
 

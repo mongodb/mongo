@@ -47,6 +47,7 @@ static void	   config_map_encryption(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
 static void	   config_map_isolation(const char *, u_int *);
 static void	   config_pct(void);
+static void	   config_prepare(void);
 static void	   config_reset(void);
 
 /*
@@ -171,6 +172,7 @@ config_setup(void)
 	config_isolation();
 	config_lrt();
 	config_pct();
+	config_prepare();
 
 	/*
 	 * If this is an LSM run, ensure cache size sanity.
@@ -664,6 +666,40 @@ config_pct(void)
 
 	testutil_assert(g.c_delete_pct + g.c_insert_pct +
 	    g.c_modify_pct + g.c_read_pct + g.c_write_pct == 100);
+}
+
+/*
+ * config_prepare --
+ *	Transaction prepare configuration.
+ */
+static void
+config_prepare(void)
+{
+	/*
+	 * We cannot prepare a transaction if logging is configured, or if
+	 * timestamps are not configured.
+	 *
+	 * Prepare isn't configured often, let it control other features, unless
+	 * they're explicitly set/not-set.
+	 */
+	if (!g.c_prepare)
+		return;
+	if (config_is_perm("prepare")) {
+		if (g.c_logging && config_is_perm("logging"))
+			testutil_die(EINVAL,
+			    "prepare is incompatible with logging");
+		if (!g.c_txn_timestamps &&
+		    config_is_perm("transaction_timestamps"))
+			testutil_die(EINVAL,
+			    "prepare requires transaction timestamps");
+	}
+	if (g.c_logging && config_is_perm("logging"))
+		return;
+	if (!g.c_txn_timestamps && config_is_perm("transaction_timestamps"))
+		return;
+
+	config_single("logging=off", 0);
+	config_single("transaction_timestamps=on", 0);
 }
 
 /*
