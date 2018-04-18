@@ -6,6 +6,9 @@ selector:
   exclude_files:
   # Exercises an internal detail of mongos<->mongod communication. Not expected to work on mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
+  # These tests rename a collection, which is not allowed for sharded collections.
+  - jstests/change_streams/change_stream_rename_target.js
+  - jstests/change_streams/change_stream_rename_resumability.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the
