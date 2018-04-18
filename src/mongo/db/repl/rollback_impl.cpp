@@ -176,11 +176,15 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _rollbackStats.rollbackId = _replicationProcess->getRollbackID();
 
-    // Write a rollback file for each namespace that has documents that would be deleted by
-    // rollback.
-    status = _writeRollbackFiles(opCtx);
-    if (!status.isOK()) {
-        return status;
+    if (shouldCreateDataFiles()) {
+        // Write a rollback file for each namespace that has documents that would be deleted by
+        // rollback.
+        status = _writeRollbackFiles(opCtx);
+        if (!status.isOK()) {
+            return status;
+        }
+    } else {
+        log() << "Not writing rollback files. 'createRollbackDataFiles' set to false.";
     }
 
     // Recover to the stable timestamp.
