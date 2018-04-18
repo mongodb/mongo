@@ -71,6 +71,7 @@ def get_history_by_revision(evergreen_api, task, commit_range, evg_project, vari
         "afterRevision": commit_range.start,
         "beforeRevision": commit_range.end,
         "testStatuses": "pass",
+        "taskStatuses": "success",
     }
 
     if variants:
@@ -174,13 +175,15 @@ def organize_executions_by_test(executions):
     tests = defaultdict(lambda: defaultdict(int))
 
     for test_file, tf_group in group_by_test_name(test_executions):
-        for variant, variant_group in group_by_attribute(tf_group, "variant"):
-            runs = [execution_runtime(test_file, e, hooks) for e in variant_group]
-            ave_execution_time = average_of_array(runs)
-            tests[test_file][variant] = ave_execution_time
+        # Only include test files that exist (a test file could have recently been deleted)
+        if os.path.isfile(test_file):
+            for variant, variant_group in group_by_attribute(tf_group, "variant"):
+                runs = [execution_runtime(test_file, e, hooks) for e in variant_group]
+                ave_execution_time = average_of_array(runs)
+                tests[test_file][variant] = ave_execution_time
 
-            if ave_execution_time > tests[test_file][MAX_RUNTIME_KEY]:
-                tests[test_file][MAX_RUNTIME_KEY] = ave_execution_time
+                if ave_execution_time > tests[test_file][MAX_RUNTIME_KEY]:
+                    tests[test_file][MAX_RUNTIME_KEY] = ave_execution_time
 
     return tests
 
@@ -224,16 +227,10 @@ def divide_tests_into_suites_by_maxtime(tests, sorted_tests, max_time_seconds):
     return suites
 
 
-def get_set_of_test_dir(test_list):
-    """Get the set of directories used by test_list."""
-    return set([os.path.dirname(test) for test in test_list])
-
-
 def get_misc_model(test_list, extra_model_data=None):
     """Build a model that will run any missing tests."""
-    test_dirs = get_set_of_test_dir(test_list)
     model = {
-        "test_names": [test_dir + "/*.js" for test_dir in test_dirs],
+        "is_misc": True,
         "excluded_tests": test_list,
     }
 

@@ -250,7 +250,10 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
 
         self.assertEquals(len(tests), 0)
 
-    def test_only_test_executions(self):
+    @patch("buildscripts.generate_resmoke_suites.os")
+    def test_only_test_executions(self, os):
+        os.path.isfile.return_value = True
+
         executions = [{
             "revision": "revision1",
             "variant": "variant1",
@@ -275,7 +278,10 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(tests["test2.js"]["variant1"], 2)
         self.assertEquals(tests["test3.js"]["variant1"], 3)
 
-    def test_mix_of_test_and_hook_executions(self):
+    @patch("buildscripts.generate_resmoke_suites.os")
+    def test_mix_of_test_and_hook_executions(self, os):
+        os.path.isfile.return_value = True
+
         executions = [
             {
                 "revision": "revision1",
@@ -316,7 +322,10 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(tests["test2.js"]["variant1"], 2)
         self.assertEquals(tests["test3.js"]["variant1"], 6)
 
-    def test_multiple_revisions_for_same_test(self):
+    @patch("buildscripts.generate_resmoke_suites.os")
+    def test_multiple_revisions_for_same_test(self, os):
+        os.path.isfile.return_value = True
+
         executions = [
             {
                 "revision": "revision1",
@@ -362,6 +371,31 @@ class OrganizeExecutionsByTestTest(unittest.TestCase):
         self.assertEquals(tests["test1.js"]["variant1"], 1)
         self.assertEquals(tests["test2.js"]["variant1"], 2)
         self.assertEquals(tests["test3.js"]["variant1"], 3)
+
+    @patch("buildscripts.generate_resmoke_suites.os")
+    def test_non_files_are_not_included(self, os):
+        os.path.isfile.return_value = False
+
+        executions = [{
+            "revision": "revision1",
+            "variant": "variant1",
+            "test_file": "test1.js",
+            "duration": 1000000000,
+        }, {
+            "revision": "revision1",
+            "variant": "variant1",
+            "test_file": "test2.js",
+            "duration": 2000000000,
+        }, {
+            "revision": "revision1",
+            "variant": "variant1",
+            "test_file": "test3.js",
+            "duration": 3000000000,
+        }]
+
+        tests = grs.organize_executions_by_test(executions)
+
+        self.assertEquals(len(tests), 0)
 
 
 class DivideTestsIntoSuitesByMaxtimeTest(unittest.TestCase):
@@ -460,36 +494,6 @@ class SuiteTest(unittest.TestCase):
         self.assertIn({"runtime": 20, "name": "variant3"}, model["variants"])
 
 
-class GetSetOfTestDirsTest(unittest.TestCase):
-    def test_with_repeated_directories(self):
-        test_list = [
-            "dir0/subdir0/test0",
-            "dir0/subdir0/test1",
-            "dir0/subdir0/test2",
-            "dir0/subdir0/test3",
-        ]
-
-        directory_set = grs.get_set_of_test_dir(test_list)
-
-        self.assertEqual(len(directory_set), 1)
-        self.assertIn("dir0/subdir0", directory_set)
-
-    def test_with_different_directories(self):
-        test_list = [
-            "dir0/subdir0/test0",
-            "dir0/subdir1/test1",
-            "dir1/subdir0/test2",
-            "dir0/subdir0/test3",
-        ]
-
-        directory_set = grs.get_set_of_test_dir(test_list)
-
-        self.assertEqual(len(directory_set), 3)
-        self.assertIn("dir0/subdir0", directory_set)
-        self.assertIn("dir1/subdir0", directory_set)
-        self.assertIn("dir0/subdir1", directory_set)
-
-
 class GetMiscModelTest(unittest.TestCase):
     def test_model_with_test_in_same_dir(self):
         test_list = [
@@ -501,38 +505,13 @@ class GetMiscModelTest(unittest.TestCase):
 
         model = grs.get_misc_model(test_list)
 
-        self.assertIn("test_names", model)
-        self.assertEqual(len(model["test_names"]), 1)
-        self.assertIn("dir0/subdir0/*.js", model["test_names"])
+        self.assertIn("is_misc", model)
 
         self.assertIn("excluded_tests", model)
         self.assertEqual(len(model["excluded_tests"]), 4)
         self.assertIn("dir0/subdir0/test0", model["excluded_tests"])
         self.assertIn("dir0/subdir0/test1", model["excluded_tests"])
         self.assertIn("dir0/subdir0/test2", model["excluded_tests"])
-        self.assertIn("dir0/subdir0/test3", model["excluded_tests"])
-
-    def test_model_with_test_in_different_dirs(self):
-        test_list = [
-            "dir0/subdir0/test0",
-            "dir0/subdir1/test1",
-            "dir1/subdir0/test2",
-            "dir0/subdir0/test3",
-        ]
-
-        model = grs.get_misc_model(test_list)
-
-        self.assertIn("test_names", model)
-        self.assertEqual(len(model["test_names"]), 3)
-        self.assertIn("dir0/subdir0/*.js", model["test_names"])
-        self.assertIn("dir0/subdir1/*.js", model["test_names"])
-        self.assertIn("dir1/subdir0/*.js", model["test_names"])
-
-        self.assertIn("excluded_tests", model)
-        self.assertEqual(len(model["excluded_tests"]), 4)
-        self.assertIn("dir0/subdir0/test0", model["excluded_tests"])
-        self.assertIn("dir0/subdir1/test1", model["excluded_tests"])
-        self.assertIn("dir1/subdir0/test2", model["excluded_tests"])
         self.assertIn("dir0/subdir0/test3", model["excluded_tests"])
 
     def test_model_includes_extra_data(self):
