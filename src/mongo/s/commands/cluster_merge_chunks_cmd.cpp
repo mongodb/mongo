@@ -37,9 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -159,28 +157,27 @@ public:
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
                              firstChunk->getShardId().toString());
+        remoteCmdObjB.append("epoch", cm->getVersion().epoch());
 
         BSONObj remoteResult;
 
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
         // formatting.
-        const auto shardStatus =
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk->getShardId());
-        if (!shardStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::ShardNotFound,
-                       str::stream() << "Can't find shard for chunk: " << firstChunk->toString()));
-        }
+        auto shard = uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk->getShardId()));
 
-        ShardConnection conn(shardStatus.getValue()->getConnString(), "");
-        bool ok = conn->runCommand("admin", remoteCmdObjB.obj(), remoteResult);
-        conn.done();
+        auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            remoteCmdObjB.obj(),
+            Shard::RetryPolicy::kNotIdempotent));
+        uassertStatusOK(response.commandStatus);
 
         Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(routingInfo));
+        CommandHelpers::filterCommandReplyForPassthrough(response.response, &result);
 
-        CommandHelpers::filterCommandReplyForPassthrough(remoteResult, &result);
-        return ok;
+        return true;
     }
 
 } clusterMergeChunksCommand;

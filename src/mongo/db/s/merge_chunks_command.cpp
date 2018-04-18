@@ -292,9 +292,8 @@ public:
     MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
     std::string help() const override {
-        return "Merge Chunks command\n"
-               "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
-               " (opt) epoch : <epoch> }";
+        return "Internal command to merge a contiguous range of chunks.\n"
+               "Usage: { mergeChunks: <ns>, epoch: <epoch>, bounds: [<min key>, <max key>] }";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -337,12 +336,7 @@ public:
                    BSONObjBuilder& result) override {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        string ns = parseNs(dbname, cmdObj);
-
-        if (ns.size() == 0) {
-            errmsg = "no namespace specified";
-            return false;
-        }
+        const NamespaceString nss(parseNs(dbname, cmdObj));
 
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
@@ -378,7 +372,7 @@ public:
             return false;
         }
 
-        auto mergeStatus = mergeChunks(opCtx, NamespaceString(ns), minKey, maxKey, epoch);
+        auto mergeStatus = mergeChunks(opCtx, nss, minKey, maxKey, epoch);
         return CommandHelpers::appendCommandStatus(result, mergeStatus);
     }
 
