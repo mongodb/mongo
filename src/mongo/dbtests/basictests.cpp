@@ -217,73 +217,6 @@ public:
 };
 }
 
-class sleeptest {
-public:
-    void run() {
-        Timer t;
-        int matches = 0;
-        for (int p = 0; p < 3; p++) {
-            sleepsecs(1);
-            int sec = (t.millis() + 2) / 1000;
-            if (sec == 1)
-                matches++;
-            else
-                mongo::unittest::log() << "temp millis: " << t.millis() << endl;
-            ASSERT(sec >= 0 && sec <= 2);
-            t.reset();
-        }
-        if (matches < 2)
-            mongo::unittest::log() << "matches:" << matches << endl;
-        ASSERT(matches >= 2);
-
-        sleepmicros(1527123);
-        ASSERT(t.micros() > 1000000);
-        ASSERT(t.micros() < 2000000);
-
-        t.reset();
-        sleepmillis(1727);
-        ASSERT(t.millis() >= 1000);
-        ASSERT(t.millis() <= 2500);
-
-        {
-            int total = 1200;
-            int ms = 2;
-            t.reset();
-            for (int i = 0; i < (total / ms); i++) {
-                sleepmillis(ms);
-            }
-            {
-                int x = t.millis();
-                if (x < 1000 || x > 2500) {
-                    cout << "sleeptest finds sleep accuracy to be not great. x: " << x << endl;
-                    ASSERT(x >= 1000);
-                    ASSERT(x <= 20000);
-                }
-            }
-        }
-
-#ifdef __linux__
-        {
-            int total = 1200;
-            int micros = 100;
-            t.reset();
-            int numSleeps = 1000 * (total / micros);
-            for (int i = 0; i < numSleeps; i++) {
-                sleepmicros(micros);
-            }
-            {
-                int y = t.millis();
-                if (y < 1000 || y > 2500) {
-                    cout << "sleeptest y: " << y << endl;
-                    ASSERT(y >= 1000);
-                    /* ASSERT( y <= 100000 ); */
-                }
-            }
-        }
-#endif
-    }
-};
-
 class SleepBackoffTest {
 public:
     void run() {
@@ -494,7 +427,6 @@ public:
         add<stringbuildertests::reset1>();
         add<stringbuildertests::reset2>();
 
-        add<sleeptest>();
         add<SleepBackoffTest>();
         add<AssertTests>();
 
