@@ -18,7 +18,7 @@ from ..core import network
 from ..utils import queue as _queue
 
 
-class TestSuiteExecutor(object):
+class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
     """Execute a test suite.
 
     Responsible for setting up and tearing down the fixtures that the
