@@ -435,14 +435,13 @@ Status storeSSLServerOptions(const moe::Environment& params) {
         if (!status.isOK()) {
             return status;
         }
-#if !defined(__APPLE__) && ((MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
-                            (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
+#if (MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
+    (OPENSSL_VERSION_NUMBER >= 0x100000cf) /* 1.0.0l */
     } else {
-        /* Disable TLS 1.0 by default on non-Apple platforms
+        /* Disable TLS 1.0 by default on all platforms
          * except on mongod/mongos which were built with an
          * old version of OpenSSL (pre 1.0.0l)
          * which does not support TLS 1.1 or later.
-         * TL;DR - Pretty much any Linux/Windows build.
          */
         log() << "Automatically disabling TLS 1.0, to force-enable TLS 1.0 "
                  "specify --sslDisabledProtocols 'none'";

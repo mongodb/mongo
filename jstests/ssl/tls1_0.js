@@ -28,13 +28,7 @@
 
     const defaultEnableTLS1_0 = (function() {
         // If the build doesn't support TLS 1.1, then TLS 1.0 is left enabled.
-        if (!supportsTLS1_1) {
-            return true;
-        }
-        // If we're on Apple, then TLS 1.0 is left enabled regardless
-        // to support other tools on the system which may be TLS 1.0 only.
-        const buildEnv = getBuildInfo().buildEnvironment || {};
-        return (buildEnv.target_os === 'macOS');
+        return !supportsTLS1_1;
     })();
 
     function test(serverDP, clientDP, shouldSucceed) {
