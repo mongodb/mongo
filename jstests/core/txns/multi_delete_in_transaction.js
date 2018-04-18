@@ -12,84 +12,48 @@
 
     assert.commandWorked(
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
-    let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
     const session = db.getMongo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(dbName);
+    const sessionColl = sessionDb[collName];
 
     jsTest.log("Prepopulate the collection.");
     assert.writeOK(testColl.insert([{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}],
                                    {writeConcern: {w: "majority"}}));
 
     jsTest.log("Do an empty multi-delete.");
-    let res = assert.commandWorked(sessionDb.runCommand({
-        delete: collName,
-        deletes: [{q: {a: 99}, limit: 0}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.eq(0, res.n);
+    session.startTransaction({writeConcern: {w: "majority"}});
 
-    res = assert.commandWorked(sessionDb.runCommand(
-        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
-    assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
+    // Remove no docs.
+    let res = sessionColl.remove({a: 99}, {justOne: false});
+    assert.eq(0, res.nRemoved);
+    res = sessionColl.find({});
+    assert.docEq(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}, {_id: 2, a: 1}]);
 
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber++),
-        // TODO(russotto): Majority write concern on commit is to avoid a WriteConflictError
-        // writing to the transaction table.
-        writeConcern: {w: "majority"},
-        autocommit: false
-    }));
+    session.commitTransaction();
 
     jsTest.log("Do a single-result multi-delete.");
-    res = assert.commandWorked(sessionDb.runCommand({
-        delete: collName,
-        deletes: [{q: {a: 1}, limit: 0}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.eq(1, res.n);
-    res = assert.commandWorked(sessionDb.runCommand(
-        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
-    assert.docEq(res.cursor.firstBatch, [{_id: 0, a: 0}, {_id: 1, a: 0}]);
+    session.startTransaction({writeConcern: {w: "majority"}});
 
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber++),
-        writeConcern: {w: "majority"},
-        autocommit: false
-    }));
+    // Remove one doc.
+    res = sessionColl.remove({a: 1}, {justOne: false});
+    assert.eq(1, res.nRemoved);
+    res = sessionColl.find({});
+    assert.docEq(res.toArray(), [{_id: 0, a: 0}, {_id: 1, a: 0}]);
+
+    session.commitTransaction();
 
     jsTest.log("Do a multiple-result multi-delete.");
-    res = assert.commandWorked(sessionDb.runCommand({
-        delete: collName,
-        deletes: [{q: {a: 0}, limit: 0}],
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber),
-        startTransaction: true,
-        autocommit: false
-    }));
-    assert.eq(2, res.n);
-    res = assert.commandWorked(sessionDb.runCommand(
-        {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}));
-    assert.docEq(res.cursor.firstBatch, []);
+    session.startTransaction({writeConcern: {w: "majority"}});
 
-    // commitTransaction can only be called on the admin database.
-    assert.commandWorked(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber++),
-        writeConcern: {w: "majority"},
-        autocommit: false
-    }));
+    // Remove 2 docs.
+    res = sessionColl.remove({a: 0}, {justOne: false});
+    assert.eq(2, res.nRemoved);
+    res = sessionColl.find({});
+    assert.docEq(res.toArray(), []);
+
+    session.commitTransaction();
 
     // Collection should be empty.
     assert.eq(0, testColl.find().itcount());
