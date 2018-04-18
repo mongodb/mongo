@@ -227,8 +227,11 @@ var BackupRestoreTest = function(options) {
         // Start numNodes node replSet
         var rst = new ReplSetTest({
             nodes: numNodes,
-            nodeOptions: {dbpath: dbpathFormat},
-            oplogSize: 1024,
+            nodeOptions: {
+                dbpath: dbpathFormat,
+                setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}
+            },
+            oplogSize: 1024
         });
         var nodes = rst.startSet();
 
@@ -238,6 +241,8 @@ var BackupRestoreTest = function(options) {
         rst.awaitNodesAgreeOnPrimary();
         var primary = rst.getPrimary();
         var secondary = rst.getSecondary();
+
+        jsTestLog("Secondary to copy data from: " + secondary);
 
         // Launch CRUD client
         var crudDb = "crud";
