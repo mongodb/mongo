@@ -236,7 +236,7 @@ add_option('spider-monkey-dbg',
 )
 
 add_option('opt',
-    choices=['on', 'off'],
+    choices=['on', 'size', 'off'],
     const='on',
     help='Enable compile-time optimization',
     nargs='?',
@@ -891,8 +891,11 @@ dbg_opt_mapping = {
     ( "off", None  ) : ( False, True ),
     ( "off", "on"  ) : ( False, True ),
     ( "off", "off" ) : ( False, False ),
+    ( "on",  "size"  ) : ( True,  True ),
+    ( "off", "size"  ) : ( False, True ),
 }
 debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
+optBuildForSize = True if optBuild and get_option('opt') == "size" else False
 
 if releaseBuild and (debugBuild or not optBuild):
     print("Error: A --release build may not have debugging, and must have optimization")
@@ -1617,11 +1620,14 @@ elif env.TargetOSIs('windows'):
     env.Append(CCFLAGS=[winRuntimeLibMap[(dynamicCRT, debugBuild)]])
 
     if optBuild:
+        # /O1:  optimize for size
         # /O2:  optimize for speed (as opposed to size)
         # /Oy-: disable frame pointer optimization (overrides /O2, only affects 32-bit)
         # /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function
         # calls
-        env.Append( CCFLAGS=["/O2", "/Oy-"] )
+
+        optStr = "/O2" if not optBuildForSize else "/O1"
+        env.Append( CCFLAGS=[optStr, "/Oy-"] )
         env.Append( LINKFLAGS=["/INCREMENTAL:NO"])
     else:
         env.Append( CCFLAGS=["/Od"] )
@@ -1730,8 +1736,10 @@ if env.TargetOSIs('posix'):
         env.Append( CCFLAGS=["-fprofile-arcs", "-ftest-coverage"] )
         env.Append( LINKFLAGS=["-fprofile-arcs", "-ftest-coverage"] )
 
-    if optBuild:
+    if optBuild and not optBuildForSize:
         env.Append( CCFLAGS=["-O2"] )
+    elif optBuild and optBuildForSize: 
+        env.Append( CCFLAGS=["-Os"] )
     else:
         env.Append( CCFLAGS=["-O0"] )
 
