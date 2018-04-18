@@ -133,6 +133,12 @@ public:
         LastError::get(client).disable();
 
         const bool authoritative = cmdObj.getBoolField("authoritative");
+        // A flag that specifies whether the set shard version catalog refresh
+        // is allowed to join an in-progress refresh triggered by an other
+        // thread, or whether it's required to either a) trigger its own
+        // refresh or b) wait for a refresh to be started after it has entered the
+        // getCollectionRoutingInfoWithRefresh function
+        const bool forceRefresh = cmdObj.getBoolField("forceRefresh");
         const bool noConnectionVersioning = cmdObj.getBoolField("noConnectionVersioning");
 
         ShardedConnectionInfo dummyInfo;
@@ -335,7 +341,10 @@ public:
 
         // Step 7
 
-        const auto status = onShardVersionMismatch(opCtx, nss, requestedVersion);
+        // Note: The forceRefresh flag controls whether we make sure to do our
+        // own refresh or if we're okay with joining another thread
+        const auto status = onShardVersionMismatch(
+            opCtx, nss, requestedVersion, forceRefresh /*forceRefreshFromThisThread*/);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);

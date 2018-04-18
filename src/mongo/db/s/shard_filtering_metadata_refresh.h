@@ -55,7 +55,8 @@ class OperationContext;
  */
 Status onShardVersionMismatch(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              ChunkVersion shardVersionReceived) noexcept;
+                              ChunkVersion shardVersionReceived,
+                              bool forceRefreshFromThisThread = false) noexcept;
 
 /**
  * Unconditionally causes the shard's filtering metadata to be refreshed from the config server and
@@ -65,7 +66,8 @@ Status onShardVersionMismatch(OperationContext* opCtx,
  * called with a lock
  */
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
-                                                const NamespaceString& nss);
+                                                const NamespaceString& nss,
+                                                bool forceRefreshFromThisThread = false);
 
 /**
  * Should be called when any client request on this shard generates a StaleDbVersion exception.

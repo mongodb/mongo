@@ -52,6 +52,66 @@ class OperationContext;
 static constexpr int kMaxNumStaleVersionRetries = 10;
 
 /**
+ * Constructed exclusively by the CatalogCache, contains a reference to the cached information for
+ * the specified database.
+ */
+class CachedDatabaseInfo {
+public:
+    const ShardId& primaryId() const;
+    std::shared_ptr<Shard> primary() const {
+        return _primaryShard;
+    };
+
+    bool shardingEnabled() const;
+    boost::optional<DatabaseVersion> databaseVersion() const;
+
+private:
+    friend class CatalogCache;
+    CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard);
+
+    DatabaseType _dbt;
+    std::shared_ptr<Shard> _primaryShard;
+};
+
+/**
+ * Constructed exclusively by the CatalogCache.
+ *
+ * This RoutingInfo can be considered a "package" of routing info for the database and for the
+ * collection. Once unsharded collections are treated as sharded collections with a single chunk,
+ * they will also have a ChunkManager with a "chunk distribution." At that point, this "package" can
+ * be dismantled: routing for commands that route by database can directly retrieve the
+ * CachedDatabaseInfo, while routing for commands that route by collection can directly retrieve the
+ * ChunkManager.
+ */
+class CachedCollectionRoutingInfo {
+public:
+    CachedDatabaseInfo db() const {
+        return _db;
+    };
+
+    std::shared_ptr<ChunkManager> cm() const {
+        return _cm;
+    }
+
+private:
+    friend class CatalogCache;
+    friend class CachedDatabaseInfo;
+
+    CachedCollectionRoutingInfo(NamespaceString nss,
+                                CachedDatabaseInfo db,
+                                std::shared_ptr<ChunkManager> cm);
+
+    NamespaceString _nss;
+
+    // Copy of the database's cached info.
+    CachedDatabaseInfo _db;
+
+    // Shared reference to the collection's cached chunk distribution if sharded, otherwise null.
+    // This is a shared reference rather than a copy because the chunk distribution can be large.
+    std::shared_ptr<ChunkManager> _cm;
+};
+
+/**
  * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
  * in the sense that it only reads from the persistent store, but never writes to it. Instead
  * writes happen through the ShardingCatalogManager and the cache hierarchy needs to be invalidated.
@@ -104,9 +164,21 @@ public:
 
     /**
      * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
+     *
+     * When forceRefreshFromThisThread is false, it's possible for this call to
+     * join an ongoing refresh from another thread forceRefreshFromThisThread.
+     * forceRefreshFromThisThread checks whether it joined another thread and
+     * then forces it to try again, which is necessary in cases where calls to
+     * getCollectionRoutingInfoWithRefresh must be causally consistent
+     *
+     * TODO: Remove this parameter in favor of using collection creation time +
+     * collection version to decide when a refresh is necessary and provide
+     * proper causal consistency
      */
     StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        bool forceRefreshFromThisThread = false);
 
     /**
      * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
@@ -227,8 +299,40 @@ private:
                                     std::shared_ptr<CollectionRoutingInfoEntry> collEntry,
                                     NamespaceString const& nss,
                                     int refreshAttempt);
+    /**
+     * Used as a flag to indicate whether or not this thread performed its own
+     * refresh for certain helper functions
+     *
+     * kPerformedRefresh is used only when the calling thread performed the
+     * refresh *itself*
+     *
+     * kDidNotPerformRefresh is used either when there was an error or when
+     * this thread joined an ongoing refresh
+     */
+    enum class RefreshAction {
+        kPerformedRefresh,
+        kDidNotPerformRefresh,
+    };
 
-    StatusWith<CachedCollectionRoutingInfo> _getCollectionRoutingInfoAt(
+    /**
+     * Return type for helper functions performing refreshes so that they can
+     * indicate both status and whether or not this thread performed its own
+     * refresh
+     */
+    struct RefreshResult {
+        // Status containing result of refresh
+        StatusWith<CachedCollectionRoutingInfo> statusWithInfo;
+        RefreshAction actionTaken;
+    };
+
+    /**
+     * Helper function used when we need the refresh action taken (e.g. when we
+     * want to force refresh)
+     */
+    CatalogCache::RefreshResult _getCollectionRoutingInfo(OperationContext* opCtx,
+                                                          const NamespaceString& nss);
+
+    CatalogCache::RefreshResult _getCollectionRoutingInfoAt(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<Timestamp> atClusterTime);
@@ -281,66 +385,6 @@ private:
     DatabaseInfoMap _databases;
     // Map from full collection name to the routing info for that collection, grouped by database
     CollectionsByDbMap _collectionsByDb;
-};
-
-/**
- * Constructed exclusively by the CatalogCache, contains a reference to the cached information for
- * the specified database.
- */
-class CachedDatabaseInfo {
-public:
-    const ShardId& primaryId() const;
-    std::shared_ptr<Shard> primary() const {
-        return _primaryShard;
-    };
-
-    bool shardingEnabled() const;
-    boost::optional<DatabaseVersion> databaseVersion() const;
-
-private:
-    friend class CatalogCache;
-    CachedDatabaseInfo(DatabaseType dbt, std::shared_ptr<Shard> primaryShard);
-
-    DatabaseType _dbt;
-    std::shared_ptr<Shard> _primaryShard;
-};
-
-/**
- * Constructed exclusively by the CatalogCache.
- *
- * This RoutingInfo can be considered a "package" of routing info for the database and for the
- * collection. Once unsharded collections are treated as sharded collections with a single chunk,
- * they will also have a ChunkManager with a "chunk distribution." At that point, this "package" can
- * be dismantled: routing for commands that route by database can directly retrieve the
- * CachedDatabaseInfo, while routing for commands that route by collection can directly retrieve the
- * ChunkManager.
- */
-class CachedCollectionRoutingInfo {
-public:
-    CachedDatabaseInfo db() const {
-        return _db;
-    };
-
-    std::shared_ptr<ChunkManager> cm() const {
-        return _cm;
-    }
-
-private:
-    friend class CatalogCache;
-    friend class CachedDatabaseInfo;
-
-    CachedCollectionRoutingInfo(NamespaceString nss,
-                                CachedDatabaseInfo db,
-                                std::shared_ptr<ChunkManager> cm);
-
-    NamespaceString _nss;
-
-    // Copy of the database's cached info.
-    CachedDatabaseInfo _db;
-
-    // Shared reference to the collection's cached chunk distribution if sharded, otherwise null.
-    // This is a shared reference rather than a copy because the chunk distribution can be large.
-    std::shared_ptr<ChunkManager> _cm;
 };
 
 }  // namespace mongo
