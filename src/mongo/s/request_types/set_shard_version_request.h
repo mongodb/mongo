@@ -73,7 +73,8 @@ public:
                                                     const ConnectionString& shard,
                                                     const NamespaceString& nss,
                                                     const ChunkVersion& nssVersion,
-                                                    bool isAuthoritative);
+                                                    bool isAuthoritative,
+                                                    bool forceRefresh = false);
 
     /**
      * Constructs a new set shard version request, which is of the "versioning" type, meaning it has
@@ -88,7 +89,8 @@ public:
                                                              const ConnectionString& shard,
                                                              const NamespaceString& nss,
                                                              const ChunkVersion& nssVersion,
-                                                             bool isAuthoritative);
+                                                             bool isAuthoritative,
+                                                             bool forceRefresh = false);
 
     /**
      * Parses an SSV request from a set shard version command.
@@ -117,6 +119,17 @@ public:
     bool isAuthoritative() const {
         return _isAuthoritative;
     }
+
+    /**
+     * Returns whether the set shard version catalog refresh is allowed to join
+     * an in-progress refresh triggered by an other thread, or whether it's
+     * required to either a) trigger its own refresh or b) wait for a refresh
+     * to be started after it has entered the getCollectionRoutingInfoWithRefresh function
+     */
+    bool shouldForceRefresh() const {
+        return _forceRefresh;
+    }
+
 
     const ShardId& getShardName() const {
         return _shardName;
@@ -156,12 +169,14 @@ private:
                            ConnectionString shardConnectionString,
                            NamespaceString nss,
                            ChunkVersion version,
-                           bool isAuthoritative);
+                           bool isAuthoritative,
+                           bool forceRefresh = false);
 
     SetShardVersionRequest();
 
     bool _init{false};
     bool _isAuthoritative{false};
+    bool _forceRefresh{false};
     bool _noConnectionVersioning{false};
 
     // Only required for v3.4 backwards compatibility.

@@ -227,7 +227,7 @@ public:
             return false;
         }
 
-        forceShardFilteringMetadataRefresh(opCtx, nss);
+        forceShardFilteringMetadataRefresh(opCtx, nss, true /* forceRefreshFromThisThread */);
 
         BSONObj stoppedAtKey;
         CleanupResult cleanupResult =

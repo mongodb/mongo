@@ -443,7 +443,8 @@ Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Nam
             fassert(28781, ConnectionString::parse(shardEntry.getHost())),
             nss,
             ChunkVersion::DROPPED(),
-            true);
+            true /* isAuthoritative */,
+            true /* forceRefresh */);
 
         auto ssvResult = shard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -570,7 +571,8 @@ void ShardingCatalogManager::shardCollection(OperationContext* opCtx,
         primaryShard->getConnString(),
         nss,
         collVersion,
-        true);
+        true /* isAuthoritative */,
+        true /* forceRefresh */);
 
     auto ssvResponse =
         shard->runCommandWithFixedRetryAttempts(opCtx,

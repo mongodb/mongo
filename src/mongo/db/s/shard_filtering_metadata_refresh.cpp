@@ -49,7 +49,8 @@ namespace mongo {
 
 Status onShardVersionMismatch(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              ChunkVersion shardVersionReceived) noexcept {
+                              ChunkVersion shardVersionReceived,
+                              bool forceRefreshFromThisThread) noexcept {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -89,7 +90,7 @@ Status onShardVersionMismatch(OperationContext* opCtx,
     }
 
     try {
-        forceShardFilteringMetadataRefresh(opCtx, nss);
+        forceShardFilteringMetadataRefresh(opCtx, nss, forceRefreshFromThisThread);
         return Status::OK();
     } catch (const DBException& ex) {
         log() << "Failed to refresh metadata for collection" << nss << causedBy(redact(ex));
@@ -98,15 +99,17 @@ Status onShardVersionMismatch(OperationContext* opCtx,
 }
 
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
-                                                const NamespaceString& nss) {
+                                                const NamespaceString& nss,
+                                                bool forceRefreshFromThisThread) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
 
     auto const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->canAcceptShardedCommands());
 
-    const auto routingInfo = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+    const auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+            opCtx, nss, forceRefreshFromThisThread));
     const auto cm = routingInfo.cm();
 
     if (!cm) {
