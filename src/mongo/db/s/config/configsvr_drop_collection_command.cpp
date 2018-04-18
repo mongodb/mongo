@@ -93,19 +93,11 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrDropCollection can only be run on config servers"));
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                "_configsvrDropCollection can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(
-            ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << nss.db(),
-            NamespaceString::validDBName(nss.db(), NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "dropCollection must be called with majority writeConcern, got "
@@ -146,8 +138,24 @@ public:
             uassertStatusOK(dbStatus);
             // If we found the DB but not the collection, the collection might exist and not be
             // sharded, so send the command to the primary shard.
-            _dropUnshardedCollectionFromShard(
-                opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
+            try {
+                _dropUnshardedCollectionFromShard(
+                    opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
+            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+                // If attempting to drop the collection as unsharded fails due to stale shard
+                // version, this means that the collection became sharded after this drop operation
+                // started. With the distributed lock in place, this can only happen if the lock was
+                // overtaken or metadata is manually tampered with. Since retrying the drop at this
+                // point could potentially cause orphaned chunk data to remain, instead of retrying
+                // just fail the drop.
+                uassertStatusOKWithContext(
+                    Status(ErrorCodes::ConflictingOperationInProgress,
+                           str::stream()
+                               << "Collection "
+                               << nss.ns()
+                               << " became sharded while the drop operation was in progress."),
+                    ex.toString());
+            }
         } else {
             uassertStatusOK(collStatus);
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->dropCollection(opCtx, nss));
