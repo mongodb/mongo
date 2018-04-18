@@ -53,13 +53,13 @@ class TestSuiteExecutor(object):
         # Only start as many jobs as we need. Note this means that the number of jobs we run may
         # not actually be _config.JOBS or self._suite.options.num_jobs.
         jobs_to_start = self._suite.options.num_jobs
-        num_tests = len(suite.tests)
+        self.num_tests = len(suite.tests)
 
-        if num_tests < jobs_to_start:
+        if self.num_tests < jobs_to_start:
             self.logger.info(
                 "Reducing the number of jobs from %d to %d since there are only %d test(s) to run.",
-                self._suite.options.num_jobs, num_tests, num_tests)
-            jobs_to_start = num_tests
+                self._suite.options.num_jobs, self.num_tests, self.num_tests)
+            jobs_to_start = self.num_tests
 
         # Must be done after getting buildlogger configuration.
         self._jobs = [self._make_job(job_num) for job_num in xrange(jobs_to_start)]
@@ -111,6 +111,13 @@ class TestSuiteExecutor(object):
                     return_code = 1
                     if self._suite.options.fail_fast:
                         break
+
+                test_report = report.as_dict()
+                test_results_num = len(test_report["results"])
+                # There should be at least as many tests results as expected number of tests.
+                if test_results_num < self.num_tests:
+                    raise errors.ResmokeError("{} reported tests is less than {} expected tests"
+                                              .format(test_results_num, self.num_tests))
 
                 # Clear the report so it can be reused for the next execution.
                 for job in self._jobs:
