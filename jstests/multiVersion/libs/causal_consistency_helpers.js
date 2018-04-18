@@ -78,3 +78,13 @@ function supportsMajorityReadConcern() {
     rst.stopSet();
     return true;
 }
+
+function assertHasNoKeys(conn) {
+    const keysCount = conn.getCollection("admin.system.keys").find().itcount();
+    assert.eq(keysCount, 0, "Expected no documents in admin.system.keys, conn: " + tojson(conn));
+}
+
+function assertHasKeys(conn) {
+    const keysCount = conn.getCollection("admin.system.keys").find().itcount();
+    assert.gte(keysCount, 2, "Expected documents in admin.system.keys, conn: " + tojson(conn));
+}

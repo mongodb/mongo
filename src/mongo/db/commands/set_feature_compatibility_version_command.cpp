@@ -241,8 +241,7 @@ public:
                 exitCleanly(EXIT_CLEAN);
             }
 
-            // If config server, downgrade shards *before* downgrading self; and clear the keys
-            // collection to ensure all shards will have the same key information on re-upgrade.
+            // If config server, downgrade shards *before* downgrading self.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
@@ -250,24 +249,31 @@ public:
                         Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
                             cmdObj,
                             BSON(FeatureCompatibilityVersion::kCommandName << requestedVersion)))));
+            }
 
-                // Stop the background key generator thread from running before trying to drop the
-                // collection so we know the key won't just be recreated.
-                //
-                // Note: no need to restart the key generator if downgrade doesn't succeed at once
-                // because downgrade must be completed before upgrade is allowed; and clusterTime
-                // auth is inactive unless fully upgraded.
+            // Stop the background key generator thread from running before trying to drop the
+            // collection so we know the key won't just be recreated.
+            //
+            // The key generator runs on the config server primary in a sharded cluster and on the
+            // primary node in a standalone replica set. This will be a noop on any other server.
+            //
+            // Note: no need to restart the key generator if downgrade doesn't succeed at once
+            // because downgrade must be completed before upgrade is allowed; and clusterTime auth
+            // is inactive unless fully upgraded.
+            if (LogicalTimeValidator::get(opCtx)) {
                 LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, false);
+            }
 
-                DBDirectClient client(opCtx);
-                BSONObj result;
-                if (!client.dropCollection(NamespaceString::kSystemKeysCollectionName.toString(),
-                                           ShardingCatalogClient::kMajorityWriteConcern,
-                                           &result)) {
-                    Status status = getStatusFromCommandResult(result);
-                    if (status != ErrorCodes::NamespaceNotFound) {
-                        uassertStatusOK(status);
-                    }
+            // Clear the keys collection to ensure all shards will have the same key information on
+            // re-upgrade.
+            DBDirectClient client(opCtx);
+            BSONObj result;
+            if (!client.dropCollection(NamespaceString::kSystemKeysCollectionName.toString(),
+                                       ShardingCatalogClient::kMajorityWriteConcern,
+                                       &result)) {
+                Status status = getStatusFromCommandResult(result);
+                if (status != ErrorCodes::NamespaceNotFound) {
+                    uassertStatusOK(status);
                 }
             }
 

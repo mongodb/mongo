@@ -43,6 +43,9 @@
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
     rst.awaitReplication();
 
+    // The system keys collection should have been dropped.
+    assertHasNoKeys(rst.getPrimary());
+
     assertDoesNotContainLogicalOrOperationTime(
         rst.getPrimary().getDB("test").runCommand({isMaster: 1}));
 
@@ -66,4 +69,9 @@
 
     assertDoesNotContainLogicalOrOperationTime(
         rst.getPrimary().getDB("test").runCommand({isMaster: 1}));
+
+    // There should still be no keys.
+    assertHasNoKeys(rst.getPrimary());
+
+    rst.stopSet();
 })();

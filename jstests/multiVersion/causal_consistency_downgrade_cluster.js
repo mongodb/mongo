@@ -72,6 +72,12 @@
     assertDoesNotContainLogicalOrOperationTime(
         st.configRS.getPrimary().getDB("test").runCommand({isMaster: 1}));
 
+    // The system keys collection should have been dropped on the config server and each shard.
+    assertHasNoKeys(st.configRS.getPrimary());
+    st._rs.forEach(rs => {
+        assertHasNoKeys(rs.test.getPrimary());
+    });
+
     // Downgrade mongos first.
     jsTest.log("Downgrading mongos servers.");
     st.upgradeCluster("last-stable", {upgradeConfigs: false, upgradeShards: false});
@@ -89,6 +95,12 @@
     jsTest.log("Downgrading config servers.");
     st.upgradeCluster("last-stable", {upgradeMongos: false, upgradeShards: false});
     st.restartMongoses();
+
+    // There should still be no keys.
+    assertHasNoKeys(st.configRS.getPrimary());
+    st._rs.forEach(rs => {
+        assertHasNoKeys(rs.test.getPrimary());
+    });
 
     // No servers return logical or operation time.
     assertDoesNotContainLogicalOrOperationTime(st.s.getDB("test").runCommand({isMaster: 1}));

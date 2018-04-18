@@ -85,8 +85,7 @@ public:
     void shutDown();
 
     /**
-     * Enable writing new keys to the config server primary. Should only be called if current node
-     * is the config primary.
+     * Enable writing new keys.
      */
     void enableKeyGenerator(OperationContext* opCtx, bool doEnable);
 
