@@ -452,7 +452,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         std::uint64_t tmp;
         fassert(50758, parseNumberFromStringWithBase(buf, 16, &tmp));
         _recoveryTimestamp = Timestamp(tmp);
-        LOG_FOR_RECOVERY(2) << "WiredTiger recoveryTimestamp. Ts: " << _recoveryTimestamp;
+        LOG_FOR_RECOVERY(0) << "WiredTiger recoveryTimestamp. Ts: " << _recoveryTimestamp;
     }
 
     _sessionCache.reset(new WiredTigerSessionCache(this));
