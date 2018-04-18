@@ -41,6 +41,7 @@ namespace mozjs {
  */
 struct GlobalInfo : public BaseInfo {
     struct Functions {
+        MONGO_DECLARE_JS_FUNCTION(sleep);
         MONGO_DECLARE_JS_FUNCTION(gc);
         MONGO_DECLARE_JS_FUNCTION(print);
         MONGO_DECLARE_JS_FUNCTION(version);
@@ -48,7 +49,7 @@ struct GlobalInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(getJSHeapLimitMB);
     };
 
-    static const JSFunctionSpec freeFunctions[6];
+    static const JSFunctionSpec freeFunctions[7];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_GLOBAL_FLAGS;

@@ -113,6 +113,8 @@ public:
 
     void gc() override;
 
+    void sleep(Milliseconds ms);
+
     bool isJavaScriptProtectionEnabled() const;
 
     double getNumber(const char* field) override;
@@ -418,6 +420,8 @@ private:
     std::vector<JS::PersistentRootedValue> _funcs;
     InternedStringTable _internedStrings;
     std::atomic<bool> _pendingKill;
+    std::mutex _sleepMutex;
+    std::condition_variable _sleepCondition;
     std::string _error;
     unsigned int _opId;        // op id for this scope
     OperationContext* _opCtx;  // Op context for DbEval

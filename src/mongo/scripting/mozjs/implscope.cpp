@@ -192,7 +192,11 @@ void MozJSImplScope::unregisterOperation() {
 }
 
 void MozJSImplScope::kill() {
-    _pendingKill.store(true);
+    {
+        std::unique_lock<std::mutex> lk(_sleepMutex);
+        _pendingKill.store(true);
+    }
+    _sleepCondition.notify_all();
     JS_RequestInterruptCallback(_runtime);
 }
 
@@ -792,6 +796,12 @@ void MozJSImplScope::injectNative(const char* field, NativeFunction func, void* 
 void MozJSImplScope::gc() {
     _pendingGC.store(true);
     JS_RequestInterruptCallback(_runtime);
+}
+
+void MozJSImplScope::sleep(Milliseconds ms) {
+    std::unique_lock<std::mutex> lk(_sleepMutex);
+
+    _sleepCondition.wait_for(lk, ms.toSystemDuration(), [this] { return _pendingKill.load(); });
 }
 
 void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
