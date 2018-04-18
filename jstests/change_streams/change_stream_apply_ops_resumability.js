@@ -4,195 +4,169 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/change_stream_util.js");
+    load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    var WatchMode = {
-        kCollection: 1,
-        kDb: 2,
-        kCluster: 3,
-    };
+    const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
+    const otherCollName = "change_stream_apply_ops_2";
+    assertDropAndRecreateCollection(db, otherCollName);
 
-    function getChangeStream({cst, watchMode, coll, resumeToken}) {
-        const changeStreamDoc = {};
-        if (resumeToken) {
-            changeStreamDoc.resumeAfter = resumeToken;
-        }
+    const otherDbName = "change_stream_apply_ops_db";
+    const otherDbCollName = "someColl";
+    assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
 
-        if (watchMode == WatchMode.kCluster) {
-            changeStreamDoc.allChangesForCluster = true;
-        }
-        const collArg = (watchMode == WatchMode.kCollection ? coll : 1);
+    let cst = new ChangeStreamTest(db);
+    let changeStream = cst.startWatchingChanges(
+        {pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}], collection: coll});
 
-        return cst.startWatchingChanges({
-            pipeline: [{$changeStream: changeStreamDoc}],
-            collection: collArg,
-            // Use a batch size of 0 to prevent any notifications from being returned in the first
-            // batch. These would be ignored by ChangeStreamTest.getOneChange().
-            aggregateOptions: {cursor: {batchSize: 0}},
-        });
-    }
+    // Do an insert outside of a transaction.
+    assert.commandWorked(coll.insert({_id: 0, a: 123}));
 
-    function testChangeStreamsWithTransactions(watchMode) {
-        let dbToStartTestOn = db;
-        if (watchMode == WatchMode.kCluster) {
-            dbToStartTestOn = db.getSiblingDB("admin");
-        }
+    // Open a session, and perform two writes within a transaction.
+    const sessionOptions = {causalConsistency: false};
+    const session = db.getMongo().startSession(sessionOptions);
+    const sessionDb = session.getDatabase(db.getName());
+    const sessionColl = sessionDb[coll.getName()];
 
-        const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
-        const otherCollName = "change_stream_apply_ops_2";
-        assertDropAndRecreateCollection(db, otherCollName);
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+    assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
+    assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
 
-        const otherDbName = "change_stream_apply_ops_db";
-        const otherDbCollName = "someColl";
-        assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
+    // One insert on a collection that we're not watching. This should be skipped by the
+    // single-collection change stream.
+    assert.commandWorked(sessionDb[otherCollName].insert({_id: 111, a: "Doc on other collection"}));
 
-        const cst = new ChangeStreamTest(dbToStartTestOn);
+    // One insert on a collection in a different database. This should be skipped by the single
+    // collection and single-db changestreams.
+    assert.commandWorked(
+        session.getDatabase(otherDbName)[otherDbCollName].insert({_id: 222, a: "Doc on other DB"}));
 
-        let changeStream = getChangeStream({cst: cst, watchMode: watchMode, coll: coll});
+    assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
 
-        // Do an insert outside of a transaction.
-        assert.commandWorked(coll.insert({_id: 0, a: 123}));
-        const nonTxnChange = cst.getOneChange(changeStream);
-        assert.eq(nonTxnChange.operationType, "insert");
-        assert.eq(nonTxnChange.documentKey, {_id: 0});
+    session.commitTransaction();
 
-        const sessionOptions = {causalConsistency: false};
-        const session = db.getMongo().startSession(sessionOptions);
-        const sessionDb = session.getDatabase(db.getName());
-        const sessionColl = sessionDb[coll.getName()];
+    // Now insert another document, not part of a transaction.
+    assert.commandWorked(coll.insert({_id: 3, a: 123}));
 
-        session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
-        assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
-        assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
+    // Define the set of changes expected for the single-collection case per the operations above.
+    const expectedChanges = [
+        {
+          documentKey: {_id: 0},
+          fullDocument: {_id: 0, a: 123},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "insert",
+        },
+        {
+          documentKey: {_id: 1},
+          fullDocument: {_id: 1, a: 0},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "insert",
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {
+          documentKey: {_id: 2},
+          fullDocument: {_id: 2, a: 0},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "insert",
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {
+          documentKey: {_id: 1},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "update",
+          updateDescription: {removedFields: [], updatedFields: {a: 1}},
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {
+          documentKey: {_id: 3},
+          fullDocument: {_id: 3, a: 123},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "insert",
+        },
+    ];
 
-        // One insert on a collection that we're not watching. This should be skipped by the
-        // single-collection change stream.
-        assert.commandWorked(
-            sessionDb[otherCollName].insert({_id: 111, a: "Doc on other collection"}));
+    // Verify that the stream returns the expected sequence of changes.
+    const changes =
+        cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges});
 
-        // This should be skipped by the single-collection and single-db changestreams.
-        assert.commandWorked(session.getDatabase(otherDbName)[otherDbCollName].insert(
-            {_id: 222, a: "Doc on other DB"}));
+    // Record the first (non-transaction) change and the first in-transaction change.
+    const nonTxnChange = changes[0], firstTxnChange = changes[1], secondTxnChange = changes[2];
 
-        assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
+    // Resume after the first non-transaction change. Be sure we see the documents from the
+    // transaction again.
+    changeStream = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {resumeAfter: nonTxnChange._id}}, {$project: {"lsid.uid": 0}}],
+        collection: coll
+    });
+    cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges.slice(1)});
 
-        session.commitTransaction();
+    // Resume after the first transaction change. Be sure we see the second change again.
+    changeStream = cst.startWatchingChanges({
+        pipeline: [{$changeStream: {resumeAfter: firstTxnChange._id}}, {$project: {"lsid.uid": 0}}],
+        collection: coll
+    });
+    cst.assertNextChangesEqual({cursor: changeStream, expectedChanges: expectedChanges.slice(2)});
 
-        // Now insert another document, not part of a transaction.
-        assert.commandWorked(coll.insert({_id: 3, a: 123}));
+    // Try starting another change stream from the _last_ change caused by the transaction. Verify
+    // that we can see the insert performed after the transaction was committed.
+    let otherCursor = cst.startWatchingChanges({
+        pipeline:
+            [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
+        collection: coll
+    });
+    cst.assertNextChangesEqual({cursor: otherCursor, expectedChanges: expectedChanges.slice(3)});
 
-        // Check for the first insert.
-        const firstTxnChange = cst.getOneChange(changeStream);
-        assert.eq(firstTxnChange.fullDocument._id, 1);
-        assert.eq(firstTxnChange.operationType, "insert", tojson(firstTxnChange));
+    // Drop the collection. This will trigger an "invalidate" event at the end of the stream.
+    assert.commandWorked(db.runCommand({drop: coll.getName()}));
+    expectedChanges.push({operationType: "invalidate"});
 
-        // Check for the second insert.
-        const secondTxnChange = cst.getOneChange(changeStream);
-        assert.eq(secondTxnChange.fullDocument._id, 2);
-        assert.eq(secondTxnChange.operationType, "insert", tojson(secondTxnChange));
+    // Add an entry for the insert on db.otherColl into expectedChanges.
+    expectedChanges.splice(3, 0, {
+        documentKey: {_id: 111},
+        fullDocument: {_id: 111, a: "Doc on other collection"},
+        ns: {db: db.getName(), coll: otherCollName},
+        operationType: "insert",
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(session._txnNumber),
+    });
 
-        // Resume after the first non-transaction change. Be sure we see the documents from the
-        // transaction again.
-        changeStream = getChangeStream(
-            {cst: cst, watchMode: watchMode, coll: coll, resumeToken: nonTxnChange._id});
-        assert.docEq(cst.getOneChange(changeStream), firstTxnChange);
-        assert.docEq(cst.getOneChange(changeStream), secondTxnChange);
+    // Verify that a whole-db stream can be resumed from the middle of the transaction, and that it
+    // will see all subsequent changes including the insert on the other collection but NOT the
+    // changes on the other DB.
+    changeStream = cst.startWatchingChanges({
+        pipeline:
+            [{$changeStream: {resumeAfter: secondTxnChange._id}}, {$project: {"lsid.uid": 0}}],
+        collection: 1
+    });
+    cst.assertNextChangesEqual(
+        {cursor: changeStream, expectedChanges: expectedChanges.slice(3), expectInvalidate: true});
 
-        // Resume after the first transaction change. Be sure we see the second change again.
-        changeStream = getChangeStream(
-            {cst: cst, watchMode: watchMode, coll: coll, resumeToken: firstTxnChange._id});
-        assert.docEq(cst.getOneChange(changeStream), secondTxnChange);
+    // Add an entry for the insert on otherDb.otherDbColl into expectedChanges.
+    expectedChanges.splice(4, 0, {
+        documentKey: {_id: 222},
+        fullDocument: {_id: 222, a: "Doc on other DB"},
+        ns: {db: otherDbName, coll: otherDbCollName},
+        operationType: "insert",
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(session._txnNumber),
+    });
 
-        let change = secondTxnChange;
-        if (watchMode >= WatchMode.kDb) {
-            // We should see the insert on the other collection.
-            change = cst.getOneChange(changeStream);
-            assert.eq(change.fullDocument._id, 111);
-            assert.eq(change.operationType, "insert", tojson(change));
+    // Verify that a whole-db stream can be resumed from the middle of the transaction, and that it
+    // will see all subsequent changes including the insert on the other collection and the changes
+    // on the other DB.
+    cst = new ChangeStreamTest(db.getSiblingDB("admin"));
+    changeStream = cst.startWatchingChanges({
+        pipeline: [
+            {$changeStream: {resumeAfter: secondTxnChange._id, allChangesForCluster: true}},
+            {$project: {"lsid.uid": 0}}
+        ],
+        collection: 1
+    });
+    cst.assertNextChangesEqual(
+        {cursor: changeStream, expectedChanges: expectedChanges.slice(3), expectInvalidate: true});
 
-            // Resume from the beginning again, be sure we see everything up until now.
-            changeStream = getChangeStream(
-                {cst: cst, watchMode: watchMode, coll: coll, resumeToken: nonTxnChange._id});
-            assert.docEq(cst.getOneChange(changeStream), firstTxnChange);
-            assert.docEq(cst.getOneChange(changeStream), secondTxnChange);
-            assert.docEq(cst.getOneChange(changeStream), change);
-        }
-
-        if (watchMode >= WatchMode.kCluster) {
-            // We should see the insert on the other db.
-            change = cst.getOneChange(changeStream);
-            assert.eq(change.fullDocument._id, 222);
-            assert.eq(change.operationType, "insert", tojson(change));
-
-            // Resume from the beginning again, be sure we see everything up until now.
-            changeStream = getChangeStream(
-                {cst: cst, watchMode: watchMode, coll: coll, resumeToken: nonTxnChange._id});
-            assert.docEq(cst.getOneChange(changeStream), firstTxnChange);
-            assert.docEq(cst.getOneChange(changeStream), secondTxnChange);
-            // We should see the document which was inserted on the other _collection_.
-            const changeFromOtherCollection = cst.getOneChange(changeStream);
-            assert.eq(changeFromOtherCollection.fullDocument._id, 111);
-
-            // Resume from the document in the other collection.
-            changeStream = getChangeStream({
-                cst: cst,
-                watchMode: watchMode,
-                coll: coll,
-                resumeToken: changeFromOtherCollection._id
-            });
-
-            // We should again see the most recent document.
-            assert.docEq(cst.getOneChange(changeStream), change);
-        }
-
-        // Try starting another change stream from the latest change, the _last_ change caused by
-        // the transaction.
-        let otherCursor =
-            getChangeStream({cst: cst, watchMode: watchMode, coll: coll, resumeToken: change._id});
-
-        // Check for the update.
-        change = cst.getOneChange(changeStream);
-        assert.eq(change.operationType, "update", tojson(change));
-        assert.eq(tojson(change.updateDescription.updatedFields), tojson({"a": 1}));
-
-        // Check for the update on the other stream.
-        assert.docEq(change, cst.getOneChange(otherCursor));
-
-        // Now test that we can resume from the _last_ change caused by a transaction.  We will
-        // check that both the initial change stream and the new one find the document that's
-        // inserted outside of the transaction.
-        otherCursor =
-            getChangeStream({cst: cst, watchMode: watchMode, coll: coll, resumeToken: change._id});
-
-        // Now check that the document inserted after the transaction is found.
-        change = cst.getOneChange(changeStream);
-        assert.eq(change.fullDocument._id, 3);
-        assert.eq(change.operationType, "insert", tojson(change));
-        assert.docEq(change, cst.getOneChange(otherCursor));
-
-        // Drop the collection. This will trigger an "invalidate" event.
-        assert.commandWorked(db.runCommand({drop: coll.getName()}));
-
-        // The drop should have invalidated the change stream.
-        cst.assertNextChangesEqual({
-            cursor: changeStream,
-            expectedChanges: [{operationType: "invalidate"}],
-            expectInvalidate: true
-        });
-
-        cst.assertNextChangesEqual({
-            cursor: otherCursor,
-            expectedChanges: [{operationType: "invalidate"}],
-            expectInvalidate: true
-        });
-
-        cst.cleanUp();
-    }
-
-    // TODO: SERVER-34302 should allow us to simplify this test, so we're not required to
-    // explicitly run both against a single collection and against the whole DB.
-    testChangeStreamsWithTransactions(WatchMode.kCollection);
-    testChangeStreamsWithTransactions(WatchMode.kDb);
-    testChangeStreamsWithTransactions(WatchMode.kCluster);
+    cst.cleanUp();
 }());

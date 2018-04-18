@@ -3609,6 +3609,50 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: change_streams_whole_cluster_passthrough
+  depends_on:
+  - name: change_streams
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_whole_cluster_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: change_streams_whole_cluster_mongos_passthrough
+  depends_on:
+  - name: change_streams_mongos_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_whole_cluster_mongos_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: change_streams_whole_cluster_secondary_reads_passthrough
+  depends_on:
+  - name: change_streams_secondary_reads
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_whole_cluster_secondary_reads_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: change_streams_whole_cluster_sharded_collections_passthrough
+  depends_on:
+  - name: change_streams_sharded_collections_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_whole_cluster_sharded_collections_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: dbtest
   commands:
   - func: "do setup"
@@ -6367,6 +6411,10 @@ buildvariants:
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_secondary_reads_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
@@ -6550,6 +6598,9 @@ buildvariants:
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
@@ -7626,6 +7677,9 @@ buildvariants:
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
@@ -8424,6 +8478,9 @@ buildvariants:
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
@@ -9036,6 +9093,10 @@ buildvariants:
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_secondary_reads_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
@@ -9563,6 +9624,10 @@ buildvariants:
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_secondary_reads_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
@@ -11107,6 +11172,9 @@ buildvariants:
   - name: change_streams_whole_db_passthrough
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
@@ -11730,6 +11798,10 @@ buildvariants:
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_secondary_reads_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded
@@ -11893,6 +11965,10 @@ buildvariants:
   - name: change_streams_whole_db_mongos_passthrough
   - name: change_streams_whole_db_secondary_reads_passthrough
   - name: change_streams_whole_db_sharded_collections_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: change_streams_whole_cluster_mongos_passthrough
+  - name: change_streams_whole_cluster_secondary_reads_passthrough
+  - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_sharded

@@ -4,160 +4,147 @@
 (function() {
     "use strict";
 
-    load("jstests/libs/change_stream_util.js");
+    load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    var WatchMode = {
-        kCollection: 1,
-        kDb: 2,
-        kCluster: 3,
-    };
+    const otherCollName = "change_stream_apply_ops_2";
+    const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
+    assertDropAndRecreateCollection(db, otherCollName);
 
-    function testChangeStreamsWithTransactions(watchMode) {
-        let dbToStartTestOn = db;
-        if (watchMode == WatchMode.kCluster) {
-            dbToStartTestOn = db.getSiblingDB("admin");
-        }
+    const otherDbName = "change_stream_apply_ops_db";
+    const otherDbCollName = "someColl";
+    assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
 
-        const otherCollName = "change_stream_apply_ops_2";
-        const coll = assertDropAndRecreateCollection(db, "change_stream_apply_ops");
-        assertDropAndRecreateCollection(db, otherCollName);
+    // Insert a document that gets deleted as part of the transaction.
+    const kDeletedDocumentId = 0;
+    coll.insert({_id: kDeletedDocumentId, a: "I was here before the transaction"});
 
-        const otherDbName = "change_stream_apply_ops_db";
-        const otherDbCollName = "someColl";
-        assertDropAndRecreateCollection(db.getSiblingDB(otherDbName), otherDbCollName);
+    let cst = new ChangeStreamTest(db);
+    let changeStream = cst.startWatchingChanges(
+        {pipeline: [{$changeStream: {}}, {$project: {"lsid.uid": 0}}], collection: coll});
 
-        // Insert a document that gets deleted as part of the transaction.
-        const kDeletedDocumentId = 0;
-        coll.insert({_id: kDeletedDocumentId, a: "I was here before the transaction"});
+    const sessionOptions = {causalConsistency: false};
+    const session = db.getMongo().startSession(sessionOptions);
+    const sessionDb = session.getDatabase(db.getName());
+    const sessionColl = sessionDb[coll.getName()];
 
-        let cst = new ChangeStreamTest(dbToStartTestOn);
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+    assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
+    assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
 
-        let changeStream = null;
-        if (watchMode == WatchMode.kCluster) {
-            changeStream = cst.startWatchingAllChangesForCluster();
-        } else {
-            const collArg = (watchMode == WatchMode.kCollection ? coll : 1);
-            changeStream =
-                cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: collArg});
-        }
+    // One insert on a collection that we're not watching. This should be skipped by the
+    // single-collection changestream.
+    assert.commandWorked(sessionDb[otherCollName].insert({_id: 111, a: "Doc on other collection"}));
 
-        const sessionOptions = {causalConsistency: false};
-        const session = db.getMongo().startSession(sessionOptions);
-        const sessionDb = session.getDatabase(db.getName());
-        const sessionColl = sessionDb[coll.getName()];
+    // One insert on a collection in a different database. This should be skipped by the single
+    // collection and single-db changestreams.
+    assert.commandWorked(
+        session.getDatabase(otherDbName)[otherDbCollName].insert({_id: 222, a: "Doc on other DB"}));
 
-        session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
-        assert.commandWorked(sessionColl.insert({_id: 1, a: 0}));
-        assert.commandWorked(sessionColl.insert({_id: 2, a: 0}));
+    assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
 
-        // One insert on a collection that we're not watching. This should be skipped by the
-        // single-collection changestream.
-        assert.commandWorked(
-            sessionDb[otherCollName].insert({_id: 111, a: "Doc on other collection"}));
+    assert.commandWorked(sessionColl.deleteOne({_id: kDeletedDocumentId}));
 
-        // This should be skipped by the single-collection and single-db changestreams.
-        assert.commandWorked(session.getDatabase(otherDbName)[otherDbCollName].insert(
-            {_id: 222, a: "Doc on other DB"}));
+    session.commitTransaction();
 
-        assert.commandWorked(sessionColl.updateOne({_id: 1}, {$inc: {a: 1}}));
+    // Do applyOps on the collection that we care about. This is an "external" applyOps, though
+    // (not run as part of a transaction) so its entries should be skipped in the change
+    // stream. This checks that applyOps that don't have an 'lsid' and 'txnNumber' field do not
+    // get unwound.
+    assert.commandWorked(db.runCommand({
+        applyOps: [
+            {op: "i", ns: coll.getFullName(), o: {_id: 3, a: "SHOULD NOT READ THIS"}},
+        ]
+    }));
 
-        assert.commandWorked(sessionColl.deleteOne({_id: kDeletedDocumentId}));
+    // Drop the collection. This will trigger an "invalidate" event at the end of the stream.
+    assert.commandWorked(db.runCommand({drop: coll.getName()}));
 
-        session.commitTransaction();
+    // Define the set of changes expected for the single-collection case per the operations above.
+    const expectedChanges = [
+        {
+          documentKey: {_id: 1},
+          fullDocument: {_id: 1, a: 0},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "insert",
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {
+          documentKey: {_id: 2},
+          fullDocument: {_id: 2, a: 0},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "insert",
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {
+          documentKey: {_id: 1},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "update",
+          updateDescription: {removedFields: [], updatedFields: {a: 1}},
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {
+          documentKey: {_id: kDeletedDocumentId},
+          ns: {db: db.getName(), coll: coll.getName()},
+          operationType: "delete",
+          lsid: session.getSessionId(),
+          txnNumber: NumberLong(session._txnNumber),
+        },
+        {operationType: "invalidate"},
+    ];
 
-        // Do applyOps on the collection that we care about. This is an "external" applyOps, though
-        // (not run as part of a transaction) so its entries should be skipped in the change
-        // stream. This checks that applyOps that don't have an 'lsid' and 'txnNumber' field do not
-        // get unwound.
-        assert.commandWorked(db.runCommand({
-            applyOps: [
-                {op: "i", ns: coll.getFullName(), o: {_id: 3, a: "SHOULD NOT READ THIS"}},
-            ]
-        }));
+    // Verify that the stream returns the expected sequence of changes.
+    const changes = cst.assertNextChangesEqual(
+        {cursor: changeStream, expectedChanges: expectedChanges, expectInvalidate: true});
 
-        // Check for the first insert.
-        let change = cst.getOneChange(changeStream);
-        assert.eq(change.fullDocument._id, 1);
-        assert.eq(change.operationType, "insert", tojson(change));
-        const firstChangeClusterTime = change.clusterTime;
-        assert(firstChangeClusterTime instanceof Timestamp, tojson(change));
-        const firstChangeTxnNumber = change.txnNumber;
-        const firstChangeLsid = change.lsid;
-        assert.eq(typeof firstChangeLsid, "object");
-        assert.eq(change.ns.coll, coll.getName());
-        assert.eq(change.ns.db, db.getName());
+    // Obtain the clusterTime from the first change.
+    const startTime = changes[0].clusterTime;
 
-        // Check for the second insert.
-        change = cst.getOneChange(changeStream);
-        assert.eq(change.fullDocument._id, 2);
-        assert.eq(change.operationType, "insert", tojson(change));
-        assert.eq(firstChangeClusterTime, change.clusterTime);
-        assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
-        assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
-        assert.eq(change.ns.coll, coll.getName());
-        assert.eq(change.ns.db, db.getName());
+    // Add an entry for the insert on db.otherColl into expectedChanges.
+    expectedChanges.splice(2, 0, {
+        documentKey: {_id: 111},
+        fullDocument: {_id: 111, a: "Doc on other collection"},
+        ns: {db: db.getName(), coll: otherCollName},
+        operationType: "insert",
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(session._txnNumber),
+    });
 
-        if (watchMode >= WatchMode.kDb) {
-            // We should see the insert on the other collection.
-            change = cst.getOneChange(changeStream);
-            assert.eq(change.fullDocument._id, 111);
-            assert.eq(change.operationType, "insert", tojson(change));
-            assert.eq(firstChangeClusterTime, change.clusterTime);
-            assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
-            assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
-            assert.eq(change.ns.coll, otherCollName);
-            assert.eq(change.ns.db, db.getName());
-        }
+    // Verify that a whole-db stream returns the expected sequence of changes, including the insert
+    // on the other collection but NOT the changes on the other DB or the manual applyOps.
+    changeStream = cst.startWatchingChanges({
+        pipeline:
+            [{$changeStream: {startAtClusterTime: {ts: startTime}}}, {$project: {"lsid.uid": 0}}],
+        collection: 1
+    });
+    cst.assertNextChangesEqual(
+        {cursor: changeStream, expectedChanges: expectedChanges, expectInvalidate: true});
 
-        if (watchMode >= WatchMode.kCluster) {
-            // We should see the insert on the other db.
-            change = cst.getOneChange(changeStream);
-            assert.eq(change.fullDocument._id, 222);
-            assert.eq(change.operationType, "insert", tojson(change));
-            assert.eq(firstChangeClusterTime, change.clusterTime);
-            assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
-            assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
-            assert.eq(change.ns.coll, otherDbCollName);
-            assert.eq(change.ns.db, otherDbName);
-        }
+    // Add an entry for the insert on otherDb.otherDbColl into expectedChanges.
+    expectedChanges.splice(3, 0, {
+        documentKey: {_id: 222},
+        fullDocument: {_id: 222, a: "Doc on other DB"},
+        ns: {db: otherDbName, coll: otherDbCollName},
+        operationType: "insert",
+        lsid: session.getSessionId(),
+        txnNumber: NumberLong(session._txnNumber),
+    });
 
-        // Check for the update.
-        change = cst.getOneChange(changeStream);
-        assert.eq(change.operationType, "update", tojson(change));
-        assert.eq(tojson(change.updateDescription.updatedFields), tojson({"a": 1}));
-        assert.eq(firstChangeClusterTime, change.clusterTime);
-        assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
-        assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
-        assert.eq(change.ns.coll, coll.getName());
-        assert.eq(change.ns.db, db.getName());
+    // Verify that a whole-cluster stream returns the expected sequence of changes, including the
+    // inserts on the other collection and the other database, but NOT the manual applyOps.
+    cst = new ChangeStreamTest(db.getSiblingDB("admin"));
+    changeStream = cst.startWatchingChanges({
+        pipeline: [
+            {$changeStream: {startAtClusterTime: {ts: startTime}, allChangesForCluster: true}},
+            {$project: {"lsid.uid": 0}}
+        ],
+        collection: 1
+    });
+    cst.assertNextChangesEqual(
+        {cursor: changeStream, expectedChanges: expectedChanges, expectInvalidate: true});
 
-        // Check for the delete.
-        change = cst.getOneChange(changeStream);
-        assert.eq(change.documentKey._id, kDeletedDocumentId);
-        assert.eq(change.operationType, "delete", tojson(change));
-        assert.eq(firstChangeClusterTime, change.clusterTime);
-        assert.eq(firstChangeTxnNumber.valueOf(), change.txnNumber);
-        assert.eq(0, bsonWoCompare(firstChangeLsid, change.lsid));
-        assert.eq(change.ns.coll, coll.getName());
-        assert.eq(change.ns.db, db.getName());
-
-        // Drop the collection. This will trigger an "invalidate" event.
-        assert.commandWorked(db.runCommand({drop: coll.getName()}));
-
-        // The drop should have invalidated the change stream.
-        cst.assertNextChangesEqual({
-            cursor: changeStream,
-            expectedChanges: [{operationType: "invalidate"}],
-            expectInvalidate: true
-        });
-
-        cst.cleanUp();
-    }
-
-    // TODO: SERVER-34302 should allow us to simplify this test, so we're not required to
-    // explicitly run both against a single collection and against the whole DB.
-    testChangeStreamsWithTransactions(WatchMode.kCollection);
-    testChangeStreamsWithTransactions(WatchMode.kDb);
-    testChangeStreamsWithTransactions(WatchMode.kCluster);
+    cst.cleanUp();
 }());

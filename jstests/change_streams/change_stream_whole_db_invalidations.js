@@ -66,7 +66,11 @@
     // Create collection on the database being watched.
     coll = assertDropAndRecreateCollection(testDB, "change_stream_whole_db_invalidations");
 
-    aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
+    // Create the $changeStream. We set 'doNotModifyInPassthroughs' so that this test will not be
+    // upconverted to a cluster-wide stream, which *would* be invalidated by dropping the collection
+    // in the other database.
+    aggCursor = cst.startWatchingChanges(
+        {pipeline: [{$changeStream: {}}], collection: 1, doNotModifyInPassthroughs: true});
 
     // Drop the collection on the other database, this should *not* invalidate the change stream.
     assertDropCollection(otherDB, otherDBColl.getName());
