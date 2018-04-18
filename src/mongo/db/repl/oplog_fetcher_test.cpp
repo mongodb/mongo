@@ -254,20 +254,6 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProt
     ASSERT_EQUALS(config.getElectionTimeoutPeriod() / 2, timeout);
 }
 
-TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermNotLastFetched) {
-    auto uninitializedTerm = OpTime::kUninitializedTerm;
-    ASSERT_NOT_EQUALS(dataReplicatorExternalState->currentTerm, uninitializedTerm);
-    dataReplicatorExternalState->currentTerm++;
-    auto cmdObj = makeOplogFetcher(_createConfig())->getFindQuery_forTest();
-    ASSERT_FALSE(cmdObj.hasField("readConcern"));
-}
-
-TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermUninitialized) {
-    dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
-    auto cmdObj = makeOplogFetcher(_createConfig())->getFindQuery_forTest();
-    ASSERT_FALSE(cmdObj.hasField("readConcern"));
-}
-
 TEST_F(OplogFetcherTest, InvalidReplSetMetadataInResponseStopsTheOplogFetcher) {
     auto shutdownState = processSingleBatch(
         {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
