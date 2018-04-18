@@ -52,17 +52,6 @@ static BSONObj native_hex_md5(const BSONObj& args, void* data) {
     return BSON("" << digestToString(d));
 }
 
-static BSONObj native_sleep(const mongo::BSONObj& args, void* data) {
-    uassert(16259,
-            "sleep takes a single numeric argument -- sleep(milliseconds)",
-            args.nFields() == 1 && args.firstElement().isNumber());
-    sleepmillis(static_cast<long long>(args.firstElement().number()));
-
-    BSONObjBuilder b;
-    b.appendUndefined("");
-    return b.obj();
-}
-
 static BSONObj native_tostrictjson(const mongo::BSONObj& args, void* data) {
     uassert(40275,
             "tostrictjson takes a single BSON object argument, and on optional boolean argument "
@@ -83,7 +72,6 @@ static BSONObj native_tostrictjson(const mongo::BSONObj& args, void* data) {
 
 void installGlobalUtils(Scope& scope) {
     scope.injectNative("hex_md5", native_hex_md5);
-    scope.injectNative("sleep", native_sleep);
     scope.injectNative("tostrictjson", native_tostrictjson);
 }
 

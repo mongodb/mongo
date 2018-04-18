@@ -42,12 +42,14 @@
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec GlobalInfo::freeFunctions[6] = {
+const JSFunctionSpec GlobalInfo::freeFunctions[7] = {
+    MONGO_ATTACH_JS_FUNCTION(sleep),
     MONGO_ATTACH_JS_FUNCTION(gc),
     MONGO_ATTACH_JS_FUNCTION(print),
     MONGO_ATTACH_JS_FUNCTION(version),
@@ -108,6 +110,18 @@ void GlobalInfo::Functions::gc::call(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
     scope->gc();
+
+    args.rval().setUndefined();
+}
+
+void GlobalInfo::Functions::sleep::call(JSContext* cx, JS::CallArgs args) {
+    uassert(16259,
+            "sleep takes a single numeric argument -- sleep(milliseconds)",
+            args.length() == 1 && args.get(0).isNumber());
+
+    auto scope = getScope(cx);
+    int64_t duration = ValueWriter(cx, args.get(0)).toInt64();
+    scope->sleep(Milliseconds(duration));
 
     args.rval().setUndefined();
 }
