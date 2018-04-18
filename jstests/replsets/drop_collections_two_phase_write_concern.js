@@ -57,10 +57,9 @@
         // Ensure that we've hit the failpoint before moving on.
         checkLog.contains(primary, 'fail point dropPendingCollectionReaperHang enabled');
 
-        // Since awaiting replication of a majority does not depend on the drop pending collection
-        // reaper yet, an operation waiting on a majority write concern will complete successfully.
-        assert.writeOK(
-            collForInserts.insert({_id: 2}, {writeConcern: writeConcernForSuccessfulOp}));
+        // While the drop pending collection reaper is blocked, an operation waiting on a majority
+        // write concern should time out.
+        assertTimeout(collForInserts.insert({_id: 2}, {writeConcern: writeConcernForTimedOutOp}));
     } finally {
         assert.commandWorked(primary.adminCommand(
             {configureFailPoint: 'dropPendingCollectionReaperHang', mode: 'off'}));

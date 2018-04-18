@@ -843,6 +843,8 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
                     }
                     auto opCtx = cc().makeOperationContext();
                     reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);
+                    auto replCoord = ReplicationCoordinator::get(opCtx.get());
+                    replCoord->signalDropPendingCollectionsRemovedFromStorage();
                 });
         }
     }
