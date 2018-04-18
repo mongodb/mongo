@@ -848,6 +848,11 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
     }
 }
 
+boost::optional<OpTime> ReplicationCoordinatorExternalStateImpl::getEarliestDropPendingOpTime()
+    const {
+    return _dropPendingCollectionReaper->getEarliestDropOpTime();
+}
+
 double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {
     return replElectionTimeoutOffsetLimitFraction;
 }

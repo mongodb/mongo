@@ -271,6 +271,12 @@ public:
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime) = 0;
 
     /**
+     * Returns earliest drop optime of drop pending collections.
+     * Returns boost::none if there are no drop pending collections.
+     */
+    virtual boost::optional<OpTime> getEarliestDropPendingOpTime() const = 0;
+
+    /**
      * Returns multiplier to apply to election timeout to obtain upper bound
      * on randomized offset.
      */
