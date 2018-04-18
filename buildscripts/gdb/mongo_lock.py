@@ -185,8 +185,12 @@ class Graph(object):
             color = ""
             if nodes and node_key in nodes:
                 color = "color = red"
-            sb.append('    "{}" [label="{}" {}]'.format(node_key, self.nodes[node_key]['node'],
-                                                        color))
+
+            # The DOT language requires that literal double quotes be escaped using a backslash
+            # character.
+            escaped_label = str(self.nodes[node_key]['node']).replace('"', '\\"')
+
+            sb.append('    "{}" [label="{}" {}]'.format(node_key, escaped_label, color))
         sb.append("}")
         return "\n".join(sb)
 
