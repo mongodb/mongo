@@ -27,8 +27,7 @@
 
 #pragma once
 
-#include "mongo/util/net/ssl_manager.h"
-
+#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"

@@ -34,7 +34,6 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/future.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

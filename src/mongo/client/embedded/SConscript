@@ -45,8 +45,9 @@ env.Library(
     ],
 )
 
-env.Library('repl_coordinator_embedded',
-    [
+env.Library(
+    target='repl_coordinator_embedded',
+    source=[
         'replication_coordinator_embedded.cpp',
     ],
     LIBDEPS=[
@@ -130,8 +131,8 @@ capi = env.Library(
         'libmongodbcapi.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         'embedded',
     ],
@@ -162,12 +163,12 @@ capiTest = capiTestEnv.Program(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/shell_protocol',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/rpc/protocol',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'mongo_embedded_capi',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_options_core',
     ],
     INSTALL_ALIAS=[
         'mobile-test',
@@ -247,12 +248,11 @@ embeddedTransportTest = embeddedTransportTestEnv.Program(
         'functions_for_test.cpp',
     ],
     LIBDEPS=[
-        'mongo_embedded_transport',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/unittest/unittest',
-    ],
-    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'mongo_embedded_transport',
     ],
     INSTALL_ALIAS=[
         'mobile-test',

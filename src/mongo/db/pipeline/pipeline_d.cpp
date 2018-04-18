@@ -87,7 +87,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

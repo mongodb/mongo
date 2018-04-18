@@ -218,7 +218,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/system_error',
         '$BUILD_DIR/mongo/client/authentication',
-        '$BUILD_DIR/mongo/util/net/ssl_stream',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
         '$BUILD_DIR/third_party/shim_asio',
         'task_executor_interface',
     ]

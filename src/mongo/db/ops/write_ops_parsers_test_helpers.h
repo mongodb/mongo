@@ -29,7 +29,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/op_msg.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 /**

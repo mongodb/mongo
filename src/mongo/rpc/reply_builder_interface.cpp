@@ -34,8 +34,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/message.h"
-
 
 namespace mongo {
 namespace rpc {

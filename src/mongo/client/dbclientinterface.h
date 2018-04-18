@@ -41,7 +41,9 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/functional.h"
@@ -49,8 +51,6 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 

@@ -35,7 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/util/net/message.h"
+#include "mongo/rpc/message.h"
 
 namespace mongo {
 

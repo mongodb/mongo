@@ -34,7 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/util/net/message.h"
+#include "mongo/rpc/message.h"
 
 namespace mongo {
 class BSONObj;

@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/rpc/message.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
@@ -48,7 +49,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/quick_exit.h"
 

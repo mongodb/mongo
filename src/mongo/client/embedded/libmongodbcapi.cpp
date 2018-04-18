@@ -41,11 +41,11 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 

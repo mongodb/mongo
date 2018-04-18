@@ -30,8 +30,8 @@
 
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/sockaddr.h"
+#include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 namespace {

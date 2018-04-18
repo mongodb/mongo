@@ -35,9 +35,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/command_request.h"
 #include "mongo/rpc/command_request_builder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/message.h"
 
 namespace {
 

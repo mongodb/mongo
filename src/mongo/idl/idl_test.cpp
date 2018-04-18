@@ -31,8 +31,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/unittest_gen.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/op_msg.h"
 
 using namespace mongo::idl::test;
 using namespace mongo::idl::import;

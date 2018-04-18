@@ -32,11 +32,11 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

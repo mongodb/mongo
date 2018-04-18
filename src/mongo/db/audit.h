@@ -36,7 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/util/net/op_msg.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 

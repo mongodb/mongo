@@ -648,7 +648,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'mongo/bson/bsonobj.h',
             'mongo/bson/bsonobjbuilder.h',
             'mongo/idl/idl_parser.h',
-            'mongo/util/net/op_msg.h',
+            'mongo/rpc/op_msg.h',
         ] + spec.globals.cpp_includes
 
         header_list.sort()

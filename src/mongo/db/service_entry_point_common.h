@@ -34,8 +34,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/rpc/message.h"
 #include "mongo/util/fail_point_service.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 

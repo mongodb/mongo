@@ -41,6 +41,10 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
 
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#include <openssl/ssl.h>
+#endif  // #ifdef MONGO_CONFIG_SSL
+
 namespace mongo {
 
 namespace moe = mongo::optionenvironment;

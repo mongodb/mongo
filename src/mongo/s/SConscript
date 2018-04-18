@@ -62,6 +62,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/update/update_common',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         'common_s',
     ],
 )

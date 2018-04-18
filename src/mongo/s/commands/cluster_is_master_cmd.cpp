@@ -40,7 +40,7 @@
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/map_util.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/version.h"
 
 namespace mongo {

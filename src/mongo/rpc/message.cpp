@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/net/message.h"
+#include "mongo/rpc/message.h"
 
 #include "mongo/platform/atomic_word.h"
 

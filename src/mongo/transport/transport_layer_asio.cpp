@@ -45,8 +45,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"

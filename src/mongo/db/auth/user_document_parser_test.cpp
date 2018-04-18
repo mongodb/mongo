@@ -40,7 +40,7 @@
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)

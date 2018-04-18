@@ -35,6 +35,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifndef _WIN32
 #include <sys/poll.h>

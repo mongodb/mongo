@@ -1,8 +1,4 @@
-// socktests.cpp : sock.{h,cpp} unit tests.
-//
-
-/**
- *    Copyright (C) 2008 10gen Inc.
+/*    Copyright 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -29,35 +25,37 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/isself.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/socket_utils.h"
+#include <string>
 
-namespace SockTests {
 
-class HostByName {
-public:
-    void run() {
-        ASSERT_EQUALS("127.0.0.1", hostbyname("localhost"));
-        ASSERT_EQUALS("127.0.0.1", hostbyname("127.0.0.1"));
-        // ASSERT_EQUALS( "::1", hostbyname( "::1" ) ); // IPv6 disabled at runtime by default.
+namespace mongo {
 
-        HostAndPort h("asdfasdfasdf_no_such_host");
-        ASSERT_EQUALS("", hostbyname("asdfasdfasdf_no_such_host"));
-    }
-};
+void setSocketKeepAliveParams(int sock,
+                              unsigned int maxKeepIdleSecs = 300,
+                              unsigned int maxKeepIntvlSecs = 300);
 
-class All : public Suite {
-public:
-    All() : Suite("sock") {}
-    void setupTests() {
-        add<HostByName>();
-    }
-};
+std::string makeUnixSockPath(int port);
 
-SuiteInstance<All> myall;
+// If an ip address is passed in, just return that.  If a hostname is passed
+// in, look up its ip and return that.  Returns "" on failure.
+std::string hostbyname(const char* hostname);
 
-}  // namespace SockTests
+void enableIPv6(bool state = true);
+bool IPv6Enabled();
+
+/** this is not cache and does a syscall */
+std::string getHostName();
+
+/** this is cached, so if changes during the process lifetime
+ * will be stale */
+std::string getHostNameCached();
+
+/** Returns getHostNameCached():<port>. */
+std::string getHostNameCachedAndPort();
+
+/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
+std::string prettyHostName();
+
+}  // namespace mongo

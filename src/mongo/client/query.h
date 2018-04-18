@@ -30,7 +30,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/util/net/message.h"
+#include "mongo/rpc/message.h"
 
 
 namespace mongo {

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/net/op_msg.h"
+#include "mongo/rpc/op_msg.h"
 
 #include <bitset>
 #include <set>

@@ -37,7 +37,7 @@
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_types.h"

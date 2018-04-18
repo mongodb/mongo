@@ -35,7 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/message.h"
+#include "mongo/rpc/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

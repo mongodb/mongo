@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_noop.h"
@@ -39,7 +40,6 @@
 #include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 
 #include <string>
 #include <vector>

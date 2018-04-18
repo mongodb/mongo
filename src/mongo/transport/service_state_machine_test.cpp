@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
@@ -47,7 +48,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/op_msg.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

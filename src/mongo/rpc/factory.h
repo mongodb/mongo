@@ -28,8 +28,8 @@
 
 #pragma once
 
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
-#include "mongo/util/net/op_msg.h"
 
 #include <memory>
 

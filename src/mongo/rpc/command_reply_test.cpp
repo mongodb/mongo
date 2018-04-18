@@ -37,9 +37,9 @@
 #include "mongo/base/data_view.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/command_reply.h"
+#include "mongo/rpc/message.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/message.h"
 
 namespace {
 
