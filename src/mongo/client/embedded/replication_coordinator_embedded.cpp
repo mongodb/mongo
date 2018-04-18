@@ -437,5 +437,9 @@ void ReplicationCoordinatorEmbedded::setIndexPrefetchConfig(
     UASSERT_NOT_IMPLEMENTED;
 }
 
+void ReplicationCoordinatorEmbedded::signalDropPendingCollectionsRemovedFromStorage() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

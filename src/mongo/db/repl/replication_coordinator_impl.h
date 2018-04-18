@@ -311,6 +311,8 @@ public:
 
     virtual Status abortCatchupIfNeeded() override;
 
+    void signalDropPendingCollectionsRemovedFromStorage() final;
+
     // ================== Test support API ===================
 
     /**

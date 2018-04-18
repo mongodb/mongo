@@ -286,6 +286,8 @@ public:
 
     virtual Status abortCatchupIfNeeded() override;
 
+    void signalDropPendingCollectionsRemovedFromStorage() final;
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
     ServiceContext* const _service;

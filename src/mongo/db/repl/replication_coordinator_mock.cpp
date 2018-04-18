@@ -490,5 +490,7 @@ Status ReplicationCoordinatorMock::abortCatchupIfNeeded() {
     return Status::OK();
 }
 
+void ReplicationCoordinatorMock::signalDropPendingCollectionsRemovedFromStorage() {}
+
 }  // namespace repl
 }  // namespace mongo

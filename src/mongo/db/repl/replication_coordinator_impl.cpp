@@ -2671,6 +2671,11 @@ Status ReplicationCoordinatorImpl::abortCatchupIfNeeded() {
     return Status(ErrorCodes::IllegalOperation, "The node is not in catch-up mode.");
 }
 
+void ReplicationCoordinatorImpl::signalDropPendingCollectionsRemovedFromStorage() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    _wakeReadyWaiters_inlock();
+}
+
 void ReplicationCoordinatorImpl::_enterDrainMode_inlock() {
     _applierState = ApplierState::Draining;
     _externalState->stopProducer();

@@ -234,6 +234,8 @@ public:
 
     Status abortCatchupIfNeeded() override;
 
+    void signalDropPendingCollectionsRemovedFromStorage() final;
+
 private:
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;

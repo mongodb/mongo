@@ -829,6 +829,11 @@ public:
     virtual Status abortCatchupIfNeeded() = 0;
 
     /**
+     * Signals that drop pending collections have been removed from storage.
+     */
+    virtual void signalDropPendingCollectionsRemovedFromStorage() = 0;
+
+    /**
      * Returns true if logOp() should not append an entry to the oplog for the namespace for this
      * operation.
      */
