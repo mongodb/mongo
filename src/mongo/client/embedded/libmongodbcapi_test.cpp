@@ -33,9 +33,11 @@
 #include <yaml-cpp/yaml.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
@@ -280,6 +282,55 @@ TEST_F(MongodbCAPITest, InsertMultipleDocuments) {
     ASSERT(outputBSON.getField("ok").numberDouble() == 1.0);
 }
 
+TEST_F(MongodbCAPITest, KillOp) {
+    auto client = createClient();
+
+    mongo::stdx::thread killOpThread([this]() {
+        auto client = createClient();
+
+        mongo::BSONObj currentOpObj = mongo::fromjson("{currentOp: 1}");
+        auto currentOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", currentOpObj);
+        mongo::BSONObj outputBSON;
+
+        // Wait for the sleep command to start in the main test thread.
+        int opid = -1;
+        do {
+            outputBSON = performRpc(client, currentOpMsg);
+            auto inprog = outputBSON.getObjectField("inprog");
+
+            // See if we find the sleep command among the running commands
+            for (const auto& elt : inprog) {
+                auto inprogObj = inprog.getObjectField(elt.fieldNameStringData());
+                std::string ns = inprogObj.getStringField("ns");
+                if (ns == "admin.$cmd") {
+                    opid = inprogObj.getIntField("opid");
+                    break;
+                }
+            }
+        } while (opid == -1);
+
+        // Sleep command found, kill it.
+        std::stringstream ss;
+        ss << "{'killOp': 1, 'op': " << opid << "}";
+        mongo::BSONObj killOpObj = mongo::fromjson(ss.str());
+        auto killOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", killOpObj);
+        outputBSON = performRpc(client, killOpMsg);
+
+        ASSERT(outputBSON.hasField("ok"));
+        ASSERT(outputBSON.getField("ok").numberDouble() == 1.0);
+    });
+
+    mongo::BSONObj sleepObj = mongo::fromjson("{'sleep': {'secs': 1000}}");
+    auto sleepOpMsg = mongo::OpMsgRequest::fromDBAndBody("admin", sleepObj);
+    auto outputBSON = performRpc(client, sleepOpMsg);
+
+    ASSERT(outputBSON.hasField("ok"));
+    ASSERT(outputBSON.getField("ok").numberDouble() != 1.0);
+    ASSERT(outputBSON.getIntField("code") == mongo::ErrorCodes::Interrupted);
+
+    killOpThread.join();
+}
+
 TEST_F(MongodbCAPITest, ReadDB) {
     auto client = createClient();
 
@@ -466,6 +517,8 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::serverGlobalParams.noUnixSocket = true;
     ::mongo::unittest::setupTestLogger();
+
+    mongo::setTestCommandsEnabled(true);
 
     // Check so we can initialize the library without providing init params
     int init = libmongodbcapi_init(nullptr);

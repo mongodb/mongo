@@ -5,9 +5,6 @@
  * successfully.
  *
  * @tags: [
- *  # killop command is not yet available on embedded
- *  incompatible_with_embedded_todo_investigate,
- *
  *  # Uses index building in background
  *  requires_background_index,
  * ]

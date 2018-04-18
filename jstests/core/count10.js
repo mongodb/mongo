@@ -7,8 +7,8 @@
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
 //
-//   # killop command is not yet available on embedded
-//   incompatible_with_embedded_todo_investigate,
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 
 t = db.count10;
