@@ -198,3 +198,4 @@ executor:
       settings:
         # Speeds up failover, reduces chance DBClientRS times out retargeting the primary.
         electionTimeoutMillis: 6500
+        catchUpTimeoutMillis: 0

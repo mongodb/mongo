@@ -51,5 +51,11 @@ executor:
     configsvr_options:
       num_nodes: 3
       all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
     shard_options:
       all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0

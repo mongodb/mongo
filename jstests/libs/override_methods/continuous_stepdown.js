@@ -20,6 +20,9 @@
  *    stepdownIntervalMS: number (default 8 seconds)
  *        Number of milliseconds to wait after issuing a step down command, and discovering the new
  *        primary.
+ *
+ *    catchUpTimeoutMS: number (default 0 seconds)
+ *        The amount of time allowed for newly-elected primaries to catch up.
  */
 
 let ContinuousStepdown;
@@ -162,7 +165,8 @@ let ContinuousStepdown;
             electionTimeoutMS: 5 * 1000,
             shardStepdown: true,
             stepdownDurationSecs: 10,
-            stepdownIntervalMS: 8 * 1000
+            stepdownIntervalMS: 8 * 1000,
+            catchUpTimeoutMS: 0,
         };
         stepdownOptions = Object.merge(defaultOptions, stepdownOptions);
 
@@ -214,10 +218,13 @@ let ContinuousStepdown;
             const _stepdownThread = new StepdownThread();
 
             /**
-             * Reconfigures the replica set to change its election timeout to
-             * stepdownOptions.electionTimeoutMS so a new primary can get elected before the
-             * stepdownOptions.stepdownIntervalMS period would cause one to step down again, then
-             * starts the primary stepdown thread.
+             * Reconfigures the replica set, then starts the stepdown thread. As part of the new
+             * config, this sets:
+             * - electionTimeoutMillis to stepdownOptions.electionTimeoutMS so a new primary can
+             *   get elected before the stepdownOptions.stepdownIntervalMS period would cause one
+             *   to step down again.
+             * - catchUpTimeoutMillis to stepdownOptions.catchUpTimeoutMS. Lower values increase
+             *   the likelihood and volume of rollbacks.
              */
             this.startContinuousFailover = function() {
                 if (_stepdownThread.hasStarted()) {
@@ -225,14 +232,29 @@ let ContinuousStepdown;
                 }
 
                 const rsconfig = this.getReplSetConfigFromNode();
-                if (rsconfig.settings.electionTimeoutMillis !== stepdownOptions.electionTimeoutMS) {
+
+                const shouldUpdateElectionTimeout =
+                    (rsconfig.settings.electionTimeoutMillis !== stepdownOptions.electionTimeoutMS);
+                const shouldUpdateCatchUpTimeout =
+                    (rsconfig.settings.catchUpTimeoutMillis !== stepdownOptions.catchUpTimeoutMS);
+
+                if (shouldUpdateElectionTimeout || shouldUpdateCatchUpTimeout) {
                     rsconfig.settings.electionTimeoutMillis = stepdownOptions.electionTimeoutMS;
+                    rsconfig.settings.catchUpTimeoutMillis = stepdownOptions.catchUpTimeoutMS;
+
                     rsconfig.version += 1;
                     reconfig(this, rsconfig);
-                    assert.eq(this.getReplSetConfigFromNode().settings.electionTimeoutMillis,
+
+                    const newSettings = this.getReplSetConfigFromNode().settings;
+
+                    assert.eq(newSettings.electionTimeoutMillis,
                               stepdownOptions.electionTimeoutMS,
                               "Failed to set the electionTimeoutMillis to " +
                                   stepdownOptions.electionTimeoutMS + " milliseconds.");
+                    assert.eq(newSettings.catchUpTimeoutMillis,
+                              stepdownOptions.catchUpTimeoutMS,
+                              "Failed to set the catchUpTimeoutMillis to " +
+                                  stepdownOptions.catchUpTimeoutMS + " milliseconds.");
                 }
 
                 _stepdownThread.start(this.nodes[0].host, stepdownOptions);
