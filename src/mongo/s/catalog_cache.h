@@ -212,6 +212,33 @@ private:
     };
 
     /**
+     * Return type for helper functions performing refreshes so that they can
+     * indicate both status and whether or not this thread joined an in
+     * progress refresh.
+     */
+    template <class T>
+    struct RefreshResult {
+        // Status containing result of refresh
+        StatusWith<T> status;
+
+        // Flag indicating whether or not this thread performed its own
+        // refresh. kDidNotPerformRefresh could mean that either no refresh was
+        // performed at all (which would be indicated by the status) or that it
+        // joined an already in-progress refresh.
+        enum class RefreshAction {
+            kPerformedRefresh,
+            kJoinedInProgressRefresh,
+        } actionTaken;
+    };
+
+    /**
+     * Helper function for getDatabase that includes in its result what refresh
+     * action was taken
+     */
+    RefreshResult<CachedDatabaseInfo> _getDatabase(OperationContext* opCtx, StringData dbName);
+
+
+    /**
      * Non-blocking call which schedules an asynchronous refresh for the specified database. The
      * database entry must be in the 'needsRefresh' state.
      */
@@ -228,7 +255,15 @@ private:
                                     NamespaceString const& nss,
                                     int refreshAttempt);
 
-    StatusWith<CachedCollectionRoutingInfo> _getCollectionRoutingInfoAt(
+
+    /**
+     * Helper function used when we need the refresh action taken (e.g. when we
+     * want to force refresh)
+     */
+    RefreshResult<CachedCollectionRoutingInfo> _getCollectionRoutingInfo(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    RefreshResult<CachedCollectionRoutingInfo> _getCollectionRoutingInfoAt(
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<Timestamp> atClusterTime);
