@@ -964,7 +964,7 @@ buildvariants:
     cluster: shard
     platform: linux
     project: *project
-    authentication: disabled
+    authentication: enabled
   run_on:
       - "rhel70-perf-shard"
   tasks:
