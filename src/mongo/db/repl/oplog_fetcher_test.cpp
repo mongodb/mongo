@@ -266,18 +266,26 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0)
     ASSERT_EQUALS(OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout, timeout);
 }
 
-TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermNotLastFetched) {
+TEST_F(OplogFetcherTest, FindQueryContainsReadConcernIfTermNotLastFetched) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
     auto uninitializedTerm = OpTime::kUninitializedTerm;
     ASSERT_NOT_EQUALS(dataReplicatorExternalState->currentTerm, uninitializedTerm);
     dataReplicatorExternalState->currentTerm++;
     auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
-    ASSERT_FALSE(cmdObj.hasField("readConcern"));
+    ASSERT_TRUE(cmdObj.hasField("readConcern")) << cmdObj;
+    ASSERT_EQUALS(lastFetched.opTime.getTimestamp(),
+                  cmdObj["readConcern"].Obj()["afterClusterTime"].timestamp())
+        << cmdObj;
 }
 
-TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermUninitialized) {
+TEST_F(OplogFetcherTest, FindQueryContainsReadConcernIfTermUninitialized) {
+    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
     dataReplicatorExternalState->currentTerm = OpTime::kUninitializedTerm;
     auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
-    ASSERT_FALSE(cmdObj.hasField("readConcern"));
+    ASSERT_TRUE(cmdObj.hasField("readConcern")) << cmdObj;
+    ASSERT_EQUALS(lastFetched.opTime.getTimestamp(),
+                  cmdObj["readConcern"].Obj()["afterClusterTime"].timestamp())
+        << cmdObj;
 }
 
 TEST_F(OplogFetcherTest, FindQueryHasAfterOpTimeWithFeatureCompatibilityVersion34) {
