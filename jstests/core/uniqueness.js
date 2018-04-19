@@ -4,8 +4,8 @@
 //     cannot_create_unique_index_when_using_hashed_shard_key,
 //     requires_fastcount,
 //
-//     # Investigate why this fails on embedded
-//     incompatible_with_embedded_todo_investigate,
+//     # Uses index building in background
+//     requires_background_index,
 // ]
 
 var res;

@@ -5,8 +5,8 @@
 //     requires_fastcount,
 //     requires_collstats,
 //
-//     # Need to investigate why this fails on embedded
-//     incompatible_with_embedded_todo_investigate,
+//     # splitVector command is not available on embedded
+//     incompatible_with_embedded,
 // ]
 
 // -------------------------
