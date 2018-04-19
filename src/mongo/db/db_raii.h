@@ -115,11 +115,12 @@ private:
     // release locks in order to block waiting
     boost::optional<AutoGetCollection> _autoColl;
 
-    // Returns true if we should read from the local snapshot (last applied timestamp) on a
-    // secondary.
-    bool _shouldDoSecondaryLocalSnapshotRead(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             repl::ReadConcernLevel readConcernLevel) const;
+    // Returns true if we should read at the last applied timestamp instead of at "no" timestamp
+    // (i.e. reading with the "latest" snapshot reflecting all writes).  Reading at the last applied
+    // timestamp avoids reading in-flux data actively being written by the replication system.
+    bool _shouldReadAtLastAppliedTimestamp(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           repl::ReadConcernLevel readConcernLevel) const;
 
     // Returns true if the minSnapshot causes conflicting catalog changes for the provided read
     // concern level or lastAppliedTimestamp.

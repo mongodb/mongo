@@ -343,17 +343,15 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         // transaction was started.
         _majorityCommittedSnapshot =
             _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
-    } else if (_isOplogReader) {
-        invariant(!_shouldReadAtLastAppliedTimestamp);
-        _sessionCache->snapshotManager().beginTransactionOnOplog(
-            _sessionCache->getKVEngine()->getOplogManager(), session);
-
     } else if (_shouldReadAtLastAppliedTimestamp &&
                _sessionCache->snapshotManager().getLocalSnapshot()) {
         // Read from the last applied timestamp (tracked globally by the SnapshotManager), which is
         // the timestamp of the most recent completed replication batch operation. This should only
         // be true for local or available readConcern on secondaries.
         _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(session, ignorePrepare);
+    } else if (_isOplogReader) {
+        _sessionCache->snapshotManager().beginTransactionOnOplog(
+            _sessionCache->getKVEngine()->getOplogManager(), session);
     } else {
         invariantWTOK(
             session->begin_transaction(session, ignorePrepare ? "ignore_prepare=true" : nullptr));

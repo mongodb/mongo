@@ -120,8 +120,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         // Read at the last applied timestamp if we don't have the PBWM lock and correct conditions
         // are met.
-        bool readAtLastAppliedTimestamp = _shouldNotConflictWithSecondaryBatchApplicationBlock &&
-            _shouldDoSecondaryLocalSnapshotRead(opCtx, nss, readConcernLevel);
+        bool readAtLastAppliedTimestamp =
+            _shouldReadAtLastAppliedTimestamp(opCtx, nss, readConcernLevel);
 
         opCtx->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(readAtLastAppliedTimestamp);
 
@@ -155,9 +155,9 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         // would block indefinitely waiting for the lastAppliedTimestamp to move forward. Instead we
         // force the reader take the PBWM lock and retry.
         if (lastAppliedTimestamp) {
-            LOG(2) << "Tried reading from local snapshot time: " << *lastAppliedTimestamp
+            LOG(2) << "Tried reading at last-applied time: " << *lastAppliedTimestamp
                    << " on nss: " << nss.ns() << ", but future catalog changes are pending at time "
-                   << *minSnapshot << ". Trying again without reading from the local snapshot";
+                   << *minSnapshot << ". Trying again without reading at last-applied time.";
             _shouldNotConflictWithSecondaryBatchApplicationBlock = boost::none;
         }
 
@@ -175,31 +175,43 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     }
 }
 
-bool AutoGetCollectionForRead::_shouldDoSecondaryLocalSnapshotRead(
+bool AutoGetCollectionForRead::_shouldReadAtLastAppliedTimestamp(
     OperationContext* opCtx,
     const NamespaceString& nss,
     repl::ReadConcernLevel readConcernLevel) const {
-    // Majority and snapshot readConcern levels should not read from the local snapshot. For both we
-    // already wait until the desired timestamp, which is updated at the end of each batch.
+
+    // If external circumstances prevent us from reading at lastApplied, disallow it.
+    if (!_shouldNotConflictWithSecondaryBatchApplicationBlock) {
+        return false;
+    }
+
+    // Majority and snapshot readConcern levels should not read from lastApplied; these read
+    // concerns already have a designated timestamp to read from.
     if (readConcernLevel != repl::ReadConcernLevel::kLocalReadConcern &&
         readConcernLevel != repl::ReadConcernLevel::kAvailableReadConcern) {
         return false;
     }
 
     // If we are in a replication state (like secondary or primary catch-up) where we are not
-    // accepting writes, we should always read from the last applied snapshot. If this node can
-    // accept writes, then no conflicting replication batches are being applied and we can read from
-    // the default snapshot.
+    // accepting writes, we should read at lastApplied. If this node can accept writes, then no
+    // conflicting replication batches are being applied and we can read from the default snapshot.
     if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin")) {
         return false;
     }
 
-    // Local and available read concerns should not be restricted to batch boundaries for
-    // non-replicated collections. Not being able to read from the last applied timestamp with
-    // non-network clients is tracked by SERVER-34440.
-    if (!nss.isReplicated() || !opCtx->getClient()->isFromUserConnection()) {
+    // Non-replicated collections do not need to read at lastApplied, as those collections are not
+    // written by the replication system.  However, the oplog is special, as it *is* written by the
+    // replication system.
+    if (!nss.isReplicated() && !nss.isOplog()) {
         return false;
     }
+
+    // Not being able to read from the lastApplied with non-network clients is tracked by
+    // SERVER-34440.  After SERVER-34440 is fixed, this code can be removed.
+    if (!opCtx->getClient()->isFromUserConnection()) {
+        return false;
+    }
+
     return true;
 }
 
