@@ -717,6 +717,7 @@ functions:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -794,6 +795,12 @@ functions:
             extra_args="$extra_args --storageEngineCacheSizeGB=1"
           fi
           set -o errexit
+
+
+          # Reduce the JSHeapLimit for the serial_run task task on Code Coverage builder variant.
+          if [[ "${build_variant}" = "enterprise-rhel-62-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
+            extra_args="$extra_args --mongodSetParameter {'jsHeapLimitMB':10}"
+          fi
 
           path_value="$PATH"
           if [ ${variant_path_suffix} ]; then
