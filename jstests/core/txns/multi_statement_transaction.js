@@ -37,8 +37,8 @@
     assert.docEq({_id: "insert-1"}, sessionColl.findOne());
 
     // Read with aggregation also returns the document.
-    let res = sessionColl.aggregate([{$match: {_id: "insert-1"}}]);
-    assert.docEq([{_id: "insert-1"}], res.toArray());
+    let docs = sessionColl.aggregate([{$match: {_id: "insert-1"}}]).toArray();
+    assert.docEq([{_id: "insert-1"}], docs);
 
     // Insert a doc within a transaction.
     assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
@@ -109,8 +109,8 @@
     assert.eq(null, testColl.findOne({_id: "doc-2"}));
 
     // But read in the same transaction returns the docs.
-    res = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}]});
-    assert.docEq([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], res.toArray());
+    docs = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}]}).toArray();
+    assert.docEq([{_id: "doc-1", a: 1}, {_id: "doc-2", a: 1}], docs);
 
     // Commit the transaction.
     session.commitTransaction();
@@ -144,8 +144,8 @@
     assert.eq(null, testColl.findOne({_id: "doc-3"}));
 
     // But read in the same transaction sees the docs get deleted.
-    res = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}, {_id: "doc-3"}]});
-    assert.docEq([], res.toArray());
+    docs = sessionColl.find({$or: [{_id: "doc-1"}, {_id: "doc-2"}, {_id: "doc-3"}]}).toArray();
+    assert.docEq([], docs);
 
     // Commit the transaction.
     session.commitTransaction();
@@ -163,7 +163,7 @@
 
     session.startTransaction();
 
-    res = sessionDb.runCommand({
+    let res = sessionDb.runCommand({
         find: collName,
         batchSize: 0,
     });
