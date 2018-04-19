@@ -176,10 +176,6 @@ public:
             return true;
         }
 
-        AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-            return definition()->secondaryAllowed(context);
-        }
-
         void doCheckAuthorization(OperationContext*) const override {}
 
         /**
@@ -221,10 +217,6 @@ public:
     private:
         bool supportsWriteConcern() const override {
             return true;
-        }
-
-        AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-            return definition()->secondaryAllowed(context);
         }
 
         void explain(OperationContext* opCtx,
@@ -272,10 +264,6 @@ public:
             return true;
         }
 
-        AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-            return definition()->secondaryAllowed(context);
-        }
-
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      BSONObjBuilder* result) override {}
@@ -311,9 +299,6 @@ public:
         }
         bool supportsWriteConcern() const override {
             return false;
-        }
-        Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-            return Base::definition()->secondaryAllowed(context);
         }
         void doCheckAuthorization(OperationContext* opCtx) const override {}
 

@@ -243,10 +243,6 @@ private:
         }
     }
 
-    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const final {
-        return definition()->secondaryAllowed(context);
-    }
-
     bool supportsReadConcern(repl::ReadConcernLevel level) const final {
         return level == repl::ReadConcernLevel::kLocalReadConcern ||
             level == repl::ReadConcernLevel::kSnapshotReadConcern;

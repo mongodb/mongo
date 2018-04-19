@@ -345,10 +345,6 @@ private:
         return true;
     }
 
-    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-        return command()->secondaryAllowed(context);
-    }
-
     void doCheckAuthorization(OperationContext* opCtx) const final {
         try {
             doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));

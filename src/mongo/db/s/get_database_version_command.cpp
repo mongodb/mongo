@@ -57,10 +57,6 @@ public:
             return false;
         }
 
-        AllowedOnSecondary secondaryAllowed(ServiceContext* srvCtx) const override {
-            return definition()->secondaryAllowed(srvCtx);
-        }
-
         // The command parameter happens to be string so it's historically been interpreted
         // by parseNs as a collection. Continuing to do so here for unexamined compatibility.
         NamespaceString ns() const override {

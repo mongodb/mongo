@@ -135,10 +135,6 @@ public:
         return false;
     }
 
-    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-        return command()->secondaryAllowed(context);
-    }
-
     /**
      * You are authorized to run an explain if you are authorized to run
      * the command that you are explaining. The auth check is performed recursively
