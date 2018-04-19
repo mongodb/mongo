@@ -4559,6 +4559,204 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharding_ese_0
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_0 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_1
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_1 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_2
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_2 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_3
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_3 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_4
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_4 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_5
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_5 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_6
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_6 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_7
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_7 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_8
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_8 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_9
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_9 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_10
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_10 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_11
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_11 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_12
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_12 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_13
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_13 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_14
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_14 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_15
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_15 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_16
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_16 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_17
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_17 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_18
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_18 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_19
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_19 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_20
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_20 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_ese_misc
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_ese_misc --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: sharding_op_query
   commands:
   - func: "do setup"
@@ -6851,6 +7049,30 @@ buildvariants:
     - replica_sets_ese_5
     - replica_sets_ese_6
     - replica_sets_ese_misc
+  - name: sharding_ese
+    execution_tasks:
+    - sharding_ese_0
+    - sharding_ese_1
+    - sharding_ese_2
+    - sharding_ese_3
+    - sharding_ese_4
+    - sharding_ese_5
+    - sharding_ese_6
+    - sharding_ese_7
+    - sharding_ese_8
+    - sharding_ese_9
+    - sharding_ese_10
+    - sharding_ese_11
+    - sharding_ese_12
+    - sharding_ese_13
+    - sharding_ese_14
+    - sharding_ese_15
+    - sharding_ese_16
+    - sharding_ese_17
+    - sharding_ese_18
+    - sharding_ese_19
+    - sharding_ese_20
+    - sharding_ese_misc
   tasks:
   - name: compile
     requires:
@@ -6875,9 +7097,6 @@ buildvariants:
   - name: jsCore
   - name: jsCore_ese
   - name: jsCore_decimal
-  - name: sharding_ese
-    distros:
-    - windows-64-vs2015-large
   - name: jsCore_auth
   - name: jsCore_txns
   - name: aggregation_fuzzer
@@ -6908,6 +7127,72 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: sharding_auth_audit
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_0
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_1
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_2
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_3
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_4
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_5
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_6
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_7
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_8
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_9
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_10
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_11
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_12
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_13
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_14
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_15
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_16
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_17
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_18
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_19
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_20
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_misc
     distros:
     - windows-64-vs2015-large
   - name: snmp
@@ -7729,6 +8014,30 @@ buildvariants:
     - sharding_13
     - sharding_14
     - sharding_misc
+  - name: sharding_ese
+    execution_tasks:
+    - sharding_ese_0
+    - sharding_ese_1
+    - sharding_ese_2
+    - sharding_ese_3
+    - sharding_ese_4
+    - sharding_ese_5
+    - sharding_ese_6
+    - sharding_ese_7
+    - sharding_ese_8
+    - sharding_ese_9
+    - sharding_ese_10
+    - sharding_ese_11
+    - sharding_ese_12
+    - sharding_ese_13
+    - sharding_ese_14
+    - sharding_ese_15
+    - sharding_ese_16
+    - sharding_ese_17
+    - sharding_ese_18
+    - sharding_ese_19
+    - sharding_ese_20
+    - sharding_ese_misc
   tasks:
   - name: compile
     requires:
@@ -7963,13 +8272,76 @@ buildvariants:
   - name: sharding_misc
     distros:
     - rhel62-large
-  - name: sharding_ese
-    distros:
-    - rhel62-large
   - name: sharding_auth
     distros:
     - rhel62-large
   - name: sharding_auth_audit
+    distros:
+    - rhel62-large
+  - name: sharding_ese_0
+    distros:
+    - rhel62-large
+  - name: sharding_ese_1
+    distros:
+    - rhel62-large
+  - name: sharding_ese_2
+    distros:
+    - rhel62-large
+  - name: sharding_ese_3
+    distros:
+    - rhel62-large
+  - name: sharding_ese_4
+    distros:
+    - rhel62-large
+  - name: sharding_ese_5
+    distros:
+    - rhel62-large
+  - name: sharding_ese_6
+    distros:
+    - rhel62-large
+  - name: sharding_ese_7
+    distros:
+    - rhel62-large
+  - name: sharding_ese_8
+    distros:
+    - rhel62-large
+  - name: sharding_ese_9
+    distros:
+    - rhel62-large
+  - name: sharding_ese_10
+    distros:
+    - rhel62-large
+  - name: sharding_ese_11
+    distros:
+    - rhel62-large
+  - name: sharding_ese_12
+    distros:
+    - rhel62-large
+  - name: sharding_ese_13
+    distros:
+    - rhel62-large
+  - name: sharding_ese_14
+    distros:
+    - rhel62-large
+  - name: sharding_ese_15
+    distros:
+    - rhel62-large
+  - name: sharding_ese_16
+    distros:
+    - rhel62-large
+  - name: sharding_ese_17
+    distros:
+    - rhel62-large
+  - name: sharding_ese_18
+    distros:
+    - rhel62-large
+  - name: sharding_ese_19
+    distros:
+    - rhel62-large
+  - name: sharding_ese_20
+    distros:
+    - rhel62-large
+  - name: sharding_ese_misc
     distros:
     - rhel62-large
   - name: sharding_gle_auth_basics_passthrough
