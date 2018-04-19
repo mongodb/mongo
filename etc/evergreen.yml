@@ -4766,6 +4766,123 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: sharding_op_query_0
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_0 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_1
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_1 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_2
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_2 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_3
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_3 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_4
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_4 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_5
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_5 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_6
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_6 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_7
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_7 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_8
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_8 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_9
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_9 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_10
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_10 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_11
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_11 --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: sharding_op_query_misc
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=sharding_misc --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: sharding_auth
   commands:
   - func: "do setup"
@@ -8196,6 +8313,21 @@ buildvariants:
     - sharding_last_stable_mongos_and_mixed_shards_10
     - sharding_last_stable_mongos_and_mixed_shards_11
     - sharding_last_stable_mongos_and_mixed_shards_misc
+  - name: sharding_op_query
+    execution_tasks:
+    - sharding_op_query_0
+    - sharding_op_query_1
+    - sharding_op_query_2
+    - sharding_op_query_3
+    - sharding_op_query_4
+    - sharding_op_query_5
+    - sharding_op_query_6
+    - sharding_op_query_7
+    - sharding_op_query_8
+    - sharding_op_query_9
+    - sharding_op_query_10
+    - sharding_op_query_11
+    - sharding_op_query_misc
   tasks:
   - name: compile
     requires:
@@ -8546,10 +8678,46 @@ buildvariants:
   - name: sharding_last_stable_mongos_and_mixed_shards_misc
     distros:
     - rhel62-large
-  - name: sharding_op_query
+  - name: sharding_csrs_continuous_config_stepdown
     distros:
     - rhel62-large
-  - name: sharding_csrs_continuous_config_stepdown
+  - name: sharding_op_query_0
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_1
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_2
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_3
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_4
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_5
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_6
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_7
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_8
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_9
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_10
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_11
+    distros:
+    - rhel62-large
+  - name: sharding_op_query_misc
     distros:
     - rhel62-large
   - name: slow1
