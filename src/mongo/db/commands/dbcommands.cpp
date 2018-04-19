@@ -629,10 +629,7 @@ public:
             if (!stateElem.eoo()) {
                 int len;
 
-                StringBuilder s;
-                s << "The element that calls binDataClean() must be type of BinData";
-
-                uassert(50750, s.str(), (stateElem.type() == BSONType::BinData));
+                uassert(50750, str::stream() << "The element that calls binDataClean() must be type of BinData, but type of " << typeName(stateElem.type()) << " found.", (stateElem.type() == BSONType::BinData));
 
                 const char* data = stateElem.binDataClean(len);
                 massert(16247, "md5 state not correct size", len == sizeof(st));
@@ -690,10 +687,11 @@ public:
                 // UNLOCKED
                 ctx.reset();
 
-                StringBuilder s;
-                s << "The element that calls binDataClean() must be type of BinData";
-
-                uassert(50751, s.str(), (owned["data"].type() == BSONType::BinData));
+                if (typeName(owned["data"].type()) == 0) {
+                    uassert(50751, str::stream() << "Field name is required", (owned["data"].type() == ));
+                } else {
+                    uassert(50752, str::stream() << "The element that calls binDataClean() must be type of BinData, but type of " << owned["data"].type() << " found.", (owned["data"].type() == BSONType::BinData));
+                }
 
                 int len;
                 const char* data = owned["data"].binDataClean(len);
