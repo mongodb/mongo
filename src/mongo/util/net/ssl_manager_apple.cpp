@@ -76,6 +76,10 @@ static const ::CFAbsoluteTime k20010101_000000_GMT = 978307200;
 StatusWith<std::string> toString(::CFStringRef str) {
     const auto len =
         ::CFStringGetMaximumSizeForEncoding(::CFStringGetLength(str), ::kCFStringEncodingUTF8);
+    if (len == 0) {
+        return std::string();
+    }
+
     std::string ret;
     ret.resize(len + 1);
     if (!::CFStringGetCString(str, &ret[0], len, ::kCFStringEncodingUTF8)) {
