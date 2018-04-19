@@ -80,13 +80,14 @@
     jsTest.log("Cannot abort empty transaction because it's not in progress");
     txnNumber++;
     // abortTransaction can only be called on the admin database.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
+    let res = sessionDb.adminCommand({
         abortTransaction: 1,
         writeConcern: {w: "majority"},
         txnNumber: NumberLong(txnNumber),
         autocommit: false
-    }),
-                                 ErrorCodes.NoSuchTransaction);
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
+    assert.eq(res.errorLabels, ["TransientTxnError"]);
 
     jsTest.log("Abort transaction on duplicated key errors");
     assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
@@ -102,13 +103,16 @@
         autocommit: false
     }));
     // But the second insert throws duplicated index key error.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    res = assert.commandFailedWithCode(sessionDb.runCommand({
         insert: collName,
         documents: [{_id: "insert-1", x: 0}],
         txnNumber: NumberLong(txnNumber),
         autocommit: false
     }),
-                                 ErrorCodes.DuplicateKey);
+                                       ErrorCodes.DuplicateKey);
+    // DuplicateKey is not a transient error.
+    assert.eq(res.errorLabels, null);
+
     // The error aborts the transaction.
     // commitTransaction can only be called on the admin database.
     assert.commandFailedWithCode(sessionDb.adminCommand({
@@ -147,13 +151,15 @@
         autocommit: false
     }));
     // Insert a doc from session 2 that conflicts with session 1.
-    assert.commandFailedWithCode(sessionDb2.runCommand({
+    res = sessionDb2.runCommand({
         insert: collName,
         documents: [{_id: "insert-1", from: 2}],
         txnNumber: NumberLong(txnNumber2),
         autocommit: false
-    }),
-                                 ErrorCodes.WriteConflict);
+    });
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
+    assert.eq(res.errorLabels, ["TransientTxnError"]);
+
     // Session 1 isn't affected.
     // commitTransaction can only be called on the admin database.
     assert.commandWorked(sessionDb.adminCommand({

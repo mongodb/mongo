@@ -217,6 +217,28 @@ bool hasClusterTime(BSONObj metadata) {
     return metadata.hasField(rpc::LogicalTimeMetadata::fieldName());
 }
 
+BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& sessionOptions,
+                       const std::string& commandName,
+                       ErrorCodes::Error code) {
+    // By specifying "autocommit", the user indicates they want to run a transaction.
+    if (!sessionOptions || !sessionOptions->getAutocommit()) {
+        return {};
+    }
+
+    bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
+    bool isTransientTxnError = code == ErrorCodes::WriteConflict  //
+        || code == ErrorCodes::SnapshotUnavailable                //
+        || code == ErrorCodes::NoSuchTransaction                  //
+        // Clients can retry a single commitTransaction command, but cannot retry the whole
+        // transaction if commitTransaction fails due to NotMaster.
+        || (isRetryable && (commandName != "commitTransaction"));
+
+    if (isTransientTxnError) {
+        return BSON("errorLabels" << BSON_ARRAY("TransientTxnError"));
+    }
+    return {};
+}
+
 /**
  * Guard object for making a good-faith effort to enter maintenance mode and leave it when it
  * goes out of scope.
@@ -448,7 +470,8 @@ bool runCommandImpl(OperationContext* opCtx,
                     rpc::ReplyBuilderInterface* replyBuilder,
                     LogicalTime startOperationTime,
                     const ServiceEntryPointCommon::Hooks& behaviors,
-                    BSONObj* writeConcernErrorObj) {
+                    BSONObjBuilder* errorInfoBuilder,
+                    const boost::optional<OperationSessionInfoFromClient>& sessionOptions) {
     const Command* command = invocation->definition();
     auto bytesToReserve = command->reserveBytesForReply();
 
@@ -485,9 +508,7 @@ bool runCommandImpl(OperationContext* opCtx,
         try {
             invokeInTransaction(opCtx, invocation, &crb);
         } catch (const DBException&) {
-            BSONObjBuilder bb;
-            behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, bb);
-            *writeConcernErrorObj = bb.obj();
+            behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, *errorInfoBuilder);
             throw;
         }
 
@@ -506,6 +527,18 @@ bool runCommandImpl(OperationContext* opCtx,
         return CommandHelpers::extractOrAppendOk(body);
     }();
     behaviors.attachCurOpErrInfo(opCtx, crb.getBodyBuilder().asTempObj());
+
+    if (!ok) {
+        auto response = crb.getBodyBuilder().asTempObj();
+        auto codeField = response["code"];
+
+        if (codeField.isNumber()) {
+            auto code = ErrorCodes::Error(codeField.numberInt());
+            // Append the error labels for transient transaction errors.
+            auto errorLabels = getErrorLabels(sessionOptions, command->getName(), code);
+            crb.getBodyBuilder().appendElements(errorLabels);
+        }
+    }
 
     BSONObjBuilder metadataBob;
     appendReplyMetadata(opCtx, request, &metadataBob);
@@ -561,9 +594,10 @@ void execCommandDatabase(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          rpc::ReplyBuilderInterface* replyBuilder,
                          const ServiceEntryPointCommon::Hooks& behaviors) {
-    BSONObj writeConcernErrorObj;
+    BSONObjBuilder errorInfoBuilder;
     auto startOperationTime = getClientOperationTime(opCtx);
     auto invocation = command->parse(opCtx, request);
+    boost::optional<OperationSessionInfoFromClient> sessionOptions = boost::none;
     try {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -575,15 +609,15 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        evaluateFailCommandFailPoint(opCtx, command->getName());
-
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto sessionOptions = initializeOperationSessionInfo(
+        sessionOptions = initializeOperationSessionInfo(
             opCtx,
             request.body,
             command->requiresAuth(),
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking());
+
+        evaluateFailCommandFailPoint(opCtx, command->getName());
 
         const auto dbname = request.getDatabase().toString();
         uassert(
@@ -821,7 +855,8 @@ void execCommandDatabase(OperationContext* opCtx,
                                 replyBuilder,
                                 startOperationTime,
                                 behaviors,
-                                &writeConcernErrorObj)) {
+                                &errorInfoBuilder,
+                                sessionOptions)) {
                 command->incrementCommandsFailed();
             }
         } catch (DBException&) {
@@ -851,6 +886,10 @@ void execCommandDatabase(OperationContext* opCtx,
             }
         }
 
+        // Append the error labels for transient transaction errors.
+        auto errorLabels = getErrorLabels(sessionOptions, command->getName(), e.code());
+        errorInfoBuilder.appendElements(errorLabels);
+
         BSONObjBuilder metadataBob;
         appendReplyMetadata(opCtx, request, &metadataBob);
         auto metadata = metadataBob.obj();
@@ -875,7 +914,7 @@ void execCommandDatabase(OperationContext* opCtx,
                    << "': " << redact(e.toString());
 
             generateErrorResponse(
-                opCtx, replyBuilder, e, metadata, writeConcernErrorObj, operationTime);
+                opCtx, replyBuilder, e, metadata, errorInfoBuilder.obj(), operationTime);
         } else {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
@@ -884,7 +923,7 @@ void execCommandDatabase(OperationContext* opCtx,
                           ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body))
                    << "': " << redact(e.toString());
 
-            generateErrorResponse(opCtx, replyBuilder, e, metadata, writeConcernErrorObj);
+            generateErrorResponse(opCtx, replyBuilder, e, metadata, errorInfoBuilder.obj());
         }
     }
 }
