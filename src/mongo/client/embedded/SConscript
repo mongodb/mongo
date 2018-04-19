@@ -159,6 +159,7 @@ capiTest = capiTestEnv.Program(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/shell_protocol',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/net/network',
         'mongo_embedded_capi',
