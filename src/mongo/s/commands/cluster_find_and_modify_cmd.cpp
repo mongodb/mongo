@@ -121,7 +121,7 @@ public:
             const auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
             shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk->getShardId()));
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
         }
 
         const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
@@ -179,13 +179,13 @@ public:
         auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
         _runCommand(opCtx,
-                    chunk->getShardId(),
-                    chunkMgr->getVersion(chunk->getShardId()),
+                    chunk.getShardId(),
+                    chunkMgr->getVersion(chunk.getShardId()),
                     nss,
                     cmdObj,
                     &result);
         updateChunkWriteStatsAndSplitIfNeeded(
-            opCtx, chunkMgr.get(), chunk.get(), cmdObj.getObjectField("update").objsize());
+            opCtx, chunkMgr.get(), chunk, cmdObj.getObjectField("update").objsize());
 
         return true;
     }

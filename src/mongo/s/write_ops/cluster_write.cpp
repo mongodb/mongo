@@ -157,9 +157,9 @@ void splitIfNeeded(OperationContext* opCtx,
     }
 
     for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
-        std::shared_ptr<Chunk> chunk;
+        boost::optional<Chunk> chunk;
         try {
-            chunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(it->first);
+            chunk.emplace(routingInfo.cm()->findIntersectingChunkWithSimpleCollation(it->first));
         } catch (const AssertionException& ex) {
             warning() << "could not find chunk while checking for auto-split: "
                       << causedBy(redact(ex));
@@ -236,7 +236,7 @@ void ClusterWriter::write(OperationContext* opCtx,
 
 void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                            ChunkManager* manager,
-                                           Chunk* chunk,
+                                           Chunk chunk,
                                            long dataWritten) {
     // Disable lastError tracking so that any errors, which occur during auto-split do not get
     // bubbled up on the client connection doing a write
@@ -245,15 +245,15 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
     const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
     const bool minIsInf =
-        (0 == manager->getShardKeyPattern().getKeyPattern().globalMin().woCompare(chunk->getMin()));
+        (0 == manager->getShardKeyPattern().getKeyPattern().globalMin().woCompare(chunk.getMin()));
     const bool maxIsInf =
-        (0 == manager->getShardKeyPattern().getKeyPattern().globalMax().woCompare(chunk->getMax()));
+        (0 == manager->getShardKeyPattern().getKeyPattern().globalMax().woCompare(chunk.getMax()));
 
-    const uint64_t chunkBytesWritten = chunk->addBytesWritten(dataWritten);
+    const uint64_t chunkBytesWritten = chunk.addBytesWritten(dataWritten);
 
     const uint64_t desiredChunkSize = balancerConfig->getMaxChunkSizeBytes();
 
-    if (!chunk->shouldSplit(desiredChunkSize, minIsInf, maxIsInf)) {
+    if (!chunk.shouldSplit(desiredChunkSize, minIsInf, maxIsInf)) {
         return;
     }
 
@@ -266,7 +266,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
     TicketHolderReleaser releaser(&(manager->autoSplitThrottle()._splitTickets));
 
-    const ChunkRange chunkRange(chunk->getMin(), chunk->getMax());
+    const ChunkRange chunkRange(chunk.getMin(), chunk.getMax());
 
     try {
         // Ensure we have the most up-to-date balancer configuration
@@ -276,7 +276,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             return;
         }
 
-        LOG(1) << "about to initiate autosplit: " << redact(chunk->toString())
+        LOG(1) << "about to initiate autosplit: " << redact(chunk.toString())
                << " dataWritten: " << chunkBytesWritten
                << " desiredChunkSize: " << desiredChunkSize;
 
@@ -295,7 +295,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
         auto splitPoints =
             uassertStatusOK(shardutil::selectChunkSplitPoints(opCtx,
-                                                              chunk->getShardId(),
+                                                              chunk.getShardId(),
                                                               nss,
                                                               manager->getShardKeyPattern(),
                                                               chunkRange,
@@ -306,7 +306,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             // No split points means there isn't enough data to split on; 1 split point means we
             // have
             // between half the chunk size to full chunk size so there is no need to split yet
-            chunk->clearBytesWritten();
+            chunk.clearBytesWritten();
             return;
         }
 
@@ -314,7 +314,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             // We don't want to reset _dataWritten since we want to check the other side right away
         } else {
             // We're splitting, so should wait a bit
-            chunk->clearBytesWritten();
+            chunk.clearBytesWritten();
         }
 
         // We assume that if the chunk being split is the first (or last) one on the collection,
@@ -326,13 +326,13 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
         if (KeyPattern::isOrderedKeyPattern(manager->getShardKeyPattern().toBSON())) {
             if (minIsInf) {
                 BSONObj key = findExtremeKeyForShard(
-                    opCtx, nss, chunk->getShardId(), manager->getShardKeyPattern(), true);
+                    opCtx, nss, chunk.getShardId(), manager->getShardKeyPattern(), true);
                 if (!key.isEmpty()) {
                     splitPoints.front() = key.getOwned();
                 }
             } else if (maxIsInf) {
                 BSONObj key = findExtremeKeyForShard(
-                    opCtx, nss, chunk->getShardId(), manager->getShardKeyPattern(), false);
+                    opCtx, nss, chunk.getShardId(), manager->getShardKeyPattern(), false);
                 if (!key.isEmpty()) {
                     splitPoints.back() = key.getOwned();
                 }
@@ -341,7 +341,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
         const auto suggestedMigrateChunk =
             uassertStatusOK(shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                                  chunk->getShardId(),
+                                                                  chunk.getShardId(),
                                                                   nss,
                                                                   manager->getShardKeyPattern(),
                                                                   manager->getVersion(),
@@ -365,7 +365,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             return collStatus.getValue().value.getAllowBalance();
         }();
 
-        log() << "autosplitted " << nss << " chunk: " << redact(chunk->toString()) << " into "
+        log() << "autosplitted " << nss << " chunk: " << redact(chunk.toString()) << " into "
               << (splitPoints.size() + 1) << " parts (desiredChunkSize " << desiredChunkSize << ")"
               << (suggestedMigrateChunk ? "" : (std::string) " (migrate suggested" +
                           (shouldBalance ? ")" : ", but no migrations allowed)"));
@@ -390,17 +390,17 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
         ChunkType chunkToMove;
         chunkToMove.setNS(nss);
-        chunkToMove.setShard(suggestedChunk->getShardId());
-        chunkToMove.setMin(suggestedChunk->getMin());
-        chunkToMove.setMax(suggestedChunk->getMax());
-        chunkToMove.setVersion(suggestedChunk->getLastmod());
+        chunkToMove.setShard(suggestedChunk.getShardId());
+        chunkToMove.setMin(suggestedChunk.getMin());
+        chunkToMove.setMax(suggestedChunk.getMax());
+        chunkToMove.setVersion(suggestedChunk.getLastmod());
 
         uassertStatusOK(configsvr_client::rebalanceChunk(opCtx, chunkToMove));
 
         // Ensure the collection gets reloaded because of the move
         Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
     } catch (const DBException& ex) {
-        chunk->clearBytesWritten();
+        chunk.clearBytesWritten();
 
         if (ErrorCodes::isStaleShardVersionError(ex.code())) {
             log() << "Unable to auto-split chunk " << redact(chunkRange.toString()) << causedBy(ex)

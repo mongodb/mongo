@@ -565,15 +565,15 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
         const auto to = toStatus.getValue();
 
         // Can't move chunk to shard it's already on
-        if (to->getId() == chunk->getShardId()) {
+        if (to->getId() == chunk.getShardId()) {
             continue;
         }
 
         ChunkType chunkType;
         chunkType.setNS(nss);
-        chunkType.setMin(chunk->getMin());
-        chunkType.setMax(chunk->getMax());
-        chunkType.setShard(chunk->getShardId());
+        chunkType.setMin(chunk.getMin());
+        chunkType.setMax(chunk.getMax());
+        chunkType.setShard(chunk.getShardId());
         chunkType.setVersion(chunkManager->getVersion());
 
         Status moveStatus = configsvr_client::moveChunk(
@@ -584,7 +584,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
             true);
         if (!moveStatus.isOK()) {
-            warning() << "couldn't move chunk " << redact(chunk->toString()) << " to shard " << *to
+            warning() << "couldn't move chunk " << redact(chunk.toString()) << " to shard " << *to
                       << " while sharding collection " << nss.ns() << causedBy(redact(moveStatus));
         }
     }
@@ -603,7 +603,8 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
 
     // Subdivide the big chunks by splitting at each of the points in "allSplits"
     // that we haven't already split by.
-    auto currentChunk = chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[0]);
+    boost::optional<Chunk> currentChunk(
+        chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[0]));
 
     std::vector<BSONObj> subSplits;
     for (unsigned i = 0; i <= allSplits.size(); i++) {
@@ -627,7 +628,8 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
             }
 
             if (i < allSplits.size()) {
-                currentChunk = chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[i]);
+                currentChunk.emplace(
+                    chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[i]));
             }
         } else {
             BSONObj splitPoint(allSplits[i]);

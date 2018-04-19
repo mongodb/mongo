@@ -73,7 +73,7 @@ RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
                                          KeyPattern shardKeyPattern,
                                          std::unique_ptr<CollatorInterface> defaultCollator,
                                          bool unique,
-                                         ChunkMap chunkMap,
+                                         ChunkInfoMap chunkMap,
                                          ChunkVersion collectionVersion)
     : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
       _nss(std::move(nss)),
@@ -87,8 +87,7 @@ RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
           _constructShardVersionMap(collectionVersion.epoch(), _chunkMap, _shardKeyOrdering)),
       _collectionVersion(collectionVersion) {}
 
-std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
-                                                           const BSONObj& collation) const {
+Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey, const BSONObj& collation) const {
     const bool hasSimpleCollation = (collation.isEmpty() && !_rt->getDefaultCollator()) ||
         SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
     if (!hasSimpleCollation) {
@@ -105,7 +104,7 @@ std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardK
             str::stream() << "Cannot target single shard using key " << shardKey,
             it != _rt->getChunkMap().end() && it->second->containsKey(shardKey));
 
-    return it->second;
+    return Chunk(*(it->second), _clusterTime);
 }
 
 bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const {
@@ -147,7 +146,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
     if (!shardKeyToFind.isEmpty()) {
         try {
             auto chunk = findIntersectingChunk(shardKeyToFind, collation);
-            shardIds->insert(chunk->getShardIdAt(_clusterTime));
+            shardIds->insert(chunk.getShardId());
             return;
         } catch (const DBException&) {
             // The query uses multiple shards
@@ -219,7 +218,7 @@ ChunkManager::ConstRangeOfChunks ChunkManager::getNextChunkOnShard(const BSONObj
         if (chunk->getShardIdAt(_clusterTime) == shardId) {
             const auto begin = it;
             const auto end = ++it;
-            return {ConstChunkIterator(begin), ConstChunkIterator(end)};
+            return {ConstChunkIterator(begin, _clusterTime), ConstChunkIterator(end, _clusterTime)};
         }
     }
 
@@ -233,7 +232,7 @@ void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
                    [](const ShardVersionMap::value_type& pair) { return pair.first; });
 }
 
-std::pair<ChunkMap::const_iterator, ChunkMap::const_iterator>
+std::pair<ChunkInfoMap::const_iterator, ChunkInfoMap::const_iterator>
 RoutingTableHistory::overlappingRanges(const BSONObj& min,
                                        const BSONObj& max,
                                        bool isMaxInclusive) const {
@@ -399,10 +398,10 @@ std::string RoutingTableHistory::toString() const {
 }
 
 ShardVersionMap RoutingTableHistory::_constructShardVersionMap(const OID& epoch,
-                                                               const ChunkMap& chunkMap,
+                                                               const ChunkInfoMap& chunkMap,
                                                                Ordering shardKeyOrdering) {
     ShardVersionMap shardVersions;
-    ChunkMap::const_iterator current = chunkMap.cbegin();
+    ChunkInfoMap::const_iterator current = chunkMap.cbegin();
 
     boost::optional<BSONObj> firstMin = boost::none;
     boost::optional<BSONObj> lastMax = boost::none;
@@ -411,11 +410,12 @@ ShardVersionMap RoutingTableHistory::_constructShardVersionMap(const OID& epoch,
         const auto& firstChunkInRange = current->second;
 
         // Tracks the max shard version for the shard on which the current range will reside
-        auto shardVersionIt = shardVersions.find(firstChunkInRange->getShardId());
+        auto shardVersionIt = shardVersions.find(firstChunkInRange->getShardIdAt(boost::none));
         if (shardVersionIt == shardVersions.end()) {
-            shardVersionIt =
-                shardVersions.emplace(firstChunkInRange->getShardId(), ChunkVersion(0, 0, epoch))
-                    .first;
+            shardVersionIt = shardVersions
+                                 .emplace(firstChunkInRange->getShardIdAt(boost::none),
+                                          ChunkVersion(0, 0, epoch))
+                                 .first;
         }
 
         auto& maxShardVersion = shardVersionIt->second;
@@ -423,10 +423,11 @@ ShardVersionMap RoutingTableHistory::_constructShardVersionMap(const OID& epoch,
         current = std::find_if(
             current,
             chunkMap.cend(),
-            [&firstChunkInRange, &maxShardVersion](const ChunkMap::value_type& chunkMapEntry) {
+            [&firstChunkInRange, &maxShardVersion](const ChunkInfoMap::value_type& chunkMapEntry) {
                 const auto& currentChunk = chunkMapEntry.second;
 
-                if (currentChunk->getShardId() != firstChunkInRange->getShardId())
+                if (currentChunk->getShardIdAt(boost::none) !=
+                    firstChunkInRange->getShardIdAt(boost::none))
                     return true;
 
                 if (currentChunk->getLastmod() > maxShardVersion)
@@ -537,7 +538,7 @@ std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
         chunkMap.erase(low, high);
 
         // Insert only the chunk itself
-        chunkMap.insert(std::make_pair(chunkMaxKeyString, std::make_shared<Chunk>(chunk)));
+        chunkMap.insert(std::make_pair(chunkMaxKeyString, std::make_shared<ChunkInfo>(chunk)));
     }
 
     // If at least one diff was applied, the metadata is correct, but it might not have changed so

@@ -562,10 +562,10 @@ ShardEndpoint ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
     // Track autosplit stats for sharded collections
     // Note: this is only best effort accounting and is not accurate.
     if (estDataSize > 0) {
-        _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
+        _stats->chunkSizeDelta[chunk.getMin()] += estDataSize;
     }
 
-    return {chunk->getShardId(), _routingInfo->cm()->getVersion(chunk->getShardId())};
+    return {chunk.getShardId(), _routingInfo->cm()->getVersion(chunk.getShardId())};
 }
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() const {

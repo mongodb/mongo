@@ -200,7 +200,7 @@ Status MigrationManager::executeManualMigration(
     // finishes the waitForDelete stage. Any failovers, therefore, must always cause the moveChunk
     // command to be retried so as to assure that the waitForDelete promise of a successful command
     // has been fulfilled.
-    if (chunk->getShardId() == migrateInfo.to && commandStatus != ErrorCodes::BalancerInterrupted) {
+    if (chunk.getShardId() == migrateInfo.to && commandStatus != ErrorCodes::BalancerInterrupted) {
         return Status::OK();
     }
 
@@ -339,7 +339,7 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             const auto chunk =
                 routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
 
-            if (chunk->getShardId() != migrationInfo.from) {
+            if (chunk.getShardId() != migrationInfo.from) {
                 // Chunk is no longer on the source shard specified by this migration. Erase the
                 // migration recovery document associated with it.
                 ScopedMigrationRequest::createForRecovery(opCtx, nss, migrationInfo.minKey);

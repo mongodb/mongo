@@ -57,7 +57,7 @@ int64_t mkDataWritten() {
 
 }  // namespace
 
-Chunk::Chunk(const ChunkType& from)
+ChunkInfo::ChunkInfo(const ChunkType& from)
     : _range(from.getMin(), from.getMax()),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
@@ -70,11 +70,10 @@ Chunk::Chunk(const ChunkType& from)
     }
 }
 
-const ShardId& Chunk::getShardIdAt(const boost::optional<Timestamp>& ts) const {
+const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
     // This chunk was refreshed from FCV 3.6 config server so it doesn't have history
-    // TODO: SERVER-34100 consider removing getShardIdAt completely
-    // TODO: SERVER-33781 add uassert once we do upgrade/downgrade work
     if (_history.empty()) {
+        // TODO: SERVER-34619 - add uassert
         return _shardId;
     }
 
@@ -95,24 +94,24 @@ const ShardId& Chunk::getShardIdAt(const boost::optional<Timestamp>& ts) const {
                             << ts.get().toString());
 }
 
-bool Chunk::containsKey(const BSONObj& shardKey) const {
+bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
 }
 
-uint64_t Chunk::getBytesWritten() const {
+uint64_t ChunkInfo::getBytesWritten() const {
     return _dataWritten;
 }
 
-uint64_t Chunk::addBytesWritten(uint64_t bytesWrittenIncrement) {
+uint64_t ChunkInfo::addBytesWritten(uint64_t bytesWrittenIncrement) {
     _dataWritten += bytesWrittenIncrement;
     return _dataWritten;
 }
 
-void Chunk::clearBytesWritten() {
+void ChunkInfo::clearBytesWritten() {
     _dataWritten = 0;
 }
 
-bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
+bool ChunkInfo::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
     // If this chunk is at either end of the range, trigger auto-split at 10% less data written in
     // order to trigger the top-chunk optimization.
     const uint64_t splitThreshold = (minIsInf || maxIsInf)
@@ -120,15 +119,15 @@ bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf)
         : desiredChunkSize;
 
     // Check if there are enough estimated bytes written to warrant a split
-    return _dataWritten >= splitThreshold / kSplitTestFactor;
+    return _dataWritten >= splitThreshold / Chunk::kSplitTestFactor;
 }
 
-std::string Chunk::toString() const {
+std::string ChunkInfo::toString() const {
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
                          << ": " << _lastmod.toString() << ", " << _range.toString();
 }
 
-void Chunk::markAsJumbo() {
+void ChunkInfo::markAsJumbo() {
     _jumbo = true;
 }
 

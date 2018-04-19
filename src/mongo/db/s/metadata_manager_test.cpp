@@ -83,7 +83,7 @@ protected:
                        ChunkVersion(1, 0, epoch),
                        kOtherShard}});
 
-        std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
+        std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, boost::none);
 
         return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
     }
@@ -104,9 +104,8 @@ protected:
         auto cm = metadata.getChunkManager();
 
         const auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
-        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(maxKey <= chunkToSplit->getMax()))
-            << "maxKey == " << maxKey
-            << " and chunkToSplit->getMax() == " << chunkToSplit->getMax();
+        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(maxKey <= chunkToSplit.getMax()))
+            << "maxKey == " << maxKey << " and chunkToSplit.getMax() == " << chunkToSplit.getMax();
         auto v1 = cm->getVersion();
         v1.incMajor();
         auto v2 = v1;
@@ -114,10 +113,10 @@ protected:
         auto v3 = v2;
         v3.incMajor();
         auto rt = cm->getRoutingHistory().makeUpdated(
-            {ChunkType{kNss, ChunkRange{chunkToSplit->getMin(), minKey}, v1, kOtherShard},
+            {ChunkType{kNss, ChunkRange{chunkToSplit.getMin(), minKey}, v1, kOtherShard},
              ChunkType{kNss, ChunkRange{minKey, maxKey}, v2, kThisShard},
-             ChunkType{kNss, ChunkRange{maxKey, chunkToSplit->getMax()}, v3, kOtherShard}});
-        cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
+             ChunkType{kNss, ChunkRange{maxKey, chunkToSplit.getMax()}, v3, kOtherShard}});
+        cm = std::make_shared<ChunkManager>(rt, boost::none);
 
         return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
     }

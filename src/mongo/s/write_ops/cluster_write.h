@@ -54,7 +54,7 @@ public:
  */
 void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                            ChunkManager* manager,
-                                           Chunk* chunk,
+                                           Chunk chunk,
                                            long dataWritten);
 
 }  // namespace mongo

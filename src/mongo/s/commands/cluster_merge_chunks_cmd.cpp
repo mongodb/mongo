@@ -156,7 +156,7 @@ public:
             ClusterMergeChunksCommand::configField(),
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
-                             firstChunk->getShardId().toString());
+                             firstChunk.getShardId().toString());
         remoteCmdObjB.append("epoch", cm->getVersion().epoch());
 
         BSONObj remoteResult;
@@ -164,7 +164,7 @@ public:
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
         // formatting.
         auto shard = uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk->getShardId()));
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk.getShardId()));
 
         auto response = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,

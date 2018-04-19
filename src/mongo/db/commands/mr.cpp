@@ -1803,7 +1803,7 @@ public:
 
         state.prepTempCollection();
 
-        std::vector<std::shared_ptr<Chunk>> chunks;
+        std::vector<Chunk> chunks;
 
         if (config.outputOptions.outType != Config::OutputType::INMEMORY) {
             auto outRoutingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
@@ -1819,7 +1819,7 @@ public:
                 const string shardName = ShardingState::get(opCtx)->getShardName();
 
                 for (const auto& chunk : cm->chunks()) {
-                    if (chunk->getShardId() == shardName) {
+                    if (chunk.getShardId() == shardName) {
                         chunks.push_back(chunk);
                     }
                 }
@@ -1833,12 +1833,11 @@ public:
         BSONList values;
 
         while (true) {
-            shared_ptr<Chunk> chunk;
             if (chunks.size() > 0) {
-                chunk = chunks[index];
+                const auto& chunk = chunks[index];
                 BSONObjBuilder b;
-                b.appendAs(chunk->getMin().firstElement(), "$gte");
-                b.appendAs(chunk->getMax().firstElement(), "$lt");
+                b.appendAs(chunk.getMin().firstElement(), "$gte");
+                b.appendAs(chunk.getMax().firstElement(), "$lt");
                 query = BSON("_id" << b.obj());
                 //                        chunkSizes.append(min);
             }
@@ -1881,8 +1880,9 @@ public:
                     values.push_back(t);
             }
 
-            if (chunk) {
-                chunkSizes.append(chunk->getMin());
+            if (chunks.size() > 0) {
+                const auto& chunk = chunks[index];
+                chunkSizes.append(chunk.getMin());
                 chunkSizes.append(chunkSize);
             }
 

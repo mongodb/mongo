@@ -239,7 +239,7 @@ public:
         ShardId shardId;
         if (_cm) {
             const auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
-            shardId = chunk->getShardId();
+            shardId = chunk.getShardId();
         } else {
             shardId = _primary->getId();
         }

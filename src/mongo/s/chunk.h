@@ -37,14 +37,11 @@ namespace mongo {
 class BSONObj;
 
 /**
- * Represents a cache entry for a single Chunk. Owned by a ChunkManager.
+ * Represents a cache entry for a single Chunk. Owned by a RoutingTableHistory.
  */
-class Chunk {
+class ChunkInfo {
 public:
-    // Test whether we should split once data * kSplitTestFactor > chunkSize (approximately)
-    static const uint64_t kSplitTestFactor = 5;
-
-    explicit Chunk(const ChunkType& from);
+    explicit ChunkInfo(const ChunkType& from);
 
     const BSONObj& getMin() const {
         return _range.getMin();
@@ -52,11 +49,6 @@ public:
 
     const BSONObj& getMax() const {
         return _range.getMax();
-    }
-
-    const ShardId& getShardId() const {
-        // TODO: SERVER-34100 - consolidate a usage of getShardAt and getShardIdAt
-        return getShardIdAt(boost::none);
     }
 
     const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
@@ -113,6 +105,82 @@ private:
 
     // Statistics for the approximate data written to this chunk
     mutable uint64_t _dataWritten;
+};
+
+class Chunk {
+public:
+    // Test whether we should split once data * kSplitTestFactor > chunkSize (approximately)
+    static const uint64_t kSplitTestFactor = 5;
+
+    Chunk(ChunkInfo& chunkInfo, const boost::optional<Timestamp>& atClusterTime)
+        : _chunkInfo(chunkInfo), _atClusterTime(atClusterTime) {}
+
+    const BSONObj& getMin() const {
+        return _chunkInfo.getMin();
+    }
+
+    const BSONObj& getMax() const {
+        return _chunkInfo.getMax();
+    }
+
+    const ShardId& getShardId() const {
+        return _chunkInfo.getShardIdAt(_atClusterTime);
+    }
+
+    ChunkVersion getLastmod() const {
+        return _chunkInfo.getLastmod();
+    }
+
+    const auto& getHistory() const {
+        return _chunkInfo.getHistory();
+    }
+
+    bool isJumbo() const {
+        return _chunkInfo.isJumbo();
+    }
+
+    /**
+     * Returns a string represenation of the chunk for logging.
+     */
+    std::string toString() const {
+        return _chunkInfo.toString();
+    }
+
+    // Returns true if this chunk contains the given shard key, and false otherwise
+    //
+    // Note: this function takes an extracted *key*, not an original document (the point may be
+    // computed by, say, hashing a given field or projecting to a subset of fields).
+    bool containsKey(const BSONObj& shardKey) const {
+        return _chunkInfo.containsKey(shardKey);
+    }
+
+    /**
+     * Get/increment/set the estimation of how much data was written for this chunk.
+     */
+    uint64_t getBytesWritten() const {
+        return _chunkInfo.getBytesWritten();
+    }
+    uint64_t addBytesWritten(uint64_t bytesWrittenIncrement) {
+        return _chunkInfo.addBytesWritten(bytesWrittenIncrement);
+    }
+    void clearBytesWritten() {
+        _chunkInfo.clearBytesWritten();
+    }
+
+    bool shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
+        return _chunkInfo.shouldSplit(desiredChunkSize, minIsInf, maxIsInf);
+    }
+
+    /**
+     * Marks this chunk as jumbo. Only moves from false to true once and is used by the balancer.
+     */
+    void markAsJumbo() {
+        _chunkInfo.markAsJumbo();
+    }
+
+private:
+    ChunkInfo& _chunkInfo;
+    const boost::optional<Timestamp> _atClusterTime;
 };
 
 }  // namespace mongo

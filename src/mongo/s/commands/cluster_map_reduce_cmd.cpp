@@ -588,13 +588,7 @@ public:
 
                 // Key reported should be the chunk's minimum
                 auto chunkWritten = outputCM->findIntersectingChunkWithSimpleCollation(key);
-                if (!chunkWritten) {
-                    warning() << "Mongod reported " << size << " bytes inserted for key " << key
-                              << " but can't find chunk";
-                } else {
-                    updateChunkWriteStatsAndSplitIfNeeded(
-                        opCtx, outputCM.get(), chunkWritten.get(), size);
-                }
+                updateChunkWriteStatsAndSplitIfNeeded(opCtx, outputCM.get(), chunkWritten, size);
             }
         }
 

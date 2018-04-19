@@ -622,15 +622,15 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
     const auto cm = routingInfo.cm().get();
 
-    const auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+    auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
         const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
             opCtx,
-            chunk->getShardId(),
+            chunk.getShardId(),
             nss,
             cm->getShardKeyPattern(),
-            ChunkRange(chunk->getMin(), chunk->getMax()),
+            ChunkRange(chunk.getMin(), chunk.getMax()),
             Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
             boost::none));
 
@@ -638,18 +638,18 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
 
         uassertStatusOK(
             shardutil::splitChunkAtMultiplePoints(opCtx,
-                                                  chunk->getShardId(),
+                                                  chunk.getShardId(),
                                                   nss,
                                                   cm->getShardKeyPattern(),
                                                   cm->getVersion(),
-                                                  ChunkRange(chunk->getMin(), chunk->getMax()),
+                                                  ChunkRange(chunk.getMin(), chunk.getMax()),
                                                   splitPoints));
     } catch (const DBException&) {
-        log() << "Marking chunk " << redact(chunk->toString()) << " as jumbo.";
+        log() << "Marking chunk " << redact(chunk.toString()) << " as jumbo.";
 
-        chunk->markAsJumbo();
+        chunk.markAsJumbo();
 
-        const std::string chunkName = ChunkType::genID(nss, chunk->getMin());
+        const std::string chunkName = ChunkType::genID(nss, chunk.getMin());
 
         auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
             opCtx,
