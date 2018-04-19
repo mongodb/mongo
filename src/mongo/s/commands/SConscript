@@ -145,3 +145,16 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/unittest/unittest',
     ]
 )
+
+env.CppUnitTest(
+    target="cluster_aggregate_test",
+    source=[
+        "cluster_aggregate_test.cpp",
+    ],
+    LIBDEPS=[
+        'cluster_commands',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+    ],
+)
