@@ -195,20 +195,28 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
 
 void LogicalTimeValidator::resetKeyManagerCache() {
     log() << "Resetting key manager cache";
-    // TODO: SERVER-34445
-    _getKeyManagerCopy()->clearCache();
+    {
+        stdx::lock_guard<stdx::mutex> keyManagerLock(_mutexKeyManager);
+        invariant(_keyManager);
+        _keyManager->clearCache();
+    }
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _lastSeenValidTime = SignedLogicalTime();
     _timeProofService.resetCache();
 }
 
 void LogicalTimeValidator::resetKeyManager() {
-    log() << "Resetting key manager";
-    stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
+    stdx::lock_guard<stdx::mutex> keyManagerLock(_mutexKeyManager);
     if (_keyManager) {
+        log() << "Resetting key manager";
         _keyManager->stopMonitoring();
         _keyManager.reset();
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _lastSeenValidTime = SignedLogicalTime();
         _timeProofService.resetCache();
+    } else {
+        log() << "Resetting key manager: no key manager exists.";
     }
 }
 
