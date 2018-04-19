@@ -69,15 +69,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     _metadataObj = readPreference.toContainingBSON();
 
     // Schedule the requests immediately.
-
-    // We must create the notification before scheduling any requests, because the notification is
-    // signaled both on an error in scheduling the request and a request's callback.
-    _notification.emplace();
-
-    // We lock so that no callbacks signal the notification until after we are done scheduling
-    // requests, to prevent signaling the notification twice, which is illegal.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _scheduleRequests(lk);
+    _scheduleRequests();
 }
 AsyncRequestsSender::~AsyncRequestsSender() {
     _cancelPendingRequests();
@@ -98,7 +90,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
         // Otherwise, wait for some response to be received.
         if (_interruptStatus.isOK()) {
             try {
-                _notification->get(_opCtx);
+                _handleResponse(_responseQueue.pop(_opCtx));
             } catch (const AssertionException& ex) {
                 // If the operation is interrupted, we cancel outstanding requests and switch to
                 // waiting for the (canceled) callbacks to finish without checking for interrupts.
@@ -107,25 +99,22 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
                 continue;
             }
         } else {
-            _notification->get();
+            _handleResponse(_responseQueue.pop());
         }
     }
     return *readyResponse;
 }
 
 void AsyncRequestsSender::stopRetrying() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
 }
 
 bool AsyncRequestsSender::done() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return std::all_of(
         _remotes.begin(), _remotes.end(), [](const RemoteData& remote) { return remote.done; });
 }
 
 void AsyncRequestsSender::_cancelPendingRequests() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
 
     // Cancel all outstanding requests so they return immediately.
@@ -137,12 +126,8 @@ void AsyncRequestsSender::_cancelPendingRequests() {
 }
 
 boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    _notification.emplace();
-
     if (!_stopRetrying) {
-        _scheduleRequests(lk);
+        _scheduleRequests();
     }
 
     // Check if any remote is ready.
@@ -171,7 +156,7 @@ boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
     return boost::none;
 }
 
-void AsyncRequestsSender::_scheduleRequests(WithLock lk) {
+void AsyncRequestsSender::_scheduleRequests() {
     invariant(!_stopRetrying);
     // Schedule remote work on hosts for which we have not sent a request or need to retry.
     for (size_t i = 0; i < _remotes.size(); ++i) {
@@ -212,21 +197,18 @@ void AsyncRequestsSender::_scheduleRequests(WithLock lk) {
 
         // If the remote does not have a response or pending request, schedule remote work for it.
         if (!remote.swResponse && !remote.cbHandle.isValid()) {
-            auto scheduleStatus = _scheduleRequest(lk, i);
+            auto scheduleStatus = _scheduleRequest(i);
             if (!scheduleStatus.isOK()) {
                 remote.swResponse = std::move(scheduleStatus);
-                // Signal the notification indicating the remote had an error (we need to do this
-                // because no request was scheduled, so no callback for this remote will run and
-                // signal the notification).
-                if (!*_notification) {
-                    _notification->set();
-                }
+                // Push a noop response to the queue to indicate that a remote is ready for
+                // re-processing due to failure.
+                _responseQueue.push(boost::none);
             }
         }
     }
 }
 
-Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
+Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
@@ -242,8 +224,9 @@ Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,
-        stdx::bind(
-            &AsyncRequestsSender::_handleResponse, this, stdx::placeholders::_1, remoteIndex));
+        [remoteIndex, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+            _responseQueue.push(Job{cbData, remoteIndex});
+        });
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
     }
@@ -252,11 +235,12 @@ Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
     return Status::OK();
 }
 
-void AsyncRequestsSender::_handleResponse(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, size_t remoteIndex) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+void AsyncRequestsSender::_handleResponse(boost::optional<Job> job) {
+    if (!job) {
+        return;
+    }
 
-    auto& remote = _remotes[remoteIndex];
+    auto& remote = _remotes[job->remoteIndex];
     invariant(!remote.swResponse);
 
     // Clear the callback handle. This indicates that we are no longer waiting on a response from
@@ -264,15 +248,10 @@ void AsyncRequestsSender::_handleResponse(
     remote.cbHandle = executor::TaskExecutor::CallbackHandle();
 
     // Store the response or error.
-    if (cbData.response.status.isOK()) {
-        remote.swResponse = std::move(cbData.response);
+    if (job->cbData.response.status.isOK()) {
+        remote.swResponse = std::move(job->cbData.response);
     } else {
-        remote.swResponse = std::move(cbData.response.status);
-    }
-
-    // Signal the notification indicating that a remote received a response.
-    if (!*_notification) {
-        _notification->set();
+        remote.swResponse = std::move(job->cbData.response.status);
     }
 }
 
