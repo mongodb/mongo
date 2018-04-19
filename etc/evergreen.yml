@@ -11256,6 +11256,66 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: snmp
 
+- name: ubuntu1604-arm64-mobile
+  display_name: "Ubuntu 16.04 arm64 (mobile)"
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1604-arm64-large
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --storageEngine=mobile
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
+      --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
+    compile_flags: >-
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --mobile-se=on
+        --ssl
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+        CCFLAGS="-march=armv8-a+crc -mtune=generic"
+        MONGO_DISTMOD=ubuntu1604
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
+    build_mongoreplay: true
+    additional_targets: mongoe
+  tasks:
+  - name: compile
+  - name: compile_all
+  - name: aggregation
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough
+  - name: audit
+  - name: auth
+  - name: auth_audit
+  - name: dbtest
+  # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
+  # - name: concurrency
+  - name: concurrency_simultaneous
+  - name: disk_mobile
+  - name: failpoints
+  - name: failpoints_auth
+  - name: integration_tests_standalone
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_mobile
+  - name: jsCore_op_query
+  - name: jsonSchema
+  - name: jstestfuzz
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
+  - name: sasl
+  - name: serial_run
+  - name: session_jscore_passthrough
+
 - name: enterprise-rhel-62-64-bit-required-mobile
   display_name: "! Enterprise RHEL 6.2 (mobile)"
   modules:
