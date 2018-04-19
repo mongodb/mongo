@@ -27,8 +27,10 @@ load("jstests/libs/write_concern_util.js");
 (function() {
     "use strict";
 
-    // Skip db hash check since this test leaves a replica set shard partitioned.
+    // Skip db hash check and shard replication since this test leaves a replica set shard
+    // partitioned.
     TestData.skipCheckDBHashes = true;
+    TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 
     var testName = "linearizable_read_concern";
 

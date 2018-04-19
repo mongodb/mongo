@@ -294,6 +294,8 @@ jsTestOptions = function() {
                 TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             skipCheckingCatalogCacheConsistencyWithShardingCatalog:
                 TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
+            skipAwaitingReplicationOnShardsBeforeCheckingUUIDs:
+                TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,

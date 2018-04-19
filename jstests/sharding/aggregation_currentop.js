@@ -15,6 +15,10 @@
  * This test requires replica set configuration and user credentials to persist across a restart.
  * @tags: [requires_persistence]
  */
+
+// Restarts cause issues with authentication for awaiting replication.
+TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
+
 (function() {
     "use strict";
 

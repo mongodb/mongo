@@ -1094,7 +1094,7 @@ var ReplSetTest = function(opts) {
      * of the oplog on *all* secondaries.
      * Returns last oplog entry.
      */
-    this.awaitLastOpCommitted = function() {
+    this.awaitLastOpCommitted = function(timeout) {
         var rst = this;
         var master = rst.getPrimary();
         var masterOpTime = _getLastOpTime(master);
@@ -1102,26 +1102,29 @@ var ReplSetTest = function(opts) {
         print("Waiting for op with OpTime " + tojson(masterOpTime) +
               " to be committed on all secondaries");
 
-        assert.soonNoExcept(function() {
-            for (var i = 0; i < rst.nodes.length; i++) {
-                var node = rst.nodes[i];
+        assert.soonNoExcept(
+            function() {
+                for (var i = 0; i < rst.nodes.length; i++) {
+                    var node = rst.nodes[i];
 
-                // Continue if we're connected to an arbiter
-                var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-                if (res.myState == ReplSetTest.State.ARBITER) {
-                    continue;
+                    // Continue if we're connected to an arbiter
+                    var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+                    if (res.myState == ReplSetTest.State.ARBITER) {
+                        continue;
+                    }
+                    var rcmOpTime = _getReadConcernMajorityOpTime(node);
+                    if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
+                        return false;
+                    }
+                    if (rs.compareOpTimes(rcmOpTime, masterOpTime) < 0) {
+                        return false;
+                    }
                 }
-                var rcmOpTime = _getReadConcernMajorityOpTime(node);
-                if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
-                    return false;
-                }
-                if (rs.compareOpTimes(rcmOpTime, masterOpTime) < 0) {
-                    return false;
-                }
-            }
 
-            return true;
-        }, "Op with OpTime " + tojson(masterOpTime) + " failed to be committed on all secondaries");
+                return true;
+            },
+            "Op with OpTime " + tojson(masterOpTime) + " failed to be committed on all secondaries",
+            timeout);
 
         return masterOpTime;
     };

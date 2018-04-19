@@ -38,6 +38,31 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
             "Checking consistency of the sharding catalog with shards' storage catalogs and catalog caches");
     }
 
+    this.awaitReplicationOnShards = function() {
+        var timeout = 1 * 60 * 1000;
+        for (var i = 0; i < this._rs.length; i++) {
+            // If this shard is standalone, the replica set object will be null. In that case, we
+            // will just skip.
+            if (!this._rs[i]) {
+                continue;
+            }
+            var rs = this._rs[i].test;
+            // The noop writer needs to be enabled in case a sync source isn't set, so that
+            // awaitLastOpCommitted() is guaranteed to finish.
+            // SERVER-33248 for reference.
+            rs.getPrimary().adminCommand({setParameter: 1, periodicNoopIntervalSecs: 1});
+            rs.getPrimary().adminCommand({setParameter: 1, writePeriodicNoops: true});
+            var keyFile = this._otherParams.keyFile;
+            if (keyFile) {
+                authutil.asCluster(rs.nodes, keyFile, function() {
+                    rs.awaitLastOpCommitted(timeout);
+                });
+            } else {
+                rs.awaitLastOpCommitted(timeout);
+            }
+        }
+    };
+
     function parseNs(dbDotColl) {
         assert.gt(dbDotColl.indexOf('.'),
                   0,
@@ -88,6 +113,11 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         this._connections.forEach(function(conn) {
             shardConnStringToConn[conn.host] = conn;
         });
+
+        if (!jsTest.options().skipAwaitingReplicationOnShardsBeforeCheckingUUIDs) {
+            // Finish replication on all shards (if they are replica sets).
+            this.awaitReplicationOnShards();
+        }
 
         for (let authoritativeCollMetadata of authoritativeCollMetadataArr) {
             const ns = authoritativeCollMetadata._id;
