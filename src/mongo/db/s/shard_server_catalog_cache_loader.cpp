@@ -899,24 +899,23 @@ Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndCh
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
     const bool wasEmpty = _collAndChunkTaskLists[nss].empty();
     _collAndChunkTaskLists[nss].addTask(std::move(task));
-
-    if (wasEmpty) {
-        Status status = _threadPool.schedule([this, nss]() { _runCollAndChunksTasks(nss); });
-        if (!status.isOK()) {
-            log() << "Cache loader failed to schedule persisted metadata update"
-                  << " task for namespace '" << nss << "' due to '" << redact(status)
-                  << "'. Clearing task list so that scheduling"
-                  << " will be attempted by the next caller to refresh this namespace.";
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            _collAndChunkTaskLists.erase(nss);
-        }
-        return status;
+    if (!wasEmpty) {
+        return Status::OK();
     }
 
-    return Status::OK();
+    Status status = _threadPool.schedule([this, nss]() { _runCollAndChunksTasks(nss); });
+    if (!status.isOK()) {
+        log() << "Cache loader failed to schedule persisted metadata update"
+              << " task for namespace '" << nss << "' due to '" << redact(status)
+              << "'. Clearing task list so that scheduling"
+              << " will be attempted by the next caller to refresh this namespace.";
+
+        _collAndChunkTaskLists.erase(nss);
+    }
+
+    return status;
 }
 
 Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
@@ -929,25 +928,24 @@ Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
     const bool wasEmpty = _dbTaskLists[dbName.toString()].empty();
     _dbTaskLists[dbName.toString()].addTask(std::move(task));
-
-    if (wasEmpty) {
-        Status status = _threadPool.schedule(
-            [ this, name = dbName.toString() ]() { _runDbTasks(StringData(name)); });
-        if (!status.isOK()) {
-            log() << "Cache loader failed to schedule persisted metadata update"
-                  << " task for db '" << dbName.toString() << "' due to '" << redact(status)
-                  << "'. Clearing task list so that scheduling"
-                  << " will be attempted by the next caller to refresh this namespace.";
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            _dbTaskLists.erase(dbName.toString());
-        }
-        return status;
+    if (!wasEmpty) {
+        return Status::OK();
     }
 
-    return Status::OK();
+    Status status =
+        _threadPool.schedule([ this, name = dbName.toString() ]() { _runDbTasks(name); });
+    if (!status.isOK()) {
+        log() << "Cache loader failed to schedule persisted metadata update"
+              << " task for db '" << dbName << "' due to '" << redact(status)
+              << "'. Clearing task list so that scheduling"
+              << " will be attempted by the next caller to refresh this namespace.";
+
+        _dbTaskLists.erase(dbName.toString());
+    }
+
+    return status;
 }
 
 void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString& nss) {
