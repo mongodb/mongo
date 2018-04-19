@@ -3,19 +3,15 @@
 (function() {
     "use strict";
 
-    // For waitForDropToComplete
-    load("jstests/replsets/libs/two_phase_drops.js");
-
     const dbName = "test";
     const collName = "finished_transaction_error_handling";
     const testDB = db.getSiblingDB(dbName);
     const testColl = testDB[collName];
 
-    testColl.drop();
-    TwoPhaseDropCollectionTest.waitForDropToComplete(testDB, collName);
+    const writeConcern = {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS};
+    testDB.runCommand({drop: collName, writeConcern: writeConcern});
+    assert.commandWorked(testDB.createCollection(collName, {writeConcern: writeConcern}));
 
-    assert.commandWorked(
-        testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
     let txnNumber = 0;
     let stmtId = 0;
 
