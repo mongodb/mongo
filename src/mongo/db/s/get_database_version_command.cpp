@@ -44,16 +44,59 @@
 namespace mongo {
 namespace {
 
-class GetDatabaseVersion : public BasicCommand {
+class GetDatabaseVersionCmd final : public TypedCommand<GetDatabaseVersionCmd> {
 public:
-    GetDatabaseVersion() : BasicCommand("getDatabaseVersion") {}
+    using Request = GetDatabaseVersion;
+
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        using MinimalInvocationBase::MinimalInvocationBase;
+
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        AllowedOnSecondary secondaryAllowed(ServiceContext* srvCtx) const override {
+            return definition()->secondaryAllowed(srvCtx);
+        }
+
+        // The command parameter happens to be string so it's historically been interpreted
+        // by parseNs as a collection. Continuing to do so here for unexamined compatibility.
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), _targetDb());
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forDatabaseName(_targetDb()),
+                            ActionType::getDatabaseVersion));
+        }
+
+        void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << definition()->getName() << " can only be run on shard servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+            BSONObj versionObj;
+            AutoGetDb autoDb(opCtx, _targetDb(), MODE_IS);
+            if (auto db = autoDb.getDb()) {
+                if (auto dbVersion = DatabaseShardingState::get(db).getDbVersion(opCtx)) {
+                    versionObj = dbVersion->toBSON();
+                }
+            }
+            result->append("dbVersion", versionObj);
+        }
+
+        StringData _targetDb() const {
+            return request().getCommandParameter();
+        }
+    };
 
     std::string help() const override {
         return " example: { getDatabaseVersion : 'foo'  } ";
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -63,45 +106,6 @@ public:
     bool adminOnly() const override {
         return true;
     }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(cmdObj.firstElement().str()),
-                ActionType::getDatabaseVersion)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname_unused,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << getName() << " can only be run on shard servers",
-                serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-
-        const auto request = GetDatabaseVersionRequest::parse(
-            IDLParserErrorContext("getDatabaseVersion command"), cmdObj);
-
-        AutoGetDb autoDb(opCtx, request.getDatabaseVersion(), MODE_IS);
-        if (!autoDb.getDb()) {
-            result.append("dbVersion", BSONObj());
-            return true;
-        }
-
-        auto const dbVersion = DatabaseShardingState::get(autoDb.getDb()).getDbVersion(opCtx);
-        if (dbVersion) {
-            result.append("dbVersion", dbVersion->toBSON());
-        } else {
-            result.append("dbVersion", BSONObj());
-        }
-
-        return true;
-    }
-
 } getDatabaseVersionCmd;
 
 }  // namespace

@@ -32,12 +32,8 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-structs:
-    getDatabaseVersionRequest:
+commands:
+    getDatabaseVersion:
         description: "An internal command to get a shard server's cached database version"
-        strict: false
-        fields:
-            getDatabaseVersion:
-                type: string
-                cpp_name: databaseVersion
-                description: "The database for which to return this node's cached database version"
+        namespace: type
+        type: string
