@@ -4226,6 +4226,78 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: replica_sets_ese_0
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_0 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_1
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_1 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_2
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_2 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_3
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_3 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_4
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_4 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_5
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_5 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_6
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_6 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_ese_misc
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_ese_misc --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets_auth
   commands:
   - func: "do setup"
@@ -6769,6 +6841,16 @@ buildvariants:
     - replica_sets_auth_5
     - replica_sets_auth_6
     - replica_sets_auth_misc
+  - name: replica_sets_ese
+    execution_tasks:
+    - replica_sets_ese_0
+    - replica_sets_ese_1
+    - replica_sets_ese_2
+    - replica_sets_ese_3
+    - replica_sets_ese_4
+    - replica_sets_ese_5
+    - replica_sets_ese_6
+    - replica_sets_ese_misc
   tasks:
   - name: compile
     requires:
@@ -6813,7 +6895,14 @@ buildvariants:
   - name: replica_sets_auth_5
   - name: replica_sets_auth_6
   - name: replica_sets_auth_misc
-  - name: replica_sets_ese
+  - name: replica_sets_ese_0
+  - name: replica_sets_ese_1
+  - name: replica_sets_ese_2
+  - name: replica_sets_ese_3
+  - name: replica_sets_ese_4
+  - name: replica_sets_ese_5
+  - name: replica_sets_ese_6
+  - name: replica_sets_ese_misc
   - name: sasl
   - name: sharding_auth
     distros:
@@ -7604,6 +7693,16 @@ buildvariants:
     - replica_sets_auth_5
     - replica_sets_auth_6
     - replica_sets_auth_misc
+  - name: replica_sets_ese
+    execution_tasks:
+    - replica_sets_ese_0
+    - replica_sets_ese_1
+    - replica_sets_ese_2
+    - replica_sets_ese_3
+    - replica_sets_ese_4
+    - replica_sets_ese_5
+    - replica_sets_ese_6
+    - replica_sets_ese_misc
   - name: sharding
     execution_tasks:
     - sharding_0
@@ -7759,7 +7858,28 @@ buildvariants:
   - name: replica_sets_auth_misc
     distros:
     - rhel62-large
-  - name: replica_sets_ese
+  - name: replica_sets_ese_0
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_1
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_2
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_3
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_4
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_5
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_6
+    distros:
+    - rhel62-large
+  - name: replica_sets_ese_misc
     distros:
     - rhel62-large
   - name: replica_sets_jscore_passthrough
