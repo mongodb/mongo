@@ -289,6 +289,10 @@ public:
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
+        uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
+                str::stream() << FeatureCompatibilityVersionParser::kParameterName
+                              << " is not yet known.",
+                serverGlobalParams.featureCompatibility.isVersionInitialized());
         switch (serverGlobalParams.featureCompatibility.getVersion()) {
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
                 featureCompatibilityVersionBuilder.append(
