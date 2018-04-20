@@ -12,8 +12,7 @@
 //     suitability of this software for any purpose. It is provided "as is"
 //     without express or implied warranty.
 ////////////////////////////////////////////////////////////////////////////////
-#ifndef LOKI_SCOPEGUARD_H_
-#define LOKI_SCOPEGUARD_H_
+#pragma once
 
 #include <exception>
 
@@ -379,13 +378,11 @@ inline ObjScopeGuardImpl2<Obj1, Ret (Obj2::*)(P1a, P2a), P1b, P2b> MakeGuard(
 
 }  // namespace mongo
 
-#define LOKI_CONCATENATE_DIRECT(s1, s2) s1##s2
-#define LOKI_CONCATENATE(s1, s2) LOKI_CONCATENATE_DIRECT(s1, s2)
-#define LOKI_ANONYMOUS_VARIABLE(str) LOKI_CONCATENATE(str, __LINE__)
+#define MONGO_SCOPEGUARD_CAT2(s1, s2) s1##s2
+#define MONGO_SCOPEGUARD_CAT(s1, s2) MONGO_SCOPEGUARD_CAT2(s1, s2)
+#define MONGO_SCOPEGUARD_ANON(str) MONGO_SCOPEGUARD_CAT(str, __LINE__)
 
 #define ON_BLOCK_EXIT \
-    MONGO_COMPILER_VARIABLE_UNUSED ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeGuard
+    MONGO_COMPILER_VARIABLE_UNUSED ScopeGuard MONGO_SCOPEGUARD_ANON(scopeGuard) = MakeGuard
 #define ON_BLOCK_EXIT_OBJ \
-    MONGO_COMPILER_VARIABLE_UNUSED ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeObjGuard
-
-#endif  // LOKI_SCOPEGUARD_H_
+    MONGO_COMPILER_VARIABLE_UNUSED ScopeGuard MONGO_SCOPEGUARD_ANON(scopeGuard) = MakeObjGuard
