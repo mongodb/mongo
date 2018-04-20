@@ -87,13 +87,6 @@ std::string RefreshState::toString() const {
                          << lastRefreshedCollectionVersion.toString();
 }
 
-Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
-    // Set 'refreshing' to true.
-    BSONObj update = BSON(ShardCollectionType::refreshing() << true);
-    return updateShardCollectionsEntry(
-        opCtx, BSON(ShardCollectionType::ns() << nss.ns()), update, BSONObj(), false /*upsert*/);
-}
-
 Status unsetPersistedRefreshFlags(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const ChunkVersion& refreshedVersion) {
@@ -185,8 +178,7 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
     invariant(query.hasField("_id"));
     if (upsert) {
         // If upserting, this should be an update from the config server that does not have shard
-        // refresh / migration inc signal information.
-        invariant(!update.hasField(ShardCollectionType::refreshing()));
+        // migration inc signal information.
         invariant(!update.hasField(ShardCollectionType::lastRefreshedCollectionVersion()));
         invariant(inc.isEmpty());
     }

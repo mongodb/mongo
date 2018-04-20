@@ -70,6 +70,8 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         ShardCollectionType shardCollectionType =
             assertGet(ShardCollectionType::fromBSON(builder.obj()));
 
+        shardCollectionType.setRefreshing(true);
+
         ASSERT_OK(updateShardCollectionsEntry(operationContext(),
                                               BSON(ShardCollectionType::ns(kNss.ns())),
                                               shardCollectionType.toBSON(),
@@ -194,9 +196,6 @@ TEST_F(ShardMetadataUtilTest, UpdateAndReadCollectionsEntry) {
 TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     setUpCollection();
 
-    // Signal refresh start
-    ASSERT_OK(setPersistedRefreshFlags(operationContext(), kNss));
-
     ShardCollectionType shardCollectionsEntry =
         assertGet(readShardCollectionsEntry(operationContext(), kNss));
 
@@ -210,7 +209,11 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     ASSERT(!shardCollectionsEntry.hasLastRefreshedCollectionVersion());
 
     // Signal refresh start again to make sure nothing changes
-    ASSERT_OK(setPersistedRefreshFlags(operationContext(), kNss));
+    ASSERT_OK(updateShardCollectionsEntry(operationContext(),
+                                          BSON(ShardCollectionType::ns() << kNss.ns()),
+                                          BSON(ShardCollectionType::refreshing() << true),
+                                          BSONObj(),
+                                          false));
 
     RefreshState state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
 

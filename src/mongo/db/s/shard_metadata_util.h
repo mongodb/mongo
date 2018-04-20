@@ -96,20 +96,6 @@ struct RefreshState {
 QueryAndSort createShardChunkDiffQuery(const ChunkVersion& collectionVersion);
 
 /**
- * Writes a persisted signal to indicate that the chunks collection is being updated. It is
- * essential to call this before updating the chunks collection for 'nss' so that secondaries do not
- * use incomplete metadata.
- *
- * It is safe to call this multiple times: it's an idempotent action.
- *
- * Don't forget to call refreshPersistedSignalFinish after the chunks update is finished!
- *
- * Note: if there is no document present in the collections collection for 'nss', nothing is
- * updated.
- */
-Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss);
-
-/**
  * Writes a persisted signal to indicate that it is once again safe to read from the chunks
  * collection for 'nss' and updates the collection's collection version to 'refreshedVersion'. It is
  * essential to call this after updating the chunks collection so that secondaries know they can
@@ -146,8 +132,8 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
  * 'inc' can be used to specify fields and their increments: it will be assigned to the $inc
  * operator.
  *
- * If 'upsert' is true, expects neither 'refreshing' or 'lastRefreshedCollectionVersion' to be
- * present in the update: these refreshing fields should only be added to an existing document.
+ * If 'upsert' is true, expects lastRefreshedCollectionVersion' to be absent in the update:
+ * these refreshing fields should only be added to an existing document.
  * Similarly, 'inc' should not specify 'upsert' true.
  */
 Status updateShardCollectionsEntry(OperationContext* opCtx,

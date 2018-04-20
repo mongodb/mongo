@@ -509,7 +509,8 @@ void CollectionShardingState::_onConfigCollectionsUpdateOp(OperationContext* opC
         // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
 
-        if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
+        if (setField.hasField(ShardCollectionType::refreshing.name()) &&
+            !setField.getBoolField("refreshing")) {
             opCtx->recoveryUnit()->registerChange(
                 new CollectionVersionLogOpHandler(opCtx, updatedNss));
         }
