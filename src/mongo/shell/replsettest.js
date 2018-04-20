@@ -142,9 +142,9 @@ var ReplSetTest = function(opts) {
         return self.liveNodes.master || false;
     }
 
-    function asCluster(conn, fn) {
-        if (self.keyFile) {
-            return authutil.asCluster(conn, self.keyFile, fn);
+    function asCluster(conn, fn, keyFileParam = self.keyFile) {
+        if (keyFileParam) {
+            return authutil.asCluster(conn, keyFileParam, fn);
         } else {
             return fn();
         }
@@ -649,7 +649,8 @@ var ReplSetTest = function(opts) {
             var primary = expectedPrimaryNodeId;
 
             for (var i = 0; i < nodes.length; i++) {
-                var replSetGetStatus = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+                var replSetGetStatus =
+                    assert.commandWorked(nodes[i].getDB("admin").runCommand({replSetGetStatus: 1}));
                 var nodesPrimary = -1;
                 for (var j = 0; j < replSetGetStatus.members.length; j++) {
                     if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
@@ -841,7 +842,8 @@ var ReplSetTest = function(opts) {
      * aren't authorized to run replSetGetStatus.
      * TODO(SERVER-14017): remove this in favor of using initiate() everywhere.
      */
-    this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd) {
+    this.initiateWithAnyNodeAsPrimary = function(
+        cfg, initCmd, {doNotWaitForStableCheckpoint: doNotWaitForStableCheckpoint = false} = {}) {
         var master = this.nodes[0].getDB("admin");
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
@@ -926,7 +928,6 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             jsTest.authenticateNodes(this.nodes);
         }
-
         this.awaitSecondaryNodes();
 
         let shouldWaitForKeys = true;
@@ -990,6 +991,9 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        if (!doNotWaitForStableCheckpoint) {
+            self.awaitLastStableCheckpointTimestamp();
+        }
     };
 
     /**
@@ -1120,6 +1124,125 @@ var ReplSetTest = function(opts) {
         }, "Op with OpTime " + tojson(masterOpTime) + " failed to be committed on all secondaries");
 
         return masterOpTime;
+    };
+
+    /**
+     * This function waits for all nodes in this replica set to take a stable checkpoint. In order
+     * to be able to roll back a node must have a stable timestamp. In order to be able to restart
+     * and not go into resync right after initial sync, a node must have a stable checkpoint. By
+     * waiting for all nodes to report having a stable checkpoint, we ensure that both of these
+     * conditions are met and that our tests can run as expected. Beyond simply waiting, this
+     * function does writes to ensure that a stable checkpoint will be taken.
+     */
+    this.awaitLastStableCheckpointTimestamp = function() {
+        let rst = this;
+        let master = rst.getPrimary();
+        let id = tojson(rst.nodeList());
+
+        // Algorithm precondition: All nodes must be in primary/secondary state.
+        //
+        // 1) Perform a majority write. This will guarantee the primary updates its commit point
+        //    to the value of this write.
+        //
+        // 2) Perform a second write. This will guarantee that all nodes will update their commit
+        //    point to a time that is >= the previous write. That will trigger a stable checkpoint
+        //    on all nodes.
+        // TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
+        // advance the commit point if the commit point being lagged is sufficient to choose a
+        // sync source.
+        function advanceCommitPoint(master) {
+            // Shadow 'db' so that we can call 'advanceCommitPoint' directly on the primary node.
+            let db = master.getDB('admin');
+            const appendOplogNoteFn = function() {
+                assert.commandWorked(db.adminCommand({
+                    "appendOplogNote": 1,
+                    "data": {"awaitLastStableCheckpointTimestamp": 1},
+                    "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
+                }));
+                assert.commandWorked(db.adminCommand(
+                    {"appendOplogNote": 1, "data": {"awaitLastStableCheckpointTimestamp": 2}}));
+            };
+
+            // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
+            // solution.
+            const masterId = "n" + rst.getNodeId(master);
+            const masterOptions = rst.nodeOptions[masterId] || {};
+            if (masterOptions.clusterAuthMode === "x509") {
+                print("AwaitLastStableCheckpointTimestamp: authenticating on separate shell " +
+                      "with x509 for " + id);
+                const subShellArgs = [
+                    'mongo',
+                    '--ssl',
+                    '--sslCAFile=' + masterOptions.sslCAFile,
+                    '--sslPEMKeyFile=' + masterOptions.sslPEMKeyFile,
+                    '--sslAllowInvalidHostnames',
+                    '--authenticationDatabase=$external',
+                    '--authenticationMechanism=MONGODB-X509',
+                    master.host,
+                    '--eval',
+                    `(${appendOplogNoteFn.toString()})();`
+                ];
+
+                const retVal = _runMongoProgram(...subShellArgs);
+                assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+            } else {
+                if (masterOptions.clusterAuthMode) {
+                    print("AwaitLastStableCheckpointTimestamp: authenticating with " +
+                          masterOptions.clusterAuthMode + " for " + id);
+                }
+                asCluster(master, appendOplogNoteFn, masterOptions.keyFile);
+            }
+        }
+
+        print("AwaitLastStableCheckpointTimestamp: Beginning for " + id);
+
+        let replSetStatus = assert.commandWorked(master.adminCommand("replSetGetStatus"));
+        if (replSetStatus["configsvr"]) {
+            // Performing dummy replicated writes against a configsvr is hard, especially if auth
+            // is also enabled.
+            return;
+        }
+
+        rst.awaitNodesAgreeOnPrimary();
+        master = rst.getPrimary();
+
+        print("AwaitLastStableCheckpointTimestamp: ensuring the commit point advances for " + id);
+        advanceCommitPoint(master);
+
+        print("AwaitLastStableCheckpointTimestamp: Waiting for stable checkpoints for " + id);
+
+        assert.soonNoExcept(function() {
+            for (let node of rst.nodes) {
+                // The `lastStableCheckpointTimestamp` field contains the timestamp of a previous
+                // checkpoint taken at a stable timestamp. At startup recovery, this field
+                // contains the timestamp reflected in the data. After startup recovery, it may
+                // be lagged and there may be a stable checkpoint at a newer timestamp.
+                let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+
+                // Continue if we're connected to an arbiter.
+                if (res.myState === ReplSetTest.State.ARBITER) {
+                    continue;
+                }
+
+                // A missing `lastStableCheckpointTimestamp` field indicates that the storage
+                // engine does not support `recover to a stable timestamp`.
+                if (!res.hasOwnProperty("lastStableCheckpointTimestamp")) {
+                    continue;
+                }
+
+                // A null `lastStableCheckpointTimestamp` indicates that the storage engine supports
+                // "recover to a stable timestamp" but does not have a stable checkpoint yet.
+                if (res.lastStableCheckpointTimestamp.getTime() === 0) {
+                    print("AwaitLastStableCheckpointTimestamp: " + node.host +
+                          " does not have a stable checkpoint yet.");
+                    return false;
+                }
+            }
+
+            return true;
+        }, "Not all members have a stable checkpoint");
+
+        print("AwaitLastStableCheckpointTimestamp: Successfully took stable checkpoints on " + id);
     };
 
     // Wait until the optime of the specified type reaches the primary's last applied optime.

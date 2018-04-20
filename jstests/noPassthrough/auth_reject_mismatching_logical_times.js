@@ -45,7 +45,9 @@
     // Add shard with auth enabled.
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
-    rst.initiate();
+
+    // TODO: Wait for stable checkpoint when SERVER-32672 is fixed.
+    rst.initiateWithAnyNodeAsPrimary(null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
     assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
 
     const testDB = st.s.getDB("test");

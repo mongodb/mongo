@@ -41,12 +41,7 @@
 
     let coll = getColl(rst.getPrimary());
 
-    // TODO Can be removed with SERVER-33165.
-    //
-    // Create a collection and perform two majority writes. This guarantees both nodes will have a
-    // stable timestamp.
-    assert.commandWorked(
-        coll.insert({}, {writeConcern: {w: "majority", wtimeout: rst.kDefaultTimeoutMS}}));
+    // Create a collection and wait for the stable timestamp to exceed its creation on both nodes.
     assert.commandWorked(
         coll.insert({}, {writeConcern: {w: "majority", wtimeout: rst.kDefaultTimeoutMS}}));
 

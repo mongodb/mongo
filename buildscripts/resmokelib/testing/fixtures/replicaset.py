@@ -196,6 +196,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         """Wait for replica set tpo be ready."""
         self._await_primary()
         self._await_secondaries()
+        self._await_stable_checkpoint()
 
     def _await_primary(self):
         # Wait for the primary to be elected.
@@ -229,6 +230,63 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                     break
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info("Secondary on port %d is now available.", secondary.port)
+
+    def _await_stable_checkpoint(self):
+        # Since this method is called at startup we expect the first node to be primary even when
+        # self.all_nodes_electable is True.
+        primary = self.nodes[0]
+        primary_client = primary.mongo_client()
+        if self.auth_options is not None:
+            auth_db = primary_client[self.auth_options["authenticationDatabase"]]
+            auth_db.authenticate(self.auth_options["username"],
+                                 password=self.auth_options["password"],
+                                 mechanism=self.auth_options["authenticationMechanism"])
+        # Algorithm precondition: All nodes must be in primary/secondary state.
+        #
+        # 1) Perform a majority write. This will guarantee the primary updates its commit point
+        #    to the value of this write.
+        #
+        # 2) Perform a second write. This will guarantee that all nodes will update their commit
+        #    point to a time that is >= the previous write. That will trigger a stable checkpoint
+        #    on all nodes.
+        # TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
+        # advance the commit point if the commit point being lagged is sufficient to choose a
+        # sync source.
+        admin = primary_client.get_database(
+            "admin", write_concern=pymongo.write_concern.WriteConcern(w="majority"))
+        admin.command("appendOplogNote", data={"await_stable_checkpoint": 1})
+        admin.command("appendOplogNote", data={"await_stable_checkpoint": 2})
+
+        for node in self.nodes:
+            self.logger.info("Waiting for node on port %d to have a stable checkpoint.", node.port)
+            client = node.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
+            client_admin = client["admin"]
+            if self.auth_options is not None:
+                client_auth_db = client[self.auth_options["authenticationDatabase"]]
+                client_auth_db.authenticate(self.auth_options["username"],
+                                            password=self.auth_options["password"],
+                                            mechanism=self.auth_options["authenticationMechanism"])
+
+            while True:
+                status = client_admin.command("replSetGetStatus")
+                # The `lastStableCheckpointTimestamp` field contains the timestamp of a previous
+                # checkpoint taken at a stable timestamp. At startup recovery, this field
+                # contains the timestamp reflected in the data. After startup recovery, it may
+                # be lagged and there may be a stable checkpoint at a newer timestamp.
+                last_stable = status.get("lastStableCheckpointTimestamp", None)
+
+                # A missing `lastStableCheckpointTimestamp` field indicates that the storage
+                # engine does not support "recover to a stable timestamp".
+                if not last_stable:
+                    break
+
+                # A null `lastStableCheckpointTimestamp` indicates that the storage engine supports
+                # "recover to a stable timestamp" but does not have a stable checkpoint yet.
+                if last_stable.time:
+                    self.logger.info("Node on port %d now has a stable checkpoint. Time: %s",
+                                     node.port, last_stable)
+                    break
+                time.sleep(0.1)  # Wait a little bit before trying again.
 
     def _do_teardown(self):
         self.logger.info("Stopping all members of the replica set...")
