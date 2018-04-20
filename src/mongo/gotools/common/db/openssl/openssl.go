@@ -4,6 +4,8 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
+// +build ssl,!openssl_pre_1.0
+
 // Package openssl implements connection to MongoDB over ssl.
 package openssl
 
@@ -12,11 +14,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/10gen/openssl"
 	"github.com/mongodb/mongo-tools/common/db/kerberos"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/spacemonkeygo/openssl"
 	"gopkg.in/mgo.v2"
 )
 

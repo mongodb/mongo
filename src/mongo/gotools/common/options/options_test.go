@@ -102,7 +102,8 @@ func TestParseAndSetOptions(t *testing.T) {
 			{
 				Name: "not built with ssl",
 				CS: connstring.ConnString{
-					UseSSL: true,
+					UseSSL:     true,
+					UseSSLSeen: true,
 				},
 				WithSSL:      false,
 				OptsIn:       New("", "", enabledURIOnly),
@@ -112,8 +113,9 @@ func TestParseAndSetOptions(t *testing.T) {
 			{
 				Name: "not built with ssl using SRV",
 				CS: connstring.ConnString{
-					UseSSL:   true,
-					UsingSRV: true,
+					UseSSL:     true,
+					UseSSLSeen: true,
+					UsingSRV:   true,
 				},
 				WithSSL:      false,
 				OptsIn:       New("", "", enabledURIOnly),
@@ -123,7 +125,8 @@ func TestParseAndSetOptions(t *testing.T) {
 			{
 				Name: "built with ssl",
 				CS: connstring.ConnString{
-					UseSSL: true,
+					UseSSL:     true,
+					UseSSLSeen: true,
 				},
 				WithSSL: true,
 				OptsIn:  New("", "", enabledURIOnly),
@@ -145,8 +148,9 @@ func TestParseAndSetOptions(t *testing.T) {
 			{
 				Name: "built with ssl using SRV",
 				CS: connstring.ConnString{
-					UseSSL:   true,
-					UsingSRV: true,
+					UseSSL:     true,
+					UseSSLSeen: true,
+					UsingSRV:   true,
 				},
 				WithSSL: true,
 				OptsIn:  New("", "", enabledURIOnly),

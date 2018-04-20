@@ -10,17 +10,18 @@ package options
 
 import (
 	"fmt"
-	"github.com/jessevdk/go-flags"
-	"github.com/mongodb/mongo-tools/common/connstring"
-	"github.com/mongodb/mongo-tools/common/failpoint"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jessevdk/go-flags"
+	"github.com/mongodb/mongo-tools/common/connstring"
+	"github.com/mongodb/mongo-tools/common/failpoint"
+	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 )
 
 // Gitspec that the tool was built with. Needs to be set using -ldflags
@@ -45,6 +46,7 @@ var (
 )
 
 const IncompatibleArgsErrorFormat = "illegal argument combination: cannot specify %s and --uri"
+const ConflictingArgsErrorFormat = "illegal argument combination: %s conflicts with --uri"
 
 // Struct encompassing all of the options that are reused across tools: "help",
 // "version", verbosity settings, ssl settings, etc.
@@ -506,7 +508,12 @@ func (opts *ToolOptions) setOptionsFromURI(cs connstring.ConnString) error {
 		}
 		return fmt.Errorf("cannot use ssl: tool not built with SSL support")
 	}
-	opts.SSL.UseSSL = cs.UseSSL
+	if cs.UseSSLSeen {
+		if opts.SSL.UseSSL && !cs.UseSSL {
+			return fmt.Errorf(ConflictingArgsErrorFormat, "--ssl")
+		}
+		opts.SSL.UseSSL = cs.UseSSL
+	}
 
 	if cs.KerberosService != "" && !BuiltWithGSSAPI {
 		return fmt.Errorf("cannot specify gssapiservicename: tool not built with kerberos support")

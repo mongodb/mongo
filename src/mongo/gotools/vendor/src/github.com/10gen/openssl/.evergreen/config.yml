@@ -1,0 +1,377 @@
+# default command type
+command_type: system
+
+# run the same task in the previous revision if the current task fails
+stepback: true
+
+functions:
+
+  "set shell vars":
+    - command: shell.exec
+      params:
+        script: |
+            set -o errexit
+            set -o xtrace
+            export RAWGOPATH="$(pwd)/gopath"
+            export GOPATH="$RAWGOPATH"
+            if [ "Windows_NT" = "$OS" ]; then
+                set -o igncr
+                export GOPATH=$(echo $GOPATH | sed -e 's|/cygdrive/c|c:|')
+            fi
+            cat <<EOT > expansion.yml
+            rawgopath: $RAWGOPATH
+            repopath: $RAWGOPATH/src/github.com/10gen/openssl
+            prepare_shell: |
+                export GOPATH="$GOPATH"
+                set -o errexit
+                set -o xtrace
+            EOT
+            cat expansion.yml
+            exit 0
+    - command: expansions.update
+      params:
+        file: expansion.yml
+
+  "setup gopath" :
+    - command: shell.exec
+      params:
+        silent: false
+        script: |
+            ${prepare_shell}
+            ${gorootvars} go get github.com/spacemonkeygo/spacelog
+            exit 0
+
+  "fetch source" :
+    - command: git.get_project
+      params:
+        directory: src
+    - command: shell.exec
+      params:
+        script: |
+            ${prepare_shell}
+            mkdir -p $(dirname "${repopath}")
+            mv src "${repopath}"
+            exit 0
+
+  "go build" :
+    - command: shell.exec
+      type: test
+      params:
+        script: |
+            ${prepare_shell}
+            cd ${repopath}
+            ${gorootvars} go build ${args} -v -x -tags '${build_tags}'
+            exit 0
+
+  "go test" :
+    - command: shell.exec
+      type: test
+      params:
+        script: |
+            ${prepare_shell}
+            cd ${repopath}
+            ${gorootvars} go test ${args} -v -x -tags '${build_tags}'
+            exit 0
+
+post:
+  - command: shell.exec
+    params:
+      silent: true
+      script: |
+        ${prepare_shell}
+        rm -rf "${rawgopath}"
+        exit 0
+
+tasks:
+
+- name: "build"
+  commands:
+    - func: "set shell vars"
+    - func: "setup gopath"
+    - func: "fetch source"
+    - func: "go build"
+
+- name: "test"
+  depends_on:
+    - name: "build"
+  commands:
+    - func: "set shell vars"
+    - func: "setup gopath"
+    - func: "fetch source"
+    - func: "go test"
+
+buildvariants:
+
+#######################################
+#        Amazon Buildvariants         #
+#######################################
+
+- name: amazonlinux64
+  display_name: Amazon Linux 64 (Go 1.8)
+  run_on:
+  - linux-64-amzn-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: amazon2
+  display_name: Amazon Linux 64 v2 (Go 1.8)
+  run_on:
+  - amazon2-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#     Debian Buildvariants            #
+#######################################
+
+- name: debian71
+  display_name: Debian 7.1 (Go 1.8)
+  run_on:
+  - debian71-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: debian81
+  display_name: Debian 8.1 (Go 1.8)
+  run_on:
+  - debian81-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: debian92
+  display_name: Debian 9.2 (Go 1.8)
+  run_on:
+  - debian92-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#           macOS Buildvariant        #
+#######################################
+
+- name: macOS-1012
+  display_name: MacOS 10.12 (Go 1.8)
+  run_on:
+  - macos-1012
+  expansions:
+    gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
+    build_tags: "openssl_pre_1.0"
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#     RHEL Buildvariants              #
+#######################################
+
+- name: rhel62
+  display_name: RHEL 6.2 (Go 1.8)
+  run_on:
+  - rhel62-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: rhel70
+  display_name: RHEL 7.0 (Go 1.8)
+  run_on:
+  - rhel70
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#     SUSE Buildvariants              #
+#######################################
+
+- name: suse11
+  display_name: SUSE 11 (Go 1.8)
+  run_on:
+  - suse11-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: "openssl_pre_1.0"
+  tasks:
+  - name: build
+  - name: test
+
+- name: suse12
+  display_name: SUSE 12 (Go 1.8)
+  run_on:
+  - suse12-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#          Ubuntu Buildvariants       #
+#######################################
+
+- name: ubuntu1404
+  display_name: Ubuntu 14.04 (Go 1.8)
+  run_on:
+  - ubuntu1404-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: ubuntu1604
+  display_name: Ubuntu 16.04 (Go 1.8)
+  run_on:
+  - ubuntu1604-test
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#        Windows Buildvariants        #
+#######################################
+
+- name: windows-64
+  display_name: Windows 64-bit (Go 1.8)
+  run_on:
+  - windows-64-vs2015-test
+  expansions:
+    gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go"'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#        ARM Buildvariants            #
+#######################################
+
+- name: ubuntu1604-arm64-go1.8
+  display_name: ZAP ARM64 Ubuntu 16.04 SSL (Go 1.8)
+  run_on:
+  - ubuntu1604-arm64-small
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/aarch64-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#        Power Buildvariants          #
+#######################################
+
+- name: rhel71-ppc64le-enterprise-go1.8
+  display_name: ZAP PPC64LE RHEL 7.1 Enterprise (Go 1.8)
+  run_on:
+  - rhel71-power8-test
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: ubuntu1604-ppc64le-enterprise-go1.8
+  display_name: ZAP PPC64LE Ubuntu 16.04 Enterprise (Go 1.8)
+  run_on:
+  - ubuntu1604-power8-test
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+#######################################
+#     Z (s390x) Buildvariants         #
+#######################################
+
+- name: rhel67-s390x-enterprise-go1.8
+  display_name: ZAP s390x RHEL 6.7 Enterprise (Go 1.8)
+  run_on:
+  - rhel67-zseries-test
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: rhel72-s390x-enterprise-go1.8
+  display_name: ZAP s390x RHEL 7.2 Enterprise (Go 1.8)
+  run_on:
+  - rhel72-zseries-test
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: suse12-s390x-enterprise-go1.8
+  display_name: ZAP s390x SUSE 12 Enterprise (Go 1.8)
+  run_on:
+  - suse12-zseries-test
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test
+
+- name: ubuntu1604-s390x-enterprise-go1.8
+  display_name: ZAP s390x Ubuntu 16.04 Enterprise (Go 1.8)
+  run_on:
+  - ubuntu1604-zseries-small
+  stepback: false
+  batchtime: 604800
+  expansions:
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_tags: ""
+  tasks:
+  - name: build
+  - name: test

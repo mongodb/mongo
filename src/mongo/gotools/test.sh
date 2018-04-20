@@ -20,9 +20,9 @@ rm -rf vendor/pkg
 . ./set_gopath.sh
 mkdir -p bin
 
-for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongoreplay; do
+for i in common bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongoreplay; do
         echo "Testing ${i}..."
-        (cd $i && go test)
+        (cd $i && go test ./... -tags "${tags}")
 done
 
 mv -f common/options/options.go.bak common/options/options.go

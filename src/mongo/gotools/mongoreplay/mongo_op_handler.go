@@ -24,6 +24,7 @@ type OpStreamSettings struct {
 	CaptureBufSize   int    `long:"capSize" description:"Size in KiB of the PCAP capture buffer"`
 	Expression       string `short:"e" long:"expr" description:"BPF filter expression to apply to packets"`
 	NetworkInterface string `short:"i" description:"network interface to listen on"`
+	MaxBufferedPages int    `long:"maxBufferedPages" description:"maximum number of memory pages to store when buffering packets. The cache size is unlimited if not set"`
 }
 
 // tcpassembly.Stream implementation.
