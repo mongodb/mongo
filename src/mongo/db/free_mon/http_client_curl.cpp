@@ -140,75 +140,81 @@ private:
     static void doPost(SharedPromise<std::vector<uint8_t>> shared_promise,
                        const std::string& urlString,
                        const BSONObj& obj) {
-        ConstDataRange data(obj.objdata(), obj.objdata() + obj.objsize());
+        try {
+            ConstDataRange data(obj.objdata(), obj.objdata() + obj.objsize());
 
-        ConstDataRangeCursor cdrc(data);
+            ConstDataRangeCursor cdrc(data);
 
-        std::unique_ptr<CURL, void (*)(CURL*)> myHandle(curl_easy_init(), curl_easy_cleanup);
+            std::unique_ptr<CURL, void (*)(CURL*)> myHandle(curl_easy_init(), curl_easy_cleanup);
 
-        if (!myHandle) {
-            shared_promise.setError({ErrorCodes::InternalError, "Curl initialization failed"});
-            return;
-        }
+            if (!myHandle) {
+                shared_promise.setError({ErrorCodes::InternalError, "Curl initialization failed"});
+                return;
+            }
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_URL, urlString.c_str());
-        curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
+            curl_easy_setopt(myHandle.get(), CURLOPT_URL, urlString.c_str());
+            curl_easy_setopt(myHandle.get(), CURLOPT_POST, 1);
 
-        // Allow http only if test commands are enabled
-        if (getTestCommandsEnabled()) {
+            // Allow http only if test commands are enabled
+            if (getTestCommandsEnabled()) {
+                curl_easy_setopt(
+                    myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
+            } else {
+                curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+            }
+
             curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
-        } else {
-            curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
-        }
+            curl_easy_setopt(myHandle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_PROTOCOLS, CURLPROTO_HTTPS | CURLPROTO_HTTP);
-        curl_easy_setopt(myHandle.get(), CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            DataBuilder dataBuilder(4096);
 
-        DataBuilder dataBuilder(4096);
+            curl_easy_setopt(myHandle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+            curl_easy_setopt(myHandle.get(), CURLOPT_WRITEDATA, &dataBuilder);
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-        curl_easy_setopt(myHandle.get(), CURLOPT_WRITEDATA, &dataBuilder);
+            curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
+            curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
+            curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_READFUNCTION, ReadMemoryCallback);
-        curl_easy_setopt(myHandle.get(), CURLOPT_READDATA, &cdrc);
-        curl_easy_setopt(myHandle.get(), CURLOPT_POSTFIELDSIZE, (long)cdrc.length());
-
-        // CURLOPT_EXPECT_100_TIMEOUT_MS??
-        curl_easy_setopt(myHandle.get(), CURLOPT_CONNECTTIMEOUT, kConnectionTimeoutSeconds);
-        curl_easy_setopt(myHandle.get(), CURLOPT_TIMEOUT, kTotalRequestTimeoutSeconds);
+            // CURLOPT_EXPECT_100_TIMEOUT_MS??
+            curl_easy_setopt(myHandle.get(), CURLOPT_CONNECTTIMEOUT, kConnectionTimeoutSeconds);
+            curl_easy_setopt(myHandle.get(), CURLOPT_TIMEOUT, kTotalRequestTimeoutSeconds);
 
 #if LIBCURL_VERSION_NUM > 0x072200
-        // Requires >= 7.34.0
-        curl_easy_setopt(myHandle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+            // Requires >= 7.34.0
+            curl_easy_setopt(myHandle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 #endif
-        curl_easy_setopt(myHandle.get(), CURLOPT_FOLLOWLOCATION, 0);
+            curl_easy_setopt(myHandle.get(), CURLOPT_FOLLOWLOCATION, 0);
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_NOSIGNAL, 1);
-        // TODO: consider making this configurable            If server log level > 3
-        // curl_easy_setopt(myHandle.get(), CURLOPT_VERBOSE, 1);
-        // curl_easy_setopt(myHandle.get(), CURLOPT_DEBUGFUNCTION , ???);
+            curl_easy_setopt(myHandle.get(), CURLOPT_NOSIGNAL, 1);
+            // TODO: consider making this configurable            If server log level > 3
+            // curl_easy_setopt(myHandle.get(), CURLOPT_VERBOSE, 1);
+            // curl_easy_setopt(myHandle.get(), CURLOPT_DEBUGFUNCTION , ???);
 
-        curl_slist* chunk = nullptr;
-        chunk = curl_slist_append(chunk, "Content-Type: application/octet-stream");
-        chunk = curl_slist_append(chunk, "Accept: application/octet-stream");
+            curl_slist* chunk = nullptr;
+            chunk = curl_slist_append(chunk, "Content-Type: application/octet-stream");
+            chunk = curl_slist_append(chunk, "Accept: application/octet-stream");
 
-        // Send the empty expect because we do not need the server to respond with 100-Contine
-        chunk = curl_slist_append(chunk, "Expect:");
+            // Send the empty expect because we do not need the server to respond with 100-Contine
+            chunk = curl_slist_append(chunk, "Expect:");
 
-        std::unique_ptr<curl_slist, void (*)(curl_slist*)> chunkHolder(chunk, curl_slist_free_all);
+            std::unique_ptr<curl_slist, void (*)(curl_slist*)> chunkHolder(chunk,
+                                                                           curl_slist_free_all);
 
-        curl_easy_setopt(myHandle.get(), CURLOPT_HTTPHEADER, chunk);
+            curl_easy_setopt(myHandle.get(), CURLOPT_HTTPHEADER, chunk);
 
-        CURLcode result = curl_easy_perform(myHandle.get());
-        if (result != CURLE_OK) {
-            shared_promise.setError({ErrorCodes::OperationFailed,
-                                     str::stream() << "Bad HTTP response from API server: "
-                                                   << curl_easy_strerror(result)});
-            return;
+            CURLcode result = curl_easy_perform(myHandle.get());
+            if (result != CURLE_OK) {
+                shared_promise.setError({ErrorCodes::OperationFailed,
+                                         str::stream() << "Bad HTTP response from API server: "
+                                                       << curl_easy_strerror(result)});
+                return;
+            }
+
+            auto d = dataBuilder.getCursor();
+            shared_promise.emplaceValue(std::vector<uint8_t>(d.data(), d.data() + d.length()));
+        } catch (...) {
+            shared_promise.setError(exceptionToStatus());
         }
-
-        auto d = dataBuilder.getCursor();
-        shared_promise.emplaceValue(std::vector<uint8_t>(d.data(), d.data() + d.length()));
     }
 
 private:

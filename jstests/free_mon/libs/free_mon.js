@@ -7,6 +7,8 @@
 // SUPPORTED_FAULT_TYPES list in mock_http_server.py
 const FAULT_FAIL_REGISTER = "fail_register";
 const FAULT_INVALID_REGISTER = "invalid_register";
+const FAULT_HALT_METRICS_5 = "halt_metrics_5";
+const FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3";
 
 class FreeMonWebServer {
     /**
@@ -138,6 +140,21 @@ class FreeMonWebServer {
             return stats.registers == count;
         }, "Failed to web server register", 60 * 1000);
     }
+
+    /**
+     * Wait for N metrics calls to be received by web server.
+     *
+     * @throws assert.soon() exception
+     */
+    waitMetrics(count) {
+        const qs = this.queryStats.bind(this);
+        // Wait for metrics uploads to occur
+        assert.soon(function() {
+            const stats = qs();
+            print("QS : " + tojson(stats));
+            return stats.metrics == count;
+        }, "Failed to web server metrics", 60 * 1000);
+    }
 }
 
 /**
@@ -154,4 +171,16 @@ function WaitForRegistration(conn) {
         const da = docs.toArray();
         return da.length != 0;
     }, "Failed to register", 60 * 1000);
+}
+
+/**
+ * Get registration document.
+ *
+ * @param {object} registration document
+ */
+function FreeMonGetRegistration(conn) {
+    const admin = conn.getDB("admin");
+    const docs = admin.system.version.find({_id: "free_monitoring"});
+    const da = docs.toArray();
+    return da[0];
 }

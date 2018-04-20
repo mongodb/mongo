@@ -62,35 +62,79 @@ boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
             return {};
         }
 
-        Date_t deadlineCV = Date_t::max();
-        if (!_queue.empty()) {
-            deadlineCV = _queue.top()->getDeadline();
-        } else {
-            deadlineCV = clockSource->now() + Hours(24);
+        while (true) {
+            Date_t deadlineCV = Date_t::max();
+            if (_useCrank) {
+                if (!_queue.empty() && _countMessagesIgnored < _countMessagesToIgnore) {
+                    // For testing purposes, ignore the deadline
+                    deadlineCV = Date_t();
+                } else {
+                    deadlineCV = clockSource->now() + Hours(1);
+                }
+            } else {
+                if (!_queue.empty()) {
+                    deadlineCV = _queue.top()->getDeadline();
+                } else {
+                    deadlineCV = clockSource->now() + Hours(24);
+                }
+            }
+
+            _condvar.wait_until(lock, deadlineCV.toSystemTimePoint(), [this, clockSource]() {
+                if (_stop) {
+                    return true;
+                }
+
+                if (this->_queue.empty()) {
+                    return false;
+                }
+
+                // Always wake in test mode
+                if (_useCrank) {
+                    if (_countMessagesIgnored < _countMessagesToIgnore) {
+                        return true;
+                    } else {
+                        dassert(_countMessagesIgnored == _countMessagesToIgnore);
+                        return false;
+                    }
+                }
+
+                auto deadlineMessage = this->_queue.top()->getDeadline();
+                if (deadlineMessage == Date_t::min()) {
+                    return true;
+                }
+
+                auto now = clockSource->now();
+
+                bool check = deadlineMessage < now;
+                return check;
+            });
+
+            if (_stop) {
+                return {};
+            }
+
+            // We were woken-up by a message being enqueue, go back to sleep and wait until crank is
+            // installed and turned.
+            if (_useCrank) {
+                if (_countMessagesIgnored == _countMessagesToIgnore) {
+                    continue;
+                }
+
+                dassert(_countMessagesIgnored <= _countMessagesToIgnore);
+            }
+
+            // If the queue is not empty, return the message
+            // otherwise we need to go back to sleep in the hope we get a message.
+            if (!_queue.empty()) {
+                break;
+            } else if (_useCrank) {
+                dassert(0, "Was asked to wait for more messages then available");
+            }
         }
 
-        _condvar.wait_until(lock, deadlineCV.toSystemTimePoint(), [this, clockSource]() {
-            if (_stop) {
-                return true;
-            }
-
-            if (this->_queue.empty()) {
-                return false;
-            }
-
-            auto deadlineMessage = this->_queue.top()->getDeadline();
-            if (deadlineMessage == Date_t::min()) {
-                return true;
-            }
-
-            auto now = clockSource->now();
-
-            bool check = deadlineMessage < now;
-            return check;
-        });
-
-        if (_stop || _queue.empty()) {
-            return {};
+        _countMessagesIgnored++;
+        if (_useCrank && _countMessagesIgnored == _countMessagesToIgnore && _waitable) {
+            _waitable->set(Status::OK());
         }
 
         auto item = _queue.top();
@@ -113,4 +157,20 @@ void FreeMonMessageQueue::stop() {
     }
 }
 
+void FreeMonMessageQueue::turnCrankForTest(size_t countMessagesToIgnore) {
+    invariant(_useCrank);
+
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+        _waitable = std::make_unique<WaitableResult>();
+
+        _countMessagesIgnored = 0;
+        _countMessagesToIgnore = countMessagesToIgnore;
+
+        _condvar.notify_one();
+    }
+
+    //_waitable->wait_for(Seconds(10));
+}
 }  // namespace mongo

@@ -70,7 +70,6 @@ StatusWith<EnableCloudStateEnum> EnableCloudState_parse(StringData value) {
         return EnableCloudStateEnum::kRuntime;
     }
 
-    // TODO
     return Status(ErrorCodes::InvalidOptions, "Unrecognized state");
 }
 

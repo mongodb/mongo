@@ -29,6 +29,7 @@
 
 #include <boost/optional.hpp>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <ratio>
 #include <string>
@@ -143,6 +144,125 @@ private:
 };
 
 /**
+ * Manage retries for metrics
+ */
+class MetricsRetryCounter : public RetryCounter {
+public:
+    explicit MetricsRetryCounter(PseudoRandom& random) : _random(random) {}
+
+    void reset() final;
+
+    bool incrementError() final;
+
+private:
+    // Random number generator for jitter
+    PseudoRandom& _random;
+
+    // Retry count for stage 1 retry
+    size_t _retryCount{0};
+
+    // Total Seconds we have retried for
+    Seconds _total;
+
+    // Last retry interval without jitter
+    Seconds _base;
+
+    // Max Duration
+    const Hours kDurationMax{7 * 24};
+};
+
+/**
+ * Simple bounded buffer of metrics to upload.
+ */
+class MetricsBuffer {
+public:
+    using container_type = std::deque<BSONObj>;
+
+    /**
+     * Add a metric to the buffer. Oldest metric will be discarded if buffer is at capacity.
+     */
+    void push(BSONObj obj) {
+        if (_queue.size() == kMaxElements) {
+            _queue.pop_front();
+        }
+
+        _queue.push_back(obj);
+    }
+
+    /**
+     * Flush the buffer down to kMinElements entries. The last entries are held for cloud.
+     */
+    void reset() {
+        while (_queue.size() > kMinElements) {
+            _queue.pop_front();
+        }
+    }
+
+    container_type::iterator begin() {
+        return _queue.begin();
+    }
+    container_type::iterator end() {
+        return _queue.end();
+    }
+
+private:
+    // Bounded queue of metrics
+    container_type _queue;
+
+    const size_t kMinElements = 1;
+    const size_t kMaxElements = 10;
+};
+
+/**
+ * Countdown latch for test support in FreeMonProcessor so that a crank can be turned manually.
+ */
+class FreeMonCountdownLatch {
+public:
+    explicit FreeMonCountdownLatch() : _count(0) {}
+
+    /**
+     * Reset countdown latch wait for N events.
+     */
+    void reset(uint32_t count) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        dassert(_count == 0);
+        dassert(count > 0);
+        _count = count;
+    }
+
+    /**
+     * Count down an event.
+     */
+    void countDown() {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+        if (_count > 0) {
+            --_count;
+            _condvar.notify_one();
+        }
+    }
+
+    /**
+     * Wait until the N events specified in reset have occured.
+     */
+    void wait() {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        _condvar.wait(lock, [&] { return _count == 0; });
+    }
+
+private:
+    // mutex to break count and cond var
+    stdx::mutex _mutex;
+
+    // cond var to signal and wait on
+    stdx::condition_variable _condvar;
+
+    // count of events to wait for
+    size_t _count;
+};
+
+
+/**
  * Process in an Agent in a Agent/Message Passing model.
  *
  * Messages are given to it by enqueue, and the Processor processes messages with run().
@@ -151,14 +271,8 @@ class FreeMonProcessor : public std::enable_shared_from_this<FreeMonProcessor> {
 public:
     FreeMonProcessor(FreeMonCollectorCollection& registration,
                      FreeMonCollectorCollection& metrics,
-                     FreeMonNetworkInterface* network)
-        : _registration(registration),
-          _metrics(metrics),
-          _network(network),
-          _random(Date_t::now().asInt64()),
-          _registrationRetry(_random) {
-        _registrationRetry.reset();
-    }
+                     FreeMonNetworkInterface* network,
+                     bool useCrankForTest);
 
     /**
      * Enqueue a message to process
@@ -171,6 +285,11 @@ public:
     void stop();
 
     /**
+     * Turn the crank of the message queue by ignoring deadlines for N messages.
+     */
+    void turnCrankForTest(size_t countMessagesToIgnore);
+
+    /**
      * Processes messages forever
      */
     void run();
@@ -179,6 +298,11 @@ public:
      * Validate the registration response. Public for unit testing.
      */
     static Status validateRegistrationResponse(const FreeMonRegistrationResponse& resp);
+
+    /**
+     * Validate the metrics response. Public for unit testing.
+     */
+    static Status validateMetricsResponse(const FreeMonMetricsResponse& resp);
 
 private:
     /**
@@ -203,9 +327,11 @@ private:
                           const FreeMonMessageWithPayload<FreeMonMessageType::RegisterServer>* msg);
 
     /**
-     * Process unregistration.
+     * Process unregistration from a command.
      */
-    void doUnregister(Client* client);
+    void doCommandUnregister(
+        Client* client,
+        FreeMonWaitableMessageWithPayload<FreeMonMessageType::UnregisterCommand>* msg);
 
     /**
      * Process a successful HTTP request.
@@ -226,6 +352,29 @@ private:
      */
     void notifyPendingRegisters(const Status s);
 
+    /**
+     * Upload collected metrics.
+     */
+    void doMetricsCollect(Client* client);
+
+    /**
+     * Upload gathered metrics.
+     */
+    void doMetricsSend(Client* client);
+
+    /**
+     * Process a successful HTTP request.
+     */
+    void doAsyncMetricsComplete(
+        Client* client,
+        const FreeMonMessageWithPayload<FreeMonMessageType::AsyncMetricsComplete>* msg);
+
+    /**
+     * Process an unsuccessful HTTP request.
+     */
+    void doAsyncMetricsFail(
+        Client* client, const FreeMonMessageWithPayload<FreeMonMessageType::AsyncMetricsFail>* msg);
+
 private:
     // Collection of collectors to send on registration
     FreeMonCollectorCollection& _registration;
@@ -242,6 +391,15 @@ private:
     // Registration Retry logic
     RegistrationRetryCounter _registrationRetry;
 
+    // Metrics Retry logic
+    MetricsRetryCounter _metricsRetry;
+
+    // Interval for gathering metrics
+    Seconds _metricsGatherInterval;
+
+    // Buffer of metrics to upload
+    MetricsBuffer _metricsBuffer;
+
     // List of tags from server configuration registration
     std::vector<std::string> _tags;
 
@@ -256,6 +414,9 @@ private:
 
     // Pending update to disk
     FreeMonStorageState _state;
+
+    // Countdown launch to support manual cranking
+    FreeMonCountdownLatch _countdown;
 
     // Message queue
     FreeMonMessageQueue _queue;

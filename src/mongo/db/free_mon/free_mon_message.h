@@ -56,25 +56,39 @@ enum class FreeMonMessageType {
     RegisterCommand,
 
     /**
-     * Internal: Generated when an async HTTP request completes succesfully.
+     * Internal: Generated when an async registration HTTP request completes succesfully.
      */
     AsyncRegisterComplete,
 
     /**
-     * Internal: Generated when an async HTTP request completes with an error.
+     * Internal: Generated when an async registration HTTP request completes with an error.
      */
     AsyncRegisterFail,
 
     /**
-     * Unregister server from server command.
-     */
+    * Unregister server from server command.
+    */
     UnregisterCommand,
 
-    // TODO - add metrics messages
-    // MetricsCollect - Cloud wants the "wait" time to calculated when the message processing
-    // starts, not ends
-    // AsyncMetricsComplete,
-    // AsyncMetricsFail,
+    /**
+     * Internal: Collect metrics and buffer them in-memory
+     */
+    MetricsCollect,
+
+    /**
+     * Internal: Send metrics to the cloud endpoint by beginning an async HTTP request.
+     */
+    MetricsSend,
+
+    /**
+     * Internal: Generated when an async metrics HTTP request completes succesfully.
+     */
+    AsyncMetricsComplete,
+
+    /**
+     * Internal: Generated when an async metrics HTTP request completes with an error.
+     */
+    AsyncMetricsFail,
 
     // TODO - add replication messages
     // OnPrimary,
@@ -178,6 +192,17 @@ struct FreeMonPayloadForMessage<FreeMonMessageType::AsyncRegisterFail> {
     using payload_type = Status;
 };
 
+template <>
+struct FreeMonPayloadForMessage<FreeMonMessageType::AsyncMetricsComplete> {
+    using payload_type = FreeMonMetricsResponse;
+};
+
+template <>
+struct FreeMonPayloadForMessage<FreeMonMessageType::AsyncMetricsFail> {
+    using payload_type = Status;
+};
+
+
 /**
  * Message with a generic payload based on the type of message.
  */
@@ -262,31 +287,52 @@ private:
 };
 
 /**
- * Custom waitable message for Register Command message.
+ * For the messages that the caller needs to wait on, this provides a mechanism to wait on messages
+ * to be processed.
+*/
+template <FreeMonMessageType typeT>
+struct FreeMonWaitablePayloadForMessage {
+    using payload_type = void;
+};
+
+template <>
+struct FreeMonWaitablePayloadForMessage<FreeMonMessageType::RegisterCommand> {
+    using payload_type = std::vector<std::string>;
+};
+
+template <>
+struct FreeMonWaitablePayloadForMessage<FreeMonMessageType::UnregisterCommand> {
+    // The parameter is unused but most not be void.
+    using payload_type = bool;
+};
+
+/**
+ * Message with a generic payload based on the type of message.
  */
-class FreeMonRegisterCommandMessage : public FreeMonMessage {
+template <FreeMonMessageType typeT>
+class FreeMonWaitableMessageWithPayload : public FreeMonMessage {
 public:
+    using payload_type = typename FreeMonWaitablePayloadForMessage<typeT>::payload_type;
+
     /**
      * Create a message that should processed immediately.
      */
-    static std::shared_ptr<FreeMonRegisterCommandMessage> createNow(
-        const std::vector<std::string>& tags) {
-        return std::make_shared<FreeMonRegisterCommandMessage>(tags, Date_t::min());
+    static std::shared_ptr<FreeMonWaitableMessageWithPayload> createNow(payload_type t) {
+        return std::make_shared<FreeMonWaitableMessageWithPayload>(t, Date_t::min());
     }
 
     /**
-     * Create a message that should processed after the specified deadline.
+     * Create a message that should processed immediately.
      */
-    static std::shared_ptr<FreeMonRegisterCommandMessage> createWithDeadline(
-        const std::vector<std::string>& tags, Date_t deadline) {
-        return std::make_shared<FreeMonRegisterCommandMessage>(tags, deadline);
+    static std::shared_ptr<FreeMonWaitableMessageWithPayload> createWithDeadline(payload_type t,
+                                                                                 Date_t deadline) {
+        return std::make_shared<FreeMonWaitableMessageWithPayload>(t, deadline);
     }
-
     /**
-     * Get tags.
+     * Get message payload.
      */
-    const std::vector<std::string>& getTags() const {
-        return _tags;
+    const payload_type& getPayload() const {
+        return _t;
     }
 
     /**
@@ -306,15 +352,17 @@ public:
     }
 
 public:
-    FreeMonRegisterCommandMessage(std::vector<std::string> tags, Date_t deadline)
-        : FreeMonMessage(FreeMonMessageType::RegisterCommand, deadline), _tags(std::move(tags)) {}
+    FreeMonWaitableMessageWithPayload(payload_type t, Date_t deadline)
+        : FreeMonMessage(typeT, deadline), _t(std::move(t)) {}
 
 private:
+    // Message payload
+    payload_type _t;
+
     // WaitaleResult to notify caller
     WaitableResult _waitable{};
-
-    // Tags
-    const std::vector<std::string> _tags;
 };
 
+using FreeMonRegisterCommandMessage =
+    FreeMonWaitableMessageWithPayload<FreeMonMessageType::RegisterCommand>;
 }  // namespace mongo

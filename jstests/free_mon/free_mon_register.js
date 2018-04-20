@@ -34,6 +34,13 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(last_register.payload.storageEngine.readOnly, false);
     assert.eq(last_register.payload.isMaster.ok, 1);
 
+    mock_web.waitMetrics(2);
+
+    const last_metrics = mock_web.query("last_metrics");
+    print(tojson(last_metrics));
+
+    assert.eq(last_metrics.version, 1);
+
     MongoRunner.stopMongod(conn);
 
     mock_web.stop();

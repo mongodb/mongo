@@ -50,8 +50,9 @@ namespace mongo {
  */
 class FreeMonController {
 public:
-    explicit FreeMonController(std::unique_ptr<FreeMonNetworkInterface> network)
-        : _network(std::move(network)) {}
+    explicit FreeMonController(std::unique_ptr<FreeMonNetworkInterface> network,
+                               bool useCrankForTest = false)
+        : _network(std::move(network)), _useCrankForTest(useCrankForTest) {}
 
     /**
      * Initializes free monitoring.
@@ -63,6 +64,11 @@ public:
      * Stops free monitoring thread.
      */
     void stop();
+
+    /**
+     * Turn the crank of the message queue by ignoring deadlines for N messages.
+    */
+    void turnCrankForTest(size_t countMessagesToIgnore);
 
     /**
      * Add a metric collector to collect on registration
@@ -103,7 +109,7 @@ public:
      * As with registerServerCommand() above, but undoes registration.
      * On complettion of this command, no further metrics will be transmitted.
      */
-    Status unregisterServerCommand();
+    boost::optional<Status> unregisterServerCommand(Milliseconds timeout);
 
     // TODO - add these methods
     // void getServerStatus(BSONObjBuilder* builder);
@@ -161,6 +167,9 @@ private:
 
     // Background thead for agent
     stdx::thread _thread;
+
+    // Crank for test
+    bool _useCrankForTest;
 
     // Background agent
     std::shared_ptr<FreeMonProcessor> _processor;

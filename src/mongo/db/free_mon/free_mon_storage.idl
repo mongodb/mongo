@@ -25,6 +25,7 @@ enums:
         values:
             disabled: disabled
             enabled: enabled
+            pending: pending
    
 structs:
     FreeMonStorageState:

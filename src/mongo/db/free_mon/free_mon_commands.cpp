@@ -123,7 +123,7 @@ public:
         if (cmd.getAction() == SetFreeMonActionEnum::enable) {
             optStatus = controller->registerServerCommand(kRegisterSyncTimeout);
         } else {
-            optStatus = controller->unregisterServerCommand();
+            optStatus = controller->unregisterServerCommand(kRegisterSyncTimeout);
         }
 
         if (optStatus) {

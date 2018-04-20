@@ -30,10 +30,18 @@ FAULT_FAIL_REGISTER = "fail_register"
 """Fault which causes the server to return a response with a document with a bad version."""
 FAULT_INVALID_REGISTER = "invalid_register"
 
+"""Fault which causes metrics to return halt after 5 metric uploads have occurred."""
+FAULT_HALT_METRICS_5 = "halt_metrics_5"
+
+"""Fault which causes metrics to return permanentlyDelete = true after 3 uploads."""
+FAULT_PERMANENTLY_DELETE_AFTER_3 = "permanently_delete_after_3"
+
 # List of supported fault types
 SUPPORTED_FAULT_TYPES = [
     FAULT_FAIL_REGISTER,
-    FAULT_INVALID_REGISTER
+    FAULT_INVALID_REGISTER,
+    FAULT_HALT_METRICS_5,
+    FAULT_PERMANENTLY_DELETE_AFTER_3,
 ]
 
 # Supported POST URL types
@@ -132,14 +140,33 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
         decoded_doc = bson.BSON.decode(raw_input)
         last_metrics = dumps(decoded_doc)
 
-        data = bson.BSON.encode({
-            'version': bson.int64.Int64(1),
-            'haltMetricsUploading': False,
-            'permanentlyDelete': False,
-            'id': 'mock123',
-            'reportingInterval': bson.int64.Int64(1),
-            'message': 'Thanks for all the metrics',
-        })
+        if stats.metrics_calls > 5 and fault_type == FAULT_HALT_METRICS_5:
+            data = bson.BSON.encode({
+                'version': bson.int64.Int64(1),
+                'haltMetricsUploading': True,
+                'permanentlyDelete': False,
+                'id': 'mock123',
+                'reportingInterval': bson.int64.Int64(1),
+                'message': 'Thanks for all the metrics',
+            })
+        elif stats.metrics_calls > 3 and fault_type == FAULT_PERMANENTLY_DELETE_AFTER_3:
+            data = bson.BSON.encode({
+                'version': bson.int64.Int64(1),
+                'haltMetricsUploading': False,
+                'permanentlyDelete': True,
+                'id': 'mock123',
+                'reportingInterval': bson.int64.Int64(1),
+                'message': 'Thanks for all the metrics',
+            })
+        else:
+            data = bson.BSON.encode({
+                'version': bson.int64.Int64(1),
+                'haltMetricsUploading': False,
+                'permanentlyDelete': False,
+                'id': 'mock123',
+                'reportingInterval': bson.int64.Int64(1),
+                'message': 'Thanks for all the metrics',
+            })
 
         # TODO: test what if header is sent first?
         self._send_header()

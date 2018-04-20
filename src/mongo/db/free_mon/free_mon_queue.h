@@ -58,6 +58,8 @@ struct FreeMonMessageGreater {
  */
 class FreeMonMessageQueue {
 public:
+    FreeMonMessageQueue(bool useCrankForTest = false) : _useCrank(useCrankForTest) {}
+
     /**
      * Enqueue a message and wake consumer if needed.
      *
@@ -77,6 +79,11 @@ public:
      */
     void stop();
 
+    /**
+     * Turn the crank of the message queue by ignoring deadlines for N messages.
+     */
+    void turnCrankForTest(size_t countMessagesToIgnore);
+
 private:
     // Condition variable to signal consumer
     stdx::condition_variable _condvar;
@@ -93,6 +100,18 @@ private:
                         std::vector<std::shared_ptr<FreeMonMessage>>,
                         FreeMonMessageGreater>
         _queue;
+
+    // Use manual crank to process messages in-order instead of based on deadlines.
+    bool _useCrank{false};
+
+    // Number of messages to ignore
+    size_t _countMessagesToIgnore{0};
+
+    // Number of messages that have been ignored
+    size_t _countMessagesIgnored{0};
+
+    // Waitable result for testing
+    std::unique_ptr<WaitableResult> _waitable;
 };
 
 

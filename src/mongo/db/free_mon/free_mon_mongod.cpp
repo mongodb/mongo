@@ -33,6 +33,7 @@
 #include "mongo/db/free_mon/free_mon_mongod.h"
 
 #include <mutex>
+#include <snappy.h>
 #include <string>
 
 #include "mongo/base/data_type_validated.h"
