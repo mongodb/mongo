@@ -78,14 +78,17 @@ class PeriodicKillSecondaries(interface.Hook):
         self._run(test_report)
 
     def _run(self, test_report):
-        hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
-            self.logger.test_case_logger, self._last_test, self, test_report)
-        hook_test_case.configure(self.fixture)
-        hook_test_case.run_dynamic_test(test_report)
-
-        # Set the hook back into a state where it will disable oplog application at the start
-        # of the next test that runs.
-        self._start_time = None
+        try:
+            hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
+                self.logger.test_case_logger, self._last_test, self, test_report)
+            hook_test_case.configure(self.fixture)
+            hook_test_case.run_dynamic_test(test_report)
+        finally:
+            # Set the hook back into a state where it will disable oplog application at the start
+            # of the next test that runs.
+            # Always reset _start_time to prevent the hook from running in after_suite immediately
+            # after failing in after_test.
+            self._start_time = None
 
     def _enable_rssyncapplystop(self, secondary):
         # Enable the "rsSyncApplyStop" failpoint on the secondary to prevent them from
