@@ -533,13 +533,17 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
         _reload.clear();
         _deleted.clear();
     }
+    // Implicitly resets _deleteNotifyExec to avoid possible invariant failure
+    // in on destruction of MigrationChunkClonerSourceLegacy, and will always
+    // call deleteNotifyExec destructor on scope exit even if something in the
+    // below if statement fails
+    auto deleteNotifyExec = std::move(_deleteNotifyExec);
 
-    if (_deleteNotifyExec) {
+    if (deleteNotifyExec) {
         AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
         const auto cursorManager =
             autoColl.getCollection() ? autoColl.getCollection()->getCursorManager() : nullptr;
-        _deleteNotifyExec->dispose(opCtx, cursorManager);
-        _deleteNotifyExec.reset();
+        deleteNotifyExec->dispose(opCtx, cursorManager);
     }
 }
 
