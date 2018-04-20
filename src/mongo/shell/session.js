@@ -713,6 +713,14 @@ var {
         };
 
         const endTransaction = (commandName, driverSession) => {
+            // If commitTransaction or abortTransaction is the first statement in a
+            // transaction, it should not send a command to the server and should mark the
+            // transaction as inactive.
+            if (this.isFirstStatement()) {
+                _txnState = ServerSession.TransactionStates.kInactive;
+                return {"ok": 1};
+            }
+
             let cmd = {[commandName]: 1, txnNumber: NumberLong(_txnNumber)};
             // writeConcern should only be specified on commit or abort
             if (_txnOptions.getTxnWriteConcern() !== undefined) {
