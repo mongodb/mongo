@@ -101,6 +101,8 @@ var $config = (function() {
     };
 
     var skip = function skip(cluster) {
+        // TODO(SERVER-34570) remove isSharded() check once transactions are supported in sharded
+        // environments.
         if (cluster.isSharded() || cluster.isStandalone()) {
             return {skip: true, msg: 'only runs in a replica set.'};
         }
