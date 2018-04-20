@@ -135,7 +135,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
                 if (!refreshNotification) {
                     refreshNotification = (dbEntry->refreshCompletionNotification =
                                                std::make_shared<Notification<Status>>());
-                    _scheduleDatabaseRefresh(ul, dbName, dbEntry);
+                    _scheduleDatabaseRefresh(ul, dbName.toString(), dbEntry);
                 }
 
                 // Wait on the notification outside of the mutex.
@@ -405,7 +405,7 @@ void CatalogCache::report(BSONObjBuilder* builder) const {
 }
 
 void CatalogCache::_scheduleDatabaseRefresh(WithLock,
-                                            const StringData dbName,
+                                            const std::string& dbName,
                                             std::shared_ptr<DatabaseInfoEntry> dbEntry) {
 
     log() << "Refreshing cached database entry for " << dbName

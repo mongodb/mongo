@@ -216,7 +216,7 @@ private:
      * database entry must be in the 'needsRefresh' state.
      */
     void _scheduleDatabaseRefresh(WithLock,
-                                  const StringData dbName,
+                                  const std::string& dbName,
                                   std::shared_ptr<DatabaseInfoEntry> dbEntry);
 
     /**
