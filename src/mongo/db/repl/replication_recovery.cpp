@@ -225,6 +225,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     // Apply remaining ops one at at time, but don't log them because they are already logged.
     UnreplicatedWritesBlock uwb(opCtx);
+    DisableDocumentValidation validationDisabler(opCtx);
 
     BSONObj entry;
     while (cursor->more()) {
