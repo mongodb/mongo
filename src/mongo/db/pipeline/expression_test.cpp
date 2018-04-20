@@ -2291,21 +2291,27 @@ TEST(ExpressionIndexOfArray,
 
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
 
-    auto expIndexOfArray =
-        Expression::parseExpression(expCtx,
-                                    // Search for 2.
-                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x'] }"),
-                                    expCtx->variablesParseState);
+    auto expIndexOfArray = Expression::parseExpression(
+        expCtx,
+        // Search for $x.
+        fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5, 'val'] , '$x'] }"),
+        expCtx->variablesParseState);
     auto optimizedIndexOfArray = expIndexOfArray->optimize();
+    ASSERT_VALUE_EQ(Value(0), optimizedIndexOfArray->evaluate(Document{{"x", 0}}));
     ASSERT_VALUE_EQ(Value(1), optimizedIndexOfArray->evaluate(Document{{"x", 1}}));
-    auto IndexNotFound =
-        Expression::parseExpression(expCtx,
-                                    // Search for 'x'.
-                                    fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x'] }"),
-                                    expCtx->variablesParseState);
-    auto optimizedIndexNotFound = IndexNotFound->optimize();
+    ASSERT_VALUE_EQ(Value(2), optimizedIndexOfArray->evaluate(Document{{"x", 2}}));
+    ASSERT_VALUE_EQ(Value(3), optimizedIndexOfArray->evaluate(Document{{"x", 3}}));
+    ASSERT_VALUE_EQ(Value(4), optimizedIndexOfArray->evaluate(Document{{"x", 4}}));
+    ASSERT_VALUE_EQ(Value(5), optimizedIndexOfArray->evaluate(Document{{"x", 5}}));
+    ASSERT_VALUE_EQ(Value(6), optimizedIndexOfArray->evaluate(Document{{"x", string("val")}}));
+
+    auto optimizedIndexNotFound = optimizedIndexOfArray->optimize();
     // Should evaluate to -1 if not found.
     ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 10}}));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 100}}));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", 1000}}));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", string("string")}}));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFound->evaluate(Document{{"x", -1}}));
 }
 
 TEST(ExpressionIndexOfArray,
@@ -2320,14 +2326,8 @@ TEST(ExpressionIndexOfArray,
     auto optimizedIndexOfArray = expIndexOfArray->optimize();
     ASSERT_VALUE_EQ(Value(4), optimizedIndexOfArray->evaluate(Document{{"x", 4}}));
 
-    auto IndexNotFoundInRange = Expression::parseExpression(
-        expCtx,
-        // Search for 0 between 3 and 5.
-        fromjson("{ $indexOfArray : [ [0, 1, 2, 3, 4, 5] , '$x', 3, 5] }"),
-        expCtx->variablesParseState);
-    auto optimizedIndexNotFoundInRange = IndexNotFoundInRange->optimize();
     // Should evaluate to -1 if not found in range.
-    ASSERT_VALUE_EQ(Value(-1), optimizedIndexNotFoundInRange->evaluate(Document{{"x", 0}}));
+    ASSERT_VALUE_EQ(Value(-1), optimizedIndexOfArray->evaluate(Document{{"x", 0}}));
 }
 
 TEST(ExpressionIndexOfArray,
@@ -2342,7 +2342,7 @@ TEST(ExpressionIndexOfArray,
     auto optimizedIndexOfArrayWithDuplicateValues = expIndexOfArrayWithDuplicateValues->optimize();
     ASSERT_VALUE_EQ(Value(2),
                     optimizedIndexOfArrayWithDuplicateValues->evaluate(Document{{"x", 2}}));
-
+    // Duplicate Values in a range.
     auto expIndexInRangeWithhDuplicateValues = Expression::parseExpression(
         expCtx,
         // Search for 2 between 4 and 6.
@@ -2353,7 +2353,6 @@ TEST(ExpressionIndexOfArray,
     ASSERT_VALUE_EQ(Value(4),
                     optimizedIndexInRangeWithDuplcateValues->evaluate(Document{{"x", 2}}));
 }
-
 
 namespace FieldPath {
 

@@ -2741,28 +2741,26 @@ Value ExpressionIndexOfArray::evaluate(const Document& root) const {
     return Value(-1);
 }
 
-ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArguments(const Document& root,
-                                                const ExpressionVector& operands,
-                                                size_t arrayLength) const {
-    
+ExpressionIndexOfArray::Arguments ExpressionIndexOfArray::evaluateAndValidateArguments(
+    const Document& root, const ExpressionVector& operands, size_t arrayLength) const {
+
     int startIndex = 0;
     if (operands.size() > 2) {
         Value startIndexArg = operands[2]->evaluate(root);
         uassertIfNotIntegralAndNonNegative(startIndexArg, getOpName(), "starting index");
-        startIndex = static_cast<int>(startIndexArg.coerceToInt());
+        startIndex = startIndexArg.coerceToInt();
     }
-    
 
     int endIndex = arrayLength;
     if (operands.size() > 3) {
         Value endIndexArg = operands[3]->evaluate(root);
         uassertIfNotIntegralAndNonNegative(endIndexArg, getOpName(), "ending index");
         // Don't let 'endIndex' exceed the length of the array.
-        endIndex = std::min(arrayLength, static_cast<size_t>(endIndexArg.coerceToInt()));
+        endIndex = std::min(static_cast<int>(arrayLength), endIndexArg.coerceToInt());
     }
-
-    return ExpressionIndexOfArray::Arguments(vpOperand[1]->evaluate(root), startIndex, endIndex);
+    return {vpOperand[1]->evaluate(root), startIndex, endIndex};
 }
+
 /**
  * This class handles the case where IndexOfArray is given an ExpressionConstant
  * instead of using a vector and searching through it we can use a unordered_map
@@ -2780,21 +2778,23 @@ public:
     virtual Value evaluate(const Document& root) const {
         auto args = evaluateAndValidateArguments(root, vpOperand, _indexMap.size());
         auto indexVec = _indexMap.find(args.targetOfSearch);
-        if (indexVec != _indexMap.end()) {
-            // Search through the vector of indecies for first index in our range.
-            for (auto index : indexVec->second) {
-                if (index >= args.startIndex && index < args.endIndex) {
-                    return Value(index);
-                }
+
+        if (indexVec == _indexMap.end())
+            return Value(-1);
+
+        // Search through the vector of indecies for first index in our range.
+        for (auto index : indexVec->second) {
+            if (index >= args.startIndex && index < args.endIndex) {
+                return Value(index);
             }
-            // the value we are searching for exists but is not in our range.
-            return Value(-1);
-        } else {
-            return Value(-1);
         }
+        // The value we are searching for exists but is not in our range.
+        return Value(-1);
     }
 
 private:
+    // Maps the values in the array to the positions at which they occur. We need to remember the
+    // positions so that we can verify they are in the appropriate range.
     const ValueUnorderedMap<vector<int>> _indexMap;
 };
 
@@ -2806,33 +2806,29 @@ intrusive_ptr<Expression> ExpressionIndexOfArray::optimize() {
     }
     // If the input array is an ExpressionConstant we can optimize using a unordered_map instead of an
     // array.
-    if (auto constantArray =  dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
+    if (auto constantArray = dynamic_cast<ExpressionConstant*>(vpOperand[0].get())) {
         const Value valueArray = constantArray->getValue();
         if (valueArray.nullish()) {
             return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
         }
         uassert(50749,
                 str::stream() << "First operand of $indexOfArray must be an array. First "
-                              << "argument is of type: "
-                               << typeName(valueArray.getType()),
+                              << "argument is of type: " 
+                              << typeName(valueArray.getType()),
                 valueArray.isArray());
 
         auto arr = valueArray.getArray();
         // To handle the case of duplicate values the values need to map to a vector of indecies.
-        ValueUnorderedMap<vector<int>> indexMap =
+        auto indexMap =
             getExpressionContext()->getValueComparator().makeUnorderedValueMap<vector<int>>();
 
         for (int i = 0; i < int(arr.size()); i++) {
-            if(indexMap.find(arr[i]) == indexMap.end()){
-               indexMap.emplace(arr[i], vector<int>());
-               indexMap[arr[i]].push_back(i); 
+            if (indexMap.find(arr[i]) == indexMap.end()) {
+                indexMap.emplace(arr[i], vector<int>());
             }
-            else {
-                indexMap[arr[i]].push_back(i);
-            }
+            indexMap[arr[i]].push_back(i);
         }
-        return intrusive_ptr<Expression>(
-            new Optimized(getExpressionContext(), indexMap, vpOperand));
+        return new Optimized(getExpressionContext(), indexMap, vpOperand);
     }
     return this;
 }
