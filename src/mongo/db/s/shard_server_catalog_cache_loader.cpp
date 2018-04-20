@@ -667,24 +667,23 @@ Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleTask(
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
     const bool wasEmpty = _taskLists[nss].empty();
     _taskLists[nss].addTask(std::move(task));
-
-    if (wasEmpty) {
-        Status status = _threadPool.schedule([this, nss]() { _runTasks(nss); });
-        if (!status.isOK()) {
-            log() << "Cache loader failed to schedule persisted metadata update"
-                  << " task for namespace '" << nss << "' due to '" << redact(status)
-                  << "'. Clearing task list so that scheduling"
-                  << " will be attempted by the next caller to refresh this namespace.";
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
-            _taskLists.erase(nss);
-        }
-        return status;
+    if (!wasEmpty) {
+        return Status::OK();
     }
 
-    return Status::OK();
+    Status status = _threadPool.schedule([this, nss]() { _runTasks(nss); });
+    if (!status.isOK()) {
+        log() << "Cache loader failed to schedule persisted metadata update"
+              << " task for namespace '" << nss << "' due to '" << redact(status)
+              << "'. Clearing task list so that scheduling"
+              << " will be attempted by the next caller to refresh this namespace.";
+
+        _taskLists.erase(nss);
+    }
+
+    return status;
 }
 
 void ShardServerCatalogCacheLoader::_runTasks(const NamespaceString& nss) {
