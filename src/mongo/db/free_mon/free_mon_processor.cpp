@@ -457,8 +457,8 @@ void FreeMonProcessor::doAsyncRegisterFail(
         return;
     }
 
-    LOG(1) << "Free Monitoring Registration Failed, " << msg->getPayload() << ", retrying in "
-           << _registrationRetry.getNextDuration();
+    LOG(1) << "Free Monitoring Registration Failed with status '" << msg->getPayload()
+           << "', retrying in " << _registrationRetry.getNextDuration();
 
     // Enqueue a register retry
     enqueue(FreeMonRegisterCommandMessage::createWithDeadline(

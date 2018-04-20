@@ -274,7 +274,7 @@ TEST(FreeMonRetryTest, TestRegistration) {
 }
 
 // Positive: Ensure the response is validated correctly
-TEST(AFreeMonProcessorTest, TestResponseValidation) {
+TEST(FreeMonProcessorTest, TestResponseValidation) {
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
         IDLParserErrorContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
