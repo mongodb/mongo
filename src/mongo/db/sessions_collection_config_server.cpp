@@ -91,6 +91,11 @@ Status SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext
 }
 
 Status SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* opCtx) {
+    // If the sharding state is not yet initialized, fail.
+    if (!Grid::get(opCtx)->isShardingInitialized()) {
+        return {ErrorCodes::ShardingStateNotInitialized, "sharding state is not yet initialized"};
+    }
+
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     {
         // Only try to set up this collection until we have done so successfully once.

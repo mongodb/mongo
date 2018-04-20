@@ -82,6 +82,18 @@ public:
               executor::NetworkInterface* network);
 
     /**
+     * Used to check if sharding is initialized for usage of global sharding services. Protected by
+     * an atomic access guard.
+     */
+    bool isShardingInitialized() const;
+
+    /**
+     * Used to indicate the sharding initialization process is complete. Should only be called once
+     * in the lifetime of a server. Protected by an atomic access guard.
+     */
+    void setShardingInitialized();
+
+    /**
      * If the instance as which this sharding component is running (config/shard/mongos) uses
      * additional connection pools other than the default, this function will be present and can be
      * used to obtain statistics about them. Otherwise, the value will be unset.
@@ -172,6 +184,8 @@ private:
     executor::NetworkInterface* _network{nullptr};
 
     CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
+
+    AtomicBool _shardingInitialized{false};
 
     // Protects _configOpTime.
     mutable stdx::mutex _mutex;

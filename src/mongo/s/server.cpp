@@ -321,6 +321,8 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
+    Grid::get(opCtx)->setShardingInitialized();
+
     return Status::OK();
 }
 

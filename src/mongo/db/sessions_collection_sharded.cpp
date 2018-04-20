@@ -56,6 +56,11 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 }  // namespace
 
 Status SessionsCollectionSharded::_checkCacheForSessionsCollection(OperationContext* opCtx) {
+    // If the sharding state is not yet initialized, fail.
+    if (!Grid::get(opCtx)->isShardingInitialized()) {
+        return {ErrorCodes::ShardingStateNotInitialized, "sharding state is not yet initialized"};
+    }
+
     // If the collection doesn't exist, fail. Only the config servers generate it.
     auto res = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
         opCtx, NamespaceString(SessionsCollection::kSessionsFullNS.toString()));
