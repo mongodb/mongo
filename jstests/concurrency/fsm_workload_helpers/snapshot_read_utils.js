@@ -76,7 +76,7 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
 /**
  * Performs a snapshot getmore. This function is to be used in conjunction with doSnapshotFind.
  */
-function doSnapshotGetMore(collName, data, getMoreErrorCodes) {
+function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionErrorCodes) {
     // doSnapshotGetMore may be called even if doSnapshotFind fails to obtain a cursor.
     if (!data.cursorId) {
         return;
@@ -99,7 +99,7 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes) {
         autocommit: false
     };
     res = data.sessionDb.adminCommand(commitCmd);
-    assertWorkedOrFailed(commitCmd, res, [ErrorCodes.NoSuchTransaction]);
+    assertWorkedOrFailed(commitCmd, res, commitTransactionErrorCodes);
 }
 
 /**
