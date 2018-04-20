@@ -231,6 +231,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     auto const css = CollectionShardingState::get(opCtx, args.nss);
     const auto metadata = css->getMetadata(opCtx);
+    log() << "XXX on udpate op observer";
 
     if (args.nss.ns() == NamespaceString::kShardConfigCollectionsCollectionName) {
         // Notification of routing table changes are only needed on secondaries
@@ -270,7 +271,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit()
             AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
 
-            if (setField.hasField(ShardCollectionType::lastRefreshedCollectionVersion.name())) {
+            if (setField.hasField(ShardCollectionType::refreshing.name()) &&
+                !setField.getBoolField("refreshing")) {
                 opCtx->recoveryUnit()->registerChange(
                     new CollectionVersionLogOpHandler(opCtx, updatedNss));
             }

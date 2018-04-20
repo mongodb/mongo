@@ -89,17 +89,15 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                                      collAndChunks.shardKeyPattern,
                                                      collAndChunks.defaultCollation,
                                                      collAndChunks.shardKeyIsUnique);
+
+    // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
+    update.setRefreshing(true);
+
     Status status = updateShardCollectionsEntry(opCtx,
                                                 BSON(ShardCollectionType::ns() << nss.ns()),
                                                 update.toBSON(),
                                                 BSONObj(),
                                                 true /*upsert*/);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
-    status = setPersistedRefreshFlags(opCtx, nss);
     if (!status.isOK()) {
         return status;
     }
