@@ -52,6 +52,7 @@
 #include "mongo/s/client/shard_local.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/stdx/memory.h"
 
@@ -107,7 +108,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         validator->resetKeyManager();
     }
 
-    return initializeGlobalShardingState(
+    Status initStatus = initializeGlobalShardingState(
         opCtx,
         configCS,
         distLockProcessId,
@@ -124,6 +125,12 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         // We only need one task executor here because sharding task executors aren't used for user
         // queries in mongod.
         1);
+
+    if (initStatus.isOK()) {
+        Grid::get(opCtx)->setShardingInitialized();
+    }
+
+    return initStatus;
 }
 
 }  // namespace mongo

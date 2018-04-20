@@ -88,6 +88,15 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     _shardRegistry->init();
 }
 
+bool Grid::isShardingInitialized() const {
+    return _shardingInitialized.load();
+}
+
+void Grid::setShardingInitialized() {
+    invariant(!_shardingInitialized.load());
+    _shardingInitialized.store(true);
+}
+
 Grid::CustomConnectionPoolStatsFn Grid::getCustomConnectionPoolStatsFn() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _customConnectionPoolStatsFn;
