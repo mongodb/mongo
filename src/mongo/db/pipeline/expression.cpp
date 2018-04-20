@@ -523,6 +523,17 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
     const size_t index = static_cast<size_t>(i);
     return array[index];
 }
+intrusive_ptr<Expression> ExpressionArrayElemAt::optimize() {
+    if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
+        if (auto expConstant = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
+            int index = expConstant->getValue().getInt() + 1;
+            if (index >= 0) {
+                dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(index);
+            }
+        }
+    }
+    return this;
+};
 
 REGISTER_EXPRESSION(arrayElemAt, ExpressionArrayElemAt::parse);
 const char* ExpressionArrayElemAt::getOpName() const {
@@ -2206,10 +2217,17 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
+            if(_limit  && static_cast<int>(output.size()) == _limit.get()){
+                return Value(std::move(output));
+            }
         }
     }
 
     return Value(std::move(output));
+}
+
+void ExpressionFilter::setLimit(int limit) {
+    _limit = boost::optional<int>(limit);
 }
 
 void ExpressionFilter::_doAddDependencies(DepsTracker* deps) const {
@@ -3898,6 +3916,34 @@ Value ExpressionSlice::evaluate(const Document& root) const {
     }
 
     return Value(vector<Value>(array.begin() + start, array.begin() + end));
+}
+
+intrusive_ptr<Expression> ExpressionSlice::optimize() {
+    // If ExpressionSlice is passed an ExpressionFilter we can stop filtering once the size of
+    // the array returned by the filter is equal to the last arguement passed to ExpressionSlice.
+    if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
+        if (auto arg1 = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
+            int firstArg = arg1->getValue().getInt();
+            if (vpOperand.size() > 2) {
+                if (auto arg2 = dynamic_cast<ExpressionConstant*>(vpOperand[2].get())) {
+                    int secondArg = arg2->getValue().getInt();
+                    // Need both arguements to be postive.
+                    if (firstArg >= 0 && secondArg >= 0) {
+                        // If ExpressionSlice is given three arguments set limit to 'firstArg' +
+                        // 'secondArg' + 1.
+                        dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
+                            ->setLimit(firstArg + secondArg + 1);
+                    }
+                }
+            }
+            // Can't set a limit if it  is negative.
+            else {
+                if (firstArg >= 0)
+                    dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(firstArg);
+            }
+        }
+    }
+    return this;
 }
 
 REGISTER_EXPRESSION(slice, ExpressionSlice::parse);

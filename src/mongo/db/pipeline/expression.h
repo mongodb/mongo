@@ -736,6 +736,7 @@ class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayE
 public:
     explicit ExpressionArrayElemAt(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
+    boost::intrusive_ptr<Expression> optimize() final;
 
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
@@ -1155,6 +1156,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
         const VariablesParseState& vps);
+    void setLimit(int limit);
 
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
@@ -1174,6 +1176,7 @@ private:
     boost::intrusive_ptr<Expression> _input;
     // The expression determining whether each element should be present in the result array.
     boost::intrusive_ptr<Expression> _filter;
+    boost::optional<int> _limit;
 };
 
 
@@ -1666,6 +1669,7 @@ public:
         : ExpressionRangedArity<ExpressionSlice, 2, 3>(expCtx) {}
 
     Value evaluate(const Document& root) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
     const char* getOpName() const final;
 };
 
