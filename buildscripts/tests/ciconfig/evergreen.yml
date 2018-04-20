@@ -9,11 +9,13 @@ functions:
         script: |
           echo "this is a 2nd command in the function!"
           ls
+
   "debug":
     command: shell.exec
     params:
       script: |
         echo "i am a debug function."
+
   "run a task that fails" :
     command: shell.exec
     params:
@@ -36,19 +38,32 @@ functions:
       script: |
         echo "I was called with ${foobar}"
 
-pre:
-  command: shell.exec
-  params:
-    script: |
-      rm -rf src || true
-      echo "pre-task run. JUST ONE COMMAND"
+  "do pre work":
+    command: shell.exec
+    params:
+      script: |
+        rm -rf src || true
+        echo "pre-task run. JUST ONE COMMAND"
 
-post:
-  - command: shell.exec
+  "do post work":
+    command: shell.exec
     params:
       script: |
         echo "post-task run."
         true
+
+  "run timeout work":
+    command: shell.exec
+    params:
+      script: |
+        echo "timeout run."
+        true
+
+pre: &pre
+  - func: "do pre work"
+
+post:
+  - func: "do post work"
   - command: attach.results
     params:
       file_location: src/results.json
@@ -56,6 +71,23 @@ post:
 test_lifecycle_excluded_tasks:
 - burn_in_tests
 - no_lifecycle*
+
+task_groups:
+- name: tg_1
+  max_hosts: 1
+  tasks:
+  - compile
+  - passing_test
+  setup_task:
+  - func: "fetch source"
+  teardown_task:
+  - func: "debug"
+  setup_group:
+    *pre
+  teardown_group:
+  - func: "do post work"
+  timeout:
+  - func: "run timeout work"
 
 tasks:
 - name: compile
@@ -154,3 +186,10 @@ buildvariants:
   - debian-stretch
   tasks:
   - name: resmoke_task
+- name: amazon
+  display_name: Amazon
+  run_on:
+  - amazon
+  tasks:
+  - name: tg_1
+  - name: timeout_test

@@ -11,7 +11,7 @@ import re
 import yaml
 
 
-class EvergreenProjectConfig(object):
+class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attributes
     """Represent an Evergreen project configuration file."""
 
     def __init__(self, path):
@@ -21,8 +21,12 @@ class EvergreenProjectConfig(object):
         self.path = path
         self.tasks = [Task(task_dict) for task_dict in self._conf["tasks"]]
         self._tasks_by_name = {task.name: task for task in self.tasks}
+        self.task_groups = [
+            TaskGroup(task_group_dict) for task_group_dict in self._conf.get("task_groups", [])
+        ]
+        self._task_groups_by_name = {task_group.name: task_group for task_group in self.task_groups}
         self.variants = [
-            Variant(variant_dict, self._tasks_by_name)
+            Variant(variant_dict, self._tasks_by_name, self._task_groups_by_name)
             for variant_dict in self._conf["buildvariants"]
         ]
         self._variants_by_name = {variant.name: variant for variant in self.variants}
@@ -38,6 +42,15 @@ class EvergreenProjectConfig(object):
     def get_task(self, task_name):
         """Return the task with the given name as a Task instance."""
         return self._tasks_by_name.get(task_name)
+
+    @property
+    def task_group_names(self):
+        """Get the list of task_group names."""
+        return self._task_groups_by_name.keys()
+
+    def get_task_group(self, task_group_name):
+        """Return the task_group with the given name as a Task instance."""
+        return self._task_groups_by_name.get(task_group_name)
 
     @property
     def lifecycle_task_names(self):
@@ -99,17 +112,45 @@ class Task(object):
         return self.name
 
 
+class TaskGroup(object):
+    """Represent a task_group configuration as found in an Evergreen project configuration file."""
+
+    def __init__(self, conf_dict):
+        """Initialize a TaskGroup from a dictionary containing its configuration."""
+        self.raw = conf_dict
+
+    @property
+    def name(self):
+        """Get the task_group name."""
+        return self.raw["name"]
+
+    @property
+    def tasks(self):
+        """Get the list of task names for task_group."""
+        return self.raw.get("tasks", [])
+
+    def __str__(self):
+        return self.name
+
+
 class Variant(object):
     """Build variant configuration as found in an Evergreen project configuration file."""
 
-    def __init__(self, conf_dict, task_map):
+    def __init__(self, conf_dict, task_map, task_group_map):
         """Initialize Variant."""
         self.raw = conf_dict
         run_on = self.run_on
-        self.tasks = [
-            VariantTask(task_map.get(t["name"]), t.get("distros", run_on), self)
-            for t in conf_dict["tasks"]
-        ]
+        self.tasks = []
+        for task in conf_dict["tasks"]:
+            task_name = task.get("name")
+            if task_name in task_group_map:
+                # A task in conf_dict may be a task_group, containing a list of tasks.
+                for task_in_group in task_group_map.get(task_name).tasks:
+                    self.tasks.append(
+                        VariantTask(task_map.get(task_in_group), task.get("distros", run_on), self))
+            else:
+                self.tasks.append(
+                    VariantTask(task_map.get(task["name"]), task.get("distros", run_on), self))
         self.distro_names = set(run_on)
         for task in self.tasks:
             self.distro_names.update(task.run_on)

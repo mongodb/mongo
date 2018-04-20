@@ -173,12 +173,97 @@ variables:
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
   mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1\"
 
+- &unittests
+  name: unittests!
+  execution_tasks:
+  - compile_unittests
+  - unittests
+
+- &compile_task_group_template
+  name: compile_task_group_template
+  max_hosts: 1
+  tasks: []
+  setup_task:
+  - func: "apply compile expansions"
+  - func: "set task expansion macros"
+  teardown_task:
+  - func: "attach scons config log"
+  - func: "attach report"
+  - func: "attach artifacts"
+  - func: "kill processes"
+  - func: "save code coverage data"
+  - func: "save mongo coredumps"
+  - func: "save failed unittests"
+  - func: "save hang analyzer debugger files"
+  - func: "save disk statistics"
+  - func: "save system resource information"
+  - func: "remove files"
+    vars:
+      files: >-
+        src/build/scons/config.log
+        src/*.gcda.gcov
+        src/gcov-intermediate-files.tgz
+        src/*.core src/*.mdmp
+        mongo-coredumps.tgz
+        src/unittest_binaries/*_test${exe}
+        mongo-unittests.tgz
+        src/debugger*.*
+        src/mongo-hanganalyzer.tgz
+        diskstats.tgz
+        system-resource-info.tgz
+        ${report_file|src/report.json}
+        ${archive_file|src/archive.json}
+  setup_group:
+  - func: "kill processes"
+  - func: "cleanup environment"
+  # The python virtual environment is installed in ${workdir}, which is created in
+  # "set up virtualenv".
+  - func: "set up virtualenv"
+  - func: "set task expansion macros"
+  - func: "clear OOM messages"
+  - command: manifest.load
+  - func: "git get project"
+  - func: "get modified patch files"
+  # NOTE: To disable the compile bypass feature, comment out the next line.
+  #
+  # TODO SERVER-34680: Uncomment the next line when the mongoe binary is downloaded from the base
+  # commit's compile task and included the artifacts tarball for the jsCore_mobile task to use.
+  # - func: "bypass compile and fetch binaries"
+  - func: "update bypass expansions"
+  - func: "get buildnumber"
+  - func: "set up credentials"
+  - func: "fetch and build OpenSSL"
+  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "generate compile expansions"
+  teardown_group:
+  - func: "scons cache pruning"
+  - func: "umount shared scons directory"
+  - func: "print OOM messages"
+  - func: "cleanup environment"
+  timeout:
+  - func: "run hang analyzer"
+
 
 #######################################
 #            Functions                #
 #######################################
 
 functions:
+
+  "remove files": &remove_files
+    command: shell.exec
+    params:
+      script: |
+        if [ -z "${files}" ]; then
+          exit 0
+        fi
+        for file in ${files}
+        do
+          if [ -f "$file" ]; then
+            echo "Removing file $file"
+            rm -f $file
+          fi
+        done
 
   "git get project" : &git_get_project
     command: git.get_project
@@ -641,12 +726,13 @@ functions:
     params:
       continue_on_err: true
       working_dir: src
+      shell: bash
       script: |
         set -o verbose
         set -o errexit
 
         # For patch builds determine if we can bypass compile.
-        if [ "${is_patch}" = "true" ]; then
+        if [[ "${is_patch}" = "true" && "${task_name}" = "compile" ]]; then
           ${activate_virtualenv}
           $python buildscripts/bypass_compile_and_fetch_binaries.py            \
             --project ${project}                                               \
@@ -883,9 +969,9 @@ functions:
         rm -rf ${install_directory|/data/mongo-install-directory}
 
         extra_args=""
-        if [ "${targets}" = "all" ] && [ -n "${num_scons_compile_all_jobs_available|}" ]; then
-          echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
-          extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
+        if [ "${reduce_scons_compile_jobs_available|false}" = "true" ] && [ -n "${num_scons_compile_jobs_available|}" ]; then
+          echo "Changing SCons to run with --jobs=${num_scons_compile_jobs_available|}"
+          extra_args="$extra_args --jobs=${num_scons_compile_jobs_available|}"
         fi
 
         ${activate_virtualenv}
@@ -2153,6 +2239,7 @@ functions:
                   exit 1
                 fi
               fi
+              rm $gcda_file
             done
           fi
         fi
@@ -2281,7 +2368,7 @@ functions:
     params:
       working_dir: "src"
       script: |
-        mkdir unittest_binaries
+        mkdir unittest_binaries || true
         # Find all core files
         core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
         for core_file in $core_files
@@ -2346,7 +2433,7 @@ functions:
   - *archive_failed_unittests
 
   ### Process & archive artifacts from hung processes ###
-  "run hang_analyzer":
+  "run hang analyzer":
     command: shell.exec
     params:
       working_dir: src
@@ -2416,7 +2503,7 @@ functions:
             --file "$remote_dir/*.$core_ext"
         fi
 
-  "tar hang_analyzer debugger files": &tar_hang_analyzer_debugger_files
+  "tar hang analyzer debugger files": &tar_hang_analyzer_debugger_files
     command: archive.targz_pack
     params:
       target: "src/mongo-hanganalyzer.tgz"
@@ -2424,7 +2511,7 @@ functions:
       include:
         - "./debugger*.*"
 
-  "archive hang_analyzer debugger files": &archive_hang_analyzer_debugger_files
+  "archive hang analyzer debugger files": &archive_hang_analyzer_debugger_files
     command: s3.put
     params:
       aws_key: ${aws_key}
@@ -2437,7 +2524,7 @@ functions:
       display_name: Hang Analyzer Output - Execution ${execution}
       optional: true
 
-  "save hang_analyzer debugger files":
+  "save hang analyzer debugger files":
   - *tar_hang_analyzer_debugger_files
   - *archive_hang_analyzer_debugger_files
 
@@ -2523,17 +2610,17 @@ functions:
 
 
 # Pre task steps
-pre: &pre
+pre:
   - func: "kill processes"
   - func: "cleanup environment"
-  # The python virtual environment is installed in ${workdir}, which is created in "set up virtualenv".
+  # The python virtual environment is installed in ${workdir}, which is created in
+  # "set up virtualenv".
   - func: "set up virtualenv"
   - func: "set task expansion macros"
   - func: "clear OOM messages"
 
 # Post task steps
-post: &post
-  - func: "attach scons config log"
+post:
   - func: "attach report"
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
@@ -2543,7 +2630,7 @@ post: &post
   - func: "save jepsen artifacts"
   - func: "save mongo coredumps"
   - func: "save failed unittests"
-  - func: "save hang_analyzer debugger files"
+  - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
   - func: "print OOM messages"
@@ -2556,7 +2643,7 @@ timeout:
   - func: "extract debugsymbols"
   - func: "get EC2 address"
   - func: "update EC2 address"
-  - func: "run hang_analyzer"
+  - func: "run hang analyzer"
 
 
 #######################################
@@ -2590,24 +2677,8 @@ tasks:
 - name: compile
   depends_on: []
   commands:
-    - command: manifest.load
-    - func: "git get project"
-    - func: "get modified patch files"
-    # NOTE: To disable the compile bypass feature, comment out the next line.
-    #
-    # TODO SERVER-34680: Uncomment the next line when the mongoe binary is downloaded from the base
-    # commit's compile task and included the artifacts tarball for the jsCore_mobile task to use.
-    # - func: "bypass compile and fetch binaries"
-    - func: "update bypass expansions"
-    - func: "get buildnumber"
-    - func: "set up credentials"
-    - func: "fetch and build OpenSSL"
     - func: "build new tools"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
-    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-    - func: "generate compile expansions"
-    # Then we load the generated version data into the agent so we can use it in task definitions
-    - func: "apply compile expansions"
     - func: "scons compile"
       vars:
         targets: core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
@@ -2760,26 +2831,16 @@ tasks:
         ignore_artifacts_for_spawn: false
         files:
           - src/artifacts.json
-    - func: "scons cache pruning"
-    - func: "umount shared scons directory"
 
-## compile_all - build all scons targets including unittests ##
+## compile_all - build all scons targets ##
 - name: compile_all
   commands:
-    - command: manifest.load
-    - func: "git get project"
-    - func: "get buildnumber"
-    - func: "set up credentials"
-    - func: "fetch and build OpenSSL"
     - func: "build new tools"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
-    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-    - func: "generate compile expansions"
-    # Then we load the generated version data into the agent so we can use it in task definitions.
-    - func: "apply compile expansions"
     - func: "scons compile"
       vars:
         targets: all
+        reduce_scons_compile_jobs_available: true
         task_compile_flags: >-
           --use-new-tools
           --build-mongoreplay="${build_mongoreplay}"
@@ -2796,18 +2857,28 @@ tasks:
         display_name: Library Dependency Graph (library_dependency_graph.json)
         build_variants: [enterprise-ubuntu1604-64]
 
-    # Run the C++ unittests as part of compile_all. The compiled binaries are automatically
-    # installed into the top-level directory by SCons.
-    # noop if ${disable_unit_tests} is "true"
+## compile_unittests - build unittests ##
+- name: compile_unittests
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: unittests
+        reduce_scons_compile_jobs_available: true
+        task_compile_flags: >-
+          --detect-odr-violations
+
+## unittests - run unittests ##
+- name: unittests
+  commands:
+    - func: "run diskstats"
+    - func: "monitor process threads"
+    - func: "collect system resource info"
     - func: "run tests"
       vars:
         resmoke_args: --suites=unittests
         run_multiple_jobs: true
 
-    - func: "scons cache pruning"
-    - func: "umount shared scons directory"
-
-## compile_mogile - build the mobile-dev and mobile-test targets only ##
+## compile_mobile - build the mobile-dev and mobile-test targets only ##
 - name: compile_mobile
   commands:
     - command: manifest.load
@@ -6365,6 +6436,22 @@ tasks:
 
 
 #######################################
+#             Task Groups             #
+#######################################
+task_groups:
+- <<: *compile_task_group_template
+  name: compile_TG
+  tasks:
+  - compile
+- <<: *compile_task_group_template
+  name: compile_all_run_unittests_TG
+  tasks:
+  - compile
+  - compile_unittests
+  - unittests
+  - compile_all
+
+#######################################
 #               Modules               #
 #######################################
 # if a module is added and to be added to the manifest
@@ -6412,11 +6499,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation
@@ -6512,11 +6598,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: dbtest
@@ -6550,6 +6635,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *unittests
   - name: replica_sets_auth
     execution_tasks:
     - replica_sets_auth_0
@@ -6602,8 +6688,7 @@ buildvariants:
     - sharding_auth_19
     - sharding_auth_misc
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
@@ -6751,11 +6836,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation
@@ -6801,11 +6885,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: dbtest
@@ -6836,11 +6919,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags ssl"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1404-build
   - name: aggregation
@@ -6929,11 +7011,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags ssl"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1604-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
   - name: aggregation
@@ -7038,9 +7119,10 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
   - name: auth
@@ -7125,9 +7207,10 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: arm64
     multiversion_edition: targeted
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: dbtest
   - name: free_monitoring
   - name: jsCore
@@ -7161,11 +7244,10 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1604-power8-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-power8-build
   - name: aggregation
@@ -7243,11 +7325,10 @@ buildvariants:
     multiversion_platform: ubuntu1604
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1604-zseries-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-zseries-large
   - name: aggregation
@@ -7346,11 +7427,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - linux-64-amzn-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - linux-64-amzn-build
   - name: aggregation_auth
@@ -7422,11 +7502,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - linux-64-amzn-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - linux-64-amzn-build
   - name: aggregation
@@ -7502,6 +7581,9 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
@@ -7512,11 +7594,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - amazon2-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - amazon2-build
   - name: aggregation_auth
@@ -7577,6 +7658,9 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: amazon
     multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -7590,11 +7674,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - amazon2-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - amazon2-build
   - name: aggregation
@@ -7675,18 +7758,17 @@ buildvariants:
     compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     ext: zip
     use_scons_cache: true
     gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go"'
     tooltags: ""
     build_mongoreplay: false
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - windows-64-vs2015-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2015-large
   - name: aggregation
@@ -7814,7 +7896,7 @@ buildvariants:
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
@@ -7826,6 +7908,7 @@ buildvariants:
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
   display_tasks:
+  - *unittests
   - name: replica_sets_auth
     execution_tasks:
     - replica_sets_auth_0
@@ -7916,12 +7999,9 @@ buildvariants:
     - sharding_ese_20
     - sharding_ese_misc
   tasks:
-  - name: compile
+  - name: compile_all_run_unittests_TG
     requires:
     - name: burn_in_tests
-    distros:
-    - windows-64-vs2015-large
-  - name: compile_all
     distros:
     - windows-64-vs2015-large
   - name: compile_benchmarks
@@ -8178,7 +8258,7 @@ buildvariants:
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
@@ -8202,7 +8282,7 @@ buildvariants:
     compile_flags: --release --ssl --ssl-provider=openssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
@@ -8231,7 +8311,7 @@ buildvariants:
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
@@ -8241,7 +8321,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: false
   tasks:
-  - name: compile
+  - name: compile_TG
     distros:
     - windows-64-vs2015-large
   - name: jsCore
@@ -8267,7 +8347,7 @@ buildvariants:
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,requires_mmapv1
@@ -8279,7 +8359,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: false
   tasks:
-  - name: compile
+  - name: compile_TG
     distros:
     - windows-64-vs2015-large
   - name: compile_all
@@ -8337,7 +8417,7 @@ buildvariants:
     compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
@@ -8345,11 +8425,10 @@ buildvariants:
     gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
     tooltags: "-tags ssl"
     build_mongoreplay: false
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - windows-64-vs2015-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2015-large
   - name: aggregation
@@ -8449,7 +8528,7 @@ buildvariants:
     compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2008plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
@@ -8461,7 +8540,7 @@ buildvariants:
   # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
   # timing-sensitive tests to fail.
-  - name: compile
+  - name: compile_TG
     distros:
     - windows-64-vs2015-large
   - name: audit
@@ -8489,9 +8568,10 @@ buildvariants:
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl openssl_pre_1.0'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_mongos_passthrough
   - name: aggregation_one_shard_sharded_collections
@@ -8592,9 +8672,10 @@ buildvariants:
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: ""
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: auth
   - name: dbtest
@@ -8630,9 +8711,10 @@ buildvariants:
     build_mongoreplay: true
     multiversion_platform: osx
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: audit
   - name: auth_audit
   - name: dbtest
@@ -8941,6 +9023,7 @@ buildvariants:
     build_mongoreplay: true
     jstestfuzz_num_generated_files: 40
   display_tasks:
+  - *unittests
   - name: replica_sets_auth
     execution_tasks:
     - replica_sets_auth_0
@@ -9079,13 +9162,10 @@ buildvariants:
     - sharding_op_query_11
     - sharding_op_query_misc
   tasks:
-  - name: compile
+  - name: compile_all_run_unittests_TG
     requires:
     - name: burn_in_tests
     - name: lint
-    distros:
-    - rhel62-large
-  - name: compile_all
     distros:
     - rhel62-large
   - name: compile_benchmarks
@@ -9635,9 +9715,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: rollback_fuzzer
   - name: aggregation
   - name: aggregation_ese
@@ -9759,11 +9840,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel70
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel70
   - name: compile_benchmarks
@@ -9813,7 +9893,7 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   tasks:
-  - name: compile
+  - name: compile_TG
     distros:
     - ubuntu1604-build
   - name: jsCore
@@ -9848,11 +9928,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags ssl"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation
@@ -9934,11 +10013,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags ssl"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel70
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel70
   - name: aggregation
@@ -10032,11 +10110,10 @@ buildvariants:
     multiversion_platform: rhel71
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel71-power8-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel71-power8-build
   - name: aggregation
@@ -10139,11 +10216,10 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel72-zseries-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel72-zseries-build
   - name: aggregation
@@ -10243,11 +10319,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel67-zseries-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel67-zseries-build
   - name: aggregation
@@ -10345,11 +10420,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1404-build
   - name: audit
@@ -10403,11 +10477,10 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
     additional_targets: dagger
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1604-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
   - name: audit
@@ -10472,11 +10545,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1604-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
 
@@ -10508,11 +10580,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - suse12-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - suse12-build
   - name: audit
@@ -10567,11 +10638,10 @@ buildvariants:
     multiversion_platform: suse12
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - suse12-zseries-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - suse12-zseries-build
   - name: aggregation
@@ -10673,11 +10743,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - suse12-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - suse12-build
   - name: aggregation
@@ -10761,11 +10830,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - debian71-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - debian71-build
   - name: audit
@@ -10817,11 +10885,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - debian81-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - debian81-build
   - name: audit
@@ -10874,11 +10941,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - debian71-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - debian71-build
   - name: aggregation
@@ -10963,11 +11029,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - debian81-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - debian81-build
   - name: aggregation
@@ -11039,6 +11104,9 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-enterprise-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager_enterprise.py
@@ -11049,11 +11117,10 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     scons_cache_scope: shared
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - debian92-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - debian92-build
   - name: audit
@@ -11092,6 +11159,9 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     multiversion_platform: debian92
     multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -11105,11 +11175,10 @@ buildvariants:
     scons_cache_scope: shared
     shared_scons_pruning: true
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - debian92-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - debian92-build
   - name: aggregation
@@ -11189,11 +11258,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation
@@ -11326,11 +11394,10 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
     additional_targets: mongoe
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation
@@ -11394,9 +11461,10 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
     build_mongoreplay: true
     additional_targets: mongoe
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
@@ -11443,7 +11511,7 @@ buildvariants:
   # pushed. It uses the task list from the enterprise-rhel-62-64-bit-mobile build variant to
   # determine the resmoke.py YAML suite configurations to run the tests under. Do not add more tasks
   # to this list.
-  - name: compile
+  - name: compile_TG
     requires:
     - name: burn_in_tests
     distros:
@@ -11484,16 +11552,16 @@ buildvariants:
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
     additional_targets: mongoe
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
   - name: audit
   - name: auth
   - name: auth_audit
-
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
@@ -11533,11 +11601,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation
@@ -11614,11 +11681,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/ppc64le-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel71-power8-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel71-power8-build
   - name: aggregation
@@ -11693,11 +11759,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     tooltags: -tags 'sasl ssl'
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel72-zseries-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel72-zseries-build
   - name: aggregation
@@ -11784,7 +11849,7 @@ buildvariants:
     build_mongoreplay: true
   stepback: false
   tasks:
-  - name: compile
+  - name: compile_TG
     distros:
     - ubuntu1404-build
   - name: dbtest
@@ -11817,9 +11882,10 @@ buildvariants:
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: rollback_fuzzer
   - name: aggregation
   - name: aggregation_ese
@@ -11943,9 +12009,10 @@ buildvariants:
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation_fuzzer
   - name: free_monitoring
   - name: jstestfuzz
@@ -11987,9 +12054,10 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
     scons_cache_scope: shared
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_ese
   - name: rollback_fuzzer
@@ -12115,9 +12183,10 @@ buildvariants:
     build_mongoreplay: true
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: dbtest
   - name: jsCore
   - name: watchdog_wiredtiger
@@ -12143,9 +12212,10 @@ buildvariants:
     hang_analyzer_dump_core: false
     test_flags: --serviceExecutor=adaptive --excludeWithAnyTags=requires_mmapv1
     scons_cache_scope: shared
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
   - name: aggregation
   - name: aggregation_ese
   - name: aggregation_auth
@@ -12239,11 +12309,10 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
     build_mongoreplay: true
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - ubuntu1604-build
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
 
@@ -12288,7 +12357,7 @@ buildvariants:
     tooltags: -tags 'ssl sasl'
     build_mongoreplay: true
   tasks:
-  - name: compile
+  - name: compile_TG
   - name: aggregation
   - name: aggregation_fuzzer
   - name: audit
@@ -12397,13 +12466,13 @@ buildvariants:
       c:/sasl/include c:/snmp/include c:/curl/include"  LIBPATH="c:/openssl/lib c:/sasl/lib
       c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows
       --win-version-min=ws08r2
-    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    num_scons_compile_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
     python: python
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
   tasks:
-  - name: compile
+  - name: compile_TG
   - name: aggregation
   - name: aggregation_fuzzer
   - name: audit
@@ -12515,7 +12584,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
   tasks:
-  - name: compile
+  - name: compile_TG
   - name: aggregation
   - name: aggregation_fuzzer
   - name: audit
@@ -12597,11 +12666,10 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: ""
     build_mongoreplay: false
+  display_tasks:
+  - *unittests
   tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
   - name: aggregation

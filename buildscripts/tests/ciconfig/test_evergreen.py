@@ -35,6 +35,11 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertIn("no_lifecycle_task", self.conf.task_names)
         self.assertIn("resmoke_task", self.conf.task_names)
 
+    def test_list_task_groups(self):
+        self.assertEqual(1, len(self.conf.task_groups))
+        self.assertEqual(1, len(self.conf.task_group_names))
+        self.assertIn("tg_1", self.conf.task_group_names)
+
     def test_list_lifecycle_task_names(self):
         self.assertEqual(5, len(self.conf.lifecycle_task_names))
         self.assertIn("compile", self.conf.task_names)
@@ -44,11 +49,12 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertIn("resmoke_task", self.conf.task_names)
 
     def test_list_variants(self):
-        self.assertEqual(3, len(self.conf.variants))
-        self.assertEqual(3, len(self.conf.variant_names))
+        self.assertEqual(4, len(self.conf.variants))
+        self.assertEqual(4, len(self.conf.variant_names))
         self.assertIn("osx-108", self.conf.variant_names)
         self.assertIn("ubuntu", self.conf.variant_names)
         self.assertIn("debian", self.conf.variant_names)
+        self.assertIn("amazon", self.conf.variant_names)
 
     def test_get_variant(self):
         variant = self.conf.get_variant("osx-108")
@@ -57,11 +63,12 @@ class TestEvergreenProjectConfig(unittest.TestCase):
         self.assertEqual("osx-108", variant.name)
 
     def test_list_distro_names(self):
-        self.assertEqual(4, len(self.conf.distro_names))
+        self.assertEqual(5, len(self.conf.distro_names))
         self.assertIn("localtestdistro", self.conf.distro_names)
         self.assertIn("ubuntu1404-test", self.conf.distro_names)
         self.assertIn("pdp-11", self.conf.distro_names)
         self.assertIn("debian-stretch", self.conf.distro_names)
+        self.assertIn("amazon", self.conf.distro_names)
 
 
 class TestTask(unittest.TestCase):
@@ -95,6 +102,34 @@ class TestTask(unittest.TestCase):
         self.assertEqual("core", task.resmoke_suite)
 
 
+class TestTaskGroup(unittest.TestCase):
+    """Unit tests for the TaskGroup class."""
+
+    def test_from_list(self):
+        task_group_dict = {
+            "name": "my_group", "max_hosts": 3, "tasks": ["task1", "task2"], "setup_task": [],
+            "teardown_task": [], "setup_group": [], "teardown_group": [], "timeout": []
+        }
+        task_group = _evergreen.TaskGroup(task_group_dict)
+
+        self.assertEqual("my_group", task_group.name)
+        self.assertEqual(2, len(task_group.tasks))
+        self.assertEqual(task_group_dict, task_group.raw)
+
+    def test_resmoke_args(self):
+        task_dict = {
+            "name":
+                "jsCore", "commands": [{
+                    "func": "run tests",
+                    "vars": {"resmoke_args": "--suites=core --shellWriteMode=commands"}
+                }]
+        }
+        task = _evergreen.Task(task_dict)
+
+        self.assertEqual("--suites=core --shellWriteMode=commands", task.resmoke_args)
+        self.assertEqual("core", task.resmoke_suite)
+
+
 class TestVariant(unittest.TestCase):
     """Unit tests for the Variant class."""
 
@@ -105,13 +140,14 @@ class TestVariant(unittest.TestCase):
     def test_from_dict(self):
         task = _evergreen.Task({"name": "compile"})
         tasks_map = {task.name: task}
+        task_groups_map = {}
         variant_dict = {
             "name": "ubuntu",
             "display_name": "Ubuntu",
             "run_on": ["ubuntu1404-test"],
             "tasks": [{"name": "compile"}],
         }
-        variant = _evergreen.Variant(variant_dict, tasks_map)
+        variant = _evergreen.Variant(variant_dict, tasks_map, task_groups_map)
 
         self.assertEqual("ubuntu", variant.name)
         self.assertEqual("Ubuntu", variant.display_name)
@@ -194,3 +230,8 @@ class TestVariant(unittest.TestCase):
         resmoke_task = variant_debian.get_task("resmoke_task")
         self.assertEqual("--suites=somesuite --storageEngine=mmapv1",
                          resmoke_task.combined_resmoke_args)
+
+        # Check for tasks included in task_groups
+        variant_amazon = self.conf.get_variant("amazon")
+        self.assertEqual(3, len(variant_amazon.tasks))
+        self.assertIn("compile", variant_amazon.task_names)
