@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/replication_recovery.h"
 
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
