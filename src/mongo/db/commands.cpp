@@ -97,28 +97,25 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
 }
 
 void CommandHelpers::logAuthViolation(OperationContext* opCtx,
-                                      const Command* command,
+                                      const CommandInvocation* invocation,
                                       const OpMsgRequest& request,
                                       ErrorCodes::Error err) {
     struct Hook final : public audit::CommandInterface {
     public:
-        Hook(const Command* command, const OpMsgRequest& request)
-            : _command{command}, _request{request} {}
+        explicit Hook(const CommandInvocation* invocation) : _invocation{invocation} {}
 
         void redactForLogging(mutablebson::Document* cmdObj) const override {
-            _command->redactForLogging(cmdObj);
+            _invocation->definition()->redactForLogging(cmdObj);
         }
 
         NamespaceString ns() const override {
-            return NamespaceString(
-                _command->parseNs(_request.getDatabase().toString(), _request.body));
+            return _invocation->ns();
         }
 
     private:
-        const Command* _command;
-        const OpMsgRequest& _request;
+        const CommandInvocation* _invocation;
     };
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(command, request), err);
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation), err);
 }
 
 void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
@@ -168,6 +165,20 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSO
                 nss.isNormal());
         return nss;
     }
+}
+
+std::string CommandHelpers::parseNsFromCommand(StringData dbname, const BSONObj& cmdObj) {
+    BSONElement first = cmdObj.firstElement();
+    if (first.type() != mongo::String)
+        return dbname.toString();
+    return str::stream() << dbname << '.' << cmdObj.firstElement().valueStringData();
+}
+
+ResourcePattern CommandHelpers::resourcePatternForNamespace(const std::string& ns) {
+    if (!NamespaceString::validCollectionComponent(ns)) {
+        return ResourcePattern::forDatabaseName(ns);
+    }
+    return ResourcePattern::forExactNamespace(NamespaceString(ns));
 }
 
 Command* CommandHelpers::findCommand(StringData name) {
@@ -349,12 +360,11 @@ CommandInvocation::~CommandInvocation() = default;
 
 void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                                            const OpMsgRequest& request) const {
-    const Command* c = definition();
     Status status = _checkAuthorizationImpl(opCtx, request);
     if (!status.isOK()) {
         log(LogComponent::kAccessControl) << status;
     }
-    CommandHelpers::logAuthViolation(opCtx, c, request, status.code());
+    CommandHelpers::logAuthViolation(opCtx, this, request, status.code());
     uassertStatusOK(status);
 }
 
@@ -376,7 +386,7 @@ private:
             bool ok = _command->run(opCtx, _dbName, _request->body, bob);
             CommandHelpers::appendCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
-            CommandHelpers::logAuthViolation(opCtx, _command, *_request, e.code());
+            CommandHelpers::logAuthViolation(opCtx, this, *_request, e.code());
             throw;
         }
     }
@@ -423,23 +433,6 @@ std::unique_ptr<CommandInvocation> BasicCommand::parse(OperationContext* opCtx,
                                                        const OpMsgRequest& request) {
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
     return stdx::make_unique<Invocation>(opCtx, request, this);
-}
-
-std::string Command::parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-    BSONElement first = cmdObj.firstElement();
-    if (first.type() != mongo::String)
-        return dbname;
-
-    return str::stream() << dbname << '.' << cmdObj.firstElement().valueStringData();
-}
-
-ResourcePattern Command::parseResourcePattern(const std::string& dbname,
-                                              const BSONObj& cmdObj) const {
-    const std::string ns = parseNs(dbname, cmdObj);
-    if (!NamespaceString::validCollectionComponent(ns)) {
-        return ResourcePattern::forDatabaseName(ns);
-    }
-    return ResourcePattern::forExactNamespace(NamespaceString(ns));
 }
 
 Command::Command(StringData name, StringData oldName)

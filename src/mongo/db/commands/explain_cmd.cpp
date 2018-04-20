@@ -74,19 +74,6 @@ public:
         return "explain database reads and writes";
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        uassert(ErrorCodes::BadValue,
-                "explain command requires a nested object",
-                Object == cmdObj.firstElement().type());
-        auto explainedObj = cmdObj.firstElement().Obj();
-        auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
-        uassert(ErrorCodes::CommandNotFound,
-                str::stream() << "explain failed due to unknown command: "
-                              << explainedObj.firstElementFieldName(),
-                explainedCommand);
-        return explainedCommand->parseNs(dbname, explainedObj);
-    }
-
 private:
     class Invocation;
 };
@@ -101,7 +88,6 @@ public:
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
           _dbName{_outerRequest->getDatabase().toString()},
-          _ns{explainCommand->parseNs(_dbName, _outerRequest->body)},
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
@@ -115,8 +101,7 @@ public:
             BSONObjBuilder bob = result->getBodyBuilder();
             _innerInvocation->explain(opCtx, _verbosity, &bob);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::logAuthViolation(
-                opCtx, command(), *_outerRequest, ErrorCodes::Unauthorized);
+            CommandHelpers::logAuthViolation(opCtx, this, *_outerRequest, ErrorCodes::Unauthorized);
             throw;
         }
     }
@@ -128,7 +113,7 @@ public:
     }
 
     NamespaceString ns() const override {
-        return _ns;
+        return _innerInvocation->ns();
     }
 
     bool supportsWriteConcern() const override {

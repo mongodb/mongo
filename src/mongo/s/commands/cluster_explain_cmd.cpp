@@ -90,7 +90,7 @@ public:
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
           _dbName{_outerRequest->getDatabase().toString()},
-          _ns{command()->parseNs(_dbName, _outerRequest->body)},
+          _ns{CommandHelpers::parseNsFromCommand(_dbName, _outerRequest->body)},
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
@@ -101,8 +101,7 @@ private:
             auto bob = result->getBodyBuilder();
             _innerInvocation->explain(opCtx, _verbosity, &bob);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::logAuthViolation(
-                opCtx, command(), *_outerRequest, ErrorCodes::Unauthorized);
+            CommandHelpers::logAuthViolation(opCtx, this, *_outerRequest, ErrorCodes::Unauthorized);
             throw;
         }
     }

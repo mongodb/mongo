@@ -802,8 +802,7 @@ void execCommandDatabase(OperationContext* opCtx,
             readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
             (iAmPrimary ||
              (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-            oss.initializeClientRoutingVersions(
-                NamespaceString(command->parseNs(dbname, request.body)), request.body);
+            oss.initializeClientRoutingVersions(invocation->ns(), request.body);
 
             auto const shardingState = ShardingState::get(opCtx);
             if (oss.hasShardVersion() || oss.hasDbVersion()) {

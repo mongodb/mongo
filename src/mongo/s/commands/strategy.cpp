@@ -146,9 +146,10 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
 }
 
 void execCommandClient(OperationContext* opCtx,
-                       Command* c,
+                       CommandInvocation* invocation,
                        const OpMsgRequest& request,
                        CommandReplyBuilder* result) {
+    const Command* c = invocation->definition();
     ON_BLOCK_EXIT([opCtx, &result] {
         auto body = result->getBodyBuilder();
         appendRequiredFieldsToResponse(opCtx, &body);
@@ -179,8 +180,6 @@ void execCommandClient(OperationContext* opCtx,
                               << fieldName,
                 topLevelFields[fieldName]++ == 0);
     }
-
-    auto invocation = c->parse(opCtx, request);
 
     try {
         invocation->checkAuthorization(opCtx, request);
@@ -315,10 +314,12 @@ void runCommand(OperationContext* opCtx,
     }
     opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
+    auto invocation = command->parse(opCtx, request);
+
     // Set the logical optype, command object and namespace as soon as we identify the command. If
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
     // namespace db.$cmd.
-    auto ns = command->parseNs(request.getDatabase().toString(), request.body);
+    std::string ns = invocation->ns().toString();
     auto nss = (request.getDatabase() == ns ? NamespaceString(ns, "$cmd") : NamespaceString(ns));
 
     // Fill out all currentOp details.
@@ -339,9 +340,18 @@ void runCommand(OperationContext* opCtx,
         for (int tries = 0;; ++tries) {
             // Try 5 times. On the last try, exceptions are rethrown.
             bool canRetry = tries < 4;
+
+            if (tries > 0) {
+                // Re-parse before retrying in case the process of run()-ning the
+                // invocation could affect the parsed result.
+                invocation = command->parse(opCtx, request);
+                invariant(invocation->ns().toString() == ns,
+                          "unexpected change of namespace when retrying");
+            }
+
             crb.reset();
             try {
-                execCommandClient(opCtx, command, request, &crb);
+                execCommandClient(opCtx, invocation.get(), request, &crb);
                 return;
             } catch (ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
                 const auto staleNs = [&] {

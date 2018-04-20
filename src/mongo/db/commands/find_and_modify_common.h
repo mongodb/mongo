@@ -36,11 +36,11 @@
 
 namespace mongo {
 
-class Command;
+class BasicCommand;
 
 namespace find_and_modify {
 
-void addPrivilegesRequiredForFindAndModify(const Command* commandTemplate,
+void addPrivilegesRequiredForFindAndModify(const BasicCommand* commandTemplate,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);

@@ -51,6 +51,7 @@
 namespace mongo {
 
 class Command;
+class CommandInvocation;
 class OperationContext;
 
 namespace mutablebson {
@@ -70,6 +71,22 @@ struct CommandHelpers {
     static NamespaceString parseNsCollectionRequired(StringData dbname, const BSONObj& cmdObj);
 
     static NamespaceStringOrUUID parseNsOrUUID(StringData dbname, const BSONObj& cmdObj);
+
+    /**
+     * Return the namespace for the command. If the first field in 'cmdObj' is of type
+     * mongo::String, then that field is interpreted as the collection name, and is
+     * appended to 'dbname' after a '.' character. If the first field is not of type
+     * mongo::String, then 'dbname' is returned unmodified.
+     */
+    static std::string parseNsFromCommand(StringData dbname, const BSONObj& cmdObj);
+
+    /**
+     * Utility that returns a ResourcePattern for the namespace returned from
+     * BasicCommand::parseNs(dbname, cmdObj). This will be either an exact namespace resource
+     * pattern or a database resource pattern, depending on whether parseNs returns a fully qualifed
+     * collection name or just a database name.
+     */
+    static ResourcePattern resourcePatternForNamespace(const std::string& ns);
 
     static Command* findCommand(StringData name);
 
@@ -188,7 +205,7 @@ struct CommandHelpers {
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 
     static void logAuthViolation(OperationContext* opCtx,
-                                 const Command* command,
+                                 const CommandInvocation* invocation,
                                  const OpMsgRequest& request,
                                  ErrorCodes::Error err);
 
@@ -196,8 +213,6 @@ struct CommandHelpers {
 
     static constexpr StringData kHelpFieldName = "help"_sd;
 };
-
-class CommandInvocation;
 
 /**
  * Serves as a base for server commands. See the constructor for more details.
@@ -228,23 +243,6 @@ public:
     const std::string& getName() const {
         return _name;
     }
-
-    /**
-     * Return the namespace for the command. If the first field in 'cmdObj' is of type
-     * mongo::String, then that field is interpreted as the collection name, and is
-     * appended to 'dbname' after a '.' character. If the first field is not of type
-     * mongo::String, then 'dbname' is returned unmodified.
-     */
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const;
-
-    /**
-     * Utility that returns a ResourcePattern for the namespace returned from
-     * parseNs(dbname, cmdObj).  This will be either an exact namespace resource pattern
-     * or a database resource pattern, depending on whether parseNs returns a fully qualifed
-     * collection name or just a database name.
-     */
-    virtual ResourcePattern parseResourcePattern(const std::string& dbname,
-                                                 const BSONObj& cmdObj) const;
 
     /**
      * Used by command implementations to hint to the rpc system how much space they will need in
@@ -359,14 +357,14 @@ public:
     /**
      * Increment counter for how many times this command has executed.
      */
-    void incrementCommandsExecuted() {
+    void incrementCommandsExecuted() const {
         _commandsExecuted.increment();
     }
 
     /**
      * Increment counter for how many times this command has failed.
      */
-    void incrementCommandsFailed() {
+    void incrementCommandsFailed() const {
         _commandsFailed.increment();
     }
 
@@ -379,13 +377,12 @@ public:
                                      const Command& command);
 
 private:
-    // Counters for how many times this command has been executed and failed
-    Counter64 _commandsExecuted;
-    Counter64 _commandsFailed;
-
     // The full name of the command
     const std::string _name;
 
+    // Counters for how many times this command has been executed and failed
+    mutable Counter64 _commandsExecuted;
+    mutable Counter64 _commandsFailed;
     // Pointers to hold the metrics tree references
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
@@ -561,6 +558,14 @@ private:
 
 public:
     using Command::Command;
+
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return CommandHelpers::parseNsFromCommand(dbname, cmdObj);
+    }
+
+    ResourcePattern parseResourcePattern(const std::string& dbname, const BSONObj& cmdObj) const {
+        return CommandHelpers::resourcePatternForNamespace(parseNs(dbname, cmdObj));
+    }
 
     //
     // Interface for subclasses to implement

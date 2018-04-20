@@ -1621,7 +1621,11 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 Command* cmd = CommandHelpers::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
-                BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nss.db().toString(), o));
+
+                // TODO: This parse could be expensive and not worth it.
+                BackgroundOperation::awaitNoBgOpInProgForNs(
+                    cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString());
+
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
                 break;
