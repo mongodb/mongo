@@ -473,12 +473,17 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* txn) {
         _reload.clear();
         _deleted.clear();
     }
+    // Implicitly resets _deleteNotifyExec to avoid possible invariant failure
+    // in on destruction of MigrationChunkClonerSourceLegacy, and will always
+    // call deleteNotifyExec destructor on scope exit even if something in the
+    // below if statement fails
+    auto deleteNotifyExec = std::move(_deleteNotifyExec);
 
-    if (_deleteNotifyExec) {
+    if (deleteNotifyExec) {
         ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollection autoColl(txn, _args.getNss(), MODE_IS);
 
-        _deleteNotifyExec.reset();
+        deleteNotifyExec.reset();
     }
 }
 
