@@ -788,27 +788,31 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         BSONObjBuilder query;
         lastChunkVersion.addToBSON(query, ChunkType::lastmod());
         query.append(ChunkType::ns(), nss.ns());
-        auto swChunks = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
-        const auto& newestChunk = swChunks.getValue();
+        auto chunkWithStatus = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
 
-        if (!swChunks.isOK()) {
-            errMsg = str::stream() << "getChunks function failed, unable to validate chunk "
-                                   << "operation metadata: " << swChunks.getStatus().toString()
-                                   << ". applyChunkOpsDeprecated failed to get confirmation "
-                                   << "of commit. Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue().response;
-        } else if (!newestChunk.empty()) {
-            invariant(newestChunk.size() == 1);
-            return Status::OK();
-        } else {
+        if (!chunkWithStatus.isOK()) {
+            errMsg = str::stream()
+                << "getChunks function failed, unable to validate chunk "
+                << "operation metadata: " << chunkWithStatus.getStatus().toString()
+                << ". applyChunkOpsDeprecated failed to get confirmation "
+                << "of commit. Unable to save chunk ops. Command: " << cmd
+                << ". Result: " << response.getValue().response;
+            return status.withContext(errMsg);
+        };
+
+        const auto& newestChunk = chunkWithStatus.getValue();
+
+        if (newestChunk.empty()) {
             errMsg = str::stream() << "chunk operation commit failed: version "
                                    << lastChunkVersion.toString()
                                    << " doesn't exist in namespace: " << nss.ns()
                                    << ". Unable to save chunk ops. Command: " << cmd
                                    << ". Result: " << response.getValue().response;
-        }
+            return status.withContext(errMsg);
+        };
 
-        return status.withContext(errMsg);
+        invariant(newestChunk.size() == 1);
+        return Status::OK();
     }
 
     return Status::OK();
