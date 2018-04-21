@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -505,18 +507,95 @@ public:
                                const BSONObj& cmdObj) const final {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        // Check for the listCollections ActionType on the database
-        // or find on system.namespaces for pre 3.0 systems.
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                           ActionType::listCollections) ||
-            authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.namespaces")),
-                ActionType::find)) {
+        if (authzSession->isAuthorizedToListCollections(dbname, cmdObj)) {
             return Status::OK();
         }
 
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "Not authorized to list collections on db: " << dbname);
+    }
+
+    BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
+                                                   const std::string& dbName,
+                                                   const BSONObj& cmdObj) {
+        mutablebson::Document rewrittenCmdObj(cmdObj);
+        mutablebson::Element ownCollections =
+            mutablebson::findFirstChildNamed(rewrittenCmdObj.root(), "authorizedCollections");
+
+        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
+
+        // We must strip $ownCollections from the delegated command.
+        uassertStatusOK(ownCollections.remove());
+
+        BSONObj collectionFilter;
+
+        // Extract and retain any previous filter
+        mutablebson::Element oldFilter =
+            mutablebson::findFirstChildNamed(rewrittenCmdObj.root(), "filter");
+
+        // Make a new filter, containing a $and array.
+        mutablebson::Element newFilter = rewrittenCmdObj.makeElementObject("filter");
+        mutablebson::Element newFilterAnd = rewrittenCmdObj.makeElementArray("$and");
+        uassertStatusOK(newFilter.pushBack(newFilterAnd));
+
+        // Append a rule to the $and, which rejects system collections.
+        mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
+            "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
+        uassertStatusOK(newFilterAnd.pushBack(systemCollectionsFilter));
+
+        if (!authzSession->isAuthorizedForAnyActionOnResource(
+                ResourcePattern::forDatabaseName(dbName))) {
+            // We passed an auth check which said we might be able to render some collections,
+            // but it doesn't seem like we should render all of them. We must filter.
+
+            // Compute the set of collection names which would be permissible to return.
+            std::set<std::string> collectionNames;
+            for (UserNameIterator nameIter = authzSession->getAuthenticatedUserNames();
+                 nameIter.more();
+                 nameIter.next()) {
+                User* authUser = authzSession->lookupUser(*nameIter);
+                const User::ResourcePrivilegeMap& resourcePrivilegeMap = authUser->getPrivileges();
+                for (const std::pair<ResourcePattern, Privilege>& resourcePrivilege :
+                     resourcePrivilegeMap) {
+                    const auto& resource = resourcePrivilege.first;
+                    if (resource.isCollectionPattern() || (resource.isExactNamespacePattern() &&
+                                                           resource.databaseToMatch() == dbName)) {
+                        collectionNames.emplace(resource.collectionToMatch().toString());
+                    }
+                }
+            }
+
+            // Construct a new filter predicate which returns only collections we were found to
+            // have privileges for.
+            BSONObjBuilder predicateBuilder;
+            BSONObjBuilder nameBuilder(predicateBuilder.subobjStart("name"));
+            BSONArrayBuilder setBuilder(nameBuilder.subarrayStart("$in"));
+
+            // Load the de-duplicated set into a BSON array
+            for (StringData collectionName : collectionNames) {
+                setBuilder << collectionName;
+            }
+            setBuilder.done();
+            nameBuilder.done();
+
+            collectionFilter = predicateBuilder.obj();
+
+            // Filter the results by our collection names.
+            mutablebson::Element newFilterAndIn =
+                rewrittenCmdObj.makeElementObject("", collectionFilter);
+            uassertStatusOK(newFilterAnd.pushBack(newFilterAndIn));
+        }
+
+        // If there was a pre-existing filter, compose it with our new one.
+        if (oldFilter.ok()) {
+            uassertStatusOK(oldFilter.remove());
+            uassertStatusOK(newFilterAnd.pushBack(oldFilter));
+        }
+
+        // Attach our new composite filter back onto the listCollections command object.
+        uassertStatusOK(rewrittenCmdObj.root().pushBack(newFilter));
+
+        return rewrittenCmdObj.getObject();
     }
 
     bool run(OperationContext* opCtx,
@@ -525,13 +604,19 @@ public:
              BSONObjBuilder& result) override {
         const auto nss(NamespaceString::makeListCollectionsNSS(dbName));
 
+        BSONObj newCmd = cmdObj;
+
+        if (newCmd["authorizedCollections"].trueValue()) {
+            newCmd = rewriteCommandForListingOwnCollections(opCtx, dbName, cmdObj);
+        }
+
         auto dbInfoStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
         if (!dbInfoStatus.isOK()) {
             return appendEmptyResultSet(opCtx, result, dbInfoStatus.getStatus(), nss.ns());
         }
 
         return cursorCommandPassthrough(
-            opCtx, dbName, dbInfoStatus.getValue(), cmdObj, nss, &result);
+            opCtx, dbName, dbInfoStatus.getValue(), newCmd, nss, &result);
     }
 
 } cmdListCollections;

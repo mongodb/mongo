@@ -154,7 +154,7 @@ public:
 
     bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) override;
 
-    bool isAuthorizedToListCollections(StringData dbname) override;
+    bool isAuthorizedToListCollections(StringData dbname, const BSONObj& cmdObj) override;
 
     bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) override;
 
@@ -174,6 +174,10 @@ public:
 
     bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
                                            const ActionSet& actions) override;
+
+    bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData dbname) override;
+
+    bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) override;
 
     void setImpersonatedUserData(std::vector<UserName> usernames,
                                  std::vector<RoleName> roles) override;

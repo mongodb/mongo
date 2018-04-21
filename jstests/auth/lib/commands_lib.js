@@ -4487,6 +4487,79 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "listOwnCollections",
+          command: {listCollections: 1, nameOnly: true, authorizedCollections: true},
+          setup: function(db) {
+              db.x.insert({_id: 5});
+              db.y.insert({_id: 6});
+          },
+          teardown: function(db) {
+              db.x.drop();
+              db.y.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {
+                    read: 1,
+                    readAnyDatabase: 1,
+                    readWrite: 1,
+                    readWriteAnyDatabase: 1,
+                    dbAdmin: 1,
+                    dbAdminAnyDatabase: 1,
+                    dbOwner: 1,
+                    userAdmin: 1,
+                    userAdminAnyDatabase: 1,
+                    hostManager: 1,
+                    enableSharding: 1,
+                    clusterMonitor: 1,
+                    clusterManager: 1,
+                    clusterAdmin: 1,
+                    backup: 1,
+                    restore: 1,
+                    root: 1,
+                    __system: 1
+                },
+              },
+              // Test legacy (pre 3.0) way of authorizing listCollections.
+              {
+                runOnDb: firstDbName,
+                privileges: [{
+                    resource: {db: firstDbName, collection: "system.namespaces"},
+                    actions: ["find"]
+                }]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {db: firstDbName, collection: "x"}, actions: ["find"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {db: "", collection: "x"}, actions: ["find"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {db: "", collection: ""}, actions: ["find"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {db: firstDbName, collection: ""}, actions: ["find"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {cluster: true}, actions: ["find"]}],
+                expectAuthzFailure: true
+              },
+              {
+                runOnDb: firstDbName,
+                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}],
+                expectAuthzFailure: true
+              },
+              {runOnDb: firstDbName, privileges: [], expectAuthzFailure: true},
+          ]
+        },
+
+        {
           testname: "listIndexes",
           command: {listIndexes: "x"},
           setup: function(db) {

@@ -108,6 +108,11 @@ const ActionSet User::getActionsForResource(const ResourcePattern& resource) con
     return it->second.getActions();
 }
 
+
+bool User::hasActionsForResource(const ResourcePattern& resource) const {
+    return !getActionsForResource(resource).empty();
+}
+
 void User::setCredentials(const CredentialData& credentials) {
     _credentials = credentials;
 }

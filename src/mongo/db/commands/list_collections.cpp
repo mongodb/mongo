@@ -212,26 +212,27 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
 
 class CmdListCollections : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kOptIn;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return false;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
 
-    std::string help() const override {
+    std::string help() const final {
         return "list collections for this db";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const final {
+
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-        if (authzSession->isAuthorizedToListCollections(dbname)) {
+        if (authzSession->isAuthorizedToListCollections(dbname, cmdObj)) {
             return Status::OK();
         }
 
@@ -244,10 +245,12 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& jsobj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) final {
         unique_ptr<MatchExpression> matcher;
+        const auto as = AuthorizationSession::get(opCtx->getClient());
 
         const bool nameOnly = jsobj["nameOnly"].trueValue();
+        const bool authorizedCollections = jsobj["authorizedCollections"].trueValue();
 
         // Check for 'filter' argument.
         BSONElement filterElt = jsobj["filter"];
@@ -291,6 +294,16 @@ public:
                 if (auto collNames = _getExactNameMatches(matcher.get())) {
                     for (auto&& collName : *collNames) {
                         auto nss = NamespaceString(db->name(), collName);
+
+                        // Only validate on a per-collection basis if the user requested
+                        // a list of authorized collections
+                        if (authorizedCollections &&
+                            (nss.coll().startsWith("system.") ||
+                             !as->isAuthorizedForAnyActionOnResource(
+                                 ResourcePattern::forExactNamespace(nss)))) {
+                            continue;
+                        }
+
                         Collection* collection = db->getCollection(opCtx, nss);
                         BSONObj collBson =
                             buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
@@ -301,6 +314,12 @@ public:
                     }
                 } else {
                     for (auto&& collection : *db) {
+                        if (authorizedCollections &&
+                            (collection->ns().coll().startsWith("system.") ||
+                             !as->isAuthorizedForAnyActionOnResource(
+                                 ResourcePattern::forExactNamespace(collection->ns())))) {
+                            continue;
+                        }
                         BSONObj collBson =
                             buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
                         if (!collBson.isEmpty()) {

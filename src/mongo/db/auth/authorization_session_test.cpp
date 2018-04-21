@@ -1245,30 +1245,85 @@ TEST_F(AuthorizationSessionTest,
 }
 
 TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPrivilege) {
+    BSONObj cmd = BSON("listCollections" << 1);
     // With no privileges, there is not authorization to list collections
-    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
-    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
-    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testFooNss.db(), cmd));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testBarNss.db(), cmd));
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections(testQuxNss.db(), cmd));
 }
 
 TEST_F(AuthorizationSessionTest, CanListCollectionsWithLegacySystemNamespacesAccess) {
+    BSONObj cmd = BSON("listCollections" << 1);
+
     // Deprecated: permissions for the find action on test.system.namespaces allows us to list
     // collections in the test database.
     authzSession->assumePrivilegesForDB(
         Privilege(testSystemNamespacesResource, {ActionType::find}));
 
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db(), cmd));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db(), cmd));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db(), cmd));
 }
 
 TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {
+    BSONObj cmd = BSON("listCollections" << 1);
     // The listCollections privilege authorizes the list collections command.
     authzSession->assumePrivilegesForDB(Privilege(testDBResource, {ActionType::listCollections}));
 
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db()));
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db()));
-    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db()));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db(), cmd));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db(), cmd));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db(), cmd));
+}
+
+TEST_F(AuthorizationSessionTest, CanListOwnCollectionsWithPrivilege) {
+    BSONObj cmd =
+        BSON("listCollections" << 1 << "nameOnly" << true << "authorizedCollections" << true);
+    // The listCollections privilege authorizes the list collections command.
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testFooNss.db(), cmd));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testBarNss.db(), cmd));
+    ASSERT_TRUE(authzSession->isAuthorizedToListCollections(testQuxNss.db(), cmd));
+
+    ASSERT_FALSE(authzSession->isAuthorizedToListCollections("other", cmd));
+}
+
+TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
+
+    // If we have a collection privilege, we have actions on that collection
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
+    ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
+        ResourcePattern::forDatabaseName(testFooNss.db())));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+
+    // If we have a database privilege, we have actions on that database and all collections it
+    // contains
+    authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forDatabaseName(testFooNss.db()), {ActionType::find}));
+    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
+    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(
+        ResourcePattern::forDatabaseName(testFooNss.db())));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
+
+    // If we have a privilege on anyNormalResource, we have actions on all databases and all
+    // collections they contain
+    authzSession->assumePrivilegesForDB(
+        Privilege(ResourcePattern::forAnyNormalResource(), {ActionType::find}));
+    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
+    ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(
+        ResourcePattern::forDatabaseName(testFooNss.db())));
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyNormalResource()));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnyResource()));
 }
 
 TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {

@@ -471,7 +471,7 @@ Status AuthorizationSessionImpl::checkAuthForKillCursors(const NamespaceString& 
         const bool canKill =
             isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(ns.db()),
                                              ActionType::killCursors) ||
-            isAuthorizedToListCollections(ns.db());
+            isAuthorizedToListCollections(ns.db(), BSONObj());
         if (canKill && isCoauthorizedWith(cursorOwner)) {
             return Status::OK();
         }
@@ -780,10 +780,15 @@ bool AuthorizationSessionImpl::isAuthorizedToChangeOwnCustomDataAsUser(const Use
                                                                 ActionType::changeOwnCustomData);
 }
 
-bool AuthorizationSessionImpl::isAuthorizedToListCollections(StringData dbname) {
+bool AuthorizationSessionImpl::isAuthorizedToListCollections(StringData dbname,
+                                                             const BSONObj& cmdObj) {
+    if (cmdObj["authorizedCollections"].trueValue() && cmdObj["nameOnly"].trueValue() &&
+        AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
+        return true;
+    }
+
     // Check for the listCollections ActionType on the database or find on system.namespaces for
     // pre 3.0 systems.
-
     return AuthorizationSessionImpl::isAuthorizedForActionsOnResource(
                ResourcePattern::forDatabaseName(dbname), ActionType::listCollections) ||
         AuthorizationSessionImpl::isAuthorizedForActionsOnResource(
@@ -894,6 +899,72 @@ void AuthorizationSessionImpl::_buildAuthenticatedRolesVector() {
         }
     }
 }
+
+bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringData db) {
+    if (_externalState->shouldIgnoreAuthChecks()) {
+        return true;
+    }
+
+    for (const auto& user : _authenticatedUsers) {
+        // First lookup any Privileges on this database specifying Database resources
+        if (user->hasActionsForResource(ResourcePattern::forDatabaseName(db))) {
+            return true;
+        }
+
+        // Any resource will match any collection in the database
+        if (user->hasActionsForResource(ResourcePattern::forAnyResource())) {
+            return true;
+        }
+
+        // If the user is authorized for anyNormalResource, then they implicitly have access
+        // to most databases.
+        if (db != "local" && db != "config" &&
+            user->hasActionsForResource(ResourcePattern::forAnyNormalResource())) {
+            return true;
+        }
+
+        // We've checked all the resource types that can be directly expressed. Now we must
+        // iterate all privileges, until we see something that could reside in the target database.
+        User::ResourcePrivilegeMap map = user->getPrivileges();
+        for (const auto& privilege : map) {
+            // If the user has a Collection privilege, then they're authorized for this resource
+            // on all databases.
+            if (privilege.first.isCollectionPattern()) {
+                return true;
+            }
+
+            // If the user has an exact namespace privilege on a collection in this database, they
+            // have access to a resource in this database.
+            if (privilege.first.isExactNamespacePattern() &&
+                privilege.first.databaseToMatch() == db) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) {
+    if (_externalState->shouldIgnoreAuthChecks()) {
+        return true;
+    }
+
+    std::array<ResourcePattern, resourceSearchListCapacity> resourceSearchList;
+    const int resourceSearchListLength =
+        buildResourceSearchList(resource, resourceSearchList.data());
+
+    for (int i = 0; i < resourceSearchListLength; ++i) {
+        for (const User* user : _authenticatedUsers) {
+            if (user->hasActionsForResource(resourceSearchList[i])) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 
 bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privilege) {
     const ResourcePattern& target(privilege.getResourcePattern());

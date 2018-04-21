@@ -274,7 +274,7 @@ public:
 
     // Returns true if the current session is authorized to list the collections in the given
     // database.
-    virtual bool isAuthorizedToListCollections(StringData dbname) = 0;
+    virtual bool isAuthorizedToListCollections(StringData dbname, const BSONObj& cmdObj) = 0;
 
     // Returns true if the current session is authenticated as the given user and that user
     // is allowed to change his/her own customData.
@@ -311,6 +311,13 @@ public:
     // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), actions).
     virtual bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
                                                    const ActionSet& actions) = 0;
+
+    // Returns true if the current session possesses a privilege which could apply to the
+    // database resource, or a specific or arbitrary resource within the database.
+    virtual bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData dbname) = 0;
+
+    // Returns true if the current session possesses a privilege which applies to the resource.
+    virtual bool isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) = 0;
 
     // Replaces the data for users that a system user is impersonating with new data.
     // The auditing system adds these users and their roles to each audit record in the log.

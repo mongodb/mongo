@@ -151,6 +151,11 @@ public:
     const ActionSet getActionsForResource(const ResourcePattern& resource) const;
 
     /**
+     * Returns true if the user has is allowed to perform an action on the given resource.
+     */
+    bool hasActionsForResource(const ResourcePattern& resource) const;
+
+    /**
      * Returns true if this copy of information about this user is still valid. If this returns
      * false, this object should no longer be used and should be returned to the
      * AuthorizationManager and a new User object for this user should be requested.
