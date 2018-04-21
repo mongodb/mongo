@@ -231,7 +231,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     auto const css = CollectionShardingState::get(opCtx, args.nss);
     const auto metadata = css->getMetadata(opCtx);
-    log() << "XXX on udpate op observer";
 
     if (args.nss.ns() == NamespaceString::kShardConfigCollectionsCollectionName) {
         // Notification of routing table changes are only needed on secondaries
