@@ -36,6 +36,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -49,10 +50,7 @@
 namespace mongo {
 namespace {
 
-using DeleteState = CollectionShardingState::DeleteState;
-
-const OperationContext::Decoration<DeleteState> getDeleteState =
-    OperationContext::declareDecoration<DeleteState>();
+const auto getDeleteState = OperationContext::declareDecoration<ShardObserverDeleteState>();
 
 bool isStandaloneOrPrimary(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -327,9 +325,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
                                           NamespaceString const& nss,
                                           BSONObj const& doc) {
-    auto& deleteState = getDeleteState(opCtx);
-    auto* css = CollectionShardingState::get(opCtx, nss.ns());
-    deleteState = css->makeDeleteState(opCtx, doc);
+    auto css = CollectionShardingState::get(opCtx, nss.ns());
+    getDeleteState(opCtx) = ShardObserverDeleteState::make(opCtx, css, doc);
 }
 
 void ShardServerOpObserver::onDelete(OperationContext* opCtx,
@@ -394,6 +391,49 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
     }
 
     return {};
+}
+
+void shardObserveInsertOp(OperationContext* opCtx,
+                          CollectionShardingState* css,
+                          const BSONObj& insertedDoc,
+                          const repl::OpTime& opTime) {
+    css->checkShardVersionOrThrow(opCtx);
+    auto msm = MigrationSourceManager::get(css);
+    if (msm) {
+        msm->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
+    }
+}
+
+void shardObserveUpdateOp(OperationContext* opCtx,
+                          CollectionShardingState* css,
+                          const BSONObj& updatedDoc,
+                          const repl::OpTime& opTime,
+                          const repl::OpTime& prePostImageOpTime) {
+    css->checkShardVersionOrThrow(opCtx);
+    auto msm = MigrationSourceManager::get(css);
+    if (msm) {
+        msm->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
+    }
+}
+
+void shardObserveDeleteOp(OperationContext* opCtx,
+                          CollectionShardingState* css,
+                          const ShardObserverDeleteState& deleteState,
+                          const repl::OpTime& opTime,
+                          const repl::OpTime& preImageOpTime) {
+    css->checkShardVersionOrThrow(opCtx);
+    auto msm = MigrationSourceManager::get(css);
+    if (msm && deleteState.isMigrating) {
+        msm->getCloner()->onDeleteOp(opCtx, deleteState.documentKey, opTime, preImageOpTime);
+    }
+}
+
+ShardObserverDeleteState ShardObserverDeleteState::make(OperationContext* opCtx,
+                                                        CollectionShardingState* css,
+                                                        const BSONObj& docToDelete) {
+    auto msm = MigrationSourceManager::get(css);
+    return {css->getMetadata(opCtx).extractDocumentKey(docToDelete).getOwned(),
+            msm && msm->getCloner()->isDocumentInMigratingChunk(docToDelete)};
 }
 
 }  // namespace mongo

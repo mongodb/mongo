@@ -734,6 +734,7 @@ env.Library(
         'catalog/collection_options',
         'op_observer',
         'repl/oplog',
+        's/sharding_runtime_d',
         'views/views_mongod',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',

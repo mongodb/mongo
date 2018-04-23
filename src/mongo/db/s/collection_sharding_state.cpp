@@ -37,7 +37,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -162,10 +161,6 @@ CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceSt
       _metadataManager(std::make_shared<MetadataManager>(
           sc, _nss, getRangeDeleterExecutorHolder(sc).getOrCreateExecutor())) {}
 
-CollectionShardingState::~CollectionShardingState() {
-    invariant(!_sourceMgr);
-}
-
 CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     return CollectionShardingState::get(opCtx, nss.ns());
@@ -236,22 +231,6 @@ void CollectionShardingState::enterCriticalSectionCommitPhase(OperationContext* 
 void CollectionShardingState::exitCriticalSection(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
     _critSec.exitCriticalSection();
-}
-
-void CollectionShardingState::setMigrationSourceManager(OperationContext* opCtx,
-                                                        MigrationSourceManager* sourceMgr) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    invariant(sourceMgr);
-    invariant(!_sourceMgr);
-
-    _sourceMgr = sourceMgr;
-}
-
-void CollectionShardingState::clearMigrationSourceManager(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    invariant(_sourceMgr);
-
-    _sourceMgr = nullptr;
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
@@ -328,50 +307,6 @@ auto CollectionShardingState::trackOrphanedDataCleanup(ChunkRange const& range)
 
 boost::optional<ChunkRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
     return _metadataManager->getNextOrphanRange(from);
-}
-
-void CollectionShardingState::onInsertOp(OperationContext* opCtx,
-                                         const BSONObj& insertedDoc,
-                                         const repl::OpTime& opTime) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    checkShardVersionOrThrow(opCtx);
-
-    if (_sourceMgr) {
-        _sourceMgr->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
-    }
-}
-
-void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
-                                         const BSONObj& updatedDoc,
-                                         const repl::OpTime& opTime,
-                                         const repl::OpTime& prePostImageOpTime) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    checkShardVersionOrThrow(opCtx);
-
-    if (_sourceMgr) {
-        _sourceMgr->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
-    }
-}
-
-auto CollectionShardingState::makeDeleteState(OperationContext* opCtx, BSONObj const& doc)
-    -> DeleteState {
-    return {getMetadata(opCtx).extractDocumentKey(doc).getOwned(),
-            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
-}
-
-void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
-                                         const DeleteState& deleteState,
-                                         const repl::OpTime& opTime,
-                                         const repl::OpTime& preImageOpTime) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    checkShardVersionOrThrow(opCtx);
-
-    if (_sourceMgr && deleteState.isMigrating) {
-        _sourceMgr->getCloner()->onDeleteOp(opCtx, deleteState.documentKey, opTime, preImageOpTime);
-    }
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,

@@ -47,6 +47,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -60,10 +61,7 @@ namespace {
 
 MONGO_FP_DECLARE(failCollectionUpdates);
 
-using DeleteState = CollectionShardingState::DeleteState;
-
-const OperationContext::Decoration<DeleteState> getDeleteState =
-    OperationContext::declareDecoration<DeleteState>();
+const auto getDeleteState = OperationContext::declareDecoration<ShardObserverDeleteState>();
 
 repl::OpTime logOperation(OperationContext* opCtx,
                           const char* opstr,
@@ -259,7 +257,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
         oplogLink.preImageOpTime = noteOplog;
     }
 
-    CollectionShardingState::DeleteState& deleteState = getDeleteState(opCtx);
+    auto& deleteState = getDeleteState(opCtx);
     opTimes.writeOpTime = logOperation(opCtx,
                                        "d",
                                        nss,
@@ -344,11 +342,6 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "i", systemIndexes, indexDoc, nullptr);
-
-    auto css = CollectionShardingState::get(opCtx, systemIndexes);
-    if (!fromMigrate) {
-        css->onInsertOp(opCtx, indexDoc, {});
-    }
 }
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
@@ -409,7 +402,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             ->logOp(opCtx, "i", nss, it->doc, nullptr);
         if (css) {
             auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
-            css->onInsertOp(opCtx, it->doc, opTime);
+            shardObserveInsertOp(opCtx, css, it->doc, opTime);
         }
     }
 
@@ -474,7 +467,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!args.fromMigrate) {
             auto css = CollectionShardingState::get(opCtx, args.nss);
-            css->onUpdateOp(opCtx, args.updatedDoc, opTime.writeOpTime, opTime.prePostImageOpTime);
+            shardObserveUpdateOp(
+                opCtx, css, args.updatedDoc, opTime.writeOpTime, opTime.prePostImageOpTime);
         }
     }
 
@@ -495,9 +489,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    BSONObj const& doc) {
-    auto& deleteState = getDeleteState(opCtx);
-    auto* css = CollectionShardingState::get(opCtx, nss);
-    deleteState = css->makeDeleteState(opCtx, doc);
+    getDeleteState(opCtx) =
+        ShardObserverDeleteState::make(opCtx, CollectionShardingState::get(opCtx, nss), doc);
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
@@ -532,7 +525,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!fromMigrate) {
             auto css = CollectionShardingState::get(opCtx, nss);
-            css->onDeleteOp(opCtx, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
+            shardObserveDeleteOp(
+                opCtx, css, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
         }
     }
 

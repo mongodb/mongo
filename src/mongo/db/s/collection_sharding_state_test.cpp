@@ -31,6 +31,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/shard_server_test_fixture.h"
@@ -156,7 +157,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
 
     // First, check that an order for deletion from an unsharded collection (where css has not been
     // "refreshed" with chunk metadata) extracts just the "_id" field:
-    auto deleteState = css->makeDeleteState(operationContext(), doc);
+    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("_id"
                            << "hello"));
@@ -181,7 +182,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
                     << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    auto deleteState = css->makeDeleteState(operationContext(), doc);
+    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("key" << 100 << "key3"
                                  << "abc"
@@ -207,7 +208,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
                            << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    auto deleteState = css->makeDeleteState(operationContext(), doc);
+    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("key" << 100 << "_id"
                                  << "hello"
@@ -231,7 +232,7 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
                            << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    auto deleteState = css->makeDeleteState(operationContext(), doc);
+    auto deleteState = ShardObserverDeleteState::make(operationContext(), css, doc);
     ASSERT_BSONOBJ_EQ(deleteState.documentKey,
                       BSON("_id"
                            << "hello"));

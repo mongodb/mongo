@@ -68,6 +68,8 @@ using namespace shardmetadatautil;
 
 namespace {
 
+const auto msmForCss = CollectionShardingState::declareDecoration<MigrationSourceManager*>();
+
 // Wait at most this much time for the recipient to catch up sufficiently so critical section can be
 // entered
 const Hours kMaxWaitToEnterCriticalSectionTimeout(6);
@@ -128,6 +130,10 @@ MONGO_FP_DECLARE(doNotRefreshRecipientAfterCommit);
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
 MONGO_FP_DECLARE(migrationCommitNetworkError);
+
+MigrationSourceManager* MigrationSourceManager::get(CollectionShardingState& css) {
+    return msmForCss(css);
+}
 
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                MoveChunkRequest request,
@@ -250,7 +256,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
         _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
             _args, metadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
-        css->setMigrationSourceManager(opCtx, this);
+        invariant(nullptr == std::exchange(msmForCss(css), this));
     }
 
     Status startCloneStatus = _cloneDriver->startClone(opCtx);
@@ -686,18 +692,13 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     invariant(_state != kDone);
 
     auto cloneDriver = [&]() {
-        // Unregister from the collection's sharding state
+        // Unregister from the collection's sharding state and exit the migration critical section.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         auto css = CollectionShardingState::get(opCtx, getNss());
 
-        // The migration source manager is not visible anymore after it is unregistered from the
-        // collection
-        css->clearMigrationSourceManager(opCtx);
-
-        // Leave the critical section.
-        CollectionShardingState::get(opCtx, _args.getNss())->exitCriticalSection(opCtx);
-
+        invariant(this == std::exchange(msmForCss(css), nullptr));
+        css->exitCriticalSection(opCtx);
         return std::move(_cloneDriver);
     }();
 
