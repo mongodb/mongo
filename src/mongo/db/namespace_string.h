@@ -175,7 +175,7 @@ public:
     };
 
     StringData db() const {
-        return _dotIndex == std::string::npos ? StringData() : StringData(_ns.c_str(), _dotIndex);
+        return _dotIndex == std::string::npos ? _ns : StringData(_ns.data(), _dotIndex);
     }
 
     StringData coll() const {
