@@ -6,18 +6,23 @@
  */
 (function() {
     "use strict";
-    var numNodes = 3;
-    var rst = new ReplSetTest({nodes: numNodes});
+    var rst = new ReplSetTest({nodes: 1});
 
     rst.startSet();
     rst.initiate();
 
-    var db1 = rst.getPrimary().getDB("local");
-    var db2 = rst.getPrimary().getDB("db2");
+    var conn = rst.getPrimary();               // Waits for PRIMARY state.
+    conn = rst.restart(0, {noReplSet: true});  // Restart as a standalone node.
+    assert.neq(null, conn, "failed to restart");
+
+    // Must drop the oplog in order to induce the correct error below.
+    conn.getDB("local").oplog.rs.drop();
+
+    var db1 = conn.getDB("local");
+    var db2 = conn.getDB("db2");
 
     var res = db1.adminCommand({copydb: 1, fromdb: db1._name, todb: db2._name});
     assert.commandFailedWithCode(res, ErrorCodes.InvalidNamespace);
     assert.gt(res["errmsg"].indexOf("cannot write to 'db2.system.replset'"), -1);
-    rst.awaitReplication();
     rst.stopSet();
 })();
