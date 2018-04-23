@@ -10,9 +10,9 @@
 
     mydb.foo.drop();
 
-    mydb.createCollection("foo");
+    assert.commandWorked(mydb.createCollection("foo", {writeConcern: {w: "majority"}}));
     session.startTransaction({readConcern: {level: "snapshot"}});
-    sessionDb.foo.insert({x: 1});
+    assert.commandWorked(sessionDb.foo.insert({x: 1}));
 
     for (let nameOnly of[false, true]) {
         // Check that both the nameOnly and full versions of listCollections don't block.

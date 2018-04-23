@@ -20,7 +20,8 @@
     const coll = primaryDB.getCollection('coll');
 
     jsTestLog('Creating collection ' + coll.getFullName());
-    assert.commandWorked(primaryDB.createCollection(coll.getName()));
+    assert.commandWorked(
+        primaryDB.createCollection(coll.getName(), {writeConcern: {w: "majority"}}));
     replTest.awaitReplication();
 
     const sessionId = session.getSessionId();

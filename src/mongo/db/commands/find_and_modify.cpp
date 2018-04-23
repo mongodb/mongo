@@ -440,23 +440,25 @@ public:
                 ParsedUpdate parsedUpdate(opCtx, &request);
                 uassertStatusOK(parsedUpdate.parseRequest());
 
-                // These are boost::optionap, because if the database or collection does not exist,
+                // These are boost::optional, because if the database or collection does not exist,
                 // they will have to be reacquired in MODE_X
                 boost::optional<AutoGetOrCreateDb> autoDb;
-                boost::optional<Lock::CollectionLock> collLock;
+                boost::optional<AutoGetCollection> autoColl;
 
-                autoDb.emplace(opCtx, dbName, MODE_IX);
-                collLock.emplace(opCtx->lockState(), nsString.ns(), MODE_IX);
+                autoColl.emplace(opCtx, nsString, MODE_IX);
 
                 {
+                    boost::optional<int> dbProfilingLevel;
+                    if (autoColl->getDb())
+                        dbProfilingLevel = autoColl->getDb()->getProfilingLevel();
+
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(),
-                                                    autoDb->getDb()->getProfilingLevel());
+                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
                 }
 
                 assertCanWrite(opCtx, nsString);
 
-                Collection* collection = autoDb->getDb()->getCollection(opCtx, nsString);
+                Collection* collection = autoColl->getCollection();
 
                 // Create the collection if it does not exist when performing an upsert because the
                 // update stage does not create its own collection
@@ -468,8 +470,7 @@ public:
 
                     // Release the collection lock and reacquire a lock on the database in exclusive
                     // mode in order to create the collection
-                    collLock.reset();
-                    autoDb.reset();
+                    autoColl.reset();
                     autoDb.emplace(opCtx, dbName, MODE_X);
 
                     assertCanWrite(opCtx, nsString);
@@ -489,13 +490,6 @@ public:
 
                     invariant(collection);
                 }
-
-                // Perform an explicit check for "not a view" because the update path doesn't use
-                // AutoGetCollection
-                uassert(ErrorCodes::CommandNotSupportedOnView,
-                        "findAndModify not supported on a view",
-                        collection ||
-                            !autoDb->getDb()->getViewCatalog()->lookup(opCtx, nsString.ns()));
 
                 const auto exec =
                     uassertStatusOK(getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate));

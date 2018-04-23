@@ -113,9 +113,29 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                             << " disappeared after successufully resolving "
                             << nsOrUUID.toString());
 
-    // If the collection exists, there is no need to check for views
-    if (_coll)
+    if (_coll) {
+        // Unlike read concern majority, read concern snapshot cannot yield and wait when there are
+        // pending catalog changes. Instead, we must return an error in such situations. We ignore
+        // this restriction for the oplog, since it never has pending catalog changes.
+        if (opCtx->recoveryUnit()->getReadConcernLevel() ==
+                repl::ReadConcernLevel::kSnapshotReadConcern &&
+            _resolvedNss != NamespaceString::kRsOplogNamespace) {
+            auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+            invariant(mySnapshot);
+            auto minSnapshot = _coll->getMinimumVisibleSnapshot();
+            uassert(
+                ErrorCodes::SnapshotUnavailable,
+                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
+                                 "changes; please retry the operation. Snapshot timestamp is "
+                              << mySnapshot->toString()
+                              << ". Collection minimum is "
+                              << minSnapshot->toString(),
+                !minSnapshot || *mySnapshot >= *minSnapshot);
+        }
+
+        // If the collection exists, there is no need to check for views.
         return;
+    }
 
     _view = db->getViewCatalog()->lookup(opCtx, _resolvedNss.ns());
     uassert(ErrorCodes::CommandNotSupportedOnView,

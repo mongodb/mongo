@@ -122,10 +122,9 @@ private:
                                            const NamespaceString& nss,
                                            repl::ReadConcernLevel readConcernLevel) const;
 
-    // Returns true if the minSnapshot causes conflicting catalog changes for the provided read
-    // concern level or lastAppliedTimestamp.
+    // Returns true if the minSnapshot causes conflicting catalog changes for either the provided
+    // lastAppliedTimestamp or the point-in-time snapshot of the RecoveryUnit on 'opCtx'.
     bool _conflictingCatalogChanges(OperationContext* opCtx,
-                                    repl::ReadConcernLevel readConcernLevel,
                                     boost::optional<Timestamp> minSnapshot,
                                     boost::optional<Timestamp> lastAppliedTimestamp) const;
 };

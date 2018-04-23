@@ -134,8 +134,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         // Return if there are no conflicting catalog changes on the collection.
         auto minSnapshot = coll->getMinimumVisibleSnapshot();
-        if (!_conflictingCatalogChanges(
-                opCtx, readConcernLevel, minSnapshot, lastAppliedTimestamp)) {
+        if (!_conflictingCatalogChanges(opCtx, minSnapshot, lastAppliedTimestamp)) {
             return;
         }
 
@@ -217,7 +216,6 @@ bool AutoGetCollectionForRead::_shouldReadAtLastAppliedTimestamp(
 
 bool AutoGetCollectionForRead::_conflictingCatalogChanges(
     OperationContext* opCtx,
-    repl::ReadConcernLevel readConcernLevel,
     boost::optional<Timestamp> minSnapshot,
     boost::optional<Timestamp> lastAppliedTimestamp) const {
     // This is the timestamp of the most recent catalog changes to this collection. If this is
@@ -246,16 +244,6 @@ bool AutoGetCollectionForRead::_conflictingCatalogChanges(
         return false;
     }
 
-    // Snapshot readConcern can't yield its locks when there are catalog changes.
-    if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        uasserted(
-            ErrorCodes::SnapshotUnavailable,
-            str::stream() << "Unable to read from a snapshot due to pending collection catalog "
-                             "changes; please retry the operation. Snapshot timestamp is "
-                          << mySnapshot->toString()
-                          << ". Collection minimum is "
-                          << minSnapshot->toString());
-    }
     return true;
 }
 
