@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -210,6 +211,10 @@ Status waitForReadConcern(OperationContext* opCtx,
     opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(readConcernArgs.getLevel(),
                                                                  replCoord->getReplicationMode());
 
+    auto session = OperationContextSession::get(opCtx);
+    // Currently speculative read concern is used only for transactions and snapshot reads.
+    const bool speculative = session && session->inSnapshotReadOrMultiDocumentTransaction();
+
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
             // For standalone nodes, Linearizable Read is not supported.
@@ -245,6 +250,11 @@ Status waitForReadConcern(OperationContext* opCtx,
         if (!replCoord->isV1ElectionProtocol()) {
             return {ErrorCodes::IncompatibleElectionProtocol,
                     "Replica sets running protocol version 0 do not support readConcern: snapshot"};
+        }
+        if (speculative) {
+            fassert(50807,
+                    opCtx->recoveryUnit()->setPointInTimeReadTimestamp(
+                        replCoord->getMyLastAppliedOpTime().getTimestamp()));
         }
     }
 
@@ -305,6 +315,7 @@ Status waitForReadConcern(OperationContext* opCtx,
 
     if ((readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
          readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) &&
+        !speculative &&
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
         if (!replCoord->isV1ElectionProtocol()) {
             return {ErrorCodes::IncompatibleElectionProtocol,

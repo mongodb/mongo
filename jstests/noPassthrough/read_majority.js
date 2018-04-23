@@ -238,12 +238,4 @@ load("jstests/libs/analyze_plan.js");
     if (supportsCommittedReads) {
         testReadConcernLevel("majority");
     }
-
-    // TODO SERVER-34388: Test snapshot readConcern when failing commands do
-    // not abort the transaction.
-    /*
-    if (supportsSnapshotReadConcern) {
-        testReadConcernLevel("snapshot");
-    }
-    */
 }());
