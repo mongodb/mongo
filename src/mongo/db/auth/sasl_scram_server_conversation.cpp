@@ -184,7 +184,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     // for the internal user.
     UserName user(ServerMechanismBase::ServerMechanismBase::_principalName,
                   ServerMechanismBase::getAuthenticationDatabase());
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
+    if (Policy::getName() == "SCRAM-SHA-1"_sd &&
+        !sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
         user != internalSecurity.user->getName()) {
         return Status(ErrorCodes::BadValue, "SCRAM-SHA-1 authentication is disabled");
     }
