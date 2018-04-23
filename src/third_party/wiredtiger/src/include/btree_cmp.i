@@ -11,33 +11,13 @@
 #include <x86intrin.h>
 #endif
 #endif
-						/* 16B alignment */
-#define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
-#define	WT_VECTOR_SIZE		16		/* chunk size */
 
 #if defined(HAVE_ARM_NEON_INTRIN_H)
 #include <arm_neon.h>
-/*
- * _mm_movemask_epi8_neon --
- *	Creates a 16-bit mask from the most significant bits of the 16 signed
- * or unsigned 8-bit integers.
- */
-static inline uint16_t
-_mm_movemask_epi8_neon(const uint8x16_t data)
-{
-	uint64x1_t p;
-	p = vset_lane_u64(0x8040201008040201, p, 0);
-	uint8x16_t powers = vcombine_u8(p, p);
-	uint8x16_t zero8x16 = vdupq_n_s8(0);
-	int8x16_t input = vcltq_s8((int8x16_t)data, (int8x16_t)zero8x16);
-	uint64x2_t mask = vpaddlq_u32(
-	    vpaddlq_u16(vpaddlq_u8(vandq_u8((uint8x16_t)input, powers))));
-	uint16_t output;
-	output =
-	    ((vgetq_lane_u8(mask, 8) << 8) | (vgetq_lane_u8(mask, 0) << 0));
-	return (output);
-}
 #endif
+						/* 16B alignment */
+#define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
+#define	WT_VECTOR_SIZE		16		/* chunk size */
 
 /*
  * __wt_lex_compare --
@@ -102,12 +82,12 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 		remain = len % WT_VECTOR_SIZE;
 		len -= remain;
 		for (; len > 0;
-			len -= WT_VECTOR_SIZE,
-			userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
+		    len -= WT_VECTOR_SIZE,
+		    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
 			u = vld1q_u8(userp);
 			t = vld1q_u8(treep);
 			res_eq = vceqq_u8(u, t);
-			if (_mm_movemask_epi8_neon(res_eq) != 65535)
+			if (vminvq_u8(res_eq) != 255)
 				break;
 		}
 		len += remain;
@@ -209,13 +189,13 @@ __wt_lex_compare_skip(
 		len -= remain;
 		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
 		for (; len > 0;
-			len -= WT_VECTOR_SIZE,
-			userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
+		    len -= WT_VECTOR_SIZE,
+		    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
 			*matchp += WT_VECTOR_SIZE) {
 			u = vld1q_u8(userp);
 			t = vld1q_u8(treep);
 			res_eq = vceqq_u8(u, t);
-			if (_mm_movemask_epi8_neon(res_eq) != 65535)
+			if (vminvq_u8(res_eq) != 255)
 				break;
 		}
 		len += remain;
