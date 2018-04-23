@@ -36,9 +36,9 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
 
     // Get connections and collection.
     var primary = replTest.getPrimary();
-    var healthySecondary = replTest.liveNodes.slaves[0];
+    var healthySecondary = replTest._slaves[0];
     healthySecondary.setSlaveOk();
-    var noSnapshotSecondary = replTest.liveNodes.slaves[1];
+    var noSnapshotSecondary = replTest._slaves[1];
     noSnapshotSecondary.setSlaveOk();
     assert.commandWorked(noSnapshotSecondary.adminCommand(
         {configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));

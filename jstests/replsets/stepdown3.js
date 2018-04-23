@@ -23,7 +23,7 @@
     assert.writeOK(master.getDB("test").foo.insert({x: 2}, options));
     // lock secondary, to pause replication
     print("\nlock secondary");
-    var locked = replTest.liveNodes.slaves[0];
+    var locked = replTest._slaves[0];
     printjson(locked.getDB("admin").runCommand({fsync: 1, lock: 1}));
 
     // do a write

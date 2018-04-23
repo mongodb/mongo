@@ -21,7 +21,7 @@
 
     // Find the hidden node.
     var hiddenNode;
-    for (var secondary of rst.liveNodes.slaves) {
+    for (var secondary of rst._slaves) {
         var isMasterRes = secondary.getDB('admin').isMaster();
         if (isMasterRes.hidden) {
             hiddenNode = secondary;

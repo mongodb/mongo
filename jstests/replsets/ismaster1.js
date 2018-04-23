@@ -140,7 +140,7 @@ checkMember({
 });
 
 checkMember({
-    conn: replTest.liveNodes.slaves[0],
+    conn: replTest._slaves[0],
     name: "slave",
     goodValues: {
         setName: "ismaster",
@@ -156,7 +156,7 @@ checkMember({
 });
 
 checkMember({
-    conn: replTest.liveNodes.slaves[1],
+    conn: replTest._slaves[1],
     name: "delayed_slave",
     goodValues: {
         setName: "ismaster",
@@ -174,7 +174,7 @@ checkMember({
 });
 
 checkMember({
-    conn: replTest.liveNodes.slaves[2],
+    conn: replTest._slaves[2],
     name: "arbiter",
     goodValues: {
         setName: "ismaster",
@@ -233,7 +233,7 @@ checkMember({
 });
 
 checkMember({
-    conn: replTest.liveNodes.slaves[0],
+    conn: replTest._slaves[0],
     name: "first_slave",
     goodValues: {
         setName: "ismaster",
@@ -250,7 +250,7 @@ checkMember({
 });
 
 checkMember({
-    conn: replTest.liveNodes.slaves[1],
+    conn: replTest._slaves[1],
     name: "very_delayed_slave",
     goodValues: {
         setName: "ismaster",
@@ -269,7 +269,7 @@ checkMember({
 });
 
 checkMember({
-    conn: replTest.liveNodes.slaves[2],
+    conn: replTest._slaves[2],
     name: "arbiter",
     goodValues: {
         setName: "ismaster",

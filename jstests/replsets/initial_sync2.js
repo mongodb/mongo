@@ -31,7 +31,7 @@ var doTest = function() {
     var foo = master.getDB("foo");
     var admin = master.getDB("admin");
 
-    var slave1 = replTest.liveNodes.slaves[0];
+    var slave1 = replTest._slaves[0];
     var admin_s1 = slave1.getDB("admin");
     var local_s1 = slave1.getDB("local");
 

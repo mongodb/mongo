@@ -614,8 +614,8 @@ var Cluster = function(options) {
             var startTime = Date.now();
             var res;
 
-            // Use liveNodes.master instead of getPrimary() to avoid the detection of a new primary.
-            var primary = rst.liveNodes.master;
+            // Use '_master' instead of getPrimary() to avoid the detection of a new primary.
+            var primary = rst._master;
 
             if (shouldCheckDBHashes) {
                 jsTest.log('Starting consistency checks for replica set with ' + primary.host +

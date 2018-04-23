@@ -33,7 +33,7 @@ doTest = function(signal) {
     // and slaves in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
-    slaves = replTest.liveNodes.slaves;
+    slaves = replTest._slaves;
     assert(slaves.length == 2, "Expected 2 slaves but length was " + slaves.length);
     slaves.forEach(function(slave) {
         // try to read from slave

@@ -35,7 +35,7 @@ replTest.initiate({
         {_id: 2, host: host + ":" + replTest.ports[2], arbiterOnly: true}
     ]
 });
-var slaves = replTest.liveNodes.slaves;
+var slaves = replTest._slaves;
 var master = replTest.getPrimary();
 var masterId = replTest.getNodeId(master);
 var slave = slaves[0];

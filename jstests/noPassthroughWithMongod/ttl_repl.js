@@ -17,7 +17,7 @@ var nodes = rt.startSet();
 rt.initiate();
 var master = rt.getPrimary();
 rt.awaitSecondaryNodes();
-var slave1 = rt.liveNodes.slaves[0];
+var slave1 = rt._slaves[0];
 
 // shortcuts
 var masterdb = master.getDB('d');

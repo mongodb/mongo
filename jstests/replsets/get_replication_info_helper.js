@@ -34,8 +34,8 @@
     assert(rawMongoProgramOutput().match("behind the primary"));
 
     // get to a primaryless state
-    for (i in replSet.liveNodes.slaves) {
-        var secondary = replSet.liveNodes.slaves[i];
+    for (i in replSet._slaves) {
+        var secondary = replSet._slaves[i];
         secondary.getDB('admin').runCommand({replSetFreeze: 120});
     }
     try {

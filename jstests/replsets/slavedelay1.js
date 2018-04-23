@@ -17,7 +17,7 @@ doTest = function(signal) {
     replTest.initiate(config);
 
     var master = replTest.getPrimary().getDB(name);
-    var slaveConns = replTest.liveNodes.slaves;
+    var slaveConns = replTest._slaves;
     var slaves = [];
     for (var i in slaveConns) {
         var d = slaveConns[i].getDB(name);

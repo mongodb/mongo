@@ -53,7 +53,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
     // Get connections and collection.
     var primary = replTest.getPrimary();
-    var secondary = replTest.liveNodes.slaves[0];
+    var secondary = replTest._slaves[0];
     var secondaryId = replTest.getNodeId(secondary);
 
     var dbPrimary = primary.getDB(name);

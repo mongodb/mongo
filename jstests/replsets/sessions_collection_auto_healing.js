@@ -11,7 +11,7 @@ load('jstests/libs/sessions_collection.js');
     var primaryAdmin = primary.getDB("admin");
 
     replTest.awaitSecondaryNodes();
-    var secondary = replTest.liveNodes.slaves[0];
+    var secondary = replTest._slaves[0];
     var secondaryAdmin = secondary.getDB("admin");
 
     // Test that we can use sessions on the primary

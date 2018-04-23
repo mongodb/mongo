@@ -38,7 +38,7 @@ load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
 
     rst.initiate(config);
 
-    let shardSecondary = rst.liveNodes.slaves[0];
+    let shardSecondary = rst._slaves[0];
 
     testReadCommittedLookup(rst.getPrimary().getDB("test"), shardSecondary, rst);
 
