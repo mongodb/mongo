@@ -519,6 +519,20 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: secondary_reads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "secondary_reads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: bestbuy_agg_WT
   priority: 5
   depends_on:
@@ -944,6 +958,7 @@ buildvariants:
     - name: bestbuy_query_MMAPv1
     - name: change_streams_throughput
     - name: change_streams_latency
+    - name: secondary_reads_WT
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
