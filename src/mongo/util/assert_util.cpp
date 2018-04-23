@@ -106,7 +106,7 @@ NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned 
 }
 
 NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
-                                          const char* msg,
+                                          const std::string& msg,
                                           const char* file,
                                           unsigned line) noexcept {
     severe() << "Invariant failure " << expr << " " << msg << " " << file << ' ' << dec << line
@@ -116,19 +116,24 @@ NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
     std::abort();
 }
 
-NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
-                                          const std::string& msg,
-                                          const char* file,
-                                          unsigned line) noexcept {
-    invariantFailedWithMsg(expr, msg.c_str(), file, line);
-}
-
 NOINLINE_DECL void invariantOKFailed(const char* expr,
                                      const Status& status,
                                      const char* file,
                                      unsigned line) noexcept {
     severe() << "Invariant failure: " << expr << " resulted in status " << redact(status) << " at "
              << file << ' ' << dec << line;
+    breakpoint();
+    severe() << "\n\n***aborting after invariant() failure\n\n" << endl;
+    std::abort();
+}
+
+NOINLINE_DECL void invariantOKFailedWithMsg(const char* expr,
+                                            const Status& status,
+                                            const std::string& msg,
+                                            const char* file,
+                                            unsigned line) noexcept {
+    severe() << "Invariant failure: " << expr << " " << msg << " resulted in status "
+             << redact(status) << " at " << file << ' ' << dec << line;
     breakpoint();
     severe() << "\n\n***aborting after invariant() failure\n\n" << endl;
     std::abort();

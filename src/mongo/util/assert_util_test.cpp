@@ -290,6 +290,15 @@ DEATH_TEST(InvariantTerminationTest, invariant, "Invariant failure false " __FIL
     invariant(false);
 }
 
+DEATH_TEST(InvariantTerminationTest, invariantOverload, "Terminating with invariant") {
+    invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"));
+}
+
+DEATH_TEST(InvariantTerminationTest, invariantStatusWithOverload, "Terminating with invariant") {
+    invariant(StatusWith<std::string>(ErrorCodes::InternalError,
+                                      "Terminating with invariantStatusWithOverload"));
+}
+
 DEATH_TEST(InvariantTerminationTest, invariantOK, "Terminating with invariantOK") {
     invariantOK(Status(ErrorCodes::InternalError, "Terminating with invariantOK"));
 }
@@ -308,6 +317,39 @@ DEATH_TEST(InvariantTerminationTest,
                                           << 12345;
     invariant(false, msg);
 }
+
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantOverloadWithStringLiteralMsg,
+           "Terminating with string literal invariant message") {
+    invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"),
+              "Terminating with string literal invariant message");
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantOverloadWithStdStringMsg,
+           "Terminating with std::string invariant message: 12345") {
+    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
+                                          << 12345;
+    invariant(Status(ErrorCodes::InternalError, "Terminating with invariant"), msg);
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantStatusWithOverloadWithStringLiteralMsg,
+           "Terminating with string literal invariant message") {
+    invariant(StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariant"),
+              "Terminating with string literal invariant message");
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantStatusWithOverloadWithStdStringMsg,
+           "Terminating with std::string invariant message: 12345") {
+    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
+                                          << 12345;
+    invariant(StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with invariant"),
+              msg);
+}
+
 
 }  // namespace
 }  // namespace mongo

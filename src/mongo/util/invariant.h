@@ -55,17 +55,18 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
 //
 //       Invariant failure !condition some/file.cpp 528
 //
-#define MONGO_invariant_1(_Expression)                                  \
-    do {                                                                \
-        if (MONGO_unlikely(!(_Expression))) {                           \
-            ::mongo::invariantFailed(#_Expression, __FILE__, __LINE__); \
-        }                                                               \
-    } while (false)
+#define MONGO_invariant_1(Expression) \
+    ::mongo::invariantWithLocation((Expression), #Expression, __FILE__, __LINE__)
 
-MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
-                                                    const char* msg,
-                                                    const char* file,
-                                                    unsigned line) noexcept;
+template <typename T>
+inline void invariantWithLocation(const T& testOK,
+                                  const char* expr,
+                                  const char* file,
+                                  unsigned line) {
+    if (MONGO_unlikely(!testOK)) {
+        ::mongo::invariantFailed(expr, file, line);
+    }
+}
 
 MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
                                                     const std::string& msg,
@@ -79,12 +80,20 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 //
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
-#define MONGO_invariant_2(_Expression, _Message)                                           \
-    do {                                                                                   \
-        if (MONGO_unlikely(!(_Expression))) {                                              \
-            ::mongo::invariantFailedWithMsg(#_Expression, (_Message), __FILE__, __LINE__); \
-        }                                                                                  \
-    } while (false)
+#define MONGO_invariant_2(Expression, contextExpr)                                           \
+    ::mongo::invariantWithContextAndLocation((Expression),                                   \
+                                             #Expression,                                    \
+                                             [&]() -> std::string { return (contextExpr); }, \
+                                             __FILE__,                                       \
+                                             __LINE__)
+
+template <typename T, typename ContextExpr>
+inline void invariantWithContextAndLocation(
+    const T& testOK, const char* expr, ContextExpr&& contextExpr, const char* file, unsigned line) {
+    if (MONGO_unlikely(!testOK)) {
+        ::mongo::invariantFailedWithMsg(expr, contextExpr(), file, line);
+    }
+}
 
 // This helper macro is necessary to make the __VAR_ARGS__ expansion work properly on MSVC.
 #define MONGO_expand(x) x

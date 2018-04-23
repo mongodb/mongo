@@ -220,6 +220,11 @@ MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr,
                                                const Status& status,
                                                const char* file,
                                                unsigned line) noexcept;
+MONGO_COMPILER_NORETURN void invariantOKFailedWithMsg(const char* expr,
+                                                      const Status& status,
+                                                      const std::string& msg,
+                                                      const char* file,
+                                                      unsigned line) noexcept;
 
 #define fassertFailed MONGO_fassertFailed
 #define MONGO_fassertFailed(...) ::mongo::fassertFailedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
@@ -448,6 +453,50 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
 #define MONGO_dassertOK(expression) \
     if (kDebugBuild)                \
     invariantOK(expression)
+
+inline void invariantWithLocation(const Status& status,
+                                  const char* expr,
+                                  const char* file,
+                                  unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        ::mongo::invariantOKFailed(expr, status, file, line);
+    }
+}
+
+template <typename T>
+inline T invariantWithLocation(StatusWith<T> sw,
+                               const char* expr,
+                               const char* file,
+                               unsigned line) {
+    if (MONGO_unlikely(!sw.isOK())) {
+        ::mongo::invariantOKFailed(expr, sw.getStatus(), file, line);
+    }
+    return std::move(sw.getValue());
+}
+
+template <typename ContextExpr>
+inline void invariantWithContextAndLocation(const Status& status,
+                                            const char* expr,
+                                            ContextExpr&& contextExpr,
+                                            const char* file,
+                                            unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        ::mongo::invariantOKFailedWithMsg(
+            expr, status, std::forward<ContextExpr>(contextExpr)(), file, line);
+    }
+}
+
+template <typename T, typename ContextExpr>
+inline T invariantWithContextAndLocation(StatusWith<T> sw,
+                                         const char* expr,
+                                         ContextExpr&& contextExpr,
+                                         const char* file,
+                                         unsigned line) {
+    if (MONGO_unlikely(!sw.isOK())) {
+        ::mongo::invariantOKFailedWithMsg(expr, sw.getStatus(), contextExpr(), file, line);
+    }
+    return std::move(sw.getValue());
+}
 
 // some special ids that we want to duplicate
 
