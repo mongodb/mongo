@@ -256,9 +256,7 @@ protected:
         BSONObj info;
         // Create a collection with specified extent sizes
         BSONObj command =
-            BSON("create" << nss.coll() << "capped" << true << "$nExtents" << extentSizes()
-                          << "autoIndexId"
-                          << false);
+            BSON("create" << nss.coll() << "capped" << true << "$nExtents" << extentSizes());
         ASSERT(client()->runCommand(nss.db().toString(), command, info));
 
         // Populate documents.
