@@ -339,14 +339,8 @@ Status runAggregate(OperationContext* opCtx,
                 uassertStatusOK(waitForReadConcern(opCtx, readConcern, true));
             }
 
-            // If the change stream is opened against a database which does not exist yet, go ahead
-            // and create it. Use MODE_IX since the AutoGetOrCreateDb helper will automatically
-            // reacquire as MODE_X if the database does not exist.
-            AutoGetOrCreateDb dbLock(opCtx, origNss.db(), MODE_IX);
-            invariant(dbLock.getDb());
             if (!origNss.isCollectionlessAggregateNS()) {
-                // AutoGetCollectionForReadCommand will raise an error if the given namespace is a
-                // view.
+                // AutoGetCollectionForReadCommand will raise an error if 'origNss' is a view.
                 AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
 
                 // Resolve the collator to either the user-specified collation or the default

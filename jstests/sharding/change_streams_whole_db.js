@@ -24,15 +24,7 @@
     });
 
     const mongosDB = st.s0.getDB("test");
-
-    // TODO SERVER-34138 will add support for opening a change stream before a database exists.
-    assert.commandFailedWithCode(
-        mongosDB.runCommand(
-            {aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {batchSize: 1}}),
-        ErrorCodes.NamespaceNotFound);
-
     const mongosColl = mongosDB[jsTestName()];
-    mongosDB.createCollection(jsTestName());
 
     let cst = new ChangeStreamTest(mongosDB);
     let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});

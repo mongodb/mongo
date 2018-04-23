@@ -35,12 +35,47 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
+
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const NamespaceString& requestedNss,
+                                        const RemoteCursor& remoteCursor,
+                                        TailableModeEnum tailableMode) {
+    auto executorPool = Grid::get(opCtx)->getExecutorPool();
+    return storePossibleCursor(
+        opCtx,
+        remoteCursor.getShardId().toString(),
+        remoteCursor.getHostAndPort(),
+        remoteCursor.getCursorResponse().toBSON(CursorResponse::ResponseType::InitialResponse),
+        requestedNss,
+        executorPool->getArbitraryExecutor(),
+        Grid::get(opCtx)->getCursorManager(),
+        tailableMode);
+}
+
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const NamespaceString& requestedNss,
+                                        const ShardId& shardId,
+                                        const Shard::CommandResponse& commandResponse,
+                                        TailableModeEnum tailableMode) {
+    invariant(commandResponse.hostAndPort);
+    auto executorPool = Grid::get(opCtx)->getExecutorPool();
+    return storePossibleCursor(opCtx,
+                               shardId,
+                               *commandResponse.hostAndPort,
+                               commandResponse.response,
+                               requestedNss,
+                               executorPool->getArbitraryExecutor(),
+                               Grid::get(opCtx)->getCursorManager(),
+                               tailableMode);
+}
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,

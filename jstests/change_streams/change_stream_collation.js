@@ -21,10 +21,6 @@
 
         const caseInsensitive = {locale: "en_US", strength: 2};
 
-        // $changeStream cannot run on a non-existent database. Create an unrelated collection to
-        // ensure that the database is present before testing.
-        assertDropAndRecreateCollection(db, "change_stream_ensure_db_exists");
-
         let caseInsensitiveCollection = "change_stream_case_insensitive";
         assertDropCollection(db, caseInsensitiveCollection);
 

@@ -83,8 +83,3 @@ executor:
     num_rs_nodes_per_shard: 2
     shard_options:
       voting_secondaries: true
-    # TODO SERVER-34138: This suite doesn't actually shard any collections, but enabling sharding
-    # will prevent read commands against non-existent databases from unconditionally returning a
-    # CursorId of 0.
-    enable_sharding:
-    - test
