@@ -7,6 +7,7 @@ import time
 
 import pymongo
 import pymongo.errors
+import pymongo.write_concern
 
 from . import interface
 from . import standalone
