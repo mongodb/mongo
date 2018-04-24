@@ -54,6 +54,13 @@ public:
     static StatusWith<std::string> parseIndexOptions(const BSONObj& options);
 
     /**
+     * Creates the "app_metadata" string for the index from the index descriptor, to be stored
+     * in WiredTiger's metadata. The output string is of the form:
+     * ",app_metadata=(...)," and can be appended to the config strings for WiredTiger's API calls.
+     */
+    static std::string generateAppMetadataString(const IndexDescriptor& desc);
+
+    /**
      * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
      * Configuration string is constructed from:
      *     built-in defaults
@@ -141,12 +148,12 @@ public:
         return _indexName;
     }
 
-    virtual bool unique() const = 0;
-
-    // Returns true if V2 unique index format is supported.
-    virtual bool isV2FormatUniqueIndex() const {
-        return false;
+    bool isIdIndex() const {
+        return _isIdIndex;
     }
+
+    virtual bool unique() const = 0;
+    virtual bool isTimestampSafeUniqueIdx() const = 0;
 
     Status dupKeyError(const BSONObj& key);
 
@@ -168,18 +175,19 @@ protected:
     class BulkBuilder;
     class StandardBulkBuilder;
     class UniqueBulkBuilder;
-    class UniqueV2BulkBuilder;
 
     const Ordering _ordering;
-    // The keystring version is effectively const after the WiredTigerIndex instance is constructed.
+    // The keystring and data format version are effectively const after the WiredTigerIndex
+    // instance is constructed.
     KeyString::Version _keyStringVersion;
+    int _dataFormatVersion;
     std::string _uri;
     uint64_t _tableId;
     std::string _collectionNamespace;
     std::string _indexName;
     KVPrefix _prefix;
+    bool _isIdIndex;
 };
-
 
 class WiredTigerIndexUnique : public WiredTigerIndex {
 public:
@@ -198,59 +206,48 @@ public:
         return true;
     }
 
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const BSONObj& key,
-                   const RecordId& id,
-                   bool dupsAllowed) override;
-
-    void _unindex(OperationContext* opCtx,
-                  WT_CURSOR* c,
-                  const BSONObj& key,
-                  const RecordId& id,
-                  bool dupsAllowed) override;
-
-private:
-    bool _partial;
-};
-
-class WiredTigerIndexUniqueV2 : public WiredTigerIndex {
-public:
-    WiredTigerIndexUniqueV2(OperationContext* ctx,
-                            const std::string& uri,
-                            const IndexDescriptor* desc,
-                            KVPrefix prefix,
-                            bool readOnly = false);
-
-    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
-                                                           bool forward) const override;
-
-    SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
-
-    bool unique() const override {
-        return true;
-    }
-
-    bool isV2FormatUniqueIndex() const override {
-        return true;
-    }
-
-    Status _insert(OperationContext* opCtx,
-                   WT_CURSOR* c,
-                   const BSONObj& key,
-                   const RecordId& id,
-                   bool dupsAllowed) override;
-
-    void _unindex(OperationContext* opCtx,
-                  WT_CURSOR* c,
-                  const BSONObj& key,
-                  const RecordId& id,
-                  bool dupsAllowed) override;
+    bool isTimestampSafeUniqueIdx() const override;
 
     bool isDup(OperationContext* opCtx,
                WT_CURSOR* c,
                const BSONObj& key,
                const RecordId& id) override;
+
+    Status _insert(OperationContext* opCtx,
+                   WT_CURSOR* c,
+                   const BSONObj& key,
+                   const RecordId& id,
+                   bool dupsAllowed) override;
+
+    Status _insertTimestampUnsafe(OperationContext* opCtx,
+                                  WT_CURSOR* c,
+                                  const BSONObj& key,
+                                  const RecordId& id,
+                                  bool dupsAllowed);
+
+    Status _insertTimestampSafe(OperationContext* opCtx,
+                                WT_CURSOR* c,
+                                const BSONObj& key,
+                                const RecordId& id,
+                                bool dupsAllowed);
+
+    void _unindex(OperationContext* opCtx,
+                  WT_CURSOR* c,
+                  const BSONObj& key,
+                  const RecordId& id,
+                  bool dupsAllowed) override;
+
+    void _unindexTimestampUnsafe(OperationContext* opCtx,
+                                 WT_CURSOR* c,
+                                 const BSONObj& key,
+                                 const RecordId& id,
+                                 bool dupsAllowed);
+
+    void _unindexTimestampSafe(OperationContext* opCtx,
+                               WT_CURSOR* c,
+                               const BSONObj& key,
+                               const RecordId& id,
+                               bool dupsAllowed);
 
 private:
     bool _partial;
@@ -270,6 +267,10 @@ public:
     SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
 
     bool unique() const override {
+        return false;
+    }
+
+    bool isTimestampSafeUniqueIdx() const override {
         return false;
     }
 
