@@ -291,7 +291,10 @@ unique_ptr<PlanStageStats> getWinningPlanStatsTree(const PlanExecutor* exec) {
 
 
 /**
- * Get PlanExecutor's original winning plan stats tree.
+ * Returns the root of the roginal winning plan used by 'exec'.
+ * This might be different than the final winning plan in the case that the MultiPlanStage selected a 
+ * blocking plan which failed, and fell back to a non-blocking plan instead.
+ * If there is no MultiPlanStage in the tree, returns the root stage of 'exec'
  */
 unique_ptr<PlanStageStats> getOriginalWinningPlanStatsTree(const PlanExecutor* exec) {
     MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
@@ -655,9 +658,9 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
 
     const auto mps = getMultiPlanStage(exec->getRootStage());
-    int originaWinningPlanIdx = static_cast<size_t>(mps->originalWinningPlanIdx());
+    const bool usedBackupPlan = ((mps->originalWinningPlanIdx()) > -1); 
 
-    if (originaWinningPlanIdx > -1) {
+    if (usedBackupPlan) {
         plannerBob.append("backupPlanUsed", true);
     } else {
         plannerBob.append("backupPlanUsed", false);
@@ -707,7 +710,7 @@ void Explain::generatePlannerInfo(PlanExecutor* exec,
     }
     allPlansBob.doneFast();
 
-    if (originaWinningPlanIdx > -1) {
+    if (usedBackupPlan) {
         // Generate array of original winning plan
         BSONObjBuilder originalWinningPlanBob(plannerBob.subobjStart("originalWinningPlan"));
         const auto originalWinnerStats = getOriginalWinningPlanStatsTree(exec);

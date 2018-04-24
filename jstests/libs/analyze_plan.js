@@ -287,3 +287,19 @@ function assertCoveredQueryAndCount({collection, query, project, count}) {
            "Winning plan for count was not covered: " + tojson(explain.queryPlanner.winningPlan));
     assertExplainCount({explainResults: explain, expectedCount: count});
 }
+
+/**
+ * Returns true if a backup plan is used.
+ */
+function backupPlanUsed(root) {
+    function sectionHasOriginalWinningPlan(explainSection) {
+        assert(explainSection.hasOwnProperty("originalWinningPlan"), tojson(explainSection));
+        return explainSection.originalWinningPlan.length !== 0;
+    }
+    
+    function cursorStageHasOriginalWinningPlan(cursorStage) {
+        assert(cursorStage.hasOwnProperty("$cursor"), tojson(cursorStage));
+        assert(cursorStage.$cursor.hasOwnProperty("queryPlanner"), tojson(cursorStage));
+        return sectionHasOriginalWinningPlan(cursorStage.$cursor.queryPlanner);
+    }
+}

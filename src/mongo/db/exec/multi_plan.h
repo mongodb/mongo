@@ -129,14 +129,21 @@ public:
     /** Return true if a best plan has been chosen  */
     bool bestPlanChosen() const;
 
-    /** Return the index of the best plan chosen, for testing */
+    /*
+    * Return the index of the best plan chosen
+    */
     int bestPlanIdx() const;
 
-    /** Return the index of the backup plan chosen, for testing */
+    /**
+     * Return the index of the backup plan chosen 
+     */
     int backupPlanIdx() const;
 
-    /** Return the index of the backup plan chosen, for testing */
+    /**
+     * Return the index of the original winning plan chosen
+     */
     int originalWinningPlanIdx() const;
+
     /**
      * Returns the QuerySolution for the best plan, or NULL if no best plan
      *
@@ -207,8 +214,8 @@ private:
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
     int _backupPlanIdx;
 
-    // index into _candidates, of the original winner of the plan competition
-    // uses -1 / kNoSuchPlan when best plan is not (yet) known
+    // Index into _candidates, of the original winner of the plan which can be used if a blocking plan .fails
+    // This is set to 'kNoSuchPlan' if there is no backup plan, or when it is not (yet) known
     int _originalWinningPlanIdx;
 
     // Set if this MultiPlanStage cannot continue, and the query must fail. This can happen in
