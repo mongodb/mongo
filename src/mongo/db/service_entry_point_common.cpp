@@ -795,8 +795,6 @@ void execCommandDatabase(OperationContext* opCtx,
         // Can throw
         opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
 
-        bool retval = false;
-
         CurOp::get(opCtx)->ensureStarted();
 
         command->incrementCommandsExecuted();
@@ -811,11 +809,18 @@ void execCommandDatabase(OperationContext* opCtx,
 
         behaviors.waitForReadConcern(opCtx, invocation.get(), request);
 
-        retval = runCommandImpl(
-            opCtx, invocation.get(), request, replyBuilder, startOperationTime, behaviors);
-
-        if (!retval) {
+        try {
+            if (!runCommandImpl(opCtx,
+                                invocation.get(),
+                                request,
+                                replyBuilder,
+                                startOperationTime,
+                                behaviors)) {
+                command->incrementCommandsFailed();
+            }
+        } catch (DBException&) {
             command->incrementCommandsFailed();
+            throw;
         }
     } catch (const DBException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
