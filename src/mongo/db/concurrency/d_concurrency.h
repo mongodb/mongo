@@ -337,17 +337,6 @@ public:
         CollectionLock(CollectionLock&&);
         ~CollectionLock();
 
-        /**
-         * When holding the collection in MODE_IX or MODE_X, calling this will release the
-         * collection and database locks, and relocks the database in MODE_X. This is typically
-         * used if the collection still needs to be created. Upgrading would not be safe as
-         * it could lead to deadlock, similarly for relocking the database without releasing
-         * the collection lock. The collection lock will also be reacquired even though it is
-         * not really needed, as it simplifies invariant checking: the CollectionLock class
-         * has as invariant that a collection lock is being held.
-         */
-        void relockAsDatabaseExclusive(Lock::DBLock& dbLock);
-
         bool isLocked() const {
             return _result == LOCK_OK;
         }

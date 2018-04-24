@@ -272,15 +272,6 @@ Lock::CollectionLock::~CollectionLock() {
     }
 }
 
-void Lock::CollectionLock::relockAsDatabaseExclusive(Lock::DBLock& dbLock) {
-    _lockState->unlock(_id);
-
-    dbLock.relockWithMode(MODE_X);
-
-    // don't need the lock, but need something to unlock in the destructor
-    _lockState->lock(_id, MODE_IX);
-}
-
 namespace {
 stdx::mutex oplogSerialization;  // for OplogIntentWriteLock
 }  // namespace
