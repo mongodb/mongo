@@ -88,15 +88,6 @@ public:
             mongo::waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
 
         CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
-
-        // SERVER-22421: This code is to ensure error response backwards compatibility with the
-        // user management commands. This can be removed in 3.6.
-        if (!waitForWCStatus.isOK() && invocation->definition()->isUserManagementCommand()) {
-            BSONObj temp = commandResponseBuilder.asTempObj().copy();
-            commandResponseBuilder.resetToEmpty();
-            CommandHelpers::appendCommandStatus(commandResponseBuilder, waitForWCStatus);
-            commandResponseBuilder.appendElementsUnique(temp);
-        }
     }
 
     void waitForLinearizableReadConcern(OperationContext* opCtx) const override {
