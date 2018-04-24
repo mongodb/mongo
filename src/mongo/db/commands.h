@@ -90,12 +90,25 @@ struct CommandHelpers {
 
     static Command* findCommand(StringData name);
 
-    // Helper for setting errmsg and ok field in command result object.
-    static void appendCommandStatus(BSONObjBuilder& result,
-                                    bool ok,
-                                    const std::string& errmsg = {});
+    /**
+     * Helper for setting errmsg and ok field in command result object.
+     *
+     * This should generally only be called from the command dispatch code or to finish off the
+     * result of serializing a reply BSONObj in the case when it isn't going directly into a real
+     * command reply to be returned to the user.
+     */
+    static void appendSimpleCommandStatus(BSONObjBuilder& result,
+                                          bool ok,
+                                          const std::string& errmsg = {});
 
-    // @return s.isOK()
+    /**
+     * Adds the status fields to command replies.
+     *
+     * Calling this inside of commands to produce their reply is now deprecated. Just throw instead.
+     */
+    static bool appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status);
+
+    // About to be deleted
     static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
 
     /**

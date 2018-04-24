@@ -369,19 +369,15 @@ public:
                     // that day, to avoid data corruption due to lack of index cleanup.
                     opCtx->recoveryUnit()->abandonSnapshot();
                     dbLock.relockWithMode(MODE_X);
-                    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-                        return CommandHelpers::appendCommandStatus(
-                            result,
-                            Status(ErrorCodes::NotMaster,
-                                   str::stream()
-                                       << "Not primary while creating background indexes in "
-                                       << ns.ns()
-                                       << ": cleaning up index build failure due to "
-                                       << e.toString()));
-                    }
                 } catch (...) {
                     std::terminate();
                 }
+                uassert(ErrorCodes::NotMaster,
+                        str::stream() << "Not primary while creating background indexes in "
+                                      << ns.ns()
+                                      << ": cleaning up index build failure due to "
+                                      << e.toString(),
+                        repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns));
             }
             throw;
         }

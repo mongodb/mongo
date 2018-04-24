@@ -98,7 +98,7 @@ protected:
     void expectFindReturnsError(ErrorCodes::Error code) {
         onCommandForPoolExecutor([code](const executor::RemoteCommandRequest& request) {
             BSONObjBuilder resBob;
-            CommandHelpers::appendCommandStatus(resBob, Status(code, "dummy error"));
+            CommandHelpers::appendCommandStatusNoThrow(resBob, Status(code, "dummy error"));
             return resBob.obj();
         });
     }

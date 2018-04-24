@@ -91,7 +91,7 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
     } catch (const DBException& ex) {
         auto body = crb.getBodyBuilder();
         body.resetToEmpty();
-        appendCommandStatus(body, ex.toStatus());
+        appendCommandStatusNoThrow(body, ex.toStatus());
     }
     return BSONObj(bb.release());
 }
@@ -186,7 +186,13 @@ Command* CommandHelpers::findCommand(StringData name) {
 }
 
 bool CommandHelpers::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
-    appendCommandStatus(result, status.isOK(), status.reason());
+    uassertStatusOK(status);
+    appendSimpleCommandStatus(result, true);
+    return true;
+}
+
+bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status) {
+    appendSimpleCommandStatus(result, status.isOK(), status.reason());
     BSONObj tmp = result.asTempObj();
     if (!status.isOK() && !tmp.hasField("code")) {
         result.append("code", status.code());
@@ -198,9 +204,9 @@ bool CommandHelpers::appendCommandStatus(BSONObjBuilder& result, const Status& s
     return status.isOK();
 }
 
-void CommandHelpers::appendCommandStatus(BSONObjBuilder& result,
-                                         bool ok,
-                                         const std::string& errmsg) {
+void CommandHelpers::appendSimpleCommandStatus(BSONObjBuilder& result,
+                                               bool ok,
+                                               const std::string& errmsg) {
     BSONObj tmp = result.asTempObj();
     bool have_ok = tmp.hasField("ok");
     bool need_errmsg = !ok && !tmp.hasField("errmsg");
@@ -219,7 +225,7 @@ bool CommandHelpers::extractOrAppendOk(BSONObjBuilder& reply) {
         return okField.trueValue();
     }
     // Missing "ok" field is an implied success.
-    CommandHelpers::appendCommandStatus(reply, true);
+    CommandHelpers::appendSimpleCommandStatus(reply, true);
     return true;
 }
 
@@ -350,7 +356,7 @@ void CommandReplyBuilder::fillFrom(const Status& status) {
         reset();
     }
     auto bob = getBodyBuilder();
-    CommandHelpers::appendCommandStatus(bob, status);
+    CommandHelpers::appendCommandStatusNoThrow(bob, status);
 }
 
 //////////////////////////////////////////////////////////////
@@ -384,7 +390,7 @@ private:
         try {
             BSONObjBuilder bob = result->getBodyBuilder();
             bool ok = _command->run(opCtx, _dbName, _request->body, bob);
-            CommandHelpers::appendCommandStatus(bob, ok);
+            CommandHelpers::appendSimpleCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
             CommandHelpers::logAuthViolation(opCtx, this, *_request, e.code());
             throw;
@@ -521,7 +527,7 @@ bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
     std::string errmsg;
     auto ok = errmsgRun(opCtx, db, cmdObj, errmsg, result);
     if (!errmsg.empty()) {
-        CommandHelpers::appendCommandStatus(result, ok, errmsg);
+        CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
     }
     return ok;
 }

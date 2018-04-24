@@ -119,7 +119,7 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
         }
         // Convert the error status back into the format of a command result.
         BSONObjBuilder statusObjBob;
-        CommandHelpers::appendCommandStatus(statusObjBob, status);
+        CommandHelpers::appendCommandStatusNoThrow(statusObjBob, status);
 
         // Get the Shard object in order to get the ConnectionString.
         auto shard =

@@ -657,12 +657,12 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         if (initialCmdHadWriteConcern) {
             Status status = writeConcern.parse(writeConcernElement.Obj());
             if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(*result, status);
+                return CommandHelpers::appendCommandStatusNoThrow(*result, status);
             }
 
             if (!(writeConcern.wNumNodes == 1 ||
                   writeConcern.wMode == WriteConcernOptions::kMajority)) {
-                return CommandHelpers::appendCommandStatus(
+                return CommandHelpers::appendCommandStatusNoThrow(
                     *result,
                     {ErrorCodes::InvalidOptions,
                      str::stream() << "Invalid replication write concern. User management write "
@@ -701,13 +701,15 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
             Shard::RetryPolicy::kNotIdempotent);
 
     if (!response.isOK()) {
-        return CommandHelpers::appendCommandStatus(*result, response.getStatus());
+        return CommandHelpers::appendCommandStatusNoThrow(*result, response.getStatus());
     }
     if (!response.getValue().commandStatus.isOK()) {
-        return CommandHelpers::appendCommandStatus(*result, response.getValue().commandStatus);
+        return CommandHelpers::appendCommandStatusNoThrow(*result,
+                                                          response.getValue().commandStatus);
     }
     if (!response.getValue().writeConcernStatus.isOK()) {
-        return CommandHelpers::appendCommandStatus(*result, response.getValue().writeConcernStatus);
+        return CommandHelpers::appendCommandStatusNoThrow(*result,
+                                                          response.getValue().writeConcernStatus);
     }
 
     CommandHelpers::filterCommandReplyForPassthrough(response.getValue().response, result);
@@ -731,7 +733,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
         return resultStatus.getValue().commandStatus.isOK();
     }
 
-    return CommandHelpers::appendCommandStatus(*result, resultStatus.getStatus());
+    return CommandHelpers::appendCommandStatusNoThrow(*result, resultStatus.getStatus());  // XXX
 }
 
 Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCtx,

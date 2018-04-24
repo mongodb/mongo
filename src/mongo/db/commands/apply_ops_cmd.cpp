@@ -267,7 +267,7 @@ public:
                                    << repl::ApplyOps::kOplogApplicationModeFieldName));
         }
 
-        auto applyOpsStatus = CommandHelpers::appendCommandStatus(
+        auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
             result, repl::applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;

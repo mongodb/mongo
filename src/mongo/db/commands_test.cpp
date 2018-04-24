@@ -40,7 +40,7 @@ namespace {
 
 TEST(Commands, appendCommandStatusOK) {
     BSONObjBuilder actualResult;
-    CommandHelpers::appendCommandStatus(actualResult, Status::OK());
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, Status::OK());
 
     BSONObjBuilder expectedResult;
     expectedResult.append("ok", 1.0);
@@ -51,7 +51,7 @@ TEST(Commands, appendCommandStatusOK) {
 TEST(Commands, appendCommandStatusError) {
     BSONObjBuilder actualResult;
     const Status status(ErrorCodes::InvalidLength, "Response payload too long");
-    CommandHelpers::appendCommandStatus(actualResult, status);
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("ok", 0.0);
@@ -68,7 +68,7 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
     actualResult.append("c", "d");
     actualResult.append("ok", "not ok");
     const Status status(ErrorCodes::InvalidLength, "Response payload too long");
-    CommandHelpers::appendCommandStatus(actualResult, status);
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("a", "b");
@@ -84,7 +84,7 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
 TEST(Commands, appendCommandStatusErrorExtraInfo) {
     BSONObjBuilder actualResult;
     const Status status(ErrorExtraInfoExample(123), "not again!");
-    CommandHelpers::appendCommandStatus(actualResult, status);
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("ok", 0.0);
@@ -362,7 +362,7 @@ struct IncrementTestCommon {
                     CommandHelpers::extractOrAppendOk(bob);
                 } catch (const DBException& e) {
                     auto bob = crb.getBodyBuilder();
-                    CommandHelpers::appendCommandStatus(bob, e.toStatus());
+                    CommandHelpers::appendCommandStatusNoThrow(bob, e.toStatus());
                 }
                 return BSONObj(bb.release());
             }();

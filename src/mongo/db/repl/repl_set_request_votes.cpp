@@ -66,7 +66,7 @@ private:
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);
         response.addToBSON(&result);
-        return CommandHelpers::appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatusNoThrow(result, status);
     }
 } cmdReplSetRequestVotes;
 

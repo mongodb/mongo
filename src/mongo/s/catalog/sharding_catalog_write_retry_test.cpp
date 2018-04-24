@@ -368,10 +368,9 @@ TEST_F(UpdateRetryTest, NotMasterErrorReturnedPersistently) {
 
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
-            BatchedCommandResponse response;
-            response.setStatus({ErrorCodes::NotMaster, "not master"});
-
-            return response.toBSON();
+            BSONObjBuilder bb;
+            CommandHelpers::appendCommandStatusNoThrow(bb, {ErrorCodes::NotMaster, "not master"});
+            return bb.obj();
         });
     }
 
@@ -430,13 +429,13 @@ TEST_F(UpdateRetryTest, NotMasterOnceSuccessAfterRetry) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(host1, request.target);
 
-        BatchedCommandResponse response;
-        response.setStatus({ErrorCodes::NotMaster, "not master"});
-
         // Ensure that when the catalog manager tries to retarget after getting the
         // NotMaster response, it will get back a new target.
         configTargeter()->setFindHostReturnValue(host2);
-        return response.toBSON();
+
+        BSONObjBuilder bb;
+        CommandHelpers::appendCommandStatusNoThrow(bb, {ErrorCodes::NotMaster, "not master"});
+        return bb.obj();
     });
 
     onCommand([&](const RemoteCommandRequest& request) {

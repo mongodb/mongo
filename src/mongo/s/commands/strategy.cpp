@@ -172,7 +172,7 @@ void execCommandClient(OperationContext* opCtx,
             help << "help for: " << c->getName() << " " << c->help();
             auto body = result->getBodyBuilder();
             body.append("help", help.str());
-            CommandHelpers::appendCommandStatus(body, true, "");
+            CommandHelpers::appendSimpleCommandStatus(body, true, "");
             return;
         }
 
@@ -186,7 +186,7 @@ void execCommandClient(OperationContext* opCtx,
         invocation->checkAuthorization(opCtx, request);
     } catch (const DBException& e) {
         auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, e.toStatus());
+        CommandHelpers::appendCommandStatusNoThrow(body, e.toStatus());
         return;
     }
 
@@ -200,7 +200,7 @@ void execCommandClient(OperationContext* opCtx,
         WriteConcernOptions::extractWCFromCommand(request.body);
     if (!wcResult.isOK()) {
         auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, wcResult.getStatus());
+        CommandHelpers::appendCommandStatusNoThrow(body, wcResult.getStatus());
         return;
     }
 
@@ -210,7 +210,7 @@ void execCommandClient(OperationContext* opCtx,
         // If we did not use the default writeConcern, one was provided when it shouldn't have
         // been by the user.
         auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             body, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
         return;
     }
@@ -225,7 +225,7 @@ void execCommandClient(OperationContext* opCtx,
         // TODO SERVER-33708.
         if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
             auto body = result->getBodyBuilder();
-            CommandHelpers::appendCommandStatus(
+            CommandHelpers::appendCommandStatusNoThrow(
                 body,
                 Status(ErrorCodes::InvalidOptions,
                        str::stream()
@@ -236,7 +236,7 @@ void execCommandClient(OperationContext* opCtx,
 
         if (!opCtx->getTxnNumber()) {
             auto body = result->getBodyBuilder();
-            CommandHelpers::appendCommandStatus(
+            CommandHelpers::appendCommandStatusNoThrow(
                 body,
                 Status(ErrorCodes::InvalidOptions,
                        "read concern snapshot is supported only in a transaction"));
@@ -245,7 +245,7 @@ void execCommandClient(OperationContext* opCtx,
 
         if (readConcernArgs.getArgsAtClusterTime()) {
             auto body = result->getBodyBuilder();
-            CommandHelpers::appendCommandStatus(
+            CommandHelpers::appendCommandStatusNoThrow(
                 body,
                 Status(ErrorCodes::InvalidOptions,
                        "read concern snapshot is not supported with atClusterTime on mongos"));
@@ -261,7 +261,7 @@ void execCommandClient(OperationContext* opCtx,
     auto metadataStatus = processCommandMetadata(opCtx, request.body);
     if (!metadataStatus.isOK()) {
         auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, metadataStatus);
+        CommandHelpers::appendCommandStatusNoThrow(body, metadataStatus);
         return;
     }
 
@@ -292,7 +292,7 @@ void runCommand(OperationContext* opCtx,
     auto const command = CommandHelpers::findCommand(commandName);
     if (!command) {
         ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             builder,
             {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
         globalCommandRegistry()->incrementUnknownCommands();
@@ -338,7 +338,7 @@ void runCommand(OperationContext* opCtx,
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     auto readConcernParseStatus = readConcernArgs.initialize(request.body);
     if (!readConcernParseStatus.isOK()) {
-        CommandHelpers::appendCommandStatus(builder, readConcernParseStatus);
+        CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
         return;
     }
 
@@ -416,7 +416,7 @@ void runCommand(OperationContext* opCtx,
         LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
         crb.reset();
         BSONObjBuilder bob = crb.getBodyBuilder();
-        CommandHelpers::appendCommandStatus(bob, e.toStatus());
+        CommandHelpers::appendCommandStatusNoThrow(bob, e.toStatus());
         appendRequiredFieldsToResponse(opCtx, &bob);
     }
 }
@@ -565,7 +565,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
         }
         reply->reset();
         auto bob = reply->getInPlaceReplyBuilder(0);
-        CommandHelpers::appendCommandStatus(bob, ex.toStatus());
+        CommandHelpers::appendCommandStatusNoThrow(bob, ex.toStatus());
         appendRequiredFieldsToResponse(opCtx, &bob);
     }
 

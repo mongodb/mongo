@@ -177,7 +177,7 @@ public:
             Status status = bsonExtractOpTimeField(cmdObj, "wOpTime", &lastOpTime);
             if (!status.isOK()) {
                 result.append("badGLE", cmdObj);
-                return CommandHelpers::appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatusNoThrow(result, status);
             }
         } else {
             return CommandHelpers::appendCommandStatus(
@@ -195,7 +195,7 @@ public:
             FieldParser::extract(cmdObj, wElectionIdField, &electionId, &errmsg);
         if (!extracted) {
             result.append("badGLE", cmdObj);
-            CommandHelpers::appendCommandStatus(result, false, errmsg);
+            CommandHelpers::appendSimpleCommandStatus(result, false, errmsg);
             return false;
         }
 
@@ -242,7 +242,7 @@ public:
 
         if (!status.isOK()) {
             result.append("badGLE", writeConcernDoc);
-            return CommandHelpers::appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
         // Don't wait for replication if there was an error reported - this matches 2.4 behavior
@@ -298,7 +298,7 @@ public:
             return true;
         }
 
-        return CommandHelpers::appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatusNoThrow(result, status);
     }
 
 } cmdGetLastError;

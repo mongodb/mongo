@@ -60,19 +60,12 @@ TEST(BatchedCommandResponse, Basic) {
                     << "errInfo"
                     << BSON("a" << 1)));
 
-    BSONObj origResponseObj = BSON("ok" << 0.0 << "errmsg"
-                                        << "this batch didn't work"
-                                        << "code"
-                                        << ErrorCodes::BadValue
-                                        << "codeName"
-                                        << "BadValue"
-                                        << BatchedCommandResponse::n(0)
-                                        << "opTime"
-                                        << mongo::Timestamp(1ULL)
-                                        << BatchedCommandResponse::writeErrors()
-                                        << writeErrorsArray
-                                        << BatchedCommandResponse::writeConcernError()
-                                        << writeConcernError);
+    BSONObj origResponseObj =
+        BSON("ok" << 1.0 << BatchedCommandResponse::n(0) << "opTime" << mongo::Timestamp(1ULL)
+                  << BatchedCommandResponse::writeErrors()
+                  << writeErrorsArray
+                  << BatchedCommandResponse::writeConcernError()
+                  << writeConcernError);
 
     string errMsg;
     BatchedCommandResponse response;

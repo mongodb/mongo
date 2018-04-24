@@ -51,7 +51,7 @@ void NetworkTestEnv::onCommand(OnCommandFunction func) {
 
     if (resultStatus.isOK()) {
         BSONObjBuilder result(std::move(resultStatus.getValue()));
-        CommandHelpers::appendCommandStatus(result, resultStatus.getStatus());
+        CommandHelpers::appendCommandStatusNoThrow(result, resultStatus.getStatus());
         const RemoteCommandResponse response(result.obj(), BSONObj(), Milliseconds(1));
 
         _mockNetwork->scheduleResponse(noi, _mockNetwork->now(), response);
@@ -74,7 +74,7 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
 
     if (cmdResponseStatus.isOK()) {
         BSONObjBuilder result(std::move(cmdResponseStatus.data));
-        CommandHelpers::appendCommandStatus(result, cmdResponseStatus.status);
+        CommandHelpers::appendCommandStatusNoThrow(result, cmdResponseStatus.status);
         const RemoteCommandResponse response(
             result.obj(), cmdResponseStatus.metadata, Milliseconds(1));
 

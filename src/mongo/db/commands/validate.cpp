@@ -176,7 +176,7 @@ public:
                     opCtx->waitForConditionOrInterrupt(_validationNotifier, lock);
                 }
             } catch (AssertionException& e) {
-                CommandHelpers::appendCommandStatus(
+                CommandHelpers::appendCommandStatusNoThrow(
                     result,
                     {ErrorCodes::CommandFailed,
                      str::stream() << "Exception during validation: " << e.toString()});
@@ -196,7 +196,7 @@ public:
         Status status =
             collection->validate(opCtx, level, background, std::move(collLk), &results, &result);
         if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
         CollectionCatalogEntry* catalogEntry = collection->getCatalogEntry();

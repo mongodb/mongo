@@ -306,7 +306,7 @@ private:
         try {
             BSONObjBuilder bob = result->getBodyBuilder();
             bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);
-            CommandHelpers::appendCommandStatus(bob, ok);
+            CommandHelpers::appendSimpleCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
             CommandHelpers::logAuthViolation(opCtx, this, *_request, ErrorCodes::Unauthorized);
             throw;

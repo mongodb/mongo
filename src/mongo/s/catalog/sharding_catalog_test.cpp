@@ -588,7 +588,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             responseBuilder, Status(ErrorCodes::UserNotFound, "User test@test not found"));
         return responseBuilder.obj();
     });
@@ -661,7 +661,7 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             responseBuilder, Status(ErrorCodes::UserNotFound, "User test@test not found"));
         return responseBuilder.obj();
     });
@@ -690,8 +690,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder responseBuilder;
-            CommandHelpers::appendCommandStatus(responseBuilder,
-                                                Status(ErrorCodes::NotMaster, "not master"));
+            CommandHelpers::appendCommandStatusNoThrow(responseBuilder,
+                                                       Status(ErrorCodes::NotMaster, "not master"));
             return responseBuilder.obj();
         });
     }
@@ -724,8 +724,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuc
         ASSERT_EQUALS(host1, request.target);
 
         BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatus(responseBuilder,
-                                            Status(ErrorCodes::NotMaster, "not master"));
+        CommandHelpers::appendCommandStatusNoThrow(responseBuilder,
+                                                   Status(ErrorCodes::NotMaster, "not master"));
 
         // Ensure that when the catalog manager tries to retarget after getting the
         // NotMaster response, it will get back a new target.
@@ -1126,12 +1126,18 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabaseExceededTimeLimit) {
     });
 
     onCommand([host1](const RemoteCommandRequest& request) {
-        ASSERT_EQUALS(host1, request.target);
+        try {
+            ASSERT_EQUALS(host1, request.target);
 
-        BatchedCommandResponse response;
-        response.setStatus({ErrorCodes::ExceededTimeLimit, "operation timed out"});
+            BatchedCommandResponse response;
+            response.setStatus({ErrorCodes::ExceededTimeLimit, "operation timed out"});
 
-        return response.toBSON();
+            return response.toBSON();
+        } catch (const DBException& ex) {
+            BSONObjBuilder bb;
+            CommandHelpers::appendCommandStatusNoThrow(bb, ex.toStatus());
+            return bb.obj();
+        }
     });
 
     // Now wait for the updateDatabase call to return
@@ -1211,7 +1217,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             responseBuilder, Status(ErrorCodes::DuplicateKey, "precondition failed"));
         return responseBuilder.obj();
     });
@@ -1259,8 +1265,8 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatus(responseBuilder,
-                                            Status(ErrorCodes::NoMatchingDocument, "some error"));
+        CommandHelpers::appendCommandStatusNoThrow(
+            responseBuilder, Status(ErrorCodes::NoMatchingDocument, "some error"));
         return responseBuilder.obj();
     });
 

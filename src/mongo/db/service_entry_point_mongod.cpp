@@ -94,7 +94,7 @@ public:
         if (!waitForWCStatus.isOK() && invocation->definition()->isUserManagementCommand()) {
             BSONObj temp = commandResponseBuilder.asTempObj().copy();
             commandResponseBuilder.resetToEmpty();
-            CommandHelpers::appendCommandStatus(commandResponseBuilder, waitForWCStatus);
+            CommandHelpers::appendCommandStatusNoThrow(commandResponseBuilder, waitForWCStatus);
             commandResponseBuilder.appendElementsUnique(temp);
         }
     }

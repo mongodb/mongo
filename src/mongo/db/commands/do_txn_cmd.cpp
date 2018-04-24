@@ -159,8 +159,8 @@ public:
         // was acknowledged. To fix this, we should wait for replication of the node’s last applied
         // OpTime if the last write operation was a no-op write.
 
-        auto doTxnStatus =
-            CommandHelpers::appendCommandStatus(result, doTxn(opCtx, dbname, cmdObj, &result));
+        auto doTxnStatus = CommandHelpers::appendCommandStatusNoThrow(
+            result, doTxn(opCtx, dbname, cmdObj, &result));
 
         return doTxnStatus;
     }

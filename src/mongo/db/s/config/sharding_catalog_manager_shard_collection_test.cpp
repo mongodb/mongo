@@ -102,7 +102,7 @@ public:
             }
 
             BSONObjBuilder responseBuilder;
-            CommandHelpers::appendCommandStatus(responseBuilder, response.getStatus());
+            CommandHelpers::appendCommandStatusNoThrow(responseBuilder, response.getStatus());
             return responseBuilder.obj();
         });
     }

@@ -59,7 +59,7 @@ public:
             ASSERT_EQ(expectedNss.ns(), request.cmdObj.firstElement().String());
 
             BSONObjBuilder responseBuilder;
-            CommandHelpers::appendCommandStatus(responseBuilder, response);
+            CommandHelpers::appendCommandStatusNoThrow(responseBuilder, response);
             return responseBuilder.obj();
         });
     }

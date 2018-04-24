@@ -1463,7 +1463,7 @@ public:
                 return CommandHelpers::appendCommandStatus(result, status);
             }
 
-            CommandHelpers::appendCommandStatus(responseBuilder, Status::OK());
+            CommandHelpers::appendSimpleCommandStatus(responseBuilder, true);
             auto swResponse = CursorResponse::parseFromBSON(responseBuilder.obj());
             if (!swResponse.isOK()) {
                 return CommandHelpers::appendCommandStatus(result, swResponse.getStatus());

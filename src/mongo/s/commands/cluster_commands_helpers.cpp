@@ -350,7 +350,7 @@ bool appendRawResponses(OperationContext* opCtx,
             // Convert the error status back into the form of a command result and append it as the
             // raw response.
             BSONObjBuilder statusObjBob;
-            CommandHelpers::appendCommandStatus(statusObjBob, sendStatus);
+            CommandHelpers::appendCommandStatusNoThrow(statusObjBob, sendStatus);
             subobj.append(shardConnStr, statusObjBob.obj());
 
             errors.push_back(std::make_pair(shardConnStr, sendStatus));

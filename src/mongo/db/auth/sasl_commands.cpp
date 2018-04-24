@@ -334,7 +334,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     }
 
     Status status = doSaslContinue(opCtx, session, cmdObj, &result);
-    CommandHelpers::appendCommandStatus(result, status);
+    CommandHelpers::appendCommandStatusNoThrow(result, status);
 
     if (mechanism.isDone()) {
         audit::logAuthentication(
