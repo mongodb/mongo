@@ -88,7 +88,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return request().getNamespace();
+            return request().getCommandParameter();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -116,10 +116,11 @@ public:
             {
                 AutoGetCollection autoColl(opCtx, ns(), MODE_IS);
 
-                // If the primary is in the critical section, secondaries must wait for the commit to
-                // finish on the primary in case a secondary's caller has an afterClusterTime inclusive
-                // of the commit (and new writes to the committed chunk) that hasn't yet propagated back
-                // to this shard. This ensures the read your own writes causal consistency guarantee.
+                // If the primary is in the critical section, secondaries must wait for the commit
+                // to finish on the primary in case a secondary's caller has an afterClusterTime
+                // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
+                // propagated back to this shard. This ensures the read your own writes causal
+                // consistency guarantee.
                 auto const css = CollectionShardingState::get(opCtx, ns());
                 auto criticalSectionSignal =
                     css->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead);
