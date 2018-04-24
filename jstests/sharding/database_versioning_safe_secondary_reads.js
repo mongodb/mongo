@@ -162,6 +162,10 @@
     jsTest.log("About to drop database from the cluster");
     assert.commandWorked(freshMongos.getDB(dbName).runCommand({dropDatabase: 1}));
 
+    // Ensure the drop has replicated to all nodes.
+    st.rs0.awaitReplication();
+    st.rs1.awaitReplication();
+
     // Once SERVER-34431 goes in, this should not have caused the in-memory versions to be cleared.
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), dbName, {});
     checkInMemoryDatabaseVersion(st.rs1.getPrimary(), dbName, {});
