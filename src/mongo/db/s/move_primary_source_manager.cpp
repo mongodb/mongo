@@ -324,14 +324,14 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
         return;
     }
 
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->logChange(
-        opCtx,
-        "movePrimary.error",
-        _dbname.toString(),
-        _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
-        ShardingCatalogClient::kMajorityWriteConcern));
-
     try {
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->logChange(
+            opCtx,
+            "movePrimary.error",
+            _dbname.toString(),
+            _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
+            ShardingCatalogClient::kMajorityWriteConcern));
+
         _cleanup(opCtx);
     } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
         BSONObjBuilder requestArgsBSON;
