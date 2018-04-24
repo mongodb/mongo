@@ -1984,9 +1984,7 @@ var ReplSetTest = function(opts) {
 
         // If restarting a node, use its existing options as the defaults.
         if ((options && options.restart) || restart) {
-            const existingOpts =
-                _useBridge ? _unbridgedNodes[n].fullOptions : this.nodes[n].fullOptions;
-            options = Object.merge(existingOpts, options);
+            options = Object.merge(this.nodes[n].fullOptions, options);
         } else {
             options = Object.merge(defaults, options);
         }
