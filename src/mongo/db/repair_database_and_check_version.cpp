@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/version.h"
@@ -140,14 +142,40 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
         invariant(db);
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
-            if (!coll->uuid()) {
-                // system.indexes and system.namespaces don't currently have UUIDs in MMAP.
-                // SERVER-29926 and SERVER-30095 will address this problem.
-                if (isMmapV1 && (coll->ns().coll() == "system.indexes" ||
-                                 coll->ns().coll() == "system.namespaces")) {
+            // The presence of system.indexes or system.namespaces on wiredTiger may
+            // have undesirable results (see SERVER-32894, SERVER-34482). It is okay to
+            // drop these collections on wiredTiger because users are not permitted to
+            // store data in them.
+            if (coll->ns().coll() == "system.indexes" || coll->ns().coll() == "system.namespaces") {
+                if (isMmapV1) {
+                    // system.indexes and system.namespaces don't currently have UUIDs in MMAP.
+                    // SERVER-29926 and SERVER-30095 will address this problem.
                     continue;
                 }
+                const auto nssToDrop = coll->ns();
+                LOG(1) << "Attempting to drop invalid system collection " << nssToDrop;
+                if (coll->numRecords(opCtx)) {
+                    severe(LogComponent::kControl) << "Cannot drop non-empty collection "
+                                                   << nssToDrop.ns();
+                    exitCleanly(EXIT_NEED_DOWNGRADE);
+                }
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                writeConflictRetry(opCtx, "dropSystemIndexes", nssToDrop.ns(), [&] {
+                    WriteUnitOfWork wunit(opCtx);
+                    BSONObjBuilder unusedResult;
+                    fassert(50837,
+                            dropCollection(
+                                opCtx,
+                                nssToDrop,
+                                unusedResult,
+                                {},
+                                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops));
+                    wunit.commit();
+                });
+                continue;
+            }
 
+            if (!coll->uuid()) {
                 if (!coll->ns().isReplicated()) {
                     nonReplicatedCollNSSsWithoutUUIDs.push_back(coll->ns());
                     continue;
