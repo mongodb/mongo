@@ -125,6 +125,9 @@ struct stream_core {
 
     // The buffer pointing to the engine's unconsumed input.
     asio::const_buffer input_;
+
+    // The buffer pointing to the engine's unconsumed output.
+    asio::mutable_buffer output_;
 };
 
 }  // namespace detail

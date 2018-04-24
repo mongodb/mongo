@@ -48,18 +48,20 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
 
             case engine::want_output_and_retry:
 
+                core.output_ = core.engine_.get_output(core.output_buffer_);
                 // Get output data from the engine and write it to the underlying
                 // transport.
-                asio::write(next_layer, core.engine_.get_output(core.output_buffer_), ec);
+                core.output_ += asio::write(next_layer, core.output_, ec);
 
                 // Try the operation again.
                 continue;
 
             case engine::want_output:
 
+                core.output_ = core.engine_.get_output(core.output_buffer_);
                 // Get output data from the engine and write it to the underlying
                 // transport.
-                asio::write(next_layer, core.engine_.get_output(core.output_buffer_), ec);
+                core.output_ += asio::write(next_layer, core.output_, ec);
 
                 // Operation is complete. Return result to caller.
                 core.engine_.map_error_code(ec);
@@ -75,7 +77,7 @@ std::size_t io(Stream& next_layer, stream_core& core, const Operation& op, asio:
 
     // Operation failed. Return result to caller.
     core.engine_.map_error_code(ec);
-    return 0;
+    return bytes_transferred;
 }
 
 template <typename Stream, typename Operation, typename Handler>

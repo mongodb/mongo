@@ -577,6 +577,10 @@ public:
         return init.result.get();
     }
 
+    asio::mutable_buffer& getCoreOutputBuffer() {
+        return core_.output_;
+    }
+
 private:
     Stream next_layer_;
     detail::stream_core core_;
