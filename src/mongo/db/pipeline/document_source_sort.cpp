@@ -206,6 +206,16 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
             container->erase(sortItr);
             sortItr = std::next(itr);
             skipSum = 0;
+        } else if (auto nextSort = dynamic_cast<DocumentSourceSort*>(nextStage)) {
+            if (nextSort == nextStage) {
+                // nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
+                // nextLimit->setLimit(nextLimit->getLimit() + skipSum);
+                // setLimitSrc(nextLimit);
+                // setLimitSrc(limitSrc);
+                container->erase(sortItr);
+                sortItr = std::next(itr);
+                skipSum = 0;
+            }
         } else if (!nextStage->constraints().canSwapWithLimit) {
             return std::next(itr);
         } else {
