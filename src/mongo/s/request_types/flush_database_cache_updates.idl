@@ -33,7 +33,7 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 commands:
-    _flushDatabaseCacheUpdatesRequest:
+    _flushDatabaseCacheUpdates:
         description: "An internal command to wait for the last routing table cache refresh for a particular database to be persisted to disk"
         strict: true
         namespace: type
