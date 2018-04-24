@@ -47,10 +47,8 @@ public:
     typedef std::vector<std::string> ArgumentVector;
     typedef std::map<std::string, std::string> EnvironmentMap;
 
-    InitializerContext(const ArgumentVector& args,
-                       const EnvironmentMap& env,
-                       ServiceContext* serviceContext)
-        : _args(args), _env(env), _serviceContext(serviceContext) {}
+    InitializerContext(const ArgumentVector& args, const EnvironmentMap& env)
+        : _args(args), _env(env) {}
 
     const ArgumentVector& args() const {
         return _args;
@@ -59,14 +57,9 @@ public:
         return _env;
     }
 
-    ServiceContext* serviceContext() const {
-        return _serviceContext;
-    }
-
 private:
     ArgumentVector _args;
     EnvironmentMap _env;
-    ServiceContext* _serviceContext;
 };
 
 }  // namespace mongo

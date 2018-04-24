@@ -42,18 +42,8 @@ namespace mongo {
  */
 class DeinitializerContext {
 public:
-    explicit DeinitializerContext(ServiceContext* serviceContext)
-        : _serviceContext(serviceContext) {}
-
     DeinitializerContext(DeinitializerContext const&) = delete;
     DeinitializerContext& operator=(DeinitializerContext const&) = delete;
-
-    ServiceContext* serviceContext() const {
-        return _serviceContext;
-    }
-
-private:
-    ServiceContext* _serviceContext;
 };
 
 }  // namespace mongo

@@ -64,7 +64,7 @@ public:
 };
 }  // namespace
 
-MONGO_INITIALIZER(DevNullEngineInit)
+MONGO_INITIALIZER_WITH_PREREQUISITES(DevNullEngineInit, ("ServiceContext"))
 (InitializerContext* context) {
     getGlobalServiceContext()->registerStorageEngine("devnull", new DevNullStorageEngineFactory());
     return Status::OK();

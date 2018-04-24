@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-MONGO_INITIALIZER(SetWiredTigerExtensions)
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetWiredTigerExtensions, ("ServiceContext"))
 (InitializerContext* context) {
     auto configHooks = stdx::make_unique<WiredTigerExtensions>();
     WiredTigerExtensions::set(getGlobalServiceContext(), std::move(configHooks));

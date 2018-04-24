@@ -43,6 +43,4 @@ public:
     explicit ServiceContextRegistrar(std::function<std::unique_ptr<ServiceContext>()> fn);
 };
 
-bool hasServiceContextFactory();
-std::unique_ptr<ServiceContext> createServiceContext();
 }  // namespace mongo

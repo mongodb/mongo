@@ -413,8 +413,7 @@ int bridgeMain(int argc, char** argv, char** envp) {
     });
 
     setupSignalHandlers();
-    setGlobalServiceContext(createServiceContext());
-    runGlobalInitializersOrDie(argc, argv, envp, getGlobalServiceContext());
+    runGlobalInitializersOrDie(argc, argv, envp);
     startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
 
     auto serviceContext = getGlobalServiceContext();

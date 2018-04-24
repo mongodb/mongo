@@ -43,12 +43,13 @@ namespace mongo {
 /* Make a EncryptionHooks pointer a decoration on the global ServiceContext */
 GlobalInitializerRegisterer encryptionHooksInitializer(
     "SetEncryptionHooks",
+    {"ServiceContext"},
     [](InitializerContext* context) {
-        EncryptionHooks::set(context->serviceContext(), stdx::make_unique<EncryptionHooks>());
+        EncryptionHooks::set(getGlobalServiceContext(), stdx::make_unique<EncryptionHooks>());
         return Status::OK();
     },
     [](DeinitializerContext* context) {
-        EncryptionHooks::set(context->serviceContext(), nullptr);
+        EncryptionHooks::set(getGlobalServiceContext(), nullptr);
         return Status::OK();
     });
 

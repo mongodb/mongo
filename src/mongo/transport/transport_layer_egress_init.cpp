@@ -38,7 +38,7 @@ namespace mongo {
 namespace {
 // Linking with this file will configure an egress-only TransportLayer on a ServiceContextNoop.
 // Use this for unit/integration tests that require only egress networking.
-MONGO_INITIALIZER(ConfigureEgressTransportLayer)
+MONGO_INITIALIZER_WITH_PREREQUISITES(ConfigureEgressTransportLayer, ("ServiceContext"))
 (InitializerContext* context) {
     auto sc = getGlobalServiceContext();
     invariant(!sc->getTransportLayer());

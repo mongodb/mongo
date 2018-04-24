@@ -741,8 +741,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     mongo::shell_utils::RecordMyLocation(argv[0]);
 
-    setGlobalServiceContext(createServiceContext());
-    mongo::runGlobalInitializersOrDie(argc, argv, envp, getGlobalServiceContext());
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     // TODO This should use a TransportLayerManager or TransportLayerFactory
     auto serviceContext = getGlobalServiceContext();

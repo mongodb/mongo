@@ -72,8 +72,9 @@ public:
 
 GlobalInitializerRegisterer mobileKVEngineInitializer(
     "MobileKVEngineInit",
+    {"ServiceContext"},
     [](InitializerContext* context) {
-        context->serviceContext()->registerStorageEngine("mobile", new MobileFactory());
+        getGlobalServiceContext()->registerStorageEngine("mobile", new MobileFactory());
         return Status::OK();
     },
     [](DeinitializerContext* const) { return Status::OK(); });

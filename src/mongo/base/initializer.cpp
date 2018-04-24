@@ -25,13 +25,17 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/initializer.h"
+
+#include <iostream>
 
 #include "mongo/base/deinitializer_context.h"
 #include "mongo/base/global_initializer.h"
+#include "mongo/base/initializer_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
-#include <iostream>
 
 namespace mongo {
 
@@ -39,14 +43,13 @@ Initializer::Initializer() {}
 Initializer::~Initializer() {}
 
 Status Initializer::executeInitializers(const InitializerContext::ArgumentVector& args,
-                                        const InitializerContext::EnvironmentMap& env,
-                                        ServiceContext* serviceContext) {
+                                        const InitializerContext::EnvironmentMap& env) {
     std::vector<std::string> sortedNodes;
     Status status = _graph.topSort(&sortedNodes);
     if (Status::OK() != status)
         return status;
 
-    InitializerContext context(args, env, serviceContext);
+    InitializerContext context(args, env);
 
     for (size_t i = 0; i < sortedNodes.size(); ++i) {
         InitializerDependencyNode* node = _graph.getInitializerNode(sortedNodes[i]);
@@ -76,13 +79,13 @@ Status Initializer::executeInitializers(const InitializerContext::ArgumentVector
     return Status::OK();
 }
 
-Status Initializer::executeDeinitializers(ServiceContext* serviceContext) {
+Status Initializer::executeDeinitializers() {
     std::vector<std::string> sortedNodes;
     Status status = _graph.topSort(&sortedNodes);
     if (Status::OK() != status)
         return status;
 
-    DeinitializerContext context(serviceContext);
+    DeinitializerContext context{};
 
     // Execute deinitialization in reverse order from initialization.
     for (auto it = sortedNodes.rbegin(), end = sortedNodes.rend(); it != end; ++it) {
@@ -105,15 +108,11 @@ Status Initializer::executeDeinitializers(ServiceContext* serviceContext) {
 }
 
 Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
-                             const InitializerContext::EnvironmentMap& env,
-                             ServiceContext* serviceContext) {
-    return getGlobalInitializer().executeInitializers(args, env, serviceContext);
+                             const InitializerContext::EnvironmentMap& env) {
+    return getGlobalInitializer().executeInitializers(args, env);
 }
 
-Status runGlobalInitializers(int argc,
-                             const char* const* argv,
-                             const char* const* envp,
-                             ServiceContext* serviceContext) {
+Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp) {
     InitializerContext::ArgumentVector args(argc);
     std::copy(argv, argv + argc, args.begin());
 
@@ -129,18 +128,15 @@ Status runGlobalInitializers(int argc,
         }
     }
 
-    return runGlobalInitializers(args, env, serviceContext);
+    return runGlobalInitializers(args, env);
 }
 
-Status runGlobalDeinitializers(ServiceContext* serviceContext) {
-    return getGlobalInitializer().executeDeinitializers(serviceContext);
+Status runGlobalDeinitializers() {
+    return getGlobalInitializer().executeDeinitializers();
 }
 
-void runGlobalInitializersOrDie(int argc,
-                                const char* const* argv,
-                                const char* const* envp,
-                                ServiceContext* serviceContext) {
-    Status status = runGlobalInitializers(argc, argv, envp, serviceContext);
+void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp) {
+    Status status = runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         std::cerr << "Failed global initialization: " << status << std::endl;
         quickExit(1);

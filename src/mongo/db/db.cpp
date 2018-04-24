@@ -772,7 +772,8 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
         executor::makeNetworkInterface("Replication", nullptr, std::move(hookList)));
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SSLManager", "default"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
+                                     ("SSLManager", "ServiceContext", "default"))
 (InitializerContext* context) {
     auto serviceContext = getGlobalServiceContext();
     repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
@@ -953,8 +954,7 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
 
     srand(static_cast<unsigned>(curTimeMicros64()));
 
-    setGlobalServiceContext(createServiceContext());
-    Status status = mongo::runGlobalInitializers(argc, argv, envp, getGlobalServiceContext());
+    Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         severe(LogComponent::kControl) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);

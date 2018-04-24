@@ -70,7 +70,7 @@ public:
 
 }  // namespace
 
-MONGO_INITIALIZER(EphemeralForTestEngineInit)
+MONGO_INITIALIZER_WITH_PREREQUISITES(EphemeralForTestEngineInit, ("ServiceContext"))
 (InitializerContext* context) {
     getGlobalServiceContext()->registerStorageEngine("ephemeralForTest",
                                                      new EphemeralForTestFactory());

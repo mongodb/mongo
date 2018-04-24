@@ -66,10 +66,9 @@ public:
      * and the thing being initialized should be considered dead in the water.
      */
     Status executeInitializers(const InitializerContext::ArgumentVector& args,
-                               const InitializerContext::EnvironmentMap& env,
-                               ServiceContext* serviceContext);
+                               const InitializerContext::EnvironmentMap& env);
 
-    Status executeDeinitializers(ServiceContext* serviceContext);
+    Status executeDeinitializers();
 
 private:
     InitializerDependencyGraph _graph;
@@ -85,22 +84,15 @@ private:
  * should probably arrange to terminate the process themselves.
  */
 Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
-                             const InitializerContext::EnvironmentMap& env,
-                             ServiceContext* serviceContext);
+                             const InitializerContext::EnvironmentMap& env);
 
-Status runGlobalInitializers(int argc,
-                             const char* const* argv,
-                             const char* const* envp,
-                             ServiceContext* serviceContext);
+Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp);
 
 /**
  * Same as runGlobalInitializers(), except prints a brief message to std::cerr
  * and terminates the process on failure.
  */
-void runGlobalInitializersOrDie(int argc,
-                                const char* const* argv,
-                                const char* const* envp,
-                                ServiceContext* serviceContext);
+void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp);
 
 /**
 * Run the global deinitializers. They will execute in reverse order from initialization.
@@ -111,6 +103,6 @@ void runGlobalInitializersOrDie(int argc,
 * This means that the few initializers that might want to terminate the program by failing
 * should probably arrange to terminate the process themselves.
 */
-Status runGlobalDeinitializers(ServiceContext* serviceContext);
+Status runGlobalDeinitializers();
 
 }  // namespace mongo

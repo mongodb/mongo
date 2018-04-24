@@ -180,7 +180,7 @@ public:
 };
 }  // namespace
 
-MONGO_INITIALIZER(WiredTigerEngineInit)
+MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit, ("ServiceContext"))
 (InitializerContext* context) {
     getGlobalServiceContext()->registerStorageEngine(kWiredTigerEngineName,
                                                      new WiredTigerFactory());
