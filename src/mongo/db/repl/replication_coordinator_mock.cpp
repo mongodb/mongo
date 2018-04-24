@@ -442,10 +442,6 @@ Status ReplicationCoordinatorMock::updateTerm(OperationContext* opCtx, long long
     return Status::OK();
 }
 
-Timestamp ReplicationCoordinatorMock::getMinimumVisibleSnapshot(OperationContext* opCtx) {
-    return Timestamp(_snapshotNameGenerator.addAndFetch(1));
-}
-
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
 
 OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() const {

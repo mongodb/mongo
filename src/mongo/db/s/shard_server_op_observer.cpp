@@ -69,7 +69,7 @@ public:
     CollectionVersionLogOpHandler(OperationContext* opCtx, const NamespaceString& nss)
         : _opCtx(opCtx), _nss(nss) {}
 
-    void commit() override {
+    void commit(boost::optional<Timestamp>) override {
         invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
 
         CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
@@ -95,7 +95,7 @@ public:
     ShardIdentityLogOpHandler(OperationContext* opCtx, ShardIdentityType shardIdentity)
         : _opCtx(opCtx), _shardIdentity(std::move(shardIdentity)) {}
 
-    void commit() override {
+    void commit(boost::optional<Timestamp>) override {
         fassertNoTrace(
             40071, ShardingState::get(_opCtx)->initializeFromShardIdentity(_opCtx, _shardIdentity));
     }

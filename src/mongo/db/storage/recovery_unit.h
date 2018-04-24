@@ -254,13 +254,17 @@ public:
      * that rollback() and commit() may be called after resources with a shorter lifetime than
      * the WriteUnitOfWork have been freed. Each registered change will be committed or rolled
      * back once.
+     *
+     * commit() handlers are passed the timestamp at which the transaction is committed. If the
+     * transaction is not committed at a particular timestamp, or if the storage engine does not
+     * support timestamps, then boost::none will be supplied for this parameter.
      */
     class Change {
     public:
         virtual ~Change() {}
 
         virtual void rollback() = 0;
-        virtual void commit() = 0;
+        virtual void commit(boost::optional<Timestamp> commitTime) = 0;
     };
 
     /**
@@ -287,7 +291,7 @@ public:
             void rollback() final {
                 _callback();
             }
-            void commit() final {}
+            void commit(boost::optional<Timestamp>) final {}
 
         private:
             Callback _callback;
@@ -307,8 +311,8 @@ public:
         public:
             OnCommitChange(Callback&& callback) : _callback(std::move(callback)) {}
             void rollback() final {}
-            void commit() final {
-                _callback();
+            void commit(boost::optional<Timestamp> commitTime) final {
+                _callback(commitTime);
             }
 
         private:

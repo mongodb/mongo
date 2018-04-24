@@ -146,7 +146,7 @@ public:
           _opTime(opTime),
           _prePostImageOpTime(prePostImageOpTime) {}
 
-    void commit() override {
+    void commit(boost::optional<Timestamp>) override {
         switch (_op) {
             case 'd': {
                 stdx::lock_guard<stdx::mutex> sl(_cloner->_mutex);

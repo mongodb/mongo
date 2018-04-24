@@ -107,7 +107,7 @@ class BtreeLogic<BtreeLayout>::Builder::SetRightLeafLocChange : public RecoveryU
 public:
     SetRightLeafLocChange(Builder* builder, DiskLoc oldLoc) : _builder(builder), _oldLoc(oldLoc) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         _builder->_rightLeafLoc = _oldLoc;
     }

@@ -82,7 +82,7 @@ void DurRecoveryUnit::commitChanges() {
 
     try {
         for (Changes::const_iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit();
+            (*it)->commit(boost::none);
         }
     } catch (...) {
         std::terminate();

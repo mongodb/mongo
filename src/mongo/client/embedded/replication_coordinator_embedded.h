@@ -79,8 +79,6 @@ public:
 
     WriteConcernOptions getGetLastErrorDefault() override;
 
-    Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) override;
-
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
     bool buildsIndexes() override;

@@ -111,16 +111,16 @@ public:
     AddCollectionChange(OperationContext* opCtx, DatabaseImpl* db, StringData ns)
         : _opCtx(opCtx), _db(db), _ns(ns.toString()) {}
 
-    virtual void commit() {
+    virtual void commit(boost::optional<Timestamp> commitTime) {
         CollectionMap::const_iterator it = _db->_collections.find(_ns);
 
         if (it == _db->_collections.end())
             return;
 
         // Ban reading from this collection on committed reads on snapshots before now.
-        auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-        auto snapshotName = replCoord->getMinimumVisibleSnapshot(_opCtx);
-        it->second->setMinimumVisibleSnapshot(snapshotName);
+        if (commitTime) {
+            it->second->setMinimumVisibleSnapshot(commitTime.get());
+        }
     }
 
     virtual void rollback() {
@@ -143,7 +143,7 @@ public:
     // Takes ownership of coll (but not db).
     RemoveCollectionChange(DatabaseImpl* db, Collection* coll) : _db(db), _coll(coll) {}
 
-    virtual void commit() {
+    virtual void commit(boost::optional<Timestamp>) {
         delete _coll;
     }
 

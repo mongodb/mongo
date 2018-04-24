@@ -53,7 +53,7 @@ void MobileRecoveryUnit::_commit() {
 
     for (auto& change : _changes) {
         try {
-            change->commit();
+            change->commit(boost::none);
         } catch (...) {
             std::terminate();
         }

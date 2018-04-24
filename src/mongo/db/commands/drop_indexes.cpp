@@ -51,8 +51,8 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 
@@ -218,9 +218,8 @@ public:
         // This was also done when dropAllIndexes() committed, but we need to ensure that no one
         // tries to read in the intermediate state where all indexes are newer than the current
         // snapshot so are unable to be used.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto snapshotName = replCoord->getMinimumVisibleSnapshot(opCtx);
-        collection->setMinimumVisibleSnapshot(snapshotName);
+        auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+        collection->setMinimumVisibleSnapshot(clusterTime);
 
         result.append("nIndexes", static_cast<int>(swIndexesToRebuild.getValue().size()));
         result.append("indexes", swIndexesToRebuild.getValue());

@@ -118,10 +118,6 @@ bool ReplicationCoordinatorEmbedded::isReplEnabled() const {
     return false;
 }
 
-Timestamp ReplicationCoordinatorEmbedded::getMinimumVisibleSnapshot(OperationContext* opCtx) {
-    return Timestamp();
-}
-
 WriteConcernOptions ReplicationCoordinatorEmbedded::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
     WriteConcernOptions writeConcern(wc);

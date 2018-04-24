@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -79,8 +80,7 @@ public:
 
         Lock::GlobalLock lk(opCtx, MODE_IX);
 
-        const auto name =
-            repl::ReplicationCoordinator::get(opCtx)->getMinimumVisibleSnapshot(opCtx);
+        auto name = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
         result.append("name", static_cast<long long>(name.asULL()));
 
         return CommandHelpers::appendCommandStatus(result, Status::OK());

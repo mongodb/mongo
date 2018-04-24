@@ -3358,27 +3358,6 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     return EventHandle();
 }
 
-Timestamp ReplicationCoordinatorImpl::getMinimumVisibleSnapshot(OperationContext* opCtx) {
-    Timestamp reservedName;
-    if (getReplicationMode() == Mode::modeReplSet) {
-        invariant(opCtx->lockState()->isLocked());
-        if (getMemberState().primary() || opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
-            // Use the current optime on the node, for primary nodes. Additionally, completion of
-            // background index builds on secondaries will not have a `commit time` and must also
-            // use the current optime.
-            reservedName = LogicalClock::get(getServiceContext())->getClusterTime().asTimestamp();
-        } else {
-            // This function is only called when applying command operations on secondaries.
-            // We ask the RecoveryUnit what timestamp it will assign to this write.
-            reservedName = opCtx->recoveryUnit()->getCommitTimestamp();
-        }
-    } else {
-        // All snapshots are the same for a standalone node.
-        reservedName = Timestamp();
-    }
-    return reservedName;
-}
-
 void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* opCtx,
                                                             const Timestamp& untilSnapshot) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);

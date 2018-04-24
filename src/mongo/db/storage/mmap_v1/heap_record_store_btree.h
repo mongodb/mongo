@@ -196,7 +196,7 @@ public:
     virtual void abandonSnapshot() {}
 
     virtual void registerChange(Change* change) {
-        change->commit();
+        change->commit(boost::none);
         delete change;
     }
 

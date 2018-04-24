@@ -127,7 +127,7 @@ void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
                                      GetNewCollectionFunction getNewCollection,
                                      CollectionUUID uuid) {
     Collection* oldColl = removeUUIDCatalogEntry(uuid);
-    opCtx->recoveryUnit()->onCommit([this, getNewCollection, uuid] {
+    opCtx->recoveryUnit()->onCommit([this, getNewCollection, uuid](boost::optional<Timestamp>) {
         // Reset current UUID entry in case some other operation updates the UUID catalog before the
         // WUOW is committed. registerUUIDCatalogEntry() is a no-op if there's an existing UUID
         // entry.

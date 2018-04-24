@@ -133,7 +133,7 @@ class MultiIndexBlockImpl::SetNeedToCleanupOnRollback : public RecoveryUnit::Cha
 public:
     explicit SetNeedToCleanupOnRollback(MultiIndexBlockImpl* indexer) : _indexer(indexer) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         _indexer->_needToCleanup = true;
     }
@@ -151,7 +151,7 @@ class MultiIndexBlockImpl::CleanupIndexesVectorOnRollback : public RecoveryUnit:
 public:
     explicit CleanupIndexesVectorOnRollback(MultiIndexBlockImpl* indexer) : _indexer(indexer) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         _indexer->_indexes.clear();
     }

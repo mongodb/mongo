@@ -328,7 +328,8 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
     return status;
 }
@@ -380,7 +381,8 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->onInserts(
         opCtx, ns(), uuid(), begin, end, fromMigrate);
 
-    opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
     return Status::OK();
 }
@@ -449,7 +451,8 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->onInserts(
         opCtx, ns(), uuid(), inserts.begin(), inserts.end(), false);
 
-    opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
     return loc.getStatus();
 }

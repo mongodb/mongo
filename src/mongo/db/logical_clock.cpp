@@ -33,6 +33,7 @@
 #include "mongo/db/logical_clock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -74,6 +75,14 @@ bool lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
     return time.asTimestamp().getSecs() <= LogicalClock::kMaxSignedInt &&
         time.asTimestamp().getInc() <= (LogicalClock::kMaxSignedInt - nTicks);
 }
+}
+
+LogicalTime LogicalClock::getClusterTimeForReplicaSet(OperationContext* opCtx) {
+    if (getGlobalReplSettings().usingReplSets()) {
+        return get(opCtx)->getClusterTime();
+    }
+
+    return {};
 }
 
 LogicalClock* LogicalClock::get(ServiceContext* service) {

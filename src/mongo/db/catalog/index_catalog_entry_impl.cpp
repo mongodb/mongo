@@ -184,7 +184,7 @@ class IndexCatalogEntryImpl::SetHeadChange : public RecoveryUnit::Change {
 public:
     SetHeadChange(IndexCatalogEntryImpl* ice, RecordId oldHead) : _ice(ice), _oldHead(oldHead) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         _ice->_head = _oldHead;
     }
@@ -273,22 +273,23 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
     // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
     // if the index metadata has changed.
-    opCtx->recoveryUnit()->onCommit([this, multikeyPaths, indexMetadataHasChanged] {
-        _isMultikey.store(true);
+    opCtx->recoveryUnit()->onCommit(
+        [this, multikeyPaths, indexMetadataHasChanged](boost::optional<Timestamp>) {
+            _isMultikey.store(true);
 
-        if (_indexTracksPathLevelMultikeyInfo) {
-            stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+            if (_indexTracksPathLevelMultikeyInfo) {
+                stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+                for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+                    _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+                }
             }
-        }
 
-        if (indexMetadataHasChanged && _infoCache) {
-            LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
-                   << " set to multi key.";
-            _infoCache->clearQueryCache();
-        }
-    });
+            if (indexMetadataHasChanged && _infoCache) {
+                LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
+                       << " set to multi key.";
+                _infoCache->clearQueryCache();
+            }
+        });
 }
 
 // ----

@@ -1128,7 +1128,8 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                                            std::vector<StmtId> stmtIdsWritten,
                                            const repl::OpTime& lastStmtIdWriteOpTime) {
     opCtx->recoveryUnit()->onCommit(
-        [ this, newTxnNumber, stmtIdsWritten = std::move(stmtIdsWritten), lastStmtIdWriteOpTime ] {
+        [ this, newTxnNumber, stmtIdsWritten = std::move(stmtIdsWritten), lastStmtIdWriteOpTime ](
+            boost::optional<Timestamp>) {
             RetryableWritesStats::get(getGlobalServiceContext())
                 ->incrementTransactionsCollectionWriteCount();
 

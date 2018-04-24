@@ -52,6 +52,12 @@ public:
         Seconds(365 * 24 * 60 * 60);  // 1 year
 
     /**
+     * Returns the current cluster time if this is a replica set node, otherwise returns a null
+     * logical time.
+     */
+    static LogicalTime getClusterTimeForReplicaSet(OperationContext* opCtx);
+
+    /**
      *  Creates an instance of LogicalClock.
      */
     LogicalClock(ServiceContext*);

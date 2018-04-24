@@ -122,7 +122,7 @@ public:
         _entry->_removeFromCache(NULL, _ns);
     }
 
-    void commit() {}
+    void commit(boost::optional<Timestamp>) {}
 
 private:
     const std::string _ns;
@@ -145,7 +145,7 @@ public:
         _catalogEntry->_collections[_ns] = _cachedEntry;
     }
 
-    void commit() {
+    void commit(boost::optional<Timestamp>) {
         delete _cachedEntry;
     }
 

@@ -162,6 +162,7 @@ private:
     bool _orderedCommit = true;
     Timestamp _commitTimestamp;
     Timestamp _prepareTimestamp;
+    boost::optional<Timestamp> _lastTimestampSet;
     uint64_t _mySnapshotId;
     Timestamp _majorityCommittedSnapshot;
     Timestamp _readAtTimestamp;

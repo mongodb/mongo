@@ -159,7 +159,7 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
               << FeatureCompatibilityVersionParser::toString(newVersion);
     }
 
-    opCtx->recoveryUnit()->onCommit([opCtx, newVersion]() {
+    opCtx->recoveryUnit()->onCommit([opCtx, newVersion](boost::optional<Timestamp>) {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
 

@@ -58,7 +58,7 @@ public:
           _ident(ident.toString()),
           _dropOnRollback(dropOnRollback) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         if (_dropOnRollback) {
             // Intentionally ignoring failure
@@ -94,7 +94,7 @@ public:
           _entry(entry),
           _dropOnCommit(dropOnCommit) {}
 
-    virtual void commit() {
+    virtual void commit(boost::optional<Timestamp>) {
         delete _entry;
 
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
