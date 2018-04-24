@@ -82,6 +82,7 @@ selector:
   - jstests/sharding/parallel.js
   - jstests/sharding/migrateBig.js
   - jstests/sharding/sharding_rs1.js
+  - jstests/sharding/move_primary_fails_without_database_version.js
   # Calls the config server primary directly (not through mongos)
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js

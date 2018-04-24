@@ -31,6 +31,7 @@ selector:
   - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
   - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
   - jstests/sharding/move_primary_basic.js
+  - jstests/sharding/move_primary_fails_without_database_version.js
   - jstests/sharding/movePrimary1.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
