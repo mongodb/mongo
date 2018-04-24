@@ -92,8 +92,6 @@ AtomicInt32 SyncTail::replBatchLimitOperations{50 * 1000};
 
 namespace {
 
-MONGO_FP_DECLARE(pauseBatchApplicationBeforeCompletion);
-
 /**
  * This variable determines the number of writer threads SyncTail will have. It can be overridden
  * using the "replWriterThreadCount" server parameter.
@@ -1386,20 +1384,6 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         // up in the future.
         const auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
         storageEngine->replicationBatchIsComplete();
-    }
-
-    // Use this fail point to hold the PBWM lock and prevent the batch from completing.
-    if (MONGO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
-        log() << "pauseBatchApplicationBeforeCompletion fail point enabled. Blocking until fail "
-                 "point is disabled.";
-        while (MONGO_FAIL_POINT(pauseBatchApplicationBeforeCompletion)) {
-            if (inShutdown()) {
-                severe() << "Turn off pauseBatchApplicationBeforeCompletion before attempting "
-                            "clean shutdown";
-                fassertFailedNoTrace(50798);
-            }
-            sleepmillis(100);
-        }
     }
 
     Timestamp firstTimeInBatch = ops.front().getTimestamp();

@@ -13,12 +13,8 @@ function SecondaryReadsTest(name = "secondary_reads_test", replSet) {
     let primary = rst.getPrimary();
     let primaryDB = primary.getDB(dbName);
     let secondary = rst.getSecondary();
-    let secondaryDB = secondary.getDB(dbName);
-    secondaryDB.getMongo().setSlaveOk();
-
     let readers = [];
-    let signalColl = "signalColl";
-    const testDoneId = "testDone";
+
     /**
      * Return an instance of ReplSetTest initialized with a standard
      * two-node replica set running with the latest version.
@@ -35,74 +31,31 @@ function SecondaryReadsTest(name = "secondary_reads_test", replSet) {
         return replSet;
     }
 
-    this.startSecondaryReaders = function(nReaders, readFn) {
-
-        let read = function() {
-            db.getMongo().setSlaveOk();
-            db = db.getSiblingDB(TestData.dbName);
-            while (true) {
-                eval(TestData.readFn);
-                let signalDoc = db.getCollection(TestData.signalColl)
-                                    .find({_id: TestData.testDoneId})
-                                    .itcount();
-                if (signalDoc != 0) {
-                    print("signal doc found. quitting...");
-                    quit();
-                }
-            }
-        };
-
-        TestData.dbName = dbName;
-        TestData.readFn = "(" + readFn.toString() + ")();";
-        TestData.signalColl = signalColl;
-        TestData.testDoneId = testDoneId;
+    this.startSecondaryReaders = function(nReaders, cmd) {
+        let readCmd = `db.getMongo().setSlaveOk();
+                       db.getMongo().setReadPref("secondaryPreferred");
+                       db = db.getSiblingDB("${dbName}");
+                       ${cmd}`;
 
         for (let i = 0; i < nReaders; i++) {
-            readers.push(startParallelShell(read, secondary.port));
+            readers.push(
+                startMongoProgramNoConnect("mongo", "--port", secondary.port, "--eval", readCmd));
             print("reader " + readers.length + " started");
         }
     };
 
-    let failPoint = "pauseBatchApplicationBeforeCompletion";
-
-    // This returns a function that should be called once after performing a replicated write on a
-    // primary. The write will start a batch on a secondary and immediately pause before completion.
-    // The returned function will return once the batch has reached the point where it has applied
-    // but not updated the last applied optime.
-    this.pauseSecondaryBatchApplication = function() {
-
-        clearRawMongoProgramOutput();
-
-        assert.commandWorked(
-            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
-
-        return function() {
-            assert.soon(function() {
-                return rawMongoProgramOutput().match(failPoint + " fail point enabled");
-            });
-        };
-    };
-
-    this.resumeSecondaryBatchApplication = function() {
-        assert.commandWorked(
-            secondaryDB.adminCommand({configureFailPoint: failPoint, mode: "off"}));
-    };
-
-    this.getPrimaryDB = function() {
-        return primaryDB;
-    };
-
-    this.getSecondaryDB = function() {
-        return secondaryDB;
+    this.doOnPrimary = function(writeFn) {
+        let db = primary.getDB(dbName);
+        writeFn(db);
     };
 
     this.stopReaders = function() {
-        print("signaling readers to stop...");
-        assert.gt(readers.length, 0, "no readers to stop");
-        assert.writeOK(primaryDB.getCollection(signalColl).insert({_id: testDoneId}));
         for (let i = 0; i < readers.length; i++) {
-            const await = readers[i];
-            await();
+            const pid = readers[i];
+            const ec = stopMongoProgramByPid(pid);
+            const expect = _isWindows() ? 1 : -15;
+            assert.eq(
+                ec, expect, "Expected mongo shell to exit with code " + expect + ". PID: " + pid);
             print("reader " + i + " done");
         }
         readers = [];
@@ -113,9 +66,7 @@ function SecondaryReadsTest(name = "secondary_reads_test", replSet) {
     };
 
     this.stop = function() {
-        if (readers.length > 0) {
-            this.stopReaders();
-        }
+        this.stopReaders();
         rst.stopSet();
     };
 }
