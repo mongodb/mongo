@@ -409,11 +409,12 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     _indexName = descriptor->indexName();
     _indexNamespace = descriptor->indexNamespace();
 
+    bool isBackgroundIndex = _spec["background"].trueValue();
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(_opCtx)) {
         isBackgroundSecondaryBuild =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
-            replCoord->getMemberState().secondary() && _spec["background"].trueValue();
+            replCoord->getMemberState().secondary() && isBackgroundIndex;
     }
 
     // Setup on-disk structures.
@@ -422,12 +423,13 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     if (!status.isOK())
         return status;
 
-    if (isBackgroundSecondaryBuild) {
+    if (isBackgroundIndex) {
         _opCtx->recoveryUnit()->onCommit([&] {
-            auto commitTs = _opCtx->recoveryUnit()->getCommitTimestamp();
-            if (!commitTs.isNull()) {
-                _collection->setMinimumVisibleSnapshot(commitTs);
-            }
+            // This will prevent the unfinished index from being visible on index iterators.
+            auto minVisible =
+                repl::ReplicationCoordinator::get(_opCtx)->getMinimumVisibleSnapshot(_opCtx);
+            _entry->setMinimumVisibleSnapshot(minVisible);
+            _collection->setMinimumVisibleSnapshot(minVisible);
         });
     }
 
