@@ -991,11 +991,6 @@ functions:
           ${activate_virtualenv}
           $python -c 'import socket; num_nodes = 5; print("\n".join(["%s:%d" % (socket.gethostname(), port) for port in range(20000, 20000 + num_nodes)]))' > nodes.txt
 
-          if [ ${distro_id} = "ubuntu1404-jepsen" ]; then
-            ${set_sudo}
-            $sudo apt-get install -y --force-yes libc++-dev libsnmp-dev
-          fi
-
   "run jepsen test" :
     - command: shell.exec
       type: test
@@ -2358,13 +2353,6 @@ functions:
       script: |
         set -o verbose
 
-        # We run the hang_analyzer.py script with root privileges when running the Jepsen tests in
-        # order to be able to attach to the mongod processes inside the LXC containers.
-        sudo=
-        if [ ${distro_id} = "ubuntu1404-jepsen" ]; then
-          ${set_sudo}
-        fi
-
         hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongoreplay,mongorestore,mongostat,mongotop"
 
         if [ ${hang_analyzer_dump_core|true} = true ]; then
@@ -2372,8 +2360,8 @@ functions:
         fi
 
         ${activate_virtualenv}
-        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $sudo $python buildscripts/hang_analyzer.py $hang_analyzer_option"
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo $python buildscripts/hang_analyzer.py $hang_analyzer_option
+        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/hang_analyzer.py $hang_analyzer_option"
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/hang_analyzer.py $hang_analyzer_option
 
         # Call hang_analyzer.py script for tasks that are running remote mongo processes
         if [ -n "${private_ip_address}" ]; then
@@ -2410,7 +2398,7 @@ functions:
           # we don't want to evaluate the local python variable, but instead pass the python string
           # so the remote host will use the right python when the virtualenv is sourced.
           cmds="$cmds; cd ${remote_dir}"
-          cmds="$cmds; PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo python buildscripts/hang_analyzer.py $hang_analyzer_option"
+          cmds="$cmds; PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" python buildscripts/hang_analyzer.py $hang_analyzer_option"
           $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${private_ip_address}           \
@@ -6833,27 +6821,6 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: jepsen_register_findAndModify_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_register_linearizableRead
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_register_linearizableRead_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_set_linearizableRead
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_set_linearizableRead_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_read-concern-majority_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_read-concern-majority_w1_WT
-    distros:
-    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -6946,6 +6913,27 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: jepsen_register_findAndModify_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_register_linearizableRead
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_register_linearizableRead_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_set_linearizableRead
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_set_linearizableRead_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_read-concern-majority_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_read-concern-majority_w1_WT
+    distros:
+    - ubuntu1604-build
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_compatibility
@@ -10315,27 +10303,6 @@ buildvariants:
   - name: audit
   - name: dbtest
   - name: ese
-  - name: jepsen_register_findAndModify_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_register_linearizableRead
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_register_linearizableRead_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_set_linearizableRead
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_set_linearizableRead_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_read-concern-majority_WT
-    distros:
-    - ubuntu1404-jepsen
-  - name: jepsen_read-concern-majority_w1_WT
-    distros:
-    - ubuntu1404-jepsen
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -10394,6 +10361,27 @@ buildvariants:
   - name: audit
   - name: dbtest
   - name: ese
+  - name: jepsen_register_findAndModify_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_register_linearizableRead
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_register_linearizableRead_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_set_linearizableRead
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_set_linearizableRead_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_read-concern-majority_WT
+    distros:
+    - ubuntu1604-build
+  - name: jepsen_read-concern-majority_w1_WT
+    distros:
+    - ubuntu1604-build
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
