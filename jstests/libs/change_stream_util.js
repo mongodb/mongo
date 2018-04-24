@@ -227,6 +227,36 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
         }
 
     };
+
+    /**
+     * Returns the document to be used for the value of a $changeStream stage, given a watchMode
+     * of type ChangeStreamTest.WatchMode and optional resumeAfter value.
+     */
+    self.getChangeStreamStage = function(watchMode, resumeAfter) {
+        const changeStreamDoc = {};
+        if (resumeAfter) {
+            changeStreamDoc.resumeAfter = resumeAfter;
+        }
+
+        if (watchMode == ChangeStreamTest.WatchMode.kCluster) {
+            changeStreamDoc.allChangesForCluster = true;
+        }
+        return changeStreamDoc;
+    };
+
+    /**
+     * Create a change stream of the given watch mode (see ChangeStreamTest.WatchMode) on the given
+     * collection. Will resume from a given point if resumeAfter is specified.
+     */
+    self.getChangeStream = function({watchMode, coll, resumeAfter}) {
+        return self.startWatchingChanges({
+            pipeline: [{$changeStream: self.getChangeStreamStage(watchMode, resumeAfter)}],
+            collection: (watchMode == ChangeStreamTest.WatchMode.kCollection ? coll : 1),
+            // Use a batch size of 0 to prevent any notifications from being returned in the first
+            // batch. These would be ignored by ChangeStreamTest.getOneChange().
+            aggregateOptions: {cursor: {batchSize: 0}},
+        });
+    };
 }
 
 /**
@@ -257,6 +287,27 @@ ChangeStreamTest.assertChangeStreamThrowsCode = function assertChangeStreamThrow
     }
     assert(false, "expected this to be unreachable");
 };
+
+/**
+ * Static method for determining which database to run the change stream aggregation on based on
+ * the watchMode.
+ */
+ChangeStreamTest.getDBForChangeStream = function(watchMode, dbObj) {
+    if (watchMode == ChangeStreamTest.WatchMode.kCluster) {
+        return dbObj.getSiblingDB("admin");
+    }
+    return dbObj;
+};
+
+/**
+ * Used in getChangeStream() and getChangeStreamStage() helpers, for specifying which type of
+ * changeStream to open.
+ */
+ChangeStreamTest.WatchMode = Object.freeze({
+    kCollection: 1,
+    kDb: 2,
+    kCluster: 3,
+});
 
 /**
  * A set of functions to help validate the behaviour of $changeStreams for a given namespace.
