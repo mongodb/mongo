@@ -7,16 +7,14 @@
     "use strict";
 
     const admin = db.getSisterDB("admin");
-    const countAllMatchingLocalCursors = function(match) {
+    function listAllCursorsWithId(cursorId) {
         return admin
             .aggregate([
                 {"$listLocalCursors": {}},
-                {"$match": match},
-                {"$count": "matches"},
+                {"$match": {"id": cursorId}},
             ])
-            .next()
-            .matches;
-    };
+            .toArray();
+    }
 
     let session = db.getMongo().startSession();
     let testDb = db.getSisterDB("listAllLocalCursors");
@@ -29,20 +27,20 @@
     let cursorIdWithoutSession =
         assert.commandWorked(testDb.runCommand({find: "data", batchSize: 0})).cursor.id;
 
-    // Ensure that the cache now contains the session and is visible by admin.
-    const count = countAllMatchingLocalCursors({
-        "ns": "listAllLocalCursors.data",
-        "$or": [
-            {
-              "id": cursorIdWithSession,
-              "lsid.id": session._serverSession.handle.getId().id,
-            },
-            {
-              "id": cursorIdWithoutSession,
-            },
-        ],
-    });
-    assert.eq(count, 2);
+    // Verify that we correctly list the cursor which is outside of a session.
+    let foundCursors = listAllCursorsWithId(cursorIdWithoutSession);
+    assert.eq(foundCursors.length, 1, tojson(foundCursors));
+    assert.eq(foundCursors[0].ns, "listAllLocalCursors.data", tojson(foundCursors));
+    assert.eq(foundCursors[0].id, cursorIdWithoutSession, tojson(foundCursors));
+
+    // Verify that we correctly list the cursor which is inside of a session.
+    foundCursors = listAllCursorsWithId(cursorIdWithSession);
+    assert.eq(foundCursors.length, 1, tojson(foundCursors));
+    assert.eq(foundCursors[0].ns, "listAllLocalCursors.data", tojson(foundCursors));
+    assert.eq(foundCursors[0].id, cursorIdWithSession, tojson(foundCursors));
+    assert(foundCursors[0].hasOwnProperty("lsid"), tojson(foundCursors));
+    assert.eq(
+        foundCursors[0].lsid.id, session._serverSession.handle.getId().id, tojson(foundCursors));
 
     assert.commandWorked(testDbWithSession.runCommand(
         {killCursors: "data", cursors: [cursorIdWithSession, cursorIdWithoutSession]}));
