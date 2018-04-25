@@ -744,6 +744,10 @@ class CmdCreateUser : public BasicCommand {
 public:
     CmdCreateUser() : BasicCommand("createUser") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -885,6 +889,10 @@ public:
 class CmdUpdateUser : public BasicCommand {
 public:
     CmdUpdateUser() : BasicCommand("updateUser") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -1028,6 +1036,10 @@ class CmdDropUser : public BasicCommand {
 public:
     CmdDropUser() : BasicCommand("dropUser") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -1095,6 +1107,10 @@ class CmdDropAllUsersFromDatabase : public BasicCommand {
 public:
     CmdDropAllUsersFromDatabase() : BasicCommand("dropAllUsersFromDatabase") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -1150,6 +1166,10 @@ public:
 class CmdGrantRolesToUser : public BasicCommand {
 public:
     CmdGrantRolesToUser() : BasicCommand("grantRolesToUser") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -1222,6 +1242,10 @@ public:
 class CmdRevokeRolesFromUser : public BasicCommand {
 public:
     CmdRevokeRolesFromUser() : BasicCommand("revokeRolesFromUser") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -1458,6 +1482,10 @@ class CmdCreateRole : public BasicCommand {
 public:
     CmdCreateRole() : BasicCommand("createRole") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -1579,6 +1607,10 @@ class CmdUpdateRole : public BasicCommand {
 public:
     CmdUpdateRole() : BasicCommand("updateRole") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -1696,6 +1728,10 @@ class CmdGrantPrivilegesToRole : public BasicCommand {
 public:
     CmdGrantPrivilegesToRole() : BasicCommand("grantPrivilegesToRole") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -1805,6 +1841,10 @@ public:
 class CmdRevokePrivilegesFromRole : public BasicCommand {
 public:
     CmdRevokePrivilegesFromRole() : BasicCommand("revokePrivilegesFromRole") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -1918,6 +1958,10 @@ class CmdGrantRolesToRole : public BasicCommand {
 public:
     CmdGrantRolesToRole() : BasicCommand("grantRolesToRole") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -2007,6 +2051,10 @@ class CmdRevokeRolesFromRole : public BasicCommand {
 public:
     CmdRevokeRolesFromRole() : BasicCommand("revokeRolesFromRole") {}
 
+    bool isUserManagementCommand() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -2090,6 +2138,10 @@ public:
 class CmdDropRole : public BasicCommand {
 public:
     CmdDropRole() : BasicCommand("dropRole") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -2232,6 +2284,10 @@ public:
 class CmdDropAllRolesFromDatabase : public BasicCommand {
 public:
     CmdDropAllRolesFromDatabase() : BasicCommand("dropAllRolesFromDatabase") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -2534,6 +2590,10 @@ public:
 class CmdMergeAuthzCollections : public BasicCommand {
 public:
     CmdMergeAuthzCollections() : BasicCommand("_mergeAuthzCollections") {}
+
+    bool isUserManagementCommand() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
