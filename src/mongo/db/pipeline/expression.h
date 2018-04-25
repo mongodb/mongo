@@ -1176,6 +1176,8 @@ private:
     boost::intrusive_ptr<Expression> _input;
     // The expression determining whether each element should be present in the result array.
     boost::intrusive_ptr<Expression> _filter;
+    // For expression ArrayElemAt and Slice we can optimize filter by setting a limit to end the
+    // filter once all values needed are filtered.
     boost::optional<int> _limit;
 };
 

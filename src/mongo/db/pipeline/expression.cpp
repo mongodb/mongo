@@ -3994,7 +3994,6 @@ intrusive_ptr<Expression> ExpressionSlice::optimize() {
     }
     return this;
 }
-
 REGISTER_EXPRESSION(slice, ExpressionSlice::parse);
 const char* ExpressionSlice::getOpName() const {
     return "$slice";
