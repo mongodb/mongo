@@ -16,6 +16,17 @@
     assertDropAndRecreateCollection(db, "t1");
     assertDropAndRecreateCollection(db, "t2");
 
+    // Test that $changeStream only accepts an object as its argument.
+    function checkArgFails(arg) {
+        assert.commandFailedWithCode(
+            db.runCommand({aggregate: "t1", pipeline: [{$changeStream: arg}], cursor: {}}), 50808);
+    }
+
+    checkArgFails(1);
+    checkArgFails("invalid");
+    checkArgFails(false);
+    checkArgFails([1, 2, "invalid", {x: 1}]);
+
     // Test that a change stream cannot be opened on collections in the "admin", "config", or
     // "local" databases.
     assertInvalidChangeStreamNss("admin", "testColl");

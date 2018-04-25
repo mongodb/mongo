@@ -268,6 +268,20 @@ public:
     }
 };
 
+TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {
+    auto expCtx = getExpCtx();
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName << "invalid").firstElement(), expCtx),
+                       AssertionException,
+                       50808);
+
+    ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
+                           BSON(DSChangeStream::kStageName << 12345).firstElement(), expCtx),
+                       AssertionException,
+                       50808);
+}
+
 TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedOption) {
     auto expCtx = getExpCtx();
 

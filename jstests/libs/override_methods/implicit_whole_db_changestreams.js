@@ -25,7 +25,8 @@ const ChangeStreamPassthroughHelpers = {
         // Determine whether this command is a valid $changeStream aggregation on a single
         // collection or database.
         if (!(cmdObj && cmdObj.aggregate && Array.isArray(cmdObj.pipeline) &&
-              cmdObj.pipeline.length > 0 && cmdObj.pipeline[0].$changeStream)) {
+              cmdObj.pipeline.length > 0 && typeof cmdObj.pipeline[0].$changeStream == "object" &&
+              cmdObj.pipeline[0].$changeStream.constructor === Object)) {
             return false;
         }
         // Single-collection and whole-db streams cannot be opened on internal databases.

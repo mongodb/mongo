@@ -462,6 +462,10 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(50808,
+            "$changeStream stage expects a document as argument.",
+            elem.type() == BSONType::Object);
+
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
 
