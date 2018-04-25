@@ -326,15 +326,11 @@ private:
 template <typename Fn>
 using CmdT = MyCommand<typename std::decay<Fn>::type>;
 
-auto okFn = [] { return Status::OK(); };
-auto errFn = [] { return Status(ErrorCodes::UnknownError, "some error"); };
-auto throwFn = []() -> Status { uasserted(ErrorCodes::UnknownError, "some error"); };
+auto throwFn = [] { uasserted(ErrorCodes::UnknownError, "some error"); };
 
 ExampleIncrementCommand exampleIncrementCommand;
 ExampleMinimalCommand exampleMinimalCommand;
 ExampleVoidCommand exampleVoidCommand;
-CmdT<decltype(okFn)> okStatusCommand("okStatus", okFn);
-CmdT<decltype(errFn)> errStatusCommand("notOkStatus", errFn);
 CmdT<decltype(throwFn)> throwStatusCommand("throwsStatus", throwFn);
 
 struct IncrementTestCommon {
@@ -390,21 +386,6 @@ TEST(TypedCommand, runVoid) {
     IncrementTestCommon{}.run(exampleVoidCommand, [](int i, const BSONObj& reply) {
         ASSERT_EQ(reply["ok"].Double(), 1.0);
         ASSERT_EQ(exampleVoidCommand.iCapture, i + 1);
-    });
-}
-
-TEST(TypedCommand, runOkStatus) {
-    IncrementTestCommon{}.run(
-        okStatusCommand, [](int i, const BSONObj& reply) { ASSERT_EQ(reply["ok"].Double(), 1.0); });
-}
-
-TEST(TypedCommand, runErrStatus) {
-    IncrementTestCommon{}.run(errStatusCommand, [](int i, const BSONObj& reply) {
-        Status status = errFn();
-        ASSERT_EQ(reply["ok"].Double(), 0.0);
-        ASSERT_EQ(reply["errmsg"].String(), status.reason());
-        ASSERT_EQ(reply["code"].Int(), status.code());
-        ASSERT_EQ(reply["codeName"].String(), ErrorCodes::errorString(status.code()));
     });
 }
 

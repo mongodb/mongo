@@ -428,39 +428,18 @@ public:
     }
 
     /**
-     * Write the specified 'status' and associated fields into this reply body, as with
-     * CommandHelpers::appendCommandStatus. Appends the "ok" and related fields if they
-     * haven't already been set.
-     *  - If 'status' is not OK, this reply is reset before adding result.
-     *  - Otherwise, any data previously written to the body is left in place.
-     */
-    void fillFrom(const Status& status);
-
-    /**
      * The specified 'object' must be BSON-serializable.
-     * Appends the "ok" and related fields if they haven't already been set.
      *
      * BSONSerializable 'x' means 'x.serialize(bob)' appends a representation of 'x'
      * into 'BSONObjBuilder* bob'.
      */
     template <typename T>
     void fillFrom(const T& object) {
+        static_assert(!isStatusOrStatusWith<std::decay_t<T>>,
+                      "Status and StatusWith<T> aren't supported by TypedCommand and fillFrom(). "
+                      "Use uassertStatusOK() instead.");
         auto bob = getBodyBuilder();
         object.serialize(&bob);
-        CommandHelpers::appendCommandStatus(bob, Status::OK());
-    }
-
-    /**
-     * Equivalent to calling fillFrom with sw.getValue() or sw.getStatus(), whichever
-     * 'sw' is holding.
-     */
-    template <typename T>
-    void fillFrom(const StatusWith<T>& sw) {
-        if (sw.isOK()) {
-            fillFrom(sw.getValue());
-        } else {
-            fillFrom(sw.getStatus());
-        }
     }
 
 private:
@@ -787,12 +766,9 @@ class TypedCommand<Derived>::MinimalInvocationBase : public InvocationBaseIntern
  *
  *       R typedRun(OperationContext* opCtx);
  *
- *     where R is either void or usable as an argument to 'CommandReplyBuilder::fillFrom'.
- *     So it's one of:
+ *     where R is one of:
  *        - void
- *        - mongo::Status
  *        - T, where T is usable with fillFrom.
- *        - mongo::StatusWith<T>, where T usable with fillFrom.
  *
  *     Note: a void typedRun produces a "pass-fail" command. If it runs to completion
  *     the result will be considered and formatted as an "ok".
