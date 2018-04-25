@@ -22,12 +22,14 @@
 
     for (var i = 0; i < 100; ++i) {
         coll.drop();
-        coll.ensureIndex({a: 1});
-        coll.ensureIndex({b: 1});
+        assert.commandWorked(coll.ensureIndex({a: 1}));
+        assert.commandWorked(coll.ensureIndex({b: 1}));
 
+        var bulk = coll.initializeUnorderedBulkOp();
         for (var j = 0; j < 100; ++j) {
-            coll.save({a: j, b: j});
+            bulk.insert({a: j, b: j});
         }
+        assert.commandWorked(bulk.execute());
 
         try {
             var m = i % 5;
