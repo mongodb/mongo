@@ -37,7 +37,7 @@ void mongo::audit::logAuthentication(Client* client,
 
 void mongo::audit::logCommandAuthzCheck(Client* client,
                                         const OpMsgRequest& cmdObj,
-                                        CommandInterface* command,
+                                        const CommandInterface& command,
                                         ErrorCodes::Error result) {}
 
 void mongo::audit::logDeleteAuthzCheck(Client* client,

@@ -69,23 +69,6 @@ const WriteConcernOptions kMajorityWriteConcern(
     WriteConcernOptions::SyncMode::UNSET,
     Seconds(60));
 
-// A facade presenting CommandDefinition as an audit::CommandInterface.
-class CommandAuditHook : public audit::CommandInterface {
-public:
-    explicit CommandAuditHook(const Command* command) : _command{command} {}
-
-    void redactForLogging(mutablebson::Document* cmdObj) const final {
-        _command->redactForLogging(cmdObj);
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const final {
-        return _command->parseNs(dbname, cmdObj);
-    }
-
-private:
-    const Command* _command;
-};
-
 }  // namespace
 
 
@@ -117,8 +100,25 @@ void CommandHelpers::logAuthViolation(OperationContext* opCtx,
                                       const Command* command,
                                       const OpMsgRequest& request,
                                       ErrorCodes::Error err) {
-    CommandAuditHook hook{command};
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, &hook, err);
+    struct Hook final : public audit::CommandInterface {
+    public:
+        Hook(const Command* command, const OpMsgRequest& request)
+            : _command{command}, _request{request} {}
+
+        void redactForLogging(mutablebson::Document* cmdObj) const override {
+            _command->redactForLogging(cmdObj);
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(
+                _command->parseNs(_request.getDatabase().toString(), _request.body));
+        }
+
+    private:
+        const Command* _command;
+        const OpMsgRequest& _request;
+    };
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(command, request), err);
 }
 
 void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
