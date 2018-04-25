@@ -687,8 +687,8 @@ public:
                 // UNLOCKED
                 ctx.reset();
 
-                if (typeName(owned["data"].type()) == 0) {
-                    uassert(50751, str::stream() << "Field name is required", (owned["data"].type() == BSONType::BinData));
+                if (owned["data"].type() == EOO) {
+                    uassert(50751, str::stream() << "The element that calls binDataClean() must be type of BinData, but type of misisng found. Field name is required", (owned["data"].type() == BSONType::BinData));
                 } else {
                     uassert(50752, str::stream() << "The element that calls binDataClean() must be type of BinData, but type of " << owned["data"].type() << " found.", (owned["data"].type() == BSONType::BinData));
                 }
