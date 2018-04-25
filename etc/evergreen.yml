@@ -5650,6 +5650,27 @@ tasks:
       run_multiple_jobs: false
 
 - <<: *task_template
+  name: free_monitoring
+  commands:
+  - func: "do setup"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        if [ "Windows_NT" = "$OS" ]; then
+          /cygdrive/c/python/python36/python.exe -m pip install -r buildscripts/requirements.txt
+        fi
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=free_monitoring --storageEngine=wiredTiger
+      run_multiple_jobs: false
+
+- <<: *task_template
   name: jsonSchema
   commands:
   - func: "do setup"
@@ -6371,7 +6392,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
@@ -6470,7 +6491,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
     scons_cache_scope: shared
@@ -6508,7 +6529,7 @@ buildvariants:
     push_name: linux-debug
     push_arch: x86_64
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
     scons_cache_scope: shared
     shared_scons_pruning: true
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
@@ -6692,7 +6713,7 @@ buildvariants:
   expansions:
     use_wt_develop: true
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
     use_scons_cache: true
     build_mongoreplay: true
 
@@ -6706,7 +6727,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-duroff
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
@@ -6815,6 +6836,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -6907,6 +6929,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -7092,6 +7115,7 @@ buildvariants:
   - name: compile
   - name: compile_all
   - name: dbtest
+  - name: free_monitoring
   - name: jsCore
   - name: push
     distros:
@@ -7398,6 +7422,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -7565,6 +7590,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -7671,6 +7697,7 @@ buildvariants:
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
+  - name: free_monitoring
   - name: integration_tests_standalone
   - name: integration_tests_replset
   - name: integration_tests_sharded
@@ -8325,6 +8352,7 @@ buildvariants:
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -8480,6 +8508,7 @@ buildvariants:
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -9815,6 +9844,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -9900,6 +9930,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -10634,6 +10665,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -10834,6 +10866,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -11750,7 +11783,7 @@ buildvariants:
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
@@ -11803,6 +11836,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd
@@ -11887,6 +11921,7 @@ buildvariants:
   - name: compile
   - name: compile_all
   - name: aggregation_fuzzer
+  - name: free_monitoring
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_replication
@@ -11918,7 +11953,7 @@ buildvariants:
     variant_path_suffix: /opt/mongodbtoolchain/v2/bin
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform: ubuntu1604
     multiversion_edition: enterprise
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under UBSAN build.
@@ -11970,6 +12005,7 @@ buildvariants:
   - name: ese
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_basics_passthrough
   - name: gle_auth_basics_passthrough_write_cmd

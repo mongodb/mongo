@@ -39,7 +39,7 @@
 
 #include <string>
 #include <vector>
-#include <windows.h>
+#include <versionhelpers.h>
 #include <winhttp.h>
 
 #include "mongo/base/status.h"
@@ -190,8 +190,13 @@ private:
             }
         });
 
+        DWORD accessType = WINHTTP_ACCESS_TYPE_DEFAULT_PROXY;
+        if (IsWindows8Point1OrGreater()) {
+            accessType = WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY;
+        }
+
         session = WinHttpOpen(L"MongoDB Free Monitoring Client/Windows",
-                              WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                              accessType,
                               WINHTTP_NO_PROXY_NAME,
                               WINHTTP_NO_PROXY_BYPASS,
                               0);

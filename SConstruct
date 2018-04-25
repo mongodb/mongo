@@ -276,8 +276,8 @@ add_option('gcov',
 )
 
 add_option('enable-free-mon',
-    choices=["on", "off"],
-    default="off",
+    choices=["auto", "on", "off"],
+    default="auto",
     help='Disable support for Free Monitoring to avoid HTTP client library dependencies',
     type='choice',
 )
@@ -1816,10 +1816,12 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 # --- check system ---
 ssl_provider = None
- 
+free_monitoring = get_option("enable-free-mon")
+
 def doConfigure(myenv):
     global wiredtiger
     global ssl_provider
+    global free_monitoring
 
     # Check that the compilers work.
     #
@@ -2976,6 +2978,21 @@ def doConfigure(myenv):
     else:
         ssl_provider = "none"
 
+    if free_monitoring == "auto":
+        if "enterprise" not in env['MONGO_MODULES']:
+            free_monitoring = "on"
+        else:
+            free_monitoring = "off"
+
+    if not env.TargetOSIs("windows") \
+        and free_monitoring == "on" \
+        and not conf.CheckLibWithHeader(
+        "curl",
+        ["curl/curl.h"], "C",
+        "curl_global_init(0);",
+        autoadd=False):
+        env.ConfError("Could not find <curl/curl.h> and curl lib")
+
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
         conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
@@ -3365,6 +3382,7 @@ Export("mmapv1")
 Export("mobile_se")
 Export("endian")
 Export("ssl_provider")
+Export("free_monitoring")
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
