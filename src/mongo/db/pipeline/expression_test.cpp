@@ -2923,9 +2923,10 @@ TEST(ExpressionFilter, ExpressionFilterWithASetLimitShouldReturnAArrayNoGreaterT
     ASSERT_TRUE(sixElemArray.getArray().size() == 6);
     ASSERT_VALUE_EQ(sixElemArray, Value(BSON_ARRAY(4 << 5 << 6 << 7 << 8 << 9)));
 }
-TEST(ExpressionArrayElemAt, ShouldEvaluateProperly) {
+TEST(ExpressionArrayElemAt, ArrayElemAtWithFilterShouldEvaluateCorrectly) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
+    // Returns an array with all values greater than 3.
     auto filterSpec = BSON(
         "$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9) << "as"
                                   << "arr"
@@ -2938,6 +2939,11 @@ TEST(ExpressionArrayElemAt, ShouldEvaluateProperly) {
     auto val = xpArrayElemAt->evaluate(Document());
     ASSERT_VALUE_EQ(val, Value(6));
 
+    auto eA = ExpressionArrayElemAt::parse(expCtx, BSON("$arrayElemAt" << BSON_ARRAY(BSON_ARRAY(1 << 2 <<3 << 4 <<5) << 1)).firstElement(), vps);
+    auto eAO = dynamic_cast<ExpressionArrayElemAt*>(eA.get())->optimize();
+    auto va = eAO->evaluate(Document());
+    ASSERT_VALUE_EQ(va, Value(2));
+
     auto ElemAtNegativeIndex = BSON("$arrayElemAt" << BSON_ARRAY(filterSpec << -2));
     auto expElemAtNegativeIndex =
         ExpressionArrayElemAt::parse(expCtx, ElemAtNegativeIndex.firstElement(), vps);
@@ -2946,9 +2952,10 @@ TEST(ExpressionArrayElemAt, ShouldEvaluateProperly) {
     ASSERT_VALUE_EQ(elemAtNegativeIndexOptimized->evaluate(Document()), Value(8));
 }
 
-TEST(ExpressionSlice, ShouldEvaluateProperly) {
+TEST(ExpressionSlice, SliceWithFilterShouldEvaluateCorrectly) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
+    // Returns an array with values greater than 1.
     auto filterSpec = BSON(
         "$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9) << "as"
                                   << "arr"

@@ -542,10 +542,10 @@ intrusive_ptr<Expression> ExpressionArrayElemAt::optimize() {
                                   << " a 32-bit integer: " 
                                   << indexArg.coerceToDouble(),
                     indexArg.integral());
-
+            auto ind = indexArg.coerceToInt();
             // Can't optimize of the index is less that 0
-            if (indexArg.getInt() >= 0) {
-                dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(indexArg.getInt() + 1);
+            if (ind  >= 0) {
+                dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(ind + 1);
             }
         }
     }
@@ -3940,52 +3940,53 @@ intrusive_ptr<Expression> ExpressionSlice::optimize() {
     // the array returned by the filter is equal to the last arguement passed to ExpressionSlice.
     if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
         if (auto secondArg = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
-            auto arg2 = secondArg->getValue();
+            auto secondVal = secondArg->getValue();
 
             uassert(50797,
                     str::stream() << "Second argument to $slice must be a numeric value,"
-                                  << " but is of type: " 
-                                  << typeName(arg2.getType()),
-                    arg2.numeric());
+                                  << " but is of type: "
+                                  << typeName(secondVal.getType()),
+                    secondVal.numeric());
 
             uassert(50798,
                     str::stream() << "Second argument to $slice can't be represented as"
                                   << " a 32-bit integer: " 
-                                  << arg2.coerceToDouble(),
-                    arg2.integral());
+                                  << secondVal.coerceToDouble(),
+                    secondVal.integral());
 
+            int arg2 = secondVal.coerceToInt();
             if (vpOperand.size() == 2) {
                 // Can't set a limit if it is negative.
-                if (arg2.getInt() >= 0) {
-                    dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
-                        ->setLimit(arg2.getInt() + 1);
+                if (arg2 >= 0) {
+                    // If slice is given two arguments set limit to the position we want to slice.
+                    dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(arg2);
                 }
             } else if (vpOperand.size() > 2) {
                 if (auto thirdArg = dynamic_cast<ExpressionConstant*>(vpOperand[2].get())) {
-                    auto arg3 = thirdArg->getValue();
+                    auto thirdVal = thirdArg->getValue();
 
                     uassert(50799,
                             str::stream() << "Third argument to $slice must be numeric, but "
-                                          << "is of type: " << typeName(arg3.getType()),
-                            arg3.numeric());
+                                          << "is of type: " << typeName(thirdVal.getType()),
+                            thirdVal.numeric());
 
                     uassert(50800,
                             str::stream() << "Third argument to $slice can't be represented"
-                                          << " as a 32-bit integer: " << arg3.coerceToDouble(),
-                            arg3.integral());
+                                          << " as a 32-bit integer: " 
+                                          << thirdVal.coerceToDouble(),
+                            thirdVal.integral());
 
                     uassert(50801,
                             str::stream() << "Third argument to $slice must be positive: "
-                                          << arg3.coerceToInt(),
-                            arg3.coerceToInt() > 0);
+                                          << thirdVal.coerceToInt(),
+                            thirdVal.coerceToInt() > 0);
 
-
-                    // Need both arguements to be postive.
-                    if (arg2.getInt() >= 0 && arg3.getInt() >= 0) {
+                    int arg3 = thirdVal.coerceToInt();
+                    if (arg2 >= 0) {
                         // If ExpressionSlice is given three arguments set limit to 'firstArg' +
                         // 'secondArg' + 1.
                         dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
-                            ->setLimit(arg2.getInt() + arg3.getInt() + 1);
+                            ->setLimit(arg2 + arg3 + 1);
                     }
                 }
             }
