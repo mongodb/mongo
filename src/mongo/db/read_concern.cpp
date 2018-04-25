@@ -208,9 +208,6 @@ Status waitForReadConcern(OperationContext* opCtx,
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord);
 
-    opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(readConcernArgs.getLevel(),
-                                                                 replCoord->getReplicationMode());
-
     auto session = OperationContextSession::get(opCtx);
     // Currently speculative read concern is used only for transactions and snapshot reads.
     const bool speculative = session && session->inSnapshotReadOrMultiDocumentTransaction();
@@ -308,8 +305,8 @@ Status waitForReadConcern(OperationContext* opCtx,
     if (atClusterTime) {
         // TODO(SERVER-34620): We should be using Session::setSpeculativeTransactionReadOpTime when
         // doing speculative execution with atClusterTime.
-        fassert(39345,
-                opCtx->recoveryUnit()->setPointInTimeReadTimestamp(atClusterTime->asTimestamp()));
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                      atClusterTime->asTimestamp());
         return Status::OK();
     }
 
@@ -328,6 +325,7 @@ Status waitForReadConcern(OperationContext* opCtx,
         LOG(debugLevel) << "Waiting for 'committed' snapshot to be available for reading: "
                         << readConcernArgs;
 
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
         Status status = opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot();
 
         // Wait until a snapshot is available.
@@ -342,6 +340,10 @@ Status waitForReadConcern(OperationContext* opCtx,
         }
 
         LOG(debugLevel) << "Using 'committed' snapshot: " << CurOp::get(opCtx)->opDescription();
+    }
+
+    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kAvailableReadConcern) {
+        opCtx->recoveryUnit()->setIgnorePrepared(true);
     }
 
     return Status::OK();

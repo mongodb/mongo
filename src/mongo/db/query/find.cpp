@@ -349,15 +349,11 @@ Message getMore(OperationContext* opCtx,
         *isCursorAuthorized = true;
 
         const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
-        opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(cc->getReadConcernLevel(),
-                                                                     replicationMode);
 
-        // TODO SERVER-33698: Remove kSnapshotReadConcern clause once we can guarantee that a
-        // readConcern level snapshot getMore will have an established point-in-time WiredTiger
-        // snapshot.
         if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-            (cc->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-             cc->getReadConcernLevel() == repl::ReadConcernLevel::kSnapshotReadConcern)) {
+            cc->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+            opCtx->recoveryUnit()->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kMajorityCommitted);
             uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
         }
 
@@ -660,13 +656,14 @@ std::string runQuery(OperationContext* opCtx,
         exec->saveState();
         exec->detachFromOperationContext();
 
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         // Allocate a new ClientCursor and register it with the cursor manager.
         ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
             opCtx,
             {std::move(exec),
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             opCtx->recoveryUnit()->getReadConcernLevel(),
+             readConcernArgs.getLevel(),
              upconvertedQuery});
         ccId = pinnedCursor.getCursor()->cursorid();
 

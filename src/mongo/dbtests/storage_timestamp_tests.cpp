@@ -81,12 +81,16 @@ class OneOffRead {
 public:
     OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        ASSERT_OK(_opCtx->recoveryUnit()->setPointInTimeReadTimestamp(ts));
+        if (ts.isNull()) {
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNone);
+        } else {
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts);
+        }
     }
 
     ~OneOffRead() {
         _opCtx->recoveryUnit()->abandonSnapshot();
-        ASSERT_OK(_opCtx->recoveryUnit()->setPointInTimeReadTimestamp(Timestamp::min()));
+        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNone);
     }
 
 private:
@@ -188,7 +192,7 @@ public:
      */
     void reset(NamespaceString nss) const {
         ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
-            invariant(_opCtx->recoveryUnit()->setPointInTimeReadTimestamp(Timestamp::min()).isOK());
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNone);
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
 
             if (collRaii.getCollection()) {
@@ -799,7 +803,8 @@ public:
         // Reading at `insertTime` should show the original document, `{_id: 0, field: 0}`.
         auto recoveryUnit = _opCtx->recoveryUnit();
         recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(insertTime.asTimestamp()));
+        recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                             insertTime.asTimestamp());
         auto doc = findOne(autoColl.getCollection());
         ASSERT_EQ(0,
                   SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0 << "field" << 0)))
@@ -808,7 +813,8 @@ public:
         // Reading at `insertTime + 1` should show the second insert that got converted to an
         // upsert, `{_id: 0}`.
         recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(insertTime.addTicks(1).asTimestamp()));
+        recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                             insertTime.addTicks(1).asTimestamp());
         doc = findOne(autoColl.getCollection());
         ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0)))
             << "Doc: " << doc.toString() << " Expected: {_id: 0}";
@@ -857,7 +863,8 @@ public:
         // Reading at `preInsertTimestamp` should not find anything.
         auto recoveryUnit = _opCtx->recoveryUnit();
         recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(preInsertTimestamp.asTimestamp()));
+        recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                             preInsertTimestamp.asTimestamp());
         ASSERT_EQ(0, itCount(autoColl.getCollection()))
             << "Should not observe a write at `preInsertTimestamp`. TS: "
             << preInsertTimestamp.asTimestamp();
@@ -865,8 +872,8 @@ public:
         // Reading at `preInsertTimestamp + 1` should observe both inserts.
         recoveryUnit = _opCtx->recoveryUnit();
         recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(
-            preInsertTimestamp.addTicks(1).asTimestamp()));
+        recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                             preInsertTimestamp.addTicks(1).asTimestamp());
         ASSERT_EQ(2, itCount(autoColl.getCollection()))
             << "Should observe both writes at `preInsertTimestamp + 1`. TS: "
             << preInsertTimestamp.addTicks(1).asTimestamp();
@@ -920,15 +927,16 @@ public:
         // Reading at `insertTime` should not see any documents.
         auto recoveryUnit = _opCtx->recoveryUnit();
         recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(preInsertTimestamp.asTimestamp()));
+        recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                             preInsertTimestamp.asTimestamp());
         ASSERT_EQ(0, itCount(autoColl.getCollection()))
             << "Should not find any documents at `preInsertTimestamp`. TS: "
             << preInsertTimestamp.asTimestamp();
 
         // Reading at `preInsertTimestamp + 1` should show the final state of the document.
         recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(
-            preInsertTimestamp.addTicks(1).asTimestamp()));
+        recoveryUnit->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                             preInsertTimestamp.addTicks(1).asTimestamp());
         auto doc = findOne(autoColl.getCollection());
         ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, BSON("_id" << 0)))
             << "Doc: " << doc.toString() << " Expected: {_id: 0}";

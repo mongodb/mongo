@@ -144,18 +144,14 @@ public:
 
     int itCountCommitted() {
         auto op = makeOperation();
-        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            repl::ReplicationCoordinator::modeReplSet);
+        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
         ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
         return itCountOn(op);
     }
 
     int itCountLocal() {
         auto op = makeOperation();
-        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-            repl::ReadConcernLevel::kLocalReadConcern, repl::ReplicationCoordinator::modeReplSet);
-        op->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(true);
+        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
         return itCountOn(op);
     }
 
@@ -168,9 +164,7 @@ public:
     }
     boost::optional<Record> readRecordCommitted(RecordId id) {
         auto op = makeOperation();
-        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            repl::ReplicationCoordinator::modeReplSet);
+        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
         ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
         return readRecordOn(op, id);
     }
@@ -183,9 +177,7 @@ public:
 
     boost::optional<Record> readRecordLocal(RecordId id) {
         auto op = makeOperation();
-        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-            repl::ReadConcernLevel::kLocalReadConcern, repl::ReplicationCoordinator::modeReplSet);
-        op->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(true);
+        op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
         return readRecordOn(op, id);
     }
 
@@ -227,9 +219,9 @@ TEST_F(SnapshotManagerTests, ConsistentIfNotSupported) {
 
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    auto readConcernLevel = ru->getReadConcernLevel();
-    ASSERT(readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
-           readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
+    auto readSource = ru->getTimestampReadSource();
+    ASSERT(readSource != RecoveryUnit::ReadSource::kMajorityCommitted);
+    ASSERT(!ru->getPointInTimeReadTimestamp());
 }
 
 TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
@@ -238,8 +230,7 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
 
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    ru->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kMajorityReadConcern,
-                                              repl::ReplicationCoordinator::modeReplSet);
+    op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
 
     // Before first snapshot is created.
     ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
@@ -265,8 +256,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
         return;  // This test is only for engines that DO support SnapshotManagers.
 
     auto op = makeOperation();
-    op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-        repl::ReadConcernLevel::kMajorityReadConcern, repl::ReplicationCoordinator::modeReplSet);
+    op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
 
     // Start an operation using a committed snapshot.
     auto snap = fetchAndIncrementTimestamp();
@@ -322,8 +312,7 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
 
     // This op should keep its original snapshot until abandoned.
     auto longOp = makeOperation();
-    longOp->recoveryUnit()->setReadConcernLevelAndReplicationMode(
-        repl::ReadConcernLevel::kMajorityReadConcern, repl::ReplicationCoordinator::modeReplSet);
+    longOp->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
     ASSERT_OK(longOp->recoveryUnit()->obtainMajorityCommittedSnapshot());
     ASSERT_EQ(itCountOn(longOp), 3);
 
@@ -383,7 +372,7 @@ TEST_F(SnapshotManagerTests, InsertAndReadOnLocalSnapshot) {
     // Not reading on the last local timestamp returns the most recent data.
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    ru->setShouldReadAtLastAppliedTimestamp(false);
+    ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNone);
     ASSERT_EQ(itCountOn(op), 1);
     ASSERT(readRecordOn(op, id));
 
@@ -419,7 +408,7 @@ TEST_F(SnapshotManagerTests, UpdateAndDeleteOnLocalSnapshot) {
     // Not reading on the last local timestamp returns the most recent data.
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
-    ru->setShouldReadAtLastAppliedTimestamp(false);
+    ru->setTimestampReadSource(RecoveryUnit::ReadSource::kNone);
     ASSERT_EQ(itCountOn(op), 1);
     auto record = readRecordOn(op, id);
     ASSERT_EQ(std::string(record->data.data()), "Blue spotted stingray");

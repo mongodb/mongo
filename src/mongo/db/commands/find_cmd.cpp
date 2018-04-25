@@ -375,7 +375,7 @@ public:
                 {std::move(exec),
                  nss,
                  AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                 opCtx->recoveryUnit()->getReadConcernLevel(),
+                 repl::ReadConcernArgs::get(opCtx).getLevel(),
                  cmdObj});
             cursorId = pinnedCursor.getCursor()->cursorid();
 

@@ -135,7 +135,7 @@
         readConcern: {level: "snapshot", atClusterTime: Timestamp(1, 1)},
         txnNumber: NumberLong(primaryTxnNumber++)
     }),
-                                 ErrorCodes.SnapshotTooOld);
+                                 ErrorCodes.SnapshotUnavailable);
 
     rst.stopSet();
 }());

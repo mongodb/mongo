@@ -50,13 +50,6 @@ public:
     RecoveryUnit* ru;
 };
 
-
-TEST_F(RecoveryUnitTestHarness, SetReadConcernLevel) {
-    ru->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kAvailableReadConcern,
-                                              repl::ReplicationCoordinator::modeReplSet);
-    ASSERT_TRUE(repl::ReadConcernLevel::kAvailableReadConcern == ru->getReadConcernLevel());
-}
-
 TEST_F(RecoveryUnitTestHarness, CommitUnitOfWork) {
     const auto rs = harnessHelper->createRecordStore(opCtx.get(), "table1");
     ru->beginUnitOfWork(opCtx.get());

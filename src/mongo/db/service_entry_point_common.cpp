@@ -1233,7 +1233,7 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
 
     if (c.isInDirectClient()) {
         if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber() ||
-            opCtx->recoveryUnit()->getReadConcernLevel() !=
+            repl::ReadConcernArgs::get(opCtx).getLevel() !=
                 repl::ReadConcernLevel::kSnapshotReadConcern) {
             invariant(!opCtx->lockState()->inAWriteUnitOfWork());
         }

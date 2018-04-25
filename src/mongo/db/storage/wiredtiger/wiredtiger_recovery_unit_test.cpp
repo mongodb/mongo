@@ -150,11 +150,14 @@ private:
     const char* wt_config = "key_format=S,value_format=S";
 };
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {
+    ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, Timestamp(1, 1));
+    ASSERT_EQ(RecoveryUnit::ReadSource::kProvided, ru1->getTimestampReadSource());
+    ASSERT_EQ(Timestamp(1, 1), ru1->getPointInTimeReadTimestamp());
+}
 TEST_F(WiredTigerRecoveryUnitTestFixture,
        LocalReadOnADocumentBeingPreparedTriggersPrepareConflict) {
     // Prepare but don't commit a transaction
-    ru1->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kLocalReadConcern,
-                                               repl::ReplicationCoordinator::modeNone);
     ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
@@ -164,10 +167,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Transaction with local readConcern triggers WT_PREPARE_CONFLICT
+    // Transaction read default triggers WT_PREPARE_CONFLICT
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
-    ru2->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kLocalReadConcern,
-                                               repl::ReplicationCoordinator::modeNone);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
@@ -180,8 +181,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 TEST_F(WiredTigerRecoveryUnitTestFixture,
        AvailableReadOnADocumentBeingPreparedDoesNotTriggerPrepareConflict) {
     // Prepare but don't commit a transaction
-    ru1->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kLocalReadConcern,
-                                               repl::ReplicationCoordinator::modeNone);
     ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
@@ -191,11 +190,10 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Transaction with available readConcern wouldn't trigger
+    // Transaction that should ignore prepared transactions won't trigger
     // WT_PREPARE_CONFLICT
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
-    ru2->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kAvailableReadConcern,
-                                               repl::ReplicationCoordinator::modeNone);
+    ru2->setIgnorePrepared(true);
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     int ret = cursor->search(cursor);
@@ -207,8 +205,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersWTRollback) {
     // Prepare but don't commit a transaction
-    ru1->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kLocalReadConcern,
-                                               repl::ReplicationCoordinator::modeNone);
     ru1->beginUnitOfWork(clientAndCtx1.second.get());
     WT_CURSOR* cursor;
     getCursor(ru1, &cursor);
@@ -218,7 +214,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
-    // Another transaction with wirte triggers WT_ROLLBACK
+    // Another transaction with write triggers WT_ROLLBACK
     ru2->beginUnitOfWork(clientAndCtx2.second.get());
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");

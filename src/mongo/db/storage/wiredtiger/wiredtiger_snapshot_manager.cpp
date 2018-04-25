@@ -74,76 +74,34 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommi
     return _committedSnapshot;
 }
 
-Status WiredTigerSnapshotManager::setTransactionReadTimestamp(Timestamp pointInTime,
-                                                              WT_SESSION* session,
-                                                              bool roundToOldest) const {
-    char readTSConfigString[15 /* read_timestamp= */ + 16 /* 16 hexadecimal digits */ +
-                            17 /* ,round_to_oldest= */ + 5 /* false */ + 1 /* trailing null */];
-    auto size = std::snprintf(readTSConfigString,
-                              sizeof(readTSConfigString),
-                              "read_timestamp=%llx,round_to_oldest=%s",
-                              pointInTime.asULL(),
-                              (roundToOldest) ? "true" : "false");
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(40664);
-    }
-    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
-
-    return wtRCToStatus(session->timestamp_transaction(session, readTSConfigString));
-}
-
 Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session) const {
-    invariantWTOK(session->begin_transaction(session, nullptr));
-    auto rollbacker =
-        MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
+    WiredTigerBeginTxnBlock txnOpen(session);
 
     stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
     uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
             "Committed view disappeared while running operation",
             _committedSnapshot);
 
-    auto status = setTransactionReadTimestamp(_committedSnapshot.get(), session);
+    auto status = txnOpen.setTimestamp(_committedSnapshot.get());
     fassert(30635, status);
-    rollbacker.Dismiss();
+
+    txnOpen.done();
     return *_committedSnapshot;
 }
 
 Timestamp WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(WT_SESSION* session,
                                                                      bool ignorePrepare) const {
-    invariantWTOK(
-        session->begin_transaction(session, (ignorePrepare) ? "ignore_prepare=true" : nullptr));
-    auto rollbacker =
-        MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
+    WiredTigerBeginTxnBlock txnOpen(session, ignorePrepare);
 
     stdx::lock_guard<stdx::mutex> lock(_localSnapshotMutex);
     invariant(_localSnapshot);
-
     LOG(3) << "begin_transaction on local snapshot " << _localSnapshot.get().toString();
-    auto status = setTransactionReadTimestamp(_localSnapshot.get(), session);
+    auto status = txnOpen.setTimestamp(_localSnapshot.get());
     fassert(50775, status);
-    rollbacker.Dismiss();
+
+    txnOpen.done();
     return *_localSnapshot;
-}
-
-void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* oplogManager,
-                                                        WT_SESSION* session) const {
-    invariantWTOK(session->begin_transaction(session, nullptr));
-    auto rollbacker =
-        MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
-
-    auto allCommittedTimestamp = oplogManager->getOplogReadTimestamp();
-    invariant(Timestamp(static_cast<unsigned long long>(allCommittedTimestamp)).asULL() ==
-              allCommittedTimestamp);
-    auto status = setTransactionReadTimestamp(
-        Timestamp(static_cast<unsigned long long>(allCommittedTimestamp)),
-        session,
-        true /* roundToOldest */);
-
-    fassert(50771, status);
-    rollbacker.Dismiss();
 }
 
 }  // namespace mongo

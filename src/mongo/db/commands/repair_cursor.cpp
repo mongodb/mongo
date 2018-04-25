@@ -103,7 +103,7 @@ public:
             {std::move(exec),
              ns,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             opCtx->recoveryUnit()->getReadConcernLevel(),
+             repl::ReadConcernArgs::get(opCtx).getLevel(),
              cmdObj});
 
         appendCursorResponseObject(

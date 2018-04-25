@@ -333,10 +333,11 @@ Status runAggregate(OperationContext* opCtx,
 
             // If the read concern is not specified, upgrade to 'majority' and wait to make sure we
             // have a snapshot available.
-            if (!repl::ReadConcernArgs::get(opCtx).hasLevel()) {
-                const repl::ReadConcernArgs readConcern(
-                    repl::ReadConcernLevel::kMajorityReadConcern);
-                uassertStatusOK(waitForReadConcern(opCtx, readConcern, true));
+            auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            if (!readConcernArgs.hasLevel()) {
+                readConcernArgs =
+                    repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+                uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, true));
             }
 
             if (!origNss.isCollectionlessAggregateNS()) {
@@ -502,7 +503,7 @@ Status runAggregate(OperationContext* opCtx,
         std::move(exec),
         origNss,
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-        opCtx->recoveryUnit()->getReadConcernLevel(),
+        repl::ReadConcernArgs::get(opCtx).getLevel(),
         cmdObj);
     if (expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
         cursorParams.setTailable(true);

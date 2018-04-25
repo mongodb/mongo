@@ -57,18 +57,6 @@ public:
     //
 
     /**
-     * Sets the read timestamp on a transaction.
-     *
-     * Reads will be reflect the state of data as of the specified timestamp.
-     *
-     * If roundToOldest is true, rounds the timestamp up to the oldest_timestamp if it is larger.
-     * The default is false.
-     */
-    Status setTransactionReadTimestamp(Timestamp pointInTime,
-                                       WT_SESSION* session,
-                                       bool roundToOldest = false) const;
-
-    /**
      * Starts a transaction and returns the SnapshotName used.
      *
      * Throws if there is currently no committed snapshot.
@@ -81,12 +69,6 @@ public:
      * Throws if no local snapshot has been set.
      */
     Timestamp beginTransactionOnLocalSnapshot(WT_SESSION* session, bool ignorePrepare) const;
-
-
-    /**
-     * Starts a transaction on the oplog using an appropriate timestamp for oplog visiblity.
-     */
-    void beginTransactionOnOplog(WiredTigerOplogManager* oplogManager, WT_SESSION* session) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to

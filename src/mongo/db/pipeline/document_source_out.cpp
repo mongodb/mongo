@@ -223,7 +223,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
             str::stream() << "$out only supports a string argument, not " << typeName(elem.type()),
             elem.type() == String);
 
-    auto readConcernLevel = pExpCtx->opCtx->recoveryUnit()->getReadConcernLevel();
+    auto readConcernLevel = repl::ReadConcernArgs::get(pExpCtx->opCtx).getLevel();
     uassert(ErrorCodes::InvalidOptions,
             "$out can not be used with either a 'majority' or 'snapshot' read concern level",
             readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&

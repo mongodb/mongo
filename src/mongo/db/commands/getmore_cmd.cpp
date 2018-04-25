@@ -345,15 +345,10 @@ public:
         ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &ccPin.getValue());
 
         const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
-        opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(cursor->getReadConcernLevel(),
-                                                                     replicationMode);
-
-        // TODO SERVER-33698: Remove kSnapshotReadConcern clause once we can guarantee that a
-        // readConcern level snapshot getMore will have an established point-in-time WiredTiger
-        // snapshot.
         if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-            (cursor->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-             cursor->getReadConcernLevel() == repl::ReadConcernLevel::kSnapshotReadConcern)) {
+            cursor->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
+            opCtx->recoveryUnit()->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kMajorityCommitted);
             uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
         }
 

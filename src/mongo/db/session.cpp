@@ -385,10 +385,19 @@ void Session::beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber t
 }
 
 void Session::setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx) {
+    // TODO: This check can be removed once SERVER-34113 is completed. Certain commands that use
+    // DBDirectClient can use snapshot readConcern, but are not supported in transactions. These
+    // commands are only allowed when test commands are enabled, but violate an invariant that the
+    // read timestamp cannot be changed on a RecoveryUnit while it is active.
+    if (opCtx->getClient()->isInDirectClient() &&
+        opCtx->recoveryUnit()->getTimestampReadSource() != RecoveryUnit::ReadSource::kNone) {
+        return;
+    }
+
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     repl::ReplicationCoordinator* replCoord =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
-    opCtx->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(true);
+    opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastAppliedSnapshot);
     opCtx->recoveryUnit()->preallocateSnapshot();
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
     invariant(readTimestamp);

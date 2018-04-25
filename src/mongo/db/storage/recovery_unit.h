@@ -55,12 +55,6 @@ public:
     virtual ~RecoveryUnit() {}
 
     /**
-     * A storage engine may elect to append state information to the passed BSONObjBuilder.  This
-     * function is not currently called by any MongoDB command, but may in the future.
-     */
-    virtual void reportState(BSONObjBuilder* b) const {}
-
-    /**
      * These should be called through WriteUnitOfWork rather than directly.
      *
      * A call to 'beginUnitOfWork' marks the beginning of a unit of work. Each call to
@@ -85,6 +79,11 @@ public:
      * This cannot be called after setTimestamp or setCommitTimestamp.
      */
     virtual void prepareUnitOfWork() {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support prepared transactions");
+    }
+
+    virtual void setIgnorePrepared(bool ignore) {
         uasserted(ErrorCodes::CommandNotSupported,
                   "This storage engine does not support prepared transactions");
     }
@@ -145,46 +144,16 @@ public:
     }
 
     /**
-     * Set this operation's readConcern level and replication mode on the recovery unit.
-     */
-    void setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel readConcernLevel,
-                                               repl::ReplicationCoordinator::Mode replicationMode) {
-        _readConcernLevel = readConcernLevel;
-        _replicationMode = replicationMode;
-    }
-
-    /**
-     * Returns the readConcern level of this recovery unit.
-     */
-    repl::ReadConcernLevel getReadConcernLevel() const {
-        return _readConcernLevel;
-    }
-
-    /**
-     * Tells the recovery unit to read at the last applied timestamp, tracked by the SnapshotManger.
-     * For local and available read concerns, this should be used to read from a consistent state on
-     * a secondary while replicated batches are being applied.
-     *
-     * For snapshot read concerns, should be used for "speculative" snapshots which provide a
-     * view of the data which may become majority committed in the future.
-     */
-    void setShouldReadAtLastAppliedTimestamp(bool value) {
-        invariant(!value || _readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
-                  _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern ||
-                  _readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
-        _shouldReadAtLastAppliedTimestamp = value;
-    }
-
-    /**
      * Returns the Timestamp being used by this recovery unit or boost::none if not reading from
-     * a point in time. Any point in time returned will reflect either:
-     *  - A timestamp set via call to setPointInTimeReadTimestamp()
-     *  - A majority committed snapshot timestamp (chosen by the storage engine when read-majority
-     *    has been enabled via call to obtainMajorityCommittedSnapshot())
+     * a point in time. Any point in time returned will reflect one of the following:
+     *  - when using ReadSource::kProvided, the timestamp provided.
+     *  - when using ReadSource::kLastAppliedSnapshot, the timestamp chosen using the storage
+     * engine's last applied timestamp.
+     *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
+     * storage engine after a transaction has been opened or after a call to
+     * obtainMajorityCommittedSnapshot().
      */
     virtual boost::optional<Timestamp> getPointInTimeReadTimestamp() const {
-        invariant(_readConcernLevel != repl::ReadConcernLevel::kMajorityReadConcern &&
-                  _readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
         return boost::none;
     }
 
@@ -237,12 +206,34 @@ public:
     }
 
     /**
-     * Sets which timestamp to use for read transactions.
+     * When no read timestamp is provided to the recovery unit, the ReadSource indicates which
+     * external timestamp source to read from.
      */
-    virtual Status setPointInTimeReadTimestamp(Timestamp timestamp) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "point-in-time reads are not implemented for this storage engine");
-    }
+    enum ReadSource {
+        kNone,               // Do not read from a timestamp. This is the default.
+        kMajorityCommitted,  // Read from the majority all-commmitted timestamp.
+        kLastApplied,  // Read from the last applied timestamp. New transactions start at the most
+                       // up-to-date timestamp.
+        kLastAppliedSnapshot,  // Read from the last applied timestamp. New transactions will always
+                               // read from the same timestamp and never advance.
+        kProvided              // Read from the timestamp provided to setTimestampReadSource.
+    };
+
+    /**
+     * Sets which timestamp to use for read transactions. If 'provided' is supplied, only kProvided
+     * is an acceptable input.
+     *
+     * Must be called in one of the following cases:
+     * - a transaction is not active
+     * - no read source has been set yet
+     * - the read source provided is the same as the existing read source
+     */
+    virtual void setTimestampReadSource(ReadSource source,
+                                        boost::optional<Timestamp> provided = boost::none) {}
+
+    virtual ReadSource getTimestampReadSource() const {
+        return ReadSource::kNone;
+    };
 
     /**
      * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
@@ -370,9 +361,6 @@ public:
 
 protected:
     RecoveryUnit() {}
-    repl::ReplicationCoordinator::Mode _replicationMode = repl::ReplicationCoordinator::modeNone;
-    repl::ReadConcernLevel _readConcernLevel = repl::ReadConcernLevel::kLocalReadConcern;
-    bool _shouldReadAtLastAppliedTimestamp = false;
 };
 
 }  // namespace mongo
