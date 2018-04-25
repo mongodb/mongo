@@ -23,6 +23,7 @@
     var db = testServer.getDB("test");
     if (!db.serverStatus().storageEngine.supportsCommittedReads) {
         print("Skipping read_majority.js since storageEngine doesn't support it.");
+        MongoRunner.stopMongod(testServer);
         return;
     }
     MongoRunner.stopMongod(testServer);

@@ -16,3 +16,4 @@ for (var i = 1000; i < 2000; ++i) {
     t.remove({_id: i});
 }
 assert.writeOK(t.insert({_id: 2000, a: 'abcd', b: 'bcde', x: 'four score and seven years ago'}));
+MongoRunner.stopMongod(m);

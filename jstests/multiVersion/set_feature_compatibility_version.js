@@ -557,4 +557,5 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.writeOK(st.s.getDB("test").foo.insert({x: 1}));
 
     st.stop();
+    MongoRunner.stopMongos(downgradeMongos);
 })();

@@ -5,3 +5,4 @@ t = m.getDB('test').test;
 t.save({x: 1});
 t.createIndex({x: 1}, {background: true});
 t.count();
+MongoRunner.stopMongod(m);

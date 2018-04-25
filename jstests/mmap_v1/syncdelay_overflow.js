@@ -12,4 +12,5 @@
     var res = conn.adminCommand({setParameter: 1, 'syncdelay': 18446744073709552000});
     assert.commandFailedWithCode(res, 2);
     assert.gt(res["errmsg"].indexOf("syncdelay must be between"), -1);
+    MongoRunner.stopMongod(conn);
 })();
