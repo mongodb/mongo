@@ -349,4 +349,6 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
             threads.forEach(thread => thread.join());
         }
     }
+
+    replTest.stopSet();
 }());

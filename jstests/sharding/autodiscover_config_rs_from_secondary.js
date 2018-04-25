@@ -47,4 +47,6 @@
     var admin = mongos.getDB('admin');
     mongos.setSlaveOk(true);
     assert.eq(1, admin.foo.findOne().a);
+    MongoRunner.stopMongos(mongos);
+    rst.stopSet();
 })();

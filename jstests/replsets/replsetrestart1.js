@@ -66,4 +66,5 @@
     replTest.awaitSecondaryNodes();
     var config2 = master.getDB("local").system.replset.findOne();
     compare_configs(config1, config2);
+    replTest.stopSet();
 }());

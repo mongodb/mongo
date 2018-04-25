@@ -126,4 +126,5 @@
     assert.soon(function() {
         return secondary.getDB("foo").foo.find().itcount() == numDocuments;
     });
+    replSet.stopSet();
 })();

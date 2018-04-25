@@ -70,4 +70,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(4, foundDocs.length, 'Incorrect number of documents found ' + tojson(foundDocs));
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 })();

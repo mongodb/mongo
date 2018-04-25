@@ -18,5 +18,8 @@
     var oldNode = conns[0];
     var config = rst.getReplSetConfig();
     var response = oldNode.getDB("admin").runCommand({replSetInitiate: config});
-    assert.eq(response.ok, 1);
+    assert.commandWorked(response);
+    // Wait for secondaries to finish their initial sync before shutting down the cluster.
+    rst.awaitSecondaryNodes();
+    rst.stopSet();
 })();

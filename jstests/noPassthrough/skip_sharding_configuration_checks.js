@@ -49,4 +49,5 @@
     shardRS.startSet({}, true);
     expectState(shardRS, ReplSetTest.State.PRIMARY);
     shardRS.stopSet();
+    MongoRunner.stopMongos(st.s);
 })();

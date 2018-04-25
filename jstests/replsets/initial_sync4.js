@@ -81,6 +81,6 @@
     assert.eq(mc.getIndexKeys().length, sc.getIndexKeys().length);
 
     assert.eq(mc.find().sort({x: 1}).itcount(), sc.find().sort({x: 1}).itcount());
-
+    MongoRunner.stopMongod(s);
     replTest.stopSet(15);
 }());

@@ -51,5 +51,5 @@
     assert.soon(function() {
         return rawMongoProgramOutput().match("behind the freshest");
     });
-
+    replSet.stopSet();
 })();

@@ -32,4 +32,5 @@
     replSet.waitForState(2, ReplSetTest.State.PRIMARY);
 
     // Cannot stop any more nodes because we will not have a majority.
+    replSet.stopSet();
 })();

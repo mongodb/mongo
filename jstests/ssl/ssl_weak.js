@@ -30,7 +30,7 @@ mongo = runMongoProgram("mongo",
 
 // 0 is the exit code for success
 assert(mongo == 0);
-
+MongoRunner.stopMongod(md);
 // Test that connecting with no client certificate and no --sslAllowConnectionsWithoutCertificates
 // fails to connect.
 var md2 = MongoRunner.runMongod({
@@ -44,3 +44,4 @@ mongo = runMongoProgram(
 
 // 1 is the exit code for failure
 assert(mongo == 1);
+MongoRunner.stopMongod(md2);

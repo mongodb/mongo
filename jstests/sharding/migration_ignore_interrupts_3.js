@@ -104,4 +104,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard2Coll2.find().itcount(), "shard2 failed to complete migration.");
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 })();

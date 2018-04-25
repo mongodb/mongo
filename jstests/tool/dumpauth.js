@@ -44,3 +44,4 @@ assert.eq(exitCode, 0, "mongodump should succeed with authentication");
 exitCode =
     MongoRunner.runMongoTool("bsondump", {}, dumpDir + "/" + dbName + "/" + profileName + ".bson");
 assert.eq(exitCode, 0, "bsondump should succeed parsing the profile data");
+MongoRunner.stopMongod(m);

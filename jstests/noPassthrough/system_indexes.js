@@ -78,5 +78,6 @@
     conn = MongoRunner.runMongod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.roles.getIndexes().length);
+    MongoRunner.stopMongod(conn);
 
 })();

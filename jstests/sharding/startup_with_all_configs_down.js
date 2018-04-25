@@ -97,4 +97,5 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(100, newMongosConn.getDB('test').foo.find().itcount());
 
     st.stop();
+    MongoRunner.stopMongos(newMongosInfo);
 }());

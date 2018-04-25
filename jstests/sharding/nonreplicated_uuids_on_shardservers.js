@@ -19,4 +19,5 @@
 
     // Ensure the new node has UUIDs for all its collections.
     checkCollectionUUIDs(secondaryAdminDB, /*isDowngrade*/ false);
+    st.stop();
 })();

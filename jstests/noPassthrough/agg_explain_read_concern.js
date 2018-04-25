@@ -52,4 +52,6 @@
         expectedErrStr = "Command does not support non local";
         assert.neq(cmdRes.errmsg.indexOf(expectedErrStr), -1, tojson(cmdRes));
     });
+
+    rst.stopSet();
 }());

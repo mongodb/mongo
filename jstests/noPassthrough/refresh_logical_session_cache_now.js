@@ -41,5 +41,5 @@
 
     assert.eq(
         config.system.sessions.count(), numSessions + 1, "should have written session records");
-
+    MongoRunner.stopMongod(conn);
 }());

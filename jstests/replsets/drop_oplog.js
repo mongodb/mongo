@@ -32,5 +32,5 @@
     renameOutput = localDB.foo.renameCollection("oplog.rs");
     assert.eq(renameOutput.ok, 0);
     assert.eq(renameOutput.errmsg, "can't rename to live oplog while replicating");
-
+    rt.stopSet();
 }());

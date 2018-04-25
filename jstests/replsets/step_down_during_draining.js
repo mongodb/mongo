@@ -130,4 +130,5 @@ load("jstests/replsets/rslib.js");
     // Check that all writes reached the secondary's op queue prior to
     // stepping down the original primary and got applied.
     assert.eq(secondary.getDB("foo").foo.find().itcount(), numDocuments);
+    replSet.stopSet();
 })();

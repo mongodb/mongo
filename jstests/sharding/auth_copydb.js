@@ -41,4 +41,5 @@
     assert.eq(1, destTestDB.foo.findOne().a);
 
     st.stop();
+    MongoRunner.stopMongod(sourceMongodConn);
 })();

@@ -60,5 +60,6 @@ load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
     testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 
     st.stop();
+    rst.stopSet();
 
 })();

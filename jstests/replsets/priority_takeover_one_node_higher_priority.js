@@ -42,4 +42,5 @@
 
     // Eventually node 0 will stand for election again because it has a higher priorty.
     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
+    replSet.stopSet();
 })();

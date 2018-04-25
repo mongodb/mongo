@@ -130,5 +130,5 @@
     m1.getCollection("test.foo").update({m1: 1}, {$set: {m1: 4}});
     noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
     assert.eq(noOp, fifthteenthOp);
-
+    replTest.stopSet();
 })();

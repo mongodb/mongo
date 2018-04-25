@@ -50,7 +50,8 @@
             assert.eq(shard2.getURL(), shard.host);
         }
     }
-
+    MongoRunner.stopMongod(shard1);
+    shard2.stopSet();
     st.stop();
 
 })();

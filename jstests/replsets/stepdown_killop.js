@@ -78,4 +78,5 @@
 
     assert.writeOK(primary.getDB(name).foo.remove({}));
     restartServerReplication(secondary);
+    replSet.stopSet();
 })();

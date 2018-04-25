@@ -34,3 +34,4 @@ adminDB.logout();
 adminDB.auth('admin', 'x');
 // Make sure that no users were actually dropped
 assert.eq(3, adminDB.system.users.count());
+MongoRunner.stopMongod(conn, null, {user: 'admin', pwd: 'x'});

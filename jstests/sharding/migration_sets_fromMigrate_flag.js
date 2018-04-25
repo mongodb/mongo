@@ -190,4 +190,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
                              "migration! Test #5 failed.");
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 })();

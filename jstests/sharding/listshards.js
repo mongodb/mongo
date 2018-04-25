@@ -64,5 +64,6 @@
 
     rs1.stopSet();
     shardTest.stop();
+    MongoRunner.stopMongod(standaloneShard);
 
 })();

@@ -37,3 +37,4 @@ mongos.getDB('config').shards.find().forEach(function(shardDoc) {
     assert(cmdResult.ok,
            'serverStatus on ' + shardDoc.host + ' failed, result: ' + tojson(cmdResult));
 });
+st.stop();

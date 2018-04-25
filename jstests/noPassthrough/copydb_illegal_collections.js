@@ -18,4 +18,5 @@
     assert.commandFailedWithCode(res, ErrorCodes.InvalidNamespace);
     assert.gt(res["errmsg"].indexOf("cannot write to 'db2.system.replset'"), -1);
     rst.awaitReplication();
+    rst.stopSet();
 })();

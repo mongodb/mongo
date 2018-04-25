@@ -100,3 +100,4 @@ authAllNodes();
 var rstConn4 = rst.getPrimary();
 rstConn4.getDB("test").a.insert({a: 4, str: "TESTTESTTEST"});
 assert.eq(4, rstConn4.getDB("test").a.count(), "Error interacting with replSet");
+rst.stopSet();

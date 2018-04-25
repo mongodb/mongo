@@ -78,4 +78,6 @@
                   sessionCount + 3,
                   "refresh on shard did not flush session records to disk");
     }
+
+    cluster.stop();
 })();

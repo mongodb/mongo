@@ -32,6 +32,7 @@
         if (exitCode != 0) {
             doassert("inner test failed with exit code " + exitcode);
         }
+        MongoRunner.stopMongod(mongod);
         return;
     }
 

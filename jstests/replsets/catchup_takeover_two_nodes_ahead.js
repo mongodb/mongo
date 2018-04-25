@@ -56,4 +56,5 @@
     replSet.waitForState(2, ReplSetTest.State.SECONDARY, replSet.kDefaultTimeoutMS);
     // Let the nodes catchup.
     restartServerReplication(nodes.slice(1, 5));
+    replSet.stopSet();
 })();

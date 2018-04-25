@@ -26,4 +26,5 @@
                    "key document " + i + ": " + tojson(key) + "expiresAt value is greater than: " +
                        maxExpireTime);
     });
+    st.stop();
 })();

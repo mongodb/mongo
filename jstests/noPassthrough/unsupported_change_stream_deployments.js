@@ -39,6 +39,7 @@
     assert.soonNoExcept(() => checkFCV(slave.getDB("admin"), "3.6") || true);
     assert.soonNoExcept(() => slave.getDB("test").ensure_db_exists.exists());
     assertChangeStreamNotSupportedOnConnection(slave);
+    masterSlaveFixture.stop();
 
     // Test a sharded cluster with standalone shards.
     const clusterWithStandalones = new ShardingTest(
@@ -55,4 +56,5 @@
         mongosDB.adminCommand({shardCollection: "test.ensure_db_exists", key: {_id: "hashed"}}));
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.shard0);
     assertChangeStreamNotSupportedOnConnection(clusterWithStandalones.shard1);
+    clusterWithStandalones.stop();
 }());

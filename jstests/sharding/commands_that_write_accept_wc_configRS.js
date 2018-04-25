@@ -306,4 +306,5 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         testMajorityWriteConcern(cmd);
     });
 
+    st.stop();
 })();

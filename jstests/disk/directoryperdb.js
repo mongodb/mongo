@@ -169,3 +169,4 @@ if (!_isWindows()) {
     assertDocumentCount(dbUU, 1);
     m = checkDBFilesInDBDirectory(m, dbUU);
 }
+MongoRunner.stopMongod(m);

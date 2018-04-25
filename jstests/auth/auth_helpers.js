@@ -63,3 +63,4 @@ assert(testedSomething, "No candidate authentication mechanisms matched.");
 
 // Invalid mechanisms shouldn't lead to authentication, but also shouldn't crash.
 assert(!admin.auth({mechanism: 'this-mechanism-is-fake', user: 'andy', pwd: 'a'}));
+MongoRunner.stopMongod(conn);

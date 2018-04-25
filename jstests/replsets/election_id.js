@@ -96,5 +96,6 @@ load("jstests/replsets/rslib.js");
     var newElectionId = res.repl.electionId;
     assert.lt(oldElectionId.valueOf(), newElectionId.valueOf());
     oldElectionId = newElectionId;
+    rst.stopSet();
 
 })();

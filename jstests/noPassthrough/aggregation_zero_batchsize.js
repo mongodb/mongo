@@ -83,4 +83,6 @@
 
     assert.throws(() => cursor.itcount(), [], "expected getMore to fail");
     assertNumOpenCursors(0);
+
+    MongoRunner.stopMongod(conn);
 }());

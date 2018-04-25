@@ -19,3 +19,4 @@ var indexList = testDB.foo.getIndexes().filter(function(idx) {
 });
 assert.eq(1, indexList.length, tojson(indexList));
 assert.docEq(indexList[0].key, {a: 1}, tojson(indexList));
+MongoRunner.stopMongod(conn, null, {user: 'root', pwd: 'password'});

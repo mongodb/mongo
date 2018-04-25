@@ -13,4 +13,5 @@
         }
         return true;
     }, "Cannot connect to 127.0.0.1 when bound to localhost", 20000);
+    MongoRunner.stopMongod(proc);
 })();

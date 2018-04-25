@@ -58,3 +58,4 @@ assert.soon(function() {
 assert.soon(function() {
     return -1 == s.getDB(first).getCollectionNames().indexOf("one");
 });
+rt.stop();

@@ -22,4 +22,5 @@
     jsTestLog('Check the query is in the profile and turn profiling off.');
     assert.eq(numProfileEntries(secondaryDB.doesntexist), 1, 'expected a single profile entry');
     assert.commandWorked(secondaryDB.runCommand({profile: 0}));
+    rst.stopSet();
 })();

@@ -26,4 +26,5 @@
     assert.writeOK(collection.remove({_id: 1}));
     assertLastOplogHasWT(primary, 'remove');
 
+    replSet.stopSet();
 })();

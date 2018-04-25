@@ -710,4 +710,5 @@ function doMultiThreadedWork(primary, numThreads) {
         print("Work done, checking to see all nodes match");
         assertSameData(primary, replTest.nodes);
     }
+    replTest.stopSet();
 })();

@@ -52,5 +52,5 @@ load("jstests/replsets/rslib.js");
                                                      {"$replData": 1});
     assert.commandWorked(res.commandReply);
     assert.eq(last_op_visible, res.metadata["$replData"].lastOpVisible);
-
+    replTest.stopSet();
 }());

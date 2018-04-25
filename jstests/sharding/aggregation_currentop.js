@@ -531,6 +531,9 @@
 
     // Test that the allUsers parameter is ignored when authentication is disabled.
     restartReplSet(shardRS, {shardsvr: null, keyFile: null});
+    // Explicitly set the keyFile to null. If ReplSetTest#stopSet sees a keyFile property, it
+    // attempts to auth before dbhash checks.
+    shardRS.keyFile = null;
 
     // Ensure that there is at least one other connection present.
     const otherConn = new Mongo(shardConn.host);
@@ -613,4 +616,5 @@
     assert.commandWorked(shardAdminDB.killOp(op.opid));
 
     awaitShell();
+    st.stop();
 })();

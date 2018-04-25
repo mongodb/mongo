@@ -49,3 +49,4 @@ assert((db1 == last.allUsers[0].db && db2 == last.allUsers[1].db) ||
 db1.setProfilingLevel(0);
 db1.dropDatabase();
 db2.dropDatabase();
+MongoRunner.stopMongod(conn);

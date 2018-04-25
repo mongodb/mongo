@@ -64,3 +64,5 @@ assert.commandWorked(f.createView("viewA", "a", []));
 assert.commandFailedWithCode(t.cloneCollection("localhost:" + fromMongod.port, "viewA"),
                              ErrorCodes.CommandNotSupportedOnView,
                              "cloneCollection on view expected to fail");
+MongoRunner.stopMongod(fromMongod);
+MongoRunner.stopMongod(toMongod);

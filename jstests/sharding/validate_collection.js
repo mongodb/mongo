@@ -81,4 +81,6 @@
     setFailValidateFailPointOnShard(true, primaryShard);
     validate(false);
     setFailValidateFailPointOnShard(false, primaryShard);
+
+    st.stop();
 })();

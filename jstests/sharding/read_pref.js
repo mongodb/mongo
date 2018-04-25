@@ -28,6 +28,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
         // find/getMore commands.
         if (useDollarQuerySyntax && st.s.getDB("test").getMongo().useReadCommands()) {
+            st.stop();
             return;
         }
 

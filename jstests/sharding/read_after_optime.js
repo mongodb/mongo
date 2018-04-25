@@ -48,4 +48,5 @@
         }
         return false;
     }, 'Did not see any log entries containing the following message: ' + msg, 60000, 300);
+    shardingTest.stop();
 })();

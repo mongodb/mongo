@@ -131,3 +131,4 @@ var canConnectSSL = runMongoProgram("mongo",
                                     "--eval",
                                     ";");
 assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");
+rst.stopSet();

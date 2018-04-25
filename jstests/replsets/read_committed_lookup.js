@@ -41,4 +41,5 @@ load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
 
     testReadCommittedLookup(rst.getPrimary().getDB("test"), shardSecondary, rst);
 
+    rst.stopSet();
 })();

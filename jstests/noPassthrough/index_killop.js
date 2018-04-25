@@ -66,4 +66,5 @@
 
     testAbortIndexBuild({background: true});
     testAbortIndexBuild({background: false});
+    MongoRunner.stopMongod(conn);
 })();

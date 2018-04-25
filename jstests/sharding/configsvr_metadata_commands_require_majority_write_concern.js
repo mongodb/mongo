@@ -149,5 +149,6 @@
                  setupFuncs.addShard,
                  cleanupFuncs.noop);
 
+    MongoRunner.stopMongos(newShard);
     st.stop();
 })();

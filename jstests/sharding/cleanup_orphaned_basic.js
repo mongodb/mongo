@@ -117,5 +117,6 @@
         {cleanupOrphaned: coll2.getFullName(), startingFromKey: {a: 'someValue', c: 1}}));
 
     st.stop();
+    MongoRunner.stopMongod(mongod);
 
 })();

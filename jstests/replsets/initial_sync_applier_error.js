@@ -52,4 +52,5 @@
     assert.eq(0, secondary.getDB('test').getCollection(name).count());
     assert.eq(1, secondary.getDB('test').getCollection(newCollName).count());
     assert.eq("hi", secondary.getDB('test').getCollection(newCollName).findOne({_id: 0}).content);
+    replSet.stopSet();
 })();

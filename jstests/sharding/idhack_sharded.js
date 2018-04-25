@@ -32,3 +32,5 @@ assert.eq(2, coll.count());
 assert.eq(1, coll.find().itcount());
 assert.eq(1, coll.find({_id: 1}, {_id: 1}).itcount());
 coll.remove({});
+
+st.stop();

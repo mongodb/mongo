@@ -52,5 +52,6 @@ load('jstests/replsets/rslib.js');
     jsTestLog("Waiting for the other high priority node to become PRIMARY.");
     var expectedNewPrimary = replTest.nodes[expectedNewPrimaryIndex];
     replTest.waitForState(expectedNewPrimary, ReplSetTest.State.PRIMARY);
+    replTest.stopSet();
 
 })();

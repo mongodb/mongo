@@ -48,4 +48,5 @@
     var disableSSLURL = `mongodb://${nodeList}/admin?replicaSet=${replTest.name}&ssl=false`;
     jsTestLog(`Replica set url (doesnt use SSL): ${disableSSLURL}`);
     assert.neq(checkShellOkay(disableSSLURL), 0, "shell correctly failed to connect without SSL");
+    replTest.stopSet();
 })();

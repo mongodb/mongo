@@ -41,5 +41,5 @@
     assert.eq(logContents.indexOf("stepdown period must be longer than secondaryCatchUpPeriodSecs"),
               -1,
               "_requestRemotePrimaryStepDown sent an invalid replSetStepDown command");
-
+    replSet.stopSet();
 })();

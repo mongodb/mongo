@@ -56,4 +56,5 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     testOps(st.s);
 
     st.stop();
+    MongoRunner.stopMongos(mongos2);
 }());

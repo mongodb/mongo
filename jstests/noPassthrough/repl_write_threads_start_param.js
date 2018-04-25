@@ -35,4 +35,5 @@
     // setParameter to ensure it is not possible
     assert.commandFailed(
         mongo.getDB("admin").runCommand({setParameter: 1, replWriterThreadCount: 1}));
+    MongoRunner.stopMongod(mongo);
 }());

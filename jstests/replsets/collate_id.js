@@ -62,4 +62,5 @@
         secondaryDB.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
     replTest.awaitReplication();
     assert.eq(0, secondaryColl.find().itcount());
+    replTest.stopSet();
 })();

@@ -80,4 +80,5 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     // Ensure maxTimeMS times out while waiting for this snapshot
     assert.commandFailed(primary.getSiblingDB(name).foo.runCommand(
         'find', {"readConcern": {"level": "majority"}, "maxTimeMS": 1000}));
+    replTest.stopSet();
 })();

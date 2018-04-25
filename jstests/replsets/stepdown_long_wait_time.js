@@ -72,4 +72,5 @@
 
     jsTestLog("Wait for SECONDARY " + secondary.host + " to become PRIMARY");
     replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
+    replSet.stopSet();
 })();

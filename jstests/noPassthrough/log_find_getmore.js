@@ -166,4 +166,5 @@
     ];
 
     assertLogLineContains(conn, logLine);
+    MongoRunner.stopMongod(conn);
 })();

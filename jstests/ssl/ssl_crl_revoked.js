@@ -22,3 +22,4 @@ var mongo = runMongoProgram("mongo",
 // 1 is the exit code for the shell failing to connect, which is what we want
 // for a successful test.
 assert(mongo == 1);
+MongoRunner.stopMongod(md);

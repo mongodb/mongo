@@ -52,4 +52,5 @@ TestData.skipCheckDBHashes = true;
     assert.eq('world', res.hello);
 
     st.stop();
+    MongoRunner.stopMongos(otherMongos);
 })();

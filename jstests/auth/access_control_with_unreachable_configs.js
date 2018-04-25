@@ -44,3 +44,4 @@ var db2 = conn2.getDB('admin');
 
 // should fail since user is not authorized.
 assert.commandFailedWithCode(db2.adminCommand('serverStatus'), authzErrorCode);
+st.stop();

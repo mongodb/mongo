@@ -48,3 +48,4 @@ assert.soon(function() {
 });
 
 // printjson(s.getDBNames());
+rt.stop();
