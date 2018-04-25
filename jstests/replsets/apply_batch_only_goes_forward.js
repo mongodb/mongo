@@ -14,6 +14,10 @@
  * restarting, so will initial sync in this scenario, invalidating the test.
  * @tags: [requires_persistence]
  */
+
+// Skip db hash check because replset cannot reach consistent state.
+TestData.skipCheckDBHashes = true;
+
 (function() {
     "use strict";
 

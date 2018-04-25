@@ -6,6 +6,9 @@
 (function() {
     "use strict";
 
+    // Skip db hash check because of invalid index spec.
+    TestData.skipCheckDBHashes = true;
+
     load("jstests/replsets/rslib.js");
 
     const testName = "initial_sync_invalid_index_spec";

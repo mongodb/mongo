@@ -4,6 +4,10 @@
  */
 (function() {
     "use strict";
+
+    // Skip db hash check because secondary is left with a different config.
+    TestData.skipCheckDBHashes = true;
+
     var numNodes = 5;
     var replTest = new ReplSetTest({name: 'testSet', nodes: numNodes});
     var nodes = replTest.startSet();

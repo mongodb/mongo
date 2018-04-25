@@ -6,6 +6,9 @@
 var NewReplicaSetConfigurationIncompatible = 103;
 var InvalidReplicaSetConfig = 93;
 
+// Skip db hash check since replsets are assigned invalid configs.
+TestData.skipCheckDBHashes = true;
+
 /*
  * Create replica set with 3 nodes, add new node as 0-vote arbiter.
  */

@@ -1,6 +1,10 @@
 /** Test TTL docs are not deleted from secondaries directly
  */
 
+// Skip db hash check because secondary will have extra document due to the usage of the godinsert
+// command.
+TestData.skipCheckDBHashes = true;
+
 var rt = new ReplSetTest({name: "ttl_repl", nodes: 2});
 
 // setup set

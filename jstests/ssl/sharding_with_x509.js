@@ -68,5 +68,11 @@
     // Make sure the right amount of data is there
     assert.eq(coll.find().itcount({my: 'test'}), toInsert / 2);
 
+    // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
+    if (st.configRS) {
+        st.configRS.nodes.forEach((node) => {
+            node.getDB('admin').auth('admin', 'pwd');
+        });
+    }
     st.stop();
 })();
