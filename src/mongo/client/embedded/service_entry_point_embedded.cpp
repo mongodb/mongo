@@ -93,7 +93,7 @@ public:
     void waitForWriteConcern(OperationContext*,
                              const CommandInvocation*,
                              const repl::OpTime&,
-                             BSONObjBuilder) const override {}
+                             BSONObjBuilder&) const override {}
 
     void waitForLinearizableReadConcern(OperationContext*) const override {}
 

@@ -73,7 +73,7 @@ public:
     void waitForWriteConcern(OperationContext* opCtx,
                              const CommandInvocation* invocation,
                              const repl::OpTime& lastOpBeforeRun,
-                             BSONObjBuilder commandResponseBuilder) const override {
+                             BSONObjBuilder& commandResponseBuilder) const override {
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop.

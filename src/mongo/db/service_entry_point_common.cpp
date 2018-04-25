@@ -212,28 +212,21 @@ void registerError(OperationContext* opCtx, const DBException& exception) {
 void generateErrorResponse(OperationContext* opCtx,
                            rpc::ReplyBuilderInterface* replyBuilder,
                            const DBException& exception,
-                           const BSONObj& replyMetadata) {
-    registerError(opCtx, exception);
-
-    // We could have thrown an exception after setting fields in the builder,
-    // so we need to reset it to a clean state just to be sure.
-    replyBuilder->reset();
-    replyBuilder->setCommandReply(exception.toStatus());
-    replyBuilder->setMetadata(replyMetadata);
-}
-
-void generateErrorResponse(OperationContext* opCtx,
-                           rpc::ReplyBuilderInterface* replyBuilder,
-                           const DBException& exception,
                            const BSONObj& replyMetadata,
-                           LogicalTime operationTime) {
+                           BSONObj extraFields = {},
+                           boost::optional<LogicalTime> operationTime = {}) {
     registerError(opCtx, exception);
+
+    if (operationTime) {
+        BSONObjBuilder bb(std::move(extraFields));
+        bb.append("operationTime", operationTime->asTimestamp());
+        extraFields = bb.obj();
+    }
 
     // We could have thrown an exception after setting fields in the builder,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
-    replyBuilder->setCommandReply(exception.toStatus(),
-                                  BSON("operationTime" << operationTime.asTimestamp()));
+    replyBuilder->setCommandReply(exception.toStatus(), extraFields);
     replyBuilder->setMetadata(replyMetadata);
 }
 
@@ -471,7 +464,8 @@ bool runCommandImpl(OperationContext* opCtx,
                     const OpMsgRequest& request,
                     rpc::ReplyBuilderInterface* replyBuilder,
                     LogicalTime startOperationTime,
-                    const ServiceEntryPointCommon::Hooks& behaviors) {
+                    const ServiceEntryPointCommon::Hooks& behaviors,
+                    BSONObj* writeConcernErrorObj) {
     const Command* command = invocation->definition();
     auto bytesToReserve = command->reserveBytesForReply();
 
@@ -504,10 +498,18 @@ bool runCommandImpl(OperationContext* opCtx,
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
         opCtx->setWriteConcern(wcResult);
-        ON_BLOCK_EXIT([&] {
-            behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, crb.getBodyBuilder());
-        });
-        invokeInTransaction(opCtx, invocation, &crb);
+
+        try {
+            invokeInTransaction(opCtx, invocation, &crb);
+        } catch (const DBException&) {
+            BSONObjBuilder bb;
+            behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, bb);
+            *writeConcernErrorObj = bb.obj();
+            throw;
+        }
+
+        auto bb = crb.getBodyBuilder();
+        behaviors.waitForWriteConcern(opCtx, invocation, lastOpBeforeRun, bb);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
@@ -576,6 +578,7 @@ void execCommandDatabase(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          rpc::ReplyBuilderInterface* replyBuilder,
                          const ServiceEntryPointCommon::Hooks& behaviors) {
+    BSONObj writeConcernErrorObj;
     auto startOperationTime = getClientOperationTime(opCtx);
     auto invocation = command->parse(opCtx, request);
     try {
@@ -845,7 +848,8 @@ void execCommandDatabase(OperationContext* opCtx,
                                 request,
                                 replyBuilder,
                                 startOperationTime,
-                                behaviors)) {
+                                behaviors,
+                                &writeConcernErrorObj)) {
                 command->incrementCommandsFailed();
             }
         } catch (DBException&) {
@@ -898,7 +902,8 @@ void execCommandDatabase(OperationContext* opCtx,
                    << "' and operationTime '" << operationTime.toString()
                    << "': " << redact(e.toString());
 
-            generateErrorResponse(opCtx, replyBuilder, e, metadata, operationTime);
+            generateErrorResponse(
+                opCtx, replyBuilder, e, metadata, writeConcernErrorObj, operationTime);
         } else {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
@@ -907,7 +912,7 @@ void execCommandDatabase(OperationContext* opCtx,
                           ServiceEntryPointCommon::getRedactedCopyForLogging(command, request.body))
                    << "': " << redact(e.toString());
 
-            generateErrorResponse(opCtx, replyBuilder, e, metadata);
+            generateErrorResponse(opCtx, replyBuilder, e, metadata, writeConcernErrorObj);
         }
     }
 }
@@ -952,7 +957,7 @@ DbResponse runCommands(OperationContext* opCtx,
             LOG(1) << "assertion while parsing command: " << ex.toString();
             if (hasClusterTime(metadata)) {
                 auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
-                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, operationTime);
+                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, {}, operationTime);
             } else {
                 generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata);
             }
@@ -997,7 +1002,7 @@ DbResponse runCommands(OperationContext* opCtx,
                 LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                        << "on database '" << request.getDatabase() << "': " << ex.toString();
 
-                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, operationTime);
+                generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, {}, operationTime);
             } else {
                 generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata);
             }
