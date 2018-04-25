@@ -34,6 +34,13 @@
         assert.eq(undefined, getUUIDFromConfigCollections(st.s, nss));
     }
 
+    // We drop the "test.foo*" collections created by the earlier for-loop so that we can later
+    // check whether UUIDs are consistent across the entire sharded cluster. No UUIDs are generated
+    // for the collections when featureCompatibilityVersion=3.4.
+    for (let i = 0; i < 3; i++) {
+        st.s.getDB(db)["foo" + i].drop();
+    }
+
     // Check that in fcv=3.6, shardCollection propagates and persists UUIDs.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
     for (let i = 0; i < 3; i++) {
@@ -59,5 +66,7 @@
         assert.neq(undefined, listCollsUUID);
         assert.eq(listCollsUUID, collEntryUUID);
     }
+
+    st.stop();
 
 })();

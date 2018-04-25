@@ -306,5 +306,12 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         testMajorityWriteConcern(cmd);
     });
 
+    // We skip checking whether the UUIDs are consistent across the entire sharded cluster because
+    // replication was intentionally stopped on the secondaries of the CSRS while processing a drop
+    // collection operation. The entry for the "wc-test-configRS30.leaves" collection therefore
+    // still remains on the config servers despite it having been deleted from the shards' storage
+    // catalogs and persisted routing table caches.
+    TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
     st.stop();
 })();

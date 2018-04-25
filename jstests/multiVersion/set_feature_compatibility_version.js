@@ -319,7 +319,17 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
     assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(),
               0);
-    rst.stopSet();
+
+    ((original) => {
+        // We skip checking dbhashes when shutting down the replica set because the 3.4 secondary
+        // cannot replicate from the primary when featureCompatibilityVersion=3.6.
+        TestData.skipCheckDBHashes = true;
+        try {
+            rst.stopSet();
+        } finally {
+            TestData.skipCheckDBHashes = original;
+        }
+    })(TestData.skipCheckDBHashes);
 
     // Test idempotency for setFeatureCompatibilityVersion.
     rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});

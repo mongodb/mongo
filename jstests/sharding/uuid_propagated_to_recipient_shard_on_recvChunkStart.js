@@ -75,4 +75,6 @@
     assert.neq(undefined, collEntryUUID);
     assert.eq(donorUUID, collEntryUUID);
 
+    st.stop();
+
 })();

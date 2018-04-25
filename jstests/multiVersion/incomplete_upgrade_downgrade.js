@@ -157,4 +157,6 @@
     // Verify FCV.
     checkFCV(adminDB, "3.6");
 
+    MongoRunner.stopMongod(conn);
+
 })();

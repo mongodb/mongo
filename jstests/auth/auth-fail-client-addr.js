@@ -8,6 +8,8 @@ function runTest(m) {
         var log = cat(m.fullOptions.logFile);
         return /Failed to authenticate root@test from client 127\.0\.0\.1:\d+/.test(log);
     }, "Authentication failure message not encountered or missing client IP", 30 * 1000, 5 * 1000);
+
+    MongoRunner.stopMongod(m);
 }
 
 print("START auth-fail-client-addr.js");

@@ -19,4 +19,6 @@
     assert.commandFailedWithCode(
         adminDB.runCommand({applyOps: [{op: 'c', ns: "test.$cmd", ui: UUID(), o: {create: "z"}}]}),
         ErrorCodes.OplogOperationUnsupported);
+
+    MongoRunner.stopMongod(conn);
 })();

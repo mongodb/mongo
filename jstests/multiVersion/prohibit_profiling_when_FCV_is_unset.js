@@ -43,4 +43,6 @@
     let collectionInfos = primaryAdmin.getCollectionInfos({name: "system.profile"});
     assert(collectionInfos[0].info.uuid,
            "Expect uuid for collection: " + tojson(collectionInfos[0]));
+
+    replTest.stopSet();
 })();

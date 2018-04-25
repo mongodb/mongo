@@ -14,5 +14,6 @@
     // Verify that the role still exists after FC upgrade to 3.6
     assert(db.runCommand({rolesInfo: "role1"}).roles[0].role === "role1");
 
+    MongoRunner.stopMongod(db.getMongo());
     print("SUCCESS auth-feature-compat-36-roles-collection.js");
 })();

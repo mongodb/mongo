@@ -84,4 +84,6 @@
     }
     replTest.waitForState(a_conn, ReplSetTest.State.PRIMARY);
     assert.eq(getOptions(a_conn), originalCollectionOptions);
+
+    replTest.stopSet();
 }());
