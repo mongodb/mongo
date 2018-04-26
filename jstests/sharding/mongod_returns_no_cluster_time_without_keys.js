@@ -2,8 +2,10 @@
  * Tests that mongod does not gossip cluster time metadata and operation time until at least one key
  * is created on the
  * config server.
+ *
+ * This test restarts shard replica sets, so it requires a persistent storage engine.
+ * @tags: [requires_persistence]
  */
-
 (function() {
     "use strict";
 
@@ -67,8 +69,9 @@
     st.rs0.stopSet(null /* signal */, true /* forRestart */);
     st.rs0.startSet({restart: true});
 
+    priRSConn = st.rs0.getPrimary().getDB("admin");
     priRSConn.auth(rUser.username, rUser.password);
-    const resNoKeys = priRSConn.runCommand({isMaster: 1});
+    const resNoKeys = assert.commandWorked(priRSConn.runCommand({isMaster: 1}));
 
     assert.eq(resNoKeys.hasOwnProperty("$clusterTime"), false);
     assert.eq(resNoKeys.hasOwnProperty("operationTime"), false);
