@@ -28,6 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/config.h"
 #include "mongo/platform/basic.h"
 
 #include <type_traits>
@@ -314,7 +315,6 @@ DEATH_TEST(InvariantTerminationTest,
     invariant(false, msg);
 }
 
-
 DEATH_TEST(InvariantTerminationTest,
            invariantOverloadWithStringLiteralMsg,
            "Terminating with string literal invariant message") {
@@ -346,6 +346,31 @@ DEATH_TEST(InvariantTerminationTest,
               msg);
 }
 
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+// dassert and its friends
+DEATH_TEST(DassertTerminationTest, invariant, "Invariant failure false " __FILE__) {
+    dassert(false);
+}
+
+DEATH_TEST(DassertTerminationTest, dassertOK, "Terminating with dassertOK") {
+    dassert(Status(ErrorCodes::InternalError, "Terminating with dassertOK"));
+}
+
+DEATH_TEST(DassertTerminationTest,
+           invariantWithStringLiteralMsg,
+           "Terminating with string literal dassert message") {
+    const char* msg = "Terminating with string literal dassert message";
+    dassert(false, msg);
+}
+
+DEATH_TEST(DassertTerminationTest,
+           dassertWithStdStringMsg,
+           "Terminating with std::string dassert message: 12345") {
+    const std::string msg = str::stream() << "Terminating with std::string dassert message: "
+                                          << 12345;
+    dassert(false, msg);
+}
+#endif  // defined(MONGO_CONFIG_DEBUG_BUILD)
 
 }  // namespace
 }  // namespace mongo
