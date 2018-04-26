@@ -21,11 +21,16 @@ load("jstests/libs/analyze_plan.js");
 
     var testServer = MongoRunner.runMongod();
     var db = testServer.getDB("test");
+    var abortEarly = false;
     if (!db.serverStatus().storageEngine.supportsCommittedReads) {
         print("Skipping read_majority.js since storageEngine doesn't support it.");
+        abortEarly = true;
+    }
+
+    MongoRunner.stopMongod(testServer);
+    if (abortEarly) {
         return;
     }
-    MongoRunner.stopMongod(testServer);
 
     var replTest = new ReplSetTest({
         nodes: 1,
