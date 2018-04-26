@@ -176,12 +176,6 @@ executor:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          # TODO: remove after SERVER-34241
-          skipValidationNamespaces:
-          - config.transactions
   - class: CleanEveryN
     n: 20
   fixture:
