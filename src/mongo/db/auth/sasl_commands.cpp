@@ -352,8 +352,8 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
 // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
 MONGO_INITIALIZER(PreSaslCommands)
 (InitializerContext*) {
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
-        CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
+    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism))
+        disableAuthMechanism(kX509AuthMechanism);
 
     return Status::OK();
 }

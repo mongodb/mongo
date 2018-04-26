@@ -28,56 +28,12 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/commands.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-class CmdAuthenticate : public BasicCommand {
-public:
-    static void disableAuthMechanism(std::string authMechanism);
+constexpr StringData kX509AuthMechanism = "MONGODB-X509"_sd;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    std::string help() const override {
-        return "internal";
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
+void disableAuthMechanism(StringData authMechanism);
 
-    CmdAuthenticate() : BasicCommand("authenticate") {}
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result);
-
-private:
-    /**
-     * Completes the authentication of "user" using "mechanism" and parameters from "cmdObj".
-     *
-     * Returns Status::OK() on success.  All other statuses indicate failed authentication.  The
-     * entire status returned here may always be used for logging.  However, if the code is
-     * AuthenticationFailed, the "reason" field of the return status may contain information
-     * that should not be revealed to the connected client.
-     *
-     * Other than AuthenticationFailed, common returns are BadValue, indicating unsupported
-     * mechanism, and ProtocolError, indicating an error in the use of the authentication
-     * protocol.
-     */
-    Status _authenticate(OperationContext* opCtx,
-                         const std::string& mechanism,
-                         const UserName& user,
-                         const BSONObj& cmdObj);
-    Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
-};
-
-extern CmdAuthenticate cmdAuthenticate;
-}
+}  // namespace mongo
