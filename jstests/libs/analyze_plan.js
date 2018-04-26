@@ -288,43 +288,6 @@ function assertCoveredQueryAndCount({collection, query, project, count}) {
     assertExplainCount({explainResults: explain, expectedCount: count});
 }
 
-/**
- * Returns true if a backup plan is used.
- */
 function backupPlanUsed(root) {
-    function sectionHasOriginalWinningPlan(explainSection) {
-        assert(explainSection.hasOwnProperty("originalWinningPlan"), tojson(explainSection));
-        return explainSection.originalWinningPlan.length !== 0;
-    }
-    
-    function cursorStageHasOriginalWinningPlan(cursorStage) {
-        assert(cursorStage.hasOwnProperty("$cursor"), tojson(cursorStage));
-        assert(cursorStage.$cursor.hasOwnProperty("queryPlanner"), tojson(cursorStage));
-        return sectionHasOriginalWinningPlan(cursorStage.$cursor.queryPlanner);
-    }
-
-    // if (root.hasOwnProperty("shards")) {
-    //     // This is a sharded agg explain.
-    //     const cursorStages = getAggPlanStages(root, "$cursor");
-    //     assert(cursorStages.length !== 0, "Did not find any $cursor stages in sharded agg explain");
-    //     return cursorStages.find((cursorStage) => cursorStageHasOriginalWinningPlan(cursorStage)) !==
-    //         undefined;
-    // } else if (root.hasOwnProperty("stages")) {
-    //     // This is an agg explain.
-    //     const cursorStages = getAggPlanStages(root, "$cursor");
-    //     return cursorStages.find((cursorStage) => cursorStageHasOriginalWinningPlan(cursorStage)) !==
-    //         undefined;
-    // } else {
-    //     // This is some sort of query explain.
-    //     assert(root.hasOwnProperty("queryPlanner"), tojson(root));
-    //     assert(root.queryPlanner.hasOwnProperty("winningPlan"), tojson(root));
-    //     if (!root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
-    //         // This is an unsharded explain.
-    //         return sectionHasOriginalWinningPlan(root.queryPlanner);
-    //     }
-    //     // This is a sharded explain. Each entry in the shards array contains a 'winningPlan' and
-    //     // 'rejectedPlans'.
-    //     return root.queryPlanner.winningPlan.shards.find(
-    //                (shard) => sectionHasOriginalWinningPlan(shard)) !== undefined;
-    // }
+    return root.queryPlanner.backupPlanUsed;
 }
