@@ -32,7 +32,7 @@
     assert.eq(null, db1EntryOriginal.version);
     assert.eq(null, db2EntryOriginal.version);
 
-    // Ensure the shard does not have a cached entries in-memory or on-disk.
+    // Ensure the shard does not have cached entries in-memory or on-disk.
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db1Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db1Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db2Name, {});
@@ -104,10 +104,9 @@
     assert.docEq(db1EntryOriginal, db1EntryFCV36);
     assert.docEq(db2EntryOriginal, db2EntryFCV36);
 
-    // The shard's in-memory database cache should have been cleared, but its on-disk cache left
-    // untouched.
-    checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db1Name, {});
-    checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db1Name, {});
+    // The shard's in-memory and on-disk database caches should have been left untouched.
+    checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db1Name, db1EntryFCV40.version);
+    checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db1Name, db1EntryFCV40.version);
     checkInMemoryDatabaseVersion(st.rs0.getPrimary(), db2Name, {});
     checkInMemoryDatabaseVersion(st.rs0.getSecondary(), db2Name, {});
     checkOnDiskDatabaseVersion(st.shard0, db1Name, db1EntryFCV40);

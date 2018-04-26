@@ -71,6 +71,7 @@ public:
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
     static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
+    static void resetAll(OperationContext* opCtx);
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**

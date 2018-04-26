@@ -124,6 +124,16 @@ public:
         return *it->second;
     }
 
+    void resetAll() {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        for (auto it = _collections.begin(); it != _collections.end(); ++it) {
+            // This is a hack to get around CollectionShardingState::refreshMetadata() requiring
+            // the X lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary
+            // measure until SERVER-31595 removes the X lock requirement.
+            it->second->markNotShardedAtStepdown();
+        }
+    }
+
     void report(OperationContext* opCtx, BSONObjBuilder* builder) {
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
@@ -173,6 +183,11 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
 
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     return &collectionsMap.getOrCreate(ns);
+}
+
+void CollectionShardingState::resetAll(OperationContext* opCtx) {
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    collectionsMap.resetAll();
 }
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
