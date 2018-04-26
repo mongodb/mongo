@@ -42,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -77,9 +78,9 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommi
     return _committedSnapshot;
 }
 
-Status WiredTigerSnapshotManager::beginTransactionAtTimestamp(Timestamp pointInTime,
+Status WiredTigerSnapshotManager::setTransactionReadTimestamp(Timestamp pointInTime,
                                                               WT_SESSION* session) const {
-    char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 8 hexadecimal characters */ +
+    char readTSConfigString[15 /* read_timestamp= */ + 16 /* 16 hexadecimal digits */ +
                             1 /* trailing null */];
     auto size = std::snprintf(
         readTSConfigString, sizeof(readTSConfigString), "read_timestamp=%llx", pointInTime.asULL());
@@ -90,49 +91,47 @@ Status WiredTigerSnapshotManager::beginTransactionAtTimestamp(Timestamp pointInT
     }
     invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
 
-    return wtRCToStatus(session->begin_transaction(session, readTSConfigString));
+    return wtRCToStatus(session->timestamp_transaction(session, readTSConfigString));
 }
 
 Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session) const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    invariantWTOK(session->begin_transaction(session, nullptr));
+    auto rollbacker =
+        MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
 
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
             "Committed view disappeared while running operation",
             _committedSnapshot);
 
-    auto status = beginTransactionAtTimestamp(_committedSnapshot.get(), session);
+    auto status = setTransactionReadTimestamp(_committedSnapshot.get(), session);
     fassertStatusOK(30635, status);
+    rollbacker.Dismiss();
     return *_committedSnapshot;
 }
 
 void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* oplogManager,
                                                         WT_SESSION* session) const {
+    invariantWTOK(session->begin_transaction(session, nullptr));
+    auto rollbacker =
+        MakeGuard([&] { invariant(session->rollback_transaction(session, nullptr) == 0); });
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto allCommittedTimestamp = oplogManager->getOplogReadTimestamp();
-    char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 16 hexadecimal digits */ +
-                            1 /* trailing null */];
-    auto size = std::snprintf(readTSConfigString,
-                              sizeof(readTSConfigString),
-                              "read_timestamp=%llx",
-                              static_cast<unsigned long long>(allCommittedTimestamp));
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(40663);
-    }
-    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
+    invariant(Timestamp(static_cast<unsigned long long>(allCommittedTimestamp)).asULL() ==
+              allCommittedTimestamp);
+    auto status = setTransactionReadTimestamp(
+        Timestamp(static_cast<unsigned long long>(allCommittedTimestamp)), session);
 
-    int status = session->begin_transaction(session, readTSConfigString);
-
-    // If begin_transaction returns EINVAL, we will assume it is due to the oldest_timestamp
-    // racing ahead of the read_timestamp.  Rather than synchronizing for this rare case, throw a
-    // WriteConflictException which will presumably be retried.
-    if (status == EINVAL) {
+    // If we failed to set the read timestamp, we assume it is due to the oldest_timestamp racing
+    // ahead.  Rather than synchronizing for this rare case, if requested, throw a
+    // WriteConflictException which will be retried.
+    if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
         throw WriteConflictException();
     }
-
-    invariantWTOK(status);
+    fassert(50771, status);
+    rollbacker.Dismiss();
 }
 
 }  // namespace mongo
