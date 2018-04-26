@@ -66,32 +66,38 @@ bool isHashedPatternEl(const BSONElement& el) {
  * ii) a compound list of ascending, potentially-nested field paths, e.g. { a : 1 , b.c : 1 }
  */
 std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPattern) {
+    uassert(ErrorCodes::BadValue, "Shard key is empty", !keyPattern.isEmpty());
+
     std::vector<std::unique_ptr<FieldRef>> parsedPaths;
 
     for (const auto& patternEl : keyPattern) {
         auto newFieldRef(stdx::make_unique<FieldRef>(patternEl.fieldNameStringData()));
 
         // Empty path
-        if (newFieldRef->numParts() == 0)
-            return {};
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Field " << patternEl.fieldNameStringData() << " is empty",
+                newFieldRef->numParts() > 0);
 
         // Extra "." in path?
-        if (newFieldRef->dottedField() != patternEl.fieldNameStringData())
-            return {};
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Field " << patternEl.fieldNameStringData()
+                              << " contains extra dot",
+                newFieldRef->dottedField() == patternEl.fieldNameStringData());
 
         // Empty parts of the path, ".."?
         for (size_t i = 0; i < newFieldRef->numParts(); ++i) {
-            if (newFieldRef->getPart(i).empty())
-                return {};
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field " << patternEl.fieldNameStringData()
+                                  << " contains empty parts",
+                    !newFieldRef->getPart(i).empty());
         }
 
         // Numeric and ascending (1.0), or "hashed" and single field
-        if (!patternEl.isNumber()) {
-            if (keyPattern.nFields() != 1 || !isHashedPatternEl(patternEl))
-                return {};
-        } else if (patternEl.numberInt() != 1) {
-            return {};
-        }
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Field " << patternEl.fieldNameStringData()
+                              << " can only be 1 or 'hashed'",
+                (patternEl.isNumber() && patternEl.numberInt() == 1) ||
+                    (keyPattern.nFields() == 1 && isHashedPatternEl(patternEl)));
 
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
@@ -129,16 +135,12 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
 }
 
 ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
-    : _keyPatternPaths(parseShardKeyPattern(keyPattern)),
-      _keyPattern(_keyPatternPaths.empty() ? BSONObj() : keyPattern),
+    : _keyPattern(keyPattern),
+      _keyPatternPaths(parseShardKeyPattern(keyPattern)),
       _hasId(keyPattern.hasField("_id"_sd)) {}
 
 ShardKeyPattern::ShardKeyPattern(const KeyPattern& keyPattern)
     : ShardKeyPattern(keyPattern.toBSON()) {}
-
-bool ShardKeyPattern::isValid() const {
-    return !_keyPattern.toBSON().isEmpty();
-}
 
 bool ShardKeyPattern::isHashedPattern() const {
     return isHashedPatternEl(_keyPattern.toBSON().firstElement());
@@ -161,11 +163,6 @@ string ShardKeyPattern::toString() const {
 }
 
 bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
-    // Shard keys are always of the form: { 'nested.path' : value, 'nested.path2' : value }
-
-    if (!isValid())
-        return false;
-
     const auto& keyPatternBSON = _keyPattern.toBSON();
 
     for (const auto& patternEl : keyPatternBSON) {
@@ -179,12 +176,6 @@ bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
 }
 
 BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
-    // Shard keys are always of the form: { 'nested.path' : value, 'nested.path2' : value }
-    // and in the same order as the key pattern
-
-    if (!isValid())
-        return BSONObj();
-
     // We want to return an empty key if users pass us something that's not a shard key
     if (shardKey.nFields() > _keyPattern.toBSON().nFields())
         return BSONObj();
@@ -225,9 +216,6 @@ static BSONElement extractKeyElementFromMatchable(const MatchableDocument& match
 }
 
 BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& matchable) const {
-    if (!isValid())
-        return BSONObj();
-
     BSONObjBuilder keyBuilder;
 
     BSONObjIterator patternIt(_keyPattern.toBSON());
@@ -277,9 +265,6 @@ static BSONElement findEqualityElement(const EqualityMatches& equalities, const 
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
-    if (!isValid())
-        return StatusWith<BSONObj>(BSONObj());
-
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(basicQuery);
 
@@ -299,9 +284,6 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
 }
 
 BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
-    if (!isValid())
-        return BSONObj();
-
     // Extract equalities from query.
     EqualityMatches equalities;
     // TODO: Build the path set initially?

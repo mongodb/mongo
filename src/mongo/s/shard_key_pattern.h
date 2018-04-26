@@ -87,8 +87,6 @@ public:
      */
     explicit ShardKeyPattern(const KeyPattern& keyPattern);
 
-    bool isValid() const;
-
     bool isHashedPattern() const;
 
     const KeyPattern& getKeyPattern() const;
@@ -233,10 +231,10 @@ public:
     };
 
 private:
+    KeyPattern _keyPattern;
+
     // Ordered, parsed paths
     std::vector<std::unique_ptr<FieldRef>> _keyPatternPaths;
-
-    KeyPattern _keyPattern;
 
     bool _hasId;
 };
