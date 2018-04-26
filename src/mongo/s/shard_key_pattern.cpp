@@ -44,17 +44,14 @@
 
 namespace mongo {
 
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using std::vector;
-
 using pathsupport::EqualityMatches;
 
-const int ShardKeyPattern::kMaxShardKeySizeBytes = 512;
-const unsigned int ShardKeyPattern::kMaxFlattenedInCombinations = 4000000;
-
 namespace {
+
+// Maximum number of intervals produced by $in queries
+constexpr size_t kMaxFlattenedInCombinations = 4000000;
+
+constexpr auto kIdField = "_id"_sd;
 
 bool isHashedPatternEl(const BSONElement& el) {
     return el.type() == String && el.String() == IndexNames::HASHED;
@@ -119,7 +116,42 @@ bool isShardKeyElement(const BSONElement& element, bool allowRegex) {
     return true;
 }
 
+BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable, StringData pathStr) {
+    ElementPath path;
+    path.init(pathStr);
+    path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
+    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
+
+    MatchableDocument::IteratorHolder matchIt(&matchable, &path);
+    if (!matchIt->more())
+        return BSONElement();
+
+    BSONElement matchEl = matchIt->next().element();
+    // We shouldn't have more than one element - we don't expand arrays
+    dassert(!matchIt->more());
+
+    return matchEl;
+}
+
+BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRef& path) {
+    int parentPathPart;
+    const BSONElement parentEl =
+        pathsupport::findParentEqualityElement(equalities, path, &parentPathPart);
+
+    if (parentPathPart == static_cast<int>(path.numParts()))
+        return parentEl;
+
+    if (parentEl.type() != Object)
+        return BSONElement();
+
+    StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
+    BSONMatchableDocument matchable(parentEl.Obj());
+    return extractKeyElementFromMatchable(matchable, suffixStr);
+}
+
 }  // namespace
+
+constexpr int ShardKeyPattern::kMaxShardKeySizeBytes;
 
 Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
     if (shardKey.objsize() <= kMaxShardKeySizeBytes)
@@ -158,7 +190,7 @@ const BSONObj& ShardKeyPattern::toBSON() const {
     return _keyPattern.toBSON();
 }
 
-string ShardKeyPattern::toString() const {
+std::string ShardKeyPattern::toString() const {
     return toBSON().toString();
 }
 
@@ -197,24 +229,6 @@ BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
     return keyBuilder.obj();
 }
 
-static BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable,
-                                                  StringData pathStr) {
-    ElementPath path;
-    path.init(pathStr);
-    path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
-    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
-
-    MatchableDocument::IteratorHolder matchIt(&matchable, &path);
-    if (!matchIt->more())
-        return BSONElement();
-
-    BSONElement matchEl = matchIt->next().element();
-    // We shouldn't have more than one element - we don't expand arrays
-    dassert(!matchIt->more());
-
-    return matchEl;
-}
-
 BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& matchable) const {
     BSONObjBuilder keyBuilder;
 
@@ -247,22 +261,6 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     return extractShardKeyFromMatchable(matchable);
 }
 
-static BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRef& path) {
-    int parentPathPart;
-    const BSONElement parentEl =
-        pathsupport::findParentEqualityElement(equalities, path, &parentPathPart);
-
-    if (parentPathPart == static_cast<int>(path.numParts()))
-        return parentEl;
-
-    if (parentEl.type() != Object)
-        return BSONElement();
-
-    StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
-    BSONMatchableDocument matchable(parentEl.Obj());
-    return extractKeyElementFromMatchable(matchable, suffixStr);
-}
-
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
@@ -276,11 +274,10 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
-        return StatusWith<BSONObj>(statusWithCQ.getStatus());
+        return statusWithCQ.getStatus();
     }
-    unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
-    return extractShardKeyFromQuery(*query);
+    return extractShardKeyFromQuery(*statusWithCQ.getValue());
 }
 
 BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
@@ -315,8 +312,8 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
                 patternPath.dottedField(),
                 BSONElementHasher::hash64(equalEl, BSONElementHasher::DEFAULT_HASH_SEED));
         } else {
-            // NOTE: The equal element may *not* have the same field name as the path -
-            // nested $and, $eq, for example
+            // NOTE: The equal element may *not* have the same field name as the path - nested $and,
+            // $eq, for example
             keyBuilder.appendAs(equalEl, patternPath.dottedField());
         }
     }
@@ -328,8 +325,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
 bool ShardKeyPattern::isUniqueIndexCompatible(const BSONObj& uniqueIndexPattern) const {
     dassert(!KeyPattern::isHashedKeyPattern(uniqueIndexPattern));
 
-    if (!uniqueIndexPattern.isEmpty() &&
-        string("_id") == uniqueIndexPattern.firstElementFieldName()) {
+    if (!uniqueIndexPattern.isEmpty() && uniqueIndexPattern.firstElementFieldName() == kIdField) {
         return true;
     }
 
@@ -340,10 +336,8 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     invariant(indexBounds.fields.size() == (size_t)_keyPattern.toBSON().nFields());
 
     // If any field is unsatisfied, return empty bound list.
-    for (vector<OrderedIntervalList>::const_iterator it = indexBounds.fields.begin();
-         it != indexBounds.fields.end();
-         it++) {
-        if (it->intervals.size() == 0) {
+    for (const auto& field : indexBounds.fields) {
+        if (field.intervals.empty()) {
             return BoundList();
         }
     }
@@ -356,77 +350,75 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     // in another iteration of the loop. We define these partially constructed intervals using pairs
     // of BSONObjBuilders (shared_ptrs, since after one iteration of the loop they still must exist
     // outside their scope).
-    typedef vector<std::pair<std::shared_ptr<BSONObjBuilder>, std::shared_ptr<BSONObjBuilder>>>
-        BoundBuilders;
+    using BoundBuilders = std::vector<std::pair<BSONObjBuilder, BSONObjBuilder>>;
 
     BoundBuilders builders;
-    builders.emplace_back(shared_ptr<BSONObjBuilder>(new BSONObjBuilder()),
-                          shared_ptr<BSONObjBuilder>(new BSONObjBuilder()));
+    builders.emplace_back();
+
     BSONObjIterator keyIter(_keyPattern.toBSON());
-    // until equalityOnly is false, we are just dealing with equality (no range or $in queries).
+    // Until equalityOnly is false, we are just dealing with equality (no range or $in queries).
     bool equalityOnly = true;
 
-    for (size_t i = 0; i < indexBounds.fields.size(); i++) {
+    for (size_t i = 0; i < indexBounds.fields.size(); ++i) {
         BSONElement e = keyIter.next();
 
         StringData fieldName = e.fieldNameStringData();
 
-        // get the relevant intervals for this field, but we may have to transform the
-        // list of what's relevant according to the expression for this field
+        // Get the relevant intervals for this field, but we may have to transform the list of
+        // what's relevant according to the expression for this field
         const OrderedIntervalList& oil = indexBounds.fields[i];
-        const vector<Interval>& intervals = oil.intervals;
+        const auto& intervals = oil.intervals;
 
         if (equalityOnly) {
             if (intervals.size() == 1 && intervals.front().isPoint()) {
-                // this field is only a single point-interval
-                BoundBuilders::const_iterator j;
-                for (j = builders.begin(); j != builders.end(); ++j) {
-                    j->first->appendAs(intervals.front().start, fieldName);
-                    j->second->appendAs(intervals.front().end, fieldName);
+                // This field is only a single point-interval
+                for (auto& builder : builders) {
+                    builder.first.appendAs(intervals.front().start, fieldName);
+                    builder.second.appendAs(intervals.front().end, fieldName);
                 }
             } else {
-                // This clause is the first to generate more than a single point.
-                // We only execute this clause once. After that, we simplify the bound
-                // extensions to prevent combinatorial explosion.
+                // This clause is the first to generate more than a single point. We only execute
+                // this clause once. After that, we simplify the bound extensions to prevent
+                // combinatorial explosion.
                 equalityOnly = false;
 
                 BoundBuilders newBuilders;
 
-                for (BoundBuilders::const_iterator it = builders.begin(); it != builders.end();
-                     ++it) {
-                    BSONObj first = it->first->obj();
-                    BSONObj second = it->second->obj();
+                for (auto& builder : builders) {
+                    BSONObj first = builder.first.obj();
+                    BSONObj second = builder.second.obj();
 
-                    for (vector<Interval>::const_iterator interval = intervals.begin();
-                         interval != intervals.end();
-                         ++interval) {
+                    for (const auto& interval : intervals) {
                         uassert(17439,
                                 "combinatorial limit of $in partitioning of results exceeded",
                                 newBuilders.size() < kMaxFlattenedInCombinations);
-                        newBuilders.emplace_back(shared_ptr<BSONObjBuilder>(new BSONObjBuilder()),
-                                                 shared_ptr<BSONObjBuilder>(new BSONObjBuilder()));
-                        newBuilders.back().first->appendElements(first);
-                        newBuilders.back().second->appendElements(second);
-                        newBuilders.back().first->appendAs(interval->start, fieldName);
-                        newBuilders.back().second->appendAs(interval->end, fieldName);
+
+                        newBuilders.emplace_back();
+
+                        newBuilders.back().first.appendElements(first);
+                        newBuilders.back().first.appendAs(interval.start, fieldName);
+
+                        newBuilders.back().second.appendElements(second);
+                        newBuilders.back().second.appendAs(interval.end, fieldName);
                     }
                 }
-                builders = newBuilders;
+
+                builders = std::move(newBuilders);
             }
         } else {
-            // if we've already generated a range or multiple point-intervals
-            // just extend what we've generated with min/max bounds for this field
-            BoundBuilders::const_iterator j;
-            for (j = builders.begin(); j != builders.end(); ++j) {
-                j->first->appendAs(intervals.front().start, fieldName);
-                j->second->appendAs(intervals.back().end, fieldName);
+            // If we've already generated a range or multiple point-intervals just extend what we've
+            // generated with min/max bounds for this field
+            for (auto& builder : builders) {
+                builder.first.appendAs(intervals.front().start, fieldName);
+                builder.second.appendAs(intervals.back().end, fieldName);
             }
         }
     }
 
     BoundList ret;
-    for (BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i)
-        ret.emplace_back(i->first->obj(), i->second->obj());
+    for (auto& builder : builders) {
+        ret.emplace_back(builder.first.obj(), builder.second.obj());
+    }
 
     return ret;
 }

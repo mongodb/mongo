@@ -66,10 +66,7 @@ typedef std::vector<std::pair<BSONObj, BSONObj>> BoundList;
 class ShardKeyPattern {
 public:
     // Maximum size of shard key
-    static const int kMaxShardKeySizeBytes;
-
-    // Maximum number of intervals produced by $in queries.
-    static const unsigned int kMaxFlattenedInCombinations;
+    static constexpr int kMaxShardKeySizeBytes = 512;
 
     /**
      * Helper to check shard key size and generate an appropriate error message.
