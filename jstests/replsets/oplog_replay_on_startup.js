@@ -103,11 +103,17 @@
                   injectedOplogTruncateAfterPointDoc,
                   "If the Timestamps differ, the server may be filling in the null timestamps");
 
-        try {
-            conn = rst.restart(0);  // Restart in replSet mode again.
-        } catch (e) {
-            assert.eq(expectedState, 'FATAL', 'node failed to restart: ' + e);
+        rst.stop(0);
+
+        if (expectedState === 'FATAL') {
+            try {
+                rst.start(0, {waitForConnect: true}, true);
+            } catch (e) {
+            }
+            rst.stop(0, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
             return;
+        } else {
+            conn = rst.start(0, {waitForConnect: true}, true);
         }
 
         // Wait for the node to go to SECONDARY if it is able.
