@@ -1590,6 +1590,15 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
 void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                                 RecordId end,
                                                 bool inclusive) {
+    if (_isOplog) {
+        // If we are truncating the oplog, we want to make sure that a forward cursor reads all
+        // committed oplog entries. Oplog visibility rules could prevent this if the oplog read
+        // timestamp has not yet been updated to reflect all committed oplog transactions. Setting
+        // the read timestamp to its maximum value should ensure that we read the effects of all
+        // previously committed transactions.
+        invariant(opCtx->recoveryUnit()->selectSnapshot(Timestamp::max()).isOK());
+    }
+
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, true);
 
     auto record = cursor->seekExact(end);
