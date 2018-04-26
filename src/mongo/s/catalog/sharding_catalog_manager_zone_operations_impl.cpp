@@ -313,6 +313,17 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
                                                         const NamespaceString& ns,
                                                         const ChunkRange& givenRange,
                                                         const std::string& zoneName) {
+    auto zoneBoundsStorageStatus =
+        ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(givenRange.getMin());
+    if (zoneBoundsStorageStatus.isOK()) {
+        zoneBoundsStorageStatus =
+            ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(givenRange.getMax());
+    }
+
+    if (!zoneBoundsStorageStatus.isOK()) {
+        return zoneBoundsStorageStatus;
+    }
+
     Lock::ExclusiveLock lk(txn->lockState(), _kZoneOpLock);
 
     auto configServer = Grid::get(txn)->shardRegistry()->getConfigShard();

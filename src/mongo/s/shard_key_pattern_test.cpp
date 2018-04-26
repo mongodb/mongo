@@ -128,10 +128,13 @@ TEST(ShardKeyPattern, NormalizeShardKey) {
                       BSON("a.b" << 10 << "c" << 30));
     ASSERT_BSONOBJ_EQ(normKey(pattern, BSON("c" << 30 << "a.b" << 10)),
                       BSON("a.b" << 10 << "c" << 30));
+    ASSERT_BSONOBJ_EQ(normKey(pattern, BSON("a.b" << BSON("$notAndOperator" << 10) << "c" << 30)),
+                      BSON("a.b" << BSON("$notAndOperator" << 10) << "c" << 30));
+    ASSERT_BSONOBJ_EQ(normKey(pattern, BSON("a.b" << BSON("$gt" << 10) << "c" << 30)),
+                      BSON("a.b" << BSON("$gt" << 10) << "c" << 30));
 
     ASSERT_BSONOBJ_EQ(normKey(pattern, BSON("b" << 10)), BSONObj());
     ASSERT_BSONOBJ_EQ(normKey(pattern, BSON("a" << 10 << "c" << 30)), BSONObj());
-    ASSERT_BSONOBJ_EQ(normKey(pattern, BSON("a.b" << BSON("$gt" << 10) << "c" << 30)), BSONObj());
 }
 
 static BSONObj docKey(const ShardKeyPattern& pattern, const BSONObj& doc) {
@@ -157,13 +160,16 @@ TEST(ShardKeyPattern, ExtractDocShardKeySingle) {
                              << "$id"
                              << 1);
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("a" << ref)), BSON("a" << ref));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$dollarPrefixKey:true}}")),
+                      fromjson("{a:{$dollarPrefixKey:true}}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$gt:10}}")), fromjson("{a:{$gt:10}}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$gt:{$dollarPrefixKey:10}}}}")),
+                      fromjson("{a:{$gt:{$dollarPrefixKey:10}}}}"));
 
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSONObj()), BSONObj());
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{b:10}")), BSONObj());
     ASSERT_BSONOBJ_EQ(docKey(pattern, BSON("" << 10)), BSONObj());
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:[1,2]}")), BSONObj());
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$invalid:true}}")), BSONObj());
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$gt:10}}")), BSONObj());
     // BSONObjIterator breaks this for now
     // ASSERT_EQUALS(docKey(pattern, BSON("a" << 10 << "a" << 20)), BSONObj());
 }
@@ -183,15 +189,17 @@ TEST(ShardKeyPattern, ExtractDocShardKeyCompound) {
                                       << "a"
                                       << 10)),
                       fromjson("{a:10, b:'20'}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:10, b:{$dollarPrefixKey:true}}")),
+                      fromjson("{a:10, b:{$dollarPrefixKey:true}}"));
+    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:10, b:{$gt:20}}")),
+                      fromjson("{a:10, b:{$gt:20}}"));
 
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:10, b:[1, 2]}")), BSONObj());
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:10, b:{$invalid:true}}")), BSONObj());
     ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{b:20}")), BSONObj());
     ASSERT_BSONOBJ_EQ(docKey(pattern,
                              BSON("" << 10 << "b"
                                      << "20")),
                       BSONObj());
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:10, b:{$gt:20}}")), BSONObj());
 
     // Ordering
     ASSERT_EQUALS(docKey(pattern, BSON("b" << 20 << "a" << 10)).firstElement().numberInt(), 10);
@@ -284,7 +292,7 @@ TEST(ShardKeyPattern, ExtractQueryShardKeySingle) {
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:10,b:{$invalid:'20'}}")), BSONObj());
 
     // Doc key extraction shouldn't work with query
-    ASSERT_BSONOBJ_EQ(docKey(pattern, fromjson("{a:{$eq:[10, 20]}, c:30}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{$eq:[10, 20]}, c:30}")), BSONObj());
 
     // $eq/$or/$and/$all
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{$eq:10}}")), fromjson("{a:10}"));

@@ -75,6 +75,12 @@ public:
     static Status checkShardKeySize(const BSONObj& shardKey);
 
     /**
+     * Validates whether the specified shard key is valid to be written as part of the sharding
+     * metadata.
+     */
+    static Status checkShardKeyIsValidForMetadataStorage(const BSONObj& shardKey);
+
+    /**
      * Constructs a shard key pattern from a BSON pattern document.  If the document is not a
      * valid shard key pattern, !isValid() will be true and key extraction will fail.
      */

@@ -364,5 +364,33 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
     ASSERT_EQ(ErrorCodes::InvalidOptions, splitStatus);
 }
 
+TEST_F(SplitChunkTest, SplitPointsWithDollarPrefixShouldFail) {
+    ChunkType chunk;
+    chunk.setNS("TestDB.TestColl");
+
+    auto origVersion = ChunkVersion(1, 0, OID::gen());
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId("shard0000"));
+
+    auto chunkMin = BSON("a" << kMinBSONKey);
+    auto chunkMax = BSON("a" << kMaxBSONKey);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+    ASSERT_OK(setupChunks({chunk}));
+
+    ASSERT_NOT_OK(catalogManager()->commitChunkSplit(operationContext(),
+                                                     NamespaceString("TestDB.TestColl"),
+                                                     origVersion.epoch(),
+                                                     ChunkRange(chunkMin, chunkMax),
+                                                     {BSON("a" << BSON("$minKey" << 1))},
+                                                     "shard0000"));
+    ASSERT_NOT_OK(catalogManager()->commitChunkSplit(operationContext(),
+                                                     NamespaceString("TestDB.TestColl"),
+                                                     origVersion.epoch(),
+                                                     ChunkRange(chunkMin, chunkMax),
+                                                     {BSON("a" << BSON("$maxKey" << 1))},
+                                                     "shard0000"));
+}
+
 }  // namespace
 }  // namespace mongo

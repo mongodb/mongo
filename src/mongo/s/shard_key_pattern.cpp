@@ -98,12 +98,15 @@ std::vector<FieldRef*> parseShardKeyPattern(const BSONObj& keyPattern) {
     return parsedPaths.release();
 }
 
-bool isShardKeyElement(const BSONElement& element, bool allowRegex) {
-    if (element.eoo() || element.type() == Array)
+bool isValidShardKeyElement(const BSONElement& element) {
+    return !element.eoo() && element.type() != Array;
+}
+
+bool isValidShardKeyElementForStorage(const BSONElement& element) {
+    if (!isValidShardKeyElement(element))
         return false;
 
-    // TODO: Disallow regex all the time
-    if (!allowRegex && element.type() == RegEx)
+    if (element.type() == RegEx)
         return false;
 
     if (element.type() == Object && !element.embeddedObject().okForStorage())
@@ -125,6 +128,17 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
                           << " is "
                           << shardKey.objsize()
                           << " bytes"};
+}
+
+Status ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(const BSONObj& shardKey) {
+    for (const auto& elem : shardKey) {
+        if (!isValidShardKeyElementForStorage(elem)) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Shard key element " << elem << " is not valid for storage"};
+        }
+    }
+
+    return Status::OK();
 }
 
 ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
@@ -169,7 +183,7 @@ bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
     for (const auto& patternEl : keyPatternBSON) {
         BSONElement keyEl = shardKey[patternEl.fieldNameStringData()];
 
-        if (!isShardKeyElement(keyEl, true))
+        if (!isValidShardKeyElement(keyEl))
             return false;
     }
 
@@ -194,7 +208,7 @@ BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
 
         BSONElement keyEl = shardKey[patternEl.fieldNameStringData()];
 
-        if (!isShardKeyElement(keyEl, true))
+        if (!isValidShardKeyElement(keyEl))
             return BSONObj();
 
         keyBuilder.appendAs(keyEl, patternEl.fieldName());
@@ -234,7 +248,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& m
         BSONElement matchEl =
             extractKeyElementFromMatchable(matchable, patternEl.fieldNameStringData());
 
-        if (!isShardKeyElement(matchEl, true))
+        if (!isValidShardKeyElement(matchEl))
             return BSONObj();
 
         if (isHashedPatternEl(patternEl)) {
@@ -319,7 +333,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
         const FieldRef& patternPath = **it;
         BSONElement equalEl = findEqualityElement(equalities, patternPath);
 
-        if (!isShardKeyElement(equalEl, false))
+        if (!isValidShardKeyElementForStorage(equalEl))
             return BSONObj();
 
         if (isHashedPattern()) {
