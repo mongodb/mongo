@@ -299,10 +299,6 @@ DEATH_TEST(InvariantTerminationTest, invariantStatusWithOverload, "Terminating w
                                       "Terminating with invariantStatusWithOverload"));
 }
 
-DEATH_TEST(InvariantTerminationTest, invariantOK, "Terminating with invariantOK") {
-    invariantOK(Status(ErrorCodes::InternalError, "Terminating with invariantOK"));
-}
-
 DEATH_TEST(InvariantTerminationTest,
            invariantWithStringLiteralMsg,
            "Terminating with string literal invariant message") {
