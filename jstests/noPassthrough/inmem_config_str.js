@@ -12,4 +12,5 @@
         inMemoryEngineConfigString: 'eviction=(threads_min=1)',
     });
     assert.neq(null, mongod, "mongod failed to started up with --inMemoryEngineConfigString");
+    MongoRunner.stopMongod(mongod);
 }());
