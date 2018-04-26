@@ -193,6 +193,20 @@ assert = (function() {
             msg, "[" + tojson(aSorted) + "] != [" + tojson(bSorted) + "] are not equal"));
     };
 
+    assert.setEq = function(aSet, bSet, msg) {
+        const failAssertion = function() {
+            doassert(_buildAssertionMessage(msg, tojson(aSet) + " != " + tojson(bSet)));
+        };
+        if (aSet.size !== bSet.size) {
+            failAssertion();
+        }
+        for (let a of aSet) {
+            if (!bSet.has(a)) {
+                failAssertion();
+            }
+        }
+    };
+
     assert.eq.automsg = function(a, b) {
         assert.eq(eval(a), eval(b), "[" + a + "] != [" + b + "]");
     };
