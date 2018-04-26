@@ -1757,17 +1757,6 @@ public:
         mergePipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         mergePipe->optimizePipeline();
 
-        auto beforeSplit = Value(mergePipe->serialize());
-
-        shardPipe = mergePipe->splitForSharded();
-        ASSERT(shardPipe);
-
-        shardPipe->unsplitFromSharded(std::move(mergePipe));
-        ASSERT_FALSE(mergePipe);
-
-        ASSERT_VALUE_EQ(Value(shardPipe->serialize()), beforeSplit);
-
-        mergePipe = std::move(shardPipe);
         shardPipe = mergePipe->splitForSharded();
         ASSERT(shardPipe);
 

@@ -194,18 +194,6 @@ TEST_F(ClusterAggregateTest, NoErrors) {
     runAggCommandSuccessful(kAggregateCmdScatterGather, false);
 }
 
-// Verify ClusterFind::runQuery will retry on a snapshot error.
-TEST_F(ClusterAggregateTest, RetryOnSnapshotError) {
-    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-
-    // Target one shard.
-    runAggCommandOneError(kAggregateCmdTargeted, ErrorCodes::SnapshotUnavailable, true);
-    runAggCommandOneError(kAggregateCmdTargeted, ErrorCodes::SnapshotTooOld, true);
-
-    // Target all shards
-    runAggCommandOneError(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
-    runAggCommandOneError(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
-}
 
 TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);

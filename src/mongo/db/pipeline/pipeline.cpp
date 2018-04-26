@@ -318,7 +318,6 @@ void Pipeline::dispose(OperationContext* opCtx) {
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::splitForSharded() {
     invariant(!isSplitForShards());
     invariant(!isSplitForMerge());
-    invariant(!_unsplitSources);
 
     // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
     // shards and all work being done in the merger. Optimizations can move operations between
@@ -326,9 +325,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::splitForSharded() {
     std::unique_ptr<Pipeline, PipelineDeleter> shardPipeline(new Pipeline(pCtx),
                                                              PipelineDeleter(pCtx->opCtx));
 
-    // Keep a copy of the original source list in case we need to reset the pipeline from split to
-    // unsplit later.
-    shardPipeline->_unsplitSources.emplace(_sources);
     cluster_aggregation_planner::performSplitPipelineOptimizations(shardPipeline.get(), this);
     shardPipeline->_splitState = SplitState::kSplitForShards;
     _splitState = SplitState::kSplitForMerge;
@@ -336,28 +332,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::splitForSharded() {
     stitch();
 
     return shardPipeline;
-}
-
-void Pipeline::unsplitFromSharded(
-    std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMergingShard) {
-    invariant(isSplitForShards());
-    invariant(!isSplitForMerge());
-    invariant(pipelineForMergingShard);
-    invariant(_unsplitSources);
-
-    // Clear the merge source list so that destroying the pipeline object won't dispose of the
-    // stages. We still have a reference to each of the stages which will be moved back to the shard
-    // pipeline via '_unsplitSources'.
-    pipelineForMergingShard->_sources.clear();
-    pipelineForMergingShard.reset();
-
-    // Set '_sources' to its original state, re-stitch, and clear the '_unsplitSources' optional.
-    _sources = *_unsplitSources;
-    _unsplitSources.reset();
-
-    _splitState = SplitState::kUnsplit;
-
-    stitch();
 }
 
 BSONObj Pipeline::getInitialQuery() const {

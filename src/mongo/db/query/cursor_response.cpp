@@ -34,7 +34,6 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -115,13 +114,6 @@ CursorResponse::CursorResponse(NamespaceString nss,
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
     if (!cmdStatus.isOK()) {
-        if (ErrorCodes::isStaleShardVersionError(cmdStatus.code())) {
-            auto vWanted = ChunkVersion::fromBSON(cmdResponse, "vWanted");
-            auto vReceived = ChunkVersion::fromBSON(cmdResponse, "vReceived");
-            if (!vWanted.hasEqualEpoch(vReceived)) {
-                return Status(ErrorCodes::StaleEpoch, cmdStatus.reason());
-            }
-        }
         return cmdStatus;
     }
 
