@@ -34,6 +34,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
@@ -92,6 +93,7 @@
 
 namespace mongo {
 
+MONGO_FP_DECLARE(failCommand);
 MONGO_FP_DECLARE(rsStopGetMore);
 MONGO_FP_DECLARE(respondWithNotPrimaryInCommandDispatch);
 MONGO_FP_DECLARE(skipCheckingForNotMasterInCommandDispatch);
@@ -146,6 +148,10 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"insert", 1},
                                         {"prepareTransaction", 1},
                                         {"update", 1}};
+
+// The command names that are ignored by the 'failCommand' failpoint.
+const StringMap<int> failCommandIgnoreList = {
+    {"buildInfo", 1}, {"configureFailPoint", 1}, {"isMaster", 1}, {"ping", 1}};
 
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
@@ -559,6 +565,24 @@ void execCommandDatabase(OperationContext* opCtx,
         // see SERVER-18515 for details.
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
+
+        if (failCommandIgnoreList.find(command->getName()) == failCommandIgnoreList.cend()) {
+            MONGO_FAIL_POINT_BLOCK(failCommand, data) {
+                bool closeConnection;
+                if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection)
+                        .isOK() &&
+                    closeConnection) {
+                    opCtx->getClient()->session()->end();
+                    uasserted(50838, "Failing command due to 'failCommand' failpoint");
+                }
+
+                long long errorCode;
+                if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
+                    uasserted(ErrorCodes::Error(errorCode),
+                              "Failing command due to 'failCommand' failpoint");
+                }
+            }
+        }
 
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto sessionOptions = initializeOperationSessionInfo(
