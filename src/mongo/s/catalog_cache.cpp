@@ -118,19 +118,10 @@ std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
 CatalogCache::CatalogCache(CatalogCacheLoader& cacheLoader) : _cacheLoader(cacheLoader) {}
 
 CatalogCache::~CatalogCache() = default;
+
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
-    return _getDatabase(opCtx, dbName).status;
-}
-
-CatalogCache::RefreshResult<CachedDatabaseInfo> CatalogCache::_getDatabase(OperationContext* opCtx,
-                                                                           StringData dbName) {
-    using DatabaseInfoRefreshResult = RefreshResult<CachedDatabaseInfo>;
-    using DatabaseInfoRefreshAction = RefreshResult<CachedDatabaseInfo>::RefreshAction;
-
-    DatabaseInfoRefreshAction refreshActionTaken;
     try {
-        // Whether we performed refresh or someone else or not at all
         while (true) {
             stdx::unique_lock<stdx::mutex> ul(_mutex);
 
@@ -145,9 +136,6 @@ CatalogCache::RefreshResult<CachedDatabaseInfo> CatalogCache::_getDatabase(Opera
                     refreshNotification = (dbEntry->refreshCompletionNotification =
                                                std::make_shared<Notification<Status>>());
                     _scheduleDatabaseRefresh(ul, dbName.toString(), dbEntry);
-                    refreshActionTaken = DatabaseInfoRefreshAction::kPerformedRefresh;
-                } else {
-                    refreshActionTaken = DatabaseInfoRefreshAction::kJoinedInProgressRefresh;
                 }
 
                 // Wait on the notification outside of the mutex.
@@ -183,39 +171,29 @@ CatalogCache::RefreshResult<CachedDatabaseInfo> CatalogCache::_getDatabase(Opera
 
             auto primaryShard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->dbt->getPrimary()));
-            return {CachedDatabaseInfo(*dbEntry->dbt, std::move(primaryShard)), refreshActionTaken};
+            return {CachedDatabaseInfo(*dbEntry->dbt, std::move(primaryShard))};
         }
     } catch (const DBException& ex) {
-        return {ex.toStatus(), refreshActionTaken};
+        return ex.toStatus();
     }
 }
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
-    return _getCollectionRoutingInfo(opCtx, nss).status;
-}
-
-CatalogCache::RefreshResult<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfo(
-    OperationContext* opCtx, const NamespaceString& nss) {
     return _getCollectionRoutingInfoAt(opCtx, nss, boost::none);
 }
 
-
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
-    return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime).status;
+    return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime);
 }
 
-CatalogCache::RefreshResult<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
+StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, boost::optional<Timestamp> atClusterTime) {
-    using CollectionRoutingInfoRefreshResult = RefreshResult<CachedCollectionRoutingInfo>;
-    using CollectionRoutingInfoRefreshAction =
-        RefreshResult<CachedCollectionRoutingInfo>::RefreshAction;
-    CollectionRoutingInfoRefreshAction refreshActionTaken;
     while (true) {
         const auto swDbInfo = getDatabase(opCtx, nss.db());
         if (!swDbInfo.isOK()) {
-            return {swDbInfo.getStatus(), CollectionRoutingInfoRefreshAction::kPerformedRefresh};
+            return swDbInfo.getStatus();
         }
         const auto dbInfo = std::move(swDbInfo.getValue());
 
@@ -223,13 +201,11 @@ CatalogCache::RefreshResult<CachedCollectionRoutingInfo> CatalogCache::_getColle
 
         const auto itDb = _collectionsByDb.find(nss.db());
         if (itDb == _collectionsByDb.end()) {
-            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr),
-                    CollectionRoutingInfoRefreshAction::kPerformedRefresh};
+            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr)};
         }
         const auto itColl = itDb->second.find(nss.ns());
         if (itColl == itDb->second.end()) {
-            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr),
-                    CollectionRoutingInfoRefreshAction::kPerformedRefresh};
+            return {CachedCollectionRoutingInfo(nss, dbInfo, nullptr)};
         }
         auto& collEntry = itColl->second;
 
@@ -239,9 +215,6 @@ CatalogCache::RefreshResult<CachedCollectionRoutingInfo> CatalogCache::_getColle
                 refreshNotification = (collEntry->refreshCompletionNotification =
                                            std::make_shared<Notification<Status>>());
                 _scheduleCollectionRefresh(ul, collEntry, nss, 1);
-                refreshActionTaken = CollectionRoutingInfoRefreshAction::kPerformedRefresh;
-            } else {
-                refreshActionTaken = CollectionRoutingInfoRefreshAction::kJoinedInProgressRefresh;
             }
 
             // Wait on the notification outside of the mutex
@@ -265,7 +238,7 @@ CatalogCache::RefreshResult<CachedCollectionRoutingInfo> CatalogCache::_getColle
             }();
 
             if (!refreshStatus.isOK()) {
-                return {refreshStatus, refreshActionTaken};
+                return refreshStatus;
             }
 
             // Once the refresh is complete, loop around to get the latest value
@@ -274,42 +247,20 @@ CatalogCache::RefreshResult<CachedCollectionRoutingInfo> CatalogCache::_getColle
 
         auto cm = std::make_shared<ChunkManager>(collEntry->routingInfo, atClusterTime);
 
-        return {CachedCollectionRoutingInfo(nss, dbInfo, std::move(cm)), refreshActionTaken};
+        return {CachedCollectionRoutingInfo(nss, dbInfo, std::move(cm))};
     }
 }
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
                                                                     StringData dbName) {
     invalidateDatabaseEntry(dbName);
-    auto refreshResult = _getDatabase(opCtx, dbName);
-    // We want to ensure that we don't join an in-progress refresh because that
-    // could violate causal consistency for this client. We don't need to actually perform the
-    // refresh ourselves but we do need the refresh to begin *after* this function is
-    // called, so calling it twice is enough regardless of what happens the
-    // second time. See SERVER-33954 for reasoning.
-    if (refreshResult.actionTaken ==
-        RefreshResult<CachedDatabaseInfo>::RefreshAction::kJoinedInProgressRefresh) {
-        invalidateDatabaseEntry(dbName);
-        refreshResult = _getDatabase(opCtx, dbName);
-    }
-    return refreshResult.status;
+    return getDatabase(opCtx, dbName);
 }
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     invalidateShardedCollection(nss);
-    auto refreshResult = _getCollectionRoutingInfo(opCtx, nss);
-    // We want to ensure that we don't join an in-progress refresh because that
-    // could violate causal consistency for this client. We don't need to actually perform the
-    // refresh ourselves but we do need the refresh to begin *after* this function is
-    // called, so calling it twice is enough regardless of what happens the
-    // second time. See SERVER-33954 for reasoning.
-    if (refreshResult.actionTaken ==
-        RefreshResult<CachedCollectionRoutingInfo>::RefreshAction::kJoinedInProgressRefresh) {
-        invalidateShardedCollection(nss);
-        refreshResult = _getCollectionRoutingInfo(opCtx, nss);
-    }
-    return refreshResult.status;
+    return getCollectionRoutingInfo(opCtx, nss);
 }
 
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfoWithRefresh(
