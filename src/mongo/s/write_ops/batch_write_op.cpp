@@ -95,11 +95,30 @@ void buildTargetError(const Status& errStatus, WriteErrorDetail* details) {
 /**
  * Helper to determine whether a number of targeted writes require a new targeted batch.
  */
-bool isNewBatchRequired(const std::vector<TargetedWrite*>& writes,
-                        const TargetedBatchMap& batchMap) {
+bool isNewBatchRequiredOrdered(const std::vector<TargetedWrite*>& writes,
+                               const TargetedBatchMap& batchMap) {
     for (const auto write : writes) {
         if (batchMap.find(&write->endpoint) == batchMap.end()) {
             return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Helper to determine whether a shard is already targeted with a different shardVersion, which
+ * necessitates a new batch. This happens when a batch write incldues a multi target write and
+ * a single target write.
+ */
+bool isNewBatchRequiredUnordered(const std::vector<TargetedWrite*>& writes,
+                                 const TargetedBatchMap& batchMap,
+                                 const std::set<ShardId>& targetedShards) {
+    for (const auto write : writes) {
+        if (batchMap.find(&write->endpoint) == batchMap.end()) {
+            if (targetedShards.find((&write->endpoint)->shardName) != targetedShards.end()) {
+                return true;
+            }
         }
     }
 
@@ -234,6 +253,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
     const bool ordered = _clientRequest.getWriteCommandBase().getOrdered();
 
     TargetedBatchMap batchMap;
+    std::set<ShardId> targetedShards;
 
     int numTargetErrors = 0;
 
@@ -249,8 +269,8 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
         //
         // Get TargetedWrites from the targeter for the write operation
         //
-
         // TargetedWrites need to be owned once returned
+
         OwnedPointerVector<TargetedWrite> writesOwned;
         vector<TargetedWrite*>& writes = writesOwned.mutableVector();
 
@@ -291,7 +311,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
 
         if (ordered && !batchMap.empty()) {
             dassert(batchMap.size() == 1u);
-            if (isNewBatchRequired(writes, batchMap)) {
+            if (isNewBatchRequiredOrdered(writes, batchMap)) {
                 writeOp.cancelWrites(NULL);
                 break;
             }
@@ -308,6 +328,12 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             break;
         }
 
+        if (!ordered && !batchMap.empty() &&
+            isNewBatchRequiredUnordered(writes, batchMap, targetedShards)) {
+            writeOp.cancelWrites(nullptr);
+            break;
+        }
+
         //
         // Targeting went ok, add to appropriate TargetedBatch
         //
@@ -317,6 +343,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             if (batchIt == batchMap.end()) {
                 TargetedWriteBatch* newBatch = new TargetedWriteBatch(write->endpoint);
                 batchIt = batchMap.emplace(&newBatch->getEndpoint(), newBatch).first;
+                targetedShards.insert((&newBatch->getEndpoint())->shardName);
             }
 
             TargetedWriteBatch* batch = batchIt->second;
