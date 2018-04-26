@@ -543,7 +543,7 @@ intrusive_ptr<Expression> ExpressionArrayElemAt::optimize() {
                                   << indexArg.coerceToDouble(),
                     indexArg.integral());
             auto ind = indexArg.coerceToInt();
-            // Can't optimize of the index is less that 0
+            // Can't optimize of the index is less that 0.
             if (ind  >= 0) {
                 dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(ind + 1);
             }
