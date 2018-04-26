@@ -129,7 +129,7 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
               << collationSpec;
         fassertFailedNoTrace(40144);
     }
-    invariantOK(collator.getStatus());
+    invariant(collator.getStatus());
 
     return std::move(collator.getValue());
 }

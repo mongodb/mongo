@@ -425,7 +425,7 @@ void prefetchOp(const OplogEntry& oplogEntry) {
 void prefetchOps(const MultiApplier::Operations& ops, ThreadPool* prefetcherPool) {
     invariant(prefetcherPool);
     for (auto&& op : ops) {
-        invariantOK(prefetcherPool->schedule([&] { prefetchOp(op); }));
+        invariant(prefetcherPool->schedule([&] { prefetchOp(op); }));
     }
     prefetcherPool->waitForIdle();
 }
@@ -441,7 +441,7 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
     invariant(writerVectors.size() == statusVector->size());
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
-            invariantOK(writerPool->schedule([
+            invariant(writerPool->schedule([
                 &func,
                 st,
                 &writer = writerVectors.at(i),
@@ -500,7 +500,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     if (!enoughToMultiThread ||
         !opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
 
-        invariantOK(threadPool->schedule(makeOplogWriterForRange(0, ops.size())));
+        invariant(threadPool->schedule(makeOplogWriterForRange(0, ops.size())));
         return;
     }
 
@@ -510,7 +510,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     for (size_t thread = 0; thread < numOplogThreads; thread++) {
         size_t begin = thread * numOpsPerThread;
         size_t end = (thread == numOplogThreads - 1) ? ops.size() : begin + numOpsPerThread;
-        invariantOK(threadPool->schedule(makeOplogWriterForRange(begin, end)));
+        invariant(threadPool->schedule(makeOplogWriterForRange(begin, end)));
     }
 }
 

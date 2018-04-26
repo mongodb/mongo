@@ -182,7 +182,7 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
                                           ->makeFromBSON(collationElem.Obj());
                 // validateIndexSpecCollation() should have checked that the index collation spec is
                 // valid.
-                invariantOK(collatorStatus.getStatus());
+                invariant(collatorStatus.getStatus());
                 indexCollator = std::move(collatorStatus.getValue());
             }
             if (!CollatorInterface::collatorsMatch(collection->getDefaultCollator(),

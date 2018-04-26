@@ -134,7 +134,7 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(
 
     for (auto&& elem : elementsToAdd) {
         auto toAdd = element->getDocument().makeElement(elem);
-        invariantOK(element->pushBack(toAdd));
+        invariant(element->pushBack(toAdd));
     }
 
     return ModifyResult::kNormalUpdate;
@@ -142,10 +142,10 @@ ModifierNode::ModifyResult AddToSetNode::updateExistingElement(
 
 void AddToSetNode::setValueForNewElement(mutablebson::Element* element) const {
     BSONObj emptyArray;
-    invariantOK(element->setValueArray(emptyArray));
+    invariant(element->setValueArray(emptyArray));
     for (auto&& elem : _elements) {
         auto toAdd = element->getDocument().makeElement(elem);
-        invariantOK(element->pushBack(toAdd));
+        invariant(element->pushBack(toAdd));
     }
 }
 

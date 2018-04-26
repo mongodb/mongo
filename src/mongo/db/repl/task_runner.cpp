@@ -112,7 +112,7 @@ void TaskRunner::schedule(const Task& task) {
         return;
     }
 
-    invariantOK(_threadPool->schedule([this] { _runTasks(); }));
+    invariant(_threadPool->schedule([this] { _runTasks(); }));
 
     _active = true;
     _cancelRequested = false;

@@ -63,7 +63,7 @@ void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,
     if (!shardConn.isOK()) {
         severe() << "got bad host string in saveGLEStats: " << hostString;
     }
-    invariantOK(shardConn.getStatus());
+    invariant(shardConn.getStatus());
 
     auto shardingMetadata = std::move(swShardingMetadata.getValue());
 

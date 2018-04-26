@@ -313,7 +313,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
                                          expCtx,
                                          extensionsCallback,
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
-        invariantOK(statusWithCQ.getStatus());
+        invariant(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.

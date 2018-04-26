@@ -46,11 +46,11 @@ ModifierNode::ModifyResult UnsetNode::updateExistingElement(
 
     invariant(parent.ok());
     if (!parent.isType(BSONType::Array)) {
-        invariantOK(element->remove());
+        invariant(element->remove());
     } else {
         // Special case: An $unset on an array element sets it to null instead of removing it from
         // the array.
-        invariantOK(element->setValueNull());
+        invariant(element->setValueNull());
     }
 
     return ModifyResult::kNormalUpdate;

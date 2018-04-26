@@ -421,7 +421,7 @@ void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk
                                                const NamespaceString& nss,
                                                CursorId cursorId) {
     auto detachedCursor = _detachCursor(lk, nss, cursorId);
-    invariantOK(detachedCursor.getStatus());
+    invariant(detachedCursor.getStatus());
 
     // Deletion of the cursor can happen out of the lock.
     lk.unlock();

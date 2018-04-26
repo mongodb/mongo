@@ -867,7 +867,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (_config->useSnapshotReads) {
                                 qr->setReadConcern(readConcernSnapshot);
                             }
-                            invariantOK(qr->validate());
+                            invariant(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             boost::optional<TxnNumber> txnNumberForOp;
@@ -993,7 +993,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (_config->useSnapshotReads) {
                                 qr->setReadConcern(readConcernSnapshot);
                             }
-                            invariantOK(qr->validate());
+                            invariant(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.queryCounter);
                             boost::optional<TxnNumber> txnNumberForOp;

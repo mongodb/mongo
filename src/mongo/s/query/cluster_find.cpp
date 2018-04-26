@@ -164,7 +164,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     // Therefore, we must always send singleBatch=false (wantMore=true) to the shards.
     newQR->setWantMore(true);
 
-    invariantOK(newQR->validate());
+    invariant(newQR->validate());
     return std::move(newQR);
 }
 

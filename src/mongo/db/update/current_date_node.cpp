@@ -43,9 +43,9 @@ constexpr StringData kTimestamp = "timestamp"_sd;
 
 void setValue(mutablebson::Element* element, bool typeIsDate) {
     if (typeIsDate) {
-        invariantOK(element->setValueDate(mongo::jsTime()));
+        invariant(element->setValueDate(mongo::jsTime()));
     } else {
-        invariantOK(element->setValueTimestamp(
+        invariant(element->setValueTimestamp(
             LogicalClock::get(getGlobalServiceContext())->reserveTicks(1).asTimestamp()));
     }
 }

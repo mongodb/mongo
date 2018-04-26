@@ -88,7 +88,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -117,7 +117,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -147,7 +147,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -166,7 +166,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 

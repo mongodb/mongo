@@ -657,7 +657,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
         auto memberState = getMemberState();
         invariant(memberState.startup2() || memberState.removed());
-        invariantOK(setFollowerMode(MemberState::RS_RECOVERING));
+        invariant(setFollowerMode(MemberState::RS_RECOVERING));
         _externalState->startSteadyStateReplication(opCtx, this);
         return;
     }
@@ -703,7 +703,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         // Because initial sync completed, we can only be in STARTUP2, not REMOVED.
         // Transition from STARTUP2 to RECOVERING and start the producer and the applier.
         invariant(getMemberState().startup2());
-        invariantOK(setFollowerMode(MemberState::RS_RECOVERING));
+        invariant(setFollowerMode(MemberState::RS_RECOVERING));
         _externalState->startSteadyStateReplication(opCtxHolder.get(), this);
     };
 
@@ -1004,7 +1004,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
             log() << "Transition to primary failed" << causedBy(status);
             return;
         }
-        invariantOK(status);
+        invariant(status);
     }
 
     // Must calculate the commit level again because firstOpTimeOfMyTerm wasn't set when we logged

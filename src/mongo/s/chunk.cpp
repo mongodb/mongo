@@ -64,7 +64,7 @@ ChunkInfo::ChunkInfo(const ChunkType& from)
       _history(from.getHistory()),
       _jumbo(from.getJumbo()),
       _dataWritten(mkDataWritten()) {
-    invariantOK(from.validate());
+    invariant(from.validate());
     if (!_history.empty()) {
         invariant(_shardId == _history.front().getShard());
     }

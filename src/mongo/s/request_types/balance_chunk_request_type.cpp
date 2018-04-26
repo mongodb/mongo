@@ -138,7 +138,7 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
     int64_t maxChunkSizeBytes,
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
     bool waitForDelete) {
-    invariantOK(chunk.validate());
+    invariant(chunk.validate());
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
@@ -158,7 +158,7 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
 }
 
 BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(const ChunkType& chunk) {
-    invariantOK(chunk.validate());
+    invariant(chunk.validate());
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);

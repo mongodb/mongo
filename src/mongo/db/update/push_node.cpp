@@ -207,21 +207,21 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
     // variable.
     ModifyResult result;
     if (arraySize == 0) {
-        invariantOK(array->pushBack(firstElementToInsert));
+        invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else if (position > arraySize) {
-        invariantOK(array->pushBack(firstElementToInsert));
+        invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kArrayAppendUpdate;
     } else if (position > 0) {
         auto insertAfter = getNthChild(*array, position - 1);
-        invariantOK(insertAfter.addSiblingRight(firstElementToInsert));
+        invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else if (position < 0 && -position < arraySize) {
         auto insertAfter = getNthChild(*array, arraySize - (-position) - 1);
-        invariantOK(insertAfter.addSiblingRight(firstElementToInsert));
+        invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else {
-        invariantOK(array->pushFront(firstElementToInsert));
+        invariant(array->pushFront(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     }
 
@@ -232,7 +232,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
                     [&document](auto& insertAfter, auto& valueToInsert) {
                         auto nextElementToInsert =
                             document.makeElementWithNewFieldName(StringData(), valueToInsert);
-                        invariantOK(insertAfter.addSiblingRight(nextElementToInsert));
+                        invariant(insertAfter.addSiblingRight(nextElementToInsert));
                         return nextElementToInsert;
                     });
 
@@ -263,11 +263,11 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
     while (static_cast<long long>(countChildren(*element)) > std::abs(_slice)) {
         result = ModifyResult::kNormalUpdate;
         if (_slice >= 0) {
-            invariantOK(element->popBack());
+            invariant(element->popBack());
         } else {
             // A negative value in '_slice' trims the array down to abs(_slice) but removes entries
             // from the front of the array instead of the back.
-            invariantOK(element->popFront());
+            invariant(element->popFront());
         }
     }
 
@@ -310,7 +310,7 @@ void PushNode::logUpdate(LogBuilder* logBuilder,
 
 void PushNode::setValueForNewElement(mutablebson::Element* element) const {
     BSONObj emptyArray;
-    invariantOK(element->setValueArray(emptyArray));
+    invariant(element->setValueArray(emptyArray));
     (void)performPush(element, nullptr);
 }
 

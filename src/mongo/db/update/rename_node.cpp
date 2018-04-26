@@ -71,12 +71,12 @@ public:
 protected:
     ModifierNode::ModifyResult updateExistingElement(
         mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const final {
-        invariantOK(element->setValueElement(_elemToSet));
+        invariant(element->setValueElement(_elemToSet));
         return ModifyResult::kNormalUpdate;
     }
 
     void setValueForNewElement(mutablebson::Element* element) const final {
-        invariantOK(element->setValueElement(_elemToSet));
+        invariant(element->setValueElement(_elemToSet));
     }
 
     bool allowCreation() const final {

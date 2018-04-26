@@ -244,7 +244,7 @@ private:
         auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
         qr->setFilter(query);
         auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
-        invariantOK(canonicalQuery.getStatus());
+        invariant(canonicalQuery.getStatus());
 
         DeleteStageParams params;
         params.isMulti = true;

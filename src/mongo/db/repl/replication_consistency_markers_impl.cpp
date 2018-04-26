@@ -88,7 +88,7 @@ boost::optional<MinValidDocument> ReplicationConsistencyMarkersImpl::_getMinVali
 void ReplicationConsistencyMarkersImpl::_updateMinValidDocument(
     OperationContext* opCtx, const TimestampedBSONObj& updateSpec) {
     Status status = _storageInterface->putSingleton(opCtx, _minValidNss, updateSpec);
-    invariantOK(status);
+    invariant(status);
 }
 
 void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationContext* opCtx) {
@@ -234,7 +234,7 @@ void ReplicationConsistencyMarkersImpl::setMinValidToAtLeast(OperationContext* o
     update.timestamp = minValid.getTimestamp();
 
     Status status = _storageInterface->updateSingleton(opCtx, _minValidNss, query, update);
-    invariantOK(status);
+    invariant(status);
 }
 
 void ReplicationConsistencyMarkersImpl::removeOldOplogDeleteFromPointField(

@@ -92,12 +92,12 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
 
         auto toRemove = current;
         current = current.rightSibling();
-        invariantOK(toRemove.remove());
+        invariant(toRemove.remove());
     }
 
     // Insert the provided contents instead.
     for (auto&& elem : _val) {
-        invariantOK(applyParams.element.appendElement(elem));
+        invariant(applyParams.element.appendElement(elem));
     }
 
     // Validate for storage.
@@ -144,10 +144,10 @@ UpdateNode::ApplyResult ObjectReplaceNode::apply(ApplyParams applyParams) const 
 
     if (applyParams.logBuilder) {
         auto replacementObject = applyParams.logBuilder->getDocument().end();
-        invariantOK(applyParams.logBuilder->getReplacementObject(&replacementObject));
+        invariant(applyParams.logBuilder->getReplacementObject(&replacementObject));
         for (auto current = applyParams.element.leftChild(); current.ok();
              current = current.rightSibling()) {
-            invariantOK(replacementObject.appendElement(current.getValue()));
+            invariant(replacementObject.appendElement(current.getValue()));
         }
     }
 

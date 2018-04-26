@@ -40,7 +40,7 @@ TextNoOpMatchExpression::TextNoOpMatchExpression(TextParams params)
     _ftsQuery.setLanguage(std::move(params.language));
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
-    invariantOK(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
+    invariant(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
 }
 
 std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {

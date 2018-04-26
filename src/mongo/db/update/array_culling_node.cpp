@@ -46,7 +46,7 @@ ModifierNode::ModifyResult ArrayCullingNode::updateExistingElement(
         // the rightSibling pointer will be invalidated.
         auto nextElement = cursor.rightSibling();
         if (_matcher->match(cursor)) {
-            invariantOK(cursor.remove());
+            invariant(cursor.remove());
             numRemoved++;
         }
         cursor = nextElement;

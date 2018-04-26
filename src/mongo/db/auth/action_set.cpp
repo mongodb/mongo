@@ -97,7 +97,7 @@ Status ActionSet::parseActionSetFromString(const std::string& actionsString, Act
     splitStringDelim(actionsString, &actionsList, ',');
     std::vector<std::string> unrecognizedActions;
     Status status = parseActionSetFromStringVector(actionsList, result, &unrecognizedActions);
-    invariantOK(status);
+    invariant(status);
     if (unrecognizedActions.empty()) {
         return Status::OK();
     }
@@ -118,7 +118,7 @@ Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>&
         if (status == ErrorCodes::FailedToParse) {
             unrecognizedActions->push_back(actionsVector[i]);
         } else {
-            invariantOK(status);
+            invariant(status);
             if (action == ActionType::anyAction) {
                 result->addAllActions();
                 return Status::OK();

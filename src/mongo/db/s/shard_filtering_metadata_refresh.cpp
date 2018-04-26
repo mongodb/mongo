@@ -54,7 +54,7 @@ Status onShardVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
 
     auto const shardingState = ShardingState::get(opCtx);
-    invariantOK(shardingState->canAcceptShardedCommands());
+    invariant(shardingState->canAcceptShardedCommands());
 
     LOG(2) << "Metadata refresh requested for " << nss.ns() << " at shard version "
            << shardVersionReceived;
@@ -103,7 +103,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
 
     auto const shardingState = ShardingState::get(opCtx);
-    invariantOK(shardingState->canAcceptShardedCommands());
+    invariant(shardingState->canAcceptShardedCommands());
 
     const auto routingInfo = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
@@ -164,7 +164,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
 
     auto const shardingState = ShardingState::get(opCtx);
-    invariantOK(shardingState->canAcceptShardedCommands());
+    invariant(shardingState->canAcceptShardedCommands());
 
     if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
         serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
@@ -195,7 +195,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
     auto const shardingState = ShardingState::get(opCtx);
-    invariantOK(shardingState->canAcceptShardedCommands());
+    invariant(shardingState->canAcceptShardedCommands());
 
     const auto refreshedDbVersion =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName))

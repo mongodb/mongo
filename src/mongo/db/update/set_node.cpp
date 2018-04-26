@@ -49,13 +49,13 @@ ModifierNode::ModifyResult SetNode::updateExistingElement(
     if (element->getValue().binaryEqualValues(_val)) {
         return ModifyResult::kNoOp;
     } else {
-        invariantOK(element->setValueBSONElement(_val));
+        invariant(element->setValueBSONElement(_val));
         return ModifyResult::kNormalUpdate;
     }
 }
 
 void SetNode::setValueForNewElement(mutablebson::Element* element) const {
-    invariantOK(element->setValueBSONElement(_val));
+    invariant(element->setValueBSONElement(_val));
 }
 
 }  // namespace mongo

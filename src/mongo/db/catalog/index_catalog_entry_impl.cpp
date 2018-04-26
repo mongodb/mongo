@@ -120,7 +120,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation);
 
         // Index spec should have already been validated.
-        invariantOK(statusWithCollator.getStatus());
+        invariant(statusWithCollator.getStatus());
 
         _collator = std::move(statusWithCollator.getValue());
     }
@@ -138,7 +138,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
                                          std::move(expCtx),
                                          ExtensionsCallbackNoop(),
                                          MatchExpressionParser::kBanAllSpecialFeatures);
-        invariantOK(statusWithMatcher.getStatus());
+        invariant(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());
         LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "
                << redact(filter);

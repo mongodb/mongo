@@ -60,13 +60,13 @@ Future<void> OplogApplier::startup() {
     auto future = _promise.getFuture();
     auto callback =
         [ this, promise = _promise.share() ](const CallbackArgs& args) mutable noexcept {
-        invariantOK(args.status);
+        invariant(args.status);
         log() << "Starting oplog application";
         _syncTail->oplogApplication(_oplogBuffer, _replCoord);
         log() << "Finished oplog application";
         promise.setWith([] {});
     };
-    invariantOK(_executor->scheduleWork(callback).getStatus());
+    invariant(_executor->scheduleWork(callback).getStatus());
     return future;
 }
 

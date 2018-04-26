@@ -111,7 +111,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     invariant(colon != string::npos);
     colgroupUri += tableUri.substr(colon);
     StatusWith<std::string> colgroupResult = getMetadata(opCtx, colgroupUri);
-    invariantOK(colgroupResult.getStatus());
+    invariant(colgroupResult.getStatus());
     WiredTigerConfigParser parser(colgroupResult.getValue());
 
     WT_CONFIG_ITEM typeItem;
@@ -227,7 +227,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(Operat
     if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
         return result.getStatus();
     }
-    invariantOK(result.getStatus());
+    invariant(result.getStatus());
 
     WiredTigerConfigParser topParser(result.getValue());
     WT_CONFIG_ITEM metadata;

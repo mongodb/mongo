@@ -410,11 +410,11 @@ Status _collModInternal(OperationContext* opCtx,
 
     // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
     if (!cmr.collValidator.eoo())
-        invariantOK(coll->setValidator(opCtx, cmr.collValidator.Obj()));
+        invariant(coll->setValidator(opCtx, cmr.collValidator.Obj()));
     if (!cmr.collValidationAction.empty())
-        invariantOK(coll->setValidationAction(opCtx, cmr.collValidationAction));
+        invariant(coll->setValidationAction(opCtx, cmr.collValidationAction));
     if (!cmr.collValidationLevel.empty())
-        invariantOK(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
+        invariant(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
 
     // UsePowerof2Sizes
     if (!cmr.usePowerOf2Sizes.eoo())

@@ -63,7 +63,7 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     } else if (languageStatus == ErrorCodes::NoSuchKey) {
         params.language = std::string();
     } else {
-        invariantOK(languageStatus);
+        invariant(languageStatus);
         expectedFieldCount++;
     }
 
@@ -74,7 +74,7 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     } else if (caseSensitiveStatus == ErrorCodes::NoSuchKey) {
         params.caseSensitive = TextMatchExpressionBase::kCaseSensitiveDefault;
     } else {
-        invariantOK(caseSensitiveStatus);
+        invariant(caseSensitiveStatus);
         expectedFieldCount++;
     }
 
@@ -85,7 +85,7 @@ ExtensionsCallback::extractTextMatchExpressionParams(BSONElement text) {
     } else if (diacriticSensitiveStatus == ErrorCodes::NoSuchKey) {
         params.diacriticSensitive = TextMatchExpressionBase::kDiacriticSensitiveDefault;
     } else {
-        invariantOK(diacriticSensitiveStatus);
+        invariant(diacriticSensitiveStatus);
         expectedFieldCount++;
     }
 

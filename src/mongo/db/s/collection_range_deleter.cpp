@@ -268,7 +268,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     }
 
     invariant(range);
-    invariantOK(wrote.getStatus());
+    invariant(wrote.getStatus());
     invariant(wrote.getValue() > 0);
 
     notification.abandon();
