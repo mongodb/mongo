@@ -124,8 +124,12 @@ var db;
             configOptions: {
                 setParameter: {logComponentVerbosity: tojson({command: 1})},
             },
-            shards: 0
+            shards: 1
         });
+
+        // We shard a collection in order to guarantee that at least one collection on the "config"
+        // database exists for when we go to run the data consistency checks against the CSRS.
+        st.shardColl(st.s.getDB("test").mycoll, {_id: 1}, false);
 
         const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
@@ -134,7 +138,10 @@ var db;
                   countMatches(pattern, output),
                   "expected not to find " + tojson(pattern) + " in the log output for 1-node CSRS");
 
-        pattern = makePatternForValidate("config", "mongos");
+        // The choice of using the "config.collections" collection here is mostly arbitrary as the
+        // "config.databases" and "config.chunks" collections are also implicitly created as part of
+        // sharding a collection.
+        pattern = makePatternForValidate("config", "collections");
         assert.eq(1,
                   countMatches(pattern, output),
                   "expected to find " + tojson(pattern) + " in the log output for 1-node CSRS");
@@ -154,9 +161,13 @@ var db;
             }
         });
 
+        // We shard a collection in order to guarantee that at least one collection on the "config"
+        // database exists for when we go to run the data consistency checks against the CSRS.
+        st.shardColl(st.s.getDB("test").mycoll, {_id: 1}, false);
+
         // Insert a document so the "dbhash" and "validate" commands have some actual work to do on
         // the replica set shard.
-        assert.commandWorked(st.s.getDB("test").mycoll.insert({}));
+        assert.commandWorked(st.s.getDB("test").mycoll.insert({_id: 0}));
         const output = runDataConsistencyChecks({conn: st.s, teardown: () => st.stop()});
 
         // The "config" database exists on both the CSRS and the replica set shards due to the
@@ -167,7 +178,10 @@ var db;
                   "expected to find " + tojson(pattern) +
                       " from each CSRS node and each replica set shard node in the log output");
 
-        pattern = makePatternForValidate("config", "mongos");
+        // The choice of using the "config.collections" collection here is mostly arbitrary as the
+        // "config.databases" and "config.chunks" collections are also implicitly created as part of
+        // sharding a collection.
+        pattern = makePatternForValidate("config", "collections");
         assert.eq(3,
                   countMatches(pattern, output),
                   "expected to find " + tojson(pattern) + " from each CSRS node in the log output");
