@@ -38,6 +38,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
@@ -91,6 +92,14 @@ protected:
             RemoteCommandTargeterMock::get(recipientShard->getTargeter())
                 ->setFindHostReturnValue(kRecipientConnStr.getServers()[0]);
         }
+
+        auto clockSource = stdx::make_unique<ClockSourceMock>();
+
+        // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
+        // real second.
+        clockSource->advance(Seconds(1));
+
+        operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
     }
 
     void tearDown() override {
