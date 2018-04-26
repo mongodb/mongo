@@ -76,11 +76,6 @@ Status extractObject(const BSONObj& obj, const std::string& fieldName, BSONEleme
                 str::stream() << "The field '" << fieldName << "' cannot be empty"};
     }
 
-    auto validForStorageStatus = bsonElement->Obj().storageValidEmbedded();
-    if (!validForStorageStatus.isOK()) {
-        return validForStorageStatus;
-    }
-
     return Status::OK();
 }
 

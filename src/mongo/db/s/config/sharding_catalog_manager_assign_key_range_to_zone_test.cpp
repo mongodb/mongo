@@ -189,6 +189,56 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MaxWithInvalidShardKeyShouldFail) {
     assertNoZoneDoc();
 }
 
+TEST_F(AssignKeyRangeToZoneTestFixture, AssignZoneWithDollarPrefixedShardKeysShouldFail) {
+    ASSERT_NOT_OK(ShardingCatalogManager::get(operationContext())
+                      ->assignKeyRangeToZone(
+                          operationContext(),
+                          shardedNS(),
+                          ChunkRange(BSON("x" << BSON("$A" << 1)), BSON("x" << BSON("$B" << 1))),
+                          zoneName()));
+    assertNoZoneDoc();
+
+    ASSERT_NOT_OK(
+        ShardingCatalogManager::get(operationContext())
+            ->assignKeyRangeToZone(operationContext(),
+                                   shardedNS(),
+                                   ChunkRange(BSON("x" << 0), BSON("x" << BSON("$maxKey" << 1))),
+                                   zoneName()));
+    assertNoZoneDoc();
+}
+
+TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysShouldFail) {
+    ChunkRange zoneWithDollarKeys(BSON("x" << BSON("$A" << 1)), BSON("x" << BSON("$B" << 1)));
+
+    // Manually insert a zone with illegal keys in order to bypass the checks performed by
+    // assignKeyRangeToZone
+    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().ns())
+                                           << TagsType::min(zoneWithDollarKeys.getMin()))));
+
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append(
+        "_id", BSON(TagsType::ns(shardedNS().ns()) << TagsType::min(zoneWithDollarKeys.getMin())));
+    updateBuilder.append(TagsType::ns(), shardedNS().ns());
+    updateBuilder.append(TagsType::min(), zoneWithDollarKeys.getMin());
+    updateBuilder.append(TagsType::max(), zoneWithDollarKeys.getMax());
+    updateBuilder.append(TagsType::tag(), "TestZone");
+
+    ASSERT_OK(Grid::get(operationContext())
+                  ->catalogClient()
+                  ->updateConfigDocument(
+                      operationContext(),
+                      TagsType::ConfigNS,
+                      updateQuery,
+                      updateBuilder.obj(),
+                      true,
+                      WriteConcernOptions(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0))));
+    assertOnlyZone(shardedNS(), zoneWithDollarKeys, "TestZone");
+
+    ASSERT_OK(ShardingCatalogManager::get(operationContext())
+                  ->removeKeyRangeFromZone(operationContext(), shardedNS(), zoneWithDollarKeys));
+    assertNoZoneDoc();
+}
+
 TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
@@ -721,5 +771,5 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
     }
 }
 
-}  // unnamed namespace
+}  // namespace
 }  // namespace mongo

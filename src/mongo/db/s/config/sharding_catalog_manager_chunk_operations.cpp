@@ -330,9 +330,16 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         }
 
         // verify that splits don't create too-big shard keys
-        Status shardKeyStatus = ShardKeyPattern::checkShardKeySize(endKey);
-        if (!shardKeyStatus.isOK()) {
-            return shardKeyStatus;
+        Status shardKeySizeStatus = ShardKeyPattern::checkShardKeySize(endKey);
+        if (!shardKeySizeStatus.isOK()) {
+            return shardKeySizeStatus;
+        }
+
+        // verify that splits don't use disallowed BSON object format
+        Status shardKeyStorageStatus =
+            ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(endKey);
+        if (!shardKeyStorageStatus.isOK()) {
+            return shardKeyStorageStatus;
         }
 
         // splits only update the 'minor' portion of version
