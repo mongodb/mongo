@@ -44,17 +44,14 @@
 
 namespace mongo {
 
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using std::vector;
-
 using pathsupport::EqualityMatches;
 
-const int ShardKeyPattern::kMaxShardKeySizeBytes = 512;
-const unsigned int ShardKeyPattern::kMaxFlattenedInCombinations = 4000000;
-
 namespace {
+
+// Maximum number of intervals produced by $in queries
+constexpr size_t kMaxFlattenedInCombinations = 4000000;
+
+constexpr auto kIdField = "_id"_sd;
 
 bool isHashedPatternEl(const BSONElement& el) {
     return el.type() == String && el.String() == IndexNames::HASHED;
@@ -66,32 +63,38 @@ bool isHashedPatternEl(const BSONElement& el) {
  * ii) a compound list of ascending, potentially-nested field paths, e.g. { a : 1 , b.c : 1 }
  */
 std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPattern) {
+    uassert(ErrorCodes::BadValue, "Shard key is empty", !keyPattern.isEmpty());
+
     std::vector<std::unique_ptr<FieldRef>> parsedPaths;
 
     for (const auto& patternEl : keyPattern) {
         auto newFieldRef(stdx::make_unique<FieldRef>(patternEl.fieldNameStringData()));
 
         // Empty path
-        if (newFieldRef->numParts() == 0)
-            return {};
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Field " << patternEl.fieldNameStringData() << " is empty",
+                newFieldRef->numParts() > 0);
 
         // Extra "." in path?
-        if (newFieldRef->dottedField() != patternEl.fieldNameStringData())
-            return {};
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Field " << patternEl.fieldNameStringData()
+                              << " contains extra dot",
+                newFieldRef->dottedField() == patternEl.fieldNameStringData());
 
         // Empty parts of the path, ".."?
         for (size_t i = 0; i < newFieldRef->numParts(); ++i) {
-            if (newFieldRef->getPart(i).empty())
-                return {};
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Field " << patternEl.fieldNameStringData()
+                                  << " contains empty parts",
+                    !newFieldRef->getPart(i).empty());
         }
 
         // Numeric and ascending (1.0), or "hashed" and single field
-        if (!patternEl.isNumber()) {
-            if (keyPattern.nFields() != 1 || !isHashedPatternEl(patternEl))
-                return {};
-        } else if (patternEl.numberInt() != 1) {
-            return {};
-        }
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Field " << patternEl.fieldNameStringData()
+                              << " can only be 1 or 'hashed'",
+                (patternEl.isNumber() && patternEl.numberInt() == 1) ||
+                    (keyPattern.nFields() == 1 && isHashedPatternEl(patternEl)));
 
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
@@ -99,12 +102,15 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
     return parsedPaths;
 }
 
-bool isShardKeyElement(const BSONElement& element, bool allowRegex) {
-    if (element.eoo() || element.type() == Array)
+bool isValidShardKeyElement(const BSONElement& element) {
+    return !element.eoo() && element.type() != Array;
+}
+
+bool isValidShardKeyElementForStorage(const BSONElement& element) {
+    if (!isValidShardKeyElement(element))
         return false;
 
-    // TODO: Disallow regex all the time
-    if (!allowRegex && element.type() == RegEx)
+    if (element.type() == RegEx)
         return false;
 
     if (element.type() == Object && !element.embeddedObject().storageValidEmbedded().isOK())
@@ -113,7 +119,42 @@ bool isShardKeyElement(const BSONElement& element, bool allowRegex) {
     return true;
 }
 
+BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable, StringData pathStr) {
+    ElementPath path;
+    path.init(pathStr).transitional_ignore();
+    path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
+    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
+
+    MatchableDocument::IteratorHolder matchIt(&matchable, &path);
+    if (!matchIt->more())
+        return BSONElement();
+
+    BSONElement matchEl = matchIt->next().element();
+    // We shouldn't have more than one element - we don't expand arrays
+    dassert(!matchIt->more());
+
+    return matchEl;
+}
+
+BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRef& path) {
+    int parentPathPart;
+    const BSONElement parentEl =
+        pathsupport::findParentEqualityElement(equalities, path, &parentPathPart);
+
+    if (parentPathPart == static_cast<int>(path.numParts()))
+        return parentEl;
+
+    if (parentEl.type() != Object)
+        return BSONElement();
+
+    StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
+    BSONMatchableDocument matchable(parentEl.Obj());
+    return extractKeyElementFromMatchable(matchable, suffixStr);
+}
+
 }  // namespace
+
+constexpr int ShardKeyPattern::kMaxShardKeySizeBytes;
 
 Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
     if (shardKey.objsize() <= kMaxShardKeySizeBytes)
@@ -128,17 +169,24 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
                           << " bytes"};
 }
 
+Status ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(const BSONObj& shardKey) {
+    for (const auto& elem : shardKey) {
+        if (!isValidShardKeyElementForStorage(elem)) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "Shard key element " << elem << " is not valid for storage"};
+        }
+    }
+
+    return Status::OK();
+}
+
 ShardKeyPattern::ShardKeyPattern(const BSONObj& keyPattern)
-    : _keyPatternPaths(parseShardKeyPattern(keyPattern)),
-      _keyPattern(_keyPatternPaths.empty() ? BSONObj() : keyPattern),
+    : _keyPattern(keyPattern),
+      _keyPatternPaths(parseShardKeyPattern(keyPattern)),
       _hasId(keyPattern.hasField("_id"_sd)) {}
 
 ShardKeyPattern::ShardKeyPattern(const KeyPattern& keyPattern)
     : ShardKeyPattern(keyPattern.toBSON()) {}
-
-bool ShardKeyPattern::isValid() const {
-    return !_keyPattern.toBSON().isEmpty();
-}
 
 bool ShardKeyPattern::isHashedPattern() const {
     return isHashedPatternEl(_keyPattern.toBSON().firstElement());
@@ -156,22 +204,17 @@ const BSONObj& ShardKeyPattern::toBSON() const {
     return _keyPattern.toBSON();
 }
 
-string ShardKeyPattern::toString() const {
+std::string ShardKeyPattern::toString() const {
     return toBSON().toString();
 }
 
 bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
-    // Shard keys are always of the form: { 'nested.path' : value, 'nested.path2' : value }
-
-    if (!isValid())
-        return false;
-
     const auto& keyPatternBSON = _keyPattern.toBSON();
 
     for (const auto& patternEl : keyPatternBSON) {
         BSONElement keyEl = shardKey[patternEl.fieldNameStringData()];
 
-        if (!isShardKeyElement(keyEl, true))
+        if (!isValidShardKeyElement(keyEl))
             return false;
     }
 
@@ -179,12 +222,6 @@ bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
 }
 
 BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
-    // Shard keys are always of the form: { 'nested.path' : value, 'nested.path2' : value }
-    // and in the same order as the key pattern
-
-    if (!isValid())
-        return BSONObj();
-
     // We want to return an empty key if users pass us something that's not a shard key
     if (shardKey.nFields() > _keyPattern.toBSON().nFields())
         return BSONObj();
@@ -196,7 +233,7 @@ BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
 
         BSONElement keyEl = shardKey[patternEl.fieldNameStringData()];
 
-        if (!isShardKeyElement(keyEl, true))
+        if (!isValidShardKeyElement(keyEl))
             return BSONObj();
 
         keyBuilder.appendAs(keyEl, patternEl.fieldName());
@@ -206,28 +243,7 @@ BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
     return keyBuilder.obj();
 }
 
-static BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable,
-                                                  StringData pathStr) {
-    ElementPath path;
-    path.init(pathStr).transitional_ignore();
-    path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
-    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
-
-    MatchableDocument::IteratorHolder matchIt(&matchable, &path);
-    if (!matchIt->more())
-        return BSONElement();
-
-    BSONElement matchEl = matchIt->next().element();
-    // We shouldn't have more than one element - we don't expand arrays
-    dassert(!matchIt->more());
-
-    return matchEl;
-}
-
 BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& matchable) const {
-    if (!isValid())
-        return BSONObj();
-
     BSONObjBuilder keyBuilder;
 
     BSONObjIterator patternIt(_keyPattern.toBSON());
@@ -236,7 +252,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& m
         BSONElement matchEl =
             extractKeyElementFromMatchable(matchable, patternEl.fieldNameStringData());
 
-        if (!isShardKeyElement(matchEl, true))
+        if (!isValidShardKeyElement(matchEl))
             return BSONObj();
 
         if (isHashedPatternEl(patternEl)) {
@@ -259,27 +275,8 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     return extractShardKeyFromMatchable(matchable);
 }
 
-static BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRef& path) {
-    int parentPathPart;
-    const BSONElement parentEl =
-        pathsupport::findParentEqualityElement(equalities, path, &parentPathPart);
-
-    if (parentPathPart == static_cast<int>(path.numParts()))
-        return parentEl;
-
-    if (parentEl.type() != Object)
-        return BSONElement();
-
-    StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
-    BSONMatchableDocument matchable(parentEl.Obj());
-    return extractKeyElementFromMatchable(matchable, suffixStr);
-}
-
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
-    if (!isValid())
-        return StatusWith<BSONObj>(BSONObj());
-
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
     qr->setFilter(basicQuery);
 
@@ -291,17 +288,13 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
-        return StatusWith<BSONObj>(statusWithCQ.getStatus());
+        return statusWithCQ.getStatus();
     }
-    unique_ptr<CanonicalQuery> query = std::move(statusWithCQ.getValue());
 
-    return extractShardKeyFromQuery(*query);
+    return extractShardKeyFromQuery(*statusWithCQ.getValue());
 }
 
 BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
-    if (!isValid())
-        return BSONObj();
-
     // Extract equalities from query.
     EqualityMatches equalities;
     // TODO: Build the path set initially?
@@ -325,7 +318,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
         const FieldRef& patternPath = **it;
         BSONElement equalEl = findEqualityElement(equalities, patternPath);
 
-        if (!isShardKeyElement(equalEl, false))
+        if (!isValidShardKeyElementForStorage(equalEl))
             return BSONObj();
 
         if (isHashedPattern()) {
@@ -333,8 +326,8 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
                 patternPath.dottedField(),
                 BSONElementHasher::hash64(equalEl, BSONElementHasher::DEFAULT_HASH_SEED));
         } else {
-            // NOTE: The equal element may *not* have the same field name as the path -
-            // nested $and, $eq, for example
+            // NOTE: The equal element may *not* have the same field name as the path - nested $and,
+            // $eq, for example
             keyBuilder.appendAs(equalEl, patternPath.dottedField());
         }
     }
@@ -346,8 +339,7 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
 bool ShardKeyPattern::isUniqueIndexCompatible(const BSONObj& uniqueIndexPattern) const {
     dassert(!KeyPattern::isHashedKeyPattern(uniqueIndexPattern));
 
-    if (!uniqueIndexPattern.isEmpty() &&
-        string("_id") == uniqueIndexPattern.firstElementFieldName()) {
+    if (!uniqueIndexPattern.isEmpty() && uniqueIndexPattern.firstElementFieldName() == kIdField) {
         return true;
     }
 
@@ -358,10 +350,8 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     invariant(indexBounds.fields.size() == (size_t)_keyPattern.toBSON().nFields());
 
     // If any field is unsatisfied, return empty bound list.
-    for (vector<OrderedIntervalList>::const_iterator it = indexBounds.fields.begin();
-         it != indexBounds.fields.end();
-         it++) {
-        if (it->intervals.size() == 0) {
+    for (const auto& field : indexBounds.fields) {
+        if (field.intervals.empty()) {
             return BoundList();
         }
     }
@@ -374,77 +364,75 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     // in another iteration of the loop. We define these partially constructed intervals using pairs
     // of BSONObjBuilders (shared_ptrs, since after one iteration of the loop they still must exist
     // outside their scope).
-    typedef vector<std::pair<std::shared_ptr<BSONObjBuilder>, std::shared_ptr<BSONObjBuilder>>>
-        BoundBuilders;
+    using BoundBuilders = std::vector<std::pair<BSONObjBuilder, BSONObjBuilder>>;
 
     BoundBuilders builders;
-    builders.emplace_back(shared_ptr<BSONObjBuilder>(new BSONObjBuilder()),
-                          shared_ptr<BSONObjBuilder>(new BSONObjBuilder()));
+    builders.emplace_back();
+
     BSONObjIterator keyIter(_keyPattern.toBSON());
-    // until equalityOnly is false, we are just dealing with equality (no range or $in queries).
+    // Until equalityOnly is false, we are just dealing with equality (no range or $in queries).
     bool equalityOnly = true;
 
-    for (size_t i = 0; i < indexBounds.fields.size(); i++) {
+    for (size_t i = 0; i < indexBounds.fields.size(); ++i) {
         BSONElement e = keyIter.next();
 
         StringData fieldName = e.fieldNameStringData();
 
-        // get the relevant intervals for this field, but we may have to transform the
-        // list of what's relevant according to the expression for this field
+        // Get the relevant intervals for this field, but we may have to transform the list of
+        // what's relevant according to the expression for this field
         const OrderedIntervalList& oil = indexBounds.fields[i];
-        const vector<Interval>& intervals = oil.intervals;
+        const auto& intervals = oil.intervals;
 
         if (equalityOnly) {
             if (intervals.size() == 1 && intervals.front().isPoint()) {
-                // this field is only a single point-interval
-                BoundBuilders::const_iterator j;
-                for (j = builders.begin(); j != builders.end(); ++j) {
-                    j->first->appendAs(intervals.front().start, fieldName);
-                    j->second->appendAs(intervals.front().end, fieldName);
+                // This field is only a single point-interval
+                for (auto& builder : builders) {
+                    builder.first.appendAs(intervals.front().start, fieldName);
+                    builder.second.appendAs(intervals.front().end, fieldName);
                 }
             } else {
-                // This clause is the first to generate more than a single point.
-                // We only execute this clause once. After that, we simplify the bound
-                // extensions to prevent combinatorial explosion.
+                // This clause is the first to generate more than a single point. We only execute
+                // this clause once. After that, we simplify the bound extensions to prevent
+                // combinatorial explosion.
                 equalityOnly = false;
 
                 BoundBuilders newBuilders;
 
-                for (BoundBuilders::const_iterator it = builders.begin(); it != builders.end();
-                     ++it) {
-                    BSONObj first = it->first->obj();
-                    BSONObj second = it->second->obj();
+                for (auto& builder : builders) {
+                    BSONObj first = builder.first.obj();
+                    BSONObj second = builder.second.obj();
 
-                    for (vector<Interval>::const_iterator interval = intervals.begin();
-                         interval != intervals.end();
-                         ++interval) {
+                    for (const auto& interval : intervals) {
                         uassert(17439,
                                 "combinatorial limit of $in partitioning of results exceeded",
                                 newBuilders.size() < kMaxFlattenedInCombinations);
-                        newBuilders.emplace_back(shared_ptr<BSONObjBuilder>(new BSONObjBuilder()),
-                                                 shared_ptr<BSONObjBuilder>(new BSONObjBuilder()));
-                        newBuilders.back().first->appendElements(first);
-                        newBuilders.back().second->appendElements(second);
-                        newBuilders.back().first->appendAs(interval->start, fieldName);
-                        newBuilders.back().second->appendAs(interval->end, fieldName);
+
+                        newBuilders.emplace_back();
+
+                        newBuilders.back().first.appendElements(first);
+                        newBuilders.back().first.appendAs(interval.start, fieldName);
+
+                        newBuilders.back().second.appendElements(second);
+                        newBuilders.back().second.appendAs(interval.end, fieldName);
                     }
                 }
-                builders = newBuilders;
+
+                builders = std::move(newBuilders);
             }
         } else {
-            // if we've already generated a range or multiple point-intervals
-            // just extend what we've generated with min/max bounds for this field
-            BoundBuilders::const_iterator j;
-            for (j = builders.begin(); j != builders.end(); ++j) {
-                j->first->appendAs(intervals.front().start, fieldName);
-                j->second->appendAs(intervals.back().end, fieldName);
+            // If we've already generated a range or multiple point-intervals just extend what we've
+            // generated with min/max bounds for this field
+            for (auto& builder : builders) {
+                builder.first.appendAs(intervals.front().start, fieldName);
+                builder.second.appendAs(intervals.back().end, fieldName);
             }
         }
     }
 
     BoundList ret;
-    for (BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i)
-        ret.emplace_back(i->first->obj(), i->second->obj());
+    for (auto& builder : builders) {
+        ret.emplace_back(builder.first.obj(), builder.second.obj());
+    }
 
     return ret;
 }

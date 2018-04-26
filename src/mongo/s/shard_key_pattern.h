@@ -66,15 +66,18 @@ typedef std::vector<std::pair<BSONObj, BSONObj>> BoundList;
 class ShardKeyPattern {
 public:
     // Maximum size of shard key
-    static const int kMaxShardKeySizeBytes;
-
-    // Maximum number of intervals produced by $in queries.
-    static const unsigned int kMaxFlattenedInCombinations;
+    static constexpr int kMaxShardKeySizeBytes = 512;
 
     /**
      * Helper to check shard key size and generate an appropriate error message.
      */
     static Status checkShardKeySize(const BSONObj& shardKey);
+
+    /**
+     * Validates whether the specified shard key is valid to be written as part of the sharding
+     * metadata.
+     */
+    static Status checkShardKeyIsValidForMetadataStorage(const BSONObj& shardKey);
 
     /**
      * Constructs a shard key pattern from a BSON pattern document.  If the document is not a
@@ -86,8 +89,6 @@ public:
      * Constructs a shard key pattern from a key pattern, see above.
      */
     explicit ShardKeyPattern(const KeyPattern& keyPattern);
-
-    bool isValid() const;
 
     bool isHashedPattern() const;
 
@@ -233,10 +234,10 @@ public:
     };
 
 private:
+    KeyPattern _keyPattern;
+
     // Ordered, parsed paths
     std::vector<std::unique_ptr<FieldRef>> _keyPatternPaths;
-
-    KeyPattern _keyPattern;
 
     bool _hasId;
 };
