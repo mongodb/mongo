@@ -162,4 +162,11 @@ void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
     _processor->turnCrankForTest(countMessagesToIgnore);
 }
 
+void FreeMonController::getServerStatus(OperationContext* opCtx, BSONObjBuilder* status) {
+    if (!_processor) {
+        status->append("state", "disabled");
+    }
+    _processor->getServerStatus(opCtx, status);
+}
+
 }  // namespace mongo

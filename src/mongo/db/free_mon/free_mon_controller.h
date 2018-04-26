@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/db/free_mon/free_mon_message.h"
 #include "mongo/db/free_mon/free_mon_network.h"
 #include "mongo/db/free_mon/free_mon_processor.h"
@@ -111,9 +112,12 @@ public:
      */
     boost::optional<Status> unregisterServerCommand(Milliseconds timeout);
 
-    // TODO - add these methods
-    // void getServerStatus(BSONObjBuilder* builder);
+    /**
+     * Populates an info blob for use by {serverStatus: 1}
+     */
+    void getServerStatus(OperationContext* opCtx, BSONObjBuilder* status);
 
+    // TODO
     // void notifyObserver(const BSONObj& doc);
 private:
     void _enqueue(std::shared_ptr<FreeMonMessage> msg);
