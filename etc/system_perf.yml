@@ -710,6 +710,20 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: move_chunk_waiting_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile_proxy
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "move_chunk_waiting"
+        authentication: disabled
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: secondary_performance_WT
   priority: 5
   depends_on:
@@ -992,6 +1006,7 @@ buildvariants:
     - name: mongos_workloads_MMAPv1
     - name: move_chunk_workloads_WT
     - name: move_chunk_workloads_MMAPv1
+    - name: move_chunk_waiting_workloads_WT
     - name: bestbuy_agg_WT
     - name: bestbuy_query_WT
     - name: bestbuy_agg_MMAPv1
