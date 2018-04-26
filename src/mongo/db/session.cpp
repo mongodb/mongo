@@ -959,7 +959,7 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         lk.lock();
         // It's possible some other thread aborted the transaction (e.g. through killSession) while
         // the opObserver was running.  If that happened, the commit should be reported as failed.
-        uassert(ErrorCodes::TransactionAborted,
+        uassert(ErrorCodes::NoSuchTransaction,
                 str::stream() << "Transaction " << opCtx->getTxnNumber()
                               << " aborted while attempting to commit",
                 _txnState == MultiDocumentTransactionState::kInProgress &&
@@ -1044,7 +1044,7 @@ void Session::_checkIsActiveTransaction(WithLock, TxnNumber txnNumber, bool chec
                           << " is now active.",
             txnNumber == _activeTxnNumber);
 
-    uassert(ErrorCodes::TransactionAborted,
+    uassert(ErrorCodes::NoSuchTransaction,
             str::stream() << "Transaction " << txnNumber << " has been aborted.",
             !checkAbort || _txnState != MultiDocumentTransactionState::kAborted);
 }

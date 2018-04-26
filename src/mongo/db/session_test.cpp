@@ -1058,7 +1058,7 @@ TEST_F(SessionTest, ConcurrencyOfAddTransactionOperationAndAbort) {
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     ASSERT_THROWS_CODE(session.addTransactionOperation(opCtx(), operation),
                        AssertionException,
-                       ErrorCodes::TransactionAborted);
+                       ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(SessionTest, ConcurrencyOfAddTransactionOperationAndMigration) {
@@ -1108,7 +1108,7 @@ TEST_F(SessionTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAbort) {
     // An endTransactionAndRetrieveOperations() after an abort should uassert.
     ASSERT_THROWS_CODE(session.endTransactionAndRetrieveOperations(opCtx()),
                        AssertionException,
-                       ErrorCodes::TransactionAborted);
+                       ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(SessionTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndMigration) {
@@ -1157,7 +1157,7 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndAbort) {
 
     // An commitTransaction() after an abort should uassert.
     ASSERT_THROWS_CODE(
-        session.commitTransaction(opCtx()), AssertionException, ErrorCodes::TransactionAborted);
+        session.commitTransaction(opCtx()), AssertionException, ErrorCodes::NoSuchTransaction);
 }
 
 TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndMigration) {
