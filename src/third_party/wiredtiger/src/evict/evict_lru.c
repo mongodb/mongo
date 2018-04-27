@@ -445,7 +445,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		return (0);
 
 	__wt_epoch(session, &now);
-	if (WT_TIMEDIFF_SEC(now, cache->stuck_time) > 300) {
+	if (WT_TIMEDIFF_SEC(now, cache->stuck_time) > WT_MINUTE * 5) {
 #if defined(HAVE_DIAGNOSTIC)
 		__wt_err(session, ETIMEDOUT,
 		    "Cache stuck for too long, giving up");

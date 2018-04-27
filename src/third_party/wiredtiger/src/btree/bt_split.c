@@ -65,10 +65,7 @@ __split_safe_free(WT_SESSION_IMPL *session,
 	 * We have swapped something in a page: if we don't have exclusive
 	 * access, check whether there are other threads in the same tree.
 	 */
-	if (!exclusive && __wt_gen_oldest(session, WT_GEN_SPLIT) > split_gen)
-		exclusive = true;
-
-	if (exclusive) {
+	if (exclusive || !__wt_gen_active(session, WT_GEN_SPLIT, split_gen)) {
 		__wt_overwrite_and_free_len(session, p, s);
 		return (0);
 	}

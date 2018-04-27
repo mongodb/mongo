@@ -5304,7 +5304,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell, *val_cell;
+	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_ITEM(tmpkey);
@@ -5377,19 +5377,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			__wt_cell_unpack(cell, kpack);
 		}
 
-		/*
-		 * Unpack the on-page value cell, and look for an update. Under
-		 * some conditions, the underlying code returning updates will
-		 * restructure the update list to include the original on-page
-		 * value, represented by the unpacked-cell argument. Row-store
-		 * doesn't store zero-length values on the page, so we build an
-		 * unpacked cell that allows us to pretend.
-		 */
-		if ((val_cell =
-		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
-			__wt_cell_unpack_empty_value(vpack);
-		else
-			__wt_cell_unpack(val_cell, vpack);
+		/* Unpack the on-page value cell, and look for an update. */
+		__wt_row_leaf_value_cell(page, rip, NULL, vpack);
 		WT_ERR(__rec_txn_read(
 		    session, r, NULL, rip, vpack, NULL, &upd));
 
@@ -5467,7 +5456,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				    "ovfl-unused", strlen("ovfl-unused"),
 				    (uint64_t)0));
 			} else {
-				val->buf.data = val_cell;
+				val->buf.data = vpack->cell;
 				val->buf.size = __wt_cell_total_len(vpack);
 				val->cell_len = 0;
 				val->len = val->buf.size;

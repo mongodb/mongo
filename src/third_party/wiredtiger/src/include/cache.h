@@ -54,6 +54,10 @@ typedef enum __wt_cache_op {
 	WT_SYNC_WRITE_LEAVES
 } WT_CACHE_OP;
 
+#define	WT_LAS_NUM_SESSIONS	5
+#define	WT_LAS_SWEEP_ENTRIES	(20 * WT_THOUSAND)
+#define	WT_LAS_SWEEP_SEC	2
+
 /*
  * WiredTiger cache structure.
  */
@@ -191,7 +195,6 @@ struct __wt_cache {
 	 * the lookaside table (other than eviction server and worker threads
 	 * and the sweep thread, all of which have their own lookaside cursors).
 	 */
-#define	WT_LAS_NUM_SESSIONS 5
 	WT_SPINLOCK	 las_lock;
 	WT_SESSION_IMPL *las_session[WT_LAS_NUM_SESSIONS];
 	bool las_session_inuse[WT_LAS_NUM_SESSIONS];
@@ -200,7 +203,7 @@ struct __wt_cache {
 	uint64_t las_entry_count;       /* Count of entries in lookaside */
 	uint64_t las_pageid;		/* Lookaside table page ID counter */
 
-	uint64_t las_sweep_cnt;		/* Entries to walk per sweep. */
+	bool las_reader;		/* Indicate an LAS reader to sweep */
 	WT_RWLOCK las_sweepwalk_lock;
 	WT_SPINLOCK las_sweep_lock;
 	WT_ITEM las_sweep_key;		/* Track sweep position. */

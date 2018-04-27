@@ -291,10 +291,11 @@ __stat_page_row_leaf(
 		    (upd->type != WT_UPDATE_RESERVE &&
 		    upd->type != WT_UPDATE_TOMBSTONE))
 			++entry_cnt;
-		if (upd == NULL && (cell =
-		    __wt_row_leaf_value_cell(page, rip, NULL)) != NULL &&
-		    __wt_cell_type(cell) == WT_CELL_VALUE_OVFL)
-			++ovfl_cnt;
+		if (upd == NULL) {
+			__wt_row_leaf_value_cell(page, rip, NULL, &unpack);
+			if (unpack.type == WT_CELL_VALUE_OVFL)
+				++ovfl_cnt;
+		}
 
 		/* Walk K/V pairs inserted after the on-page K/V pair. */
 		WT_SKIP_FOREACH(ins, WT_ROW_INSERT(page, rip))

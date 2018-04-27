@@ -160,7 +160,9 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * for a key and then insert those updates into the page, then all the
 	 * updates for the next key, and so on.
 	 */
+	WT_PUBLISH(cache->las_reader, true);
 	__wt_readlock(session, &cache->las_sweepwalk_lock);
+	WT_PUBLISH(cache->las_reader, false);
 	locked = true;
 	for (ret = __wt_las_cursor_position(cursor, las_pageid);
 	    ret == 0;

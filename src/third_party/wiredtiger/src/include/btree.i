@@ -1013,11 +1013,11 @@ __wt_row_leaf_key(WT_SESSION_IMPL *session,
 
 /*
  * __wt_row_leaf_value_cell --
- *	Return a pointer to the value cell for a row-store leaf page key, or
- * NULL if there isn't one.
+ *	Return the unpacked value for a row-store leaf page key.
  */
-static inline WT_CELL *
-__wt_row_leaf_value_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack)
+static inline void
+__wt_row_leaf_value_cell(
+    WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack, WT_CELL_UNPACK *vpack)
 {
 	WT_CELL *kcell, *vcell;
 	WT_CELL_UNPACK unpack;
@@ -1052,7 +1052,7 @@ __wt_row_leaf_value_cell(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK *kpack)
 		}
 	}
 
-	return (__wt_cell_leaf_value_parse(page, vcell));
+	__wt_cell_unpack(__wt_cell_leaf_value_parse(page, vcell), vpack);
 }
 
 /*
@@ -1425,9 +1425,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 * locked exclusive (e.g., when the whole tree is being evicted).  In
 	 * that case, no readers can be looking at an old index.
 	 */
-	if (!F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
-	    WT_PAGE_IS_INTERNAL(page) &&
-	    page->pg_intl_split_gen >= __wt_gen_oldest(session, WT_GEN_SPLIT))
+	if (WT_PAGE_IS_INTERNAL(page) &&
+	    !F_ISSET(session->dhandle, WT_DHANDLE_EXCLUSIVE) &&
+	    __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
 		return (false);
 
 	/*

@@ -100,16 +100,8 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		if (__wt_row_leaf_value(page, rip, &cursor->value))
 			return (0);
 
-		/*
-		 * Take the value from the original page cell (which may be
-		 * empty).
-		 */
-		if ((cell =
-		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL) {
-			cursor->value.size = 0;
-			return (0);
-		}
-		__wt_cell_unpack(cell, &unpack);
+		/* Take the value from the original page cell. */
+		__wt_row_leaf_value_cell(page, rip, NULL, &unpack);
 		return (__wt_page_cell_data_ref(
 		    session, page, &unpack, &cursor->value));
 

@@ -34,6 +34,7 @@ static void	   config_checksum(void);
 static void	   config_compression(const char *);
 static void	   config_encryption(void);
 static const char *config_file_type(u_int);
+static bool	   config_fix(void);
 static void	   config_helium_reset(void);
 static void	   config_in_memory(void);
 static void	   config_in_memory_reset(void);
@@ -74,15 +75,15 @@ config_setup(void)
 			config_single("file_type=row", 0);
 		else
 			switch (mmrand(NULL, 1, 10)) {
-			case 1:					/* 10% */
-				if (!config_is_perm("modify_pct")) {
+			case 1: case 2: case 3:			/* 30% */
+				config_single("file_type=var", 0);
+				break;
+			case 4:					/* 10% */
+				if (config_fix()) {
 					config_single("file_type=fix", 0);
 					break;
 				}
-				/* FALLTHROUGH */
-			case 2: case 3: case 4:			/* 30% */
-				config_single("file_type=var", 0);
-				break;				/* 60% */
+				/* FALLTHROUGH */		/* 60% */
 			case 5: case 6: case 7: case 8: case 9: case 10:
 				config_single("file_type=row", 0);
 				break;
@@ -393,6 +394,24 @@ config_encryption(void)
 }
 
 /*
+ * config_fix --
+ *	Fixed-length column-store configuration.
+ */
+static bool
+config_fix(void)
+{
+	/*
+	 * Fixed-length column stores don't support the lookaside table (so, no
+	 * long running transactions), or modify operations.
+	 */
+	if (config_is_perm("long_running_txn"))
+		return (false);
+	if (config_is_perm("modify_pct"))
+		return (false);
+	return (true);
+}
+
+/*
  * config_helium_reset --
  *	Helium configuration review.
  */
@@ -552,8 +571,8 @@ config_lrt(void)
 	 * WiredTiger doesn't support a lookaside file for fixed-length column
 	 * stores.
 	 */
-	if (g.type == FIX) {
-		if (config_is_perm("long_running_txn") && g.c_long_running_txn)
+	if (g.type == FIX && g.c_long_running_txn) {
+		if (config_is_perm("long_running_txn"))
 			testutil_die(EINVAL,
 			    "long_running_txn not supported with fixed-length "
 			    "column store");
@@ -693,10 +712,14 @@ config_prepare(void)
 			testutil_die(EINVAL,
 			    "prepare requires transaction timestamps");
 	}
-	if (g.c_logging && config_is_perm("logging"))
+	if (g.c_logging && config_is_perm("logging")) {
+		config_single("prepare=off", 0);
 		return;
-	if (!g.c_txn_timestamps && config_is_perm("transaction_timestamps"))
+	}
+	if (!g.c_txn_timestamps && config_is_perm("transaction_timestamps")) {
+		config_single("prepare=off", 0);
 		return;
+	}
 
 	config_single("logging=off", 0);
 	config_single("transaction_timestamps=on", 0);

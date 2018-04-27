@@ -893,9 +893,8 @@ static inline uint64_t
 __las_sweep_count(WT_CACHE *cache)
 {
 	/*
-	 * The sweep server wakes up every 10 seconds (by default), it's a slow
-	 * moving thread. Try to review the entire lookaside table once every 5
-	 * minutes, or every 30 calls.
+	 * The sweep server is a slow moving thread. Try to review the entire
+	 * lookaside table once every 5 minutes.
 	 *
 	 * The reason is because the lookaside table exists because we're seeing
 	 * cache/eviction pressure (it allows us to trade performance and disk
@@ -909,8 +908,8 @@ __las_sweep_count(WT_CACHE *cache)
 	 * with lookaside entries are blocked during sweep, make sure we do
 	 * some work but don't block reads for too long.
 	 */
-	return ((uint64_t)WT_MAX(100, WT_MIN(10 * WT_THOUSAND,
-	    cache->las_entry_count / 30)));
+	return ((uint64_t)WT_MAX(100,
+	    cache->las_entry_count / (WT_MINUTE * 5 / WT_LAS_SWEEP_SEC)));
 }
 
 /*
@@ -925,7 +924,6 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 	u_int i;
 
 	cache = S2C(session)->cache;
-	cache->las_sweep_cnt = __las_sweep_count(cache);
 
 	__wt_spin_lock(session, &cache->las_sweep_lock);
 
@@ -984,8 +982,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 #else
 	wt_timestamp_t *val_ts;
 #endif
-	uint64_t cnt, remove_cnt, las_counter, las_pageid, saved_pageid;
-	uint64_t las_txnid;
+	uint64_t cnt, remove_cnt, las_pageid, saved_pageid, visit_cnt;
+	uint64_t las_counter, las_txnid;
 	uint32_t las_id, session_flags;
 	uint8_t upd_type;
 	int notused;
@@ -1050,8 +1048,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 * rather than driving the lookaside table to empty.
 	 */
 	cnt = __las_sweep_count(cache);
-	if (cnt < cache->las_sweep_cnt)
-		cnt = cache->las_sweep_cnt;
+	if (cnt < WT_LAS_SWEEP_ENTRIES)
+		cnt = WT_LAS_SWEEP_ENTRIES;
+	visit_cnt = 0;
 
 	/* Walk the file. */
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -1078,13 +1077,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			cnt = 0;
 
 		/*
-		 * If we have processed enough entries and we are between
-		 * blocks, give up.
+		 * We only want to break between key blocks. Stop if we've
+		 * processed enough entries either all we wanted or enough
+		 * and there is a reader waiting and we're on a key boundary.
 		 */
+		++visit_cnt;
+		if ((cnt == 0 ||
+		    (visit_cnt > WT_LAS_SWEEP_ENTRIES && cache->las_reader)) &&
+		    saved_key->size == 0)
+			break;
 		if (cnt > 0)
 			--cnt;
-		else if (saved_key->size == 0)
-			break;
 
 		/*
 		 * If the entry belongs to a dropped tree, discard it.
@@ -1138,9 +1141,19 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			if (cnt == 0)
 				break;
 
+			/* We can only start removing from a full value. */
+			if (upd_type == WT_UPDATE_MODIFY) {
+				saved_key->size = 0;
+				continue;
+			}
+
 			WT_ERR(__wt_buf_set(session, saved_key,
 			    las_key.data, las_key.size));
 
+			/*
+			 * If the first stable record contains data, we have to
+			 * keep it.
+			 */
 			if (upd_type != WT_UPDATE_BIRTHMARK)
 				continue;
 		}

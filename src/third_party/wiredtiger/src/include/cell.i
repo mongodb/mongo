@@ -717,28 +717,23 @@ done:	WT_CELL_LEN_CHK(cell, unpack->__len);
 static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
-	(void)__wt_cell_unpack_safe(cell, unpack, NULL, NULL);
-}
-
-/*
- * __wt_cell_unpack_empty_value --
- *	Create an unpacked cell that looks like zero-length row-store value.
- */
-static inline void
-__wt_cell_unpack_empty_value(WT_CELL_UNPACK *unpack)
-{
 	/*
 	 * Row-store doesn't store zero-length values on pages, but this allows
 	 * us to pretend.
 	 */
-	unpack->cell = NULL;
-	unpack->v = 0;
-	unpack->data = "";
-	unpack->size = 0;
-	unpack->__len = 0;
-	unpack->prefix = 0;
-	unpack->raw = unpack->type = WT_CELL_VALUE;
-	unpack->ovfl = 0;
+	if (cell == NULL) {
+		unpack->cell = NULL;
+		unpack->v = 0;
+		unpack->data = "";
+		unpack->size = 0;
+		unpack->__len = 0;
+		unpack->prefix = 0;
+		unpack->raw = unpack->type = WT_CELL_VALUE;
+		unpack->ovfl = 0;
+		return;
+	}
+
+	(void)__wt_cell_unpack_safe(cell, unpack, NULL, NULL);
 }
 
 /*
@@ -786,7 +781,7 @@ __cell_data_ref(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	return (huffman == NULL ? 0 :
+	return (huffman == NULL || store->size == 0 ? 0 :
 	    __wt_huffman_decode(
 	    session, huffman, store->data, store->size, store));
 }

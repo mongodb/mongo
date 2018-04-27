@@ -157,6 +157,9 @@ __wt_session_release_resources(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 
+	/* Transaction cleanup */
+	__wt_txn_release_resources(session);
+
 	/* Block manager cleanup */
 	if (session->block_manager_cleanup != NULL)
 		WT_TRET(session->block_manager_cleanup(session));

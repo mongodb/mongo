@@ -136,11 +136,11 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 }
 
 /*
- * __wt_gen_oldest --
+ * __gen_oldest --
  *	Return the oldest generation in use for the resource.
  */
-uint64_t
-__wt_gen_oldest(WT_SESSION_IMPL *session, int which)
+static uint64_t
+__gen_oldest(WT_SESSION_IMPL *session, int which)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *s;
@@ -171,6 +171,43 @@ __wt_gen_oldest(WT_SESSION_IMPL *session, int which)
 	}
 
 	return (oldest);
+}
+
+/*
+ * __wt_gen_active --
+ *	Return if a specified generation is in use for the resource.
+ */
+bool
+__wt_gen_active(WT_SESSION_IMPL *session, int which, uint64_t generation)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *s;
+	uint64_t v;
+	uint32_t i, session_cnt;
+
+	conn = S2C(session);
+
+	/*
+	 * No lock is required because the session array is fixed size, but it
+	 * may contain inactive entries. We must review any active session, so
+	 * insert a read barrier after reading the active session count. That
+	 * way, no matter what sessions come or go, we'll check the slots for
+	 * all of the sessions that could have been active when we started our
+	 * check.
+	 */
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
+		if (!s->active)
+			continue;
+
+		/* Ensure we only read the value once. */
+		WT_ORDERED_READ(v, s->generations[which]);
+
+		if (v != 0 && generation >= v)
+			return (true);
+	}
+
+	return (false);
 }
 
 /*
@@ -240,7 +277,7 @@ __stash_discard(WT_SESSION_IMPL *session, int which)
 	session_stash = &session->stash[which];
 
 	/* Get the resource's oldest generation. */
-	oldest = __wt_gen_oldest(session, which);
+	oldest = __gen_oldest(session, which);
 
 	for (i = 0,
 	    stash = session_stash->list; i < session_stash->cnt; ++i, ++stash) {
