@@ -8782,6 +8782,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --variables-files=etc/scons/xcode_macos.vars
     disable_unit_tests: true
     enable_embedded_tests: native
@@ -8810,6 +8811,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --variables-files=etc/scons/xcode_ios.vars
     disable_unit_tests: true
   tasks:
@@ -8837,6 +8839,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --variables-files=etc/scons/xcode_ios_sim.vars
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -8867,6 +8870,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --variables-files=etc/scons/xcode_tvos.vars
     disable_unit_tests: true
   tasks:
@@ -8895,6 +8899,7 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --variables-files=etc/scons/xcode_tvos_sim.vars
     disable_unit_tests: true
     enable_embedded_tests: ios_tvos_simulator
@@ -8922,6 +8927,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       --allocator=system
     disable_unit_tests: true
@@ -8949,6 +8955,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --android-toolchain-path=$(dirname $(pwd))/android_toolchain
       --variables-files=etc/scons/android_toolchain.vars
     disable_unit_tests: true
@@ -8979,6 +8986,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --dbg=off
       --opt=size
+      --enable-free-mon=off
       --android-toolchain-path=$(dirname $(pwd))/android_toolchain
       --variables-files=etc/scons/android_toolchain.vars
     disable_unit_tests: true
