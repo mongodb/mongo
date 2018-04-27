@@ -6997,9 +6997,8 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: powercycle
   - name: powercycle_fcv3.6
-# SERVER-34075: Re-enable once powercycle_replication* can test against recoverable rollback changes.
-#  - name: powercycle_replication
-#  - name: powercycle_replication_smalloplog
+  - name: powercycle_replication
+  - name: powercycle_replication_smalloplog
   - name: powercycle_syncdelay
   - name: powercycle_write_concern_majority
   - name: sharding
@@ -8535,8 +8534,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: powercycle
   - name: powercycle_fcv3.6
-# SERVER-34075: Re-enable once powercycle_replication* can test against recoverable rollback changes.
-#  - name: powercycle_replication
+  - name: powercycle_replication
   - name: powercycle_syncdelay
   - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough
