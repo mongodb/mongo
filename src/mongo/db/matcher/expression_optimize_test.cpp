@@ -28,6 +28,7 @@
 
 #include "mongo/db/pipeline/expression.h"
 
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -358,6 +359,28 @@ TEST(ExpressionOptimizeTest, AndRemovesAlwaysTrueChildren) {
     ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{a: {$eq: 1}}"));
 }
 
+TEST(ExpressionOptimizeTest, AndWithSingleChildAlwaysTrueOptimizesToEmptyAnd) {
+    BSONObj obj = fromjson("{$and: [{$alwaysTrue: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    // TODO SERVER-34759 We want this to optimize to an AlwaysTrueMatchExpression.
+    ASSERT_TRUE(dynamic_cast<AndMatchExpression*>(optimizedMatchExpression.get()));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{}"));
+}
+
+TEST(ExpressionOptimizeTest, AndWithEachChildAlwaysTrueOptimizesToEmptyAnd) {
+    BSONObj obj = fromjson("{$and: [{$alwaysTrue: 1}, {$alwaysTrue: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    // TODO SERVER-34759 We want this to optimize to an AlwaysTrueMatchExpression.
+    ASSERT_TRUE(dynamic_cast<AndMatchExpression*>(optimizedMatchExpression.get()));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{}"));
+}
+
 TEST(ExpressionOptimizeTest, NestedAndWithAlwaysFalseOptimizesToAlwaysFalse) {
     BSONObj obj = fromjson("{$and: [{$and: [{$alwaysFalse: 1}, {a: 1}]}, {b: 1}]}");
     std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
@@ -385,10 +408,32 @@ TEST(ExpressionOptimizeTest, OrRemovesAlwaysFalseChildren) {
     ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{a: {$eq: 1}}"));
 }
 
+TEST(ExpressionOptimizeTest, OrPromotesSingleAlwaysFalseAfterOptimize) {
+    // The nested predicate is always false. This test is designed to reproduce SERVER-34714.
+    BSONObj obj = fromjson("{$or: [{a: {$all: []}}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_TRUE(dynamic_cast<AlwaysFalseMatchExpression*>(optimizedMatchExpression.get()));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
 TEST(ExpressionOptimizeTest, OrPromotesSingleAlwaysFalse) {
     BSONObj obj = fromjson("{$or: [{$alwaysFalse: 1}]}");
     std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
     auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_TRUE(dynamic_cast<AlwaysFalseMatchExpression*>(optimizedMatchExpression.get()));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, OrPromotesMultipleAlwaysFalse) {
+    BSONObj obj = fromjson("{$or: [{$alwaysFalse: 1}, {a: {$all: []}}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_TRUE(dynamic_cast<AlwaysFalseMatchExpression*>(optimizedMatchExpression.get()));
     BSONObjBuilder bob;
     optimizedMatchExpression->serialize(&bob);
     ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));

@@ -71,6 +71,8 @@ SubplanStage::SubplanStage(OperationContext* opCtx,
       _query(cq) {
     invariant(_collection);
     invariant(_query->root()->matchType() == MatchExpression::OR);
+    invariant(_query->root()->numChildren(),
+              "Cannot use a SUBPLAN stage for an $or with no children");
 }
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
@@ -99,8 +101,8 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
-    // We can only subplan rooted $or queries.
-    return MatchExpression::OR == expr->matchType();
+    // We can only subplan rooted $or queries, and only if they have at least one clause.
+    return MatchExpression::OR == expr->matchType() && expr->numChildren() > 0;
 }
 
 Status SubplanStage::planSubqueries() {
