@@ -53,7 +53,6 @@ def collect_cache_contents(cache_path):
                 except OSError as err:
                     LOGGER.warning("Ignoring error querying file %s : %s", file_path, err)
 
-
     return (total, contents)
 
 
