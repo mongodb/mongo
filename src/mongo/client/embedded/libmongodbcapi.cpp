@@ -270,6 +270,11 @@ int client_wire_protocol_rpc(libmongodbcapi_client* client,
     Message msg(std::move(sb));
 
     client->response = sep->handleRequest(opCtx.get(), msg);
+
+    MsgData::View outMessage(client->response.response.buf());
+    outMessage.setId(nextMessageId());
+    outMessage.setResponseToMsgId(msg.header().getId());
+
     *output_size = client->response.response.size();
     *output = (void*)client->response.response.buf();
 

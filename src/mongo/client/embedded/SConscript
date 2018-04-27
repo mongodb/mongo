@@ -129,6 +129,7 @@ capi = env.Library(
         'libmongodbcapi.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         'embedded',
