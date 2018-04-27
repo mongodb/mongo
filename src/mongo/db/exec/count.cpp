@@ -119,17 +119,11 @@ PlanStage::StageState CountStage::doWork(WorkingSetID* out) {
     if (PlanStage::IS_EOF == state) {
         _commonStats.isEOF = true;
         return PlanStage::IS_EOF;
-    } else if (PlanStage::DEAD == state) {
-        return state;
-    } else if (PlanStage::FAILURE == state) {
+    } else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
+        // The stage which produces a failure is responsible for allocating a working set member
+        // with error details.
+        invariant(WorkingSet::INVALID_ID != id);
         *out = id;
-        // If a stage fails, it may create a status WSM to indicate why it failed, in which
-        // case 'id' is valid. If ID is invalid, we create our own error message.
-        if (WorkingSet::INVALID_ID == id) {
-            const std::string errmsg = "count stage failed to read result from child";
-            Status status = Status(ErrorCodes::InternalError, errmsg);
-            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-        }
         return state;
     } else if (PlanStage::ADVANCED == state) {
         // We got a result. If we're still skipping, then decrement the number left to skip.

@@ -66,19 +66,11 @@ PlanStage::StageState LimitStage::doWork(WorkingSetID* out) {
     if (PlanStage::ADVANCED == status) {
         *out = id;
         --_numToReturn;
-        return PlanStage::ADVANCED;
     } else if (PlanStage::FAILURE == status || PlanStage::DEAD == status) {
+        // The stage which produces a failure is responsible for allocating a working set member
+        // with error details.
+        invariant(WorkingSet::INVALID_ID != id);
         *out = id;
-        // If a stage fails, it may create a status WSM to indicate why it
-        // failed, in which case 'id' is valid.  If ID is invalid, we
-        // create our own error message.
-        if (WorkingSet::INVALID_ID == id) {
-            mongoutils::str::stream ss;
-            ss << "limit stage failed to read in results from child";
-            Status status(ErrorCodes::InternalError, ss);
-            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-        }
-        return status;
     } else if (PlanStage::NEED_YIELD == status) {
         *out = id;
     }

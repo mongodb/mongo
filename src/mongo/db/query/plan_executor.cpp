@@ -631,6 +631,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
 
             if (NULL != objOut) {
                 BSONObj statusObj;
+                invariant(WorkingSet::INVALID_ID != id);
                 WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &statusObj);
                 *objOut = Snapshotted<BSONObj>(SnapshotId(), statusObj);
             }

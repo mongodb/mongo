@@ -219,16 +219,10 @@ PlanStage::StageState AndSortedStage::moveTowardTargetRecordId(WorkingSetID* out
         _ws->free(_targetId);
         return state;
     } else if (PlanStage::FAILURE == state || PlanStage::DEAD == state) {
+        // The stage which produces a failure is responsible for allocating a working set member
+        // with error details.
+        invariant(WorkingSet::INVALID_ID != id);
         *out = id;
-        // If a stage fails, it may create a status WSM to indicate why it
-        // failed, in which case 'id' is valid.  If ID is invalid, we
-        // create our own error message.
-        if (WorkingSet::INVALID_ID == id) {
-            mongoutils::str::stream ss;
-            ss << "sorted AND stage failed to read in results from child " << workingChildNumber;
-            Status status(ErrorCodes::InternalError, ss);
-            *out = WorkingSetCommon::allocateStatusMember(_ws, status);
-        }
         _isEOF = true;
         _ws->free(_targetId);
         return state;
