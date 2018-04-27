@@ -575,8 +575,9 @@ void Session::_beginOrContinueTxn(WithLock wl,
                           << "See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
-            (serverGlobalParams.featureCompatibility.getVersion() ==
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40));
+            (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+             serverGlobalParams.featureCompatibility.getVersion() ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40));
 
         _setActiveTxn(wl, opCtx, txnNumber, canKillCursors);
         _autocommit = false;
