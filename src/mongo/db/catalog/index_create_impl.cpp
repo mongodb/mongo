@@ -175,17 +175,18 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
     while (true) {
         try {
             WriteUnitOfWork wunit(_opCtx);
-            // This cleans up all index builds.
-            // Because that may need to write, it is done inside
-            // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
+            // This cleans up all index builds. Because that may need to write, it is done inside of
+            // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail();
             }
 
             auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
             if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
-                // Primaries must timestamp the failure of an index build (via an op
-                // message). Secondaries may not fail index builds.
+                // Primaries must timestamp the failure of an index build (via an op message).
+                // Secondaries may not fail index builds.
+                // Make lock acquisition uninterruptible because writing an op message takes a lock.
+                UninterruptibleLockGuard(_opCtx->lockState());
                 _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                     _opCtx,
                     BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
