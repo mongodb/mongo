@@ -38,8 +38,11 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_aggregate.h"
-#include "mongo/s/commands/strategy.h"
+#include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
@@ -111,20 +114,49 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         // Parse the command BSON to a QueryRequest.
         bool isExplain = true;
-        auto qr = QueryRequest::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
-        if (!qr.isOK()) {
-            return qr.getStatus();
+        auto swQr = QueryRequest::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
+        if (!swQr.isOK()) {
+            return swQr.getStatus();
         }
-
+        auto& qr = *swQr.getValue();
 
         try {
-            Strategy::explainFind(
-                opCtx, cmdObj, *qr.getValue(), verbosity, ReadPreferenceSetting::get(opCtx), out);
+            const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
+
+            long long millisElapsed;
+            std::vector<AsyncRequestsSender::Response> shardResponses;
+
+            // We will time how long it takes to run the commands on the shards.
+            Timer timer;
+            const auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
+            shardResponses =
+                scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                           qr.nss().db(),
+                                                           qr.nss(),
+                                                           routingInfo,
+                                                           explainCmd,
+                                                           ReadPreferenceSetting::get(opCtx),
+                                                           Shard::RetryPolicy::kIdempotent,
+                                                           qr.getFilter(),
+                                                           qr.getCollation());
+            millisElapsed = timer.millis();
+
+            const char* mongosStageName =
+                ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
+
+            uassertStatusOK(ClusterExplain::buildExplainResult(
+                opCtx,
+                ClusterExplain::downconvert(opCtx, shardResponses),
+                mongosStageName,
+                millisElapsed,
+                out));
+
             return Status::OK();
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             out->resetToEmpty();
 
-            auto aggCmdOnView = qr.getValue().get()->asAggregationCommand();
+            auto aggCmdOnView = qr.asAggregationCommand();
             if (!aggCmdOnView.isOK()) {
                 return aggCmdOnView.getStatus();
             }
