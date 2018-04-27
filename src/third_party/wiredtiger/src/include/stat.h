@@ -420,6 +420,7 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
 	int64_t cache_read_deleted;
+	int64_t cache_read_deleted_prepared;
 	int64_t cache_read_lookaside;
 	int64_t cache_read_lookaside_skipped;
 	int64_t cache_read_lookaside_delay;
@@ -609,6 +610,7 @@ struct __wt_connection_stats {
 	int64_t dhandle_lock_blocked;
 	int64_t page_index_slot_ref_blocked;
 	int64_t log_server_sync_blocked;
+	int64_t prepared_transition_blocked_page;
 	int64_t page_busy_blocked;
 	int64_t page_forcible_evict_blocked;
 	int64_t page_locked_blocked;
@@ -622,6 +624,10 @@ struct __wt_connection_stats {
 	int64_t txn_commit_queue_len;
 	int64_t txn_snapshots_created;
 	int64_t txn_snapshots_dropped;
+	int64_t txn_prepare;
+	int64_t txn_prepare_commit;
+	int64_t txn_prepare_active;
+	int64_t txn_prepare_rollback;
 	int64_t txn_query_ts;
 	int64_t txn_read_queue_empty;
 	int64_t txn_read_queue_head;
@@ -737,6 +743,7 @@ struct __wt_dsrc_stats {
 	int64_t cache_write_lookaside;
 	int64_t cache_read;
 	int64_t cache_read_deleted;
+	int64_t cache_read_deleted_prepared;
 	int64_t cache_read_lookaside;
 	int64_t cache_pages_requested;
 	int64_t cache_eviction_pages_seen;

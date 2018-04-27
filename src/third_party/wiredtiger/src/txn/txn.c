@@ -1380,17 +1380,15 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_global_shutdown --
- *	Shut down the global transaction state.
+ * __wt_txn_activity_drain --
+ *	Wait for transactions to quiesce.
  */
 int
-__wt_txn_global_shutdown(WT_SESSION_IMPL *session)
+__wt_txn_activity_drain(WT_SESSION_IMPL *session)
 {
 	bool txn_active;
 
 	/*
-	 * We're shutting down.  Make sure everything gets freed.
-	 *
 	 * It's possible that the eviction server is in the middle of a long
 	 * operation, with a transaction ID pinned.  In that case, we will loop
 	 * here until the transaction ID is released, when the oldest
@@ -1405,15 +1403,30 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 		__wt_yield();
 	}
 
+	return (0);
+}
+
+/*
+ * __wt_txn_global_shutdown --
+ *	Shut down the global transaction state.
+ */
+void
+__wt_txn_global_shutdown(WT_SESSION_IMPL *session)
+{
 #ifdef HAVE_TIMESTAMPS
 	/*
-	 * Now that all transactions have completed, no timestamps should be
-	 * pinned.
+	 * All application transactions have completed, ignore the pinned
+	 * timestamp so that updates can be evicted from the cache during
+	 * connection close.
+	 *
+	 * Note that we are relying on a special case in __wt_txn_visible_all
+	 * that returns true during close when there is no pinned timestamp
+	 * set.
 	 */
-	__wt_timestamp_set_inf(&S2C(session)->txn_global.pinned_timestamp);
+	S2C(session)->txn_global.has_pinned_timestamp = false;
+#else
+	WT_UNUSED(session);
 #endif
-
-	return (0);
 }
 
 /*

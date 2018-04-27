@@ -191,6 +191,12 @@ void
 __wt_session_gen_enter(WT_SESSION_IMPL *session, int which)
 {
 	/*
+	 * Don't enter a generation we're already in, it will likely result in
+	 * code intended to be protected by a generation running outside one.
+	 */
+	WT_ASSERT(session, session->generations[which] == 0);
+
+	/*
 	 * Assign the thread's resource generation and publish it, ensuring
 	 * threads waiting on a resource to drain see the new value. Check we
 	 * haven't raced with a generation update after publishing, we rely on

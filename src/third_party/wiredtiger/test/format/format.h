@@ -198,6 +198,7 @@ typedef struct {
 	uint32_t c_ops;
 	uint32_t c_prefix_compression;
 	uint32_t c_prefix_compression_min;
+	uint32_t c_prepare;
 	uint32_t c_quiet;
 	uint32_t c_read_pct;
 	uint32_t c_rebalance;
@@ -211,9 +212,17 @@ typedef struct {
 	uint32_t c_statistics_server;
 	uint32_t c_threads;
 	uint32_t c_timer;
+	uint32_t c_timing_stress_checkpoint;
+	uint32_t c_timing_stress_split_1;
+	uint32_t c_timing_stress_split_2;
+	uint32_t c_timing_stress_split_3;
+	uint32_t c_timing_stress_split_4;
+	uint32_t c_timing_stress_split_5;
+	uint32_t c_timing_stress_split_6;
+	uint32_t c_timing_stress_split_7;
+	uint32_t c_truncate;
 	uint32_t c_txn_freq;
 	uint32_t c_txn_timestamps;
-	uint32_t c_truncate;
 	uint32_t c_value_max;
 	uint32_t c_value_min;
 	uint32_t c_verify;
@@ -268,22 +277,21 @@ typedef struct {
 
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
-	uint64_t commit;			/* transaction resolution */
-	uint64_t prepare;
-	uint64_t rollback;
-	uint64_t deadlock;
-
 	uint64_t commit_timestamp;		/* last committed timestamp */
 	uint64_t read_timestamp;		/* read timestamp */
 
 	volatile bool quit;			/* thread should quit */
 
-	uint64_t search;			/* operation counts */
+	uint64_t ops;				/* total operations */
+	uint64_t commit;			/* operation counts */
+	uint64_t deadlock;
 	uint64_t insert;
-	uint64_t update;
+	uint64_t prepare;
 	uint64_t remove;
+	uint64_t rollback;
+	uint64_t search;
 	uint64_t truncate;
-	uint64_t ops;
+	uint64_t update;
 
 	uint64_t keyno;				/* key */
 	WT_ITEM	 *key, _key;			/* key, value */

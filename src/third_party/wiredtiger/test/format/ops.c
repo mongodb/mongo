@@ -193,11 +193,12 @@ wts_ops(int lastrun)
 			tinfo = tinfo_list[i];
 			total.commit += tinfo->commit;
 			total.deadlock += tinfo->deadlock;
-			total.prepare += tinfo->prepare;
 			total.insert += tinfo->insert;
+			total.prepare += tinfo->prepare;
 			total.remove += tinfo->remove;
 			total.rollback += tinfo->rollback;
 			total.search += tinfo->search;
+			total.truncate += tinfo->truncate;
 			total.update += tinfo->update;
 
 			switch (tinfo->state) {
@@ -496,26 +497,36 @@ begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 	u_int v;
 	const char *config;
 	char config_buf[64];
+	bool locked;
+
+	locked = false;
 
 	if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
-		v = mmrand(&tinfo->rnd, 2, 4);
+		v = mmrand(&tinfo->rnd, 1, 3);
 	switch (v) {
-	case ISOLATION_READ_UNCOMMITTED:
+	case 1:
+		v = ISOLATION_READ_UNCOMMITTED;
 		config = "isolation=read-uncommitted";
 		break;
-	case ISOLATION_READ_COMMITTED:
+	case 2:
+		v = ISOLATION_READ_COMMITTED;
 		config = "isolation=read-committed";
 		break;
-	case ISOLATION_SNAPSHOT:
+	case 3:
 	default:
 		v = ISOLATION_SNAPSHOT;
 		config = "isolation=snapshot";
+
 		if (g.c_txn_timestamps) {
 			/*
 			 * Avoid starting a new reader when a prepare is in
 			 * progress.
 			 */
-			(void)pthread_rwlock_rdlock(&g.prepare_lock);
+			if (g.c_prepare) {
+				testutil_check(
+				    pthread_rwlock_rdlock(&g.prepare_lock));
+				locked = true;
+			}
 
 			/*
 			 * Set the thread's read timestamp to the current value
@@ -537,8 +548,8 @@ begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 
 	testutil_check(session->begin_transaction(session, config));
 
-	if (v == ISOLATION_SNAPSHOT && g.c_txn_timestamps)
-		(void)pthread_rwlock_unlock(&g.prepare_lock);
+	if (locked)
+		testutil_check(pthread_rwlock_unlock(&g.prepare_lock));
 
 	/*
 	 * It's OK for the oldest timestamp to move past a running query, clear
@@ -630,12 +641,8 @@ prepare_transaction(TINFO *tinfo, WT_SESSION *session)
 	uint64_t ts;
 	char config_buf[64];
 
-	/*
-	 * We cannot prepare a transaction if logging on the table is set.
-	 * Prepare also requires timestamps. Skip if not using timestamps,
-	 * if no timestamp has yet been set, or if using logging.
-	 */
-	if (!g.c_txn_timestamps || g.timestamp == 0 || g.c_logging)
+	/* Skip if no timestamp has yet been set. */
+	if (g.timestamp == 0)
 		return (0);
 
 	/*
@@ -652,14 +659,14 @@ prepare_transaction(TINFO *tinfo, WT_SESSION *session)
 	 * Prepare will return error if prepare timestamp is less than any
 	 * active read timestamp.
 	 */
-	(void)pthread_rwlock_wrlock(&g.prepare_lock);
+	testutil_check(pthread_rwlock_wrlock(&g.prepare_lock));
 
 	ts = set_commit_timestamp(tinfo);
 	testutil_check(__wt_snprintf(
 	    config_buf, sizeof(config_buf), "prepare_timestamp=%" PRIx64, ts));
 	ret = session->prepare_transaction(session, config_buf);
 
-	(void)pthread_rwlock_unlock(&g.prepare_lock);
+	testutil_check(pthread_rwlock_unlock(&g.prepare_lock));
 
 	return (ret);
 }
@@ -1095,9 +1102,10 @@ update_instead_of_chosen_op:
 		}
 
 		/*
-		 * Prepare the transaction 10% of the time.
+		 * If prepare configured, prepare the transaction 10% of the
+		 * time.
 		 */
-		if (mmrand(&tinfo->rnd, 1, 10) == 1) {
+		if (g.c_prepare && mmrand(&tinfo->rnd, 1, 10) == 1) {
 			ret = prepare_transaction(tinfo, session);
 			testutil_assert(ret == 0 || ret == WT_PREPARE_CONFLICT);
 			if (ret == WT_PREPARE_CONFLICT)

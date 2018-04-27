@@ -71,13 +71,9 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 
 	*skipp = false;
 
-	/*
-	 * If we have a clean page in memory, attempt to evict it. Do a fast
-	 * check for a dirty page, and then repeat the test once we're locked.
-	 */
+	/* If we have a clean page in memory, attempt to evict it. */
 	previous_state = ref->state;
 	if ((previous_state == WT_REF_MEM || previous_state == WT_REF_LIMBO) &&
-	    !__wt_page_is_modified(ref->page) &&
 	    __wt_atomic_casv32(&ref->state, previous_state, WT_REF_LOCKED)) {
 		if (__wt_page_is_modified(ref->page)) {
 			ref->state = previous_state;
@@ -371,6 +367,12 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_RET(__wt_page_modify_init(session, page));
 	if (btree->modified)
 		__wt_page_modify_set(session, page);
+
+	if (ref->page_del != NULL &&
+	    ref->page_del->prepare_state != WT_PREPARE_INIT) {
+		WT_STAT_CONN_INCR(session, cache_read_deleted_prepared);
+		WT_STAT_DATA_INCR(session, cache_read_deleted_prepared);
+	}
 
 	/*
 	 * An operation is accessing a "deleted" page, and we're building an

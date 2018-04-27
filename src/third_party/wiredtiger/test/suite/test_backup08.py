@@ -26,19 +26,20 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_timestamp10.py
-#   Timestamps: Saving and querying the last checkpoint and recovery timestamps.
+# test_backup08.py
+#   Timestamps: Verify the saved checkpoint timestamp survives a backup.
 #
 
-from suite_subprocess import suite_subprocess
+import os, shutil
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
 
-class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
+class test_backup08(wttest.WiredTigerTestCase):
     conn_config = 'config_base=false,create,log=(enabled)'
+    dir = 'backup.dir'
     coll1_uri = 'table:collection10.1'
     coll2_uri = 'table:collection10.2'
     coll3_uri = 'table:collection10.3'
@@ -48,15 +49,9 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
     table_cnt = 3
 
     types = [
-        ('all', dict(use_stable='false', run_wt=0)),
-        ('all+wt', dict(use_stable='false', run_wt=1)),
-        ('all+wt2', dict(use_stable='false', run_wt=2)),
-        ('default', dict(use_stable='default', run_wt=0)),
-        ('default+wt', dict(use_stable='default', run_wt=1)),
-        ('default+wt2', dict(use_stable='default', run_wt=2)),
-        ('stable', dict(use_stable='true', run_wt=0)),
-        ('stable+wt', dict(use_stable='true', run_wt=1)),
-        ('stable+wt2', dict(use_stable='true', run_wt=2)),
+        ('all', dict(use_stable='false')),
+        ('default', dict(use_stable='default')),
+        ('stable', dict(use_stable='true')),
     ]
     scenarios = make_scenarios(types)
 
@@ -96,71 +91,52 @@ class test_timestamp10(wttest.WiredTigerTestCase, suite_subprocess):
             self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(ts) +
                 ',stable_timestamp=' + timestamp_str(ts))
             # This forces a different checkpoint timestamp for each table.
-            self.session.checkpoint()
+            # Default is to use the stable timestamp.
+            expected = ts
+            ckpt_config = ''
+            if self.use_stable == 'false':
+                expected = 0
+                ckpt_config = 'use_timestamp=false'
+            elif self.use_stable == 'true':
+                ckpt_config = 'use_timestamp=true'
+            self.session.checkpoint(ckpt_config)
             q = self.conn.query_timestamp('get=last_checkpoint')
-            self.assertTimestampsEqual(q, timestamp_str(ts))
-        return ts
+            self.assertTimestampsEqual(q, timestamp_str(expected))
+        return expected
 
-    def close_and_recover(self, expected_rec_ts):
+    def backup_and_recover(self, expected_rec_ts):
         #
-        # Close with the close configuration string and optionally run
-        # the 'wt' command. Then open the connection again and query the
+        # Perform a live backup. Then open the backup and query the
         # recovery timestamp verifying it is the expected value.
         #
-        if self.use_stable == 'true':
-            close_cfg = 'use_timestamp=true'
-        elif self.use_stable == 'false':
-            close_cfg = 'use_timestamp=false'
-        else:
-            close_cfg = ''
-        self.close_conn(close_cfg)
+        os.mkdir(self.dir)
+        cursor = self.session.open_cursor('backup:')
+        while True:
+            ret = cursor.next()
+            if ret != 0:
+                break
+            shutil.copy(cursor.get_key(), self.dir)
+        self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
+        cursor.close()
 
-        # Run the wt command some number of times to get some runs in that do
-        # not use timestamps. Make sure the recovery checkpoint is maintained.
-        for i in range(0, self.run_wt):
-            self.runWt(['-h', '.', '-R', 'list', '-v'], outfilename="list.out")
-
-        self.open_conn()
-        q = self.conn.query_timestamp('get=recovery')
+        backup_conn = self.wiredtiger_open(self.dir)
+        q = backup_conn.query_timestamp('get=recovery')
         self.pr("query recovery ts: " + q)
         self.assertTimestampsEqual(q, timestamp_str(expected_rec_ts))
 
-    def test_timestamp_recovery(self):
+    def test_timestamp_backup(self):
         if not wiredtiger.timestamp_build():
             self.skipTest('requires a timestamp build')
 
-        # Add some data and checkpoint at a stable timestamp.
-        last_stable = self.data_and_checkpoint()
+        # Add some data and checkpoint using the timestamp or not
+        # depending on the configuration. Get the expected timestamp
+        # where the data is checkpointed for the backup.
+        ckpt_ts = self.data_and_checkpoint()
 
-        expected = 0
-        # Note: assumes default is true.
-        if self.use_stable != 'false':
-            expected = last_stable
-        # Close and run recovery checking the stable timestamp.
-        self.close_and_recover(expected)
-
-        # Verify the data in the recovered database.
-        c_op = self.session.open_cursor(self.oplog_uri)
-        c = []
-        c.append(self.session.open_cursor(self.coll1_uri))
-        c.append(self.session.open_cursor(self.coll2_uri))
-        c.append(self.session.open_cursor(self.coll3_uri))
-        for table in range(1,self.table_cnt+1):
-            curs = c[table - 1]
-            start = self.nentries * table
-            end = start + self.nentries
-            ts = (end - 3)
-            for i in range(start,end):
-                # The oplog-like table is logged so it always has all the data.
-                self.assertEquals(c_op[i], i)
-                curs.set_key(i)
-                # Earlier tables have all the data because later checkpoints
-                # will save the last bit of data. Only the last table will
-                # be missing some.
-                if self.use_stable == 'false' or i <= ts or table != self.table_cnt:
-                    self.assertEquals(curs[i], i)
-                else:
-                    self.assertEqual(curs.search(), wiredtiger.WT_NOTFOUND)
+        # Backup and run recovery checking the recovery timestamp.
+        # This tests that the stable timestamp information is transferred
+        # with the backup. It should be part of the backup metadata file.
+        self.backup_and_recover(ckpt_ts)
 
 if __name__ == '__main__':
     wttest.run()

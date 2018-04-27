@@ -60,7 +60,10 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 	 * devices.  If a target list is configured for the checkpoint, this
 	 * function is called with each target list entry; check the entry to
 	 * make sure it's backed by a file.  If no target list is configured,
-	 * confirm the metadata file contains no non-file objects.
+	 * confirm the metadata file contains no non-file objects. Skip any
+	 * internal system objects. We don't want spurious error messages,
+	 * other code will skip over them and the user has no control over
+	 * their existence.
 	 */
 	if (uri == NULL) {
 		WT_RET(__wt_metadata_cursor(session, &cursor));
@@ -69,6 +72,7 @@ __checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 			    !WT_PREFIX_MATCH(uri, "file:") &&
 			    !WT_PREFIX_MATCH(uri, "index:") &&
+			    !WT_PREFIX_MATCH(uri, WT_SYSTEM_PREFIX) &&
 			    !WT_PREFIX_MATCH(uri, "table:")) {
 				fail = uri;
 				break;
@@ -381,8 +385,13 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	/* Give up if scrubbing is disabled. */
-	if (cache->eviction_checkpoint_target < DBL_EPSILON ||
+	/*
+	 * Give up if scrubbing is disabled, including when checkpointing with
+	 * a timestamp on close (we can't evict dirty pages in that case, so
+	 * scrubbing cannot help).
+	 */
+	if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) ||
+	    cache->eviction_checkpoint_target < DBL_EPSILON ||
 	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
 		return;
 
@@ -707,12 +716,31 @@ __checkpoint_prepare(
 	    WT_TXN_HAS_TS_COMMIT | WT_TXN_HAS_TS_READ |
 	    WT_TXN_PUBLIC_TS_COMMIT | WT_TXN_PUBLIC_TS_READ));
 
-	if (use_timestamp && txn_global->has_stable_timestamp) {
-		__wt_timestamp_set(
-		    &txn->read_timestamp, &txn_global->stable_timestamp);
-		F_SET(txn, WT_TXN_HAS_TS_READ);
-	} else
+	if (use_timestamp) {
+		/*
+		 * If the user wants timestamps then set the metadata
+		 * checkpoint timestamp based on whether or not a stable
+		 * timestamp is actually in use.  Only set it when we're not
+		 * running recovery because recovery doesn't set the recovery
+		 * timestamp until its checkpoint is complete.
+		 */
+		if (txn_global->has_stable_timestamp) {
+			__wt_timestamp_set(&txn->read_timestamp,
+			    &txn_global->stable_timestamp);
+			F_SET(txn, WT_TXN_HAS_TS_READ);
+			if (!F_ISSET(conn, WT_CONN_RECOVERING))
+				__wt_timestamp_set(
+				    &txn_global->meta_ckpt_timestamp,
+				    &txn->read_timestamp);
+		} else if (!F_ISSET(conn, WT_CONN_RECOVERING))
+			__wt_timestamp_set(&txn_global->meta_ckpt_timestamp,
+			    &txn_global->recovery_timestamp);
+	} else {
 		__wt_timestamp_set_zero(&txn->read_timestamp);
+		if (!F_ISSET(conn, WT_CONN_RECOVERING))
+			__wt_timestamp_set_zero(
+			    &txn_global->meta_ckpt_timestamp);
+	}
 #else
 	WT_UNUSED(use_timestamp);
 #endif
@@ -871,6 +899,21 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	session->dhandle = NULL;
 
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * Record the timestamp from the transaction if we were successful.
+	 * Store it in a temp variable now because it will be invalidated during
+	 * commit but we don't want to set it until we know the checkpoint
+	 * is successful. We have to set the system information before we
+	 * release the snapshot.
+	 */
+	__wt_timestamp_set_zero(&ckpt_tmp_ts);
+	if (full) {
+		WT_ERR(__wt_meta_sysinfo_set(session));
+		__wt_timestamp_set(&ckpt_tmp_ts, &txn->read_timestamp);
+	}
+#endif
+
 	/* Release the snapshot so we aren't pinning updates in cache. */
 	__wt_txn_release_snapshot(session);
 
@@ -900,15 +943,6 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * checkpointing the metadata since we know that all files in the
 	 * checkpoint are now in a consistent state.
 	 */
-#ifdef HAVE_TIMESTAMPS
-	/*
-	 * Record the timestamp from the transaction if we were successful.
-	 * Store it in a temp variable now because it will be invalidated during
-	 * commit but we don't want to set it until we know the checkpoint
-	 * is successful.
-	 */
-	__wt_timestamp_set(&ckpt_tmp_ts, &txn->read_timestamp);
-#endif
 	WT_ERR(__wt_txn_commit(session, NULL));
 
 	/*

@@ -202,6 +202,8 @@ static inline void
 __wt_cache_decr_check_uint64(
     WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v, const char *fld)
 {
+	uint64_t orig = *vp;
+
 	if (v == 0 || __wt_atomic_sub64(vp, v) < WT_EXABYTE)
 		return;
 
@@ -211,7 +213,8 @@ __wt_cache_decr_check_uint64(
 	 */
 	*vp = 0;
 	__wt_errx(session,
-	    "%s went negative with decrement of %" PRIu64, fld, v);
+	    "%s was %" PRIu64 ", went negative with decrement of %" PRIu64, fld,
+	    orig, v);
 
 #ifdef HAVE_DIAGNOSTIC
 	__wt_abort(session);
@@ -1183,6 +1186,10 @@ __wt_page_del_active(
  *
  *      We cannot evict dirty pages or split while a checkpoint is in progress,
  *      unless the checkpoint thread is doing the work.
+ *
+ *	Also, during connection close, if we take a checkpoint as of a
+ *	timestamp, eviction should not write dirty pages to avoid updates newer
+ *	than the checkpoint timestamp leaking to disk.
  */
 static inline bool
 __wt_btree_can_evict_dirty(WT_SESSION_IMPL *session)
@@ -1190,7 +1197,8 @@ __wt_btree_can_evict_dirty(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 
 	btree = S2BT(session);
-	return (btree->checkpointing == WT_CKPT_OFF ||
+	return ((btree->checkpointing == WT_CKPT_OFF &&
+	    !F_ISSET(S2C(session), WT_CONN_CLOSING_TIMESTAMP)) ||
 	    WT_SESSION_IS_CHECKPOINT(session));
 }
 

@@ -121,16 +121,24 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	bool clean_page, inmem_split, tree_dead;
+	bool clean_page, inmem_split, local_gen, tree_dead;
 
 	conn = S2C(session);
 	page = ref->page;
+	local_gen = false;
 
 	__wt_verbose(session, WT_VERB_EVICT,
 	    "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
-	/* Enter the eviction generation. */
-	__wt_session_gen_enter(session, WT_GEN_EVICT);
+	/*
+	 * Enter the eviction generation. If we re-enter eviction, leave the
+	 * previous eviction generation (which must be as low as the current
+	 * generation), untouched.
+	 */
+	if (__wt_session_gen(session, WT_GEN_EVICT) == 0) {
+		local_gen = true;
+		__wt_session_gen_enter(session, WT_GEN_EVICT);
+	}
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -221,8 +229,9 @@ err:		if (!closing)
 		WT_STAT_DATA_INCR(session, cache_eviction_fail);
 	}
 
-done:	/* Leave the eviction generation. */
-	__wt_session_gen_leave(session, WT_GEN_EVICT);
+done:	/* Leave any local eviction generation. */
+	if (local_gen)
+		__wt_session_gen_leave(session, WT_GEN_EVICT);
 
 	return (ret);
 }
@@ -609,10 +618,10 @@ __evict_review(
 	ret = __wt_reconcile(session, ref, NULL, flags, lookaside_retryp);
 
 	/*
-	 * If attempting eviction in service of a checkpoint, we may
-	 * successfully reconcile but then find that there are updates on the
-	 * page too new to evict.  Give up evicting in that case: checkpoint
-	 * will include the reconciled page when it visits the parent.
+	 * If attempting eviction during a checkpoint, we may successfully
+	 * reconcile but then find that there are updates on the page too new
+	 * to evict.  Give up evicting in that case: checkpoint will include
+	 * the reconciled page when it visits the parent.
 	 */
 	if (WT_SESSION_IS_CHECKPOINT(session) && !__wt_page_is_modified(page) &&
 	    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
@@ -632,6 +641,19 @@ __evict_review(
 	}
 
 	WT_RET(ret);
+
+	/*
+	 * Give up on eviction during a checkpoint if the page splits.
+	 *
+	 * We get here if checkpoint reads a page with lookaside entries: if
+	 * more of those entries are visible now than when the original
+	 * eviction happened, the page could split.  In most workloads, this is
+	 * very unlikely.  However, since checkpoint is partway through
+	 * reconciling the parent page, a split can corrupt the checkpoint.
+	 */
+	if (WT_SESSION_IS_CHECKPOINT(session) &&
+	    page->modify->rec_result == WT_PM_REC_MULTIBLOCK)
+		return (EBUSY);
 
 	/*
 	 * Success: assert the page is clean or reconciliation was configured

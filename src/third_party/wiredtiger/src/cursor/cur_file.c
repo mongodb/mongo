@@ -530,8 +530,9 @@ __curfile_cache(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	cbt->dhandle = cbt->btree->dhandle;
 
-	WT_TRET(__wt_cursor_cache(cursor, cbt->btree->dhandle));
+	WT_TRET(__wt_cursor_cache(cursor, cbt->dhandle));
 	WT_TRET(__wt_session_release_dhandle(session));
 	return (ret);
 }
@@ -552,7 +553,7 @@ __curfile_reopen(WT_CURSOR *cursor, bool check_only)
 	is_dead = false;
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	dhandle = cbt->btree->dhandle;
+	dhandle = cbt->dhandle;
 
 	if (!WT_DHANDLE_CAN_REOPEN(dhandle))
 		ret = WT_NOTFOUND;
@@ -579,6 +580,9 @@ __curfile_reopen(WT_CURSOR *cursor, bool check_only)
 		 * memory owned by the btree handle.
 		 */
 		if (ret == 0) {
+			WT_ASSERT(session,
+			    dhandle->type == WT_DHANDLE_TYPE_BTREE);
+			cbt->btree = dhandle->handle;
 			cursor->internal_uri = cbt->btree->dhandle->name;
 			cursor->key_format = cbt->btree->key_format;
 			cursor->value_format = cbt->btree->value_format;

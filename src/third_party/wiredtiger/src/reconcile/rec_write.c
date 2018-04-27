@@ -1665,16 +1665,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * read into this part of the name space again, the cache read function
 	 * instantiates an entirely new page.)
 	 */
-	if (ref->addr != NULL && !__wt_page_del_active(session, ref, true))
-		WT_RET(__wt_ref_block_free(session, ref));
-
-	/*
-	 * If the original page is gone, we can skip the slot on the internal
-	 * page.
-	 */
-	if (ref->addr == NULL) {
-		*statep = WT_CHILD_IGNORE;
-
+	if (ref->addr != NULL && !__wt_page_del_active(session, ref, true)) {
 		/*
 		 * Minor memory cleanup: if a truncate call deleted this page
 		 * and we were ever forced to instantiate the page in memory,
@@ -1687,6 +1678,15 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 			__wt_free(session, ref->page_del);
 		}
 
+		WT_RET(__wt_ref_block_free(session, ref));
+	}
+
+	/*
+	 * If the original page is gone, we can skip the slot on the internal
+	 * page.
+	 */
+	if (ref->addr == NULL) {
+		*statep = WT_CHILD_IGNORE;
 		return (0);
 	}
 
@@ -5328,6 +5328,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 	key = &r->k;
 	val = &r->v;
+	vpack = &_vpack;
 
 	WT_RET(__rec_split_init(session, r, page, 0, btree->maxleafpage));
 
@@ -5376,14 +5377,19 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			__wt_cell_unpack(cell, kpack);
 		}
 
-		/* Unpack the on-page value cell, and look for an update. */
+		/*
+		 * Unpack the on-page value cell, and look for an update. Under
+		 * some conditions, the underlying code returning updates will
+		 * restructure the update list to include the original on-page
+		 * value, represented by the unpacked-cell argument. Row-store
+		 * doesn't store zero-length values on the page, so we build an
+		 * unpacked cell that allows us to pretend.
+		 */
 		if ((val_cell =
 		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
-			vpack = NULL;
-		else {
-			vpack = &_vpack;
+			__wt_cell_unpack_empty_value(vpack);
+		else
 			__wt_cell_unpack(val_cell, vpack);
-		}
 		WT_ERR(__rec_txn_read(
 		    session, r, NULL, rip, vpack, NULL, &upd));
 
@@ -5399,10 +5405,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * copy, we have to create a new value item as the old
 			 * item might have been discarded from the page.
 			 */
-			if (vpack == NULL) {
-				val->buf.data = NULL;
-				val->cell_len = val->len = val->buf.size = 0;
-			} else if (vpack->raw == WT_CELL_VALUE_COPY) {
+			if (vpack->raw == WT_CELL_VALUE_COPY) {
 				/* If the item is Huffman encoded, decode it. */
 				if (btree->huffman_value == NULL) {
 					p = vpack->data;
@@ -5478,8 +5481,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * The first time we find an overflow record we're not
 			 * going to use, discard the underlying blocks.
 			 */
-			if (vpack != NULL &&
-			    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)
+			if (vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)
 				WT_ERR(__wt_ovfl_remove(session,
 				    page, vpack, F_ISSET(r, WT_REC_EVICT)));
 
@@ -6183,18 +6185,18 @@ __rec_las_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_DECL_RET;
 	WT_MULTI *multi;
-	uint32_t btree_id, i;
-
-	btree_id = S2BT(session)->id;
+	uint64_t las_pageid;
+	uint32_t i;
 
 	/*
 	 * Note the additional check for a non-zero lookaside page ID, that
 	 * flags if lookaside table entries for this page have been written.
 	 */
 	for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-		if (multi->supd != NULL && multi->page_las.las_pageid != 0)
-			WT_TRET(__wt_las_remove_block(session,
-			    btree_id, multi->page_las.las_pageid));
+		if (multi->supd != NULL &&
+		    (las_pageid = multi->page_las.las_pageid) != 0)
+			WT_TRET(
+			    __wt_las_remove_block(session, las_pageid, true));
 
 	return (ret);
 }

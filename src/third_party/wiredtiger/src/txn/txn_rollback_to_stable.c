@@ -22,13 +22,13 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	WT_DECL_TIMESTAMP(rollback_timestamp)
 	WT_ITEM las_key, las_timestamp, las_value;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t las_counter, las_pageid, las_total, las_txnid, remove_cnt;
+	uint64_t las_counter, las_pageid, las_total, las_txnid;
 	uint32_t las_id, session_flags;
 	uint8_t upd_type;
 
 	conn = S2C(session);
 	cursor = NULL;
-	las_total = remove_cnt = 0;
+	las_total = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 	WT_CLEAR(las_timestamp);
 
@@ -51,6 +51,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	/* Walk the file. */
 	__wt_writelock(session, &conn->cache->las_sweepwalk_lock);
 	while ((ret = cursor->next(cursor)) == 0) {
+		++las_total;
 		WT_ERR(cursor->get_key(cursor,
 		    &las_pageid, &las_id, &las_counter, &las_key));
 
@@ -73,17 +74,15 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 		if (__wt_timestamp_cmp(
 		    &rollback_timestamp, las_timestamp.data) < 0) {
 			WT_ERR(cursor->remove(cursor));
-			++remove_cnt;
 			WT_STAT_CONN_INCR(session, txn_rollback_las_removed);
-		} else
-			++las_total;
+			--las_total;
+		}
 	}
 	WT_ERR_NOTFOUND_OK(ret);
-err:	__wt_writeunlock(session, &conn->cache->las_sweepwalk_lock);
+err:	if (ret == 0)
+		conn->cache->las_entry_count = las_total;
+	__wt_writeunlock(session, &conn->cache->las_sweepwalk_lock);
 	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
-	__wt_cache_decr_check_uint64(session,
-	    &conn->cache->las_entry_count, remove_cnt, "lookaside entry count");
-	WT_STAT_CONN_SET(session, cache_lookaside_entries, las_total);
 
 	F_CLR(session, WT_SESSION_READ_WONT_NEED);
 
