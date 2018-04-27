@@ -1,21 +1,20 @@
-// Tests the scenario described in SERVER-2753.
+// Tests the scenario described in SERVER-27534.
 // 1. Send a single insert command with a large number of documents and the {ordered: true} option.
-// 2. Force the thread processing the insert command to hang inbetween insert batches. (Inserts are
+// 2. Force the thread processing the insert command to hang in between insert batches. (Inserts are
 //    typically split into batches of 64, and the server yields locks between batches.)
 // 3. Disconnect the original primary from the network, forcing another node to step up.
 // 4. Insert a single document on the new primary.
 // 5. Return the original primary to the network and force it to step up by disconnecting the
 //    primary that replaced it. The original primary has to roll back any batches from step 1
 //    that were inserted locally but did not get majority committed before the insert in step 4.
-// 6. Unpause the thread performing the insert from step 1. If it continues to
-//    insert batches even though there was a rollback, those inserts will
-//    violate the {ordered: true} option.
-
-load('jstests/libs/parallelTester.js');
-load("jstests/replsets/rslib.js");
+// 6. Unpause the thread performing the insert from step 1. If it continues to insert batches even
+//    though there was a rollback, those inserts will violate the {ordered: true} option.
 
 (function() {
     "use strict";
+
+    load('jstests/libs/parallelTester.js');
+    load("jstests/replsets/rslib.js");
 
     var name = "interrupted_batch_insert";
     var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
@@ -41,8 +40,9 @@ load("jstests/replsets/rslib.js");
     assert.commandWorked(getParameterResult);
     const batchSize = getParameterResult.internalInsertMaxBatchSize;
 
-    // Prevent node 1 from getting any data from the node 0 oplog.
-    conns[0].disconnect(conns[1]);
+    // Prevent any writes to node 0 (the primary) from replicating to nodes 1 and 2.
+    stopServerReplication(conns[1]);
+    stopServerReplication(conns[2]);
 
     // Allow the primary to insert the first 5 batches of documents. After that, the fail point
     // activates, and the client thread hangs until the fail point gets turned off.
@@ -67,20 +67,21 @@ load("jstests/replsets/rslib.js");
 
     // Wait long enough to guarantee that all 5 batches of inserts have executed and the primary is
     // hung on the "hangDuringBatchInsert" fail point.
-    sleep(1000);
+    checkLog.contains(primary, "hangDuringBatchInsert fail point enabled");
 
     // Make sure the insert command is, in fact, running in the background.
     assert.eq(primary.getDB("db").currentOp({"command.insert": name, active: true}).inprog.length,
               1);
 
     // Completely isolate the current primary (node 0), forcing it to step down.
+    conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
 
     // Wait for node 1, the only other eligible node, to become the new primary.
     replTest.waitForState(replTest.nodes[1], ReplSetTest.State.PRIMARY);
+    assert.eq(replTest.nodes[1], replTest.getPrimary());
 
-    // Wait for node 2 to acknowledge node 1 as the new primary.
-    replTest.awaitSyncSource(replTest.nodes[2], replTest.nodes[1]);
+    restartServerReplication(conns[2]);
 
     // Issue a write to the new primary.
     var collOnNewPrimary = replTest.nodes[1].getCollection(collName);
@@ -88,14 +89,12 @@ load("jstests/replsets/rslib.js");
 
     // Isolate node 1, forcing it to step down as primary, and reconnect node 0, allowing it to step
     // up again.
-    conns[0].reconnect(conns[2]);
     conns[1].disconnect(conns[2]);
+    conns[0].reconnect(conns[2]);
 
     // Wait for node 0 to become primary again.
     replTest.waitForState(primary, ReplSetTest.State.PRIMARY);
-
-    // Wait until node 2 recognizes node 0 as primary.
-    replTest.awaitSyncSource(replTest.nodes[2], primary);
+    assert.eq(replTest.nodes[0], replTest.getPrimary());
 
     // Allow the batch insert to continue.
     assert.commandWorked(primary.getDB("db").adminCommand(
@@ -121,6 +120,7 @@ load("jstests/replsets/rslib.js");
     // Reconnect the remaining disconnected nodes, so we can exit.
     conns[0].reconnect(conns[1]);
     conns[1].reconnect(conns[2]);
+    restartServerReplication(conns[1]);
 
     replTest.stopSet(15);
 }());

@@ -384,6 +384,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     auto acquireCollection = [&] {
         while (true) {
             if (MONGO_FAIL_POINT(hangDuringBatchInsert)) {
+                log() << "batch insert - hangDuringBatchInsert fail point enabled. Blocking until "
+                         "fail point is disabled.";
                 MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringBatchInsert);
             }
 
