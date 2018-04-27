@@ -2894,13 +2894,14 @@ TEST(ExpressionObjectOptimizations,
 
 }  // namespace Object
 
-TEST(ExpressionFilter, ExpressionFilterWithASetLimitShouldReturnAArrayNoGreaterThanTheLimit) {
+TEST(ExpressionFilter, ExpressionFilterWithASetLimitShouldReturnAnArrayNoGreaterThanTheLimit) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
     auto filterSpec = BSON(
         "$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9) << "as"
                                   << "arr"
-                                  << "cond" << BSON("$gt" << BSON_ARRAY("$$arr" << 3))));
+                                  << "cond"
+                                  << BSON("$gt" << BSON_ARRAY("$$arr" << 3))));
 
 
     auto expFilter = ExpressionFilter::parse(expCtx, filterSpec.firstElement(), vps);
@@ -2931,28 +2932,30 @@ TEST(ExpressionArrayElemAt, ArrayElemAtWithFilterShouldEvaluateCorrectly) {
     auto filterSpec = BSON(
         "$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9) << "as"
                                   << "arr"
-                                  << "cond" << BSON("$gt" << BSON_ARRAY("$$arr" << 3))));
+                                  << "cond"
+                                  << BSON("$gt" << BSON_ARRAY("$$arr" << 3))));
 
     auto arrayElemAtSpec = BSON("$arrayElemAt" << BSON_ARRAY(filterSpec << 2));
 
     auto expArrayElemAt = ExpressionArrayElemAt::parse(expCtx, arrayElemAtSpec.firstElement(), vps);
-    auto xpArrayElemAt = dynamic_cast<ExpressionArrayElemAt*>(expArrayElemAt.get())->optimize();
-    auto val = xpArrayElemAt->evaluate(Document());
+    auto optimized = dynamic_cast<ExpressionArrayElemAt*>(expArrayElemAt.get())->optimize();
+    auto val = optimized->evaluate(Document());
     ASSERT_VALUE_EQ(val, Value(6));
 
-    auto eA = ExpressionArrayElemAt::parse(expCtx, BSON("$arrayElemAt" << BSON_ARRAY(BSON_ARRAY(1 << 2 <<3 << 4 <<5) << 1)).firstElement(), vps);
-    auto eAO = dynamic_cast<ExpressionArrayElemAt*>(eA.get())->optimize();
-    auto va = eAO->evaluate(Document());
-    ASSERT_VALUE_EQ(va, Value(2));
+    expArrayElemAt = ExpressionArrayElemAt::parse(
+        expCtx,
+        BSON("$arrayElemAt" << BSON_ARRAY(BSON_ARRAY(1 << 2 << 3 << 4 << 5) << 1)).firstElement(),
+        vps);
 
-    auto ElemAtNegativeIndex = BSON("$arrayElemAt" << BSON_ARRAY(filterSpec << -2));
-    auto expElemAtNegativeIndex =
-        ExpressionArrayElemAt::parse(expCtx, ElemAtNegativeIndex.firstElement(), vps);
-    auto elemAtNegativeIndexOptimized =
-        dynamic_cast<ExpressionArrayElemAt*>(expElemAtNegativeIndex.get())->optimize();
-    ASSERT_VALUE_EQ(elemAtNegativeIndexOptimized->evaluate(Document()), Value(8));
+    optimized = dynamic_cast<ExpressionArrayElemAt*>(expArrayElemAt.get())->optimize();
+    val = optimized->evaluate(Document());
+    ASSERT_VALUE_EQ(val, Value(2));
+
+    expArrayElemAt = ExpressionArrayElemAt::parse(
+        expCtx, BSON("$arrayElemAt" << BSON_ARRAY(filterSpec << -2)).firstElement(), vps);
+    optimized = dynamic_cast<ExpressionArrayElemAt*>(expArrayElemAt.get())->optimize();
+    ASSERT_VALUE_EQ(optimized->evaluate(Document()), Value(8));
 }
-
 TEST(ExpressionSlice, SliceWithFilterShouldEvaluateCorrectly) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
@@ -2960,24 +2963,21 @@ TEST(ExpressionSlice, SliceWithFilterShouldEvaluateCorrectly) {
     auto filterSpec = BSON(
         "$filter" << BSON("input" << BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9) << "as"
                                   << "arr"
-                                  << "cond" << BSON("$gt" << BSON_ARRAY("$$arr" << 1))));
+                                  << "cond"
+                                  << BSON("$gt" << BSON_ARRAY("$$arr" << 1))));
     auto sliceSpec = BSON("$slice" << BSON_ARRAY(filterSpec << 2 << 2));
     auto expSlice = ExpressionSlice::parse(expCtx, sliceSpec.firstElement(), vps);
     auto optimizedSlice = dynamic_cast<ExpressionSlice*>(expSlice.get())->optimize();
     ASSERT_VALUE_EQ(optimizedSlice->evaluate(Document()), Value(BSON_ARRAY(4 << 5)));
 
-    auto sliceNegative = BSON("$slice" << BSON_ARRAY(filterSpec << -4 << 4));
-    auto expSliceNegative = ExpressionSlice::parse(expCtx, sliceNegative.firstElement(), vps);
-    auto optimizedSliceNegative =
-        dynamic_cast<ExpressionSlice*>(expSliceNegative.get())->optimize();
-    ASSERT_VALUE_EQ(optimizedSliceNegative->evaluate(Document()),
-                    Value(BSON_ARRAY(6 << 7 << 8 << 9)));
-    auto sliceNegative2ndArg = BSON("$slice" << BSON_ARRAY(filterSpec << -2));
-    auto expSliceNegative2ndArg =
-        ExpressionSlice::parse(expCtx, sliceNegative2ndArg.firstElement(), vps);
-    auto optimizedSliceNegative2ndArg =
-        dynamic_cast<ExpressionSlice*>(expSliceNegative2ndArg.get())->optimize();
-    ASSERT_VALUE_EQ(optimizedSliceNegative2ndArg->evaluate(Document()), Value(BSON_ARRAY(8 << 9)));
+    sliceSpec = BSON("$slice" << BSON_ARRAY(filterSpec << -4 << 4));
+    expSlice = ExpressionSlice::parse(expCtx, sliceSpec.firstElement(), vps);
+    optimizedSlice = dynamic_cast<ExpressionSlice*>(expSlice.get())->optimize();
+    ASSERT_VALUE_EQ(optimizedSlice->evaluate(Document()), Value(BSON_ARRAY(6 << 7 << 8 << 9)));
+    sliceSpec = BSON("$slice" << BSON_ARRAY(filterSpec << -2));
+    expSlice = ExpressionSlice::parse(expCtx, sliceSpec.firstElement(), vps);
+    optimizedSlice = dynamic_cast<ExpressionSlice*>(expSlice.get())->optimize();
+    ASSERT_VALUE_EQ(optimizedSlice->evaluate(Document()), Value(BSON_ARRAY(8 << 9)));
 }
 
 namespace Or {

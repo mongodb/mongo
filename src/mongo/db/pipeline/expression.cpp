@@ -525,27 +525,27 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
 }
 
 intrusive_ptr<Expression> ExpressionArrayElemAt::optimize() {
-    // If ExpressionArrayElemAt is passed an ExpressionFilter as its first arugment
-    // set a limit on the filter so filter returns an array with the last element being the value we
-    // want.
+    // This will optimize all arguments to this expression.
+    auto optimized = ExpressionNary::optimize();
+    if (optimized.get() != this) {
+        return optimized;
+    }
+
+    // If ExpressionArrayElemAt is passed an ExpressionFilter as its first arugment set a limit on
+    // the filter so filter returns an array with the last element being the value we want.
     if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
         if (auto expConstant = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
             auto indexArg = expConstant->getValue();
 
-            uassert(50802,
-                    str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                                  << " but is " 
-                                  << typeName(indexArg.getType()),
-                    indexArg.numeric());
             uassert(50803,
                     str::stream() << getOpName() << "'s second argument must be representable as"
-                                  << " a 32-bit integer: " 
+                                  << " a 32-bit integer: "
                                   << indexArg.coerceToDouble(),
                     indexArg.integral());
-            auto ind = indexArg.coerceToInt();
+            auto index = indexArg.coerceToInt();
             // Can't optimize of the index is less that 0.
-            if (ind  >= 0) {
-                dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(ind + 1);
+            if (index >= 0) {
+                dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(index + 1);
             }
         }
     }
@@ -2234,7 +2234,7 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
-            if(_limit  && static_cast<int>(output.size()) == _limit.get()){
+            if (_limit && static_cast<int>(output.size()) == _limit.get()) {
                 return Value(std::move(output));
             }
         }
@@ -3913,20 +3913,7 @@ Value ExpressionSlice::evaluate(const Document& root) const {
             return Value(BSONNULL);
         }
 
-        uassert(28727,
-                str::stream() << "Third argument to $slice must be numeric, but "
-                              << "is of type: "
-                              << typeName(countVal.getType()),
-                countVal.numeric());
-        uassert(28728,
-                str::stream() << "Third argument to $slice can't be represented"
-                              << " as a 32-bit integer: "
-                              << countVal.coerceToDouble(),
-                countVal.integral());
-        uassert(28729,
-                str::stream() << "Third argument to $slice must be positive: "
-                              << countVal.coerceToInt(),
-                countVal.coerceToInt() > 0);
+        uassertIfNotIntegralAndNonNegative(countVal, "$slice", "third argument");
 
         size_t count = size_t(countVal.coerceToInt());
         end = std::min(start + count, array.size());
@@ -3942,15 +3929,9 @@ intrusive_ptr<Expression> ExpressionSlice::optimize() {
         if (auto secondArg = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
             auto secondVal = secondArg->getValue();
 
-            uassert(50797,
-                    str::stream() << "Second argument to $slice must be a numeric value,"
-                                  << " but is of type: "
-                                  << typeName(secondVal.getType()),
-                    secondVal.numeric());
-
             uassert(50798,
                     str::stream() << "Second argument to $slice can't be represented as"
-                                  << " a 32-bit integer: " 
+                                  << " a 32-bit integer: "
                                   << secondVal.coerceToDouble(),
                     secondVal.integral());
 
@@ -3965,28 +3946,13 @@ intrusive_ptr<Expression> ExpressionSlice::optimize() {
                 if (auto thirdArg = dynamic_cast<ExpressionConstant*>(vpOperand[2].get())) {
                     auto thirdVal = thirdArg->getValue();
 
-                    uassert(50799,
-                            str::stream() << "Third argument to $slice must be numeric, but "
-                                          << "is of type: " << typeName(thirdVal.getType()),
-                            thirdVal.numeric());
-
-                    uassert(50800,
-                            str::stream() << "Third argument to $slice can't be represented"
-                                          << " as a 32-bit integer: " 
-                                          << thirdVal.coerceToDouble(),
-                            thirdVal.integral());
-
-                    uassert(50801,
-                            str::stream() << "Third argument to $slice must be positive: "
-                                          << thirdVal.coerceToInt(),
-                            thirdVal.coerceToInt() > 0);
+                    uassertIfNotIntegralAndNonNegative(thirdVal, "$slice", "third argument");
 
                     int arg3 = thirdVal.coerceToInt();
                     if (arg2 >= 0) {
-                        // If ExpressionSlice is given three arguments set limit to 'firstArg' +
-                        // 'secondArg' + 1.
-                        dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
-                            ->setLimit(arg2 + arg3 + 1);
+                        // The limit needs to set as the last element we want in this case its
+                        // the position argument + the first n elements argument.
+                        dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->setLimit(arg2 + arg3);
                     }
                 }
             }
