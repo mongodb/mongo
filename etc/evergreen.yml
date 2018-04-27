@@ -8359,10 +8359,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: false
   tasks:
-  - name: compile_TG
-    distros:
-    - windows-64-vs2015-large
-  - name: compile_all
+  - name: compile_all_run_unittests_TG
     distros:
     - windows-64-vs2015-large
   - name: audit
