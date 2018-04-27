@@ -20,6 +20,24 @@
         });
     });
 
+    tests.push(function errorCodesShouldNotThrowExceptionForInheritedAttributes() {
+        assert.doesNotThrow(() => {
+            return ErrorCodes.prototype;
+        });
+    });
+
+    tests.push(function errorCodesShouldNotThrowExceptionForSymbols() {
+        assert.doesNotThrow(() => {
+            return print(+ErrorCodes);
+        });
+    });
+
+    tests.push(function errorCodesShouldNotThrowExceptionForConstructor() {
+        assert.doesNotThrow(() => {
+            return ErrorCodes.constructor;
+        });
+    });
+
     tests.push(function errorCodeStringsShouldThrowExceptionForNonExistingError() {
         assert.throws(() => {
             return ErrorCodeStrings[nonExistingErrorCode];
