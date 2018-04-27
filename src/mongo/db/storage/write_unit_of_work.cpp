@@ -59,7 +59,7 @@ WriteUnitOfWork::~WriteUnitOfWork() {
 
 std::unique_ptr<WriteUnitOfWork> WriteUnitOfWork::createForSnapshotResume(
     OperationContext* opCtx, RecoveryUnitState ruState) {
-    auto wuow = stdx::make_unique<WriteUnitOfWork>();
+    auto wuow = std::unique_ptr<WriteUnitOfWork>(new WriteUnitOfWork());
     wuow->_opCtx = opCtx;
     wuow->_toplevel = true;
     wuow->_opCtx->_ruState = ruState;

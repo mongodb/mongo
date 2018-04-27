@@ -59,8 +59,6 @@ public:
         kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
     };
 
-    WriteUnitOfWork() = default;
-
     WriteUnitOfWork(OperationContext* opCtx);
 
     ~WriteUnitOfWork();
@@ -98,6 +96,8 @@ public:
     void commit();
 
 private:
+    WriteUnitOfWork() = default;  // for createForSnapshotResume
+
     OperationContext* _opCtx;
 
     bool _toplevel;
