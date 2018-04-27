@@ -154,6 +154,18 @@ void BSONCollectionCatalogEntry::getReadyIndexes(OperationContext* opCtx,
     }
 }
 
+void BSONCollectionCatalogEntry::getAllUniqueIndexes(OperationContext* opCtx,
+                                                     std::vector<std::string>* names) const {
+    MetaData md = _getMetaData(opCtx);
+
+    for (unsigned i = 0; i < md.indexes.size(); i++) {
+        if (md.indexes[i].spec["unique"]) {
+            std::string indexName = md.indexes[i].spec["name"].String();
+            names->push_back(indexName);
+        }
+    }
+}
+
 bool BSONCollectionCatalogEntry::isIndexMultikey(OperationContext* opCtx,
                                                  StringData indexName,
                                                  MultikeyPaths* multikeyPaths) const {

@@ -236,6 +236,8 @@ protected:
         bool droppedUserDBs = false;
         std::vector<std::string> droppedCollections;
         int documentsInsertedCount = 0;
+        bool uniqueIndexUpdated = false;
+        bool upgradeNonReplicatedUniqueIndexesShouldFail = false;
     };
 
     stdx::mutex _storageInterfaceWorkDoneMutex;  // protects _storageInterfaceWorkDone.
@@ -248,6 +250,8 @@ protected:
                                                   const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
             _storageInterfaceWorkDone.createOplogCalled = true;
+            _storageInterfaceWorkDone.uniqueIndexUpdated = false;
+            _storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail = false;
             return Status::OK();
         };
         _storageInterface->truncateCollFn = [this](OperationContext* opCtx,
@@ -300,6 +304,19 @@ protected:
                 return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
                     std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
             };
+        _storageInterface->upgradeNonReplicatedUniqueIndexesFn = [this](OperationContext* opCtx) {
+            LockGuard lock(_storageInterfaceWorkDoneMutex);
+            if (_storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail) {
+                // One of the status codes a failed upgradeNonReplicatedUniqueIndexes call
+                // can return is NamespaceNotFound.
+                return Status(ErrorCodes::NamespaceNotFound,
+                              "upgradeNonReplicatedUniqueIndexes failed because the desired "
+                              "ns was not found.");
+            } else {
+                _storageInterfaceWorkDone.uniqueIndexUpdated = true;
+                return Status::OK();
+            }
+        };
 
         _dbWorkThreadPool = stdx::make_unique<ThreadPool>(ThreadPool::Options());
         _dbWorkThreadPool->startup();
@@ -423,8 +440,8 @@ protected:
 
     void runInitialSyncWithBadFCVResponse(std::vector<BSONObj> docs,
                                           ErrorCodes::Error expectedError);
-    void doSuccessfulInitialSyncWithOneBatch();
-    OplogEntry doInitialSyncWithOneBatch();
+    void doSuccessfulInitialSyncWithOneBatch(bool shouldSetFCV);
+    OplogEntry doInitialSyncWithOneBatch(bool shouldSetFCV);
 
     std::unique_ptr<TaskExecutorMock> _executorProxy;
 
@@ -3382,7 +3399,7 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsGetNextApplierBatchCallbackOnOplog
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
 }
 
-OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
+OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch(bool shouldSetFCV) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -3429,7 +3446,12 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
         assertRemoteCommandNameEquals("getMore", request);
         net->blackHole(noi);
 
-        // Last rollback ID.
+        // Last rollback ID check. Before this check, set fCV to 4.2 if required by the test.
+        // TODO(SERVER-34489) Update below statement to setFCV=4.2 when upgrade/downgrade is ready.
+        if (shouldSetFCV) {
+            createTimestampSafeUniqueIndex = true;
+        }
+
         request = net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
         assertRemoteCommandNameEquals("replSetGetRBID", request);
         net->runReadyNetworkOperations();
@@ -3445,8 +3467,10 @@ OplogEntry InitialSyncerTest::doInitialSyncWithOneBatch() {
     return lastOp;
 }
 
-void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
-    auto lastOp = doInitialSyncWithOneBatch();
+void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch(bool shouldSetFCV) {
+    auto lastOp = doInitialSyncWithOneBatch(shouldSetFCV);
+    // TODO(SERVER-34489) Replace this by fCV reset when upgrade/downgrade is ready.
+    createTimestampSafeUniqueIndex = false;
     ASSERT_EQUALS(lastOp.getOpTime(), unittest::assertGet(_lastApplied).opTime);
     ASSERT_EQUALS(lastOp.getHash(), unittest::assertGet(_lastApplied).value);
 
@@ -3455,7 +3479,14 @@ void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
 
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsLastAppliedOnReachingStopTimestampAfterApplyingOneBatch) {
-    doSuccessfulInitialSyncWithOneBatch();
+    // Tell test to setFCV=4.2 before the last rollback ID check.
+    // _rollbackCheckerCheckForRollbackCallback() calls upgradeNonReplicatedUniqueIndexes
+    // only if fCV is 4.2.
+    doSuccessfulInitialSyncWithOneBatch(true);
+
+    // Ensure that upgradeNonReplicatedUniqueIndexes is called.
+    LockGuard lock(_storageInterfaceWorkDoneMutex);
+    ASSERT_TRUE(_storageInterfaceWorkDone.uniqueIndexUpdated);
 }
 
 TEST_F(InitialSyncerTest,
@@ -4052,6 +4083,29 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
     executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
 
     initialSyncer->join();
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerDoesNotCallUpgradeNonReplicatedUniqueIndexesOnFCV40) {
+    // In MongoDB 4.2, upgradeNonReplicatedUniqueIndexes will only be called if fCV is 4.2.
+    doSuccessfulInitialSyncWithOneBatch(false);
+
+    // TODO(SERVER-34489) Ensure that upgradeNonReplicatedUniqueIndexes is not called if fCV
+    // is not 4.2.
+    LockGuard lock(_storageInterfaceWorkDoneMutex);
+    ASSERT_FALSE(_storageInterfaceWorkDone.uniqueIndexUpdated);
+}
+
+TEST_F(InitialSyncerTest, InitialSyncerUpgradeNonReplicatedUniqueIndexesError) {
+    // Ensure upgradeNonReplicatedUniqueIndexes returns a bad status. This should be passed to the
+    // initial syncer.
+    {
+        LockGuard lock(_storageInterfaceWorkDoneMutex);
+        _storageInterfaceWorkDone.upgradeNonReplicatedUniqueIndexesShouldFail = true;
+    }
+    doInitialSyncWithOneBatch(true);
+
+    // Ensure the upgradeNonReplicatedUniqueIndexes status was captured.
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, _lastApplied);
 }
 
 }  // namespace

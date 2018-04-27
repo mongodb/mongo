@@ -59,4 +59,23 @@ Status collModForUUIDUpgrade(OperationContext* opCtx,
                              const NamespaceString& ns,
                              const BSONObj& cmdObj,
                              CollectionUUID uuid);
+
+/**
+ * Applies the collMod operation and optionally updates formatVersion of unique indexes belonging
+ * to collection "nss".
+ */
+Status collModWithUpgrade(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& cmdObj);
+
+/*
+ * Updates the unique indexes to timestamp safe unique index format on setFCV=4.2. It also updates
+ * non-replicated unique indexes indirectly by calling updateNonReplicatedUniqueIndexes().
+ */
+void updateUniqueIndexesOnUpgrade(OperationContext* opCtx);
+
+/*
+ * Updates non-replicated unique indexes to timestamp safe unique index format.
+ */
+Status updateNonReplicatedUniqueIndexes(OperationContext* opCtx);
 }  // namespace mongo

@@ -810,9 +810,10 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
           NamespaceString nss;
-          BSONObjBuilder resultWeDontCareAbout;
           std::tie(std::ignore, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
-          return collMod(opCtx, nss, cmd, &resultWeDontCareAbout);
+          // The collMod for apply ops could be either a user driven collMod or a collMod triggered
+          // by an upgrade.
+          return collModWithUpgrade(opCtx, nss, cmd);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},

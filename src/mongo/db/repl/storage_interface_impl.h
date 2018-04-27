@@ -156,6 +156,8 @@ public:
     StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
                                                          const NamespaceString& nss) override;
 
+    Status upgradeNonReplicatedUniqueIndexes(OperationContext* opCtx) override;
+
     void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
     void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;

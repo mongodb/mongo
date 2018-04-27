@@ -415,6 +415,30 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
+        // Update unique index format version for all non-replicated collections. It is possible
+        // for MongoDB to have a "clean startup", i.e., no non-local databases, but still have
+        // unique indexes on collections in the local database. On clean startup,
+        // setFeatureCompatibilityVersion (which updates the unique index format version of
+        // collections) is not called, so any pre-existing collections are upgraded here. We exclude
+        // ShardServers when updating indexes belonging to non-replicated collections on the primary
+        // because ShardServers are started up by default with featureCompatibilityVersion 4.0, so
+        // we don't want to update those indexes until the cluster's featureCompatibilityVersion is
+        // explicitly set to 4.2 by config server. The below unique index update for non-replicated
+        // collections only occurs on the primary; updates for unique indexes belonging to
+        // non-replicated collections are done on secondaries during InitialSync. When the config
+        // server sets the featureCompatibilityVersion to 4.2, the shard primary will update unique
+        // indexes belonging to all the collections. One special case here is if a shard is already
+        // in featureCompatibilityVersion 4.2 and a new node is started up with --shardsvr and added
+        // to that shard, the new node will still start up with featureCompatibilityVersion 4.0 and
+        // may need to have unique index version updated. Such indexes would be updated during
+        // InitialSync because the new node is a secondary.
+        // TODO(SERVER-34489) Add a check for latest FCV when upgrade/downgrade is ready.
+        if (FeatureCompatibilityVersion::isCleanStartUp() &&
+            serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+            auto updateStatus = updateNonReplicatedUniqueIndexes(opCtx);
+            if (!updateStatus.isOK())
+                return updateStatus;
+        }
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();

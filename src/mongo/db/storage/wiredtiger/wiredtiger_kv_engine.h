@@ -136,6 +136,10 @@ public:
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident);
 
+    virtual void alterIdentMetadata(OperationContext* opCtx,
+                                    StringData ident,
+                                    const IndexDescriptor* desc);
+
     virtual Status okToRename(OperationContext* opCtx,
                               StringData fromNS,
                               StringData toNS,

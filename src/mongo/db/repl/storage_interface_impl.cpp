@@ -1042,6 +1042,10 @@ StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
     return collection->uuid();
 }
 
+Status StorageInterfaceImpl::upgradeNonReplicatedUniqueIndexes(OperationContext* opCtx) {
+    return updateNonReplicatedUniqueIndexes(opCtx);
+}
+
 void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
     serviceCtx->getStorageEngine()->setStableTimestamp(snapshotName);
 }

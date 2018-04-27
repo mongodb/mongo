@@ -170,6 +170,8 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
+            updateUniqueIndexesOnUpgrade(opCtx);
+
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(

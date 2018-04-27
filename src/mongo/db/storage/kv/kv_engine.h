@@ -163,6 +163,10 @@ public:
 
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) = 0;
 
+    virtual void alterIdentMetadata(OperationContext* opCtx,
+                                    StringData ident,
+                                    const IndexDescriptor* desc){};
+
     // optional
     virtual int flushAllFiles(OperationContext* opCtx, bool sync) {
         return 0;

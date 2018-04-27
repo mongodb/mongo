@@ -170,12 +170,10 @@ std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& de
 
     int keyStringVersion;
 
-    // This gating variable controls the creation between timestamp safe and timestamp unsafe
-    // unique indexes. The gating condition will be enhanced to check for FCV 4.2 by SERVER-32825
+    // The gating variable controls the creation between timestamp safe and timestamp unsafe
+    // unique indexes. The gating condition will be enhanced to check for FCV 4.2 by SERVER-34489
     // and the gating variable will be removed when FCV 4.2 becomes available.
-    bool createNewStyleUniqueIdx = false;
-
-    if (createNewStyleUniqueIdx && desc.unique() && !desc.isIdIndex()) {
+    if (createTimestampSafeUniqueIndex && desc.unique() && !desc.isIdIndex()) {
         keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
             ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
             : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
