@@ -76,11 +76,11 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
 
     // If the admin database, which contains the server configuration collection with the
     // featureCompatibilityVersion document, does not exist, create it.
-    Database* db = dbHolder().get(opCtx, fcvNss.db());
+    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, fcvNss.db());
     if (!db) {
         log() << "Re-creating admin database that was dropped.";
     }
-    db = dbHolder().openDb(opCtx, fcvNss.db());
+    db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, fcvNss.db());
     invariant(db);
 
     // If the server configuration collection, which contains the FCV document, does not exist, then
@@ -136,7 +136,7 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
     bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
     std::vector<NamespaceString> nonReplicatedCollNSSsWithoutUUIDs;
     for (const auto& dbName : dbNames) {
-        Database* db = dbHolder().openDb(opCtx, dbName);
+        Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db);
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
@@ -318,7 +318,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // Attempt to restore the featureCompatibilityVersion document if it is missing.
         NamespaceString fcvNSS(NamespaceString::kServerConfigurationNamespace);
 
-        Database* db = dbHolder().get(opCtx, fcvNSS.db());
+        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, fcvNSS.db());
         Collection* versionColl;
         BSONObj featureCompatibilityVersion;
         if (!db || !(versionColl = db->getCollection(opCtx, fcvNSS)) ||
@@ -349,7 +349,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // it is fine to not open the "local" database and populate the catalog entries because we
         // won't attempt to drop the temporary collections anyway.
         Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
-        dbHolder().openDb(opCtx, kSystemReplSetCollection.db());
+        DatabaseHolder::getDatabaseHolder().openDb(opCtx, kSystemReplSetCollection.db());
     }
 
     const repl::ReplSettings& replSettings =
@@ -377,7 +377,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
         LOG(1) << "    Recovering database: " << dbName;
 
-        Database* db = dbHolder().openDb(opCtx, dbName);
+        Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db);
 
         // First thing after opening the database is to check for file compatibility,

@@ -309,18 +309,4 @@ private:
 
 void dropAllDatabasesExceptLocalImpl(OperationContext* opCtx);
 
-/**
- * Creates the namespace 'ns' in the database 'db' according to 'options'. If 'createDefaultIndexes'
- * is true, creates the _id index for the collection (and the system indexes, in the case of system
- * collections). Creates the collection's _id index according to 'idIndex', if it is non-empty. When
- * 'idIndex' is empty, creates the default _id index.
- */
-Status userCreateNSImpl(OperationContext* opCtx,
-                        Database* db,
-                        StringData ns,
-                        BSONObj options,
-                        CollectionOptions::ParseKind parseKind = CollectionOptions::parseForCommand,
-                        bool createDefaultIndexes = true,
-                        const BSONObj& idIndex = BSONObj());
-
 }  // namespace mongo

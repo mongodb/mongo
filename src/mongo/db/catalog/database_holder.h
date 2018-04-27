@@ -31,6 +31,7 @@
 #include <set>
 #include <string>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/functional.h"
@@ -62,17 +63,14 @@ public:
         virtual std::set<std::string> getNamesWithConflictingCasing(StringData name) = 0;
     };
 
-private:
-    static std::unique_ptr<Impl> makeImpl();
-
 public:
-    using factory_function_type = decltype(makeImpl);
+    static MONGO_DECLARE_SHIM(()->DatabaseHolder&) getDatabaseHolder;
 
-    static void registerFactory(stdx::function<factory_function_type> factory);
+    static MONGO_DECLARE_SHIM((PrivateTo<DatabaseHolder>)->std::unique_ptr<Impl>) makeImpl;
 
     inline ~DatabaseHolder() = default;
 
-    inline explicit DatabaseHolder() : _pimpl(makeImpl()) {}
+    inline explicit DatabaseHolder() : _pimpl(makeImpl(PrivateCall<DatabaseHolder>{})) {}
 
     /**
      * Retrieves an already opened database or returns NULL. Must be called with the database
@@ -147,7 +145,4 @@ private:
 
     std::unique_ptr<Impl> _pimpl;
 };
-
-extern DatabaseHolder& dbHolder();
-extern void registerDbHolderImpl(stdx::function<decltype(dbHolder)> impl);
 }  // namespace mongo

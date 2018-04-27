@@ -101,8 +101,8 @@ Status createCollection(OperationContext* opCtx,
 
         // Create collection.
         const bool createDefaultIndexes = true;
-        status =
-            userCreateNS(opCtx, ctx.db(), nss.ns(), options, kind, createDefaultIndexes, idIndex);
+        status = Database::userCreateNS(
+            opCtx, ctx.db(), nss.ns(), options, kind, createDefaultIndexes, idIndex);
 
         if (!status.isOK()) {
             return status;
@@ -137,7 +137,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     auto newCmd = cmdObj;
 
     auto* const serviceContext = opCtx->getServiceContext();
-    auto* const db = dbHolder().get(opCtx, dbName);
+    auto* const db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
 
     // If a UUID is given, see if we need to rename a collection out of the way, and whether the
     // collection already exists under a different name. If so, rename it into place. As this is

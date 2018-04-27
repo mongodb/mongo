@@ -370,7 +370,7 @@ Status StorageInterfaceImpl::insertDocuments(OperationContext* opCtx,
 }
 
 Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
-    dropAllDatabasesExceptLocal(opCtx);
+    Database::dropAllDatabasesExceptLocal(opCtx);
     return Status::OK();
 }
 

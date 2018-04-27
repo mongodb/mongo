@@ -98,7 +98,7 @@ void IndexBuilder::run() {
     Lock::DBLock dlk(opCtx.get(), ns.db(), MODE_X);
     OldClientContext ctx(opCtx.get(), ns.getSystemIndexesCollection());
 
-    Database* db = dbHolder().get(opCtx.get(), ns.db().toString());
+    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx.get(), ns.db().toString());
 
     Status status = _build(opCtx.get(), db, true, &dlk);
     if (!status.isOK()) {
@@ -210,7 +210,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
 
     if (allowBackgroundBuilding) {
         dbLock->relockWithMode(MODE_X);
-        Database* reloadDb = dbHolder().get(opCtx, ns.db());
+        Database* reloadDb = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
         fassert(28553, reloadDb);
         fassert(28554, reloadDb->getCollection(opCtx, ns));
     }

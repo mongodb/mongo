@@ -677,13 +677,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             // options.
             WriteUnitOfWork wuow(opCtx);
             const bool createDefaultIndexes = true;
-            Status status = userCreateNS(opCtx,
-                                         db,
-                                         _nss.ns(),
-                                         donorOptions,
-                                         CollectionOptions::parseForStorage,
-                                         createDefaultIndexes,
-                                         donorIdIndexSpec);
+            Status status = Database::userCreateNS(opCtx,
+                                                   db,
+                                                   _nss.ns(),
+                                                   donorOptions,
+                                                   CollectionOptions::parseForStorage,
+                                                   createDefaultIndexes,
+                                                   donorIdIndexSpec);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << _nss << "] "
                           << " with options " << donorOptions << ": " << redact(status);

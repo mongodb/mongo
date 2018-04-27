@@ -59,7 +59,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
     : _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           uassertLockTimeout(
               str::stream() << "database " << dbName, mode, deadline, _dbLock.isLocked());
-          return dbHolder().get(opCtx, dbName);
+          return DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
       }()) {
     if (_db) {
         DatabaseShardingState::get(_db).checkDbVersion(opCtx);
@@ -159,7 +159,7 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
             _autoDb.emplace(opCtx, dbName, MODE_X, deadline);
         }
 
-        _db = dbHolder().openDb(opCtx, dbName, &_justCreated);
+        _db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName, &_justCreated);
     }
 
     DatabaseShardingState::get(_db).checkDbVersion(opCtx);

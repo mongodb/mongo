@@ -70,37 +70,32 @@
 #include "mongo/util/represent_as.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER(InitializeIndexCatalogFactory)(InitializerContext* const) {
-    IndexCatalog::registerFactory([](
-        IndexCatalog* const this_, Collection* const collection, const int maxNumIndexesAllowed) {
-        return stdx::make_unique<IndexCatalogImpl>(this_, collection, maxNumIndexesAllowed);
-    });
-    return Status::OK();
+MONGO_REGISTER_SHIM(IndexCatalog::makeImpl)
+(IndexCatalog* const this_,
+ Collection* const collection,
+ const int maxNumIndexesAllowed,
+ PrivateTo<IndexCatalog>)
+    ->std::unique_ptr<IndexCatalog::Impl> {
+    return std::make_unique<IndexCatalogImpl>(this_, collection, maxNumIndexesAllowed);
 }
 
-MONGO_INITIALIZER(InitializeIndexCatalogIndexIteratorFactory)(InitializerContext* const) {
-    IndexCatalog::IndexIterator::registerFactory([](OperationContext* const opCtx,
-                                                    const IndexCatalog* const cat,
-                                                    const bool includeUnfinishedIndexes) {
-        return stdx::make_unique<IndexCatalogImpl::IndexIteratorImpl>(
-            opCtx, cat, includeUnfinishedIndexes);
-    });
-    return Status::OK();
+MONGO_REGISTER_SHIM(IndexCatalog::IndexIterator::makeImpl)
+(OperationContext* const opCtx,
+ const IndexCatalog* const cat,
+ const bool includeUnfinishedIndexes,
+ PrivateTo<IndexCatalog::IndexIterator>)
+    ->std::unique_ptr<IndexCatalog::IndexIterator::Impl> {
+    return std::make_unique<IndexCatalogImpl::IndexIteratorImpl>(
+        opCtx, cat, includeUnfinishedIndexes);
+}
+MONGO_REGISTER_SHIM(IndexCatalog::fixIndexKey)(const BSONObj& key)->BSONObj {
+    return IndexCatalogImpl::fixIndexKey(key);
 }
 
-MONGO_INITIALIZER(InitializeFixIndexKeyImpl)(InitializerContext* const) {
-    IndexCatalog::registerFixIndexKeyImpl(&IndexCatalogImpl::fixIndexKey);
-    return Status::OK();
+MONGO_REGISTER_SHIM(IndexCatalog::prepareInsertDeleteOptions)
+(OperationContext* opCtx, const IndexDescriptor* desc, InsertDeleteOptions* options)->void {
+    return IndexCatalogImpl::prepareInsertDeleteOptions(opCtx, desc, options);
 }
-
-MONGO_INITIALIZER(InitializePrepareInsertDeleteOptionsImpl)(InitializerContext* const) {
-    IndexCatalog::registerPrepareInsertDeleteOptionsImpl(
-        &IndexCatalogImpl::prepareInsertDeleteOptions);
-    return Status::OK();
-}
-
-}  // namespace
 
 using std::unique_ptr;
 using std::endl;

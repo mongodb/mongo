@@ -128,7 +128,7 @@ protected:
             if (!db) {
                 // When setting the profiling level, create the database if it didn't already exist.
                 // When just reading the profiling level, we do not create the database.
-                db = dbHolder().openDb(opCtx, dbName);
+                db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
             }
             uassertStatusOK(db->setProfilingLevel(opCtx, profilingLevel));
         }

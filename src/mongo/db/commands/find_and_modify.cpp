@@ -480,8 +480,8 @@ public:
                     if (!collection) {
                         uassertStatusOK(userAllowedCreateNS(nsString.db(), nsString.coll()));
                         WriteUnitOfWork wuow(opCtx);
-                        uassertStatusOK(
-                            userCreateNS(opCtx, autoDb->getDb(), nsString.ns(), BSONObj()));
+                        uassertStatusOK(Database::userCreateNS(
+                            opCtx, autoDb->getDb(), nsString.ns(), BSONObj()));
                         wuow.commit();
 
                         collection = autoDb->getDb()->getCollection(opCtx, nsString);

@@ -210,7 +210,7 @@ public:
 
         // Closing a database requires a global lock.
         Lock::GlobalWrite lk(opCtx);
-        auto db = dbHolder().get(opCtx, dbname);
+        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbname);
         if (db) {
             if (db->isDropPending(opCtx)) {
                 return CommandHelpers::appendCommandStatus(
@@ -221,7 +221,8 @@ public:
             }
         } else {
             // If the name doesn't make an exact match, check for a case insensitive match.
-            std::set<std::string> otherCasing = dbHolder().getNamesWithConflictingCasing(dbname);
+            std::set<std::string> otherCasing =
+                DatabaseHolder::getDatabaseHolder().getNamesWithConflictingCasing(dbname);
             if (otherCasing.empty()) {
                 // Database doesn't exist. Treat this as a success (historical behavior).
                 return true;
@@ -255,7 +256,7 @@ public:
             opCtx, engine, dbname, preserveClonedFilesOnFailure, backupOriginalFiles);
 
         // Open database before returning
-        dbHolder().openDb(opCtx, dbname);
+        DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
         return CommandHelpers::appendCommandStatus(result, status);
     }
 } cmdRepairDatabase;

@@ -506,7 +506,7 @@ uint32_t IndexConsistency::_hashKeyString(const KeyString& ks, int indexNumber) 
 
 Status IndexConsistency::_throwExceptionIfError() {
 
-    Database* database = dbHolder().get(_opCtx, _nss.db());
+    Database* database = DatabaseHolder::getDatabaseHolder().get(_opCtx, _nss.db());
 
     // Ensure the database still exists.
     if (!database) {
