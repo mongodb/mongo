@@ -1114,11 +1114,11 @@ def remote_handler(options, operations):
 
     print_uptime()
     LOGGER.info("Operations to perform %s", operations)
-    host_port = "localhost:{}".format(options.port)
+    host = options.host if options.host else "localhost"
+    host_port = "{}:{}".format(host, options.port)
 
-    if options.use_replica_set and options.repl_set:
-        options.mongod_options = "{} --replSet {}".format(
-            options.mongod_options, options.repl_set)
+    if options.repl_set:
+        options.mongod_options = "{} --replSet {}".format(options.mongod_options, options.repl_set)
 
     # For MongodControl, the file references should be fully specified.
     if options.mongodb_bin_dir:
@@ -1135,7 +1135,7 @@ def remote_handler(options, operations):
         port=options.port,
         options=options.mongod_options)
 
-    mongo_client_opts = get_mongo_client_args(host="localhost", port=options.port, options=options)
+    mongo_client_opts = get_mongo_client_args(host=host, port=options.port, options=options)
 
     # Perform the sequence of operations specified. If any operation fails
     # then return immediately.
@@ -1187,7 +1187,7 @@ def remote_handler(options, operations):
             mongo = pymongo.MongoClient(**mongo_client_opts)
             LOGGER.info("Server buildinfo: %s", mongo.admin.command("buildinfo"))
             LOGGER.info("Server serverStatus: %s", mongo.admin.command("serverStatus"))
-            if options.use_replica_set and options.repl_set:
+            if options.repl_set:
                 ret = mongo_reconfig_replication(mongo, host_port, options.repl_set)
             ret = 0 if not ret else 1
 
@@ -1454,23 +1454,29 @@ def mongo_reconfig_replication(mongo, host_port, repl_set):
     # The side affect of using force=True are large jumps in the config
     # version, which after many reconfigs may exceed the 'int' value.
 
+    LOGGER.info("Reconfiguring replication %s %s", host_port, repl_set)
     database = pymongo.database.Database(mongo, "local")
     system_replset = database.get_collection("system.replset")
     # Check if replica set has already been initialized
     if not system_replset or not system_replset.find_one():
         rs_config = {"_id": repl_set, "members": [{"_id": 0, "host": host_port}]}
         ret = mongo.admin.command("replSetInitiate", rs_config)
+        LOGGER.info("Replication initialized: %s %s", ret, rs_config)
     else:
         # Wait until replication is initialized.
         while True:
             try:
                 ret = mongo.admin.command("replSetGetConfig")
                 if ret["ok"] != 1:
+                    LOGGER.error("Failed replSetGetConfig: %s", ret)
                     return 1
                 break
+            except pymongo.errors.AutoReconnect:
+                pass
             except pymongo.errors.OperationFailure as err:
                 # src/mongo/base/error_codes.err: error_code("NotYetInitialized", 94)
                 if err.code != 94:
+                    LOGGER.error("Replication failed to initialize: %s", ret)
                     return 1
         rs_config = ret["config"]
         # We only reconfig if there is a change to 'host'.
@@ -1478,7 +1484,13 @@ def mongo_reconfig_replication(mongo, host_port, repl_set):
             # With force=True, version is ignored.
             # rs_config["version"] = rs_config["version"] + 1
             rs_config["members"][0]["host"] = host_port
-            ret = mongo.admin.command("replSetReconfig", rs_config, force=True)
+            while True:
+                try:
+                    ret = mongo.admin.command("replSetReconfig", rs_config, force=True)
+                    break
+                except pymongo.errors.AutoReconnect:
+                    pass
+            LOGGER.info("Replication reconfigured: %s", ret)
     primary_available = mongod_wait_for_primary(mongo)
     LOGGER.debug("isMaster: %s", mongo.admin.command("isMaster"))
     LOGGER.debug("replSetGetStatus: %s", mongo.admin.command("replSetGetStatus"))
@@ -1844,6 +1856,11 @@ Examples:
                                    " defaults to standalone node",
                               default=None)
 
+    # The current host used to start and connect to mongod. Not meant to be specified
+    # by the user.
+    mongod_options.add_option("--mongodHost", dest="host", help=optparse.SUPPRESS_HELP,
+                              default=None)
+
     # The current port used to start and connect to mongod. Not meant to be specified
     # by the user.
     mongod_options.add_option("--mongodPort",
@@ -1851,12 +1868,6 @@ Examples:
                               help=optparse.SUPPRESS_HELP,
                               type="int",
                               default=None)
-
-    mongod_options.add_option("--useReplicaSet",
-                              dest="use_replica_set",
-                              help=optparse.SUPPRESS_HELP,
-                              action="store_true",
-                              default=False)
 
     # The ports used on the 'server' side when in standard or secret mode.
     mongod_options.add_option("--mongodUsablePorts",
@@ -2349,6 +2360,7 @@ Examples:
         remote_operation = ("--remoteOperation"
                             " {rsync_opt}"
                             " {canary_opt}"
+                            " --mongodHost {host}"
                             " --mongodPort {port}"
                             " {rsync_cmd}"
                             " {remove_lock_file_cmd}"
@@ -2357,12 +2369,10 @@ Examples:
                             " {validate_collections_cmd}"
                             " {validate_canary_cmd}"
                             " {seed_docs}").format(
-                                rsync_opt=rsync_opt,
-                                canary_opt=canary_opt,
-                                port=secret_port,
-                                rsync_cmd=rsync_cmd,
-                                remove_lock_file_cmd=remove_lock_file_cmd,
-                                set_fcv_cmd=set_fcv_cmd if loop_num == 1 else "",
+                                rsync_opt=rsync_opt, canary_opt=canary_opt, host=mongod_host,
+                                port=secret_port, rsync_cmd=rsync_cmd,
+                                remove_lock_file_cmd=remove_lock_file_cmd, set_fcv_cmd=set_fcv_cmd
+                                if loop_num == 1 else "",
                                 validate_collections_cmd=validate_collections_cmd,
                                 validate_canary_cmd=validate_canary_cmd,
                                 seed_docs=seed_docs if loop_num == 1 else "")
@@ -2425,21 +2435,14 @@ Examples:
 
         # Optionally, rsync the post-recovery database.
         # Start monogd on the standard port.
-        # Replica sets are optionally used in this mode.
-        use_replica_set = "--useReplicaSet" if options.repl_set else ""
         remote_op = ("--remoteOperation"
                      " {}"
+                     " --mongodHost {}"
                      " --mongodPort {}"
                      " {}"
-                     " {}"
-                     " start_mongod").format(
-                         rsync_opt, standard_port, use_replica_set, rsync_cmd)
-        ret, output = call_remote_operation(
-            local_ops,
-            options.remote_python,
-            script_name,
-            client_args,
-            remote_op)
+                     " start_mongod").format(rsync_opt, mongod_host, standard_port, rsync_cmd)
+        ret, output = call_remote_operation(local_ops, options.remote_python, script_name,
+                                            client_args, remote_op)
         rsync_text = "rsync_data afterrecovery & " if options.rsync_data else ""
         LOGGER.info("****%s start mongod: %d %s****", rsync_text, ret, output)
         if ret:
