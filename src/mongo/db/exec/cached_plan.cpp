@@ -148,6 +148,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             return replan(yieldPolicy, shouldCache);
         } else if (PlanStage::DEAD == state) {
             BSONObj statusObj;
+            invariant(WorkingSet::INVALID_ID != id);
             WorkingSetCommon::getStatusMemberObject(*_ws, id, &statusObj);
 
             LOG(1) << "Execution of cached plan failed: PlanStage died"
