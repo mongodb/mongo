@@ -124,6 +124,7 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
                 'informationalURL': 'http://www.example.com/123',
                 'message': 'Welcome to the Mock Free Monitoring Endpoint',
                 'reportingInterval': bson.int64.Int64(1),
+                'userReminder': "Don't forget to check your metrics!",
             })
 
         self._send_header()

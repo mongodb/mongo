@@ -1879,6 +1879,40 @@ var DB;
         return this._runAggregate({aggregate: 1, pipeline: pipeline}, options);
     };
 
+    DB.prototype.getFreeMonitoringStatus = function() {
+        'use strict';
+        return assert.commandWorked(this.adminCommand({getFreeMonitoringStatus: 1}));
+    };
+
+    DB.prototype.enableFreeMonitoring = function() {
+        'use strict';
+        assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'enable'}));
+
+        const cmd = this.adminCommand({getFreeMonitoringStatus: 1});
+        if (!cmd.ok && (cmd.code == ErrorCode.Unauthorized)) {
+            // Edge case: It's technically possible that a user can change free-mon state,
+            // but is not allowed to inspect it.
+            print("Successfully initiated free monitoring, but unable to determine status " +
+                  "as you lack the 'checkFreeMonitoringStatus' privilege.");
+            return null;
+        }
+        assert.commandWorked(cmd);
+
+        if (cmd.state !== 'enabled') {
+            print("Successfully initiated free monitoring. The registration is " +
+                  "proceeding in the background. ");
+            print("Run db.getFreeMonitoringStatus() at any time to check on the progress.");
+            return null;
+        }
+
+        return cmd;
+    };
+
+    DB.prototype.disableFreeMonitoring = function() {
+        'use strict';
+        assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'disable'}));
+    };
+
     // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the
     // DB's getProperty() handler in C++ takes precedence when a property isn't defined on the DB
     // instance directly. The "hasOwnProperty" property is defined on Object.prototype, so we must

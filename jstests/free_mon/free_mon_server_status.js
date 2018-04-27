@@ -22,9 +22,10 @@ load("jstests/free_mon/libs/free_mon.js");
     // Initial state.
     assert.eq(freeMonStats().state, 'undecided');
 
-    assert.commandWorked(admin.runCommand({setFreeMonitoring: 1, action: 'enable'}));
+    admin.enableFreeMonitoring();
     WaitForRegistration(mongod);
 
+    // Enabled.
     const enabled = freeMonStats();
     assert.eq(enabled.state, 'enabled');
     assert.eq(enabled.retryIntervalSecs, kRetryIntervalSecs);
@@ -32,7 +33,7 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(enabled.metricsErrors, 0);
 
     // Explicitly disabled.
-    assert.commandWorked(admin.runCommand({setFreeMonitoring: 1, action: 'disable'}));
+    admin.disableFreeMonitoring();
     sleep(2);  // Give the async command time to run.
 
     const disabled = freeMonStats();
@@ -41,7 +42,6 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(disabled.registerErrors, 0);
     assert.eq(disabled.metricsErrors, 0);
 
-    // Enabled.
     // Cleanup.
     MongoRunner.stopMongod(mongod);
     mock_web.stop();
