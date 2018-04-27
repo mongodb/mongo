@@ -33,11 +33,11 @@
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), shardConn.name);
 
-    // Drops and re-creates the sharded test collection.
+    // Drops and re-shards the test collection, then splits at {_id: 0} and moves the upper chunk to
+    // the second shard.
     function dropAndRecreateTestCollection() {
         assert(mongosDB.test.drop());
-        assert.commandWorked(mongosDB.adminCommand(
-            {shardCollection: mongosDB.test.getFullName(), key: {_id: "hashed"}}));
+        st.shardColl(mongosDB.test, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName(), true);
     }
 
     // Configures logging parameters on the target environment, constructs a list of test operations
@@ -60,8 +60,10 @@
             }
         }
 
-        for (let i = 0; i < 10; ++i) {
+        for (let i = 1; i <= 5; ++i) {
             assertWriteOK(coll.insert({_id: i, a: i, loc: {type: "Point", coordinates: [i, i]}}));
+            assertWriteOK(
+                coll.insert({_id: -i, a: -i, loc: {type: "Point", coordinates: [-i, -i]}}));
         }
         assertWriteOK(coll.createIndex({loc: "2dsphere"}));
 
@@ -273,7 +275,7 @@
                                        q: {_id: 100, $comment: logFormatTestComment},
                                        u: {$inc: {b: 1}},
                                        multi: true,
-                                       planSummary: 'IXSCAN { _id: "hashed" }',
+                                       planSummary: "IXSCAN { _id: 1 }",
                                        keysExamined: 0,
                                        docsExamined: 0,
                                        nMatched: 0,
@@ -288,7 +290,7 @@
               logFields: {
                   command: "insert",
                   insert: `${coll.getName()}|${coll.getFullName()}`,
-                  keysInserted: 2,
+                  keysInserted: 1,
                   ninserted: 1,
                   nShards: 1
               }
@@ -311,7 +313,7 @@
                                        keysExamined: 0,
                                        docsExamined: 12,
                                        ndeleted: 1,
-                                       keysDeleted: 2
+                                       keysDeleted: 1
                                      })
             },
             {
@@ -371,7 +373,7 @@
                 logFields: {
                     command: "find",
                     find: coll.getName(),
-                    planSummary: 'IXSCAN { _id: "hashed" }',
+                    planSummary: "IXSCAN { _id: 1 }",
                     comment: logFormatTestComment,
                     collation: {locale: "fr"},
                     cursorExhausted: 1,
