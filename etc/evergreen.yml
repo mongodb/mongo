@@ -7917,7 +7917,6 @@ buildvariants:
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
   display_tasks:
-  - *unittests
   - name: replica_sets_auth
     execution_tasks:
     - replica_sets_auth_0
@@ -8008,7 +8007,7 @@ buildvariants:
     - sharding_ese_20
     - sharding_ese_misc
   tasks:
-  - name: compile_all_run_unittests_TG
+  - name: compile_TG
     requires:
     - name: burn_in_tests
     distros:
@@ -8249,6 +8248,17 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
+
+- <<: *enterprise-windows-64-2k8-template
+  name: enterprise-windows-64-2k8-compile-all
+  display_name: "* Enterprise Windows 2008R2 compile_all"
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - windows-64-vs2015-large
+  # Do not add more tasks to this list.
 
 - <<: *enterprise-windows-64-2k8-template
   name: enterprise-windows-64-2k8-wtdevelop
