@@ -448,7 +448,6 @@ Status _collModInternal(OperationContext* opCtx,
                                         << nss.ns());
         }
         coll->refreshUUID(opCtx);
-        opCtx->recoveryUnit()->onRollback([coll, opCtx]() { coll->refreshUUID(opCtx); });
     }
 
     // Only observe non-view collMods, as view operations are observed as operations on the
