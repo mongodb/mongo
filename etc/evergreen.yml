@@ -808,7 +808,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          if [ ${disable_unit_tests|false} = "false" ]; then
+          if [[ ${disable_unit_tests|false} = "false" && ! -f ${skip_tests|/dev/null} ]]; then
 
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
@@ -943,7 +943,7 @@ functions:
             exit 0
           fi
           exit $resmoke_exit_code
-          fi # end if ${disable_unit_tests}
+          fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]
 
     - command: shell.exec
       params:
@@ -975,7 +975,14 @@ functions:
         fi
 
         ${activate_virtualenv}
+        set +o errexit
         ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${task_compile_flags|} ${scons_cache_args|} $extra_args ${targets} ${additional_targets|} MONGO_VERSION=${version}
+        exit_status=$?
+        # If compile fails we do not run any tests
+        if [ $exit_status -ne 0 ]; then
+          touch ${skip_tests}
+        fi
+        exit $exit_status
 
   "generate compile expansions" :
     command: shell.exec
@@ -2150,6 +2157,8 @@ functions:
         value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_shell
         value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
+      - key: skip_tests
+        value: skip_test-${build_id}
 
   ### Clear and print OOM messages ###
   "clear OOM messages":
