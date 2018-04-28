@@ -508,6 +508,11 @@ add_option('msvc-debugging-format',
     type='choice',
 )
 
+add_option('jlink',
+        help="Limit link concurrency to given value",
+        nargs=1,
+        type=int)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -3412,6 +3417,42 @@ env.Alias("distsrc-tgz", env.GZip(
 )
 env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
 env.Alias("distsrc", "distsrc-tgz")
+
+# Do this as close to last as possible before reading SConscripts, so
+# that any tools that may have injected other things via emitters are included
+# among the side effect adornments.
+#
+# TODO: Move this to a tool.
+if has_option('jlink'):
+    jlink = get_option('jlink')
+    if jlink < 1:
+        env.FatalError("The argument to jlink must be a positive integer")
+
+    target_builders = ['Program', 'SharedLibrary', 'LoadableModule']
+
+    # A bound map of stream (as in stream of work) name to side-effect
+    # file. Since SCons will not allow tasks with a shared side-effect
+    # to execute concurrently, this gives us a way to limit link jobs
+    # independently of overall SCons concurrency.
+    jlink_stream_map = dict()
+
+    def jlink_emitter(target, source, env):
+        name = str(target[0])
+        se_name = "#jlink-stream" + str(hash(name) % jlink)
+        se_node = jlink_stream_map.get(se_name, None)
+        if not se_node:
+            se_node = env.Entry(se_name)
+            # This may not be necessary, but why chance it
+            env.NoCache(se_node)
+            jlink_stream_map[se_name] = se_node
+        env.SideEffect(se_node, target)
+        return (target, source)
+
+    for target_builder in target_builders:
+        builder = env['BUILDERS'][target_builder]
+        base_emitter = builder.emitter
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, jlink_emitter])
+        builder.emitter = new_emitter
 
 env.SConscript(
     dirs=[
