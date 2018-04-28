@@ -48,26 +48,6 @@ namespace detail {
 
 namespace {
 
-std::ostringstream& operator<<(std::ostringstream& ss, ::OSStatus status) {
-    apple::CFUniquePtr<::CFStringRef> errstr(::SecCopyErrorMessageString(status, nullptr));
-    if (!errstr) {
-        ss << "Unknown Error: " << static_cast<int>(status);
-        return ss;
-    }
-    const auto len = ::CFStringGetMaximumSizeForEncoding(::CFStringGetLength(errstr.get()),
-                                                         ::kCFStringEncodingUTF8);
-    std::string ret;
-    ret.resize(len + 1);
-    if (!::CFStringGetCString(errstr.get(), &ret[0], len, ::kCFStringEncodingUTF8)) {
-        ss << "Unknown Error: " << static_cast<int>(status);
-        return ss;
-    }
-
-    ret.resize(strlen(ret.c_str()));
-    ss << ret;
-    return ss;
-}
-
 const class osstatus_category : public error_category {
 public:
     const char* name() const noexcept final {
@@ -76,7 +56,22 @@ public:
 
     std::string message(int value) const noexcept final {
         const auto status = static_cast<::OSStatus>(value);
-        return mongo::str::stream() << "Secure.Transport: " << status;
+        apple::CFUniquePtr<::CFStringRef> errstr(::SecCopyErrorMessageString(status, nullptr));
+        if (!errstr) {
+            return mongo::str::stream() << "Secure.Transport unknown error: "
+                                        << static_cast<int>(status);
+        }
+        const auto len = ::CFStringGetMaximumSizeForEncoding(::CFStringGetLength(errstr.get()),
+                                                             ::kCFStringEncodingUTF8);
+        std::string ret;
+        ret.resize(len + 1);
+        if (!::CFStringGetCString(errstr.get(), &ret[0], len, ::kCFStringEncodingUTF8)) {
+            return mongo::str::stream() << "Secure.Transport unknown error: "
+                                        << static_cast<int>(status);
+        }
+
+        ret.resize(strlen(ret.c_str()));
+        return mongo::str::stream() << "Secure.Transport: " << ret;
     }
 } OSStatus_category;
 
@@ -150,8 +145,6 @@ bool engine::_initSSL(stream_base::handshake_type type, asio::error_code& ec) {
     }
 
     auto status = ::SSLSetConnection(_ssl.get(), static_cast<void*>(this));
-
-    // TODO: ::SSLSetPeerDomainName()
 
     if (_certs && (status == ::errSecSuccess)) {
         status = ::SSLSetCertificate(_ssl.get(), _certs.get());

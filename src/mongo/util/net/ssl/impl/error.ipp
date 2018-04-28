@@ -47,6 +47,9 @@ public:
 #elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
     std::string message(int value) const {
         // engine_apple produces osstatus_errorcategory messages except for stream_truncated
+        if (value == asio::ssl::error::stream_truncated) {
+            return "asio.ssl stream truncated";
+        }
         return "asio.ssl error";
     }
 #else
