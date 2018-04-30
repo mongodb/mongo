@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_http.h"
 #include "mongo/db/free_mon/free_mon_message.h"
@@ -222,6 +223,35 @@ public:
     }
 };
 
+/**
+ * Collect the UUIDs associated with the named collections (if available).
+ */
+class FreeMonNamespaceUUIDCollector : public FreeMonCollectorInterface {
+public:
+    FreeMonNamespaceUUIDCollector(std::set<NamespaceString> namespaces)
+        : _namespaces(std::move(namespaces)) {}
+
+    std::string name() const final {
+        return "uuid";
+    }
+
+    void collect(OperationContext* opCtx, BSONObjBuilder& builder) {
+        for (auto nss : _namespaces) {
+            AutoGetCollectionForRead coll(opCtx, nss);
+            auto* collection = coll.getCollection();
+            if (collection) {
+                auto optUUID = collection->uuid();
+                if (optUUID) {
+                    builder << nss.toString() << optUUID.get();
+                }
+            }
+        }
+    }
+
+private:
+    std::set<NamespaceString> _namespaces;
+};
+
 }  // namespace
 
 
@@ -269,6 +299,13 @@ void registerCollectors(FreeMonController* controller) {
 
         controller->addMetricsCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
             "replSetGetConfig", "replSetGetConfig", "", BSON("replSetGetConfig" << 1)));
+
+        // Collect UUID for certain collections.
+        std::set<NamespaceString> namespaces({NamespaceString("local.oplog.rs")});
+        controller->addRegistrationCollector(
+            std::make_unique<FreeMonNamespaceUUIDCollector>(namespaces));
+        controller->addMetricsCollector(
+            std::make_unique<FreeMonNamespaceUUIDCollector>(namespaces));
     }
 
     controller->addRegistrationCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(

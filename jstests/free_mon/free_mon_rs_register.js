@@ -34,6 +34,20 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(last_register.payload.isMaster.ok, 1);
     assert.eq(last_register.payload.replSetGetConfig.config.version, 2);
 
+    function isUUID(val) {
+        // Mock webserver gives us back unpacked BinData/UUID in the form:
+        // { '$uuid': '0123456789abcdef0123456789abcdef' }.
+        if ((typeof val) !== 'object') {
+            return false;
+        }
+        const uuid = val['$uuid'];
+        if ((typeof uuid) !== 'string') {
+            return false;
+        }
+        return uuid.match(/^[0-9a-fA-F]{32}$/) !== null;
+    }
+    assert.eq(isUUID(last_register.payload.uuid['local.oplog.rs']), true);
+
     // Restart the secondary
     // Now we're going to shut down all nodes
     var s1 = rst._slaves[0];
