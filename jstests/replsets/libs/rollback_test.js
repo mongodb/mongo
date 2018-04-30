@@ -37,8 +37,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",
-        // DEPRECATED: Remove this line after TIG-680.
-        kSyncSourceOps: "kSyncSourceOpsBeforeRollback",
         kSyncSourceOpsBeforeRollback: "kSyncSourceOpsBeforeRollback",
         kSyncSourceOpsDuringRollback: "kSyncSourceOpsDuringRollback",
         kSteadyStateOps: "kSteadyStateOps",
@@ -47,9 +45,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
     const AcceptableTransitions = {
         [State.kStopped]: [],
         [State.kRollbackOps]: [State.kSyncSourceOpsBeforeRollback],
-        // DEPRECATED: remove transition to State.kSteadyStateOps after TIG-680.
-        [State.kSyncSourceOpsBeforeRollback]:
-            [State.kSyncSourceOpsDuringRollback, State.kSteadyStateOps],
+        [State.kSyncSourceOpsBeforeRollback]: [State.kSyncSourceOpsDuringRollback],
         [State.kSyncSourceOpsDuringRollback]: [State.kSteadyStateOps],
         [State.kSteadyStateOps]: [State.kStopped, State.kRollbackOps],
     };
@@ -279,9 +275,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         return curPrimary;
     };
-
-    // DEPRECATED: remove this line after TIG-680.
-    this.transitionToSyncSourceOperations = this.transitionToSyncSourceOperationsBeforeRollback;
 
     /**
      * Transition to the third stage of rollback testing, where we reconnect the rollback node so
