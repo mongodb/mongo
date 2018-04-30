@@ -33,9 +33,20 @@
 #include "mongo/db/catalog/collection_info_cache.h"
 
 namespace mongo {
+namespace {
+stdx::function<CollectionInfoCache::factory_function_type> factory;
+}  // namespace
+
 CollectionInfoCache::Impl::~Impl() = default;
 
-MONGO_DEFINE_SHIM(CollectionInfoCache::makeImpl);
+void CollectionInfoCache::registerFactory(decltype(factory) newFactory) {
+    factory = std::move(newFactory);
+}
+
+auto CollectionInfoCache::makeImpl(Collection* const collection, const NamespaceString& ns)
+    -> std::unique_ptr<Impl> {
+    return factory(collection, ns);
+}
 
 void CollectionInfoCache::TUHook::hook() noexcept {}
 }  // namespace mongo

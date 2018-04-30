@@ -1,3 +1,5 @@
+// @file keypattern.cpp
+
 /**
 *    Copyright (C) 2012 10gen Inc.
 *

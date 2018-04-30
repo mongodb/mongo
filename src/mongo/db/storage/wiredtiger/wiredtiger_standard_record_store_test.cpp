@@ -451,4 +451,4 @@ TEST_F(SizeStorerValidateTest, InvalidSizeStorerAtCreation) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // mongo

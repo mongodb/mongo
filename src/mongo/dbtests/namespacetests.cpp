@@ -1,3 +1,6 @@
+// namespacetests.cpp : namespace.{h,cpp} unit tests.
+//
+
 /**
  *    Copyright (C) 2008-2014 MongoDB Inc.
  *
@@ -547,7 +550,7 @@ public:
         Lock::DBLock lk(&opCtx, dbName, MODE_X);
 
         bool justCreated;
-        Database* db = DatabaseHolder::getDatabaseHolder().openDb(&opCtx, dbName, &justCreated);
+        Database* db = dbHolder().openDb(&opCtx, dbName, &justCreated);
         ASSERT(justCreated);
 
         Collection* committedColl;
@@ -591,7 +594,7 @@ public:
         Lock::DBLock lk(&opCtx, dbName, MODE_X);
 
         bool justCreated;
-        Database* db = DatabaseHolder::getDatabaseHolder().openDb(&opCtx, dbName, &justCreated);
+        Database* db = dbHolder().openDb(&opCtx, dbName, &justCreated);
         ASSERT(justCreated);
 
         {

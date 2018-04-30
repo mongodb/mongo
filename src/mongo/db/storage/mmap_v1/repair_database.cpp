@@ -312,7 +312,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
             new RepairFileDeleter(opCtx, dbName, reservedPathString, reservedPath));
 
     {
-        Database* originalDatabase = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+        Database* originalDatabase = dbHolder().openDb(opCtx, dbName);
         if (originalDatabase == NULL) {
             return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
         }
@@ -454,7 +454,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
         repairFileDeleter->success();
 
     // Close the database so we can rename/delete the original data files
-    DatabaseHolder::getDatabaseHolder().close(opCtx, dbName, "database closed for repair");
+    dbHolder().close(opCtx, dbName, "database closed for repair");
 
     if (backupOriginalFiles) {
         _renameForBackup(dbName, reservedPath);
@@ -480,7 +480,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
     }
 
     // Reopen the database so it's discoverable
-    DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+    dbHolder().openDb(opCtx, dbName);
 
     return Status::OK();
 }

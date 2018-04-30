@@ -99,7 +99,7 @@ void ServiceContextMongoDTest::_doTest() {
 }
 
 void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
-    Database::dropAllDatabasesExceptLocal(opCtx);
+    dropAllDatabasesExceptLocal(opCtx);
 
     Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDBLocal(opCtx, "local", MODE_X);
@@ -111,11 +111,10 @@ void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
         });
     }
 
-    // Database::dropAllDatabasesExceptLocal() does not close empty databases. However the holder
-    // still allocates resources to track these empty databases. These resources not released by
-    // Database::dropAllDatabasesExceptLocal() will be leaked at exit unless we call
-    // DatabaseHolder::closeAll.
-    DatabaseHolder::getDatabaseHolder().closeAll(opCtx, "all databases dropped");
+    // dropAllDatabasesExceptLocal() does not close empty databases. However the holder still
+    // allocates resources to track these empty databases. These resources not released by
+    // dropAllDatabasesExceptLocal() will be leaked at exit unless we call DatabaseHolder::closeAll.
+    dbHolder().closeAll(opCtx, "all databases dropped");
 }
 
 }  // namespace mongo

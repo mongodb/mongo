@@ -152,7 +152,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
                                     << target.ns());
     }
 
-    Database* const sourceDB = DatabaseHolder::getDatabaseHolder().get(opCtx, source.db());
+    Database* const sourceDB = dbHolder().get(opCtx, source.db());
     if (sourceDB) {
         DatabaseShardingState::get(sourceDB).checkDbVersion(opCtx);
     }
@@ -180,7 +180,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
 
     BackgroundOperation::assertNoBgOpInProgForNs(source.ns());
 
-    Database* const targetDB = DatabaseHolder::getDatabaseHolder().openDb(opCtx, target.db());
+    Database* const targetDB = dbHolder().openDb(opCtx, target.db());
 
     // Check if the target namespace exists and if dropTarget is true.
     // Return a non-OK status if target exists and dropTarget is not true or if the collection

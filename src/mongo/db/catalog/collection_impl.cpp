@@ -76,30 +76,34 @@
 
 namespace mongo {
 
-MONGO_REGISTER_SHIM(Collection::makeImpl)
-(Collection* const _this,
- OperationContext* const opCtx,
- const StringData fullNS,
- OptionalCollectionUUID uuid,
- CollectionCatalogEntry* const details,
- RecordStore* const recordStore,
- DatabaseCatalogEntry* const dbce,
- PrivateTo<Collection>)
-    ->std::unique_ptr<Collection::Impl> {
-    return std::make_unique<CollectionImpl>(_this, opCtx, fullNS, uuid, details, recordStore, dbce);
-}
-
-MONGO_REGISTER_SHIM(Collection::parseValidationLevel)
-(const StringData data)->StatusWith<Collection::ValidationLevel> {
-    return CollectionImpl::parseValidationLevel(data);
-}
-
-MONGO_REGISTER_SHIM(Collection::parseValidationAction)
-(const StringData data)->StatusWith<Collection::ValidationAction> {
-    return CollectionImpl::parseValidationAction(data);
-}
-
 namespace {
+MONGO_INITIALIZER(InitializeCollectionFactory)(InitializerContext* const) {
+    Collection::registerFactory(
+        [](Collection* const _this,
+           OperationContext* const opCtx,
+           const StringData fullNS,
+           OptionalCollectionUUID uuid,
+           CollectionCatalogEntry* const details,
+           RecordStore* const recordStore,
+           DatabaseCatalogEntry* const dbce) -> std::unique_ptr<Collection::Impl> {
+            return stdx::make_unique<CollectionImpl>(
+                _this, opCtx, fullNS, uuid, details, recordStore, dbce);
+        });
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(InitializeParseValidationLevelImpl)(InitializerContext* const) {
+    Collection::registerParseValidationLevelImpl(
+        [](const StringData data) { return CollectionImpl::parseValidationLevel(data); });
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(InitializeParseValidationActionImpl)(InitializerContext* const) {
+    Collection::registerParseValidationActionImpl(
+        [](const StringData data) { return CollectionImpl::parseValidationAction(data); });
+    return Status::OK();
+}
+
 // Used below to fail during inserts.
 MONGO_FP_DECLARE(failCollectionInserts);
 

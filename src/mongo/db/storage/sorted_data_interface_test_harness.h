@@ -1,3 +1,5 @@
+// sorted_data_interface_test_harness.h
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -134,4 +136,4 @@ inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
 inline std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper() {
     return dynamic_ptr_cast<SortedDataInterfaceHarnessHelper>(newHarnessHelper());
 }
-}  // namespace mongo
+}

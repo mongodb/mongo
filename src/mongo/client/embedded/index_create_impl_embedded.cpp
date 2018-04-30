@@ -44,12 +44,14 @@ class MultiIndexBlockImplEmbedded : public MultiIndexBlockImpl {
         return false;
     }
 };
-}  // namespace
 
-MONGO_REGISTER_SHIM(MultiIndexBlock::makeImpl)
-(OperationContext* const opCtx, Collection* const collection, PrivateTo<MultiIndexBlock>)
-    ->std::unique_ptr<MultiIndexBlock::Impl> {
-    return std::make_unique<MultiIndexBlockImplEmbedded>(opCtx, collection);
+MONGO_INITIALIZER(InitializeMultiIndexBlockFactory)(InitializerContext* const) {
+    MultiIndexBlock::registerFactory(
+        [](OperationContext* const opCtx, Collection* const collection) {
+            return stdx::make_unique<MultiIndexBlockImplEmbedded>(opCtx, collection);
+        });
+    return Status::OK();
 }
 
+}  // namespace
 }  // namespace mongo

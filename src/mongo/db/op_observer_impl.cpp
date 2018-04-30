@@ -660,7 +660,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     // catalog are all present and equal, unless the collection is system.indexes or
     // system.namespaces (see SERVER-29926, SERVER-30095).
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db());
+    Database* db = dbHolder().get(opCtx, nss.db());
     // Some unit tests call the op observer on an unregistered Database.
     if (!db) {
         return;

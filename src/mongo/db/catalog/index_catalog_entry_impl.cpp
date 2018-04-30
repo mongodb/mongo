@@ -53,18 +53,20 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-MONGO_REGISTER_SHIM(IndexCatalogEntry::makeImpl)
-(IndexCatalogEntry* const this_,
- OperationContext* const opCtx,
- const StringData ns,
- CollectionCatalogEntry* const collection,
- std::unique_ptr<IndexDescriptor> descriptor,
- CollectionInfoCache* const infoCache,
- PrivateTo<IndexCatalogEntry>)
-    ->std::unique_ptr<IndexCatalogEntry::Impl> {
-    return std::make_unique<IndexCatalogEntryImpl>(
-        this_, opCtx, ns, collection, std::move(descriptor), infoCache);
+namespace {
+MONGO_INITIALIZER(InitializeIndexCatalogEntryFactory)(InitializerContext* const) {
+    IndexCatalogEntry::registerFactory([](IndexCatalogEntry* const this_,
+                                          OperationContext* const opCtx,
+                                          const StringData ns,
+                                          CollectionCatalogEntry* const collection,
+                                          std::unique_ptr<IndexDescriptor> descriptor,
+                                          CollectionInfoCache* const infoCache) {
+        return stdx::make_unique<IndexCatalogEntryImpl>(
+            this_, opCtx, ns, collection, std::move(descriptor), infoCache);
+    });
+    return Status::OK();
 }
+}  // namespace
 
 using std::string;
 

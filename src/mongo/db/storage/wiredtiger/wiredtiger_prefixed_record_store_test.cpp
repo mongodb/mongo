@@ -251,4 +251,4 @@ TEST(WiredTigerRecordStoreTest, PrefixedSeekingCursor) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // mongo

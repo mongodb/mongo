@@ -330,16 +330,19 @@ public:
         virtual const CollatorInterface* getDefaultCollator() const = 0;
     };
 
+private:
+    static std::unique_ptr<Impl> makeImpl(Collection* _this,
+                                          OperationContext* opCtx,
+                                          StringData fullNS,
+                                          OptionalCollectionUUID uuid,
+                                          CollectionCatalogEntry* details,
+                                          RecordStore* recordStore,
+                                          DatabaseCatalogEntry* dbce);
+
 public:
-    static MONGO_DECLARE_SHIM((Collection * _this,
-                               OperationContext* opCtx,
-                               StringData fullNS,
-                               OptionalCollectionUUID uuid,
-                               CollectionCatalogEntry* details,
-                               RecordStore* recordStore,
-                               DatabaseCatalogEntry* dbce,
-                               PrivateTo<Collection>)
-                                  ->std::unique_ptr<Impl>) makeImpl;
+    using factory_function_type = decltype(makeImpl);
+
+    static void registerFactory(stdx::function<factory_function_type> factory);
 
     explicit inline Collection(OperationContext* const opCtx,
                                const StringData fullNS,
@@ -347,8 +350,7 @@ public:
                                CollectionCatalogEntry* const details,  // does not own
                                RecordStore* const recordStore,         // does not own
                                DatabaseCatalogEntry* const dbce)       // does not own
-        : _pimpl(makeImpl(
-              this, opCtx, fullNS, uuid, details, recordStore, dbce, PrivateCall<Collection>{})) {
+        : _pimpl(makeImpl(this, opCtx, fullNS, uuid, details, recordStore, dbce)) {
         this->_impl().init(opCtx);
     }
 
@@ -625,8 +627,13 @@ public:
             opCtx, validator, allowedFeatures, maxFeatureCompatibilityVersion);
     }
 
-    static MONGO_DECLARE_SHIM((StringData)->StatusWith<ValidationLevel>) parseValidationLevel;
-    static MONGO_DECLARE_SHIM((StringData)->StatusWith<ValidationAction>) parseValidationAction;
+    static StatusWith<ValidationLevel> parseValidationLevel(StringData);
+    static StatusWith<ValidationAction> parseValidationAction(StringData);
+
+    static void registerParseValidationLevelImpl(
+        stdx::function<decltype(parseValidationLevel)> impl);
+    static void registerParseValidationActionImpl(
+        stdx::function<decltype(parseValidationAction)> impl);
 
     /**
      * Sets the validator for this collection.

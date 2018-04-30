@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/base/shim.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_settings.h"
@@ -70,15 +69,16 @@ public:
                                    const std::set<std::string>& indexesUsed) = 0;
     };
 
+private:
+    static std::unique_ptr<Impl> makeImpl(Collection* collection, const NamespaceString& ns);
 
 public:
-    static MONGO_DECLARE_SHIM((Collection * collection,
-                               const NamespaceString& ns,
-                               PrivateTo<CollectionInfoCache>)
-                                  ->std::unique_ptr<Impl>) makeImpl;
+    using factory_function_type = decltype(makeImpl);
+
+    static void registerFactory(stdx::function<factory_function_type> factory);
 
     explicit inline CollectionInfoCache(Collection* const collection, const NamespaceString& ns)
-        : _pimpl(makeImpl(collection, ns, PrivateCall<CollectionInfoCache>{})) {}
+        : _pimpl(makeImpl(collection, ns)) {}
 
     inline ~CollectionInfoCache() = default;
 

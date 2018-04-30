@@ -32,7 +32,6 @@
 #include <string>
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/base/shim.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -103,15 +102,18 @@ public:
         virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
     };
 
+private:
+    static std::unique_ptr<Impl> makeImpl(IndexCatalogEntry* this_,
+                                          OperationContext* opCtx,
+                                          StringData ns,
+                                          CollectionCatalogEntry* collection,
+                                          std::unique_ptr<IndexDescriptor> descriptor,
+                                          CollectionInfoCache* infoCache);
+
 public:
-    static MONGO_DECLARE_SHIM((IndexCatalogEntry * this_,
-                               OperationContext* opCtx,
-                               StringData ns,
-                               CollectionCatalogEntry* collection,
-                               std::unique_ptr<IndexDescriptor> descriptor,
-                               CollectionInfoCache* infoCache,
-                               PrivateTo<IndexCatalogEntry>)
-                                  ->std::unique_ptr<Impl>) makeImpl;
+    using factory_function_type = decltype(makeImpl);
+
+    static void registerFactory(stdx::function<factory_function_type> factory);
 
     explicit IndexCatalogEntry(
         OperationContext* opCtx,

@@ -266,14 +266,14 @@ Status repairDatabase(OperationContext* opCtx,
     }
 
     // Close the db and invalidate all current users and caches.
-    DatabaseHolder::getDatabaseHolder().close(opCtx, dbName, "database closed for repair");
+    dbHolder().close(opCtx, dbName, "database closed for repair");
     ON_BLOCK_EXIT([&dbName, &opCtx] {
         try {
             // Ensure that we don't trigger an exception when attempting to take locks.
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
             // Open the db after everything finishes.
-            auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
+            auto db = dbHolder().openDb(opCtx, dbName);
 
             // Set the minimum snapshot for all Collections in this db. This ensures that readers
             // using majority readConcern level can only use the collections after their repaired

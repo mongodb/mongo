@@ -36,13 +36,66 @@
 namespace mongo {
 Database::Impl::~Impl() = default;
 
-MONGO_DEFINE_SHIM(Database::makeImpl);
+namespace {
+stdx::function<Database::factory_function_type> factory;
+}  // namespace
+
+void Database::registerFactory(decltype(factory) newFactory) {
+    factory = std::move(newFactory);
+}
+
+auto Database::makeImpl(Database* const this_,
+                        OperationContext* const opCtx,
+                        const StringData name,
+                        DatabaseCatalogEntry* const dbEntry) -> std::unique_ptr<Impl> {
+    return factory(this_, opCtx, name, dbEntry);
+}
 
 void Database::TUHook::hook() noexcept {}
 
-MONGO_DEFINE_SHIM(Database::dropDatabase);
+namespace {
+stdx::function<decltype(Database::dropDatabase)> dropDatabaseImpl;
+}
 
-MONGO_DEFINE_SHIM(Database::userCreateNS);
+void Database::dropDatabase(OperationContext* const opCtx, Database* const db) {
+    return dropDatabaseImpl(opCtx, db);
+}
 
-MONGO_DEFINE_SHIM(Database::dropAllDatabasesExceptLocal);
+void Database::registerDropDatabaseImpl(stdx::function<decltype(dropDatabase)> impl) {
+    dropDatabaseImpl = std::move(impl);
+}
+
+namespace {
+stdx::function<decltype(userCreateNS)> userCreateNSImpl;
+stdx::function<decltype(dropAllDatabasesExceptLocal)> dropAllDatabasesExceptLocalImpl;
+}  // namespace
 }  // namespace mongo
+
+auto mongo::userCreateNS(OperationContext* const opCtx,
+                         Database* const db,
+                         const StringData ns,
+                         const BSONObj options,
+                         const CollectionOptions::ParseKind parseKind,
+                         const bool createDefaultIndexes,
+                         const BSONObj& idIndex) -> Status {
+    return userCreateNSImpl(opCtx, db, ns, options, parseKind, createDefaultIndexes, idIndex);
+}
+
+void mongo::registerUserCreateNSImpl(stdx::function<decltype(userCreateNS)> impl) {
+    userCreateNSImpl = std::move(impl);
+}
+
+void mongo::dropAllDatabasesExceptLocal(OperationContext* const opCtx) {
+    return dropAllDatabasesExceptLocalImpl(opCtx);
+}
+
+/**
+ * Registers an implementation of `dropAllDatabaseExceptLocal` for use by library clients.
+ * This is necessary to allow `catalog/database` to be a vtable edge.
+ * @param impl Implementation of `dropAllDatabaseExceptLocal` to install.
+ * @note This call is not thread safe.
+ */
+void mongo::registerDropAllDatabasesExceptLocalImpl(
+    stdx::function<decltype(dropAllDatabasesExceptLocal)> impl) {
+    dropAllDatabasesExceptLocalImpl = std::move(impl);
+}

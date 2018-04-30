@@ -193,7 +193,7 @@ auto createCollectionWithUuid(OperationContext* opCtx, const NamespaceString& ns
 void createDatabase(OperationContext* opCtx, StringData dbName) {
     Lock::GlobalWrite globalLock(opCtx);
     bool justCreated;
-    Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName, &justCreated);
+    Database* db = dbHolder().openDb(opCtx, dbName, &justCreated);
     ASSERT_TRUE(db);
     ASSERT_TRUE(justCreated);
 }
@@ -991,8 +991,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
     {
         Lock::GlobalWrite globalLock(_opCtx.get());
         bool justCreated = false;
-        Database* db =
-            DatabaseHolder::getDatabaseHolder().openDb(_opCtx.get(), nss.db(), &justCreated);
+        Database* db = dbHolder().openDb(_opCtx.get(), nss.db(), &justCreated);
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
     }

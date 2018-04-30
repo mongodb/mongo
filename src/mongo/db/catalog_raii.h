@@ -40,8 +40,7 @@ namespace mongo {
 
 /**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
- * obtains a reference to the database. Used as a shortcut for calls to
- * DatabaseHolder::getDatabaseHolder().get().
+ * obtains a reference to the database. Used as a shortcut for calls to dbHolder().get().
  *
  * Use this when you want to do a database-level operation, like read a list of all collections, or
  * drop a collection.
@@ -153,9 +152,9 @@ private:
 /**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
  * obtains a reference to the database, creating it was non-existing. Used as a shortcut for
- * calls to DatabaseHolder::getDatabaseHolder().openDb(), taking care of locking details. The
- * requested mode must be MODE_IX or MODE_X. If the database needs to be created, the lock will
- * automatically be reacquired as MODE_X.
+ * calls to dbHolder().openDb(), taking care of locking details. The requested mode must be
+ * MODE_IX or MODE_X. If the database needs to be created, the lock will automatically be
+ * reacquired as MODE_X.
  *
  * Use this when you are about to perform a write, and want to create the database if it doesn't
  * already exist.
