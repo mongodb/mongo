@@ -260,7 +260,10 @@ Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
     return Status::OK();
 }
 
+// Passing opCtx means you'd like to opt into opCtx interruption.  During cleanup we actually don't.
 void AsyncRequestsSender::_makeProgress(OperationContext* opCtx) {
+    invariant(!opCtx || opCtx == _opCtx);
+
     boost::optional<Job> job;
 
     if (_baton) {
@@ -268,11 +271,11 @@ void AsyncRequestsSender::_makeProgress(OperationContext* opCtx) {
         if (boost::optional<boost::optional<Job>> tryJob = _responseQueue.tryPop()) {
             job = std::move(*tryJob);
         } else {
-            _baton->run(_opCtx, boost::none);
+            _baton->run(opCtx, boost::none);
         }
     } else {
         // Otherwise we block on the queue
-        job = _opCtx ? _responseQueue.pop(_opCtx) : _responseQueue.pop();
+        job = opCtx ? _responseQueue.pop(opCtx) : _responseQueue.pop();
     }
 
     if (!job) {
