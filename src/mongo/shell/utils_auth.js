@@ -74,6 +74,23 @@ var authutil;
         var ex;
         const authMode = jsTest.options().clusterAuthMode;
 
+        // put a connection in an array for uniform processing.
+        let connArray = conn;
+        if (conn.length == null)
+            connArray = [conn];
+
+        let clusterTimes = connArray.map(connElem => {
+            const connClusterTime = connElem.getClusterTime();
+            const sessionClusterTime = connElem._getDefaultSession().getClusterTime();
+            const operationTime = connElem._getDefaultSession().getOperationTime();
+
+            connElem.resetClusterTime_forTesting();
+            connElem._getDefaultSession().resetClusterTime_forTesting();
+            connElem._getDefaultSession().resetOperationTime_forTesting();
+
+            return {connClusterTime, sessionClusterTime, operationTime};
+        });
+
         if (authMode === 'keyFile') {
             authutil.assertAuthenticate(conn, 'admin', {
                 user: '__system',
@@ -93,6 +110,28 @@ var authutil;
         } finally {
             try {
                 authutil.logout(conn, 'admin');
+                let connArray = conn;
+                if (conn.length == null)
+                    connArray = [conn];
+
+                for (let i = 0; i < connArray.length; i++) {
+                    let connElem = connArray[i];
+                    connElem.resetClusterTime_forTesting();
+                    connElem._getDefaultSession().resetClusterTime_forTesting();
+                    connElem._getDefaultSession().resetOperationTime_forTesting();
+                    if (clusterTimes[i].connClusterTime) {
+                        jsTestLog("Restoring clusterTime: " + tojson(clusterTimes[i].connClusterTime));
+                        connElem.advanceClusterTime(clusterTimes[i].connClusterTime);
+                    }
+                    if (clusterTimes[i].sessionClusterTime) {
+                        connElem._getDefaultSession().advanceClusterTime(
+                            clusterTimes[i].sessionClusterTime);
+                    }
+                    if (clusterTimes[i].operationTime) {
+                        connElem._getDefaultSession().advanceOperationTime(
+                            clusterTimes[i].operationTime);
+                    }
+                }
             } catch (ex) {
             }
         }
