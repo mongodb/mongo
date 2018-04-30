@@ -335,60 +335,63 @@ void runCommand(OperationContext* opCtx,
 
     CommandReplyBuilder crb(std::move(builder));
 
-    int loops = 5;
-    while (true) {
-        crb.reset();
-        try {
-            execCommandClient(opCtx, command, request, &crb);
-            return;
-        } catch (ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
-            const auto ns = [&] {
-                if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                    return NamespaceString(staleInfo->getns());
-                } else if (auto implicitCreateInfo =
-                               ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-                    return NamespaceString(implicitCreateInfo->getNss());
-                } else {
+    try {
+        for (int tries = 0;; ++tries) {
+            // Try 5 times. On the last try, exceptions are rethrown.
+            bool canRetry = tries < 4;
+            crb.reset();
+            try {
+                execCommandClient(opCtx, command, request, &crb);
+                return;
+            } catch (ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
+                const auto staleNs = [&] {
+                    if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+                        return NamespaceString(staleInfo->getns());
+                    } else if (auto implicitCreateInfo =
+                                   ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
+                        return NamespaceString(implicitCreateInfo->getNss());
+                    } else {
+                        throw;
+                    }
+                }();
+
+                if (staleNs.isEmpty()) {
+                    // This should be impossible but older versions tried incorrectly to handle it
+                    // here.
+                    log()
+                        << "Received a stale config error with an empty namespace while executing "
+                        << redact(request.body) << " : " << redact(ex);
                     throw;
                 }
-            }();
 
-            if (ns.isEmpty()) {
-                // This should be impossible but older versions tried incorrectly to handle it here.
-                log() << "Received a stale config error with an empty namespace while executing "
-                      << redact(request.body) << " : " << redact(ex);
-                throw;
+                if (!canRetry)
+                    throw;
+
+                log() << "Retrying command " << redact(request.body) << causedBy(ex);
+
+                ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
+                if (staleNs.isValid()) {
+                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNs);
+                }
+
+                continue;
+            } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
+                Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(e->getDb(),
+                                                                         e->getVersionReceived());
+                if (!canRetry)
+                    throw;
+                continue;
             }
-
-            if (loops <= 0)
-                throw;
-
-            log() << "Retrying command " << redact(request.body) << causedBy(ex);
-
-            ShardConnection::checkMyConnectionVersions(opCtx, ns.ns());
-            if (ns.isValid()) {
-                Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(ns);
-            }
-
-            loops--;
-            continue;
-        } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
-            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(e->getDb(),
-                                                                     e->getVersionReceived());
-            loops--;
-            continue;
-        } catch (const DBException& e) {
-            crb.reset();
-            BSONObjBuilder bob = crb.getBodyBuilder();
-            ON_BLOCK_EXIT([&] { appendRequiredFieldsToResponse(opCtx, &bob); });
-            command->incrementCommandsFailed();
-            CommandHelpers::appendCommandStatus(bob, e.toStatus());
-            LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
-            CurOp::get(opCtx)->debug().errInfo = e.toStatus();
-            return;
+            MONGO_UNREACHABLE;
         }
-
-        MONGO_UNREACHABLE;
+    } catch (const DBException& e) {
+        command->incrementCommandsFailed();
+        CurOp::get(opCtx)->debug().errInfo = e.toStatus();
+        LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
+        crb.reset();
+        BSONObjBuilder bob = crb.getBodyBuilder();
+        CommandHelpers::appendCommandStatus(bob, e.toStatus());
+        appendRequiredFieldsToResponse(opCtx, &bob);
     }
 }
 
@@ -499,27 +502,26 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
 DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
     auto reply = rpc::makeReplyBuilder(rpc::protocolForMessage(m));
 
-    [&] {
-        OpMsgRequest request;
-        std::string db;
-        try {  // Parse.
-            request = rpc::opMsgRequestFromAnyProtocol(m);
-            db = request.getDatabase().toString();
-        } catch (const DBException& ex) {
-            // If this error needs to fail the connection, propagate it out.
-            if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
+    bool propagateException = false;
+
+    try {
+        // Parse.
+        OpMsgRequest request = [&] {
+            try {
+                return rpc::opMsgRequestFromAnyProtocol(m);
+            } catch (const DBException& ex) {
+                // If this error needs to fail the connection, propagate it out.
+                if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
+                    propagateException = true;
+
+                LOG(1) << "Exception thrown while parsing command " << causedBy(redact(ex));
                 throw;
+            }
+        }();
 
-            LOG(1) << "Exception thrown while parsing command " << causedBy(redact(ex));
-            reply->reset();
-            auto bob = reply->getInPlaceReplyBuilder(0);
-            CommandHelpers::appendCommandStatus(bob, ex.toStatus());
-            appendRequiredFieldsToResponse(opCtx, &bob);
-
-            return;  // From lambda. Don't try executing if parsing failed.
-        }
-
-        try {  // Execute.
+        // Execute.
+        std::string db = request.getDatabase().toString();
+        try {
             LOG(3) << "Command begin db: " << db << " msg id: " << m.header().getId();
             runCommand(opCtx, request, m.operation(), reply->getInPlaceReplyBuilder(0));
             LOG(3) << "Command end db: " << db << " msg id: " << m.header().getId();
@@ -529,13 +531,17 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
 
             // Record the exception in CurOp.
             CurOp::get(opCtx)->debug().errInfo = ex.toStatus();
-
-            reply->reset();
-            auto bob = reply->getInPlaceReplyBuilder(0);
-            CommandHelpers::appendCommandStatus(bob, ex.toStatus());
-            appendRequiredFieldsToResponse(opCtx, &bob);
+            throw;
         }
-    }();
+    } catch (const DBException& ex) {
+        if (propagateException) {
+            throw;
+        }
+        reply->reset();
+        auto bob = reply->getInPlaceReplyBuilder(0);
+        CommandHelpers::appendCommandStatus(bob, ex.toStatus());
+        appendRequiredFieldsToResponse(opCtx, &bob);
+    }
 
     if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
         return {};  // Don't reply.
@@ -712,8 +718,9 @@ void Strategy::explainFind(OperationContext* opCtx,
     long long millisElapsed;
     std::vector<AsyncRequestsSender::Response> shardResponses;
 
-    short loops = 5;
-    do {
+    for (int tries = 0;; ++tries) {
+        bool canRetry = tries < 4;  // Fifth try (i.e. try #4) is the last one.
+
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
         try {
@@ -734,9 +741,11 @@ void Strategy::explainFind(OperationContext* opCtx,
         } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
             Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(e->getDb(),
                                                                      e->getVersionReceived());
-            loops--;
+            if (!canRetry) {
+                throw;
+            }
         }
-    } while (loops > 0);
+    }
 
     const char* mongosStageName =
         ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);
