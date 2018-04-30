@@ -277,89 +277,91 @@ public:
             jsobj, "includePendingDrops", false, &includePendingDrops);
         uassertStatusOK(status);
 
-        AutoGetDb autoDb(opCtx, dbname, MODE_IS);
-
-        Database* db = autoDb.getDb();
-
-        auto ws = make_unique<WorkingSet>();
-        auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
-
-        if (db) {
-            if (auto collNames = _getExactNameMatches(matcher.get())) {
-                for (auto&& collName : *collNames) {
-                    auto nss = NamespaceString(db->name(), collName);
-                    Collection* collection = db->getCollection(opCtx, nss);
-                    BSONObj collBson =
-                        buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
-                    if (!collBson.isEmpty()) {
-                        _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
-                    }
-                }
-            } else {
-                for (auto&& collection : *db) {
-                    BSONObj collBson =
-                        buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
-                    if (!collBson.isEmpty()) {
-                        _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
-                    }
-                }
-            }
-
-            // Skipping views is only necessary for internal cloning operations.
-            bool skipViews = filterElt.type() == mongo::Object &&
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
-            if (!skipViews) {
-                db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
-                    BSONObj viewBson = buildViewBson(view, nameOnly);
-                    if (!viewBson.isEmpty()) {
-                        _addWorkingSetMember(opCtx, viewBson, matcher.get(), ws.get(), root.get());
-                    }
-                });
-            }
-        }
-
         const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
-
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
-        uassertStatusOK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
-
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         BSONArrayBuilder firstBatch;
+        {
+            AutoGetDb autoDb(opCtx, dbname, MODE_IS);
+            Database* db = autoDb.getDb();
 
-        for (long long objCount = 0; objCount < batchSize; objCount++) {
-            BSONObj next;
-            PlanExecutor::ExecState state = exec->getNext(&next, NULL);
-            if (state == PlanExecutor::IS_EOF) {
-                break;
+            auto ws = make_unique<WorkingSet>();
+            auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
+
+            if (db) {
+                if (auto collNames = _getExactNameMatches(matcher.get())) {
+                    for (auto&& collName : *collNames) {
+                        auto nss = NamespaceString(db->name(), collName);
+                        Collection* collection = db->getCollection(opCtx, nss);
+                        BSONObj collBson =
+                            buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
+                        if (!collBson.isEmpty()) {
+                            _addWorkingSetMember(
+                                opCtx, collBson, matcher.get(), ws.get(), root.get());
+                        }
+                    }
+                } else {
+                    for (auto&& collection : *db) {
+                        BSONObj collBson =
+                            buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
+                        if (!collBson.isEmpty()) {
+                            _addWorkingSetMember(
+                                opCtx, collBson, matcher.get(), ws.get(), root.get());
+                        }
+                    }
+                }
+
+                // Skipping views is only necessary for internal cloning operations.
+                bool skipViews = filterElt.type() == mongo::Object &&
+                    SimpleBSONObjComparator::kInstance.evaluate(
+                        filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
+                if (!skipViews) {
+                    db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
+                        BSONObj viewBson = buildViewBson(view, nameOnly);
+                        if (!viewBson.isEmpty()) {
+                            _addWorkingSetMember(
+                                opCtx, viewBson, matcher.get(), ws.get(), root.get());
+                        }
+                    });
+                }
             }
-            invariant(state == PlanExecutor::ADVANCED);
 
-            // If we can't fit this result inside the current batch, then we stash it for later.
-            if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
-                exec->enqueue(next);
-                break;
+            exec = uassertStatusOK(PlanExecutor::make(
+                opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD));
+
+            for (long long objCount = 0; objCount < batchSize; objCount++) {
+                BSONObj next;
+                PlanExecutor::ExecState state = exec->getNext(&next, NULL);
+                if (state == PlanExecutor::IS_EOF) {
+                    break;
+                }
+                invariant(state == PlanExecutor::ADVANCED);
+
+                // If we can't fit this result inside the current batch, then we stash it for later.
+                if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
+                    exec->enqueue(next);
+                    break;
+                }
+
+                firstBatch.append(next);
             }
-
-            firstBatch.append(next);
-        }
-
-        CursorId cursorId = 0LL;
-        if (!exec->isEOF()) {
+            if (exec->isEOF()) {
+                appendCursorResponseObject(0LL, cursorNss.ns(), firstBatch.arr(), &result);
+                return true;
+            }
             exec->saveState();
             exec->detachFromOperationContext();
-            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
-                opCtx,
-                {std::move(exec),
-                 cursorNss,
-                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                 opCtx->recoveryUnit()->getReadConcernLevel(),
-                 jsobj});
-            cursorId = pinnedCursor.getCursor()->cursorid();
-        }
+        }  // Drop db lock. Global cursor registration must be done without holding any locks.
 
-        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
+        auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+            opCtx,
+            {std::move(exec),
+             cursorNss,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->recoveryUnit()->getReadConcernLevel(),
+             jsobj});
+
+        appendCursorResponseObject(
+            pinnedCursor.getCursor()->cursorid(), cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

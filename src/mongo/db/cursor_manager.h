@@ -292,8 +292,13 @@ private:
         OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
     void deregisterCursor(ClientCursor* cursor);
+    void deregisterAndDestroyCursor(
+        Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>::OnePartition&&,
+        OperationContext* opCtx,
+        std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
 
-    void unpin(OperationContext* opCtx, ClientCursor* cursor);
+    void unpin(OperationContext* opCtx,
+               std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
 
     bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
 

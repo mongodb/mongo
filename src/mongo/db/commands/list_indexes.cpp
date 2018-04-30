@@ -125,83 +125,89 @@ public:
         uassertStatusOK(
             CursorRequest::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize));
 
-        AutoGetCollectionForReadCommand ctx(opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj));
-        Collection* collection = ctx.getCollection();
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "ns does not exist: " << ctx.getNss().ns(),
-                collection);
-
-        const CollectionCatalogEntry* cce = collection->getCatalogEntry();
-        invariant(cce);
-
-        const auto nss = ctx.getNss();
-
-        vector<string> indexNames;
-        writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&indexNames, &cce, &opCtx] {
-            indexNames.clear();
-            cce->getReadyIndexes(opCtx, &indexNames);
-        });
-
-        auto ws = make_unique<WorkingSet>();
-        auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
-
-        for (size_t i = 0; i < indexNames.size(); i++) {
-            BSONObj indexSpec =
-                writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&cce, &opCtx, &indexNames, i] {
-                    return cce->getIndexSpec(opCtx, indexNames[i]);
-                });
-
-            WorkingSetID id = ws->allocate();
-            WorkingSetMember* member = ws->get(id);
-            member->keyData.clear();
-            member->recordId = RecordId();
-            member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec.getOwned());
-            member->transitionToOwnedObj();
-            root->pushBack(id);
-        }
-
-        const NamespaceString cursorNss = NamespaceString::makeListIndexesNSS(dbname, nss.coll());
-        invariant(nss == cursorNss.getTargetNSForListIndexes());
-
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
-        uassertStatusOK(statusWithPlanExecutor.getStatus());
-        auto exec = std::move(statusWithPlanExecutor.getValue());
-
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+        NamespaceString cursorNss;
         BSONArrayBuilder firstBatch;
+        {
+            AutoGetCollectionForReadCommand ctx(opCtx,
+                                                CommandHelpers::parseNsOrUUID(dbname, cmdObj));
+            Collection* collection = ctx.getCollection();
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "ns does not exist: " << ctx.getNss().ns(),
+                    collection);
 
-        for (long long objCount = 0; objCount < batchSize; objCount++) {
-            BSONObj next;
-            PlanExecutor::ExecState state = exec->getNext(&next, NULL);
-            if (state == PlanExecutor::IS_EOF) {
-                break;
+            const CollectionCatalogEntry* cce = collection->getCatalogEntry();
+            invariant(cce);
+
+            const auto nss = ctx.getNss();
+
+            vector<string> indexNames;
+            writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&indexNames, &cce, &opCtx] {
+                indexNames.clear();
+                cce->getReadyIndexes(opCtx, &indexNames);
+            });
+
+            auto ws = make_unique<WorkingSet>();
+            auto root = make_unique<QueuedDataStage>(opCtx, ws.get());
+
+            for (size_t i = 0; i < indexNames.size(); i++) {
+                BSONObj indexSpec = writeConflictRetry(
+                    opCtx, "listIndexes", nss.ns(), [&cce, &opCtx, &indexNames, i] {
+                        return cce->getIndexSpec(opCtx, indexNames[i]);
+                    });
+
+                WorkingSetID id = ws->allocate();
+                WorkingSetMember* member = ws->get(id);
+                member->keyData.clear();
+                member->recordId = RecordId();
+                member->obj = Snapshotted<BSONObj>(SnapshotId(), indexSpec.getOwned());
+                member->transitionToOwnedObj();
+                root->pushBack(id);
             }
-            invariant(state == PlanExecutor::ADVANCED);
 
-            // If we can't fit this result inside the current batch, then we stash it for later.
-            if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
-                exec->enqueue(next);
-                break;
+            cursorNss = NamespaceString::makeListIndexesNSS(dbname, nss.coll());
+            invariant(nss == cursorNss.getTargetNSForListIndexes());
+
+            exec = uassertStatusOK(PlanExecutor::make(
+                opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD));
+
+            for (long long objCount = 0; objCount < batchSize; objCount++) {
+                BSONObj next;
+                PlanExecutor::ExecState state = exec->getNext(&next, NULL);
+                if (state == PlanExecutor::IS_EOF) {
+                    break;
+                }
+                invariant(state == PlanExecutor::ADVANCED);
+
+                // If we can't fit this result inside the current batch, then we stash it for later.
+                if (!FindCommon::haveSpaceForNext(next, objCount, firstBatch.len())) {
+                    exec->enqueue(next);
+                    break;
+                }
+
+                firstBatch.append(next);
             }
 
-            firstBatch.append(next);
-        }
+            if (exec->isEOF()) {
+                appendCursorResponseObject(0LL, cursorNss.ns(), firstBatch.arr(), &result);
+                return true;
+            }
 
-        CursorId cursorId = 0LL;
-        if (!exec->isEOF()) {
             exec->saveState();
             exec->detachFromOperationContext();
-            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
-                opCtx,
-                {std::move(exec),
-                 cursorNss,
-                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                 opCtx->recoveryUnit()->getReadConcernLevel(),
-                 cmdObj});
-            cursorId = pinnedCursor.getCursor()->cursorid();
-        }
+        }  // Drop collection lock. Global cursor registration must be done without holding any
+           // locks.
 
-        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
+        const auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+            opCtx,
+            {std::move(exec),
+             cursorNss,
+             AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+             opCtx->recoveryUnit()->getReadConcernLevel(),
+             cmdObj});
+
+        appendCursorResponseObject(
+            pinnedCursor.getCursor()->cursorid(), cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

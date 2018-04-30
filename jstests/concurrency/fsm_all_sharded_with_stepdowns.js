@@ -103,6 +103,7 @@ var blacklist = [
     // Use getmores.
     'agg_base.js',
     'create_index_background.js',
+    'globally_managed_cursors.js',
     'indexed_insert_ordered_bulk.js',
     'indexed_insert_text.js',
     'indexed_insert_unordered_bulk.js',

@@ -204,7 +204,8 @@ void ClientCursorPin::release() {
         deleteUnderlying();
     } else {
         // Unpin the cursor under the collection cursor manager lock.
-        _cursor->_cursorManager->unpin(_opCtx, _cursor);
+        _cursor->_cursorManager->unpin(
+            _opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
         cursorStatsOpenPinned.decrement();
     }
 
