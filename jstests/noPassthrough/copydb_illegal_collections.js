@@ -2,7 +2,7 @@
  * This test creates a replica set and tries copying the local database. It expects an error on
  * the `copydb` command when it runs across an illegal namespace to copy, e.g:
  * `local.system.replset` -> `db2.system.replset`.
- * @tags: [requires_replication]
+ * @tags: [requires_replication, requires_persistence]
  */
 (function() {
     "use strict";
@@ -22,6 +22,7 @@
     var db2 = conn.getDB("db2");
 
     var res = db1.adminCommand({copydb: 1, fromdb: db1._name, todb: db2._name});
+
     assert.commandFailedWithCode(res, ErrorCodes.InvalidNamespace);
     assert.gt(res["errmsg"].indexOf("cannot write to 'db2.system.replset'"), -1);
     rst.stopSet();
