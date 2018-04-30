@@ -831,6 +831,11 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
         if (opCtx->getWriteUnitOfWork()) {
             opCtx->setWriteUnitOfWork(nullptr);
         }
+        // We must clear the recovery unit so any post-transaction writes can run without
+        // transactional settings such as a read timestamp.
+        opCtx->setRecoveryUnit(
+            opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
     if (canKillCursors) {
         _killTransactionCursors(opCtx, _sessionId, txnNumberAtStart);
@@ -979,6 +984,11 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 _txnState = MultiDocumentTransactionState::kAborted;
             }
         }
+        // We must clear the recovery unit so any post-transaction writes can run without
+        // transactional settings such as a read timestamp.
+        opCtx->setRecoveryUnit(
+            opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         _commitcv.notify_all();
     });
     lk.unlock();
