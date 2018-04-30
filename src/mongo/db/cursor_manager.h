@@ -251,9 +251,19 @@ private:
     ClientCursorPin _registerCursor(
         OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
-    void deregisterCursor(ClientCursor* cc);
+    void deregisterCursor(ClientCursor* cursor);
 
-    void unpin(OperationContext* opCtx, ClientCursor* cursor);
+    /**
+     * Removes the cursor from the partition, unlocks the partition, then calls 'dispose()' on
+     * 'cursor' and deletes it.
+     */
+    void deregisterAndDestroyCursor(
+        Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>::OnePartition&&,
+        OperationContext* opCtx,
+        std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
+
+    void unpin(OperationContext* opCtx,
+               std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor);
 
     bool cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now);
 

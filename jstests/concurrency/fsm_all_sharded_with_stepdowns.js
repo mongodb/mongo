@@ -63,13 +63,6 @@ var blacklist = [
     'indexed_insert_eval.js',  // eval doesn't work with sharded collections
     'indexed_insert_eval_nolock.js',  // eval doesn't work with sharded collections
 
-    // These workloads sometimes triggers an 'unable to target write op for collection ... caused by
-    // ... database not found' error. Further investigation still needs to be done, but these
-    // failures may be due to SERVER-17397 'drops in a sharded cluster may not fully succeed'
-    // because it drops and reuses the same namespaces.
-    'kill_multicollection_aggregation.js',
-    'invalidated_cursors.js',
-
     'plan_cache_drop_database.js',  // cannot ensureIndex after dropDatabase without sharding first
     'remove_single_document.js',    // our .remove(query, {justOne: true}) calls lack shard keys
     'remove_single_document_eval.js',         // eval doesn't work with sharded collections
@@ -113,6 +106,7 @@ var blacklist = [
     // Use getmores.
     'agg_base.js',
     'create_index_background.js',
+    'globally_managed_cursors.js',
     'indexed_insert_ordered_bulk.js',
     'indexed_insert_text.js',
     'indexed_insert_unordered_bulk.js',
@@ -134,6 +128,8 @@ var blacklist = [
     'yield_sort.js',
     'yield_sort_merge.js',
     'yield_text.js',
+    'kill_multicollection_aggregation.js',
+    'invalidated_cursors.js',
 
     // Use non retryable writes.
     'remove_and_bulk_insert.js',

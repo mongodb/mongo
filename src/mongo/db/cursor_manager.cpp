@@ -427,29 +427,37 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
 
     // Mark all cursors as killed, but keep around those we can in order to provide a useful error
     // message to the user when they attempt to use it next time.
-    auto allCurrentPartitions = _cursorMap->lockAllPartitions();
-    for (auto&& partition : allCurrentPartitions) {
-        for (auto it = partition.begin(); it != partition.end();) {
-            auto* cursor = it->second;
-            cursor->markAsKilled(reason);
+    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDisposeWithoutMutex;
+    {
+        auto allCurrentPartitions = _cursorMap->lockAllPartitions();
+        for (auto&& partition : allCurrentPartitions) {
+            for (auto it = partition.begin(); it != partition.end();) {
+                auto* cursor = it->second;
+                cursor->markAsKilled(reason);
 
-            // If pinned, there is an active user of this cursor, who is now responsible for
-            // cleaning it up. Otherwise, we can immediately dispose of it.
-            if (cursor->_isPinned) {
-                it = partition.erase(it);
-                continue;
-            }
+                // If pinned, there is an active user of this cursor, who is now responsible for
+                // cleaning it up. Otherwise, we can immediately dispose of it.
+                if (cursor->_isPinned) {
+                    it = partition.erase(it);
+                    continue;
+                }
 
-            if (!collectionGoingAway) {
-                // We keep around unpinned cursors so that future attempts to use the cursor will
-                // result in a useful error message.
-                ++it;
-            } else {
-                cursor->dispose(opCtx);
-                delete cursor;
-                it = partition.erase(it);
+                if (!collectionGoingAway) {
+                    // We keep around unpinned cursors so that future attempts to use the cursor
+                    // will result in a useful error message.
+                    ++it;
+                } else {
+                    toDisposeWithoutMutex.emplace_back(cursor);
+                    it = partition.erase(it);
+                }
             }
         }
+    }
+
+    // Dispose of the cursors we can now delete. This might involve lock acquisitions for safe
+    // cleanup, so avoid doing it while holding mutexes.
+    for (auto&& cursor : toDisposeWithoutMutex) {
+        cursor->dispose(opCtx);
     }
 }
 
@@ -488,16 +496,14 @@ bool CursorManager::cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_
 }
 
 std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
-    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDelete;
+    std::vector<std::unique_ptr<ClientCursor, ClientCursor::Deleter>> toDisposeWithoutMutex;
 
     for (size_t partitionId = 0; partitionId < kNumPartitions; ++partitionId) {
         auto lockedPartition = _cursorMap->lockOnePartitionById(partitionId);
         for (auto it = lockedPartition->begin(); it != lockedPartition->end();) {
             auto* cursor = it->second;
             if (cursorShouldTimeout_inlock(cursor, now)) {
-                // Dispose of the cursor and remove it from the partition.
-                cursor->dispose(opCtx);
-                toDelete.push_back(std::unique_ptr<ClientCursor, ClientCursor::Deleter>{cursor});
+                toDisposeWithoutMutex.emplace_back(cursor);
                 it = lockedPartition->erase(it);
             } else {
                 ++it;
@@ -505,7 +511,11 @@ std::size_t CursorManager::timeoutCursors(OperationContext* opCtx, Date_t now) {
         }
     }
 
-    return toDelete.size();
+    // Be careful not to dispose of cursors while holding the partition lock.
+    for (auto&& cursor : toDisposeWithoutMutex) {
+        cursor->dispose(opCtx);
+    }
+    return toDisposeWithoutMutex.size();
 }
 
 namespace {
@@ -544,9 +554,9 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
         Status error{ErrorCodes::QueryPlanKilled,
                      str::stream() << "cursor killed because: "
                                    << cursor->getExecutor()->getKillReason()};
-        lockedPartition->erase(cursor->cursorid());
-        cursor->dispose(opCtx);
-        delete cursor;
+        deregisterAndDestroyCursor(std::move(lockedPartition),
+                                   opCtx,
+                                   std::unique_ptr<ClientCursor, ClientCursor::Deleter>(cursor));
         return error;
     }
 
@@ -568,7 +578,8 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
     return ClientCursorPin(opCtx, cursor);
 }
 
-void CursorManager::unpin(OperationContext* opCtx, ClientCursor* cursor) {
+void CursorManager::unpin(OperationContext* opCtx,
+                          std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
     // Avoid computing the current time within the critical section.
     auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
 
@@ -576,6 +587,10 @@ void CursorManager::unpin(OperationContext* opCtx, ClientCursor* cursor) {
     invariant(cursor->_isPinned);
     cursor->_isPinned = false;
     cursor->_lastUseDate = now;
+
+    // The cursor will stay around in '_cursorMap', so release the unique pointer to avoid deleting
+    // it.
+    cursor.release();
 }
 
 void CursorManager::getCursorIds(std::set<CursorId>* openCursors) const {
@@ -687,6 +702,21 @@ void CursorManager::deregisterCursor(ClientCursor* cc) {
     _cursorMap->erase(cc->cursorid());
 }
 
+void CursorManager::deregisterAndDestroyCursor(
+    Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>::OnePartition&& lk,
+    OperationContext* opCtx,
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> cursor) {
+    {
+        auto lockWithRestrictedScope = std::move(lk);
+        lockWithRestrictedScope->erase(cursor->cursorid());
+    }
+    // Dispose of the cursor without holding any cursor manager mutexes. Disposal of a cursor
+    // can require taking lock manager locks, which we want to avoid while holding a mutex. If
+    // we did so, any caller of a CursorManager method which already held a lock manager lock
+    // could induce a deadlock when trying to acquire a CursorManager lock.
+    cursor->dispose(opCtx);
+}
+
 Status CursorManager::eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
@@ -712,8 +742,7 @@ Status CursorManager::eraseCursor(OperationContext* opCtx, CursorId id, bool sho
         audit::logKillCursorsAuthzCheck(opCtx->getClient(), _nss, id, ErrorCodes::OK);
     }
 
-    lockedPartition->erase(ownedCursor->cursorid());
-    ownedCursor->dispose(opCtx);
+    deregisterAndDestroyCursor(std::move(lockedPartition), opCtx, std::move(ownedCursor));
     return Status::OK();
 }
 
