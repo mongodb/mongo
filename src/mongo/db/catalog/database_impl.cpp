@@ -78,16 +78,17 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER(InitializeDatabaseFactory)(InitializerContext* const) {
-    Database::registerFactory([](Database* const this_,
-                                 OperationContext* const opCtx,
-                                 const StringData name,
-                                 DatabaseCatalogEntry* const dbEntry) {
-        return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry);
-    });
-    return Status::OK();
+MONGO_REGISTER_SHIM(Database::makeImpl)
+(Database* const this_,
+ OperationContext* const opCtx,
+ const StringData name,
+ DatabaseCatalogEntry* const dbEntry,
+ PrivateTo<Database>)
+    ->std::unique_ptr<Database::Impl> {
+    return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry);
 }
+
+namespace {
 MONGO_FP_DECLARE(hangBeforeLoggingCreateCollection);
 }  // namespace
 
@@ -865,7 +866,7 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
         Top::get(serviceContext).collectionDropped(coll->ns().ns(), true);
     }
 
-    dbHolder().close(opCtx, name, "database dropped");
+    DatabaseHolder::getDatabaseHolder().close(opCtx, name, "database dropped");
 
     auto const storageEngine = serviceContext->getGlobalStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", name, [&] {
@@ -895,7 +896,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
 
     if (!_uniqueCollectionNamespacePseudoRandom) {
         _uniqueCollectionNamespacePseudoRandom =
-            stdx::make_unique<PseudoRandom>(Date_t::now().asInt64());
+            std::make_unique<PseudoRandom>(Date_t::now().asInt64());
     }
 
     const auto charsToChooseFrom =
@@ -935,60 +936,19 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                       << " attempts due to namespace conflicts with existing collections.");
 }
 
-namespace {
-MONGO_INITIALIZER(InitializeDropDatabaseImpl)(InitializerContext* const) {
-    Database::registerDropDatabaseImpl(DatabaseImpl::dropDatabase);
-    return Status::OK();
-}
-MONGO_INITIALIZER(InitializeUserCreateNSImpl)(InitializerContext* const) {
-    registerUserCreateNSImpl(userCreateNSImpl);
-    return Status::OK();
+MONGO_REGISTER_SHIM(Database::dropDatabase)(OperationContext* opCtx, Database* db)->void {
+    return DatabaseImpl::dropDatabase(opCtx, db);
 }
 
-MONGO_INITIALIZER(InitializeDropAllDatabasesExceptLocalImpl)(InitializerContext* const) {
-    registerDropAllDatabasesExceptLocalImpl(dropAllDatabasesExceptLocalImpl);
-    return Status::OK();
-}
-}  // namespace
-}  // namespace mongo
-
-void mongo::dropAllDatabasesExceptLocalImpl(OperationContext* opCtx) {
-    Lock::GlobalWrite lk(opCtx);
-
-    vector<string> n;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
-    storageEngine->listDatabases(&n);
-
-    if (n.size() == 0)
-        return;
-    log() << "dropAllDatabasesExceptLocal " << n.size();
-
-    repl::ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
-
-    for (const auto& dbName : n) {
-        if (dbName != "local") {
-            writeConflictRetry(opCtx, "dropAllDatabasesExceptLocal", dbName, [&opCtx, &dbName] {
-                Database* db = dbHolder().get(opCtx, dbName);
-
-                // This is needed since dropDatabase can't be rolled back.
-                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed
-                if (db == nullptr) {
-                    log() << "database disappeared after listDatabases but before drop: " << dbName;
-                } else {
-                    DatabaseImpl::dropDatabase(opCtx, db);
-                }
-            });
-        }
-    }
-}
-
-auto mongo::userCreateNSImpl(OperationContext* opCtx,
-                             Database* db,
-                             StringData ns,
-                             BSONObj options,
-                             CollectionOptions::ParseKind parseKind,
-                             bool createDefaultIndexes,
-                             const BSONObj& idIndex) -> Status {
+MONGO_REGISTER_SHIM(Database::userCreateNS)
+(OperationContext* opCtx,
+ Database* db,
+ StringData ns,
+ BSONObj options,
+ CollectionOptions::ParseKind parseKind,
+ bool createDefaultIndexes,
+ const BSONObj& idIndex)
+    ->Status {
     invariant(db);
 
     LOG(1) << "create collection " << ns << ' ' << options;
@@ -1087,3 +1047,34 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+MONGO_REGISTER_SHIM(Database::dropAllDatabasesExceptLocal)(OperationContext* opCtx)->void {
+    Lock::GlobalWrite lk(opCtx);
+
+    vector<string> n;
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    storageEngine->listDatabases(&n);
+
+    if (n.size() == 0)
+        return;
+    log() << "dropAllDatabasesExceptLocal " << n.size();
+
+    repl::ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
+
+    for (const auto& dbName : n) {
+        if (dbName != "local") {
+            writeConflictRetry(opCtx, "dropAllDatabasesExceptLocal", dbName, [&opCtx, &dbName] {
+                Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+
+                // This is needed since dropDatabase can't be rolled back.
+                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed
+                if (db == nullptr) {
+                    log() << "database disappeared after listDatabases but before drop: " << dbName;
+                } else {
+                    DatabaseImpl::dropDatabase(opCtx, db);
+                }
+            });
+        }
+    }
+}
+}  // namespace mongo

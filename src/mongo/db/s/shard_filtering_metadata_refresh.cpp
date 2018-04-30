@@ -213,7 +213,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
             // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call
             // into checkDbVersion().
             Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-            const auto db = dbHolder().get(opCtx, dbName);
+            const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
             if (!db) {
                 log() << "Database " << dbName
                       << " has been dropped; not caching the refreshed databaseVersion";
@@ -234,7 +234,7 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
 
         // The cached version is older than the refreshed version; update the cached version.
         Lock::DBLock dbLock(opCtx, dbName, MODE_X);
-        const auto db = dbHolder().get(opCtx, dbName);
+        const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
         if (!db) {
             log() << "Database " << dbName
                   << " has been dropped; not caching the refreshed databaseVersion";

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 10gen Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,25 +17,20 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects for
- *    all of the code used other than as permitted herein. If you modify file(s)
- *    with this exception, you may extend this exception to your version of the
- *    file(s), but you are not obligated to do so. If you do not wish to do so,
- *    delete this exception statement from your version. If you delete this
- *    exception statement from all source files in the program, then also delete
- *    it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+#include "mongo/base/shim.h"
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/collection_info_cache.h"
 
 namespace mongo {
-CollectionInfoCache::Impl::~Impl() = default;
-
-MONGO_DEFINE_SHIM(CollectionInfoCache::makeImpl);
-
-void CollectionInfoCache::TUHook::hook() noexcept {}
+namespace {
+MONGO_INITIALIZER_GROUP(ShimHooks, MONGO_NO_PREREQUISITES, ("default"));
+}  // namespace
 }  // namespace mongo

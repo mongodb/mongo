@@ -31,6 +31,8 @@
 #include <memory>
 #include <string>
 
+#include "mongo/base/shim.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
@@ -45,6 +47,7 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
 /**
  * Represents a logical database containing Collections.
  *
@@ -123,16 +126,34 @@ public:
         virtual const CollectionMap& collections() const = 0;
     };
 
-private:
-    static std::unique_ptr<Impl> makeImpl(Database* _this,
-                                          OperationContext* opCtx,
-                                          StringData name,
-                                          DatabaseCatalogEntry* dbEntry);
-
 public:
-    using factory_function_type = decltype(makeImpl);
+    static MONGO_DECLARE_SHIM((OperationContext * opCtx)->void) dropAllDatabasesExceptLocal;
 
-    static void registerFactory(stdx::function<factory_function_type> factory);
+    /**
+     * Creates the namespace 'ns' in the database 'db' according to 'options'. If
+     * 'createDefaultIndexes'
+     * is true, creates the _id index for the collection (and the system indexes, in the case of
+     * system
+     * collections). Creates the collection's _id index according to 'idIndex', if it is non-empty.
+     * When
+     * 'idIndex' is empty, creates the default _id index.
+     */
+    static MONGO_DECLARE_SHIM(
+        (OperationContext * opCtx,
+         Database* db,
+         StringData ns,
+         BSONObj options,
+         CollectionOptions::ParseKind parseKind = CollectionOptions::parseForCommand,
+         bool createDefaultIndexes = true,
+         const BSONObj& idIndex = BSONObj())
+            ->Status) userCreateNS;
+
+    static MONGO_DECLARE_SHIM((Database * this_,
+                               OperationContext* opCtx,
+                               StringData name,
+                               DatabaseCatalogEntry*,
+                               PrivateTo<Database>)
+                                  ->std::unique_ptr<Impl>) makeImpl;
 
     /**
      * Iterating over a Database yields Collection* pointers.
@@ -182,7 +203,7 @@ public:
     explicit inline Database(OperationContext* const opCtx,
                              const StringData name,
                              DatabaseCatalogEntry* const dbEntry)
-        : _pimpl(makeImpl(this, opCtx, name, dbEntry)) {
+        : _pimpl(makeImpl(this, opCtx, name, dbEntry, PrivateCall<Database>{})) {
         this->_impl().init(opCtx);
     }
 
@@ -335,17 +356,7 @@ public:
      *
      * Must be called with the specified database locked in X mode.
      */
-    static void dropDatabase(OperationContext* opCtx, Database* db);
-
-    /**
-     * Registers an implementation of `Database::dropDatabase` for use by library clients.
-     * This is necessary to allow `catalog/database` to be a vtable edge.
-     * @param impl Implementation of `dropDatabase` to install.
-     * @note This call is not thread safe.
-     */
-    static void registerDropDatabaseImpl(stdx::function<decltype(dropDatabase)> impl);
-
-    // static Status validateDBName( StringData dbname );
+    static MONGO_DECLARE_SHIM((OperationContext * opCtx, Database* db)->void) dropDatabase;
 
     inline const NamespaceString& getSystemIndexesName() const {
         return this->_impl().getSystemIndexesName();
@@ -395,37 +406,4 @@ private:
 
     std::unique_ptr<Impl> _pimpl;
 };
-
-void dropAllDatabasesExceptLocal(OperationContext* opCtx);
-
-/**
- * Registers an implementation of `dropAllDatabaseExceptLocal` for use by library clients.
- * This is necessary to allow `catalog/database` to be a vtable edge.
- * @param impl Implementation of `dropAllDatabaseExceptLocal` to install.
- * @note This call is not thread safe.
- */
-void registerDropAllDatabasesExceptLocalImpl(
-    stdx::function<decltype(dropAllDatabasesExceptLocal)> impl);
-
-/**
- * Creates the namespace 'ns' in the database 'db' according to 'options'. If 'createDefaultIndexes'
- * is true, creates the _id index for the collection (and the system indexes, in the case of system
- * collections). Creates the collection's _id index according to 'idIndex', if it is non-empty. When
- * 'idIndex' is empty, creates the default _id index.
- */
-Status userCreateNS(OperationContext* opCtx,
-                    Database* db,
-                    StringData ns,
-                    BSONObj options,
-                    CollectionOptions::ParseKind parseKind = CollectionOptions::parseForCommand,
-                    bool createDefaultIndexes = true,
-                    const BSONObj& idIndex = BSONObj());
-
-/**
- * Registers an implementation of `userCreateNS` for use by library clients.
- * This is necessary to allow `catalog/database` to be a vtable edge.
- * @param impl Implementation of `userCreateNS` to install.
- * @note This call is not thread safe.
- */
-void registerUserCreateNSImpl(stdx::function<decltype(userCreateNS)> impl);
 }  // namespace mongo

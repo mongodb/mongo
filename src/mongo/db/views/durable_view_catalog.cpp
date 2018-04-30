@@ -54,7 +54,7 @@ namespace mongo {
 
 void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const NamespaceString& name) {
     dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
-    Database* db = dbHolder().get(opCtx, name.db());
+    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, name.db());
 
     if (db) {
         opCtx->recoveryUnit()->onCommit([db]() { db->getViewCatalog()->invalidate(); });

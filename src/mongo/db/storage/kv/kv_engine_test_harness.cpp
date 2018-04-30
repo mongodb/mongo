@@ -1,5 +1,3 @@
-// kv_engine_test_harness.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *

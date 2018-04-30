@@ -1,5 +1,3 @@
-// ephemeral_for_test_record_store_test.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *

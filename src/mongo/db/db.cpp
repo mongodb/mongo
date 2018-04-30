@@ -222,7 +222,7 @@ void logStartup(OperationContext* opCtx) {
     if (!collection) {
         BSONObj options = BSON("capped" << true << "size" << 10 * 1024 * 1024);
         repl::UnreplicatedWritesBlock uwb(opCtx);
-        uassertStatusOK(userCreateNS(opCtx, db, startupLogCollectionName.ns(), options));
+        uassertStatusOK(Database::userCreateNS(opCtx, db, startupLogCollectionName.ns(), options));
         collection = db->getCollection(opCtx, startupLogCollectionName);
     }
     invariant(collection);

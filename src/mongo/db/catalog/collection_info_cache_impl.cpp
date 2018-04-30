@@ -49,15 +49,11 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER(InitializeCollectionInfoCacheFactory)(InitializerContext* const) {
-    CollectionInfoCache::registerFactory(
-        [](Collection* const collection, const NamespaceString& ns) {
-            return stdx::make_unique<CollectionInfoCacheImpl>(collection, ns);
-        });
-    return Status::OK();
+MONGO_REGISTER_SHIM(CollectionInfoCache::makeImpl)
+(Collection* const collection, const NamespaceString& ns, PrivateTo<CollectionInfoCache>)
+    ->std::unique_ptr<CollectionInfoCache::Impl> {
+    return std::make_unique<CollectionInfoCacheImpl>(collection, ns);
 }
-}  // namespace
 
 CollectionInfoCacheImpl::CollectionInfoCacheImpl(Collection* collection, const NamespaceString& ns)
     : _collection(collection),

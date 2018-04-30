@@ -117,15 +117,15 @@
  * of the function to declare would be options.
  */
 #define MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)                        \
-    ::mongo::Status _MONGO_INITIALIZER_FUNCTION_NAME(NAME)(::mongo::InitializerContext*); \
+    ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)(::mongo::InitializerContext*); \
     namespace {                                                                           \
     ::mongo::GlobalInitializerRegisterer _mongoInitializerRegisterer_##NAME(              \
         std::string(#NAME),                                                               \
         MONGO_MAKE_STRING_VECTOR PREREQUISITES,                                           \
         MONGO_MAKE_STRING_VECTOR DEPENDENTS,                                              \
-        mongo::InitializerFunction(_MONGO_INITIALIZER_FUNCTION_NAME(NAME)));              \
+        mongo::InitializerFunction(MONGO_INITIALIZER_FUNCTION_NAME_(NAME)));              \
     }                                                                                     \
-    ::mongo::Status _MONGO_INITIALIZER_FUNCTION_NAME(NAME)
+    ::mongo::Status MONGO_INITIALIZER_FUNCTION_NAME_(NAME)
 
 /**
  * Macro to define an initializer group.
@@ -143,4 +143,4 @@
  * Macro to produce a name for a mongo initializer function for an initializer operation
  * named "NAME".
  */
-#define _MONGO_INITIALIZER_FUNCTION_NAME(NAME) _mongoInitializerFunction_##NAME
+#define MONGO_INITIALIZER_FUNCTION_NAME_(NAME) _mongoInitializerFunction_##NAME

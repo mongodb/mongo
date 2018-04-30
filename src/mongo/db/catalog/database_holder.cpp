@@ -36,32 +36,9 @@ namespace mongo {
 
 DatabaseHolder::Impl::~Impl() = default;
 
-namespace {
-stdx::function<DatabaseHolder::factory_function_type> factory;
-}  // namespace
-
-void DatabaseHolder::registerFactory(decltype(factory) newFactory) {
-    factory = std::move(newFactory);
-}
-
-auto DatabaseHolder::makeImpl() -> std::unique_ptr<Impl> {
-    return factory();
-}
-
 void DatabaseHolder::TUHook::hook() noexcept {}
 
-namespace {
-stdx::function<decltype(dbHolder)> dbHolderImpl;
-}  // namespace
+MONGO_DEFINE_SHIM(DatabaseHolder::makeImpl);
+MONGO_DEFINE_SHIM(DatabaseHolder::getDatabaseHolder);
+
 }  // namespace mongo
-
-// The `mongo::` prefix is necessary to placate MSVC -- it is unable to properly identify anonymous
-// nested namespace members in `decltype` expressions when defining functions using scope-resolution
-// syntax.
-void mongo::registerDbHolderImpl(decltype(mongo::dbHolderImpl) impl) {
-    dbHolderImpl = std::move(impl);
-}
-
-auto mongo::dbHolder() -> DatabaseHolder& {
-    return dbHolderImpl();
-}

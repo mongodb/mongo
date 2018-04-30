@@ -102,8 +102,8 @@ void RollbackTest::tearDown() {
     SessionCatalog::get(_serviceContextMongoDTest.getServiceContext())->reset_forTest();
 
     // We cannot unset the global replication coordinator because ServiceContextMongoD::tearDown()
-    // calls dropAllDatabasesExceptLocal() which requires the replication coordinator to clear all
-    // snapshots.
+    // calls Databse::dropAllDatabasesExceptLocal() which requires the replication coordinator to
+    // clear all snapshots.
     _serviceContextMongoDTest.tearDown();
 
     // ServiceContextMongoD::tearDown() does not destroy service context so it is okay
@@ -179,7 +179,7 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
                                             const CollectionOptions& options) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
     mongo::WriteUnitOfWork wuow(opCtx);
-    auto db = dbHolder().openDb(opCtx, nss.db());
+    auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
     db->dropCollection(opCtx, nss.ns()).transitional_ignore();
     auto coll = db->createCollection(opCtx, nss.ns(), options);

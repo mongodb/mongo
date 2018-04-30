@@ -92,7 +92,7 @@ repl::OpTime UUIDCatalogObserver::onRenameCollection(OperationContext* opCtx,
     if (!uuid)
         return {};
     auto getNewCollection = [opCtx, toCollection] {
-        auto db = dbHolder().get(opCtx, toCollection.db());
+        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, toCollection.db());
         auto newColl = db->getCollection(opCtx, toCollection);
         invariant(newColl);
         return newColl;

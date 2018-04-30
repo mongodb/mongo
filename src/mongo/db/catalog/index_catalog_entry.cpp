@@ -38,22 +38,7 @@
 namespace mongo {
 IndexCatalogEntry::Impl::~Impl() = default;
 
-namespace {
-stdx::function<IndexCatalogEntry::factory_function_type> factory;
-}  // namespace
-
-void IndexCatalogEntry::registerFactory(decltype(factory) newFactory) {
-    factory = std::move(newFactory);
-}
-
-auto IndexCatalogEntry::makeImpl(IndexCatalogEntry* const this_,
-                                 OperationContext* const opCtx,
-                                 const StringData ns,
-                                 CollectionCatalogEntry* const collection,
-                                 std::unique_ptr<IndexDescriptor> descriptor,
-                                 CollectionInfoCache* const infoCache) -> std::unique_ptr<Impl> {
-    return factory(this_, opCtx, ns, collection, std::move(descriptor), infoCache);
-}
+MONGO_DEFINE_SHIM(IndexCatalogEntry::makeImpl);
 
 void IndexCatalogEntry::TUHook::hook() noexcept {}
 
@@ -62,7 +47,13 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* opCtx,
                                      CollectionCatalogEntry* collection,
                                      std::unique_ptr<IndexDescriptor> descriptor,
                                      CollectionInfoCache* infoCache)
-    : _pimpl(makeImpl(this, opCtx, ns, collection, std::move(descriptor), infoCache)) {}
+    : _pimpl(makeImpl(this,
+                      opCtx,
+                      ns,
+                      collection,
+                      std::move(descriptor),
+                      infoCache,
+                      PrivateCall<IndexCatalogEntry>{})) {}
 
 void IndexCatalogEntry::init(std::unique_ptr<IndexAccessMethod> accessMethod) {
     return this->_impl().init(std::move(accessMethod));

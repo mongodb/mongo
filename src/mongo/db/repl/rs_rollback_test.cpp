@@ -357,7 +357,7 @@ int _testRollbackDelete(OperationContext* opCtx,
 
     Lock::DBLock dbLock(opCtx, "test", MODE_S);
     Lock::CollectionLock collLock(opCtx->lockState(), "test.t", MODE_S);
-    auto db = dbHolder().get(opCtx, "test");
+    auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, "test");
     ASSERT_TRUE(db);
     auto collection = db->getCollection(opCtx, "test.t");
     if (!collection) {
@@ -1777,7 +1777,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
                            _replicationProcess.get()));
     {
         Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
-        auto db = dbHolder().get(_opCtx.get(), "test");
+        auto db = DatabaseHolder::getDatabaseHolder().get(_opCtx.get(), "test");
         ASSERT_TRUE(db);
         ASSERT_FALSE(db->getCollection(_opCtx.get(), "test.t"));
     }

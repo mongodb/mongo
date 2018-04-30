@@ -41,14 +41,12 @@ class MultiIndexBlockImplServers : public MultiIndexBlockImpl {
         return spec["background"].trueValue();
     }
 };
+}  // namespace
 
-MONGO_INITIALIZER(InitializeMultiIndexBlockFactory)(InitializerContext* const) {
-    MultiIndexBlock::registerFactory(
-        [](OperationContext* const opCtx, Collection* const collection) {
-            return stdx::make_unique<MultiIndexBlockImplServers>(opCtx, collection);
-        });
-    return Status::OK();
+MONGO_REGISTER_SHIM(MultiIndexBlock::makeImpl)
+(OperationContext* const opCtx, Collection* const collection, PrivateTo<MultiIndexBlock>)
+    ->std::unique_ptr<MultiIndexBlock::Impl> {
+    return std::make_unique<MultiIndexBlockImplServers>(opCtx, collection);
 }
 
-}  // namespace
 }  // namespace mongo

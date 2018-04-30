@@ -269,9 +269,9 @@ public:
                        str::stream() << "Not primary while creating indexes in " << ns.ns()));
         }
 
-        Database* db = dbHolder().get(opCtx, ns.db());
+        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
         if (!db) {
-            db = dbHolder().openDb(opCtx, ns.db());
+            db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, ns.db());
         }
         DatabaseShardingState::get(db).checkDbVersion(opCtx);
 
@@ -393,7 +393,7 @@ public:
                     str::stream() << "Not primary while completing index build in " << dbname,
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns));
 
-            Database* db = dbHolder().get(opCtx, ns.db());
+            Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
             if (db) {
                 DatabaseShardingState::get(db).checkDbVersion(opCtx);
             }

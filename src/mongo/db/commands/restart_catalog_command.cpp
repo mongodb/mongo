@@ -95,7 +95,7 @@ public:
         std::vector<std::string> allDbs;
         getGlobalServiceContext()->getGlobalStorageEngine()->listDatabases(&allDbs);
         for (auto&& dbName : allDbs) {
-            const auto db = dbHolder().get(opCtx, dbName);
+            const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
             if (db->isDropPending(opCtx)) {
                 return CommandHelpers::appendCommandStatus(
                     result,

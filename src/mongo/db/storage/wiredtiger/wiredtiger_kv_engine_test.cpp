@@ -1,5 +1,3 @@
-// wiredtiger_kv_engine_test.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *

@@ -269,7 +269,8 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
 }
 
 OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& ns, bool doVersion)
-    : OldClientContext(opCtx, ns, doVersion, dbHolder().get(opCtx, ns), false) {}
+    : OldClientContext(
+          opCtx, ns, doVersion, DatabaseHolder::getDatabaseHolder().get(opCtx, ns), false) {}
 
 OldClientContext::OldClientContext(
     OperationContext* opCtx, const std::string& ns, bool doVersion, Database* db, bool justCreated)
@@ -277,7 +278,7 @@ OldClientContext::OldClientContext(
     if (!_db) {
         const auto dbName = nsToDatabaseSubstring(ns);
         invariant(_opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-        _db = dbHolder().openDb(_opCtx, dbName, &_justCreated);
+        _db = DatabaseHolder::getDatabaseHolder().openDb(_opCtx, dbName, &_justCreated);
         invariant(_db);
     }
 
