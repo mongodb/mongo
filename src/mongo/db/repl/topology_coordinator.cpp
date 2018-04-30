@@ -61,7 +61,11 @@
 
 namespace mongo {
 namespace repl {
+
 using std::vector;
+
+MONGO_FP_DECLARE(forceSyncSourceCandidate);
+
 const Seconds TopologyCoordinator::VoteLease::leaseTime = Seconds(30);
 
 // Controls how caught up in replication a secondary with higher priority than the current primary
@@ -202,6 +206,41 @@ HostAndPort TopologyCoordinator::chooseNewSyncSource(Date_t now,
     if (_selfIndex == -1) {
         LOG(1) << "Cannot sync from any members because we are not in the replica set config";
         return HostAndPort();
+    }
+
+    MONGO_FAIL_POINT_BLOCK(forceSyncSourceCandidate, customArgs) {
+        const auto& data = customArgs.getData();
+        const auto hostAndPortElem = data["hostAndPort"];
+        if (!hostAndPortElem) {
+            severe() << "'forceSyncSoureCandidate' parameter set with invalid host and port: "
+                     << data;
+            fassertFailed(50835);
+        }
+
+        const auto hostAndPort = HostAndPort(hostAndPortElem.checkAndGetStringData());
+        const int syncSourceIndex = _rsConfig.findMemberIndexByHostAndPort(hostAndPort);
+        if (syncSourceIndex < 0) {
+            log() << "'forceSyncSourceCandidate' failed due to host and port not in "
+                     "replica set config: "
+                  << hostAndPort.toString();
+            fassertFailed(50836);
+        }
+
+
+        if (_memberIsBlacklisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
+            log() << "Cannot select a sync source because forced candidate is blacklisted: "
+                  << hostAndPort.toString();
+            _syncSource = HostAndPort();
+            return _syncSource;
+        }
+
+        _syncSource = _rsConfig.getMemberAt(syncSourceIndex).getHostAndPort();
+        log() << "choosing sync source candidate due to 'forceSyncSourceCandidate' parameter: "
+              << _syncSource;
+        std::string msg(str::stream() << "syncing from: " << _syncSource.toString()
+                                      << " by 'forceSyncSourceCandidate' parameter");
+        setMyHeartbeatMessage(now, msg);
+        return _syncSource;
     }
 
     // if we have a target we've requested to sync from, use it
