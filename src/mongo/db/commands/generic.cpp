@@ -116,6 +116,54 @@ public:
     }
 } pingCmd;
 
+class EchoCommand final : public TypedCommand<EchoCommand> {
+public:
+    struct Request {
+        static constexpr auto kCommandName = "echo"_sd;
+        static Request parse(const IDLParserErrorContext&, const OpMsgRequest& request) {
+            return Request{request};
+        }
+
+        const OpMsgRequest& request;
+    };
+
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        using MinimalInvocationBase::MinimalInvocationBase;
+
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {}
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().request.getDatabase());
+        }
+
+        void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
+            result->append("echo", request().request.body);
+        }
+    };
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool requiresAuth() const override {
+        return false;
+    }
+};
+constexpr StringData EchoCommand::Request::kCommandName;
+
+MONGO_INITIALIZER(RegisterEcho)(InitializerContext* context) {
+    if (getTestCommandsEnabled()) {
+        new EchoCommand();
+    }
+    return Status::OK();
+}
+
 class ListCommandsCmd : public BasicCommand {
 public:
     std::string help() const override {

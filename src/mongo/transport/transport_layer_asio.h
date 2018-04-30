@@ -40,6 +40,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_mode.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -65,6 +66,9 @@ class ServiceContext;
 class ServiceEntryPoint;
 
 namespace transport {
+
+// This fail point simulates reads and writes that always return 1 byte and fail with EAGAIN
+MONGO_FP_FORWARD_DECLARE(transportLayerASIOshortOpportunisticReadWrite);
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.

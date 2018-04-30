@@ -194,6 +194,7 @@
         },
         dropRole: {skip: "always targets the config server"},
         dropUser: {skip: "always targets the config server"},
+        echo: {skip: "does not forward command to primary shard"},
         enableSharding: {skip: "does not forward command to primary shard"},
         endSessions: {skip: "goes through the cluster write path"},
         eval: {

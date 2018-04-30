@@ -36,6 +36,7 @@
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer_asio.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/net/sock.h"
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
@@ -49,6 +50,8 @@
 
 namespace mongo {
 namespace transport {
+
+MONGO_FP_DECLARE(transportLayerASIOshortOpportunisticReadWrite);
 
 template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
@@ -413,7 +416,24 @@ private:
                                    const MutableBufferSequence& buffers,
                                    const transport::BatonHandle& baton = nullptr) {
         std::error_code ec;
-        auto size = asio::read(stream, buffers, ec);
+        size_t size;
+
+        if (MONGO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
+            _blockingMode == Async) {
+            asio::mutable_buffer localBuffer = buffers;
+
+            if (buffers.size()) {
+                localBuffer = asio::mutable_buffer(buffers.data(), 1);
+            }
+
+            size = asio::read(stream, localBuffer, ec);
+            if (!ec && buffers.size() > 1) {
+                ec = asio::error::would_block;
+            }
+        } else {
+            size = asio::read(stream, buffers, ec);
+        }
+
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
             (_blockingMode == Async)) {
             // asio::read is a loop internally, so some of buffers may have been read into already.
@@ -474,7 +494,24 @@ private:
                                     const ConstBufferSequence& buffers,
                                     const transport::BatonHandle& baton = nullptr) {
         std::error_code ec;
-        auto size = asio::write(stream, buffers, ec);
+        std::size_t size;
+
+        if (MONGO_FAIL_POINT(transportLayerASIOshortOpportunisticReadWrite) &&
+            _blockingMode == Async) {
+            asio::const_buffer localBuffer = buffers;
+
+            if (buffers.size()) {
+                localBuffer = asio::const_buffer(buffers.data(), 1);
+            }
+
+            size = asio::write(stream, localBuffer, ec);
+            if (!ec && buffers.size() > 1) {
+                ec = asio::error::would_block;
+            }
+        } else {
+            size = asio::write(stream, buffers, ec);
+        }
+
         if (((ec == asio::error::would_block) || (ec == asio::error::try_again)) &&
             (_blockingMode == Async)) {
 

@@ -227,6 +227,7 @@
             }
         },
         dropUser: {skip: isUnrelated},
+        echo: {skip: isUnrelated},
         emptycapped: {
             command: {emptycapped: "view"},
             expectFailure: true,
