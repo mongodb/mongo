@@ -575,6 +575,8 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         return;
     }
 
+    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
+
     // Rollback is a synchronous operation that uses the task executor and may not be
     // executed inside the fetcher callback.
 
@@ -724,6 +726,7 @@ void BackgroundSync::stop(bool resetLastFetchedOptime) {
 
 void BackgroundSync::start(OperationContext* opCtx) {
     OpTimeWithHash lastAppliedOpTimeWithHash;
+    ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
     do {
         lastAppliedOpTimeWithHash = _readLastAppliedOpTimeWithHash(opCtx);
         stdx::lock_guard<stdx::mutex> lk(_mutex);
