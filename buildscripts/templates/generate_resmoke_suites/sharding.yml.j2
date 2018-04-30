@@ -22,8 +22,6 @@ selector:
 {% endif %}
 {% if excluded_tests is defined %}
   exclude_files:
-  # TODO: SERVER-31937
-  - jstests/sharding/kill_sessions.js
 {% for test in excluded_tests %}
   - {{ test }}
 {% endfor %}

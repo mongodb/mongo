@@ -10,8 +10,6 @@ selector:
   roots:
   - jstests/sharding/*.js
   exclude_files:
-  # TODO: SERVER-31937
-  - jstests/sharding/kill_sessions.js
   - jstests/sharding/mongos_rs_shard_failure_tolerance.js
   - jstests/sharding/top_chunk_autosplit.js
   - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js

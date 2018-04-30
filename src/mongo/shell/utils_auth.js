@@ -120,7 +120,6 @@ var authutil;
                     connElem._getDefaultSession().resetClusterTime_forTesting();
                     connElem._getDefaultSession().resetOperationTime_forTesting();
                     if (clusterTimes[i].connClusterTime) {
-                        jsTestLog("Restoring clusterTime: " + tojson(clusterTimes[i].connClusterTime));
                         connElem.advanceClusterTime(clusterTimes[i].connClusterTime);
                     }
                     if (clusterTimes[i].sessionClusterTime) {

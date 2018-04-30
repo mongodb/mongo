@@ -25,8 +25,6 @@ selector:
 {% if is_misc is defined %}
   - jstests/sharding/*.js
   exclude_files:
-  # TODO: SERVER-31937
-  - jstests/sharding/kill_sessions.js
 {% if excluded_tests is defined %}
 {% for test in excluded_tests %}
   - {{ test }}
