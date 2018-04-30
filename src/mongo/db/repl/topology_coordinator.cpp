@@ -1947,7 +1947,8 @@ void TopologyCoordinator::changeMemberState_forTest(const MemberState& newMember
     log() << newMemberState;
 }
 
-void TopologyCoordinator::_setCurrentPrimaryForTest(int primaryIndex) {
+void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
+                                                    const Timestamp& electionTime) {
     if (primaryIndex == _selfIndex) {
         changeMemberState_forTest(MemberState::RS_PRIMARY);
     } else {
@@ -1957,7 +1958,7 @@ void TopologyCoordinator::_setCurrentPrimaryForTest(int primaryIndex) {
         if (primaryIndex != -1) {
             ReplSetHeartbeatResponse hbResponse;
             hbResponse.setState(MemberState::RS_PRIMARY);
-            hbResponse.setElectionTime(Timestamp());
+            hbResponse.setElectionTime(electionTime);
             hbResponse.setAppliedOpTime(_memberData.at(primaryIndex).getHeartbeatAppliedOpTime());
             hbResponse.setSyncingTo(HostAndPort());
             hbResponse.setHbMsg("");

@@ -110,7 +110,7 @@ protected:
 
     void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0)) {
         getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionTimestamp);
-        getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
+        getTopoCoord().setCurrentPrimary_forTest(_selfIndex, electionTimestamp);
         OpTime dummyOpTime(Timestamp(1, 1), getTopoCoord().getTerm());
         ASSERT_OK(getTopoCoord().completeTransitionToPrimary(dummyOpTime));
     }
@@ -1091,7 +1091,7 @@ TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunAgainstPrimary) {
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     makeSelfPrimary();
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-    getTopoCoord()._setCurrentPrimaryForTest(0);
+    getTopoCoord().setCurrentPrimary_forTest(0);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h3"), &response, &result);
     ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
     ASSERT_EQUALS("primaries don't sync", result.reason());
@@ -1566,7 +1566,6 @@ TEST_F(TopoCoordTest,
     ASSERT_EQUALS(HostAndPort("h5").toString(), response2Obj["prevSyncTarget"].String());
 }
 
-// TODO(dannenberg) figure out a concise name for this
 TEST_F(TopoCoordTest, ReplSetGetStatus) {
     // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
     // set, with each node in a different state.
@@ -1586,6 +1585,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     OpTime oplogDurable(Timestamp(3, 4), 1);
     OpTime lastCommittedOpTime(Timestamp(2, 3), 6);
     OpTime readConcernMajorityOpTime(Timestamp(4, 5), 7);
+    Timestamp lastStableCheckpointTimestamp(9, 9);
     BSONObj initialSyncStatus = BSON("failedInitialSyncAttempts" << 1);
     std::string setName = "mySet";
 
@@ -1629,7 +1629,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     getTopoCoord().prepareHeartbeatRequestV1(startupTime + Milliseconds(2), setName, member);
     getTopoCoord().processHeartbeatResponse(
         heartbeatTime, Milliseconds(4000), member, hbResponseGood);
-    makeSelfPrimary();
+    makeSelfPrimary(electionTime);
     getTopoCoord().setMyLastAppliedOpTime(oplogProgress, startupTime, false);
     getTopoCoord().setMyLastDurableOpTime(oplogDurable, startupTime, false);
     getTopoCoord().advanceLastCommittedOpTime(lastCommittedOpTime);
@@ -1642,23 +1642,28 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
             curTime,
             static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
             readConcernMajorityOpTime,
-            initialSyncStatus},
+            initialSyncStatus,
+            lastStableCheckpointTimestamp},
         &statusBuilder,
         &resultStatus);
     ASSERT_OK(resultStatus);
     BSONObj rsStatus = statusBuilder.obj();
+    unittest::log() << rsStatus;
 
     // Test results for all non-self members
     ASSERT_EQUALS(setName, rsStatus["set"].String());
     ASSERT_EQUALS(curTime.asInt64(), rsStatus["date"].Date().asInt64());
-    ASSERT_BSONOBJ_EQ(lastCommittedOpTime.toBSON(),
-                      rsStatus["optimes"]["lastCommittedOpTime"].Obj());
+    ASSERT_EQUALS(lastStableCheckpointTimestamp,
+                  rsStatus["lastStableCheckpointTimestamp"].timestamp());
+    ASSERT_FALSE(rsStatus.hasField("electionTime"));
+    ASSERT_FALSE(rsStatus.hasField("pingMs"));
     {
         const auto optimes = rsStatus["optimes"].Obj();
         ASSERT_BSONOBJ_EQ(readConcernMajorityOpTime.toBSON(),
                           optimes["readConcernMajorityOpTime"].Obj());
         ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), optimes["appliedOpTime"].Obj());
         ASSERT_BSONOBJ_EQ((oplogDurable).toBSON(), optimes["durableOpTime"].Obj());
+        ASSERT_BSONOBJ_EQ(lastCommittedOpTime.toBSON(), optimes["lastCommittedOpTime"].Obj());
     }
     std::vector<BSONElement> memberArray = rsStatus["members"].Array();
     ASSERT_EQUALS(4U, memberArray.size());
@@ -1680,6 +1685,9 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                   member0Status["optimeDate"].Date());
     ASSERT_EQUALS(timeoutTime, member0Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
+    ASSERT_FALSE(member0Status.hasField("lastStableCheckpointTimestamp"));
+    ASSERT_FALSE(member0Status.hasField("electionTime"));
+    ASSERT_TRUE(member0Status.hasField("pingMs"));
 
     // Test member 1, the node that's SECONDARY
     ASSERT_EQUALS(1, member1Status["_id"].Int());
@@ -1696,6 +1704,9 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].date());
     ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
     ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].str());
+    ASSERT_FALSE(member1Status.hasField("lastStableCheckpointTimestamp"));
+    ASSERT_FALSE(member1Status.hasField("electionTime"));
+    ASSERT_TRUE(member1Status.hasField("pingMs"));
 
     // Test member 2, the node that's UNKNOWN
     ASSERT_EQUALS(2, member2Status["_id"].numberInt());
@@ -1708,6 +1719,9 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_TRUE(member2Status.hasField("optimeDate"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
     ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
+    ASSERT_FALSE(member2Status.hasField("lastStableCheckpointTimestamp"));
+    ASSERT_FALSE(member2Status.hasField("electionTime"));
+    ASSERT_TRUE(member2Status.hasField("pingMs"));
 
     // Now test results for ourself, the PRIMARY
     ASSERT_EQUALS(MemberState::RS_PRIMARY, rsStatus["myState"].numberInt());
@@ -1723,11 +1737,28 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
     ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
                   selfStatus["optimeDate"].Date());
+    ASSERT_FALSE(selfStatus.hasField("lastStableCheckpointTimestamp"));
+    ASSERT_EQUALS(electionTime, selfStatus["electionTime"].timestamp());
+    ASSERT_FALSE(selfStatus.hasField("pingMs"));
 
     ASSERT_EQUALS(2000, rsStatus["heartbeatIntervalMillis"].numberInt());
     ASSERT_BSONOBJ_EQ(initialSyncStatus, rsStatus["initialSyncStatus"].Obj());
 
-    // TODO(spencer): Test electionTime and pingMs are set properly
+    // Test no lastStableCheckpointTimestamp field.
+    BSONObjBuilder statusBuilder2;
+    getTopoCoord().prepareStatusResponse(
+        TopologyCoordinator::ReplSetStatusArgs{
+            curTime,
+            static_cast<unsigned>(durationCount<Seconds>(uptimeSecs)),
+            readConcernMajorityOpTime,
+            initialSyncStatus},
+        &statusBuilder2,
+        &resultStatus);
+    ASSERT_OK(resultStatus);
+    rsStatus = statusBuilder2.obj();
+    unittest::log() << rsStatus;
+    ASSERT_EQUALS(setName, rsStatus["set"].String());
+    ASSERT_FALSE(rsStatus.hasField("lastStableCheckpointTimestamp"));
 }
 
 TEST_F(TopoCoordTest, NodeReturnsInvalidReplicaSetConfigInResponseToGetStatusWhenAbsentFromConfig) {
@@ -5253,7 +5284,7 @@ TEST_F(HeartbeatResponseTestV1, NodeWillNotTransitionToPrimaryAfterHearingAboutN
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY,
                                              firstOpTimeOfTerm.getTimestamp());
-    getTopoCoord()._setCurrentPrimaryForTest(getSelfIndex());
+    getTopoCoord().setCurrentPrimary_forTest(getSelfIndex());
 
     // At first transition to primary is OK
     ASSERT(getTopoCoord().canCompleteTransitionToPrimary(initialTerm));

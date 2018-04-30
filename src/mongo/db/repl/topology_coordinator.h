@@ -751,7 +751,8 @@ public:
     // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
     // TODO(spencer): Remove this once we can easily call for an election in unit tests to
     // set the current primary.
-    void _setCurrentPrimaryForTest(int primaryIndex);
+    void setCurrentPrimary_forTest(int primaryIndex,
+                                   const Timestamp& electionTime = Timestamp(0, 0));
 
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;
