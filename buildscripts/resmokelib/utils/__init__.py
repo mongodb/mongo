@@ -5,6 +5,8 @@ Helper functions.
 from __future__ import absolute_import
 
 import os.path
+import shutil
+import sys
 
 import pymongo
 import yaml
@@ -14,6 +16,28 @@ from . import archival
 
 def default_if_none(value, default):
     return value if value is not None else default
+
+
+def rmtree(path, **kwargs):
+    """Wrap shutil.rmtreee.
+
+    Use a UTF-8 unicode path if Windows.
+    See https://bugs.python.org/issue24672, where shutil.rmtree can fail with UTF-8.
+    Use a bytes path to rmtree, otherwise.
+    See https://github.com/pypa/setuptools/issues/706.
+    """
+    if is_windows():
+        if not isinstance(path, unicode):
+            path = unicode(path, "utf-8")
+    else:
+        if isinstance(path, unicode):
+            path = path.encode("utf-8")
+    shutil.rmtree(path, **kwargs)
+
+
+def is_windows():
+    """Return True if Windows."""
+    return sys.platform.startswith("win32") or sys.platform.startswith("cygwin")
 
 
 def is_string_list(lst):

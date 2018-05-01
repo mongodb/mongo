@@ -6,7 +6,6 @@ from __future__ import absolute_import
 
 import os
 import os.path
-import shutil
 import time
 
 import pymongo
@@ -56,7 +55,7 @@ class MongoDFixture(interface.Fixture):
 
     def setup(self):
         if not self.preserve_dbpath:
-            shutil.rmtree(self._dbpath, ignore_errors=True)
+            utils.rmtree(self._dbpath, ignore_errors=True)
 
         try:
             os.makedirs(self._dbpath)
