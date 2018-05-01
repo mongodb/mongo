@@ -3296,6 +3296,34 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=rollback_fuzzer
 
+## rollback generational fuzzer with clean shutdowns ##
+- <<: *jstestfuzz_template
+  name: rollback_fuzzer_clean_shutdowns
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 4 --numLinesPerFile 300 --maxLinesBetweenEvents 50
+      npm_command: rollback-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=rollback_fuzzer_clean_shutdowns
+
+## rollback generational fuzzer with unclean shutdowns ##
+- <<: *jstestfuzz_template
+  name: rollback_fuzzer_unclean_shutdowns
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 2 --numLinesPerFile 300 --maxLinesBetweenEvents 50
+      npm_command: rollback-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=rollback_fuzzer_unclean_shutdowns
+
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz
@@ -7865,6 +7893,8 @@ buildvariants:
   - name: noPassthrough
   - name: noPassthroughWithMongod
   - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
@@ -8711,6 +8741,8 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: retryable_writes_jscore_passthrough
   - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
   - name: serial_run
   - name: session_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
@@ -9374,6 +9406,8 @@ buildvariants:
   - name: lint
   - name: burn_in_tests
   - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
   - name: aggregation
   - name: aggregation_ese
   - name: aggregation_auth
@@ -9922,6 +9956,8 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
   - name: aggregation
   - name: aggregation_ese
   - name: aggregation_auth
@@ -12112,6 +12148,8 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
   - name: aggregation
   - name: aggregation_ese
   - name: aggregation_auth
@@ -12288,6 +12326,8 @@ buildvariants:
   - name: aggregation
   - name: aggregation_ese
   - name: rollback_fuzzer
+  - name: rollback_fuzzer_clean_shutdowns
+  - name: rollback_fuzzer_unclean_shutdowns
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
   - name: aggregation_mongos_passthrough

@@ -18,6 +18,7 @@
 "use strict";
 
 load("jstests/replsets/rslib.js");
+load("jstests/replsets/libs/two_phase_drops.js");
 load("jstests/hooks/validate_collections.js");
 
 /**
@@ -51,6 +52,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
     };
 
     const collectionValidator = new CollectionValidator();
+
+    const SIGKILL = 9;
+    const SIGTERM = 15;
+    const kNumDataBearingNodes = 2;
 
     let rst;
     let curPrimary;
@@ -116,6 +121,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
                 {_id: 2, host: nodes[2], arbiterOnly: true}
             ]
         });
+
+        assert.eq(replSet.nodes.length - replSet.getArbiters().length,
+                  kNumDataBearingNodes,
+                  "Mismatch between number of data bearing nodes and test configuration.");
+
         return replSet;
     }
 
@@ -123,9 +133,17 @@ function RollbackTest(name = "RollbackTest", replSet) {
         assert.eq(curState,
                   State.kSteadyStateOps,
                   "Not in kSteadyStateOps state, cannot check data consistency");
+
+        // We must wait for collection drops to complete so that we don't get spurious failures
+        // in the consistency checks.
+        rst.nodes.forEach(TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete);
+
         const name = rst.name;
-        // We must check counts before we validate since validate fixes counts.
-        rst.checkCollectionCounts(name);
+        // We must check counts before we validate since validate fixes counts. We cannot check
+        // counts if unclean shutdowns occur.
+        if (!TestData.allowUncleanShutdowns || !TestData.rollbackShutdowns) {
+            rst.checkCollectionCounts(name);
+        }
         rst.checkOplogs(name);
         rst.checkReplicatedDataHashes(name);
         collectionValidator.validateNodes(rst.nodeList());
@@ -165,27 +183,35 @@ function RollbackTest(name = "RollbackTest", replSet) {
         log(`Ensuring the secondary ${curSecondary.host} is connected to the other nodes`);
         curSecondary.reconnect([curPrimary, arbiter]);
 
-        log("Waiting for rollback to complete", true);
-        let rbid = -1;
-        assert.soon(() => {
-            try {
-                rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
-            } catch (e) {
-                // Command can fail when sync source is being cleared.
-            }
-            // Fail early if the rbid is greater than lastRBID+1.
-            assert.lte(rbid,
-                       lastRBID + 1,
-                       `RBID is too large. current RBID: ${rbid}, last RBID: ${lastRBID}`);
+        // If we shut down the primary before the secondary begins rolling back against it, then
+        // the secondary may get elected and not actually roll back. In that case we do not
+        // check the RBID and just await replication.
+        if (!TestData.rollbackShutdowns) {
+            log(`Waiting for rollback to complete on ${curSecondary.host}`, true);
+            let rbid = -1;
+            assert.soon(() => {
+                try {
+                    rbid = assert.commandWorked(curSecondary.adminCommand("replSetGetRBID")).rbid;
+                } catch (e) {
+                    // Command can fail when sync source is being cleared.
+                }
+                // Fail early if the rbid is greater than lastRBID+1.
+                assert.lte(rbid,
+                           lastRBID + 1,
+                           `RBID is too large. current RBID: ${rbid}, last RBID: ${lastRBID}`);
 
-            return rbid === lastRBID + 1;
+                return rbid === lastRBID + 1;
 
-        }, "Timed out waiting for RBID to increment");
+            }, "Timed out waiting for RBID to increment on " + curSecondary.host);
+        } else {
+            log(`Skipping RBID check on ${curSecondary.host} because shutdowns ` +
+                `may prevent a rollback here.`);
+        }
 
         rst.awaitSecondaryNodes();
         rst.awaitReplication();
 
-        log("Rollback and awaitReplication completed", true);
+        log(`Rollback on ${curSecondary.host} (if needed) and awaitReplication completed`, true);
 
         // We call transition to steady state ops after awaiting replication has finished,
         // otherwise it could be confusing to see operations being replicated when we're already
@@ -306,5 +332,44 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
     this.getSecondary = function() {
         return curSecondary;
+    };
+
+    this.restartNode = function(nodeId, signal) {
+        assert(signal === SIGKILL || signal === SIGTERM, `Received unknown signal: ${signal}`);
+        assert.gte(nodeId, 0, "Invalid argument to RollbackTest.restartNode()");
+
+        const hostName = rst.nodes[nodeId].host;
+
+        if (!TestData.rollbackShutdowns) {
+            log(`Not restarting node ${hostName} because 'rollbackShutdowns' was not specified.`);
+            return;
+        }
+
+        if (nodeId >= kNumDataBearingNodes) {
+            log(`Not restarting node ${nodeId} because this replica set is too small.`);
+            return;
+        }
+
+        if (!TestData.allowUncleanShutdowns && signal !== SIGTERM) {
+            log(`Sending node ${hostName} signal ${SIGTERM}` +
+                ` instead of ${signal} because 'allowUncleanShutdowns' was not specified.`);
+            signal = SIGTERM;
+        }
+
+        let opts = {};
+        if (signal === SIGKILL) {
+            opts = {allowedExitCode: MongoRunner.EXIT_SIGKILL};
+        }
+
+        log(`Stopping node ${hostName} with signal ${signal}`);
+        rst.stop(nodeId, signal, opts);
+        log(`Restarting node ${hostName}`);
+        rst.start(nodeId, {}, true /* restart */);
+
+        // Ensure that the primary is ready to take operations before continuing. If both nodes are
+        // connected to the arbiter, the primary may switch.
+        curPrimary = rst.getPrimary();
+        curSecondary = rst.getSecondary();
+        assert.neq(curPrimary, curSecondary);
     };
 }

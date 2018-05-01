@@ -16,7 +16,9 @@
  */
 "use strict";
 
-load("jstests/libs/check_log.js");  // For 'checkLog'.
+load("jstests/libs/check_log.js");            // For 'checkLog'.
+load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
+load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
 
 class TwoPhaseDropCollectionTest {
     constructor(testName, dbName) {
@@ -59,6 +61,31 @@ class TwoPhaseDropCollectionTest {
         let failMsg = "'listCollections' command failed";
         let res = assert.commandWorked(database.runCommand("listCollections", args), failMsg);
         return res.cursor.firstBatch;
+    }
+
+    /**
+     * Waits for all collections pending drop to be completely dropped on the given connection.
+     */
+    static waitForAllCollectionDropsToComplete(conn) {
+        assert.soon(function() {
+            const dbNames = conn.getDBNames();
+            for (let dbName of dbNames) {
+                const currDB = conn.getDB(dbName);
+                let collectionsWithPending =
+                    TwoPhaseDropCollectionTest.listCollections(currDB, {includePendingDrops: true});
+                let collectionsNoPending = TwoPhaseDropCollectionTest.listCollections(currDB);
+                if (!arrayEq(collectionsWithPending, collectionsNoPending)) {
+                    // Do a write on the primary to ensure that the commit point advances.
+                    let cmd = {
+                        appendOplogNote: 1,
+                        data: {id: "waitForAllCollectionDropsToCompleteHelper"}
+                    };
+                    FixtureHelpers.runCommandOnEachPrimary({db: conn.getDB("admin"), cmdObj: cmd});
+                    return false;
+                }
+            }
+            return true;
+        }, "Not all collection drops completed on " + conn.host);
     }
 
     /**
