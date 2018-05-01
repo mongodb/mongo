@@ -527,9 +527,9 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
 intrusive_ptr<Expression> ExpressionArrayElemAt::optimize() {
     // This will optimize all arguments to this expression.
     auto optimized = ExpressionNary::optimize();
-    if (optimized.get() != this) {
+    if (optimized.get() != this) 
         return optimized;
-    }
+    
 
     // If ExpressionArrayElemAt is passed an ExpressionFilter as its first arugment set a limit on
     // the filter so filter returns an array with the last element being the value we want.
@@ -3923,6 +3923,11 @@ Value ExpressionSlice::evaluate(const Document& root) const {
 }
 
 intrusive_ptr<Expression> ExpressionSlice::optimize() {
+    // This will optimize all arguments to this expression.
+    auto optimized = ExpressionNary::optimize();
+    if(optimized.get() != this)
+        return optimized;
+
     // If ExpressionSlice is passed an ExpressionFilter we can stop filtering once the size of
     // the array returned by the filter is equal to the last arguement passed to ExpressionSlice.
     if (dynamic_cast<ExpressionFilter*>(vpOperand[0].get())) {
