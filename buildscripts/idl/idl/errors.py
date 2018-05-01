@@ -73,7 +73,6 @@ ERROR_ID_ENUM_BAD_TYPE = "ID0036"
 ERROR_ID_ENUM_BAD_INT_VAUE = "ID0037"
 ERROR_ID_ENUM_NON_UNIQUE_VALUES = "ID0038"
 ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
-ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM = "ID0040"
 ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
 ERROR_ID_FIELD_NO_COMMAND = "ID0042"
 ERROR_ID_NO_ARRAY_OF_CHAIN = "ID0043"
@@ -554,15 +553,6 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_ENUM_NON_CONTINUOUS_RANGE,
                         ("Enum '%s' has non-continuous integer variables, enums must have a " +
                          "continuous range of integer variables.") % (enum_name))
-
-    def add_enum_field_must_be_empty_error(self, location, name, field_name):
-        # type: (common.SourceLocation, unicode, unicode) -> None
-        """Add an error about field must be empty for fields of type enum."""
-        # pylint: disable=invalid-name
-        self._add_error(
-            location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM,
-            ("Field '%s' cannot contain a value for property '%s' when a field's type is a enum") %
-            (name, field_name))
 
     def add_bad_command_namespace_error(self, location, command_name, command_namespace,
                                         valid_commands):

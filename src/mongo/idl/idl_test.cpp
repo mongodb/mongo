@@ -1526,18 +1526,27 @@ TEST(IDLEnum, TestEnum) {
     auto testStruct = StructWithEnum::parse(ctxt, testDoc);
     ASSERT_TRUE(testStruct.getField1() == IntEnum::c2);
     ASSERT_TRUE(testStruct.getField2() == StringEnumEnum::s0);
+    ASSERT_TRUE(testStruct.getFieldDefault() == StringEnumEnum::s1);
 
     assert_same_types<decltype(testStruct.getField1()), IntEnum>();
     assert_same_types<decltype(testStruct.getField1o()), const boost::optional<IntEnum>>();
     assert_same_types<decltype(testStruct.getField2()), StringEnumEnum>();
     assert_same_types<decltype(testStruct.getField2o()), const boost::optional<StringEnumEnum>>();
+    assert_same_types<decltype(testStruct.getFieldDefault()), StringEnumEnum>();
+
+    auto testSerializedDoc = BSON("field1" << 2 << "field2"
+                                           << "zero"
+                                           << "fieldDefault"
+                                           << "one");
+
+
     // Positive: Test we can roundtrip from the just parsed document
     {
         BSONObjBuilder builder;
         testStruct.serialize(&builder);
         auto loopbackDoc = builder.obj();
 
-        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+        ASSERT_BSONOBJ_EQ(testSerializedDoc, loopbackDoc);
     }
 
     // Positive: Test we can serialize from nothing the same document
@@ -1549,7 +1558,7 @@ TEST(IDLEnum, TestEnum) {
         one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
-        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+        ASSERT_BSONOBJ_EQ(testSerializedDoc, serializedDoc);
     }
 }
 

@@ -187,8 +187,13 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
                     (_get_field_constant_name(field))
                 with writer.IndentedScopedBlock(self._writer, pred, '}'):
                     if field.default:
-                        self._writer.write_line('%s = %s;' % (_get_field_member_name(field),
-                                                              field.default))
+                        if field.enum_type:
+                            self._writer.write_line('%s = %s::%s;' %
+                                                    (_get_field_member_name(field), field.cpp_type,
+                                                     field.default))
+                        else:
+                            self._writer.write_line('%s = %s;' % (_get_field_member_name(field),
+                                                                  field.default))
                     else:
                         self._writer.write_line('ctxt.throwMissingField(%s);' %
                                                 (_get_field_constant_name(field)))
@@ -258,6 +263,10 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
                                     '%s.%s(%s);' %
                                     (_get_field_member_name(field.chained_struct_field),
                                      _get_field_member_setter_name(field), field.default))
+                            elif field.enum_type:
+                                self._writer.write_line('%s = %s::%s;' %
+                                                        (_get_field_member_name(field),
+                                                         field.cpp_type, field.default))
                             else:
                                 self._writer.write_line('%s = %s;' % (_get_field_member_name(field),
                                                                       field.default))
@@ -500,7 +509,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         member_name = _get_field_member_name(field)
 
         if field.default and not field.constructed:
-            self._writer.write_line('%s %s{%s};' % (member_type, member_name, field.default))
+            if field.enum_type:
+                self._writer.write_line('%s %s{%s::%s};' % (member_type, member_name,
+                                                            field.cpp_type, field.default))
+            else:
+                self._writer.write_line('%s %s{%s};' % (member_type, member_name, field.default))
         else:
             self._writer.write_line('%s %s;' % (member_type, member_name))
 
