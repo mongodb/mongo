@@ -6,7 +6,6 @@ from __future__ import absolute_import
 
 import os
 import os.path
-import shutil
 import sys
 import threading
 
@@ -83,7 +82,7 @@ class _SingleJSTestCase(interface.TestCase):
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
 
-        shutil.rmtree(data_dir, ignore_errors=True)
+        utils.rmtree(data_dir, ignore_errors=True)
 
         try:
             os.makedirs(data_dir)

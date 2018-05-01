@@ -6,7 +6,6 @@ from __future__ import absolute_import
 
 import os
 import os.path
-import shutil
 
 from . import interface
 from ... import config
@@ -46,7 +45,7 @@ class DBTestCase(interface.TestCase):
         dbpath = os.path.join(dbpath_prefix, "job%d" % (self.fixture.job_num), "unittest")
         self.dbtest_options["dbpath"] = dbpath
 
-        shutil.rmtree(dbpath, ignore_errors=True)
+        utils.rmtree(dbpath, ignore_errors=True)
 
         try:
             os.makedirs(dbpath)
