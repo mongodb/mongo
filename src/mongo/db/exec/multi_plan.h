@@ -206,15 +206,15 @@ private:
     // one-to-one with _candidates.
     std::vector<CandidatePlan> _candidates;
 
-    // index into _candidates, of the winner of the plan competition
+    // index into '_candidates' of the winner of the plan competition
     // uses -1 / kNoSuchPlan when best plan is not (yet) known
     int _bestPlanIdx;
 
-    // index into _candidates, of the backup of the plan competition
-    // uses -1 / kNoSuchPlan when best plan is not (yet) known
+    // The index within '_candidates' of the non-blocking backup plan which can be used if a blocking plan fails. 
+    // This is set to 'kNoSuchPlan' if there is no backup plan, or when it is not yet known.
     int _backupPlanIdx;
 
-    // Index into _candidates, of the original winner of the plan which can be used if a blocking plan .fails
+    // Index into '_candidates' of the original winner of the plan which can be used if a blocking plan fails.
     // This is set to 'kNoSuchPlan' if there is no backup plan, or when it is not (yet) known
     int _originalWinningPlanIdx;
 

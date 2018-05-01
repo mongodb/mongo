@@ -3,28 +3,29 @@
 // This test was designed to reproduce SERVER-32721"
 
 load("jstests/libs/analyze_plan.js");
+(function() {
+    "use strict";
 
-"use strict";
+    const explain_backup_plan_test = db.explain_backup_plan;
+    explain_backup_plan_test.drop();
 
-db.foo.drop();
-let bulk = db.foo.initializeUnorderedBulkOp();
+    let bulk = explain_backup_plan_test.initializeUnorderedBulkOp();
 
-for (let i = 0; i < 100000; ++i) {
-    bulk.insert({_id: i, x: i, y: i});
-}
+    for (let i = 0; i < 100000; ++i) {
+        bulk.insert({_id: i, x: i, y: i});
+    }
 
-bulk.execute();
-db.foo.ensureIndex({x: 1});
+    bulk.execute();
+    explain_backup_plan_test.ensureIndex({x: 1});
 
-// Configure log level and lower the sort bytes limit.
-db.setLogLevel(5, "query");
-db.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: 100});
+    db.adminCommand({setParameter: 1, internalQueryExecMaxBlockingSortBytes: 100});
 
-const test1 = db.foo.find({x: {$gte: 90}}).sort({_id: 1}).explain(true);
-const test2 = db.foo.find({x: {$gte: 90000}}).sort({_id: 1}).explain(true);
-// This query will not use the backup plan, hence it generates only two stages: winningPlan and
-// rejectedPlans
-assert.eq(backupPlanUsed(test1), false, "test1 did not use a backup plan");
-// This query will use backup plan, the exaplin output for this query will generate three
-// stages: winningPlan, rejectedPlans and originalWinningPlan
-assert(backupPlanUsed(test2), "backup plan invoked in test2");
+    const test1 = explain_backup_plan_test.find({x: {$gte: 90}}).sort({_id: 1}).explain(true);
+    const test2 = explain_backup_plan_test.find({x: {$gte: 90000}}).sort({_id: 1}).explain(true);
+    // This query will not use the backup plan, hence it generates only two stages: winningPlan and
+    // rejectedPlans.
+    assert(!backupPlanUsed(test1), "test1 did not use a backup plan");
+    // This query will use backup plan, the exaplin output for this query will generate three
+    // stages: winningPlan, rejectedPlans and originalWinningPlan.
+    assert(backupPlanUsed(test2), "backup plan invoked in test2");
+})();
