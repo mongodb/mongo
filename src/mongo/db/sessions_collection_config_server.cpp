@@ -79,12 +79,13 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
 }
 
 Status SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
-    auto res = scatterGatherOnlyVersionIfUnsharded(opCtx,
-                                                   SessionsCollection::kSessionsDb.toString(),
-                                                   SessionsCollection::kSessionsNamespaceString,
-                                                   SessionsCollection::generateCreateIndexesCmd(),
-                                                   ReadPreferenceSetting::get(opCtx),
-                                                   Shard::RetryPolicy::kNoRetry);
+    auto res = scatterGatherOnlyVersionIfUnsharded(
+        opCtx,
+        SessionsCollection::kSessionsNamespaceString.db().toString(),
+        SessionsCollection::kSessionsNamespaceString,
+        SessionsCollection::generateCreateIndexesCmd(),
+        ReadPreferenceSetting::get(opCtx),
+        Shard::RetryPolicy::kNoRetry);
     return res.getStatus();
 }
 

@@ -47,13 +47,9 @@ class OperationContext;
 class SessionsCollection {
 
 public:
-    virtual ~SessionsCollection();
-
-    static constexpr StringData kSessionsDb = "config"_sd;
-    static constexpr StringData kSessionsCollection = "system.sessions"_sd;
-    static constexpr StringData kSessionsFullNS = "config.system.sessions"_sd;
-
     static const NamespaceString kSessionsNamespaceString;
+
+    virtual ~SessionsCollection();
 
     /**
      * Ensures that the sessions collection exists and has the proper indexes.

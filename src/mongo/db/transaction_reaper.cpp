@@ -51,7 +51,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
 namespace {
 
 constexpr Minutes kTransactionRecordMinimumLifetime(30);
@@ -108,7 +107,7 @@ public:
         : _collection(std::move(collection)) {}
 
     int reap(OperationContext* opCtx) override {
-        Handler handler(opCtx, _collection.get());
+        Handler handler(opCtx, *_collection);
 
         Lock::DBLock lk(opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IS);
         Lock::CollectionLock lock(
@@ -142,8 +141,8 @@ private:
     std::shared_ptr<SessionsCollection> _collection;
 };
 
-int handleBatchHelper(SessionsCollection* sessionsCollection,
-                      OperationContext* opCtx,
+int handleBatchHelper(OperationContext* opCtx,
+                      SessionsCollection& sessionsCollection,
                       const LogicalSessionIdSet& batch) {
     if (batch.empty()) {
         return 0;
@@ -163,8 +162,8 @@ int handleBatchHelper(SessionsCollection* sessionsCollection,
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    auto removed = uassertStatusOK(sessionsCollection->findRemovedSessions(opCtx, batch));
-    uassertStatusOK(sessionsCollection->removeTransactionRecords(opCtx, removed));
+    auto removed = uassertStatusOK(sessionsCollection.findRemovedSessions(opCtx, batch));
+    uassertStatusOK(sessionsCollection.removeTransactionRecords(opCtx, removed));
 
     return removed.size();
 }
@@ -174,8 +173,11 @@ int handleBatchHelper(SessionsCollection* sessionsCollection,
  */
 class ReplHandler {
 public:
-    ReplHandler(OperationContext* opCtx, SessionsCollection* collection)
-        : _opCtx(opCtx), _sessionsCollection(collection), _numReaped(0), _finalized(false) {}
+    ReplHandler(OperationContext* opCtx, SessionsCollection& sessionsCollection)
+        : _opCtx(opCtx),
+          _sessionsCollection(sessionsCollection),
+          _numReaped(0),
+          _finalized(false) {}
 
     ~ReplHandler() {
         invariant(_finalized.load());
@@ -183,21 +185,22 @@ public:
 
     void handleLsid(const LogicalSessionId& lsid) {
         _batch.insert(lsid);
+
         if (_batch.size() > write_ops::kMaxWriteBatchSize) {
-            _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, _batch);
+            _numReaped += handleBatchHelper(_opCtx, _sessionsCollection, _batch);
             _batch.clear();
         }
     }
 
     int finalize() {
         invariant(!_finalized.swap(true));
-        _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, _batch);
+        _numReaped += handleBatchHelper(_opCtx, _sessionsCollection, _batch);
         return _numReaped;
     }
 
 private:
-    OperationContext* _opCtx;
-    SessionsCollection* _sessionsCollection;
+    OperationContext* const _opCtx;
+    SessionsCollection& _sessionsCollection;
 
     LogicalSessionIdSet _batch;
 
@@ -212,8 +215,11 @@ private:
  */
 class ShardedHandler {
 public:
-    ShardedHandler(OperationContext* opCtx, SessionsCollection* collection)
-        : _opCtx(opCtx), _sessionsCollection(collection), _numReaped(0), _finalized(false) {}
+    ShardedHandler(OperationContext* opCtx, SessionsCollection& sessionsCollection)
+        : _opCtx(opCtx),
+          _sessionsCollection(sessionsCollection),
+          _numReaped(0),
+          _finalized(false) {}
 
     ~ShardedHandler() {
         invariant(_finalized.load());
@@ -229,10 +235,11 @@ public:
         if (!(_cm || _primary)) {
             auto routingInfo =
                 uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
-                    _opCtx, NamespaceString(SessionsCollection::kSessionsFullNS)));
+                    _opCtx, SessionsCollection::kSessionsNamespaceString));
             _cm = routingInfo.cm();
             _primary = routingInfo.primary();
         }
+
         ShardId shardId;
         if (_cm) {
             const auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
@@ -240,10 +247,11 @@ public:
         } else {
             shardId = _primary->getId();
         }
+
         auto& lsids = _shards[shardId];
         lsids.insert(lsid);
         if (lsids.size() > write_ops::kMaxWriteBatchSize) {
-            _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, lsids);
+            _numReaped += handleBatchHelper(_opCtx, _sessionsCollection, lsids);
             _shards.erase(shardId);
         }
     }
@@ -251,15 +259,16 @@ public:
     int finalize() {
         invariant(!_finalized.swap(true));
         for (const auto& pair : _shards) {
-            _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, pair.second);
+            _numReaped += handleBatchHelper(_opCtx, _sessionsCollection, pair.second);
         }
 
         return _numReaped;
     }
 
 private:
-    OperationContext* _opCtx;
-    SessionsCollection* _sessionsCollection;
+    OperationContext* const _opCtx;
+    SessionsCollection& _sessionsCollection;
+
     std::shared_ptr<ChunkManager> _cm;
     std::shared_ptr<Shard> _primary;
 

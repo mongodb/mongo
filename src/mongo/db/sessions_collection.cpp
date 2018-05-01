@@ -149,13 +149,8 @@ Status runBulkCmd(StringData label,
 
 }  // namespace
 
-
-constexpr StringData SessionsCollection::kSessionsDb;
-constexpr StringData SessionsCollection::kSessionsCollection;
-constexpr StringData SessionsCollection::kSessionsFullNS;
 const NamespaceString SessionsCollection::kSessionsNamespaceString =
-    NamespaceString{SessionsCollection::kSessionsFullNS};
-
+    NamespaceString(NamespaceString::kConfigDb, "system.sessions");
 
 SessionsCollection::~SessionsCollection() = default;
 
@@ -328,7 +323,7 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
     indexes.push_back(std::move(index));
 
     CreateIndexesCmd createIndexes;
-    createIndexes.setCreateIndexes(kSessionsCollection.toString());
+    createIndexes.setCreateIndexes(kSessionsNamespaceString.coll());
     createIndexes.setIndexes(std::move(indexes));
 
     return createIndexes.toBSON();

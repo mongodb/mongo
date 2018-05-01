@@ -63,7 +63,7 @@ Status SessionsCollectionSharded::_checkCacheForSessionsCollection(OperationCont
 
     // If the collection doesn't exist, fail. Only the config servers generate it.
     auto res = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-        opCtx, NamespaceString(SessionsCollection::kSessionsFullNS.toString()));
+        opCtx, SessionsCollection::kSessionsNamespaceString);
     if (!res.isOK()) {
         return res.getStatus();
     }
@@ -83,7 +83,8 @@ Status SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCt
 Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
                                                   const LogicalSessionRecordSet& sessions) {
     auto send = [&](BSONObj toSend) {
-        auto opMsg = OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsDb, toSend);
+        auto opMsg =
+            OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsNamespaceString.db(), toSend);
         auto request = BatchedCommandRequest::parseUpdate(opMsg);
 
         BatchedCommandResponse response;
@@ -105,7 +106,8 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
 Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
                                                 const LogicalSessionIdSet& sessions) {
     auto send = [&](BSONObj toSend) {
-        auto opMsg = OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsDb, toSend);
+        auto opMsg =
+            OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsNamespaceString.db(), toSend);
         auto request = BatchedCommandRequest::parseDelete(opMsg);
 
         BatchedCommandResponse response;
@@ -129,9 +131,8 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
 
     auto send = [&](BSONObj toSend) -> StatusWith<BSONObj> {
-        const NamespaceString nss(SessionsCollection::kSessionsFullNS);
-
-        auto qr = QueryRequest::makeFromFindCommand(nss, toSend, false);
+        auto qr = QueryRequest::makeFromFindCommand(
+            SessionsCollection::kSessionsNamespaceString, toSend, false);
         if (!qr.isOK()) {
             return qr.getStatus();
         }
@@ -162,7 +163,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
         for (const auto& obj : batch) {
             firstBatch.append(obj);
         }
-        firstBatch.done(cursorId.getValue(), nss.ns());
+        firstBatch.done(cursorId.getValue(), SessionsCollection::kSessionsNamespaceString.ns());
 
         return result.obj();
     };

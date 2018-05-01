@@ -49,7 +49,7 @@ Status SessionsCollectionStandalone::setupSessionsCollection(OperationContext* o
     DBDirectClient client(opCtx);
     auto cmd = generateCreateIndexesCmd();
     BSONObj info;
-    if (!client.runCommand(kSessionsDb.toString(), cmd, info)) {
+    if (!client.runCommand(kSessionsNamespaceString.db().toString(), cmd, info)) {
         return getStatusFromCommandResult(info);
     }
 
