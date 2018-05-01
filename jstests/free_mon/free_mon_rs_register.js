@@ -36,7 +36,7 @@ load("jstests/free_mon/libs/free_mon.js");
 
     // Restart the secondary
     // Now we're going to shut down all nodes
-    var s1 = rst.liveNodes.slaves[0];
+    var s1 = rst._slaves[0];
     var s1Id = rst.getNodeId(s1);
 
     rst.stop(s1Id);
