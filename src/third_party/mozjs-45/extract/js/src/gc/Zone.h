@@ -322,6 +322,10 @@ struct Zone : public JS::shadow::Zone,
     // can't be determined by examining this zone by itself.
     ZoneSet gcZoneGroupEdges;
 
+    // Zones with dead proxies require an extra scan through the wrapper map,
+    // so track whether any dead proxies are known to exist.
+    bool hasDeadProxies;
+
     // Malloc counter to measure memory pressure for GC scheduling. It runs from
     // gcMaxMallocBytes down to zero. This counter should be used only when it's
     // not possible to know the size of a free.

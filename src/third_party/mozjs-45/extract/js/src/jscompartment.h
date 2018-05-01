@@ -602,6 +602,8 @@ struct JSCompartment
 
     void findOutgoingEdges(js::gc::ComponentFinder<JS::Zone>& finder);
 
+    MOZ_MUST_USE bool findDeadProxyZoneEdges(bool* foundAny);
+
     js::DtoaCache dtoaCache;
 
     // Random number generator for Math.random().
