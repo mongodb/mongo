@@ -10688,6 +10688,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - ubuntu1604-build
+  - name: buildscripts_test
 
 ###########################################
 #          SUSE buildvariants             #

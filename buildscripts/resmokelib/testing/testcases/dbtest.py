@@ -4,7 +4,6 @@ from __future__ import absolute_import
 
 import os
 import os.path
-import shutil
 
 from . import interface
 from ... import config
@@ -50,7 +49,7 @@ class DBTestCase(interface.ProcessTestCase):
         self._clear_dbpath()
 
     def _clear_dbpath(self):
-        shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
+        utils.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
         return core.programs.dbtest_program(self.logger, executable=self.dbtest_executable,
