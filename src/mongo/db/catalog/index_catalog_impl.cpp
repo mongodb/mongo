@@ -418,20 +418,21 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     if (!status.isOK())
         return status;
 
-    if (isBackgroundIndex) {
-        _opCtx->recoveryUnit()->onCommit([&] {
-            // This will prevent the unfinished index from being visible on index iterators.
-            auto minVisible =
-                repl::ReplicationCoordinator::get(_opCtx)->getMinimumVisibleSnapshot(_opCtx);
-            _entry->setMinimumVisibleSnapshot(minVisible);
-            _collection->setMinimumVisibleSnapshot(minVisible);
-        });
-    }
-
     auto* const descriptorPtr = descriptor.get();
     const bool initFromDisk = false;
     _entry = IndexCatalogImpl::_setupInMemoryStructures(
         _catalog, _opCtx, std::move(descriptor), initFromDisk);
+
+    if (isBackgroundIndex) {
+        _opCtx->recoveryUnit()->onCommit(
+            [ opCtx = _opCtx, entry = _entry, collection = _collection ] {
+                // This will prevent the unfinished index from being visible on index iterators.
+                auto minVisible =
+                    repl::ReplicationCoordinator::get(opCtx)->getMinimumVisibleSnapshot(opCtx);
+                entry->setMinimumVisibleSnapshot(minVisible);
+                collection->setMinimumVisibleSnapshot(minVisible);
+            });
+    }
 
     // Register this index with the CollectionInfoCache to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
