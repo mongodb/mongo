@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-class DocumentSourceOut final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceOut final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
@@ -53,7 +53,7 @@ public:
                 TransactionRequirement::kNotAllowed};
     }
 
-    // Virtuals for SplittableDocumentSource
+    // Virtuals for NeedsMergerDocumentSource
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return NULL;
     }

@@ -142,7 +142,7 @@ namespace {
  * "invalidate" entries.
  * It is not intended to be created by the user.
  */
-class DocumentSourceCloseCursor final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceCloseCursor final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     GetNextResult getNext() final;
 
