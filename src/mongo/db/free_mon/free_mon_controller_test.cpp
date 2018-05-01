@@ -831,6 +831,12 @@ struct ControllerHolder {
         controller->stop();
     }
 
+    void start(RegistrationType registrationType) {
+        std::vector<std::string> tags;
+        controller->start(registrationType, tags);
+    }
+
+
     FreeMonController* operator->() {
         return controller.get();
     }
@@ -842,11 +848,12 @@ struct ControllerHolder {
     std::unique_ptr<FreeMonController> controller;
 };
 
+
 // Positive: Test Register works
 TEST_F(FreeMonControllerTest, TestRegister) {
     ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
 
-    controller->start(RegistrationType::DoNotRegister);
+    controller.start(RegistrationType::DoNotRegister);
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
 
@@ -866,7 +873,7 @@ TEST_F(FreeMonControllerTest, TestRegisterTimeout) {
 
     ControllerHolder controller(_mockThreadPool.get(), opts);
 
-    controller->start(RegistrationType::DoNotRegister);
+    controller.start(RegistrationType::DoNotRegister);
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
     controller->turnCrankForTest(Turner().registerCommand(2));
@@ -883,7 +890,7 @@ TEST_F(FreeMonControllerTest, TestRegisterFail) {
     opts.invalidRegister = true;
     ControllerHolder controller(_mockThreadPool.get(), opts, false);
 
-    controller->start(RegistrationType::DoNotRegister);
+    controller.start(RegistrationType::DoNotRegister);
 
     ASSERT_NOT_OK(controller->registerServerCommand(duration_cast<Milliseconds>(Seconds(15))));
 
@@ -900,7 +907,7 @@ TEST_F(FreeMonControllerTest, TestRegisterHalts) {
     opts.haltRegister = true;
     ControllerHolder controller(_mockThreadPool.get(), opts);
 
-    controller->start(RegistrationType::DoNotRegister);
+    controller.start(RegistrationType::DoNotRegister);
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
     controller->turnCrankForTest(Turner().registerCommand());
@@ -915,7 +922,7 @@ TEST_F(FreeMonControllerTest, TestRegisterHalts) {
 TEST_F(FreeMonControllerTest, TestMetrics) {
     ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
 
-    controller->start(RegistrationType::RegisterOnStart);
+    controller.start(RegistrationType::RegisterOnStart);
 
     controller->turnCrankForTest(
         Turner().registerServer().registerCommand().collect(2).metricsSend());
@@ -934,7 +941,7 @@ TEST_F(FreeMonControllerTest, TestMetrics) {
 TEST_F(FreeMonControllerTest, TestMetricsWithEmptyStorage) {
     ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().collect(4));
 
     ASSERT_GTE(controller.network->getRegistersCalls(), 0);
@@ -962,7 +969,7 @@ TEST_F(FreeMonControllerTest, TestMetricsWithEnabledStorage) {
 
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::enabled));
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(
         Turner().registerServer().registerCommand().collect(2).metricsSend());
 
@@ -981,7 +988,7 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorage) {
 
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::disabled));
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().collect(4));
 
     ASSERT_GTE(controller.network->getRegistersCalls(), 0);
@@ -999,7 +1006,7 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegister) {
 
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::disabled));
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().collect(4));
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
@@ -1020,7 +1027,7 @@ TEST_F(FreeMonControllerTest, TestMetricsWithDisabledStorageThenRegisterAndRereg
 
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::disabled));
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().collect(4));
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
@@ -1054,7 +1061,7 @@ TEST_F(FreeMonControllerTest, TestMetricsUnregisterCancelsRegister) {
     opts.failRegisterHttp = true;
     ControllerHolder controller(_mockThreadPool.get(), opts);
 
-    controller->start(RegistrationType::DoNotRegister);
+    controller.start(RegistrationType::DoNotRegister);
 
     ASSERT_OK(controller->registerServerCommand(Milliseconds::min()));
     controller->turnCrankForTest(Turner().registerCommand(2));
@@ -1080,7 +1087,7 @@ TEST_F(FreeMonControllerTest, TestMetricsHalt) {
     opts.haltMetrics = true;
     ControllerHolder controller(_mockThreadPool.get(), opts);
 
-    controller->start(RegistrationType::RegisterOnStart);
+    controller.start(RegistrationType::RegisterOnStart);
 
     controller->turnCrankForTest(
         Turner().registerServer().registerCommand().collect(4).metricsSend());
@@ -1102,7 +1109,7 @@ TEST_F(FreeMonControllerTest, TestMetricsPermanentlyDelete) {
     opts.permanentlyDeleteAfter3 = true;
     ControllerHolder controller(_mockThreadPool.get(), opts);
 
-    controller->start(RegistrationType::RegisterOnStart);
+    controller.start(RegistrationType::RegisterOnStart);
 
     controller->turnCrankForTest(
         Turner().registerServer().registerCommand().collect(5).metricsSend(4));
@@ -1122,7 +1129,7 @@ TEST_F(FreeMonControllerTest, TestRegistrationIdRotatesAfterRegistration) {
 
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::enabled));
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
     controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(2));
 
     // Ensure registration rotated the id
@@ -1145,7 +1152,7 @@ TEST_F(FreeMonControllerTest, TestRegistrationIdRotatesAfterRegistration) {
 TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
     ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
 
-    controller->start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
 
     controller->turnCrankForTest(Turner().registerServer().collect(3));
 
@@ -1170,7 +1177,7 @@ TEST_F(FreeMonControllerTest, TestMetricBatchingOnError) {
     opts.fail2MetricsUploads = true;
     ControllerHolder controller(_mockThreadPool.get(), opts);
 
-    controller->start(RegistrationType::RegisterOnStart);
+    controller.start(RegistrationType::RegisterOnStart);
 
     controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(2));
 
@@ -1194,7 +1201,7 @@ TEST_F(FreeMonControllerTest, TestMetricBatchingOnErrorRealtime) {
     opts.fail2MetricsUploads = true;
     ControllerHolder controller(_mockThreadPool.get(), opts, false);
 
-    controller->start(RegistrationType::RegisterOnStart);
+    controller.start(RegistrationType::RegisterOnStart);
 
     // Ensure the first upload sends 2 samples
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());

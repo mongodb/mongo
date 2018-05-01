@@ -12,6 +12,7 @@ load("jstests/free_mon/libs/free_mon.js");
     let options = {
         setParameter: "cloudFreeMonitoringEndpointURL=" + mock_web.getURL(),
         enableFreeMonitoring: "on",
+        freeMonitoringTag: "foo",
         verbose: 1,
     };
 
@@ -33,6 +34,7 @@ load("jstests/free_mon/libs/free_mon.js");
     assert.eq(last_register.payload.buildInfo.ok, 1);
     assert.eq(last_register.payload.storageEngine.readOnly, false);
     assert.eq(last_register.payload.isMaster.ok, 1);
+    assert.eq(last_register.tags, ["foo"]);
 
     mock_web.waitMetrics(2);
 

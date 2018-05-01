@@ -41,8 +41,8 @@ structs:
             description: "Existing Registration Id"
             type: string
             optional: true
-          tag:
-            description: "Tag"
+          tags:
+            description: "Tags"
             type: array<string>
             optional: true
 

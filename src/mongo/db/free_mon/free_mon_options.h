@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace mongo {
 
@@ -45,7 +46,7 @@ enum class EnableCloudStateEnum : std::int32_t {
  * Free Monitoring configuration options
  */
 struct FreeMonParams {
-    std::string freeMonitoringTag;
+    std::vector<std::string> freeMonitoringTags;
     EnableCloudStateEnum freeMonitoringState = EnableCloudStateEnum::kRuntime;
 };
 

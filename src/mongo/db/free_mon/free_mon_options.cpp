@@ -83,10 +83,12 @@ Status addFreeMonitoringOptions(moe::OptionSection* options) {
                                             moe::String,
                                             "Enable Cloud Free Monitoring (on|runtime|off)");
 
-    // Command Line: --enableFreeMonitoringTag=string
-    // YAML Name: cloud.monitoring.free.tag=string
-    freeMonitoringOptions.addOptionChaining(
-        "cloud.monitoring.free.tag", "freeMonitoringTag", moe::String, "Cloud Free Monitoring Tag");
+    // Command Line: --enableFreeMonitoringTag=array<string>
+    // YAML Name: cloud.monitoring.free.tag=array<string>
+    freeMonitoringOptions.addOptionChaining("cloud.monitoring.free.tags",
+                                            "freeMonitoringTag",
+                                            moe::StringVector,
+                                            "Cloud Free Monitoring Tags");
 
     Status ret = options->addSection(freeMonitoringOptions);
     if (!ret.isOK()) {
@@ -108,9 +110,9 @@ Status storeFreeMonitoringOptions(const moe::Environment& params) {
         globalFreeMonParams.freeMonitoringState = swState.getValue();
     }
 
-    if (params.count("cloud.monitoring.free.tag")) {
-        globalFreeMonParams.freeMonitoringTag =
-            params["cloud.monitoring.free.tag"].as<std::string>();
+    if (params.count("cloud.monitoring.free.tags")) {
+        globalFreeMonParams.freeMonitoringTags =
+            params["cloud.monitoring.free.tags"].as<std::vector<std::string>>();
     }
 
     return Status::OK();

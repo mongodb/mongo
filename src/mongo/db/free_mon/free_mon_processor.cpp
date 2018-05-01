@@ -392,7 +392,7 @@ void FreeMonProcessor::doCommandRegister(Client* client,
     }
 
     if (!_tags.empty()) {
-        req.setTag(transformVector(msg->getPayload()));
+        req.setTags(transformVector(msg->getPayload()));
     }
 
     // Collect the data

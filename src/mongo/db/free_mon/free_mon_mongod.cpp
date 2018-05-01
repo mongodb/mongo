@@ -335,7 +335,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
         }
     }
 
-    staticFreeMon->start(registrationType);
+    controllerPtr->start(registrationType, globalFreeMonParams.freeMonitoringTags);
 }
 
 void stopFreeMonitoring() {
