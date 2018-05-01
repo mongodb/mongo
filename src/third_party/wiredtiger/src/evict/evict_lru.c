@@ -2375,11 +2375,14 @@ __wt_cache_eviction_worker(
 	for (initial_progress = cache->eviction_progress;; ret = 0) {
 		/*
 		 * A pathological case: if we're the oldest transaction in the
-		 * system and the eviction server is stuck trying to find space,
-		 * abort the transaction to give up all hazard pointers before
-		 * trying again.
+		 * system and the eviction server is stuck trying to find space
+		 * (and we're not in recovery, because those transactions can't
+		 * be rolled back), abort the transaction to give up all hazard
+		 * pointers before trying again.
 		 */
-		if (__wt_cache_stuck(session) && __wt_txn_am_oldest(session)) {
+		if (__wt_cache_stuck(session) &&
+		    __wt_txn_am_oldest(session) &&
+		    !F_ISSET(conn, WT_CONN_RECOVERING)) {
 			--cache->evict_aggressive_score;
 			WT_STAT_CONN_INCR(session, txn_fail_cache);
 			WT_ERR(__wt_txn_rollback_required(session,

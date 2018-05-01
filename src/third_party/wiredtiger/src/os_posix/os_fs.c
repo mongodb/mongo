@@ -31,6 +31,23 @@
 /*
  * __posix_sync --
  *	Underlying support function to flush a file descriptor.
+ *
+ * Fsync calls (or fsync-style calls, for example, fdatasync) are not retried
+ * on failure, and failure halts the system.
+ *
+ * Excerpted from the LWN.net article https://lwn.net/Articles/752063/:
+ * In short, PostgreSQL assumes that a successful call to fsync() indicates
+ * that all data written since the last successful call made it safely to
+ * persistent storage. But that is not what the kernel actually does. When
+ * a buffered I/O write fails due to a hardware-level error, filesystems
+ * will respond differently, but that behavior usually includes discarding
+ * the data in the affected pages and marking them as being clean. So a read
+ * of the blocks that were just written will likely return something other
+ * than the data that was written.
+ *
+ * Given the shared history of UNIX filesystems, and the difficulty of knowing
+ * what specific error will be returned under specific circumstances, we don't
+ * retry fsync-style calls and panic if a flush operation fails.
  */
 static int
 __posix_sync(
@@ -39,8 +56,6 @@ __posix_sync(
 	WT_DECL_RET;
 
 #if defined(F_FULLFSYNC)
-	static bool fullfsync_error_logged = false;
-
 	/*
 	 * OS X fsync documentation:
 	 * "Note that while fsync() will flush all data from the host to the
@@ -54,31 +69,49 @@ __posix_sync(
 	 * OS X F_FULLFSYNC fcntl documentation:
 	 * "This is currently implemented on HFS, MS-DOS (FAT), and Universal
 	 * Disk Format (UDF) file systems."
+	 *
+	 * See comment in __posix_sync(): sync cannot be retried or fail.
 	 */
-	WT_SYSCALL_RETRY(fcntl(fd, F_FULLFSYNC, 0) == -1 ? -1 : 0, ret);
-	if (ret == 0)
-		return (0);
+	static enum { FF_NOTSET, FF_IGNORE, FF_OK } ff_status = FF_NOTSET;
+	switch (ff_status) {
+	case FF_NOTSET:
+		WT_SYSCALL(fcntl(fd, F_FULLFSYNC, 0) == -1 ? -1 : 0, ret);
+		if (ret == 0) {
+			ff_status = FF_OK;
+			return (0);
+		}
 
-	/*
-	 * Assume F_FULLFSYNC failed because the file system doesn't support it
-	 * and fallback to fsync.
-	 */
-	if (!fullfsync_error_logged) {
-		fullfsync_error_logged = true;
+		/*
+		 * If the first F_FULLFSYNC fails, assume the file system
+		 * doesn't support it and fallback to fdatasync or fsync.
+		 */
+		ff_status = FF_IGNORE;
 		__wt_err(session, ret,
-		    "fcntl(F_FULLFSYNC) failed, falling back to fsync");
+		    "fcntl(F_FULLFSYNC) failed, falling back to fdatasync "
+		    "or fsync");
+		break;
+	case FF_IGNORE:
+		break;
+	case FF_OK:
+		WT_SYSCALL(fcntl(fd, F_FULLFSYNC, 0) == -1 ? -1 : 0, ret);
+		if (ret == 0)
+			return (0);
+		WT_PANIC_RET(session,
+		    ret, "%s: %s: fcntl(F_FULLFSYNC)", name, func);
 	}
 #endif
 #if defined(HAVE_FDATASYNC)
-	WT_SYSCALL_RETRY(fdatasync(fd), ret);
+	/* See comment in __posix_sync(): sync cannot be retried or fail. */
+	WT_SYSCALL(fdatasync(fd), ret);
 	if (ret == 0)
 		return (0);
-	WT_RET_MSG(session, ret, "%s: %s: fdatasync", name, func);
+	WT_PANIC_RET(session, ret, "%s: %s: fdatasync", name, func);
 #else
-	WT_SYSCALL_RETRY(fsync(fd), ret);
+	/* See comment in __posix_sync(): sync cannot be retried or fail. */
+	WT_SYSCALL(fsync(fd), ret);
 	if (ret == 0)
 		return (0);
-	WT_RET_MSG(session, ret, "%s: %s: fsync", name, func);
+	WT_PANIC_RET(session, ret, "%s: %s: fsync", name, func);
 #endif
 }
 
@@ -116,12 +149,15 @@ __posix_directory_sync(WT_SESSION_IMPL *session, const char *path)
 	WT_SYSCALL(close(fd), tret);
 	if (tret != 0) {
 		__wt_err(session, tret, "%s: directory-sync: close", dir);
-		if (ret == 0)
-			ret = tret;
+		WT_TRET(tret);
 	}
 
 err:	__wt_scr_free(session, &tmp);
-	return (ret);
+	if (ret == 0)
+		return (ret);
+
+	/* See comment in __posix_sync(): sync cannot be retried or fail. */
+	WT_PANIC_RET(session, ret, "%s: directory-sync", path);
 }
 #endif
 
@@ -468,11 +504,13 @@ __posix_file_sync_nowait(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session)
 	session = (WT_SESSION_IMPL *)wt_session;
 	pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-	WT_SYSCALL_RETRY(sync_file_range(pfh->fd,
+	/* See comment in __posix_sync(): sync cannot be retried or fail. */
+	WT_SYSCALL(sync_file_range(pfh->fd,
 	    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE), ret);
 	if (ret == 0)
 		return (0);
-	WT_RET_MSG(session, ret,
+
+	WT_PANIC_RET(session, ret,
 	    "%s: handle-sync-nowait: sync_file_range", file_handle->name);
 }
 #endif
