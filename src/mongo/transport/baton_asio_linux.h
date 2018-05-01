@@ -228,8 +228,6 @@ public:
             }
         });
 
-        bool eventfdFired = false;
-
         // Note that it's important to check for interrupt without the lock, because markKilled
         // calls schedule, which will deadlock if we're holding the lock when calling this.
         if (opCtx) {
@@ -333,7 +331,6 @@ public:
 
             if (pollIter->revents) {
                 _efd.wait();
-                eventfdFired = true;
 
                 remaining--;
             }
@@ -351,9 +348,6 @@ public:
 
             invariant(remaining == 0);
         }
-
-        // If we got here, we should have done something
-        invariant(toFulfill.size() || _scheduled.size() || eventfdFired);
 
         return true;
     }
