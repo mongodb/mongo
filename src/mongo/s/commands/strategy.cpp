@@ -296,6 +296,11 @@ void runCommand(OperationContext* opCtx,
         return;
     }
 
+    // Transactions are disallowed in sharded clusters in MongoDB 4.0.
+    uassert(50841,
+            "Multi-document transactions cannot be run in a sharded cluster.",
+            !request.body.hasField("startTransaction") && !request.body.hasField("autocommit"));
+
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
     // the OperationContext. Be sure to do this as soon as possible so that further processing by
     // subsequent code has the deadline available. The 'maxTimeMS' option unfortunately has a
