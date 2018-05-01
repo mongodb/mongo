@@ -49,12 +49,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << kStageName << " must be run against the '"
-                          << SessionsCollection::kSessionsCollection
-                          << "' collection in the '"
-                          << SessionsCollection::kSessionsDb
-                          << "' database.",
-            nss == NamespaceString{SessionsCollection::kSessionsFullNS});
+            str::stream() << kStageName << " may only be run against "
+                          << SessionsCollection::kSessionsNamespaceString.ns(),
+            nss == SessionsCollection::kSessionsNamespaceString);
 
     const auto& spec = listSessionsParseSpec(kStageName, elem);
     if (spec.getAllUsers()) {
