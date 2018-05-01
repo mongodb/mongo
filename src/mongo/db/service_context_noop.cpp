@@ -35,10 +35,6 @@
 
 namespace mongo {
 
-StorageEngine* ServiceContextNoop::getGlobalStorageEngine() {
-    return nullptr;
-}
-
 void ServiceContextNoop::initializeGlobalStorageEngine() {}
 
 void ServiceContextNoop::shutdownGlobalStorageEngineCleanly() {}

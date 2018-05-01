@@ -34,8 +34,6 @@ namespace mongo {
 
 class ServiceContextNoop : public ServiceContext {
 public:
-    StorageEngine* getGlobalStorageEngine() override;
-
     void initializeGlobalStorageEngine() override;
 
     void shutdownGlobalStorageEngineCleanly() override;

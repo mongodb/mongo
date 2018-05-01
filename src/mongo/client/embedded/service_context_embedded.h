@@ -45,8 +45,6 @@ public:
 
     ~ServiceContextMongoEmbedded();
 
-    StorageEngine* getGlobalStorageEngine() override;
-
     void createLockFile();
 
     void initializeGlobalStorageEngine() override;
@@ -64,8 +62,6 @@ private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 
     std::unique_ptr<StorageEngineLockFile> _lockFile;
-
-    std::unique_ptr<StorageEngine> _storageEngine;
 
     // All possible storage engines are registered here through MONGO_INIT.
     FactoryMap _storageFactories;

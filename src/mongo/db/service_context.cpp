@@ -193,6 +193,12 @@ transport::ServiceExecutor* ServiceContext::getServiceExecutor() const {
     return _serviceExecutor.get();
 }
 
+void ServiceContext::setStorageEngine(std::unique_ptr<StorageEngine> engine) {
+    invariant(engine);
+    invariant(!_storageEngine);
+    _storageEngine = std::move(engine);
+}
+
 void ServiceContext::setOpObserver(std::unique_ptr<OpObserver> opObserver) {
     _opObserver = std::move(opObserver);
 }

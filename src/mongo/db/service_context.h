@@ -267,9 +267,23 @@ public:
     virtual void shutdownGlobalStorageEngineCleanly() = 0;
 
     /**
+     * Sets the storage engine for this instance. May be called up to once per instance.
+     */
+    void setStorageEngine(std::unique_ptr<StorageEngine> engine);
+
+    /**
      * Return the storage engine instance we're using.
      */
-    virtual StorageEngine* getGlobalStorageEngine() = 0;
+    StorageEngine* getStorageEngine() {
+        return _storageEngine.get();
+    }
+
+    /**
+     * Return the storage engine instance we're using.
+     */
+    StorageEngine* getGlobalStorageEngine() {
+        return getStorageEngine();
+    }
 
     //
     // Global operation management.  This may not belong here and there may be too many methods
@@ -459,6 +473,11 @@ private:
      * Returns a new OperationContext. Private, for use by makeOperationContext.
      */
     virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
+
+    /**
+     * The storage engine, if any.
+     */
+    std::unique_ptr<StorageEngine> _storageEngine;
 
     /**
      * The periodic runner.

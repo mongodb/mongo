@@ -70,13 +70,6 @@ ServiceContextMongoD::ServiceContextMongoD() = default;
 
 ServiceContextMongoD::~ServiceContextMongoD() = default;
 
-StorageEngine* ServiceContextMongoD::getGlobalStorageEngine() {
-    // We don't check that globalStorageEngine is not-NULL here intentionally.  We can encounter
-    // an error before it's initialized and proceed to exitCleanly which is equipped to deal
-    // with a NULL storage engine.
-    return _storageEngine;
-}
-
 void ServiceContextMongoD::createLockFile() {
     try {
         _lockFile.reset(new StorageEngineLockFile(storageGlobalParams.dbpath));
@@ -109,7 +102,7 @@ void ServiceContextMongoD::createLockFile() {
 
 void ServiceContextMongoD::initializeGlobalStorageEngine() {
     // This should be set once.
-    invariant(!_storageEngine);
+    invariant(!getStorageEngine());
 
     // We should have a _lockFile or be in read-only mode. Confusingly, we can still have a lockFile
     // if we are in read-only mode. This can happen if the server is started in read-only mode on a
@@ -220,8 +213,9 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
         }
     });
 
-    _storageEngine = factory->create(storageGlobalParams, _lockFile.get());
-    _storageEngine->finishInit();
+    setStorageEngine(
+        std::unique_ptr<StorageEngine>(factory->create(storageGlobalParams, _lockFile.get())));
+    getStorageEngine()->finishInit();
 
     if (_lockFile) {
         uassertStatusOK(_lockFile->writePid());
@@ -238,12 +232,12 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
 
     guard.Dismiss();
 
-    _supportsDocLocking = _storageEngine->supportsDocLocking();
+    _supportsDocLocking = getStorageEngine()->supportsDocLocking();
 }
 
 void ServiceContextMongoD::shutdownGlobalStorageEngineCleanly() {
-    invariant(_storageEngine);
-    _storageEngine->cleanShutdown();
+    invariant(getStorageEngine());
+    getStorageEngine()->cleanShutdown();
     if (_lockFile) {
         _lockFile->clearPidAndUnlock();
     }
@@ -258,7 +252,7 @@ void ServiceContextMongoD::registerStorageEngine(const std::string& name,
     invariant(factory);
 
     // and all factories should be added before we pick a storage engine.
-    invariant(NULL == _storageEngine);
+    invariant(!getStorageEngine());
 
     _storageFactories[name] = factory;
 }
