@@ -41,7 +41,7 @@ namespace mongo {
  * The $bucketAuto stage takes a user-specified number of buckets and automatically determines
  * boundaries such that the values are approximately equally distributed between those buckets.
  */
-class DocumentSourceBucketAuto final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceBucketAuto final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;

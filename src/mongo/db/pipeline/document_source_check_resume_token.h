@@ -91,7 +91,7 @@ private:
  * stream.  It is not intended to be created by the user.
  */
 class DocumentSourceEnsureResumeTokenPresent final : public DocumentSource,
-                                                     public SplittableDocumentSource {
+                                                     public NeedsMergerDocumentSource {
 public:
     // Used to record the results of comparing the token data extracted from documents in the
     // resumed stream against the client's resume token.
@@ -118,9 +118,9 @@ public:
     }
 
     /**
-     * SplittableDocumentSource methods; this has to run on the merger, since the resume point could
-     * be at any shard. Also add a DocumentSourceShardCheckResumability stage on the shards pipeline
-     * to ensure that each shard has enough oplog history to resume the change stream.
+     * NeedsMergerDocumentSource methods; this has to run on the merger, since the resume point
+     * could be at any shard. Also add a DocumentSourceShardCheckResumability stage on the shards
+     * pipeline to ensure that each shard has enough oplog history to resume the change stream.
      */
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return DocumentSourceShardCheckResumability::create(pExpCtx,

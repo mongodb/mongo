@@ -384,7 +384,7 @@ bool Pipeline::requiredToRunOnMongos() const {
     for (auto&& stage : _sources) {
         // If this pipeline is capable of splitting before the mongoS-only stage, then the pipeline
         // as a whole is not required to run on mongoS.
-        if (isUnsplit() && dynamic_cast<SplittableDocumentSource*>(stage.get())) {
+        if (isUnsplit() && dynamic_cast<NeedsMergerDocumentSource*>(stage.get())) {
             return false;
         }
 

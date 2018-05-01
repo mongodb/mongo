@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class DocumentSourceGroup final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceGroup final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     using Accumulators = std::vector<boost::intrusive_ptr<Accumulator>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
@@ -99,7 +99,7 @@ public:
         return _streaming;
     }
 
-    // Virtuals for SplittableDocumentSource.
+    // Virtuals for NeedsMergerDocumentSource.
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final;
 

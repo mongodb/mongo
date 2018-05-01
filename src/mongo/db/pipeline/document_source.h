@@ -706,7 +706,7 @@ private:
  * This class marks DocumentSources that should be split between the merger and the shards. See
  * Pipeline::Optimizations::Sharded::findSplitPoint() for details.
  */
-class SplittableDocumentSource {
+class NeedsMergerDocumentSource {
 public:
     /**
      * Returns a source to be run on the shards, or NULL if no work should be done on the shards for
@@ -719,17 +719,16 @@ public:
     virtual boost::intrusive_ptr<DocumentSource> getShardSource() = 0;
 
     /**
-     * Returns a list of stages that combine results from the shards, or an empty list if no work
-     * should be done in the merge pipeline for this stage. Must not mutate the existing source
-     * object; if different behaviour is required, a new source should be created and configured
-     * appropriately. It is an error for getMergeSources() to return a pointer to the same object as
-     * getShardSource().
+     * Returns a list of stages that combine results from the shards. Subclasses of this class
+     * should not return an empty list. Must not mutate the existing source object; if different
+     * behaviour is required, a new source should be created and configured appropriately. It is an
+     * error for getMergeSources() to return a pointer to the same object as getShardSource().
      */
     virtual std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() = 0;
 
 protected:
-    // It is invalid to delete through a SplittableDocumentSource-typed pointer.
-    virtual ~SplittableDocumentSource() {}
+    // It is invalid to delete through a NeedsMergerDocumentSource-typed pointer.
+    virtual ~NeedsMergerDocumentSource() {}
 };
 
 }  // namespace mongo

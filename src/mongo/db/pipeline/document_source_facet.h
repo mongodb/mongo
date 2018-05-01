@@ -55,7 +55,7 @@ class NamespaceString;
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
  */
-class DocumentSourceFacet final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceFacet final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     struct FacetPipeline {
         FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
