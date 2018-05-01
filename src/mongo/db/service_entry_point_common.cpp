@@ -542,6 +542,29 @@ bool runCommandImpl(OperationContext* opCtx,
 }
 
 /**
+ * Maybe uassert according to the 'failCommand' fail point.
+ */
+void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
+    if (failCommandIgnoreList.find(commandName) != failCommandIgnoreList.cend()) {
+        return;  // Early return to keep tidy fail point stats.
+    }
+    MONGO_FAIL_POINT_BLOCK(failCommand, data) {
+        bool closeConnection;
+        if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
+            closeConnection) {
+            opCtx->getClient()->session()->end();
+            uasserted(50838, "Failing command due to 'failCommand' failpoint");
+        }
+
+        long long errorCode;
+        if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
+            uasserted(ErrorCodes::Error(errorCode),
+                      "Failing command due to 'failCommand' failpoint");
+        }
+    }
+}
+
+/**
  * Executes a command after stripping metadata, performing authorization checks,
  * handling audit impersonation, and (potentially) setting maintenance mode. This method
  * also checks that the command is permissible to run on the node given its current
@@ -566,23 +589,7 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::readRequestMetadata(opCtx, request.body);
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
-        if (failCommandIgnoreList.find(command->getName()) == failCommandIgnoreList.cend()) {
-            MONGO_FAIL_POINT_BLOCK(failCommand, data) {
-                bool closeConnection;
-                if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection)
-                        .isOK() &&
-                    closeConnection) {
-                    opCtx->getClient()->session()->end();
-                    uasserted(50838, "Failing command due to 'failCommand' failpoint");
-                }
-
-                long long errorCode;
-                if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
-                    uasserted(ErrorCodes::Error(errorCode),
-                              "Failing command due to 'failCommand' failpoint");
-                }
-            }
-        }
+        evaluateFailCommandFailPoint(opCtx, command->getName());
 
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto sessionOptions = initializeOperationSessionInfo(
