@@ -35,6 +35,12 @@ namespace mongo {
 class CurOpFailpointHelpers {
 public:
     /**
+     * Helper function which sets the 'msg' field of the opCtx's CurOp to the specified string, and
+     * returns the original value of the field.
+     */
+    static std::string updateCurOpMsg(OperationContext* opCtx, const std::string& newMsg);
+
+    /**
      * This helper function works much like MONGO_FAIL_POINT_PAUSE_WHILE_SET, but additionally
      * calls whileWaiting() at regular intervals. Finally, it also sets the 'msg' field of the
      * opCtx's CurOp to the given string while the failpoint is active.

@@ -79,6 +79,7 @@ selector:
   # the group command cannot be issued against a sharded cluster
   - jstests/concurrency/fsm_workloads/group.js
   - jstests/concurrency/fsm_workloads/group_cond.js
+  - jstests/concurrency/fsm_workloads/group_killop.js
   # eval doesn't work with sharded collections
   - jstests/concurrency/fsm_workloads/indexed_insert_eval.js
   - jstests/concurrency/fsm_workloads/indexed_insert_eval_nolock.js

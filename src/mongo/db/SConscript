@@ -983,6 +983,7 @@ env.Library(
         'commands',
         'concurrency/write_conflict_exception',
         'curop',
+        'curop_failpoint_helpers',
         'cursor_server_params',
         'db_raii',
         'dbdirectclient',
