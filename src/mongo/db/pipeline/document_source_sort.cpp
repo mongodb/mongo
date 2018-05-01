@@ -193,10 +193,12 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     invariant(*itr == this);
 
     auto sortItr = std::next(itr);
+    auto curSort = (*sortItr).get();
+
     long long skipSum = 0;
     while (sortItr != container->end()) {
         auto nextStage = (*sortItr).get();
-
+        
         if (auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage)) {
             skipSum += nextSkip->getSkip();
             ++sortItr;
@@ -207,18 +209,20 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
             sortItr = std::next(itr);
             skipSum = 0;
         } else if (auto nextSort = dynamic_cast<DocumentSourceSort*>(nextStage)) {
-            if (nextSort == nextStage) {
-                // nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
-                // nextLimit->setLimit(nextLimit->getLimit() + skipSum);
-                // setLimitSrc(nextLimit);
-                // setLimitSrc(limitSrc);
+            // If next stage is same $sort, perform merge
+            if (nextSort == curSort) {
+                nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
+                nextLimit->setLimit(nextLimit->getLimit() + skipSum);
+                setLimitSrc(nextLimit);
                 container->erase(sortItr);
                 sortItr = std::next(itr);
                 skipSum = 0;
+                ++sortItr;
             }
         } else if (!nextStage->constraints().canSwapWithLimit) {
             return std::next(itr);
         } else {
+            curSort = nextStage;
             ++sortItr;
         }
     }
