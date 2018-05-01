@@ -99,14 +99,14 @@ variables:
   resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
   should_shuffle: false
   continue_on_failure: false
-
-- &run_jstestfuzz_tests
-  func: "run tests"
   # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
   # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
   # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
   # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
   timeout_secs: 1800
+
+- &run_jstestfuzz_tests
+  func: "run tests"
   vars:
     <<: *jstestfuzz_config_vars
 
@@ -715,6 +715,33 @@ functions:
           fi
         fi
 
+  "determine task timeout" : &determine_task_timeout
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        $python buildscripts/evergreen_task_timeout.py \
+          --task-name ${task_name}                     \
+          --build-variant ${build_variant}             \
+          --timeout ${timeout_secs|0}                  \
+          --out-file task_timeout_expansions.yml
+
+  "update task timeout expansions" : &update_task_timeout_expansions
+    command: expansions.update
+    params:
+      ignore_missing_file: true
+      file: src/task_timeout_expansions.yml
+
+  "update task timeout" : &update_task_timeout
+    command: timeout.update
+    params:
+      timeout_secs: ${timeout_secs}
+
   "update bypass expansions" : &update_bypass_expansions
     command: expansions.update
     params:
@@ -789,6 +816,9 @@ functions:
           virtualenv --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
 
   "run tests" :
+    - *determine_task_timeout
+    - *update_task_timeout_expansions
+    - *update_task_timeout
     - command: expansions.update
       params:
         updates:
@@ -4221,18 +4251,18 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout
 
 - <<: *task_template
   name: concurrency_replication
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout
 
 - <<: *task_template
   name: concurrency_sharded_replication
@@ -4255,45 +4285,45 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout for each test
     vars:
       resmoke_args: --suites=concurrency_sharded_causal_consistency --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout for each test
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency_and_balancer
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout for each test
     vars:
       resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout for each test
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout for each test
     vars:
       resmoke_args: --suites=concurrency_sharded_with_stepdowns --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout for each test
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns_and_balancer
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout for each test
     vars:
       resmoke_args: --suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout for each test
 
 - <<: *task_template
   name: concurrency_simultaneous
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency_simultaneous --storageEngine=wiredTiger
+      timeout_secs: 21600 # 6 hour timeout
 
 - <<: *task_template
   name: rlp
