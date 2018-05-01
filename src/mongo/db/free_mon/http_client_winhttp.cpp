@@ -257,6 +257,26 @@ private:
             return;
         }
 
+        DWORD statusCode = 0;
+        DWORD statusCodeLength = sizeof(statusCode);
+
+        if (!WinHttpQueryHeaders(request,
+                                 WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                 WINHTTP_HEADER_NAME_BY_INDEX,
+                                 &statusCode,
+                                 &statusCodeLength,
+                                 WINHTTP_NO_HEADER_INDEX)) {
+            setError("Error querying status from server");
+            return;
+        }
+
+        if (statusCode != 200) {
+            shared_promise.setError(
+                Status(ErrorCodes::OperationFailed,
+                       str::stream() << "Unexpected http status code from server: " << statusCode));
+            return;
+        }
+
         // Marshal response into vector.
         std::vector<uint8_t> ret;
         auto sz = ret.size();

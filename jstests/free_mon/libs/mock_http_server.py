@@ -104,6 +104,7 @@ class FreeMonHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(http.HTTPStatus.INTERNAL_SERVER_ERROR)
             self.send_header("content-type", "application/octet-stream")
             self.end_headers()
+            self.wfile.write("Internal Error of some sort.".encode())
             return
 
         if fault_type == FAULT_INVALID_REGISTER:

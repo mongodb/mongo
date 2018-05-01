@@ -210,6 +210,22 @@ private:
                 return;
             }
 
+            long statusCode;
+            result = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
+            if (result != CURLE_OK) {
+                shared_promise.setError({ErrorCodes::OperationFailed,
+                                         str::stream() << "Unexpected error retrieving response: "
+                                                       << curl_easy_strerror(result)});
+                return;
+            }
+
+            if (statusCode != 200) {
+                shared_promise.setError(Status(
+                    ErrorCodes::OperationFailed,
+                    str::stream() << "Unexpected http status code from server: " << statusCode));
+                return;
+            }
+
             auto d = dataBuilder.getCursor();
             shared_promise.emplaceValue(std::vector<uint8_t>(d.data(), d.data() + d.length()));
         } catch (...) {
