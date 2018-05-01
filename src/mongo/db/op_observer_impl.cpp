@@ -866,8 +866,7 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
         opsArray.append(stmt.toBSON());
     }
     opsArray.done();
-    const auto dbName = stmts[0].getNamespace().db().toString();
-    const NamespaceString cmdNss{dbName, "$cmd"};
+    const NamespaceString cmdNss{"admin", "$cmd"};
 
     OperationSessionInfo sessionInfo;
     repl::OplogLink oplogLink;
