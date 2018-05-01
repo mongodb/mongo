@@ -42,6 +42,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/oplog_application_checks.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -163,8 +164,14 @@ public:
 
         return doTxnStatus;
     }
+};
 
-} doTxnCmd;
+MONGO_INITIALIZER(RegisterDoTxnCommand)(InitializerContext* ctx) {
+    if (getTestCommandsEnabled()) {
+        new DoTxnCmd();
+    }
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo
