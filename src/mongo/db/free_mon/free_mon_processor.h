@@ -28,7 +28,6 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <boost/thread/synchronized_value.hpp>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -85,7 +84,7 @@ public:
     /**
      * Get the next retry duration.
      */
-    Seconds getNextDuration() const {
+    Seconds getNextDuration() {
         dassert(_current != Seconds(0));
         return _current;
     }
@@ -93,7 +92,7 @@ public:
     /**
      * Get the next retry deadline
      */
-    Date_t getNextDeadline(Client* client) const {
+    Date_t getNextDeadline(Client* client) {
         return client->getServiceContext()->getPreciseClockSource()->now() + _current;
     }
 
@@ -118,10 +117,6 @@ public:
     void reset() final;
 
     bool incrementError() final;
-
-    size_t getCount() const {
-        return _retryCount;
-    }
 
 private:
     // Random number generator for jitter
@@ -158,10 +153,6 @@ public:
     void reset() final;
 
     bool incrementError() final;
-
-    size_t getCount() const {
-        return _retryCount;
-    }
 
 private:
     // Random number generator for jitter
@@ -317,11 +308,6 @@ private:
     /**
      * Read the state from the database.
      */
-    void readState(OperationContext* opCtx);
-
-    /**
-     * Create a short-lived opCtx and read the state from the database.
-     */
     void readState(Client* client);
 
     /**
@@ -389,14 +375,6 @@ private:
     void doAsyncMetricsFail(
         Client* client, const FreeMonMessageWithPayload<FreeMonMessageType::AsyncMetricsFail>* msg);
 
-protected:
-    friend class FreeMonController;
-
-    /**
-     * Server status section with state for active processor.
-     */
-    void getServerStatus(OperationContext* opCtx, BSONObjBuilder* status);
-
 private:
     // Collection of collectors to send on registration
     FreeMonCollectorCollection& _registration;
@@ -411,19 +389,16 @@ private:
     PseudoRandom _random;
 
     // Registration Retry logic
-    boost::synchronized_value<RegistrationRetryCounter> _registrationRetry;
+    RegistrationRetryCounter _registrationRetry;
 
     // Metrics Retry logic
-    boost::synchronized_value<MetricsRetryCounter> _metricsRetry;
+    MetricsRetryCounter _metricsRetry;
 
     // Interval for gathering metrics
     Seconds _metricsGatherInterval;
 
     // Buffer of metrics to upload
     MetricsBuffer _metricsBuffer;
-
-    // When did we last send a metrics batch?
-    boost::synchronized_value<boost::optional<Date_t>> _lastMetricsSend;
 
     // List of tags from server configuration registration
     std::vector<std::string> _tags;
@@ -435,10 +410,10 @@ private:
     std::vector<std::shared_ptr<FreeMonMessage>> _pendingRegisters;
 
     // Last read storage state
-    boost::synchronized_value<boost::optional<FreeMonStorageState>> _lastReadState;
+    boost::optional<FreeMonStorageState> _lastReadState;
 
     // Pending update to disk
-    boost::synchronized_value<FreeMonStorageState> _state;
+    FreeMonStorageState _state;
 
     // Countdown launch to support manual cranking
     FreeMonCountdownLatch _countdown;
