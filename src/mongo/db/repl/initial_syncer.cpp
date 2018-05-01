@@ -1475,11 +1475,7 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
         }
 
         // Check for ops that must be processed one at a time.
-        if (entry.isCommand() ||
-            // Index builds are achieved through the use of an insert op, not a command op.
-            // The following line is the same as what the insert code uses to detect an index
-            // build.
-            (entry.getNamespace().isSystemDotIndexes())) {
+        if (entry.isCommand()) {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
