@@ -13,6 +13,11 @@
     const systemIndexesDB = "systemIndexesDB";
     const UUIDFCV = "3.6";
 
+    // This test is irrelevant for MMAP.
+    if (jsTest.options().storageEngine == "mmapv1") {
+        return;
+    }
+
     // Create system.indexes on wiredTiger, using a version of mongod that does not assign UUIDs.
     let rst = new ReplSetTest({
         nodes: 3,
