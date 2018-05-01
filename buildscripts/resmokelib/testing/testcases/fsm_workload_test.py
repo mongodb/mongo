@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import os.path
 import threading
 
+from buildscripts.resmokelib.testing.testcases import interface
 from buildscripts.resmokelib.testing.testcases import jsrunnerfile
 
 
@@ -24,10 +25,25 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
         self.same_collection = same_collection
         self.same_db = same_db or self.same_collection
         self.db_name_prefix = db_name_prefix
+        self.dbpath_prefix = None
         jsrunnerfile.JSRunnerFileTestCase.__init__(
             self, logger, "FSM workload", fsm_workload,
             test_runner_file="jstests/concurrency/fsm_libs/resmoke_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
+
+    def configure(self, fixture, *args, **kwargs):
+        """Configure the FSMWorkloadTestCase runner."""
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
+
+        self.dbpath_prefix = self.fixture.get_dbpath_prefix()
+
+        global_vars = self.shell_options.get("global_vars", {}).copy()
+
+        test_data = global_vars.get("TestData", {}).copy()
+        self._populate_test_data(test_data)
+
+        global_vars["TestData"] = test_data
+        self.shell_options["global_vars"] = global_vars
 
     @property
     def fsm_workload(self):
@@ -37,6 +53,7 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
     def _populate_test_data(self, test_data):
 
         test_data["fsmWorkloads"] = self.fsm_workload
+        test_data["resmokeDbPathPrefix"] = self.dbpath_prefix
 
         with FSMWorkloadTestCase._COUNTER_LOCK:
             count = FSMWorkloadTestCase._COUNTER

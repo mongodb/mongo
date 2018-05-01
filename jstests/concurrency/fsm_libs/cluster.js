@@ -275,16 +275,19 @@ var Cluster = function(options) {
                     rawST.startContinuousFailover();
                 };
 
-                this.stopContinuousFailover = function() {
-                    rawST.stopContinuousFailover(
-                        {waitForPrimary: true, waitForMongosRetarget: true});
-
+                this.reestablishConnectionsAfterFailover = function() {
                     // Call getPrimary() to re-establish the connections in FSMShardingTest
                     // as it is not a transparent proxy for SharingTest/rawST.
                     st._configsvr.getPrimary();
                     for (let rst of st._shard_rsts) {
                         rst.getPrimary();
                     }
+                };
+
+                this.stopContinuousFailover = function() {
+                    rawST.stopContinuousFailover(
+                        {waitForPrimary: true, waitForMongosRetarget: true});
+                    this.reestablishConnectionsAfterFailover();
                 };
             }
 
@@ -394,17 +397,7 @@ var Cluster = function(options) {
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
             throw new Error('config function must be a function that takes a db as an argument');
         }
-
-        var configs = [];
-        var config = st.c(0);
-        var i = 0;
-        while (config) {
-            configs.push(config);
-            ++i;
-            config = st.c(i);
-        }
-
-        configs.forEach(function(conn) {
+        st._configServers.forEach(function(conn) {
             fn(conn.getDB('admin'));
         });
     };
