@@ -61,6 +61,15 @@ def is_windows():
     return sys.platform.startswith("win32") or sys.platform.startswith("cygwin")
 
 
+def remove_if_exists(path):
+    """Remove path if it exists."""
+    if path is not None and os.path.exists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def is_string_list(lst):
     """Return true if 'lst' is a list of strings, and false otherwise."""
     return isinstance(lst, list) and all(isinstance(x, basestring) for x in lst)
