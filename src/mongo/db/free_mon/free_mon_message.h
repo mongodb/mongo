@@ -90,9 +90,25 @@ enum class FreeMonMessageType {
      */
     AsyncMetricsFail,
 
-    // TODO - add replication messages
-    // OnPrimary,
-    // OpObserver,
+    /**
+     * Notify that the node has been made a primary replica.
+     */
+    OnTransitionToPrimary,
+
+    /**
+     * Notify that storage has received an insert or update.
+     */
+    NotifyOnUpsert,
+
+    /**
+     * Notify that storage has received a delete or drop collection.
+     */
+    NotifyOnDelete,
+
+    /**
+     * Notify that storage has been rolled back.
+     */
+    NotifyOnRollback,
 };
 
 /**
@@ -202,6 +218,10 @@ struct FreeMonPayloadForMessage<FreeMonMessageType::AsyncMetricsFail> {
     using payload_type = Status;
 };
 
+template <>
+struct FreeMonPayloadForMessage<FreeMonMessageType::NotifyOnUpsert> {
+    using payload_type = BSONObj;
+};
 
 /**
  * Message with a generic payload based on the type of message.

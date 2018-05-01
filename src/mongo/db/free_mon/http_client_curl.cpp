@@ -211,7 +211,7 @@ private:
             }
 
             long statusCode;
-            result = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &statusCode);
+            result = curl_easy_getinfo(myHandle.get(), CURLINFO_RESPONSE_CODE, &statusCode);
             if (result != CURLE_OK) {
                 shared_promise.setError({ErrorCodes::OperationFailed,
                                          str::stream() << "Unexpected error retrieving response: "

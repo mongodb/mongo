@@ -43,6 +43,7 @@ structs:
           state:
             description: "Indicates whether it is disabled or enabled"
             type: StorageState
+            default: disabled
           registrationId:
             description: "Registration Id"
             type: string

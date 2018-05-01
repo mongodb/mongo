@@ -282,6 +282,8 @@ ExitCode _initAndListen(int listenPort) {
     } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         opObserverRegistry->addObserver(stdx::make_unique<ConfigServerOpObserver>());
     }
+    setupFreeMonitoringOpObserver(opObserverRegistry.get());
+
 
     serviceContext->setOpObserver(std::move(opObserverRegistry));
 

@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
 
@@ -43,13 +44,12 @@ namespace mongo {
 
 namespace {
 
-static const NamespaceString adminSystemVersionNss("admin.system.version");
-constexpr auto kFreeMonDocIdKey = "free_monitoring";
-
 // mms-automation stores its document in local.clustermanager
 static const NamespaceString localClusterManagerNss("local.clustermanager");
 
 }  // namespace
+
+constexpr StringData FreeMonStorage::kFreeMonDocIdKey;
 
 boost::optional<FreeMonStorageState> FreeMonStorage::read(OperationContext* opCtx) {
     BSONObj deleteKey = BSON("_id" << kFreeMonDocIdKey);
@@ -57,12 +57,15 @@ boost::optional<FreeMonStorageState> FreeMonStorage::read(OperationContext* opCt
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
 
-    Lock::DBLock dblk(opCtx, adminSystemVersionNss.db(), MODE_IS);
-    Lock::CollectionLock lk(opCtx->lockState(), adminSystemVersionNss.ns(), MODE_IS);
+    Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
+    Lock::CollectionLock lk(
+        opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
 
-    auto swObj = storageInterface->findById(opCtx, adminSystemVersionNss, elementKey);
+    auto swObj = storageInterface->findById(
+        opCtx, NamespaceString::kServerConfigurationNamespace, elementKey);
     if (!swObj.isOK()) {
-        if (swObj.getStatus() == ErrorCodes::NoSuchKey) {
+        if (swObj.getStatus() == ErrorCodes::NoSuchKey ||
+            swObj.getStatus() == ErrorCodes::NamespaceNotFound) {
             return {};
         }
 
@@ -80,12 +83,17 @@ void FreeMonStorage::replace(OperationContext* opCtx, const FreeMonStorageState&
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
     {
-        Lock::DBLock dblk(opCtx, adminSystemVersionNss.db(), MODE_IS);
-        Lock::CollectionLock lk(opCtx->lockState(), adminSystemVersionNss.ns(), MODE_IS);
+        Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
+        Lock::CollectionLock lk(
+            opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
 
-        auto swObj = storageInterface->upsertById(opCtx, adminSystemVersionNss, elementKey, obj);
-        if (!swObj.isOK()) {
-            uassertStatusOK(swObj);
+        if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+                opCtx, NamespaceString::kServerConfigurationNamespace)) {
+            auto swObj = storageInterface->upsertById(
+                opCtx, NamespaceString::kServerConfigurationNamespace, elementKey, obj);
+            if (!swObj.isOK()) {
+                uassertStatusOK(swObj);
+            }
         }
     }
 }
@@ -96,17 +104,23 @@ void FreeMonStorage::deleteState(OperationContext* opCtx) {
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
     {
-        Lock::DBLock dblk(opCtx, adminSystemVersionNss.db(), MODE_IS);
-        Lock::CollectionLock lk(opCtx->lockState(), adminSystemVersionNss.ns(), MODE_IS);
+        Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
+        Lock::CollectionLock lk(
+            opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
 
-        auto swObj = storageInterface->deleteById(opCtx, adminSystemVersionNss, elementKey);
-        if (!swObj.isOK()) {
-            // Ignore errors about no document
-            if (swObj.getStatus() == ErrorCodes::NoSuchKey) {
-                return;
+        if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+                opCtx, NamespaceString::kServerConfigurationNamespace)) {
+
+            auto swObj = storageInterface->deleteById(
+                opCtx, NamespaceString::kServerConfigurationNamespace, elementKey);
+            if (!swObj.isOK()) {
+                // Ignore errors about no document
+                if (swObj.getStatus() == ErrorCodes::NoSuchKey) {
+                    return;
+                }
+
+                uassertStatusOK(swObj);
             }
-
-            uassertStatusOK(swObj);
         }
     }
 }
@@ -114,8 +128,9 @@ void FreeMonStorage::deleteState(OperationContext* opCtx) {
 boost::optional<BSONObj> FreeMonStorage::readClusterManagerState(OperationContext* opCtx) {
     auto storageInterface = repl::StorageInterface::get(opCtx);
 
-    Lock::DBLock dblk(opCtx, adminSystemVersionNss.db(), MODE_IS);
-    Lock::CollectionLock lk(opCtx->lockState(), adminSystemVersionNss.ns(), MODE_IS);
+    Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
+    Lock::CollectionLock lk(
+        opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
 
     auto swObj = storageInterface->findSingleton(opCtx, localClusterManagerNss);
     if (!swObj.isOK()) {

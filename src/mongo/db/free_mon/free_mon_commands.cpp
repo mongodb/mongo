@@ -38,7 +38,7 @@ namespace mongo {
 
 namespace {
 
-const auto kRegisterSyncTimeout = Milliseconds{100};
+const auto kRegisterSyncTimeout = Milliseconds{5000};
 
 /**
  * Indicates the current status of Free Monitoring.
@@ -46,6 +46,10 @@ const auto kRegisterSyncTimeout = Milliseconds{100};
 class GetFreeMonitoringStatusCommand : public BasicCommand {
 public:
     GetFreeMonitoringStatusCommand() : BasicCommand("getFreeMonitoringStatus") {}
+
+    bool adminOnly() const override {
+        return true;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
@@ -89,6 +93,10 @@ class SetFreeMonitoringCommand : public BasicCommand {
 public:
     SetFreeMonitoringCommand() : BasicCommand("setFreeMonitoring") {}
 
+    bool adminOnly() const override {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
     }
@@ -119,6 +127,12 @@ public:
         auto cmd = SetFreeMonitoring::parse(ctx, cmdObj);
 
         auto* controller = FreeMonController::get(opCtx->getServiceContext());
+        if (!controller) {
+            // Pending operation.
+            uasserted(50840,
+                      "Free Monitoring has been disabled via the command-line and/or config file");
+        }
+
         boost::optional<Status> optStatus = boost::none;
         if (cmd.getAction() == SetFreeMonActionEnum::enable) {
             optStatus = controller->registerServerCommand(kRegisterSyncTimeout);

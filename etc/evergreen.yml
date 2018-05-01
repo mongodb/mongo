@@ -11119,6 +11119,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough
@@ -11266,6 +11267,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
+  - name: free_monitoring
   - name: gle_auth
   - name: gle_auth_write_cmd
   - name: gle_auth_basics_passthrough

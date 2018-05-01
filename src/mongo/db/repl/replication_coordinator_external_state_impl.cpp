@@ -48,6 +48,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_metadata_hook.h"
@@ -753,6 +754,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);
+
+    notifyFreeMonitoringOnTransitionToPrimary();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

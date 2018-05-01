@@ -49,6 +49,7 @@
 #include "mongo/db/free_mon/free_mon_http.h"
 #include "mongo/db/free_mon/free_mon_message.h"
 #include "mongo/db/free_mon/free_mon_network.h"
+#include "mongo/db/free_mon/free_mon_op_observer.h"
 #include "mongo/db/free_mon/free_mon_options.h"
 #include "mongo/db/free_mon/free_mon_protocol_gen.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
@@ -67,19 +68,6 @@
 namespace mongo {
 
 namespace {
-
-const auto getFreeMonController =
-    ServiceContext::declareDecoration<std::unique_ptr<FreeMonController>>();
-
-FreeMonController* getGlobalFreeMonController() {
-    if (!hasGlobalServiceContext()) {
-        return nullptr;
-    }
-
-    return getFreeMonController(getGlobalServiceContext()).get();
-}
-
-
 /**
  * Expose cloudFreeMonitoringEndpointURL set parameter to URL for free monitoring.
  */
@@ -317,12 +305,12 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
 
     auto controller = stdx::make_unique<FreeMonController>(std::move(network));
 
+    auto controllerPtr = controller.get();
+
     registerCollectors(controller.get());
 
     // Install the new controller
-    auto& staticFreeMon = getFreeMonController(serviceContext);
-
-    staticFreeMon = std::move(controller);
+    FreeMonController::set(getGlobalServiceContext(), std::move(controller));
 
     RegistrationType registrationType = RegistrationType::DoNotRegister;
     if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOn) {
@@ -333,6 +321,8 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
         } else {
             registrationType = RegistrationType::RegisterOnStart;
         }
+    } else if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kRuntime) {
+        registrationType = RegistrationType::RegisterAfterOnTransitionToPrimary;
     }
 
     controllerPtr->start(registrationType, globalFreeMonParams.freeMonitoringTags);
@@ -343,15 +333,19 @@ void stopFreeMonitoring() {
         return;
     }
 
-    auto controller = getGlobalFreeMonController();
+    auto controller = FreeMonController::get(getGlobalServiceContext());
 
     if (controller != nullptr) {
         controller->stop();
     }
 }
 
-FreeMonController* FreeMonController::get(ServiceContext* serviceContext) {
-    return getFreeMonController(serviceContext).get();
+void notifyFreeMonitoringOnTransitionToPrimary() {
+    FreeMonController::get(getGlobalServiceContext())->notifyOnTransitionToPrimary();
+}
+
+void setupFreeMonitoringOpObserver(OpObserverRegistry* registry) {
+    registry->addObserver(stdx::make_unique<FreeMonOpObserver>());
 }
 
 FreeMonHttpClientInterface::~FreeMonHttpClientInterface() = default;

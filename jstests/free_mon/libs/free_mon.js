@@ -169,7 +169,7 @@ function WaitForRegistration(conn) {
     assert.soon(function() {
         const docs = admin.system.version.find({_id: "free_monitoring"});
         const da = docs.toArray();
-        return da.length != 0;
+        return da.length === 1 && da[0].state === "enabled";
     }, "Failed to register", 60 * 1000);
 }
 

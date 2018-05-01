@@ -67,7 +67,7 @@ public:
 
     /**
      * Turn the crank of the message queue by ignoring deadlines for N messages.
-    */
+     */
     void turnCrankForTest(size_t countMessagesToIgnore);
 
     /**
@@ -84,6 +84,11 @@ public:
      * Get the FreeMonController from ServiceContext.
      */
     static FreeMonController* get(ServiceContext* serviceContext);
+
+    /**
+     * Set the FreeMonController in the ServiceContext.
+     */
+    static void set(ServiceContext* serviceContext, std::unique_ptr<FreeMonController> controller);
 
     /**
      * Start registration of mongod with remote service.
@@ -114,7 +119,28 @@ public:
     // TODO - add these methods
     // void getServerStatus(BSONObjBuilder* builder);
 
-    // void notifyObserver(const BSONObj& doc);
+    /**
+     * Notify on upsert.
+     *
+     * Updates and inserts are treated as the same.
+     */
+    void notifyOnUpsert(const BSONObj& doc);
+
+    /**
+     * Notify on document delete or drop collection.
+     */
+    void notifyOnDelete();
+
+    /**
+     * Notify that we local instance has become a primary.
+     */
+    void notifyOnTransitionToPrimary();
+
+    /**
+     * Notify that storage has rolled back
+     */
+    void notifyOnRollback();
+
 private:
     void _enqueue(std::shared_ptr<FreeMonMessage> msg);
 

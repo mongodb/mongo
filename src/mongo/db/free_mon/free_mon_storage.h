@@ -42,6 +42,11 @@ namespace mongo {
 class FreeMonStorage {
 public:
     /**
+     * The _id value in admin.system.version.
+     */
+    static constexpr auto kFreeMonDocIdKey = "free_monitoring"_sd;
+
+    /**
      * Reads document from disk if it exists.
      */
     static boost::optional<FreeMonStorageState> read(OperationContext* opCtx);

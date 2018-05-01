@@ -85,13 +85,6 @@ void FreeMonStorageTest::setUp() {
 
     // Transition to PRIMARY so that the server can accept writes.
     ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_PRIMARY));
-
-    // Create collection with one document.
-    CollectionOptions collectionOptions;
-    collectionOptions.uuid = UUID::gen();
-    auto statusCC = _storage->createCollection(
-        _opCtx.get(), NamespaceString("admin", "system.version"), collectionOptions);
-    ASSERT_OK(statusCC);
 }
 
 void FreeMonStorageTest::tearDown() {
@@ -109,6 +102,20 @@ repl::ReplicationCoordinatorMock* FreeMonStorageTest::_getReplCoord() const {
 
 // Positive: Test Storage works
 TEST_F(FreeMonStorageTest, TestStorage) {
+
+    // Validate no collection works
+    {
+        auto emptyDoc = FreeMonStorage::read(_opCtx.get());
+        ASSERT_FALSE(emptyDoc.is_initialized());
+    }
+
+    // Create collection with one document.
+    CollectionOptions collectionOptions;
+    collectionOptions.uuid = UUID::gen();
+    auto statusCC = _storage->createCollection(
+        _opCtx.get(), NamespaceString("admin", "system.version"), collectionOptions);
+    ASSERT_OK(statusCC);
+
 
     FreeMonStorageState initialState =
         FreeMonStorageState::parse(IDLParserErrorContext("foo"),
@@ -143,6 +150,77 @@ TEST_F(FreeMonStorageTest, TestStorage) {
     {
         auto emptyDoc = FreeMonStorage::read(_opCtx.get());
         ASSERT_FALSE(emptyDoc.is_initialized());
+    }
+
+    // Verfiy delete of nothing succeeds
+    FreeMonStorage::deleteState(_opCtx.get());
+}
+
+
+// Positive: Test Storage works on a secondary
+TEST_F(FreeMonStorageTest, TestSecondary) {
+
+    // Create collection with one document.
+    CollectionOptions collectionOptions;
+    collectionOptions.uuid = UUID::gen();
+    auto statusCC = _storage->createCollection(
+        _opCtx.get(), NamespaceString("admin", "system.version"), collectionOptions);
+    ASSERT_OK(statusCC);
+
+
+    FreeMonStorageState initialState =
+        FreeMonStorageState::parse(IDLParserErrorContext("foo"),
+                                   BSON("version" << 1LL << "state"
+                                                  << "enabled"
+                                                  << "registrationId"
+                                                  << "1234"
+                                                  << "informationalURL"
+                                                  << "http://example.com"
+                                                  << "message"
+                                                  << "hello"
+                                                  << "userReminder"
+                                                  << ""));
+
+    FreeMonStorage::replace(_opCtx.get(), initialState);
+
+    {
+        auto persistedDoc = FreeMonStorage::read(_opCtx.get());
+
+        ASSERT_TRUE(persistedDoc.is_initialized());
+
+        ASSERT_TRUE(persistedDoc == initialState);
+    }
+
+    // Now become a secondary
+    ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    FreeMonStorageState updatedState =
+        FreeMonStorageState::parse(IDLParserErrorContext("foo"),
+                                   BSON("version" << 2LL << "state"
+                                                  << "enabled"
+                                                  << "registrationId"
+                                                  << "1234"
+                                                  << "informationalURL"
+                                                  << "http://example.com"
+                                                  << "message"
+                                                  << "hello"
+                                                  << "userReminder"
+                                                  << ""));
+
+
+    {
+        auto persistedDoc = FreeMonStorage::read(_opCtx.get());
+
+        ASSERT_TRUE(persistedDoc.is_initialized());
+
+        ASSERT_TRUE(persistedDoc == initialState);
+    }
+
+    FreeMonStorage::deleteState(_opCtx.get());
+
+    {
+        auto persistedDoc = FreeMonStorage::read(_opCtx.get());
+        ASSERT_TRUE(persistedDoc.is_initialized());
     }
 
     // Verfiy delete of nothing succeeds
