@@ -67,7 +67,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
@@ -463,14 +462,15 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
 // Schedules the writes to the oplog for 'ops' into threadPool. The caller must guarantee that 'ops'
 // stays valid until all scheduled work in the thread pool completes.
 void scheduleWritesToOplog(OperationContext* opCtx,
+                           StorageInterface* storageInterface,
                            ThreadPool* threadPool,
                            const MultiApplier::Operations& ops) {
 
-    auto makeOplogWriterForRange = [&ops](size_t begin, size_t end) {
+    auto makeOplogWriterForRange = [storageInterface, &ops](size_t begin, size_t end) {
         // The returned function will be run in a separate thread after this returns. Therefore all
         // captures other than 'ops' must be by value since they will not be available. The caller
         // guarantees that 'ops' will stay in scope until the spawned threads complete.
-        return [&ops, begin, end] {
+        return [storageInterface, &ops, begin, end] {
             auto opCtx = cc().makeOperationContext();
             UnreplicatedWritesBlock uwb(opCtx.get());
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
@@ -486,8 +486,8 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             }
 
             fassert(40141,
-                    StorageInterface::get(opCtx.get())
-                        ->insertDocuments(opCtx.get(), NamespaceString::kRsOplogNamespace, docs));
+                    storageInterface->insertDocuments(
+                        opCtx.get(), NamespaceString::kRsOplogNamespace, docs));
         };
     };
 
@@ -690,8 +690,11 @@ class SyncTail::OpQueueBatcher {
     MONGO_DISALLOW_COPYING(OpQueueBatcher);
 
 public:
-    OpQueueBatcher(SyncTail* syncTail, OplogBuffer* oplogBuffer)
-        : _syncTail(syncTail), _oplogBuffer(oplogBuffer), _thread([this] { run(); }) {}
+    OpQueueBatcher(SyncTail* syncTail, StorageInterface* storageInterface, OplogBuffer* oplogBuffer)
+        : _syncTail(syncTail),
+          _storageInterface(storageInterface),
+          _oplogBuffer(oplogBuffer),
+          _thread([this] { run(); }) {}
     ~OpQueueBatcher() {
         invariant(_isDead);
         _thread.join();
@@ -720,9 +723,8 @@ private:
      */
     std::size_t _calculateBatchLimitBytes() {
         auto opCtx = cc().makeOperationContext();
-        auto storageInterface = StorageInterface::get(opCtx.get());
         auto oplogMaxSizeResult =
-            storageInterface->getOplogMaxSize(opCtx.get(), NamespaceString::kRsOplogNamespace);
+            _storageInterface->getOplogMaxSize(opCtx.get(), NamespaceString::kRsOplogNamespace);
         auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
         return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
     }
@@ -780,6 +782,7 @@ private:
     }
 
     SyncTail* const _syncTail;
+    StorageInterface* const _storageInterface;
     OplogBuffer* const _oplogBuffer;
 
     stdx::mutex _mutex;  // Guards _ops.
@@ -806,7 +809,7 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
     // arbiterOnly field for any member.
     invariant(!replCoord->getMemberState().arbiter());
 
-    OpQueueBatcher batcher(this, oplogBuffer);
+    OpQueueBatcher batcher(this, _storageInterface, oplogBuffer);
 
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
         getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
@@ -814,8 +817,6 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
             : new ApplyBatchFinalizer(replCoord)};
 
     // Get replication consistency markers.
-    ReplicationProcess* replProcess = ReplicationProcess::get(replCoord->getServiceContext());
-    ReplicationConsistencyMarkers* consistencyMarkers = replProcess->getConsistencyMarkers();
     OpTime minValid;
 
     while (true) {  // Exits on message from OpQueueBatcher.
@@ -840,7 +841,7 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
         }
 
         // Get the current value of 'minValid'.
-        minValid = consistencyMarkers->getMinValid(&opCtx);
+        minValid = _consistencyMarkers->getMinValid(&opCtx);
 
         // Transition to SECONDARY state, if possible.
         tryToGoLiveAsASecondary(&opCtx, replCoord, minValid);
@@ -902,7 +903,7 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
         setNewTimestamp(opCtx.getServiceContext(), lastOpTimeInBatch.getTimestamp());
 
         // 2. Persist our "applied through" optime to disk.
-        consistencyMarkers->setAppliedThrough(&opCtx, lastOpTimeInBatch);
+        _consistencyMarkers->setAppliedThrough(&opCtx, lastOpTimeInBatch);
 
         // 3. Ensure that the last applied op time hasn't changed since the start of this batch.
         const auto lastAppliedOpTimeAtEndOfBatch = replCoord->getMyLastAppliedOpTime();
@@ -915,7 +916,7 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
 
         // 4. Update oplog visibility by notifying the storage engine of the new oplog entries.
         const bool orderedCommit = true;
-        StorageInterface::get(&opCtx)->oplogDiskLocRegister(
+        _storageInterface->oplogDiskLocRegister(
             &opCtx, lastOpTimeInBatch.getTimestamp(), orderedCommit);
 
         // 5. Finalize this batch. We are at a consistent optime if our current optime is >= the
@@ -1317,8 +1318,6 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         prefetchOps(ops, _writerPool);
     }
 
-    auto consistencyMarkers = ReplicationProcess::get(opCtx)->getConsistencyMarkers();
-
     LOG(2) << "replication batch size is " << ops.size();
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
     // entries from the oplog until we finish writing.
@@ -1341,8 +1340,8 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         ON_BLOCK_EXIT([&] { _writerPool->waitForIdle(); });
 
         // Write batch of ops into oplog.
-        consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
-        scheduleWritesToOplog(opCtx, _writerPool, ops);
+        _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
+        scheduleWritesToOplog(opCtx, _storageInterface, _writerPool, ops);
 
         // Holds extracted applyOps operations. Keep in scope until all operations in 'ops' and
         // 'applyOpsOperations' have been applied.
@@ -1362,8 +1361,8 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         _writerPool->waitForIdle();
 
         // Reset consistency markers in case the node fails while applying ops.
-        consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
-        consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
+        _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
+        _consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
         {
             std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
@@ -1417,7 +1416,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
             // the first timestamp in the batch since we do not have enough information to find out
             // the timestamp of the first write that set the given multikey path.
             fassert(50686,
-                    StorageInterface::get(opCtx)->setIndexIsMultikey(
+                    _storageInterface->setIndexIsMultikey(
                         opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
         }
     }
