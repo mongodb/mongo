@@ -1031,7 +1031,11 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             // If the collection turned into a view, we might get an error trying to
             // refetch documents, but these errors should be ignored, as we'll be creating
             // the view during oplog replay.
-            if (ex.code() == ErrorCodes::CommandNotSupportedOnView)
+            // Collection may be dropped on the sync source, in which case it will be dropped during
+            // oplog replay. So it is safe to ignore NamespaceNotFound errors while trying to
+            // refetch documents.
+            if (ex.code() == ErrorCodes::CommandNotSupportedOnView ||
+                ex.code() == ErrorCodes::NamespaceNotFound)
                 continue;
 
             log() << "Rollback couldn't re-fetch from uuid: " << uuid << " _id: " << redact(doc._id)
