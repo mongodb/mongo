@@ -2924,6 +2924,63 @@ def doConfigure(myenv):
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
 
+    if env['TARGET_ARCH'] == "ppc64le":
+        # This checks for an altivec optimization we use in full text search.
+        # Different versions of gcc appear to put output bytes in different
+        # parts of the output vector produced by vec_vbpermq.  This configure
+        # check looks to see which format the compiler produces.
+        #
+        # NOTE: This breaks cross compiles, as it relies on checking runtime functionality for the
+        # environment we're in.  A flag to choose the index, or the possibility that we don't have
+        # multiple versions to support (after a compiler upgrade) could solve the problem if we
+        # eventually need them.
+        def CheckAltivecVbpermqOutput(context, index):
+            test_body = """
+                #include <altivec.h>
+                #include <cstring>
+                #include <cstdint>
+                #include <cstdlib>
+
+                int main() {{
+                    using Native = __vector signed char;
+                    const size_t size = sizeof(Native);
+                    const Native bits = {{ 120, 112, 104, 96, 88, 80, 72, 64, 56, 48, 40, 32, 24, 16, 8, 0 }};
+
+                    uint8_t inputBuf[size];
+                    std::memset(inputBuf, 0xFF, sizeof(inputBuf));
+
+                    for (size_t offset = 0; offset <= size; offset++) {{
+                        Native vec = vec_vsx_ld(0, reinterpret_cast<const Native*>(inputBuf));
+
+                        uint64_t mask = vec_extract(vec_vbpermq(vec, bits), {0});
+
+                        size_t initialZeros = (mask == 0 ? size : __builtin_ctzll(mask));
+                        if (initialZeros != offset) {{
+			    return 1;
+                        }}
+
+                        if (offset < size) {{
+                            inputBuf[offset] = 0;  // Add an initial 0 for the next loop.
+                        }}
+                    }}
+
+		    return 0;
+                }}
+            """.format(index)
+
+            context.Message('Checking for vec_vbperm output in index {0}... '.format(index))
+            ret = context.TryRun(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret[0])
+            return ret[0]
+
+        conf.AddTest('CheckAltivecVbpermqOutput', CheckAltivecVbpermqOutput)
+
+        outputIndex = next((idx for idx in [0,1] if conf.CheckAltivecVbpermqOutput(idx)), None)
+        if outputIndex is not None:
+	    conf.env.SetConfigHeaderDefine("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex)
+        else:
+            myenv.ConfError("Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported")
+
     return conf.Finish()
 
 env = doConfigure( env )

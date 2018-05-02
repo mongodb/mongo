@@ -242,6 +242,7 @@ if env.TargetOSIs('windows'):
     env.Alias('generated-sources', generatedResourceConstantFile)
 
 config_header_substs = (
+    ('@mongo_config_altivec_vec_vbpermq_output_index@', 'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
     ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
     ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
     ('@mongo_config_have___declspec_thread@', 'MONGO_CONFIG_HAVE___DECLSPEC_THREAD'),
