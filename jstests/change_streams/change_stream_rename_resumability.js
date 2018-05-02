@@ -33,12 +33,16 @@
     assert.eq(change.operationType, "invalidate", tojson(change));
     assert(cursor.isExhausted());
 
-    // Try resuming from the invalidate.
-    const resumeCursor = coll.watch([], {resumeAfter: change._id});
+    // TODO SERVER-34789: The code below should throw an error. We exercise this behavior here to
+    // be sure that it doesn't crash the server, but the ability to resume a change stream after an
+    // invalidate is a bug, not a feature.
 
-    // Be sure we can see the change after the rename.
-    assert.soon(() => resumeCursor.hasNext());
-    change = resumeCursor.next();
-    assert.eq(change.operationType, "insert", tojson(change));
-    assert.docEq(change.fullDocument, {_id: 2});
+    // Try resuming from the invalidate.
+    assert.doesNotThrow(function() {
+        const resumeCursor = coll.watch([], {resumeAfter: change._id});
+        assert.soon(() => resumeCursor.hasNext());
+        // Not checking the contents of the document returned, because we do not technically
+        // support this behavior.
+        resumeCursor.next();
+    });
 }());

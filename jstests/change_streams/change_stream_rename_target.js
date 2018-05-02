@@ -33,8 +33,16 @@
     // Do another insert.
     assert.writeOK(testDB[collName2].insert({_id: 2}));
 
-    let cursor = testDB[collName2].watch([], {resumeAfter: invalidate._id});
-    assert.soon(() => cursor.hasNext());
-    let change = cursor.next();
-    assert.docEq(change.fullDocument, {_id: 2});
+    // TODO SERVER-34789: The code below should throw an error. We exercise this behavior here to
+    // be sure that it doesn't crash the server, but the ability to resume a change stream after an
+    // invalidate is a bug, not a feature.
+
+    // Try resuming from the invalidate.
+    assert.doesNotThrow(function() {
+        let cursor = testDB[collName2].watch([], {resumeAfter: invalidate._id});
+        assert.soon(() => cursor.hasNext());
+        // Not checking the contents of the document returned, because we do not technically
+        // support this behavior.
+        cursor.next();
+    });
 }());
