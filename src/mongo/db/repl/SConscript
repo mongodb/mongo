@@ -620,6 +620,7 @@ env.Library(
     source=[
         'applier_helpers.cpp',
         'oplog_applier.cpp',
+        'session_update_tracker.cpp',
         'sync_tail.cpp',
     ],
     LIBDEPS=[

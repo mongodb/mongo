@@ -1203,21 +1203,6 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
     }
 }
 
-std::vector<repl::OplogEntry> Session::addOpsForReplicatingTxnTable(
-    const std::vector<repl::OplogEntry>& ops) {
-    std::vector<repl::OplogEntry> newOps;
-
-    for (auto&& op : ops) {
-        newOps.push_back(op);
-
-        if (auto updateTxnTableOp = createMatchingTransactionTableUpdate(op)) {
-            newOps.push_back(*updateTxnTableOp);
-        }
-    }
-
-    return newOps;
-}
-
 boost::optional<repl::OplogEntry> Session::createMatchingTransactionTableUpdate(
     const repl::OplogEntry& entry) {
     auto sessionInfo = entry.getOperationSessionInfo();

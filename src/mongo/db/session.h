@@ -363,13 +363,6 @@ public:
     BSONObj reportStashedState() const;
 
     /**
-     * Scan through the list of operations and add new oplog entries for updating
-     * config.transactions if needed.
-     */
-    static std::vector<repl::OplogEntry> addOpsForReplicatingTxnTable(
-        const std::vector<repl::OplogEntry>& ops);
-
-    /**
      * Returns a new oplog entry if the given entry has transaction state embedded within in.
      * The new oplog entry will contain the operation needed to replicate the transaction
      * table.
