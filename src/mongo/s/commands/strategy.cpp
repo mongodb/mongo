@@ -346,8 +346,8 @@ void runCommand(OperationContext* opCtx,
 
     try {
         for (int tries = 0;; ++tries) {
-            // Try 5 times. On the last try, exceptions are rethrown.
-            bool canRetry = tries < 4;
+            // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are rethrown.
+            bool canRetry = tries < kMaxNumStaleVersionRetries - 1;
 
             if (tries > 0) {
                 // Re-parse before retrying in case the process of run()-ning the
@@ -361,52 +361,53 @@ void runCommand(OperationContext* opCtx,
             try {
                 execCommandClient(opCtx, invocation.get(), request, &crb);
                 return;
-            } catch (const DBException& ex) {
-                if (ErrorCodes::isNeedRetargettingError(ex.code()) ||
-                    ErrorCodes::isSnapshotError(ex.code())) {
-                    const auto staleNs = [&] {
-                        if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                            return NamespaceString(staleInfo->getns());
-                        } else if (auto implicitCreateInfo =
-                                       ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
-                            return NamespaceString(implicitCreateInfo->getNss());
-                        } else {
-                            throw;
-                        }
-                    }();
-
-                    if (staleNs.isEmpty()) {
-                        // This should be impossible but older versions tried incorrectly to handle
-                        // it here.
-                        log() << "Received a stale config error with an empty namespace while "
-                                 "executing "
-                              << redact(request.body) << " : " << redact(ex);
+            } catch (ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
+                const auto staleNs = [&] {
+                    if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+                        return NamespaceString(staleInfo->getns());
+                    } else if (auto implicitCreateInfo =
+                                   ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
+                        return NamespaceString(implicitCreateInfo->getNss());
+                    } else {
                         throw;
                     }
+                }();
 
-                    if (!canRetry)
-                        throw;
-
-                    LOG(2) << "Retrying command " << redact(request.body) << causedBy(ex);
-
-                    if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError)) {
-                        ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
-                    }
-
-                    if (staleNs.isValid()) {
-                        Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNs);
-                    }
-
-                    continue;
-                } else if (auto sce = ex.extraInfo<StaleDbRoutingVersion>()) {
-                    Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(
-                        sce->getDb(), sce->getVersionReceived());
-                    if (!canRetry)
-                        throw;
-                    continue;
-                } else {
+                if (staleNs.isEmpty()) {
+                    // This should be impossible but older versions tried incorrectly to handle
+                    // it here.
+                    log() << "Received a stale config error with an empty namespace while "
+                             "executing "
+                          << redact(request.body) << " : " << redact(ex);
                     throw;
                 }
+
+                if (!canRetry)
+                    throw;
+
+                LOG(2) << "Retrying command " << redact(request.body) << causedBy(ex);
+
+                if (!MONGO_FAIL_POINT(doNotRefreshShardsOnRetargettingError)) {
+                    ShardConnection::checkMyConnectionVersions(opCtx, staleNs.ns());
+                }
+
+                if (staleNs.isValid()) {
+                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNs);
+                }
+
+                continue;
+            } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& e) {
+                Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(e->getDb(),
+                                                                         e->getVersionReceived());
+                if (!canRetry)
+                    throw;
+                continue;
+            } catch (const ExceptionForCat<ErrorCategory::SnapshotError>& ex) {
+                LOG(2) << "Retrying command " << redact(request.body) << causedBy(ex);
+                if (!canRetry)
+                    throw;
+                // Simple retry on any type of snapshot error.
+                continue;
             }
             MONGO_UNREACHABLE;
         }

@@ -33,8 +33,12 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/keys_collection_client_sharded.h"
+#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/unittest/unittest.h"
@@ -49,23 +53,16 @@ const NamespaceString kNss = NamespaceString("test", "coll");
 
 using InspectionCallback = stdx::function<void(const executor::RemoteCommandRequest& request)>;
 
-BSONObj appendSnapshotReadConcern(BSONObj cmdObj) {
-    BSONObjBuilder bob(cmdObj);
-    BSONObjBuilder readConcernBob = bob.subobjStart(repl::ReadConcernArgs::kReadConcernFieldName);
-    readConcernBob.append("level", "snapshot");
-    readConcernBob.doneFast();
-    return bob.obj();
-}
-
 class ClusterAggregateTest : public CatalogCacheTestFixture {
 protected:
-    const BSONObj kAggregateCmdTargeted{fromjson(
-        "{pipeline: [{$match: {_id: 0}}], explain: false, allowDiskUse: false, fromMongos: true, "
-        "cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: {level: 'snapshot'}}")};
-
-    const BSONObj kAggregateCmdScatterGather{
-        fromjson("{pipeline: [], explain: false, allowDiskUse: false, fromMongos: true, "
+    const BSONObj kAggregateCmdTargeted{
+        fromjson("{aggregate: 'coll', pipeline: [{$match: {_id: 0}}], explain: false, "
+                 "allowDiskUse: false, fromMongos: true, "
                  "cursor: {batchSize: 10}, maxTimeMS: 100, readConcern: {level: 'snapshot'}}")};
+
+    const BSONObj kAggregateCmdScatterGather{fromjson(
+        "{aggregate: 'coll', pipeline: [], explain: false, allowDiskUse: false, fromMongos: true, "
+        "cursor: {batchSize: 10}, readConcern: {level: 'snapshot'}}")};
 
     void setUp() {
         CatalogCacheTestFixture::setUp();
@@ -76,6 +73,18 @@ protected:
         LogicalTime initialTime(Timestamp(10, 1));
         logicalClock->setClusterTimeFromTrustedSource(initialTime);
         LogicalClock::set(serviceContext(), std::move(logicalClock));
+
+        auto keysCollectionClient = stdx::make_unique<KeysCollectionClientSharded>(
+            Grid::get(operationContext())->catalogClient());
+
+        auto keyManager = std::make_shared<KeysCollectionManager>(
+            "dummy", std::move(keysCollectionClient), Seconds(KeysRotationIntervalSec));
+
+        auto validator = stdx::make_unique<LogicalTimeValidator>(keyManager);
+        LogicalTimeValidator::set(serviceContext(), std::move(validator));
+
+        // ReadConcern 'snapshot' is only supported with test commands enabled.
+        setTestCommandsEnabled(true);
     }
 
     // The index of the shard expected to receive the response is used to prevent different shards
@@ -111,20 +120,17 @@ protected:
         });
     }
 
-    BSONObj runAggregateCommand(BSONObj aggCmd) {
-        BSONObjBuilder result;
+    DbResponse runAggregateCommand(BSONObj aggCmd) {
+        // Create a new client/operation context per command, and setup a test session ID and
+        // transaction number.
+        auto client = serviceContext()->makeClient("ClusterAggClient");
+        auto opCtx = client->makeOperationContext();
+        opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
+        opCtx->setTxnNumber(1);
 
-        ClusterAggregate::Namespaces nsStruct;
-        nsStruct.requestedNss = kNss;
-        nsStruct.executionNss = kNss;
+        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.db(), aggCmd);
 
-        auto request = unittest::assertGet(AggregationRequest::parseFromBSON(kNss, aggCmd));
-        LiteParsedPipeline liteParsedPipeline(request);
-
-        auto cursorId =
-            ClusterAggregate::runAggregate(operationContext(), nsStruct, request, aggCmd, &result);
-
-        return result.obj();
+        return Strategy::clientCommand(opCtx.get(), opMsgRequest.serialize());
     }
 
     void runAggCommandSuccessful(BSONObj cmd, bool isTargeted) {
@@ -170,8 +176,7 @@ protected:
     }
 
     void runAggCommandMaxErrors(BSONObj cmd, ErrorCodes::Error code, bool isTargeted) {
-        auto future =
-            launchAsync([&] { ASSERT_THROWS_CODE(runAggregateCommand(cmd), DBException, code); });
+        auto future = launchAsync([&] { runAggregateCommand(cmd); });
 
         size_t numRetries =
             isTargeted ? kMaxNumStaleVersionRetries : kMaxNumStaleVersionRetries * numShards;
@@ -194,44 +199,45 @@ TEST_F(ClusterAggregateTest, NoErrors) {
     runAggCommandSuccessful(kAggregateCmdScatterGather, false);
 }
 
+// Verify aggregate through mongos will retry on a snapshot error.
+TEST_F(ClusterAggregateTest, RetryOnSnapshotError) {
+    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+
+    // Target one shard.
+    runAggCommandOneError(kAggregateCmdTargeted, ErrorCodes::SnapshotUnavailable, true);
+    runAggCommandOneError(kAggregateCmdTargeted, ErrorCodes::SnapshotTooOld, true);
+
+    // Target all shards
+    runAggCommandOneError(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
+    runAggCommandOneError(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
+}
 
 TEST_F(ClusterAggregateTest, AttachesAtClusterTimeForSnapshotReadConcern) {
     loadRoutingTableWithTwoChunksAndTwoShards(kNss);
-    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
-    operationContext()->setTxnNumber(1);
-
-    repl::ReadConcernArgs::get(operationContext()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
 
     auto containsAtClusterTime = [](const executor::RemoteCommandRequest& request) {
         ASSERT(!request.cmdObj["readConcern"]["atClusterTime"].eoo());
     };
 
     // Target one shard.
-    runCommandInspectRequests(
-        appendSnapshotReadConcern(kAggregateCmdTargeted), containsAtClusterTime, true);
+    runCommandInspectRequests(kAggregateCmdTargeted, containsAtClusterTime, true);
 
     // Target all shards.
-    runCommandInspectRequests(
-        appendSnapshotReadConcern(kAggregateCmdScatterGather), containsAtClusterTime, false);
+    runCommandInspectRequests(kAggregateCmdScatterGather, containsAtClusterTime, false);
 }
 
-// Verify ClusterAggregate::runAggregate will retry up to its max retry attempts on snapshot errors
+// Verify aggregate commands will retry up to its max retry attempts on snapshot errors
 // then return the final error it receives.
 TEST_F(ClusterAggregateTest, MaxRetriesSnapshotErrors) {
-    // TODO: SERVER-34552
-    bool server_34552_fixed{false};
-    if (server_34552_fixed) {
-        loadRoutingTableWithTwoChunksAndTwoShards(kNss);
+    loadRoutingTableWithTwoChunksAndTwoShards(kNss);
 
-        // Target one shard.
-        runAggCommandMaxErrors(kAggregateCmdTargeted, ErrorCodes::SnapshotUnavailable, true);
-        runAggCommandMaxErrors(kAggregateCmdTargeted, ErrorCodes::SnapshotTooOld, true);
+    // Target one shard.
+    runAggCommandMaxErrors(kAggregateCmdTargeted, ErrorCodes::SnapshotUnavailable, true);
+    runAggCommandMaxErrors(kAggregateCmdTargeted, ErrorCodes::SnapshotTooOld, true);
 
-        // Target all shards
-        runAggCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
-        runAggCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
-    }
+    // Target all shards
+    runAggCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotUnavailable, false);
+    runAggCommandMaxErrors(kAggregateCmdScatterGather, ErrorCodes::SnapshotTooOld, false);
 }
 
 }  // namespace
