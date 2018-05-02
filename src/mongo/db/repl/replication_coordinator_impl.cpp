@@ -69,6 +69,7 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -1850,6 +1851,11 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
     auto client = opCtx->getClient();
     bool isPrimaryOrSecondary = _canServeNonLocalReads.loadRelaxed();
 
+    // Always allow reads from the direct client, no matter what.
+    if (client->isInDirectClient()) {
+        return Status::OK();
+    }
+
     // Oplog reads are not allowed during STARTUP state, but we make an exception for internal
     // reads. Internal reads are required for cleaning up unfinished apply batches.
     if (!isPrimaryOrSecondary && getReplicationMode() == modeReplSet && ns.isOplog()) {
@@ -1862,12 +1868,18 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         }
     }
 
-    if (client->isInDirectClient()) {
-        return Status::OK();
-    }
     if (canAcceptWritesFor_UNSAFE(opCtx, ns)) {
         return Status::OK();
     }
+
+    auto session = OperationContextSession::get(opCtx);
+    if (session && session->inMultiDocumentTransaction()) {
+        if (!_canAcceptNonLocalWrites && !getTestCommandsEnabled()) {
+            return Status(ErrorCodes::NotMaster,
+                          "Multi-document transactions are only allowed on replica set primaries.");
+        }
+    }
+
     if (slaveOk) {
         if (isPrimaryOrSecondary) {
             return Status::OK();

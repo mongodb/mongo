@@ -197,7 +197,6 @@ selector:
   - jstests/replsets/apply_ops_idempotency.js
   - jstests/replsets/initial_sync_invalid_index_spec.js
   - jstests/replsets/disallow_adding_initialized_node1.js
-  - jstests/replsets/transactions_prohibited_on_secondaries.js
   - jstests/replsets/read_majority_two_arbs.js
   - jstests/replsets/retryable_commit_transaction_after_restart.js
   - jstests/replsets/apply_ops_insert_write_conflict_nonatomic.js

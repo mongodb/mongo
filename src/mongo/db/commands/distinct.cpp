@@ -171,6 +171,11 @@ public:
         auto parsedDistinct =
             uassertStatusOK(ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false));
 
+        // Check whether we are allowed to read from this node after acquiring our locks.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassertStatusOK(replCoord->checkCanServeReadsFor(
+            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
