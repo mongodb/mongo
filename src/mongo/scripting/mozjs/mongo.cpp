@@ -530,6 +530,9 @@ void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs 
         uasserted(ErrorCodes::BadValue, "2nd arg must be a NumberLong");
     }
 
+    // getConnectionRef verifies that the connection is still open
+    getConnectionRef(args);
+
     std::string ns = ValueWriter(cx, args.get(0)).toString();
     long long cursorId = NumberLongInfo::ToNumberLong(cx, args.get(1));
 
