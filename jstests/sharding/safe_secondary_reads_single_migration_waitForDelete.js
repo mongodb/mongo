@@ -315,6 +315,7 @@
         serverStatus: {skip: "does not return user data"},
         setCommittedSnapshot: {skip: "does not return user data"},
         setFeatureCompatibilityVersion: {skip: "primary only"},
+        setFreeMonitoring: {skip: "primary only"},
         setParameter: {skip: "does not return user data"},
         setShardVersion: {skip: "does not return user data"},
         shardCollection: {skip: "primary only"},

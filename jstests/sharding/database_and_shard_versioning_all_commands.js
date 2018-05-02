@@ -19,8 +19,8 @@
         if (testCase.skip) {
             for (let key of Object.keys(testCase)) {
                 assert(
-                    key === "skip" || key === "enterpriseOnly",
-                    "if a test case specifies 'skip', it must not specify any other fields besides 'enterpriseOnly': " +
+                    key === "skip" || key === "conditional",
+                    "if a test case specifies 'skip', it must not specify any other fields besides 'conditional': " +
                         key + ": " + tojson(testCase));
             }
             return;
@@ -301,7 +301,7 @@
             }
         },
         listShards: {skip: "does not forward command to primary shard"},
-        logApplicationMessage: {skip: "not on a user database", enterpriseOnly: true},
+        logApplicationMessage: {skip: "not on a user database", conditional: true},
         logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},
         logout: {skip: "not on a user database"},
         mapReduce: {
@@ -423,6 +423,8 @@
         saslStart: {skip: "not on a user database"},
         serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
         setFeatureCompatibilityVersion: {skip: "not on a user database"},
+        setFreeMonitoring:
+            {skip: "explicitly fails for mongos, primary mongod only", conditional: true},
         setParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
         shardCollection: {skip: "does not forward command to primary shard"},
         shardConnPoolStats: {skip: "does not forward command to primary shard"},
@@ -577,7 +579,7 @@
             // After iterating through all the existing commands, ensure there were no additional
             // test cases that did not correspond to any mongos command.
             for (let key of Object.keys(testCases)) {
-                assert(testCases[key].validated || testCases[key].enterpriseOnly,
+                assert(testCases[key].validated || testCases[key].conditional,
                        "you defined a test case for a command '" + key +
                            "' that does not exist on mongos: " + tojson(testCases[key]));
             }
