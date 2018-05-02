@@ -239,6 +239,8 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
                                                     _oplogBuffer.get(),
                                                     _bgSync.get(),
                                                     replCoord,
+                                                    _replicationProcess->getConsistencyMarkers(),
+                                                    _storageInterface,
                                                     OplogApplier::Options(),
                                                     _writerPool.get());
     _oplogApplierShutdownFuture = _oplogApplier->startup();

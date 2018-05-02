@@ -38,6 +38,8 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -77,7 +79,11 @@ public:
      * distributed across writer threads in 'writerPool'. Each writer thread applies its own vector
      * of operations using 'func'. The writer thread pool is not owned by us.
      */
-    SyncTail(OplogApplier::Observer* observer, MultiSyncApplyFunc func, ThreadPool* writerPool);
+    SyncTail(OplogApplier::Observer* observer,
+             ReplicationConsistencyMarkers* consistencyMarkers,
+             StorageInterface* storageInterface,
+             MultiSyncApplyFunc func,
+             ThreadPool* writerPool);
     virtual ~SyncTail();
 
     /**
@@ -248,6 +254,8 @@ private:
     std::string _hostname;
 
     OplogApplier::Observer* const _observer;
+    ReplicationConsistencyMarkers* const _consistencyMarkers;
+    StorageInterface* const _storageInterface;
 
     // Function to use during applyOps
     MultiSyncApplyFunc _applyFunc;

@@ -128,14 +128,15 @@ public:
 };
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
-    : SyncTail(this, SyncTail::MultiSyncApplyFunc(), nullptr), _document(document) {}
+    : SyncTail(this, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr),
+      _document(document) {}
 
 BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const OplogEntry&) {
     return _document;
 }
 
 SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
-    : SyncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {}
+    : SyncTail(nullptr, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {}
 
 bool SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* opCtx,
                                                                         const OplogEntry&) {
@@ -378,11 +379,17 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
 
 DEATH_TEST_F(SyncTailTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
     auto writerPool = SyncTail::makeWriterPool();
-    SyncTail syncTail(nullptr, noopApplyOperationFn, writerPool.get());
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      noopApplyOperationFn,
+                      writerPool.get());
     syncTail.multiApply(_opCtx.get(), {}).getStatus().ignore();
 }
 
 bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
+                                          ReplicationConsistencyMarkers* const consistencyMarkers,
+                                          StorageInterface* const storageInterface,
                                           const NamespaceString& nss,
                                           const CollectionOptions& options) {
     auto writerPool = SyncTail::makeWriterPool();
@@ -401,7 +408,8 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("a" << 1));
     ASSERT_FALSE(op.isForCappedCollection);
 
-    SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
+    SyncTail syncTail(
+        nullptr, consistencyMarkers, storageInterface, applyOperationFn, writerPool.get());
     auto lastOpTime = unittest::assertGet(syncTail.multiApply(opCtx, {op}));
     ASSERT_EQUALS(op.getOpTime(), lastOpTime);
 
@@ -416,14 +424,18 @@ TEST_F(
     SyncTailTest,
     MultiApplyDoesNotSetOplogEntryIsForCappedCollectionWhenProcessingNonCappedCollectionInsertOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    ASSERT_FALSE(_testOplogEntryIsForCappedCollection(_opCtx.get(), nss, CollectionOptions()));
+    ASSERT_FALSE(_testOplogEntryIsForCappedCollection(
+        _opCtx.get(), getConsistencyMarkers(), getStorageInterface(), nss, CollectionOptions()));
 }
 
 TEST_F(SyncTailTest,
        MultiApplySetsOplogEntryIsForCappedCollectionWhenProcessingCappedCollectionInsertOperation) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    ASSERT_TRUE(
-        _testOplogEntryIsForCappedCollection(_opCtx.get(), nss, createOplogCollectionOptions()));
+    ASSERT_TRUE(_testOplogEntryIsForCappedCollection(_opCtx.get(),
+                                                     getConsistencyMarkers(),
+                                                     getStorageInterface(),
+                                                     nss,
+                                                     createOplogCollectionOptions()));
 }
 
 TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceHash) {
@@ -453,7 +465,11 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     auto op1 = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss1, BSON("x" << 1));
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(2), 0), 1LL}, nss2, BSON("x" << 2));
 
-    SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      applyOperationFn,
+                      writerPool.get());
     auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx.get(), {op1, op2}));
     ASSERT_EQUALS(op2.getOpTime(), lastOpTime);
 
@@ -1607,7 +1623,8 @@ TEST_F(SyncTailTxnTableTest, SimpleWriteWithTxn) {
                                    date);
 
     auto writerPool = SyncTail::makeWriterPool();
-    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp}));
 
     checkTxnTable(sessionInfo, {Timestamp(1, 0), 1}, date);
@@ -1637,7 +1654,8 @@ TEST_F(SyncTailTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable) {
                                    Date_t::now());
 
     auto writerPool = SyncTail::makeWriterPool();
-    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp}));
 
     DBDirectClient client(_opCtx.get());
@@ -1681,7 +1699,8 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectWriteToTxnTab
                                     date);
 
     auto writerPool = SyncTail::makeWriterPool();
-    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp, insertOp2}));
 
     checkTxnTable(sessionInfo, {Timestamp(3, 0), 2}, date);
@@ -1727,7 +1746,8 @@ TEST_F(SyncTailTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
         {Timestamp(Seconds(7), 0), 1LL}, ns3, BSON("_id" << 0), info);
 
     auto writerPool = SyncTail::makeWriterPool();
-    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    SyncTail syncTail(
+        nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(
         _opCtx.get(),
         {opSingle, opDiffTxnSmaller, opDiffTxnLarger, opSameTxnSooner, opSameTxnLater, opNoTxn}));

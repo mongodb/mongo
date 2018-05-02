@@ -36,8 +36,10 @@
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_buffer_proxy.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
@@ -154,7 +156,11 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(OperationContext
                                                                 OplogApplier::Observer* observer,
                                                                 const HostAndPort& source,
                                                                 ThreadPool* writerPool) {
-    SyncTail syncTail(observer, repl::multiInitialSyncApply, writerPool);
+    auto replicationProcess = ReplicationProcess::get(opCtx);
+    auto consistencyMarkers = replicationProcess->getConsistencyMarkers();
+    auto storageInterface = StorageInterface::get(opCtx);
+    SyncTail syncTail(
+        observer, consistencyMarkers, storageInterface, repl::multiInitialSyncApply, writerPool);
     syncTail.setHostname(source.toString());
     return syncTail.multiApply(opCtx, std::move(ops));
 }

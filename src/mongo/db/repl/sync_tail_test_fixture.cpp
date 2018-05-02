@@ -131,6 +131,14 @@ void SyncTailTest::tearDown() {
     ServiceContextMongoDTest::tearDown();
 }
 
+ReplicationConsistencyMarkers* SyncTailTest::getConsistencyMarkers() const {
+    return _replicationProcess->getConsistencyMarkers();
+}
+
+StorageInterface* SyncTailTest::getStorageInterface() const {
+    return StorageInterface::get(_opCtx.get());
+}
+
 void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                                const BSONObj& op,
                                                bool expectedApplyOpCalled) {
@@ -187,7 +195,11 @@ Status SyncTailTest::runOpSteadyState(const OplogEntry& op) {
 }
 
 Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      SyncTail::MultiSyncApplyFunc(),
+                      nullptr);
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);
@@ -201,7 +213,11 @@ Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {
 }
 
 Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      SyncTail::MultiSyncApplyFunc(),
+                      nullptr);
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);

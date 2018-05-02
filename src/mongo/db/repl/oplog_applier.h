@@ -37,7 +37,9 @@
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -76,6 +78,8 @@ public:
                  OplogBuffer* oplogBuffer,
                  Observer* observer,
                  ReplicationCoordinator* replCoord,
+                 ReplicationConsistencyMarkers* consistencyMarkers,
+                 StorageInterface* storageInterface,
                  const Options& options,
                  ThreadPool* writerPool);
 
@@ -110,6 +114,12 @@ private:
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
+
+    // Not owned by us.
+    ReplicationConsistencyMarkers* const _consistencyMarkers;
+
+    // Not owned by us.
+    StorageInterface* const _storageInterface;
 
     // Used to configure OplogApplier behavior.
     const Options _options;

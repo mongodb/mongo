@@ -91,6 +91,7 @@ public:
     const Timestamp nullTs = Timestamp();
     const int presentTerm = 1;
     repl::ReplicationCoordinatorMock* _coordinatorMock;
+    repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
     StorageTimestampTest() {
         if (mongo::storageGlobalParams.engine != "wiredTiger") {
@@ -117,6 +118,9 @@ public:
         repl::ReplicationProcess::set(
             cc().getServiceContext(),
             std::unique_ptr<repl::ReplicationProcess>(replicationProcess));
+
+        _consistencyMarkers =
+            repl::ReplicationProcess::get(cc().getServiceContext())->getConsistencyMarkers();
 
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
@@ -1226,8 +1230,10 @@ public:
                       << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
-        repl::SyncTail syncTail(nullptr, repl::multiSyncApply, writerPool.get());
+        repl::SyncTail syncTail(
+            nullptr, _consistencyMarkers, storageInterface, repl::multiSyncApply, writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(syncTail.multiApply(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1329,8 +1335,13 @@ public:
         // after bulk index builds.
         std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
 
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
-        repl::SyncTail syncTail(nullptr, repl::multiInitialSyncApply, writerPool.get());
+        repl::SyncTail syncTail(nullptr,
+                                _consistencyMarkers,
+                                storageInterface,
+                                repl::multiInitialSyncApply,
+                                writerPool.get());
         auto lastTime = unittest::assertGet(syncTail.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
@@ -1891,8 +1902,10 @@ public:
                       << doc0));
 
         // Apply the operation.
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool(1);
-        repl::SyncTail syncTail(nullptr, applyOperationFn, writerPool.get());
+        repl::SyncTail syncTail(
+            nullptr, _consistencyMarkers, storageInterface, applyOperationFn, writerPool.get());
         auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
         ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
 

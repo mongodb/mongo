@@ -68,7 +68,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
@@ -277,9 +276,15 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op)
 }  // namespace
 
 SyncTail::SyncTail(OplogApplier::Observer* observer,
+                   ReplicationConsistencyMarkers* consistencyMarkers,
+                   StorageInterface* storageInterface,
                    MultiSyncApplyFunc func,
                    ThreadPool* writerPool)
-    : _observer(observer), _applyFunc(func), _writerPool(writerPool) {}
+    : _observer(observer),
+      _consistencyMarkers(consistencyMarkers),
+      _storageInterface(storageInterface),
+      _applyFunc(func),
+      _writerPool(writerPool) {}
 
 SyncTail::~SyncTail() {}
 

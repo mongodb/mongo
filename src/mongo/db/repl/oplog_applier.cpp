@@ -44,14 +44,19 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,
                            Observer* observer,
                            ReplicationCoordinator* replCoord,
+                           ReplicationConsistencyMarkers* consistencyMarkers,
+                           StorageInterface* storageInterface,
                            const OplogApplier::Options& options,
                            ThreadPool* writerPool)
     : _executor(executor),
       _oplogBuffer(oplogBuffer),
       _observer(observer),
       _replCoord(replCoord),
+      _consistencyMarkers(consistencyMarkers),
+      _storageInterface(storageInterface),
       _options(options),
-      _syncTail(std::make_unique<SyncTail>(_observer, multiSyncApply, writerPool)) {
+      _syncTail(std::make_unique<SyncTail>(
+          _observer, _consistencyMarkers, _storageInterface, multiSyncApply, writerPool)) {
     invariant(!options.allowNamespaceNotFoundErrorsOnCrudOps);
     invariant(!options.relaxUniqueIndexConstraints);
 }
