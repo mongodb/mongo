@@ -663,7 +663,6 @@ env.Library(
     ],
     LIBDEPS=[
         'oplog_application',
-        'replication_process',
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/catalog/document_validation',

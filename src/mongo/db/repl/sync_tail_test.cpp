@@ -491,7 +491,7 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     // Check ops in oplog.
     // Obtain the last 2 entries in the oplog using a reverse collection scan.
     stdx::lock_guard<stdx::mutex> lock(mutex);
-    auto storage = StorageInterface::get(_opCtx.get());
+    auto storage = getStorageInterface();
     auto operationsWrittenToOplog =
         unittest::assertGet(storage->findDocuments(_opCtx.get(),
                                                    NamespaceString::kRsOplogNamespace,

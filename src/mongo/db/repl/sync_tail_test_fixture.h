@@ -42,8 +42,6 @@ class OperationContext;
 
 namespace repl {
 
-class ReplicationProcess;
-
 /**
  * OpObserver for SyncTail test fixture.
  */
@@ -106,7 +104,8 @@ protected:
                                      bool expectedApplyOpCalled);
 
     ServiceContext::UniqueOperationContext _opCtx;
-    ReplicationProcess* _replicationProcess = nullptr;
+    std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
+    std::unique_ptr<StorageInterface> _storageInterface;
     SyncTailOpObserver* _opObserver = nullptr;
 
     // Implements the SyncTail::MultiSyncApplyFn interface and does nothing.
