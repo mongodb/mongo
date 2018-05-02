@@ -1,5 +1,7 @@
 // Test resuming a change stream on a node other than the one it was started on. Accomplishes this
 // by triggering a stepdown.
+// This test uses the WiredTiger storage engine, which does not support running without journaling.
+// @tags: [requires_replication,requires_journaling]
 (function() {
     "use strict";
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
