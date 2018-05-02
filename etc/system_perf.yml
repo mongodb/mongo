@@ -371,6 +371,21 @@ tasks:
         # Disabling --ycsb-throughput-analysis until BF-7153 fixed
         # script_flags: --ycsb-throughput-analysis reports
 
+- name: industry_benchmarks_secondary_reads_WT
+  depends_on:
+    - name: compile_proxy
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb-secondary-reads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+
 - name: industry_benchmarks_MMAPv1
   priority: 5
   depends_on:
@@ -1035,6 +1050,7 @@ buildvariants:
       distros:
         - rhel70
     - name: industry_benchmarks_WT
+    - name: industry_benchmarks_secondary_reads_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
     - name: misc_workloads_WT
