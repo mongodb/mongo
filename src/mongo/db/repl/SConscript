@@ -620,6 +620,7 @@ env.Library(
 env.Library(
     target='sync_tail',
     source=[
+        'session_update_tracker.cpp',
         'sync_tail.cpp',
     ],
     LIBDEPS=[

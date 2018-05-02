@@ -1871,7 +1871,7 @@ TEST_F(SyncTailTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable) {
     ASSERT_TRUE(result.isEmpty());
 }
 
-TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectWriteToTxnTable) {
+TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDeleteToTxnTable) {
     const auto sessionId = makeLogicalSessionIdForTest();
     OperationSessionInfo sessionInfo;
     sessionInfo.setSessionId(sessionId);
@@ -1915,6 +1915,42 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectWriteToTxnTab
         _opCtx.get(), writerPool.get(), {insertOp, deleteOp, insertOp2}, applyOperation));
 
     checkTxnTable(sessionInfo, {Timestamp(3, 0), 2}, date);
+}
+
+TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdateToTxnTable) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    auto date = Date_t::now();
+
+    auto insertOp = makeOplogEntry(nss(),
+                                   {Timestamp(1, 0), 1},
+                                   repl::OpTypeEnum::kInsert,
+                                   BSON("_id" << 1),
+                                   boost::none,
+                                   sessionInfo,
+                                   date);
+
+    repl::OpTime newWriteOpTime(Timestamp(2, 0), 1);
+    auto updateOp = makeOplogEntry(NamespaceString::kSessionTransactionsTableNamespace,
+                                   {Timestamp(4, 0), 1},
+                                   repl::OpTypeEnum::kUpdate,
+                                   BSON("$set" << BSON("lastWriteOpTime" << newWriteOpTime)),
+                                   BSON("_id" << sessionInfo.getSessionId()->toBSON()),
+                                   {},
+                                   Date_t::now());
+
+    auto writerPool = SyncTail::makeWriterPool();
+    SyncTail syncTail(nullptr, multiSyncApply);
+    auto applyOperation = [&](MultiApplier::OperationPtrs* ops) -> Status {
+        multiSyncApply(ops, &syncTail);
+        return Status::OK();
+    };
+
+    ASSERT_OK(multiApply(_opCtx.get(), writerPool.get(), {insertOp, updateOp}, applyOperation));
+
+    checkTxnTable(sessionInfo, newWriteOpTime, date);
 }
 
 TEST_F(SyncTailTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
