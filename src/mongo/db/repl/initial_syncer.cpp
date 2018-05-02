@@ -364,13 +364,7 @@ BSONObj InitialSyncer::_getInitialSyncProgress_inlock() const {
                 dbsBuilder.doneFast();
             }
         }
-        // In 3.4, BSONObjBuilder::obj() does not check the validity of the document it returns so
-        // we check it explicitly here.
-        auto obj = bob.obj();
-        uassert(ErrorCodes::InvalidBSON,
-                str::stream() << "Invalid BSONObj size: " << obj.objsize(),
-                obj.isValid());
-        return obj;
+        return bob.obj();
     } catch (const DBException& e) {
         log() << "Error creating initial sync progress object: " << e.toString();
     }
