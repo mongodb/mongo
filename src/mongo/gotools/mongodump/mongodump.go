@@ -44,6 +44,7 @@ type MongoDump struct {
 	query           bson.M
 	oplogCollection string
 	oplogStart      bson.MongoTimestamp
+	oplogEnd        bson.MongoTimestamp
 	isMongos        bool
 	authVersion     int
 	archive         *archive.Writer
@@ -358,7 +359,7 @@ func (dump *MongoDump) Dump() (err error) {
 			return fmt.Errorf("error finding oplog: %v", err)
 		}
 		log.Logvf(log.Info, "getting most recent oplog timestamp")
-		dump.oplogStart, err = dump.getOplogStartTime()
+		dump.oplogStart, err = dump.getCurrentOplogTime()
 		if err != nil {
 			return fmt.Errorf("error getting oplog start: %v", err)
 		}
@@ -390,6 +391,11 @@ func (dump *MongoDump) Dump() (err error) {
 	// we check to see if the oplog has rolled over (i.e. the most recent entry when
 	// we started still exist, so we know we haven't lost data)
 	if dump.OutputOptions.Oplog {
+		dump.oplogEnd, err = dump.getCurrentOplogTime()
+		if err != nil {
+			return fmt.Errorf("error getting oplog end: %v", err)
+		}
+
 		log.Logvf(log.DebugLow, "checking if oplog entry %v still exists", dump.oplogStart)
 		exists, err := dump.checkOplogTimestampExists(dump.oplogStart)
 		if !exists {
@@ -402,7 +408,8 @@ func (dump *MongoDump) Dump() (err error) {
 		log.Logvf(log.DebugHigh, "oplog entry %v still exists", dump.oplogStart)
 
 		log.Logvf(log.Always, "writing captured oplog to %v", dump.manager.Oplog().Location)
-		err = dump.DumpOplogAfterTimestamp(dump.oplogStart)
+
+		err = dump.DumpOplogBetweenTimestamps(dump.oplogStart, dump.oplogEnd)
 		if err != nil {
 			return fmt.Errorf("error dumping oplog: %v", err)
 		}

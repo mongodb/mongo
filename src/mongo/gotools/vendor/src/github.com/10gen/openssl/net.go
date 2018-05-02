@@ -80,6 +80,27 @@ func Dial(network, addr string, ctx *Ctx, flags DialFlags) (*Conn, error) {
 	return DialSession(network, addr, ctx, flags, nil)
 }
 
+// DialWithDialer will connect to network/address using the provided dialer and
+// then wrap the corresponding underlying connection with an OpenSSL client
+// connection using context ctx. If flags includes InsecureSkipHostVerification,
+// the server certificate's hostname will not be checked to match the hostname
+// in addr. Otherwise, flags should be 0.
+//
+// Dial probably won't work for you unless you set a verify location or add
+// some certs to the certificate store of the client context you're using.
+// This library is not nice enough to use the system certificate store by
+// default for you yet.
+func DialWithDialer(dialer *net.Dialer, network, addr string, ctx *Ctx, flags DialFlags) (*Conn, error) {
+	return dialSessionWithDialer(
+		dialer,
+		network,
+		addr,
+		ctx,
+		flags,
+		nil,
+	)
+}
+
 // DialSession will connect to network/address and then wrap the corresponding
 // underlying connection with an OpenSSL client connection using context ctx.
 // If flags includes InsecureSkipHostVerification, the server certificate's
@@ -95,6 +116,18 @@ func Dial(network, addr string, ctx *Ctx, flags DialFlags) (*Conn, error) {
 // can be retrieved from the GetSession method on the Conn.
 func DialSession(network, addr string, ctx *Ctx, flags DialFlags,
 	session []byte) (*Conn, error) {
+	return dialSessionWithDialer(
+		new(net.Dialer),
+		network,
+		addr,
+		ctx,
+		flags,
+		session,
+	)
+}
+
+func dialSessionWithDialer(dialer *net.Dialer, network, addr string, ctx *Ctx, flags DialFlags,
+	session []byte) (*Conn, error) {
 
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -108,7 +141,7 @@ func DialSession(network, addr string, ctx *Ctx, flags DialFlags,
 		}
 		// TODO: use operating system default certificate chain?
 	}
-	c, err := net.Dial(network, addr)
+	c, err := dialer.Dial(network, addr)
 	if err != nil {
 		return nil, err
 	}

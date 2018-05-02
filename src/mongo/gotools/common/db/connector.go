@@ -1,6 +1,7 @@
 package db
 
 import (
+	"net"
 	"time"
 
 	"github.com/mongodb/mongo-tools/common/db/kerberos"
@@ -28,11 +29,25 @@ type VanillaDBConnector struct {
 // dial timeout.
 func (self *VanillaDBConnector) Configure(opts options.ToolOptions) error {
 	timeout := time.Duration(opts.Timeout) * time.Second
+	// create the dialer func that will be used to connect
+	dialer := func(addr *mgo.ServerAddr) (net.Conn, error) {
+		conn, err := net.DialTimeout("tcp", addr.String(), timeout)
+		if err != nil {
+			return nil, err
+		}
+		// enable TCP keepalive
+		err = util.EnableTCPKeepAlive(conn, time.Duration(opts.TCPKeepAliveSeconds)*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	}
 
 	// set up the dial info
 	self.dialInfo = &mgo.DialInfo{
 		Direct:         opts.Direct,
 		ReplicaSetName: opts.ReplicaSetName,
+		DialServer:     dialer,
 		Username:       opts.Auth.Username,
 		Password:       opts.Auth.Password,
 		Source:         opts.GetAuthenticationDatabase(),

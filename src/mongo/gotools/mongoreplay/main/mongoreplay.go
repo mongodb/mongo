@@ -4,7 +4,9 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/mongodb/mongo-tools/mongoreplay"
 
+	"fmt"
 	"os"
+	"runtime"
 )
 
 const (
@@ -25,6 +27,11 @@ func main() {
 
 	if versionOpts.PrintVersion() {
 		os.Exit(ExitOk)
+	}
+
+	if runtime.NumCPU() == 1 {
+		fmt.Fprint(os.Stderr, "mongoreplay must be run with multiple threads")
+		os.Exit(ExitError)
 	}
 
 	opts := mongoreplay.Options{}

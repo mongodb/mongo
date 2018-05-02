@@ -1,5 +1,5 @@
 // +build cgo
-// +build -darwin
+// +build !darwin
 
 package openssl
 
@@ -19,4 +19,11 @@ func FIPSModeSet(mode bool) error {
 		return errorFromErrorQueue()
 	}
 	return nil
+}
+
+func FIPSMode() bool {
+	if C.FIPS_mode() == 0 {
+		return false
+	}
+	return true
 }

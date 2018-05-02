@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // +build !darwin
+// +build !openssl_pre_1.0
 
 package openssl
 

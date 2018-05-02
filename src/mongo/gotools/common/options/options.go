@@ -4,23 +4,24 @@ package options
 
 import (
 	"fmt"
-	"github.com/jessevdk/go-flags"
-	"github.com/mongodb/mongo-tools/common/connstring"
-	"github.com/mongodb/mongo-tools/common/failpoint"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jessevdk/go-flags"
+	"github.com/mongodb/mongo-tools/common/connstring"
+	"github.com/mongodb/mongo-tools/common/failpoint"
+	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 )
 
 // Gitspec that the tool was built with. Needs to be set using -ldflags
 var (
-	VersionStr = "built-without-version-string"
-	Gitspec    = "built-without-git-spec"
+	VersionStr = "r3.4.14-18-gd0bd6a35"
+	Gitspec    = "d0bd6a3539ed33ae2de254168681e7acbebe74e2"
 )
 
 var (
@@ -120,7 +121,8 @@ type Connection struct {
 	Host string `short:"h" long:"host" value-name:"<hostname>" description:"mongodb host to connect to (setname/host1,host2 for replica sets)"`
 	Port string `long:"port" value-name:"<port>" description:"server port (can also use --host hostname:port)"`
 
-	Timeout int `long:"dialTimeout" default:"3" hidden:"true" description:"dial timeout in seconds"`
+	Timeout             int `long:"dialTimeout" default:"3" hidden:"true" description:"dial timeout in seconds"`
+	TCPKeepAliveSeconds int `long:"TCPKeepAliveSeconds" default:"30" hidden:"true" description:"seconds between TCP keep alives"`
 }
 
 // Struct holding ssl-related options

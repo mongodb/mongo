@@ -1,3 +1,11 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
+// +build ssl,!openssl_pre_1.0
+
 // Package openssl implements connection to MongoDB over ssl.
 package openssl
 
@@ -6,10 +14,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/10gen/openssl"
 	"github.com/mongodb/mongo-tools/common/db/kerberos"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/spacemonkeygo/openssl"
 	"gopkg.in/mgo.v2"
 )
 
@@ -40,7 +48,15 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 	dialer := func(addr *mgo.ServerAddr) (net.Conn, error) {
 		conn, err := openssl.Dial("tcp", addr.String(), self.ctx, flags)
 		self.dialError = err
-		return conn, err
+		if err != nil {
+			return nil, err
+		}
+		// enable TCP keepalive
+		err = util.EnableTCPKeepAlive(conn.UnderlyingConn(), time.Duration(opts.TCPKeepAliveSeconds)*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
 	}
 
 	timeout := time.Duration(opts.Timeout) * time.Second
