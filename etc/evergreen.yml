@@ -4253,7 +4253,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency --storageEngine=wiredTiger
-      timeout_secs: 21600 # 6 hour timeout
 
 - <<: *task_template
   name: concurrency_replication
@@ -4262,7 +4261,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger
-      timeout_secs: 21600 # 6 hour timeout
 
 - <<: *task_template
   name: concurrency_sharded_replication
@@ -4287,7 +4285,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_causal_consistency --storageEngine=wiredTiger
-      timeout_secs: 21600 # 6 hour timeout for each test
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency_and_balancer
@@ -4296,7 +4293,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_sharded_causal_consistency_and_balancer --storageEngine=wiredTiger
-      timeout_secs: 21600 # 6 hour timeout for each test
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns
