@@ -22,6 +22,8 @@ var $config = (function() {
     // Use the workload name as the collection name.
     var uniqueCollectionName = 'secondary_reads';
 
+    load('jstests/concurrency/fsm_workload_helpers/server_types.js');
+
     function isWriterThread() {
         return this.tid === 0;
     }
@@ -64,8 +66,11 @@ var $config = (function() {
         }
     }
 
-    function getReadConcernLevel() {
-        const readConcernLevels = ['local', 'available', 'majority'];
+    function getReadConcernLevel(supportsCommittedReads) {
+        const readConcernLevels = ['local', 'available'];
+        if (supportsCommittedReads) {
+            readConcernLevels.push('majority');
+        }
         return readConcernLevels[Random.randInt(readConcernLevels.length)];
     }
 
@@ -77,7 +82,8 @@ var $config = (function() {
             if (this.isWriterThread()) {
                 this.insertDocuments(db, this.collName, {w: 1});
             } else {
-                this.readFromSecondaries(db, this.collName, getReadConcernLevel());
+                this.readFromSecondaries(
+                    db, this.collName, getReadConcernLevel(supportsCommittedReads(db)));
             }
         }
 
