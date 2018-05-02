@@ -66,7 +66,6 @@
 #include "mongo/util/scopeguard.h"
 
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -3991,9 +3990,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         << attempt1;
 }
 
-DEATH_TEST_F(InitialSyncerTest,
-             GetInitialSyncProgressThrowsExceptionIfClonerStatsExceedBsonLimit,
-             "terminate() called") {
+TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExceedBsonLimit) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -4043,11 +4040,14 @@ DEATH_TEST_F(InitialSyncerTest,
         net->runReadyNetworkOperations();
     }
 
-    // This should throw because we are unable to fit all the cloner stats into a BSON document.
-    ASSERT_THROWS(initialSyncer->getInitialSyncProgress(), DBException);
+    // This returns a valid document because we omit the cloner stats when they do not fit in a
+    // BSON document.
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_FALSE(progress.hasField("databases")) << progress;
 
-    // Initial sync will attempt to log stats again at shutdown in a callback, where it will
-    // terminate because of the unhandled exception.
+    // Initial sync will attempt to log stats again at shutdown in a callback, where it should not
+    // terminate because we now return a valid stats document.
     ASSERT_OK(initialSyncer->shutdown());
 
     // Deliver cancellation signal to callbacks.
