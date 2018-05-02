@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/callback_completion_guard.h"
@@ -480,6 +481,7 @@ private:
                              Fetcher::Documents::const_iterator end,
                              const OplogFetcher::DocumentsInfo& info);
 
+    void _appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob) const;
     BSONObj _getInitialSyncProgress_inlock() const;
 
     StatusWith<Operations> _getNextApplierBatch_inlock();
