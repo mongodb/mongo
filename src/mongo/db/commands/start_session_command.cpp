@@ -77,16 +77,8 @@ public:
         ServiceContext* serviceContext = client->getServiceContext();
 
         auto lsCache = LogicalSessionCache::get(serviceContext);
-        boost::optional<LogicalSessionRecord> record;
-
-        try {
-            record = makeLogicalSessionRecord(opCtx, lsCache->now());
-        } catch (...) {
-            auto status = exceptionToStatus();
-
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
+        boost::optional<LogicalSessionRecord> record =
+            makeLogicalSessionRecord(opCtx, lsCache->now());
         lsCache->startSession(opCtx, record.get());
 
         makeLogicalSessionToClient(record->getId()).serialize(&result);

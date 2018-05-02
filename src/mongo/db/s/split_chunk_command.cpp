@@ -118,8 +118,7 @@ public:
 
         string shardName;
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);
-        if (!parseShardNameStatus.isOK())
-            return CommandHelpers::appendCommandStatus(result, parseShardNameStatus);
+        uassertStatusOK(parseShardNameStatus);
 
         log() << "received splitChunk request: " << redact(cmdObj);
 

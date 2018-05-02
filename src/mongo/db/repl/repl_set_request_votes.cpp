@@ -52,15 +52,11 @@ private:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         ReplSetRequestVotesArgs parsedArgs;
         status = parsedArgs.initialize(cmdObj);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         ReplSetRequestVotesResponse response;
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(

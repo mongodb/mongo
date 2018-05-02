@@ -180,12 +180,10 @@ public:
                 return CommandHelpers::appendCommandStatusNoThrow(result, status);
             }
         } else {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "Expected \"wOpTime\" field in getLastError to "
-                                        "have type Date, Timestamp, or OpTime but found type "
-                                     << typeName(opTimeElement.type())));
+            uasserted(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected \"wOpTime\" field in getLastError to "
+                                       "have type Date, Timestamp, or OpTime but found type "
+                                    << typeName(opTimeElement.type()));
         }
 
 

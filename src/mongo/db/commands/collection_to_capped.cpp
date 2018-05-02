@@ -121,25 +121,22 @@ public:
 
         NamespaceString nss(dbname, to);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::NotMaster,
-                       str::stream() << "Not primary while cloning collection " << from << " to "
-                                     << to
-                                     << " (as capped)"));
+            uasserted(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while cloning collection " << from << " to "
+                                    << to
+                                    << " (as capped)");
         }
 
         Database* const db = autoDb.getDb();
         if (!db) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::NamespaceNotFound,
-                       str::stream() << "database " << dbname << " not found"));
+            uasserted(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "database " << dbname << " not found");
         }
 
         Status status =
             cloneCollectionAsCapped(opCtx, db, from.toString(), to.toString(), size, temp);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 } cmdCloneCollectionAsCapped;
 
@@ -181,7 +178,8 @@ public:
             return false;
         }
 
-        return CommandHelpers::appendCommandStatus(result, convertToCapped(opCtx, nss, size));
+        uassertStatusOK(convertToCapped(opCtx, nss, size));
+        return true;
     }
 
 } cmdConvertToCapped;

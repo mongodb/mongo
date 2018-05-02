@@ -153,11 +153,11 @@ public:
 
         if (optStatus) {
             // Completed within timeout.
-            return CommandHelpers::appendCommandStatus(result, *optStatus);
+            uassertStatusOK(*optStatus);
         } else {
             // Pending operation.
-            return CommandHelpers::appendCommandStatus(result, Status::OK());
         }
+        return true;
     }
 
 } setFreeMonitoringCmd;

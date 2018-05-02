@@ -99,10 +99,8 @@ public:
              BSONObjBuilder& result) {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrEnableSharding can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrEnableSharding can only be run on config servers");
         }
 
         const std::string dbname = parseNs("", cmdObj);
@@ -113,10 +111,8 @@ public:
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kLocalDb) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 str::stream() << "can't shard " + dbname + " database"});
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "can't shard " + dbname + " database");
         }
 
         uassert(ErrorCodes::InvalidOptions,

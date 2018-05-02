@@ -64,7 +64,8 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        return CommandHelpers::appendCommandStatus(result, {ErrorCodes::CommandFailed, help()});
+        uasserted(ErrorCodes::CommandFailed, help());
+        return true;
     }
 
 } clusterSetFreeMonitoring;

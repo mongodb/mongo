@@ -121,8 +121,7 @@ public:
                                           << toString
                                           << "' because that shard does not exist");
             log() << msg;
-            return CommandHelpers::appendCommandStatus(result,
-                                                       Status(ErrorCodes::ShardNotFound, msg));
+            uasserted(ErrorCodes::ShardNotFound, msg);
         }
 
         const auto to = toStatus.getValue();

@@ -1414,9 +1414,7 @@ public:
         auto client = opCtx->getClient();
 
         if (client->isInDirectClient()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation, "Cannot run mapReduce command from eval()"));
+            uasserted(ErrorCodes::IllegalOperation, "Cannot run mapReduce command from eval()");
         }
 
         auto curOp = CurOp::get(opCtx);
@@ -1442,10 +1440,8 @@ public:
         try {
             State state(opCtx, config);
             if (!state.sourceExists()) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::NamespaceNotFound,
-                           str::stream() << "namespace does not exist: " << config.nss.ns()));
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "namespace does not exist: " << config.nss.ns());
             }
 
             state.init();
@@ -1580,9 +1576,7 @@ public:
                         scopedAutoDb.reset(new AutoGetDb(opCtx, config.nss.db(), MODE_S));
 
                         auto restoreStatus = exec->restoreState();
-                        if (!restoreStatus.isOK()) {
-                            return CommandHelpers::appendCommandStatus(result, restoreStatus);
-                        }
+                        uassertStatusOK(restoreStatus);
 
                         reduceTime += t.micros();
 
@@ -1596,11 +1590,9 @@ public:
                 }
 
                 if (PlanExecutor::DEAD == execState || PlanExecutor::FAILURE == execState) {
-                    return CommandHelpers::appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::OperationFailed,
-                               str::stream() << "Executor error during mapReduce command: "
-                                             << WorkingSetCommon::toStatusString(o)));
+                    uasserted(ErrorCodes::OperationFailed,
+                              str::stream() << "Executor error during mapReduce command: "
+                                            << WorkingSetCommon::toStatusString(o));
                 }
 
                 // Record the indexes used by the PlanExecutor.
@@ -1730,11 +1722,9 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::CommandNotSupported,
-                       str::stream() << "Can not execute mapReduce with output database " << dbname
-                                     << " which lives on config servers"));
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Can not execute mapReduce with output database " << dbname
+                                    << " which lives on config servers");
         }
 
         // Don't let any lock acquisitions get interrupted.
@@ -1809,10 +1799,7 @@ public:
         if (config.outputOptions.outType != Config::OutputType::INMEMORY) {
             auto outRoutingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
                 opCtx, config.outputOptions.finalNamespace);
-            if (!outRoutingInfoStatus.isOK()) {
-                return CommandHelpers::appendCommandStatus(result,
-                                                           outRoutingInfoStatus.getStatus());
-            }
+            uassertStatusOK(outRoutingInfoStatus.getStatus());
 
             if (auto cm = outRoutingInfoStatus.getValue().cm()) {
                 // Fetch result from other shards 1 chunk at a time. It would be better to do just

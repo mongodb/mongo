@@ -125,9 +125,7 @@ public:
 
         BSONElement mechanismElement;
         Status status = bsonExtractField(cmdObj, saslCommandMechanismFieldName, &mechanismElement);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         BSONElement payloadElement;
         status = bsonExtractField(cmdObj, saslCommandPayloadFieldName, &payloadElement);
@@ -146,7 +144,7 @@ public:
         if (!authConn->runCommand(
                 fromDb, BSON("saslStart" << 1 << mechanismElement << payloadElement), ret)) {
             authConn.reset();
-            return CommandHelpers::appendCommandStatus(result, getStatusFromCommandResult(ret));
+            uassertStatusOK(getStatusFromCommandResult(ret));
         }
 
         CommandHelpers::filterCommandReplyForPassthrough(ret, &result);

@@ -70,9 +70,7 @@ bool KillCursorsCmdBase::run(OperationContext* opCtx,
                              const BSONObj& cmdObj,
                              BSONObjBuilder& result) {
     auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
-    if (!statusWithRequest.isOK()) {
-        return CommandHelpers::appendCommandStatus(result, statusWithRequest.getStatus());
-    }
+    uassertStatusOK(statusWithRequest.getStatus());
     auto killCursorsRequest = std::move(statusWithRequest.getValue());
 
     std::vector<CursorId> cursorsKilled;

@@ -127,7 +127,8 @@ public:
         barr.append(clonedColls);
         result.append("clonedColls", barr.arr());
 
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 } cmdClone;

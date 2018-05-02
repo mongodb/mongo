@@ -110,7 +110,7 @@ public:
         if (status.isOK()) {
             collation = collationElement.Obj();
         } else if (status != ErrorCodes::NoSuchKey) {
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         if (cmdObj["limit"].isNumber()) {
@@ -158,19 +158,13 @@ public:
             // Rewrite the count command as an aggregation.
 
             auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, false);
-            if (!countRequest.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, countRequest.getStatus());
-            }
+            uassertStatusOK(countRequest.getStatus());
 
             auto aggCmdOnView = countRequest.getValue().asAggregationCommand();
-            if (!aggCmdOnView.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, aggCmdOnView.getStatus());
-            }
+            uassertStatusOK(aggCmdOnView.getStatus());
 
             auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
-            if (!aggRequestOnView.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, aggRequestOnView.getStatus());
-            }
+            uassertStatusOK(aggRequestOnView.getStatus());
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
@@ -181,9 +175,7 @@ public:
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
             auto formatStatus = formatter.appendAsCountResponse(&result);
-            if (!formatStatus.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, formatStatus);
-            }
+            uassertStatusOK(formatStatus);
 
             return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
@@ -210,8 +202,7 @@ public:
             shardSubTotal.doneFast();
             // Add error context so that you can see on which shard failed as well as details
             // about that error.
-            return CommandHelpers::appendCommandStatus(
-                result, status.withContext(str::stream() << "failed on: " << response.shardId));
+            uassertStatusOK(status.withContext(str::stream() << "failed on: " << response.shardId));
         }
 
         shardSubTotal.doneFast();

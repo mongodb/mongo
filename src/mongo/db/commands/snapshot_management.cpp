@@ -73,8 +73,7 @@ public:
              BSONObjBuilder& result) {
         auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
-            return CommandHelpers::appendCommandStatus(result,
-                                                       {ErrorCodes::CommandNotSupported, ""});
+            uasserted(ErrorCodes::CommandNotSupported, "");
         }
 
         Lock::GlobalLock lk(opCtx, MODE_IX);
@@ -82,7 +81,7 @@ public:
         auto name = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
         result.append("name", static_cast<long long>(name.asULL()));
 
-        return CommandHelpers::appendCommandStatus(result, Status::OK());
+        return true;
     }
 };
 
@@ -117,8 +116,7 @@ public:
              BSONObjBuilder& result) {
         auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
-            return CommandHelpers::appendCommandStatus(result,
-                                                       {ErrorCodes::CommandNotSupported, ""});
+            uasserted(ErrorCodes::CommandNotSupported, "");
         }
 
         Lock::GlobalLock lk(opCtx, MODE_IX);

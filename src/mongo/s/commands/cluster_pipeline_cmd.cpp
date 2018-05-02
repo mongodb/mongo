@@ -80,8 +80,8 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        return CommandHelpers::appendCommandStatus(
-            result, _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
+        uassertStatusOK(_runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
+        return true;
     }
 
     Status explain(OperationContext* opCtx,

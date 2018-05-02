@@ -114,10 +114,8 @@ public:
         }
 
         if (!nss.isNormal() && full) {
-            CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::CommandFailed, "Can only run full validate on a regular collection"});
-            return false;
+            uasserted(ErrorCodes::CommandFailed,
+                      "Can only run full validate on a regular collection");
         }
 
         if (!serverGlobalParams.quiet.load()) {
@@ -129,13 +127,10 @@ public:
         Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
         if (!collection) {
             if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view"});
+                uasserted(ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view");
             }
 
-            CommandHelpers::appendCommandStatus(result,
-                                                {ErrorCodes::NamespaceNotFound, "ns not found"});
-            return false;
+            uasserted(ErrorCodes::NamespaceNotFound, "ns not found");
         }
 
         // Omit background validation logic until it is fully implemented and vetted.
@@ -151,18 +146,15 @@ public:
         }
 
         if (!isInRecordIdOrder && background) {
-            appendCommandStatus(result,
-                                {ErrorCodes::CommandFailed,
-                                 "This storage engine does not support the background option, use "
-                                 "background:false"});
+            uasserted(ErrorCodes::CommandFailed,
+                      "This storage engine does not support the background option, use "
+                      "background:false");
             return false;
         }
 
         if (full && background) {
-            appendCommandStatus(result,
-                                {ErrorCodes::CommandFailed,
-                                 "A full validate cannot run in the background, use full:false"});
-            return false;
+            uasserted(ErrorCodes::CommandFailed,
+                      "A full validate cannot run in the background, use full:false");
         }
         */
 

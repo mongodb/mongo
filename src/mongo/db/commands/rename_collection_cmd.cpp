@@ -149,19 +149,17 @@ public:
         }
 
         if (source.isServerConfigurationCollection()) {
-            CommandHelpers::appendCommandStatus(result,
-                                                Status(ErrorCodes::IllegalOperation,
-                                                       "renaming the server configuration "
-                                                       "collection (admin.system.version) is not "
-                                                       "allowed"));
-            return false;
+            uasserted(ErrorCodes::IllegalOperation,
+                      "renaming the server configuration "
+                      "collection (admin.system.version) is not "
+                      "allowed");
         }
 
         RenameCollectionOptions options;
         options.dropTarget = cmdObj["dropTarget"].trueValue();
         options.stayTemp = cmdObj["stayTemp"].trueValue();
-        return CommandHelpers::appendCommandStatus(
-            result, renameCollection(opCtx, source, target, options));
+        uassertStatusOK(renameCollection(opCtx, source, target, options));
+        return true;
     }
 
 } cmdrenamecollection;

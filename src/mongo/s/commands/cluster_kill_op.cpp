@@ -99,9 +99,7 @@ private:
 
         // Will throw if shard id is not found
         auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdent);
-        if (!shardStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, shardStatus.getStatus());
-        }
+        uassertStatusOK(shardStatus.getStatus());
         auto shard = shardStatus.getValue();
 
         int opId;

@@ -117,10 +117,7 @@ public:
                                                                  parsedRequest.getShardName(),
                                                                  parsedRequest.getValidAfter());
 
-        if (!mergeChunkResult.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, mergeChunkResult);
-        }
-
+        uassertStatusOK(mergeChunkResult);
         return true;
     }
 } configsvrMergeChunkCmd;

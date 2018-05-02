@@ -64,9 +64,7 @@ public:
         bool showPrivileges;
         Status status =
             bsonExtractBooleanFieldWithDefault(cmdObj, "showPrivileges", false, &showPrivileges);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         BSONObjBuilder authInfo(result.subobjStart("authInfo"));
         {

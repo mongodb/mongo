@@ -75,10 +75,8 @@ public:
              BSONObjBuilder& result) override {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrCommitMovePrimary can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrCommitMovePrimary can only be run on config servers");
         }
 
         uassert(ErrorCodes::InvalidOptions,

@@ -128,7 +128,8 @@ public:
         if (firstFailedShardStatus.isOK())
             output.appendBool("valid", isValid);
 
-        return CommandHelpers::appendCommandStatus(output, firstFailedShardStatus);
+        uassertStatusOK(firstFailedShardStatus);
+        return true;
     }
 
 } validateCmd;

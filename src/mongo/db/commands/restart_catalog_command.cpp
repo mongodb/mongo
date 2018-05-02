@@ -97,11 +97,9 @@ public:
         for (auto&& dbName : allDbs) {
             const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
             if (db->isDropPending(opCtx)) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::DatabaseDropPending,
-                     str::stream() << "cannot restart the catalog because database " << dbName
-                                   << " is pending removal"});
+                uasserted(ErrorCodes::DatabaseDropPending,
+                          str::stream() << "cannot restart the catalog because database " << dbName
+                                        << " is pending removal");
             }
         }
 

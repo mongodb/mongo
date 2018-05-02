@@ -51,15 +51,12 @@ public:
             LastError::get(opCtx->getClient()).disable();
 
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         bool includeInitialSync = false;
         Status initialSyncStatus =
             bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", false, &includeInitialSync);
-        if (!initialSyncStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, initialSyncStatus);
-        }
+        uassertStatusOK(initialSyncStatus);
 
         auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
         if (includeInitialSync) {
@@ -67,7 +64,8 @@ public:
         }
         status =
             ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(&result, responseStyle);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 private:

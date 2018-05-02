@@ -110,7 +110,7 @@ public:
 
     void uassertCommandDoesNotSpecifyWriteConcern(const BSONObj& cmd) const override {
         if (commandSpecifiesWriteConcern(cmd)) {
-            uassertStatusOK({ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
+            uasserted(ErrorCodes::InvalidOptions, "Command does not support writeConcern");
         }
     }
 

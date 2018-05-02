@@ -107,8 +107,7 @@ public:
             .then([](std::vector<uint8_t> blob) {
 
                 if (blob.empty()) {
-                    uassertStatusOK(
-                        Status(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received"));
+                    uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
                 }
 
                 ConstDataRange cdr(reinterpret_cast<char*>(blob.data()), blob.size());
@@ -133,8 +132,7 @@ public:
             .then([](std::vector<uint8_t> blob) {
 
                 if (blob.empty()) {
-                    uassertStatusOK(
-                        Status(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received"));
+                    uasserted(ErrorCodes::FreeMonHttpTemporaryFailure, "Empty response received");
                 }
 
                 ConstDataRange cdr(reinterpret_cast<char*>(blob.data()), blob.size());

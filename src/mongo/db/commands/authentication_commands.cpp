@@ -231,9 +231,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     }
     std::string mechanism = cmdObj.getStringField("mechanism");
     if (mechanism.empty()) {
-        CommandHelpers::appendCommandStatus(result,
-                                            {ErrorCodes::BadValue, "Auth mechanism not specified"});
-        return false;
+        uasserted(ErrorCodes::BadValue, "Auth mechanism not specified");
     }
     UserName user;
     auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
@@ -260,15 +258,14 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
                   << (client->hasRemote() ? (" from client " + client->getRemote().toString()) : "")
                   << " with mechanism " << mechanism << ": " << status;
         }
+        sleepmillis(saslGlobalParams.authFailedDelay.load());
         if (status.code() == ErrorCodes::AuthenticationFailed) {
             // Statuses with code AuthenticationFailed may contain messages we do not wish to
             // reveal to the user, so we return a status with the message "auth failed".
-            CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::AuthenticationFailed, "auth failed"));
+            uasserted(ErrorCodes::AuthenticationFailed, "auth failed");
         } else {
-            CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
-        sleepmillis(saslGlobalParams.authFailedDelay.load());
         return false;
     }
     result.append("dbname", user.getDB());

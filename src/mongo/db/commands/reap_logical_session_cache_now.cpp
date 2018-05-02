@@ -76,9 +76,7 @@ public:
         auto client = opCtx->getClient();
 
         auto res = cache->reapNow(client);
-        if (!res.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, res);
-        }
+        uassertStatusOK(res);
 
         return true;
     }

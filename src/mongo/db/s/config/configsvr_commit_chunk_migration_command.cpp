@@ -136,9 +136,7 @@ public:
             commitRequest.getFromShard(),
             commitRequest.getToShard(),
             commitRequest.getValidAfter());
-        if (!response.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, response.getStatus());
-        }
+        uassertStatusOK(response.getStatus());
         result.appendElements(response.getValue());
         return true;
     }

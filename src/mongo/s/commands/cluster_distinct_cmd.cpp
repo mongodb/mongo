@@ -183,19 +183,13 @@ public:
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, ex->getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
-            if (!parsedDistinct.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, parsedDistinct.getStatus());
-            }
+            uassertStatusOK(parsedDistinct.getStatus());
 
             auto aggCmdOnView = parsedDistinct.getValue().asAggregationCommand();
-            if (!aggCmdOnView.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, aggCmdOnView.getStatus());
-            }
+            uassertStatusOK(aggCmdOnView.getStatus());
 
             auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
-            if (!aggRequestOnView.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, aggRequestOnView.getStatus());
-            }
+            uassertStatusOK(aggRequestOnView.getStatus());
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
@@ -205,9 +199,8 @@ public:
 
             ViewResponseFormatter formatter(aggResult);
             auto formatStatus = formatter.appendAsDistinctResponse(&result);
-            if (!formatStatus.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, formatStatus);
-            }
+            uassertStatusOK(formatStatus);
+
             return true;
         }
 

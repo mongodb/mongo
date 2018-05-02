@@ -103,7 +103,8 @@ public:
         if (status.isOK()) {
             wunit.commit();
         }
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 };
 
@@ -217,33 +218,27 @@ public:
                      BSONObjBuilder& result) {
         const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
         if (!fullNs.isValid()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidNamespace,
-                 str::stream() << "collection name " << fullNs.ns() << " is not valid"});
+            uasserted(ErrorCodes::InvalidNamespace,
+                      str::stream() << "collection name " << fullNs.ns() << " is not valid");
         }
 
         int n = cmdObj.getIntField("n");
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
         if (n <= 0) {
-            return CommandHelpers::appendCommandStatus(
-                result, {ErrorCodes::BadValue, "n must be a positive integer"});
+            uasserted(ErrorCodes::BadValue, "n must be a positive integer");
         }
 
         // Lock the database in mode IX and lock the collection exclusively.
         AutoGetCollection autoColl(opCtx, fullNs, MODE_IX, MODE_X);
         Collection* collection = autoColl.getCollection();
         if (!collection) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::NamespaceNotFound,
-                 str::stream() << "collection " << fullNs.ns() << " does not exist"});
+            uasserted(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "collection " << fullNs.ns() << " does not exist");
         }
 
         if (!collection->isCapped()) {
-            return CommandHelpers::appendCommandStatus(
-                result, {ErrorCodes::IllegalOperation, "collection must be capped"});
+            uasserted(ErrorCodes::IllegalOperation, "collection must be capped");
         }
 
         RecordId end;
@@ -257,11 +252,9 @@ public:
             for (int i = 0; i < n + 1; ++i) {
                 PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
                 if (PlanExecutor::ADVANCED != state) {
-                    return CommandHelpers::appendCommandStatus(
-                        result,
-                        {ErrorCodes::IllegalOperation,
-                         str::stream() << "invalid n, collection contains fewer than " << n
-                                       << " documents"});
+                    uasserted(ErrorCodes::IllegalOperation,
+                              str::stream() << "invalid n, collection contains fewer than " << n
+                                            << " documents");
                 }
             }
         }
@@ -293,7 +286,8 @@ public:
                      BSONObjBuilder& result) {
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
 
-        return CommandHelpers::appendCommandStatus(result, emptyCapped(opCtx, nss));
+        uassertStatusOK(emptyCapped(opCtx, nss));
+        return true;
     }
 };
 

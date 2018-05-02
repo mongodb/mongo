@@ -145,9 +145,7 @@ public:
             maybeDisableValidation.emplace(opCtx);
 
         auto status = OplogApplicationChecks::checkOperationArray(cmdObj.firstElement());
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         // TODO (SERVER-30217): When a write concern is provided to the doTxn command, we
         // normally wait on the OpTime of whichever operation successfully completed last. This is

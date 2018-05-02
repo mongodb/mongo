@@ -89,7 +89,8 @@ public:
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
-        return CommandHelpers::appendCommandStatus(result, dropIndexes(opCtx, nss, jsobj, &result));
+        uassertStatusOK(dropIndexes(opCtx, nss, jsobj, &result));
+        return true;
     }
 
 } cmdDropIndexes;
@@ -130,11 +131,9 @@ public:
         Collection* collection = autoDb.getDb()->getCollection(opCtx, toReIndexNss);
         if (!collection) {
             if (autoDb.getDb()->getViewCatalog()->lookup(opCtx, toReIndexNss.ns()))
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::CommandNotSupportedOnView, "can't re-index a view"});
+                uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
             else
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
+                uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
         }
 
         BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNss.ns());
@@ -197,16 +196,12 @@ public:
             indexer = stdx::make_unique<MultiIndexBlock>(opCtx, collection);
 
             swIndexesToRebuild = indexer->init(all);
-            if (!swIndexesToRebuild.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, swIndexesToRebuild.getStatus());
-            }
+            uassertStatusOK(swIndexesToRebuild.getStatus());
             wunit.commit();
         }
 
         auto status = indexer->insertAllDocumentsInCollection();
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         {
             WriteUnitOfWork wunit(opCtx);

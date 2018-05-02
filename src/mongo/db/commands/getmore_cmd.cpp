@@ -225,9 +225,7 @@ public:
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             Status status = replCoord->updateTerm(opCtx, *request.term);
             // Note: updateTerm returns ok if term stayed the same.
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, status);
-            }
+            uassertStatusOK(status);
         }
 
         // Cursors come in one of two flavors:
@@ -273,18 +271,13 @@ public:
 
             Collection* collection = readLock->getCollection();
             if (!collection) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::OperationFailed,
-                           "collection dropped between getMore calls"));
+                uasserted(ErrorCodes::OperationFailed, "collection dropped between getMore calls");
             }
             cursorManager = collection->getCursorManager();
         }
 
         auto ccPin = cursorManager->pinCursor(opCtx, request.cursorid);
-        if (!ccPin.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, ccPin.getStatus());
-        }
+        uassertStatusOK(ccPin.getStatus());
 
         ClientCursor* cursor = ccPin.getValue().getCursor();
 
@@ -315,20 +308,16 @@ public:
         // authenticated in order to run getMore on the cursor.
         if (!AuthorizationSession::get(opCtx->getClient())
                  ->isCoauthorizedWith(cursor->getAuthenticatedUsers())) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::Unauthorized,
-                       str::stream() << "cursor id " << request.cursorid
-                                     << " was not created by the authenticated user"));
+            uasserted(ErrorCodes::Unauthorized,
+                      str::stream() << "cursor id " << request.cursorid
+                                    << " was not created by the authenticated user");
         }
 
         if (request.nss != cursor->nss()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::Unauthorized,
-                       str::stream() << "Requested getMore on namespace '" << request.nss.ns()
-                                     << "', but cursor belongs to a different namespace "
-                                     << cursor->nss().ns()));
+            uasserted(ErrorCodes::Unauthorized,
+                      str::stream() << "Requested getMore on namespace '" << request.nss.ns()
+                                    << "', but cursor belongs to a different namespace "
+                                    << cursor->nss().ns());
         }
 
         // Ensure the lsid and txnNumber of the getMore match that of the originating command.
@@ -336,11 +325,9 @@ public:
         validateTxnNumber(opCtx, request, cursor);
 
         if (request.nss.isOplog() && MONGO_FAIL_POINT(rsStopGetMoreCmd)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::CommandFailed,
-                       str::stream() << "getMore on " << request.nss.ns()
-                                     << " rejected due to active fail point rsStopGetMoreCmd"));
+            uasserted(ErrorCodes::CommandFailed,
+                      str::stream() << "getMore on " << request.nss.ns()
+                                    << " rejected due to active fail point rsStopGetMoreCmd");
         }
 
         // Validation related to awaitData.
@@ -351,7 +338,7 @@ public:
         if (request.awaitDataTimeout && !cursor->isAwaitData()) {
             Status status(ErrorCodes::BadValue,
                           "cannot set maxTimeMS on getMore command for a non-awaitData cursor");
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         // On early return, get rid of the cursor.
@@ -441,9 +428,7 @@ public:
         }
 
         Status batchStatus = generateBatch(opCtx, cursor, request, &nextBatch, &state, &numResults);
-        if (!batchStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, batchStatus);
-        }
+        uassertStatusOK(batchStatus);
 
         PlanSummaryStats postExecutionStats;
         Explain::getSummaryStats(*exec, &postExecutionStats);
@@ -506,9 +491,7 @@ public:
         globalOpCounters.gotGetMore();
 
         StatusWith<GetMoreRequest> parsedRequest = GetMoreRequest::parseFromBSON(dbname, cmdObj);
-        if (!parsedRequest.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, parsedRequest.getStatus());
-        }
+        uassertStatusOK(parsedRequest.getStatus());
         auto request = parsedRequest.getValue();
         return runParsed(opCtx, request.nss, request, cmdObj, result);
     }

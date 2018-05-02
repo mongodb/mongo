@@ -144,9 +144,7 @@ public:
                                                maxChunkObjects,
                                                maxChunkSize,
                                                maxChunkSizeBytes);
-        if (!statusWithSplitKeys.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithSplitKeys.getStatus());
-        }
+        uassertStatusOK(statusWithSplitKeys.getStatus());
 
         result.append("splitKeys", statusWithSplitKeys.getValue());
         return true;

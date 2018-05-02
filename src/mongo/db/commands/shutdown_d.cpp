@@ -63,7 +63,7 @@ public:
         Status status = repl::ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(timeoutSecs), Seconds(120));
         if (!status.isOK() && status.code() != ErrorCodes::NotMaster) {  // ignore not master
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         // Never returns

@@ -185,7 +185,7 @@ public:
             if (!status.isOK()) {
                 releaseLock();
                 warning() << "fsyncLock failed. Lock count reset to 0. Status: " << status;
-                return CommandHelpers::appendCommandStatus(result, status);
+                uassertStatusOK(status);
             }
         }
 

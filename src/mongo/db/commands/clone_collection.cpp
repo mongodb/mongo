@@ -133,13 +133,9 @@ public:
         // (e.g. system.indexes), so we must check that it is legal to both create and write to the
         // namespace.
         auto allowedCreateStatus = userAllowedCreateNS(dbname, nsToCollectionSubstring(ns));
-        if (!allowedCreateStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, allowedCreateStatus);
-        }
+        uassertStatusOK(allowedCreateStatus);
         auto allowedWriteStatus = userAllowedWriteNS(dbname, nsToCollectionSubstring(ns));
-        if (!allowedWriteStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, allowedWriteStatus);
-        }
+        uassertStatusOK(allowedWriteStatus);
 
         BSONObj query = cmdObj.getObjectField("query");
         if (query.isEmpty())

@@ -108,9 +108,6 @@ struct CommandHelpers {
      */
     static bool appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status);
 
-    // About to be deleted
-    static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
-
     /**
      * If "ok" field is present in `reply`, uses its truthiness.
      * Otherwise, the absence of failure is considered success, `reply` is patched to indicate it.

@@ -612,7 +612,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
     responseBuilder.done(clusterCursorId, requestedNss.ns());
 
-    CommandHelpers::appendCommandStatus(cursorResponse, Status::OK());
+    CommandHelpers::appendSimpleCommandStatus(cursorResponse, true);
 
     return cursorResponse.obj();
 }

@@ -129,9 +129,8 @@ public:
              BSONObjBuilder& result) {
         auth::CreateOrUpdateUserArgs args;
         Status status = auth::parseCreateOrUpdateUserCommands(cmdObj, getName(), dbname, &args);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
+
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx,
             getName(),
@@ -181,9 +180,8 @@ public:
              BSONObjBuilder& result) {
         UserName userName;
         Status status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
+
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx,
             getName(),
@@ -273,9 +271,8 @@ public:
         vector<RoleName> roles;
         Status status = auth::parseRolePossessionManipulationCommands(
             cmdObj, getName(), dbname, &userNameString, &roles);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
+
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx,
             getName(),
@@ -323,9 +320,8 @@ public:
         vector<RoleName> unusedRoles;
         Status status = auth::parseRolePossessionManipulationCommands(
             cmdObj, getName(), dbname, &userNameString, &unusedRoles);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
+
         const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
             opCtx,
             getName(),

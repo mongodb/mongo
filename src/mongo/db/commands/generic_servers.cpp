@@ -236,13 +236,11 @@ public:
                            BSONObjBuilder& result) {
         BSONElement val = cmdObj.firstElement();
         if (val.type() != String) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "Argument to getLog must be of type String; found "
-                                     << val.toString(false)
-                                     << " of type "
-                                     << typeName(val.type())));
+            uasserted(ErrorCodes::TypeMismatch,
+                      str::stream() << "Argument to getLog must be of type String; found "
+                                    << val.toString(false)
+                                    << " of type "
+                                    << typeName(val.type()));
         }
 
         string p = val.String();
@@ -306,13 +304,10 @@ public:
                      BSONObjBuilder& result) {
         std::string logName;
         Status status = bsonExtractStringField(cmdObj, "clearLog", &logName);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         if (logName != "global") {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::InvalidOptions, "Only the 'global' log can be cleared"));
+            uasserted(ErrorCodes::InvalidOptions, "Only the 'global' log can be cleared");
         }
         RamLog* ramlog = RamLog::getIfExists(logName);
         invariant(ramlog);

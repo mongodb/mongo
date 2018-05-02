@@ -73,10 +73,8 @@ public:
         } else if (mode == "conservative") {
 
         } else {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::InvalidOptions,
-                       "Only conservative|moderate|aggressive are valid options."));
+            uasserted(ErrorCodes::InvalidOptions,
+                      "Only conservative|moderate|aggressive are valid options.");
         }
         return true;
     }
@@ -122,8 +120,7 @@ public:
         } else if (mode == "normal") {
 
         } else {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::InvalidOptions, "Only low|normal are valid options."));
+            uasserted(ErrorCodes::InvalidOptions, "Only low|normal are valid options.");
         }
         return true;
     }

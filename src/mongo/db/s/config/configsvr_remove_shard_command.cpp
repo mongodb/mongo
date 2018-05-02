@@ -109,8 +109,7 @@ public:
             std::string msg(str::stream() << "Could not drop shard '" << target
                                           << "' because it does not exist");
             log() << msg;
-            return CommandHelpers::appendCommandStatus(result,
-                                                       Status(ErrorCodes::ShardNotFound, msg));
+            uasserted(ErrorCodes::ShardNotFound, msg);
         }
         const auto& shard = shardStatus.getValue();
 
@@ -156,9 +155,7 @@ public:
                     boost::none,  // return all
                     nullptr,
                     repl::ReadConcernLevel::kMajorityReadConcern);
-                if (!swChunks.isOK()) {
-                    return CommandHelpers::appendCommandStatus(result, swChunks.getStatus());
-                }
+                uassertStatusOK(swChunks.getStatus());
 
                 const auto& chunks = swChunks.getValue();
                 result.append("msg", "draining ongoing");

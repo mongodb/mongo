@@ -181,9 +181,7 @@ public:
             ctx.reset();
 
             auto viewAggregation = parsedDistinct.asAggregationCommand();
-            if (!viewAggregation.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
-            }
+            uassertStatusOK(viewAggregation.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
@@ -194,9 +192,7 @@ public:
         Collection* const collection = ctx->getCollection();
 
         auto executor = getExecutorDistinct(opCtx, collection, nss.ns(), &parsedDistinct);
-        if (!executor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, executor.getStatus());
-        }
+        uassertStatusOK(executor.getStatus());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -247,10 +243,8 @@ public:
                   << redact(PlanExecutor::statestr(state))
                   << ", stats: " << redact(Explain::getWinningPlanStats(executor.getValue().get()));
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error during distinct command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                "Executor error during distinct command"));
         }
 
 

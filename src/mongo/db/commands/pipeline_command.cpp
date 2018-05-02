@@ -92,13 +92,9 @@ public:
         const auto aggregationRequest =
             uassertStatusOK(AggregationRequest::parseFromBSON(dbname, cmdObj, boost::none));
 
-        return CommandHelpers::appendCommandStatus(
-            result,
-            runAggregate(opCtx,
-                         aggregationRequest.getNamespaceString(),
-                         aggregationRequest,
-                         cmdObj,
-                         result));
+        uassertStatusOK(runAggregate(
+            opCtx, aggregationRequest.getNamespaceString(), aggregationRequest, cmdObj, result));
+        return true;
     }
 
     Status explain(OperationContext* opCtx,

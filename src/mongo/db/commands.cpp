@@ -185,12 +185,6 @@ Command* CommandHelpers::findCommand(StringData name) {
     return globalCommandRegistry()->findCommand(name);
 }
 
-bool CommandHelpers::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
-    uassertStatusOK(status);
-    appendSimpleCommandStatus(result, true);
-    return true;
-}
-
 bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const Status& status) {
     appendSimpleCommandStatus(result, status.isOK(), status.reason());
     BSONObj tmp = result.asTempObj();

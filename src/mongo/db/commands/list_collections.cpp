@@ -253,17 +253,14 @@ public:
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
             if (filterElt.type() != mongo::Object) {
-                return CommandHelpers::appendCommandStatus(
-                    result, Status(ErrorCodes::BadValue, "\"filter\" must be an object"));
+                uasserted(ErrorCodes::BadValue, "\"filter\" must be an object");
             }
             // The collator is null because collection objects are compared using binary comparison.
             const CollatorInterface* collator = nullptr;
             boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
             StatusWithMatchExpression statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
-            if (!statusWithMatcher.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, statusWithMatcher.getStatus());
-            }
+            uassertStatusOK(statusWithMatcher.getStatus());
             matcher = std::move(statusWithMatcher.getValue());
         }
 
@@ -271,19 +268,14 @@ public:
         long long batchSize;
         Status parseCursorStatus =
             CursorRequest::parseCommandCursorOptions(jsobj, defaultBatchSize, &batchSize);
-        if (!parseCursorStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, parseCursorStatus);
-        }
+        uassertStatusOK(parseCursorStatus);
 
         // Check for 'includePendingDrops' flag. The default is to not include drop-pending
         // collections.
         bool includePendingDrops;
         Status status = bsonExtractBooleanFieldWithDefault(
             jsobj, "includePendingDrops", false, &includePendingDrops);
-
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         AutoGetDb autoDb(opCtx, dbname, MODE_IS);
 
@@ -331,9 +323,7 @@ public:
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder firstBatch;

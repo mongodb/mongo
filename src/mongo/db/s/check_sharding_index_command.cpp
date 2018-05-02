@@ -200,10 +200,8 @@ public:
         }
 
         if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
-                    "Executor error while checking sharding index"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
+                "Executor error while checking sharding index"));
         }
 
         return true;

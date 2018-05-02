@@ -229,9 +229,7 @@ public:
         // Pass parseNs to makeFromFindCommand in case cmdObj does not have a UUID.
         auto qrStatus = QueryRequest::makeFromFindCommand(
             NamespaceString(parseNs(dbname, cmdObj)), cmdObj, isExplain);
-        if (!qrStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, qrStatus.getStatus());
-        }
+        uassertStatusOK(qrStatus.getStatus());
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto& qr = qrStatus.getValue();
@@ -240,9 +238,7 @@ public:
         if (auto term = qr->getReplicationTerm()) {
             Status status = replCoord->updateTerm(opCtx, *term);
             // Note: updateTerm returns ok if term stayed the same.
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, status);
-            }
+            uassertStatusOK(status);
         }
 
         // Acquire locks. If the query is on a view, we release our locks and convert the query
@@ -277,9 +273,7 @@ public:
                                          expCtx,
                                          extensionsCallback,
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
-        if (!statusWithCQ.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithCQ.getStatus());
-        }
+        uassertStatusOK(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         if (ctx->getView()) {
@@ -290,19 +284,15 @@ public:
             // necessary), if possible.
             const auto& qr = cq->getQueryRequest();
             auto viewAggregationCommand = qr.asAggregationCommand();
-            if (!viewAggregationCommand.isOK())
-                return CommandHelpers::appendCommandStatus(result,
-                                                           viewAggregationCommand.getStatus());
+            uassertStatusOK(viewAggregationCommand.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx,
                 OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregationCommand.getValue())));
             auto status = getStatusFromCommandResult(aggResult);
             if (status.code() == ErrorCodes::InvalidPipelineOperator) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::InvalidPipelineOperator,
-                     str::stream() << "Unsupported in view pipeline: " << status.reason()});
+                uasserted(ErrorCodes::InvalidPipelineOperator,
+                          str::stream() << "Unsupported in view pipeline: " << status.reason());
             }
             result.resetToEmpty();
             result.appendElements(aggResult);
@@ -313,9 +303,7 @@ public:
 
         // Get the execution plan for the query.
         auto statusWithPlanExecutor = getExecutorFind(opCtx, collection, nss, std::move(cq));
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -363,10 +351,8 @@ public:
             error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
                     << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error during find command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                "Executor error during find command"));
         }
 
         // Before saving the cursor, ensure that whatever plan we established happened with the

@@ -176,7 +176,7 @@ public:
             Status collationEltStatus =
                 bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElt);
             if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
-                return CommandHelpers::appendCommandStatus(result, collationEltStatus);
+                uassertStatusOK(collationEltStatus);
             }
             if (collationEltStatus.isOK()) {
                 collation = collationElt.Obj();
@@ -304,10 +304,8 @@ public:
             log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
                   << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(currObj).withContext(
-                    "Executor error during geoNear command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(currObj).withContext(
+                "Executor error during geoNear command"));
         }
 
         PlanSummaryStats summary;

@@ -89,40 +89,32 @@ public:
         Lock::GlobalWrite global(opCtx);
         Database* database = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.db());
         if (!database) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::NamespaceNotFound, "database local does not exist"));
+            uasserted(ErrorCodes::NamespaceNotFound, "database local does not exist");
         }
         Collection* coll = database->getCollection(opCtx, nss);
         if (!coll) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::NamespaceNotFound, "oplog does not exist"));
+            uasserted(ErrorCodes::NamespaceNotFound, "oplog does not exist");
         }
         if (!coll->isCapped()) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::IllegalOperation, "oplog isn't capped"));
+            uasserted(ErrorCodes::IllegalOperation, "oplog isn't capped");
         }
         if (!jsobj["size"].isNumber()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::InvalidOptions, "invalid size field, size should be a number"));
+            uasserted(ErrorCodes::InvalidOptions, "invalid size field, size should be a number");
         }
 
         long long sizeMb = jsobj["size"].numberLong();
         long long size = sizeMb * 1024 * 1024;
         if (sizeMb < 990L) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least"));
+            uasserted(ErrorCodes::InvalidOptions, "oplog size should be 990MB at least");
         }
         WriteUnitOfWork wunit(opCtx);
         Status status = coll->getRecordStore()->updateCappedSize(opCtx, size);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
         CollectionCatalogEntry* entry = coll->getCatalogEntry();
         entry->updateCappedSize(opCtx, size);
         wunit.commit();
         LOG(0) << "replSetResizeOplog success, currentSize:" << size;
-        return CommandHelpers::appendCommandStatus(result, Status::OK());
+        return true;
     }
 } cmdReplSetResizeOplog;
 }

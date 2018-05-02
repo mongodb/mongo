@@ -275,10 +275,8 @@ public:
             }
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                        "Executor error during filemd5 command"));
+                uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                    "Executor error during filemd5 command"));
             }
 
             if (partialOk)

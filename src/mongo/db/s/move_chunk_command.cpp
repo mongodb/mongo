@@ -145,16 +145,6 @@ public:
         } else {
             status = scopedMigration.waitForCompletion(opCtx);
         }
-
-        if (status == ErrorCodes::ChunkTooBig) {
-            // This code is for compatibility with pre-3.2 balancer, which does not recognize the
-            // ChunkTooBig error code and instead uses the "chunkTooBig" field in the response,
-            // and the 3.4 shard, which failed to set the ChunkTooBig status code.
-            // TODO: Remove after 3.6 is released.
-            result.appendBool("chunkTooBig", true);
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
         uassertStatusOK(status);
 
         if (moveChunkRequest.getWaitForDelete()) {

@@ -373,7 +373,8 @@ public:
         }
 
         auto mergeStatus = mergeChunks(opCtx, nss, minKey, maxKey, epoch);
-        return CommandHelpers::appendCommandStatus(result, mergeStatus);
+        uassertStatusOK(mergeStatus);
+        return true;
     }
 
 } mergeChunksCmd;

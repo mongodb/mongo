@@ -108,10 +108,8 @@ public:
              BSONObjBuilder& result) override {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrMovePrimary can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrMovePrimary can only be run on config servers");
         }
 
         auto movePrimaryRequest =
@@ -125,10 +123,8 @@ public:
 
         if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kConfigDb ||
             dbname == NamespaceString::kLocalDb) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 str::stream() << "Can't move primary for " << dbname << " database"});
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Can't move primary for " << dbname << " database");
         }
 
         uassert(ErrorCodes::InvalidOptions,
@@ -139,10 +135,8 @@ public:
         const std::string to = movePrimaryRequest.getTo().toString();
 
         if (to.empty()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 str::stream() << "you have to specify where you want to move it"});
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "you have to specify where you want to move it");
         }
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
@@ -249,8 +243,7 @@ public:
 
             if (!worked) {
                 log() << "clone failed" << redact(cloneRes);
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::OperationFailed, str::stream() << "clone failed"});
+                uasserted(ErrorCodes::OperationFailed, str::stream() << "clone failed");
             }
 
             if (auto wcErrorElem = cloneRes["writeConcernError"]) {

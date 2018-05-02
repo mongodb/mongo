@@ -178,9 +178,7 @@ public:
 
         const bool isExplain = false;
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
-        if (!request.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, request.getStatus());
-        }
+        uassertStatusOK(request.getStatus());
 
         // Check whether we are allowed to read from this node after acquiring our locks.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -192,9 +190,7 @@ public:
             ctx.reset();
 
             auto viewAggregation = request.getValue().asAggregationCommand();
-            if (!viewAggregation.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
-            }
+            uassertStatusOK(viewAggregation.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
@@ -211,9 +207,7 @@ public:
 
         auto statusWithPlanExecutor =
             getExecutorCount(opCtx, collection, request.getValue(), false /*explain*/);
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -225,9 +219,7 @@ public:
         }
 
         Status execPlanStatus = exec->executePlan();
-        if (!execPlanStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, execPlanStatus);
-        }
+        uassertStatusOK(execPlanStatus);
 
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);

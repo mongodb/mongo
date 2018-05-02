@@ -500,9 +500,7 @@ public:
                 // Take distributed lock to prevent split / migration.
                 auto scopedDistLock = catalogClient->getDistLockManager()->lock(
                     opCtx, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
-                if (!scopedDistLock.isOK()) {
-                    return CommandHelpers::appendCommandStatus(result, scopedDistLock.getStatus());
-                }
+                uassertStatusOK(scopedDistLock.getStatus());
 
                 BSONObj finalCmdObj = appendAllowImplicitCreate(finalCmd.obj(), true);
                 mrCommandResults.clear();

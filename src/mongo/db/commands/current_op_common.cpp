@@ -112,7 +112,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     // Make any final custom additions to the response object.
     appendToResponse(&result);
 
-    return CommandHelpers::appendCommandStatus(result, Status::OK());
+    return true;
 }
 
 }  // namespace mongo

@@ -89,10 +89,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrDropDatabase can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrDropDatabase can only be run on config servers");
         }
 
         const std::string dbname = parseNs("", cmdObj);

@@ -92,11 +92,10 @@ public:
         std::unique_ptr<MatchExpression> filter;
         if (auto filterElt = jsobj[kFilterField]) {
             if (filterElt.type() != BSONType::Object) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::TypeMismatch,
-                     str::stream() << "Field '" << kFilterField << "' must be of type Object in: "
-                                   << jsobj});
+                uasserted(ErrorCodes::TypeMismatch,
+                          str::stream() << "Field '" << kFilterField
+                                        << "' must be of type Object in: "
+                                        << jsobj);
             }
             // The collator is null because database metadata objects are compared using simple
             // binary comparison.
@@ -104,9 +103,7 @@ public:
             boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
             auto statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
-            if (!statusWithMatcher.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, statusWithMatcher.getStatus());
-            }
+            uassertStatusOK(statusWithMatcher.getStatus());
             filter = std::move(statusWithMatcher.getValue());
         }
         bool nameOnly = jsobj[kNameOnlyField].trueValue();

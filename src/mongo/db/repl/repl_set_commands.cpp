@@ -107,44 +107,39 @@ public:
         if (cmdObj.hasElement("waitForMemberState")) {
             long long stateVal;
             auto status = bsonExtractIntegerField(cmdObj, "waitForMemberState", &stateVal);
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, status);
-            }
+            uassertStatusOK(status);
 
             const auto swMemberState = MemberState::create(stateVal);
-            if (!swMemberState.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, swMemberState.getStatus());
-            }
+            uassertStatusOK(swMemberState.getStatus());
             const auto expectedState = swMemberState.getValue();
 
             long long timeoutMillis;
             status = bsonExtractIntegerField(cmdObj, "timeoutMillis", &timeoutMillis);
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, status);
-            }
+            uassertStatusOK(status);
             Milliseconds timeout(timeoutMillis);
             log() << "replSetTest: waiting " << timeout << " for member state to become "
                   << expectedState;
 
             status = replCoord->waitForMemberState(expectedState, timeout);
 
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
+            return true;
         } else if (cmdObj.hasElement("waitForDrainFinish")) {
             long long timeoutMillis;
             auto status = bsonExtractIntegerField(cmdObj, "waitForDrainFinish", &timeoutMillis);
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, status);
-            }
+            uassertStatusOK(status);
             Milliseconds timeout(timeoutMillis);
             log() << "replSetTest: waiting " << timeout << " for applier buffer to finish draining";
 
             status = replCoord->waitForDrainFinish(timeout);
 
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
+            return true;
         }
 
         Status status = replCoord->checkReplEnabledForCommand(&result);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 };
 
@@ -168,11 +163,10 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         result.append("rbid", ReplicationProcess::get(opCtx)->getRollbackID());
-        return CommandHelpers::appendCommandStatus(result, Status::OK());
+        return true;
     }
 } cmdReplSetRBID;
 
@@ -189,8 +183,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         ReplicationCoordinator::get(opCtx)->processReplSetGetConfig(&result);
         return true;
@@ -312,10 +305,8 @@ public:
         std::string replSetString =
             ReplicationCoordinator::get(opCtx)->getSettings().getReplSetString();
         if (replSetString.empty()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::NoReplicationEnabled,
-                       "This node was not started with the replSet option"));
+            uasserted(ErrorCodes::NoReplicationEnabled,
+                      "This node was not started with the replSet option");
         }
 
         if (configObj.isEmpty()) {
@@ -359,7 +350,8 @@ public:
 
         Status status =
             ReplicationCoordinator::get(opCtx)->processReplSetInitiate(opCtx, configObj, &result);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 private:
@@ -381,9 +373,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         if (cmdObj["replSetReconfig"].type() != Object) {
             result.append("errmsg", "no configuration specified");
@@ -411,7 +401,8 @@ public:
         }
         wuow.commit();
 
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 private:
@@ -438,12 +429,11 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         int secs = (int)cmdObj.firstElement().numberInt();
-        return CommandHelpers::appendCommandStatus(
-            result, ReplicationCoordinator::get(opCtx)->processReplSetFreeze(secs, &result));
+        uassertStatusOK(ReplicationCoordinator::get(opCtx)->processReplSetFreeze(secs, &result));
+        return true;
     }
 
 private:
@@ -468,8 +458,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         const bool force = cmdObj["force"].trueValue();
 
@@ -478,7 +467,7 @@ public:
             stepDownForSecs = 60;
         } else if (stepDownForSecs < 0) {
             status = Status(ErrorCodes::BadValue, "stepdown period must be a positive integer");
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         long long secondaryCatchUpPeriodSecs;
@@ -492,26 +481,27 @@ public:
                 secondaryCatchUpPeriodSecs = 10;
             }
         } else if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         if (secondaryCatchUpPeriodSecs < 0) {
             status = Status(ErrorCodes::BadValue,
                             "secondaryCatchUpPeriodSecs period must be a positive or absent");
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         if (stepDownForSecs < secondaryCatchUpPeriodSecs) {
             status = Status(ErrorCodes::BadValue,
                             "stepdown period must be longer than secondaryCatchUpPeriodSecs");
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         log() << "Attempting to step down in response to replSetStepDown command";
 
         status = ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 private:
@@ -532,13 +522,11 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
-        return CommandHelpers::appendCommandStatus(
-            result,
-            ReplicationCoordinator::get(opCtx)->setMaintenanceMode(
-                cmdObj["replSetMaintenance"].trueValue()));
+        uassertStatusOK(ReplicationCoordinator::get(opCtx)->setMaintenanceMode(
+            cmdObj["replSetMaintenance"].trueValue()));
+        return true;
     }
 
 private:
@@ -560,18 +548,15 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         HostAndPort targetHostAndPort;
         status = targetHostAndPort.initialize(cmdObj["replSetSyncFrom"].valuestrsafe());
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
-        return CommandHelpers::appendCommandStatus(
-            result,
-            ReplicationCoordinator::get(opCtx)->processReplSetSyncFrom(
-                opCtx, targetHostAndPort, &result));
+        uassertStatusOK(ReplicationCoordinator::get(opCtx)->processReplSetSyncFrom(
+            opCtx, targetHostAndPort, &result));
+        return true;
     }
 
 private:
@@ -590,8 +575,7 @@ public:
         auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
         Status status = replCoord->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         // accept and ignore handshakes sent from old (3.0-series) nodes without erroring to
         // enable mixed-version operation, since we no longer use the handshakes
@@ -623,8 +607,9 @@ public:
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         } else {
             // Parsing error from UpdatePositionArgs.
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
+        return true;
     }
 } cmdReplSetUpdatePosition;
 
@@ -685,7 +670,7 @@ public:
            checks many things that are pre-initialization. */
         if (!ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets()) {
             status = Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
 
         // Process heartbeat based on the version of request. The missing fields in mismatched
@@ -702,7 +687,8 @@ public:
                 LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from "
                                       << cmdObj.getStringField("from")
                                       << " and generated response, " << response;
-                return CommandHelpers::appendCommandStatus(result, status);
+                uassertStatusOK(status);
+                return true;
             }
             // else: fall through to old heartbeat protocol as it is likely that
             // a new node just joined the set
@@ -710,9 +696,7 @@ public:
 
         ReplSetHeartbeatArgs args;
         status = args.initialize(cmdObj);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         // ugh.
         if (args.getCheckEmpty()) {
@@ -726,7 +710,8 @@ public:
 
         LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from " << cmdObj.getStringField("from")
                               << " and generated response, " << response;
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 } cmdReplSetHeartbeat;
 
@@ -742,8 +727,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         ReplicationCoordinator::ReplSetFreshArgs parsedArgs;
         parsedArgs.id = cmdObj["id"].Int();
@@ -759,7 +743,8 @@ public:
         parsedArgs.opTime = Timestamp(cmdObj["opTime"].Date());
 
         status = ReplicationCoordinator::get(opCtx)->processReplSetFresh(parsedArgs, &result);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 } cmdReplSetFresh;
 
@@ -776,8 +761,7 @@ private:
         else LOG(2) << "received elect msg " << cmdObj.toString();
 
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         ReplicationCoordinator::ReplSetElectArgs parsedArgs;
         parsedArgs.set = cmdObj["set"].String();
@@ -792,7 +776,8 @@ private:
         parsedArgs.round = cmdObj["round"].OID();
 
         status = ReplicationCoordinator::get(opCtx)->processReplSetElect(parsedArgs, &result);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 } cmdReplSetElect;
 
@@ -805,8 +790,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         log() << "Received replSetStepUp request";
 
@@ -816,7 +800,8 @@ public:
             log() << "replSetStepUp request failed" << causedBy(status);
         }
 
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 private:
@@ -840,15 +825,15 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
         log() << "Received replSetAbortPrimaryCatchUp request";
 
         status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded();
         if (!status.isOK()) {
             log() << "replSetAbortPrimaryCatchUp request failed" << causedBy(status);
         }
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 private:

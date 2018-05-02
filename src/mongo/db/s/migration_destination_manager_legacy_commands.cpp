@@ -218,7 +218,7 @@ public:
         mdm->report(result, opCtx, false);
         if (!status.isOK()) {
             log() << status.reason();
-            return CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
         return true;
     }
@@ -266,7 +266,7 @@ public:
             mdm->report(result, opCtx, false);
             if (!status.isOK()) {
                 log() << status.reason();
-                return CommandHelpers::appendCommandStatus(result, status);
+                uassertStatusOK(status);
             }
         } else if (migrationSessionIdStatus == ErrorCodes::NoSuchKey) {
             mdm->abortWithoutSessionIdCheck();

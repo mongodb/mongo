@@ -137,37 +137,33 @@ public:
         // disallow dropping the config database
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
             (dbname == NamespaceString::kConfigDb)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "Cannot drop 'config' database if mongod started "
-                       "with --configsvr"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "Cannot drop 'config' database if mongod started "
+                      "with --configsvr");
         }
 
         if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
             (dbname == NamespaceString::kLocalDb)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       str::stream() << "Cannot drop '" << dbname
-                                     << "' database while replication is active"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot drop '" << dbname
+                                    << "' database while replication is active");
         }
         BSONElement e = cmdObj.firstElement();
         int p = (int)e.number();
         if (p != 1) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter"));
+            uasserted(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter");
         }
 
         Status status = dropDatabase(opCtx, dbname);
         if (status == ErrorCodes::NamespaceNotFound) {
-            return CommandHelpers::appendCommandStatus(result, Status::OK());
+            return true;
         }
         if (status.isOK()) {
             result.append("dropped", dbname);
         }
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 } cmdDropDatabase;
@@ -215,11 +211,9 @@ public:
         auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbname);
         if (db) {
             if (db->isDropPending(opCtx)) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::DatabaseDropPending,
-                           str::stream() << "Cannot repair database " << dbname
-                                         << " since it is pending being dropped."));
+                uasserted(ErrorCodes::DatabaseDropPending,
+                          str::stream() << "Cannot repair database " << dbname
+                                        << " since it is pending being dropped.");
             }
         } else {
             // If the name doesn't make an exact match, check for a case insensitive match.
@@ -259,7 +253,8 @@ public:
 
         // Open database before returning
         DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 } cmdRepairDatabase;
 
@@ -308,13 +303,13 @@ public:
             return false;
         }
 
-        return CommandHelpers::appendCommandStatus(
-            result,
+        uassertStatusOK(
             dropCollection(opCtx,
                            nsToDrop,
                            result,
                            {},
                            DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+        return true;
     }
 
 } cmdDrop;
@@ -362,24 +357,19 @@ public:
         // Validate _id index spec and fill in missing fields.
         if (auto idIndexElem = cmdObj["idIndex"]) {
             if (cmdObj["viewOn"]) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::InvalidOptions,
-                     str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexElem});
+                uasserted(ErrorCodes::InvalidOptions,
+                          str::stream() << "'idIndex' is not allowed with 'viewOn': "
+                                        << idIndexElem);
             }
             if (cmdObj["autoIndexId"]) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::InvalidOptions,
-                     str::stream() << "'idIndex' is not allowed with 'autoIndexId': "
-                                   << idIndexElem});
+                uasserted(ErrorCodes::InvalidOptions,
+                          str::stream() << "'idIndex' is not allowed with 'autoIndexId': "
+                                        << idIndexElem);
             }
 
             if (idIndexElem.type() != BSONType::Object) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::TypeMismatch,
-                     str::stream() << "'idIndex' has to be a document: " << idIndexElem});
+                uasserted(ErrorCodes::TypeMismatch,
+                          str::stream() << "'idIndex' has to be a document: " << idIndexElem);
             }
 
             auto idIndexSpec = idIndexElem.Obj();
@@ -393,16 +383,13 @@ public:
             std::unique_ptr<CollatorInterface> defaultCollator;
             if (auto collationElem = cmdObj["collation"]) {
                 if (collationElem.type() != BSONType::Object) {
-                    return CommandHelpers::appendCommandStatus(
-                        result,
-                        {ErrorCodes::TypeMismatch,
-                         str::stream() << "'collation' has to be a document: " << collationElem});
+                    uasserted(ErrorCodes::TypeMismatch,
+                              str::stream() << "'collation' has to be a document: "
+                                            << collationElem);
                 }
                 auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(collationElem.Obj());
-                if (!collatorStatus.isOK()) {
-                    return CommandHelpers::appendCommandStatus(result, collatorStatus.getStatus());
-                }
+                uassertStatusOK(collatorStatus.getStatus());
                 defaultCollator = std::move(collatorStatus.getValue());
             }
             idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpecCollation(
@@ -417,22 +404,20 @@ public:
                 idIndexCollator = std::move(collatorStatus.getValue());
             }
             if (!CollatorInterface::collatorsMatch(defaultCollator.get(), idIndexCollator.get())) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::BadValue,
-                     "'idIndex' must have the same collation as the collection."});
+                uasserted(ErrorCodes::BadValue,
+                          "'idIndex' must have the same collation as the collection.");
             }
 
             // Remove "idIndex" field from command.
             auto resolvedCmdObj = cmdObj.removeField("idIndex");
 
-            return CommandHelpers::appendCommandStatus(
-                result, createCollection(opCtx, dbname, resolvedCmdObj, idIndexSpec));
+            uassertStatusOK(createCollection(opCtx, dbname, resolvedCmdObj, idIndexSpec));
+            return true;
         }
 
         BSONObj idIndexSpec;
-        return CommandHelpers::appendCommandStatus(
-            result, createCollection(opCtx, dbname, cmdObj, idIndexSpec));
+        uassertStatusOK(createCollection(opCtx, dbname, cmdObj, idIndexSpec));
+        return true;
     }
 } cmdCreate;
 
@@ -569,10 +554,8 @@ public:
 
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             warning() << "Internal error while reading " << ns;
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error while reading during dataSize command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                "Executor error while reading during dataSize command"));
         }
 
         ostringstream os;
@@ -665,7 +648,8 @@ public:
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
-        return CommandHelpers::appendCommandStatus(result, collMod(opCtx, nss, jsobj, &result));
+        uassertStatusOK(collMod(opCtx, nss, jsobj, &result));
+        return true;
     }
 
 } collectionModCommand;

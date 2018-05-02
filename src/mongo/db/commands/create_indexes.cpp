@@ -240,8 +240,7 @@ public:
         const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         Status status = userAllowedWriteNS(ns);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
 
         // Disallow users from creating new indexes on config.transactions since the sessions
         // code was optimized to not update indexes.
@@ -251,9 +250,7 @@ public:
 
         auto specsWithStatus =
             parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility);
-        if (!specsWithStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, specsWithStatus.getStatus());
-        }
+        uassertStatusOK(specsWithStatus.getStatus());
         auto specs = std::move(specsWithStatus.getValue());
 
         // Index builds cannot currently handle lock interruption.
@@ -263,10 +260,8 @@ public:
         // Do not use AutoGetOrCreateDb because we may relock the DbLock in mode IX.
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_X);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::NotMaster,
-                       str::stream() << "Not primary while creating indexes in " << ns.ns()));
+            uasserted(ErrorCodes::NotMaster,
+                      str::stream() << "Not primary while creating indexes in " << ns.ns());
         }
 
         Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, ns.db());
@@ -281,14 +276,11 @@ public:
         } else {
             if (db->getViewCatalog()->lookup(opCtx, ns.ns())) {
                 errmsg = "Cannot create indexes on a view";
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
+                uasserted(ErrorCodes::CommandNotSupportedOnView, errmsg);
             }
 
             status = userAllowedCreateNS(ns.db(), ns.coll());
-            if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, status);
-            }
+            uassertStatusOK(status);
 
             writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
@@ -301,9 +293,7 @@ public:
 
         auto indexSpecsWithDefaults =
             resolveCollectionDefaultProperties(opCtx, collection, std::move(specs));
-        if (!indexSpecsWithDefaults.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, indexSpecsWithDefaults.getStatus());
-        }
+        uassertStatusOK(indexSpecsWithDefaults.getStatus());
         specs = std::move(indexSpecsWithDefaults.getValue());
 
         const int numIndexesBefore = collection->getIndexCatalog()->numIndexesTotal(opCtx);
@@ -330,10 +320,7 @@ public:
             const BSONObj& spec = specs[i];
             if (spec["unique"].trueValue()) {
                 status = checkUniqueIndexConstraints(opCtx, ns, spec["key"].Obj());
-
-                if (!status.isOK()) {
-                    return CommandHelpers::appendCommandStatus(result, status);
-                }
+                uassertStatusOK(status);
             }
         }
 
@@ -348,11 +335,9 @@ public:
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_IX);
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::NotMaster,
-                           str::stream() << "Not primary while creating background indexes in "
-                                         << ns.ns()));
+                uasserted(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while creating background indexes in "
+                                        << ns.ns());
             }
         }
 

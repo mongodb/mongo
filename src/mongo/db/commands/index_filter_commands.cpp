@@ -121,7 +121,8 @@ bool IndexFilterCommand::run(OperationContext* opCtx,
                              BSONObjBuilder& result) {
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     Status status = runIndexFilterCommand(opCtx, nss.ns(), cmdObj, &result);
-    return CommandHelpers::appendCommandStatus(result, status);
+    uassertStatusOK(status);
+    return true;
 }
 
 

@@ -176,7 +176,7 @@ public:
 
             auto status = ClusterAggregate::runAggregate(
                 opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
-            CommandHelpers::appendCommandStatus(*out, status);
+            uassertStatusOK(status);
             return status;
         }
     }
@@ -192,9 +192,7 @@ public:
 
         const bool isExplain = false;
         auto qr = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
-        if (!qr.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, qr.getStatus());
-        }
+        uassertStatusOK(qr.getStatus());
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto cq = CanonicalQuery::canonicalize(opCtx,
@@ -202,9 +200,7 @@ public:
                                                expCtx,
                                                ExtensionsCallbackNoop(),
                                                MatchExpressionParser::kAllowAllSpecialFeatures);
-        if (!cq.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, cq.getStatus());
-        }
+        uassertStatusOK(cq.getStatus());
 
         try {
             // Do the work to generate the first batch of results. This blocks waiting to get
@@ -221,14 +217,10 @@ public:
             return true;
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();
-            if (!aggCmdOnView.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, aggCmdOnView.getStatus());
-            }
+            uassertStatusOK(aggCmdOnView.getStatus());
 
             auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
-            if (!aggRequestOnView.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, aggRequestOnView.getStatus());
-            }
+            uassertStatusOK(aggRequestOnView.getStatus());
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
@@ -243,8 +235,8 @@ public:
 
             auto status = ClusterAggregate::runAggregate(
                 opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &result);
-            CommandHelpers::appendCommandStatus(result, status);
-            return status.isOK();
+            uassertStatusOK(status);
+            return true;
         }
     }
 

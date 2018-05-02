@@ -495,7 +495,8 @@ bool appendEmptyResultSet(OperationContext* opCtx,
         return true;
     }
 
-    return CommandHelpers::appendCommandStatus(result, status);
+    uassertStatusOK(status);
+    return true;
 }
 
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName) {
