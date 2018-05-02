@@ -145,6 +145,10 @@ MultiIndexBlockImpl::MultiIndexBlockImpl(OperationContext* opCtx, Collection* co
       _needToCleanup(true) {}
 
 MultiIndexBlockImpl::~MultiIndexBlockImpl() {
+    if (!_needToCleanup && !_indexes.empty()) {
+        _collection->infoCache()->clearQueryCache();
+    }
+
     if (!_needToCleanup || _indexes.empty())
         return;
     while (true) {
