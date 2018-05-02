@@ -71,7 +71,7 @@ int runDbTests(int argc, char** argv) {
 
         // We may be shut down before we have a global storage
         // engine.
-        if (!getGlobalServiceContext()->getGlobalStorageEngine())
+        if (!getGlobalServiceContext()->getStorageEngine())
             return;
 
         getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();

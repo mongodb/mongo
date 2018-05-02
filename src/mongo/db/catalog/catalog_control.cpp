@@ -60,7 +60,7 @@ void closeCatalog(OperationContext* opCtx) {
 
     // Close the storage engine's catalog.
     log() << "closeCatalog: closing storage engine catalog";
-    opCtx->getServiceContext()->getGlobalStorageEngine()->closeCatalog(opCtx);
+    opCtx->getServiceContext()->getStorageEngine()->closeCatalog(opCtx);
 }
 
 void openCatalog(OperationContext* opCtx) {
@@ -68,7 +68,7 @@ void openCatalog(OperationContext* opCtx) {
 
     // Load the catalog in the storage engine.
     log() << "openCatalog: loading storage engine catalog";
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->loadCatalog(opCtx);
 
     log() << "openCatalog: reconciling catalog and idents";

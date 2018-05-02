@@ -135,7 +135,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
  */
 Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                                      const std::vector<std::string>& dbNames) {
-    bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
+    bool isMmapV1 = opCtx->getServiceContext()->getStorageEngine()->isMmapV1();
     std::vector<NamespaceString> nonReplicatedCollNSSsWithoutUUIDs;
     for (const auto& dbName : dbNames) {
         Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
@@ -313,7 +313,7 @@ void rebuildIndexes(OperationContext* opCtx, StorageEngine* storageEngine) {
 StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
-    auto const storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     Lock::GlobalWrite lk(opCtx);
 
@@ -545,7 +545,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     if (!fcvDocumentExists && nonLocalDatabases) {
         severe()
             << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
-        if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        if (opCtx->getServiceContext()->getStorageEngine()->isMmapV1()) {
             severe() << "Please run with --journalOptions "
                      << static_cast<int>(MMAPV1Options::JournalRecoverOnly)
                      << " to recover the journal. Then run with --repair to restore the document.";

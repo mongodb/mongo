@@ -558,7 +558,7 @@ void addCollectionUUIDs(OperationContext* opCtx) {
 
     // Add UUIDs to all collections of all databases if they do not already have UUIDs.
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     {
         Lock::GlobalLock lk(opCtx, MODE_IS);
         storageEngine->listDatabases(&dbNames);

@@ -410,7 +410,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
     _dbEntry->appendExtraStats(opCtx, output, scale);
 
-    if (!opCtx->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+    if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         boost::filesystem::path dbpath(storageGlobalParams.dbpath);
         if (storageGlobalParams.directoryperdb) {
             dbpath /= _name;
@@ -868,7 +868,7 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
 
     DatabaseHolder::getDatabaseHolder().close(opCtx, name, "database dropped");
 
-    auto const storageEngine = serviceContext->getGlobalStorageEngine();
+    auto const storageEngine = serviceContext->getStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", name, [&] {
         storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
@@ -1052,7 +1052,7 @@ MONGO_REGISTER_SHIM(Database::dropAllDatabasesExceptLocal)(OperationContext* opC
     Lock::GlobalWrite lk(opCtx);
 
     vector<string> n;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->listDatabases(&n);
 
     if (n.size() == 0)

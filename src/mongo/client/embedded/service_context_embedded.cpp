@@ -286,7 +286,7 @@ std::unique_ptr<OperationContext> ServiceContextMongoEmbedded::_newOpCtx(Client*
         opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
     }
 
-    opCtx->setRecoveryUnit(getGlobalStorageEngine()->newRecoveryUnit(),
+    opCtx->setRecoveryUnit(getStorageEngine()->newRecoveryUnit(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     return opCtx;
 }

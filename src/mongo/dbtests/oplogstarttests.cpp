@@ -439,7 +439,7 @@ public:
 
         // These tests rely on extent allocation details specific to mmapv1.
         // TODO figure out a way to generically test this.
-        if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        if (getGlobalServiceContext()->getStorageEngine()->isMmapV1()) {
             add<OplogStartIsNewestExtentHop>();
             add<OplogStartOneEmptyExtent>();
             add<OplogStartTwoEmptyExtents>();

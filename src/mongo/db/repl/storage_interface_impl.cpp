@@ -1033,25 +1033,25 @@ StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
 }
 
 void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
-    serviceCtx->getGlobalStorageEngine()->setStableTimestamp(snapshotName);
+    serviceCtx->getStorageEngine()->setStableTimestamp(snapshotName);
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
                                                    Timestamp snapshotName) {
-    serviceCtx->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
+    serviceCtx->getStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 
 StatusWith<Timestamp> StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx) {
-    return opCtx->getServiceContext()->getGlobalStorageEngine()->recoverToStableTimestamp(opCtx);
+    return opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx);
 }
 
 bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const {
-    return serviceCtx->getGlobalStorageEngine()->supportsRecoverToStableTimestamp();
+    return serviceCtx->getStorageEngine()->supportsRecoverToStableTimestamp();
 }
 
 boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(
     ServiceContext* serviceCtx) const {
-    return serviceCtx->getGlobalStorageEngine()->getRecoveryTimestamp();
+    return serviceCtx->getStorageEngine()->getRecoveryTimestamp();
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
@@ -1131,7 +1131,7 @@ boost::optional<Timestamp> StorageInterfaceImpl::getLastStableCheckpointTimestam
         return boost::none;
     }
 
-    const auto ret = serviceCtx->getGlobalStorageEngine()->getLastStableCheckpointTimestamp();
+    const auto ret = serviceCtx->getStorageEngine()->getLastStableCheckpointTimestamp();
     if (ret == boost::none) {
         return Timestamp::min();
     }

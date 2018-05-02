@@ -403,7 +403,7 @@ void _logOpsInner(OperationContext* opCtx,
             }
 
             auto lastAppliedTimestamp = finalOpTime.getTimestamp();
-            const auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+            const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             if (storageEngine->supportsDocLocking()) {
                 // If the storage engine supports document level locking, then it is possible for
                 // oplog writes to commit out of order. In that case, we only want to set our last
@@ -577,7 +577,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 #else
     long long lowerBound = 0;
     double bytes = 0;
-    if (opCtx->getClient()->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+    if (opCtx->getClient()->getServiceContext()->getStorageEngine()->isEphemeral()) {
         // in memory: 50MB minimum size
         lowerBound = 50LL * 1024 * 1024;
         bytes = pi.getMemSizeMB() * 1024 * 1024;
@@ -652,7 +652,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
     });
 
     /* sync here so we don't get any surprising lag later when we try to sync */
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     storageEngine->flushAllFiles(opCtx, true);
 
     log() << "******" << endl;

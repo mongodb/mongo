@@ -90,7 +90,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // Don't take the ParallelBatchWriterMode lock when the server parameter is set and our
     // storage engine supports snapshot reads.
     if (allowSecondaryReadsDuringBatchApplication.load() &&
-        opCtx->getServiceContext()->getGlobalStorageEngine()->supportsReadConcernSnapshot()) {
+        opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }
     const auto collectionLockMode = getLockModeForQuery(opCtx);

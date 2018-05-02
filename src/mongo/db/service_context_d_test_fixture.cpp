@@ -59,7 +59,7 @@ void ServiceContextMongoDTest::setUp() {
     auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
-    if (!serviceContext->getGlobalStorageEngine()) {
+    if (!serviceContext->getStorageEngine()) {
         // When using the "ephemeralForTest" storage engine, it is fine for the temporary directory
         // to go away after the global storage engine is initialized.
         unittest::TempDir tempDir("service_context_d_test_fixture");

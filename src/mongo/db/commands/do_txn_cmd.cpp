@@ -136,7 +136,7 @@ public:
              BSONObjBuilder& result) override {
         uassert(ErrorCodes::CommandNotSupported,
                 "This storage engine does not support transactions.",
-                !opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1());
+                !opCtx->getServiceContext()->getStorageEngine()->isMmapV1());
 
         validateDoTxnCommand(cmdObj);
 

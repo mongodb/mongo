@@ -326,7 +326,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     }
 
     log() << "Starting replication storage threads";
-    _service->getGlobalStorageEngine()->setJournalListener(this);
+    _service->getStorageEngine()->setJournalListener(this);
 
     _oplogApplierTaskExecutor = makeTaskExecutor(_service, "rsSync");
     _oplogApplierTaskExecutor->startup();
@@ -387,7 +387,7 @@ ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const
 Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationContext* opCtx) {
     try {
         Lock::GlobalWrite globalWrite(opCtx);
-        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
 
         if (!engine->isMmapV1()) {
             return Status::OK();
@@ -783,7 +783,7 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
 
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = _service->getGlobalStorageEngine();
+    StorageEngine* storageEngine = _service->getStorageEngine();
     storageEngine->listDatabases(&dbNames);
 
     for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
@@ -802,13 +802,13 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
 }
 
 void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
-    if (auto manager = _service->getGlobalStorageEngine()->getSnapshotManager())
+    if (auto manager = _service->getStorageEngine()->getSnapshotManager())
         manager->dropAllSnapshots();
 }
 
 void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
     const OpTime& newCommitPoint) {
-    auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
+    auto manager = _service->getStorageEngine()->getSnapshotManager();
     if (manager) {
         manager->setCommittedSnapshot(newCommitPoint.getTimestamp());
     }
@@ -816,14 +816,14 @@ void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
 }
 
 void ReplicationCoordinatorExternalStateImpl::updateLocalSnapshot(const OpTime& optime) {
-    auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
+    auto manager = _service->getStorageEngine()->getSnapshotManager();
     if (manager) {
         manager->setLocalSnapshot(optime.getTimestamp());
     }
 }
 
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
-    return _service->getGlobalStorageEngine()->getSnapshotManager() != nullptr;
+    return _service->getStorageEngine()->getSnapshotManager() != nullptr;
 }
 
 void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
@@ -865,7 +865,7 @@ double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFra
 
 bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageEngine(
     OperationContext* opCtx) const {
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
     return storageEngine->getSnapshotManager();
@@ -873,7 +873,7 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
 
 bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedByStorageEngine(
     OperationContext* opCtx) const {
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
     return storageEngine->supportsReadConcernSnapshot();

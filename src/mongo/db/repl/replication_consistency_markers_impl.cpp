@@ -162,7 +162,7 @@ void ReplicationConsistencyMarkersImpl::clearInitialSyncFlag(OperationContext* o
 
     _updateMinValidDocument(opCtx, update);
 
-    if (getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()) {
+    if (getGlobalServiceContext()->getStorageEngine()->isDurable()) {
         opCtx->recoveryUnit()->waitUntilDurable();
         replCoord->setMyLastDurableOpTime(time);
     }
@@ -191,8 +191,7 @@ void ReplicationConsistencyMarkersImpl::setMinValid(OperationContext* opCtx,
 
     // This method is only used with storage engines that do not support recover to stable
     // timestamp. As a result, their timestamps do not matter.
-    invariant(
-        !opCtx->getServiceContext()->getGlobalStorageEngine()->supportsRecoverToStableTimestamp());
+    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
     update.timestamp = Timestamp();
 
     _updateMinValidDocument(opCtx, update);

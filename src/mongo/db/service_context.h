@@ -278,13 +278,6 @@ public:
         return _storageEngine.get();
     }
 
-    /**
-     * Return the storage engine instance we're using.
-     */
-    StorageEngine* getGlobalStorageEngine() {
-        return getStorageEngine();
-    }
-
     //
     // Global operation management.  This may not belong here and there may be too many methods
     // here.

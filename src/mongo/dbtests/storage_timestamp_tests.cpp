@@ -295,7 +295,7 @@ public:
                                  Timestamp ts,
                                  bool shouldExpect) {
         KVCatalog* kvCatalog =
-            static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine())
+            static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine())
                 ->getCatalog();
 
         auto recoveryUnit = _opCtx->recoveryUnit();
@@ -1612,7 +1612,7 @@ public:
             stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
 
         auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
 
         // Declare the database to be in a "synced" state, i.e: in steady-state replication.
@@ -1713,7 +1713,7 @@ public:
         }
 
         auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
 
         NamespaceString nss("unittests.timestampIndexBuilds");
@@ -1825,8 +1825,7 @@ public:
         if (mongo::storageGlobalParams.engine != "wiredTiger") {
             return;
         }
-        ASSERT(
-            _opCtx->getServiceContext()->getGlobalStorageEngine()->supportsReadConcernSnapshot());
+        ASSERT(_opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot());
 
         NamespaceString ns("unittest.secondaryReadsDuringBatchApplicationAreAllowed");
         reset(ns);

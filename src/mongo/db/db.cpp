@@ -586,7 +586,7 @@ ExitCode _initAndListen(int listenPort) {
     // Start up a background task to periodically check for and kill expired transactions.
     // Only do this on storage engines supporting snapshot reads, which hold resources we wish to
     // release periodically in order to avoid storage cache pressure build up.
-    auto storageEngine = serviceContext->getGlobalStorageEngine();
+    auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
     if (storageEngine->supportsReadConcernSnapshot()) {
         startPeriodicThreadToAbortExpiredTransactions(serviceContext);
@@ -844,7 +844,7 @@ void shutdownTask() {
     // Shut down the global dbclient pool so callers stop waiting for connections.
     globalConnPool.shutdown();
 
-    if (serviceContext->getGlobalStorageEngine()) {
+    if (serviceContext->getStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
         OperationContext* opCtx = client->getOperationContext();
         if (!opCtx) {
@@ -930,7 +930,7 @@ void shutdownTask() {
     invariant(LOCK_OK == result);
 
     // Global storage engine may not be started in all cases before we exit
-    if (serviceContext->getGlobalStorageEngine()) {
+    if (serviceContext->getStorageEngine()) {
         serviceContext->shutdownGlobalStorageEngineCleanly();
     }
 

@@ -71,8 +71,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        auto snapshotManager =
-            getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
+        auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
             return CommandHelpers::appendCommandStatus(result,
                                                        {ErrorCodes::CommandNotSupported, ""});
@@ -116,8 +115,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        auto snapshotManager =
-            getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
+        auto snapshotManager = getGlobalServiceContext()->getStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
             return CommandHelpers::appendCommandStatus(result,
                                                        {ErrorCodes::CommandNotSupported, ""});

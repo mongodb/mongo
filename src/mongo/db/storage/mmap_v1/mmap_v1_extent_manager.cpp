@@ -115,7 +115,7 @@ MmapV1ExtentManager::MmapV1ExtentManager(StringData dbname, StringData path, boo
       _path(path.toString()),
       _directoryPerDB(directoryPerDB),
       _rid(RESOURCE_METADATA, dbname) {
-    StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
     invariant(engine->isMmapV1());
     MMAPV1Engine* mmapEngine = static_cast<MMAPV1Engine*>(engine);
     _recordAccessTracker = &mmapEngine->getRecordAccessTracker();

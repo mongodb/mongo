@@ -250,7 +250,7 @@ public:
         e = cmdObj.getField("backupOriginalFiles");
         bool backupOriginalFiles = e.isBoolean() && e.boolean();
 
-        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
         repl::UnreplicatedWritesBlock uwb(opCtx);
         Status status = repairDatabase(
             opCtx, engine, dbname, preserveClonedFilesOnFailure, backupOriginalFiles);
@@ -745,7 +745,7 @@ public:
             result.appendNumber("indexes", 0);
             result.appendNumber("indexSize", 0);
             result.appendNumber("fileSize", 0);
-            if (!getGlobalServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+            if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
                 result.appendNumber("fsUsedSize", 0);
                 result.appendNumber("fsTotalSize", 0);
             }

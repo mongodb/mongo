@@ -503,7 +503,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     // there would be no way to take advantage of multiple threads if a storage engine doesn't
     // support document locking.
     if (!enoughToMultiThread ||
-        !opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
+        !opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
 
         invariant(threadPool->schedule(makeOplogWriterForRange(0, ops.size())));
         return;
@@ -576,7 +576,7 @@ void fillWriterVectors(OperationContext* opCtx,
                        std::vector<MultiApplier::OperationPtrs>* writerVectors,
                        std::vector<MultiApplier::Operations>* applyOpsOperations) {
     const auto serviceContext = opCtx->getServiceContext();
-    const auto storageEngine = serviceContext->getGlobalStorageEngine();
+    const auto storageEngine = serviceContext->getStorageEngine();
 
     const bool supportsDocLocking = storageEngine->supportsDocLocking();
     const uint32_t numWriters = writerVectors->size();
@@ -812,7 +812,7 @@ void SyncTail::oplogApplication(OplogBuffer* oplogBuffer, ReplicationCoordinator
     OpQueueBatcher batcher(this, _storageInterface, oplogBuffer);
 
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
-        getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
+        getGlobalServiceContext()->getStorageEngine()->isDurable()
             ? new ApplyBatchFinalizerForJournal(replCoord)
             : new ApplyBatchFinalizer(replCoord)};
 
@@ -1388,7 +1388,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         // This means that all the writes associated with the oplog entries in the batch are
         // finished and no new writes with timestamps associated with those oplog entries will show
         // up in the future.
-        const auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+        const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         storageEngine->replicationBatchIsComplete();
     }
 

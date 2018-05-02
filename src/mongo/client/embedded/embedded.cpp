@@ -155,7 +155,7 @@ void shutdown(ServiceContext* srvContext) {
         }
 
         // Global storage engine may not be started in all cases before we exit
-        if (serviceContext->getGlobalStorageEngine()) {
+        if (serviceContext->getStorageEngine()) {
             serviceContext->shutdownGlobalStorageEngineCleanly();
         }
 

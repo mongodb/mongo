@@ -116,7 +116,7 @@ private:
         // MMAPv1 is the only storage engine that does not.
         //
         // TODO SERVER-22727: Store path-level multikey information in MMAPv1 index catalog.
-        return !getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1();
+        return !getGlobalServiceContext()->getStorageEngine()->isMmapV1();
     }
 
     std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {

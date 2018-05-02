@@ -635,7 +635,7 @@ namespace {
  */
 bool replHasDatabases(OperationContext* opCtx) {
     std::vector<string> names;
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     storageEngine->listDatabases(&names);
 
     if (names.size() >= 2)

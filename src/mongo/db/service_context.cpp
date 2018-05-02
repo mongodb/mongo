@@ -93,7 +93,7 @@ bool supportsDocLocking() {
 }
 
 bool isMMAPV1() {
-    StorageEngine* globalStorageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* globalStorageEngine = getGlobalServiceContext()->getStorageEngine();
 
     invariant(globalStorageEngine);
     return globalStorageEngine->isMmapV1();

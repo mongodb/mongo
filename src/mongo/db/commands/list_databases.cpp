@@ -112,7 +112,7 @@ public:
         bool nameOnly = jsobj[kNameOnlyField].trueValue();
 
         vector<string> dbNames;
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
         {
             Lock::GlobalLock lk(opCtx, MODE_IS);
             storageEngine->listDatabases(&dbNames);

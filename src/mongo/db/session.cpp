@@ -618,7 +618,7 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
     _locker->unsetThreadId();
 
     _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
-    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
+    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
 
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
@@ -837,9 +837,8 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
         }
         // We must clear the recovery unit so any post-transaction writes can run without
         // transactional settings such as a read timestamp.
-        opCtx->setRecoveryUnit(
-            opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
     if (canKillCursors) {
         _killTransactionCursors(opCtx, _sessionId, txnNumberAtStart);
@@ -992,9 +991,8 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         }
         // We must clear the recovery unit so any post-transaction writes can run without
         // transactional settings such as a read timestamp.
-        opCtx->setRecoveryUnit(
-            opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         _commitcv.notify_all();
     });
     lk.unlock();

@@ -98,7 +98,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
 Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& writeConcern) {
     if (writeConcern.syncMode == WriteConcernOptions::SyncMode::JOURNAL &&
-        !opCtx->getServiceContext()->getGlobalStorageEngine()->isDurable()) {
+        !opCtx->getServiceContext()->getStorageEngine()->isDurable()) {
         return Status(ErrorCodes::BadValue,
                       "cannot use 'j' option when a host does not have journaling enabled");
     }
@@ -183,7 +183,7 @@ Status waitForWriteConcern(OperationContext* opCtx,
         case WriteConcernOptions::SyncMode::NONE:
             break;
         case WriteConcernOptions::SyncMode::FSYNC: {
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             if (!storageEngine->isDurable()) {
                 result->fsyncFiles = storageEngine->flushAllFiles(opCtx, true);
             } else {
