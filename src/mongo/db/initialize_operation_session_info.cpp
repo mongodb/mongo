@@ -54,7 +54,7 @@ boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
         // or as an externally authorized user.
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
         if (authSession && authSession->isUsingLocalhostBypass() &&
-            !authSession->getAuthenticatedUserNames().more()) {
+            !authSession->isAuthenticated()) {
             return boost::none;
         }
     }

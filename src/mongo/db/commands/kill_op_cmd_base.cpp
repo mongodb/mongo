@@ -51,8 +51,7 @@ Status KillOpCmdBase::checkAuthForCommand(Client* client,
         return Status::OK();
     }
 
-    bool isAuthenticated = AuthorizationSession::get(client)->getAuthenticatedUserNames().more();
-    if (isAuthenticated && isKillingLocalOp(cmdObj.getField("op"))) {
+    if (authzSession->isAuthenticated() && isKillingLocalOp(cmdObj.getField("op"))) {
         // Look up the OperationContext and see if we have permission to kill it. This is done once
         // here and again in the command body. The check here in the checkAuthForCommand() function
         // is necessary because if the check fails, it will be picked up by the auditing system.

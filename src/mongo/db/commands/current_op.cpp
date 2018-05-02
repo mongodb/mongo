@@ -55,8 +55,7 @@ public:
             return Status::OK();
         }
 
-        bool isAuthenticated = authzSession->getAuthenticatedUserNames().more();
-        if (isAuthenticated && cmdObj["$ownOps"].trueValue()) {
+        if (authzSession->isAuthenticated() && cmdObj["$ownOps"].trueValue()) {
             return Status::OK();
         }
 
