@@ -416,10 +416,13 @@ func (s *S) TestAuthRemoveUser(c *C) {
 	c.Assert(err, Equals, mgo.ErrNotFound)
 
 	err = mydb.Login("myuser", "mypass")
-	c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.")
+	c.Assert(err, ErrorMatches, "auth fail(s|ed)|.*Authentication failed.|Could not find user.*")
 }
 
 func (s *S) TestAuthLoginTwiceDoesNothing(c *C) {
+	if s.versionAtLeast(3, 7, 3) {
+		c.Skip("Login caching invalidated by mechanism negotation in 3.7.3+")
+	}
 	session, err := mgo.Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
@@ -438,6 +441,9 @@ func (s *S) TestAuthLoginTwiceDoesNothing(c *C) {
 }
 
 func (s *S) TestAuthLoginLogoutLoginDoesNothing(c *C) {
+	if s.versionAtLeast(3, 7, 3) {
+		c.Skip("Login caching invalidated by mechanism negotation in 3.7.3+")
+	}
 	session, err := mgo.Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
@@ -580,6 +586,9 @@ func (s *S) TestAuthLoginCachingWithNewSession(c *C) {
 }
 
 func (s *S) TestAuthLoginCachingAcrossPool(c *C) {
+	if s.versionAtLeast(3, 7, 3) {
+		c.Skip("Login caching invalidated by mechanism negotation in 3.7.3+")
+	}
 	// Logins are cached even when the conenction goes back
 	// into the pool.
 
@@ -631,6 +640,9 @@ func (s *S) TestAuthLoginCachingAcrossPool(c *C) {
 }
 
 func (s *S) TestAuthLoginCachingAcrossPoolWithLogout(c *C) {
+	if s.versionAtLeast(3, 7, 3) {
+		c.Skip("Login caching invalidated by mechanism negotation in 3.7.3+")
+	}
 	// Now verify that logouts are properly flushed if they
 	// are not revalidated after leaving the pool.
 
@@ -892,6 +904,108 @@ func (s *S) TestAuthScramSha1URL(c *C) {
 	c.Logf("Connected! Testing the need for authentication...")
 	err = mycoll.Find(nil).One(nil)
 	c.Assert(err, Equals, mgo.ErrNotFound)
+}
+
+func (s *S) TestAuthScramSha256Cred(c *C) {
+	if !s.versionAtLeast(3, 7, 3) {
+		c.Skip("SCRAM-SHA-256 tests depend on 3.7.3")
+	}
+	cred := &mgo.Credential{
+		Username:  "IX",
+		Password:  "IX",
+		Mechanism: "SCRAM-SHA-256",
+		Source:    "admin",
+	}
+	host := "localhost:40002"
+	c.Logf("Connecting to %s...", host)
+	session, err := mgo.Dial(host)
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	mycoll := session.DB("admin").C("mycoll")
+
+	c.Logf("Connected! Testing the need for authentication (before login)...")
+	err = mycoll.Find(nil).One(nil)
+	c.Assert(err, ErrorMatches, "unauthorized|not authorized .*")
+
+	c.Logf("Authenticating...")
+	err = session.Login(cred)
+	c.Assert(err, IsNil)
+	c.Logf("Authenticated!")
+
+	c.Logf("Connected! Testing the need for authentication (after login)...")
+	err = mycoll.Find(nil).One(nil)
+	c.Assert(err, Equals, mgo.ErrNotFound)
+}
+
+func (s *S) TestAuthScramSha256URL(c *C) {
+	if !s.versionAtLeast(3, 7, 3) {
+		c.Skip("SCRAM-SHA-256 tests depend on 3.7.3")
+	}
+	host := "localhost:40002"
+	c.Logf("Connecting to %s...", host)
+	session, err := mgo.Dial(fmt.Sprintf("IX:IX@%s?authMechanism=SCRAM-SHA-256", host))
+	c.Assert(err, IsNil)
+	defer session.Close()
+
+	mycoll := session.DB("admin").C("mycoll")
+
+	c.Logf("Connected! Testing the need for authentication...")
+	err = mycoll.Find(nil).One(nil)
+	c.Assert(err, Equals, mgo.ErrNotFound)
+}
+
+func (s *S) TestAuthScramSha256URLSaslprep(c *C) {
+	if !s.versionAtLeast(3, 7, 3) {
+		c.Skip("SCRAM-SHA-256 tests depend on 3.7.3")
+	}
+	host := "localhost:40002"
+
+	cases := []string{
+		"IX:IX",
+		"IX:I%C2%ADX",
+		"%E2%85%A8:IV",
+		"%E2%85%A8:I%C2%ADV",
+		"\u2168:\u2163",
+	}
+
+	for i, v := range cases {
+		uri := fmt.Sprintf("%s@%s?authMechanism=SCRAM-SHA-256", v, host)
+		c.Logf("Case %d: %s", i, uri)
+		session, err := mgo.Dial(uri)
+		c.Assert(err, IsNil)
+		defer session.Close()
+		mycoll := session.DB("admin").C("mycoll")
+		c.Logf("Connected! Testing the need for authentication...")
+		err = mycoll.Find(nil).One(nil)
+		c.Assert(err, Equals, mgo.ErrNotFound)
+	}
+
+}
+
+func (s *S) TestAuthScramNegotiation(c *C) {
+	if !s.versionAtLeast(3, 7, 3) {
+		c.Skip("SCRAM-SHA-256 tests depend on 3.7.3")
+	}
+	host := "localhost:40002"
+
+	cases := []string{
+		"IX:IX",
+		"sha1:sha1",
+		"both:both",
+	}
+
+	for i, v := range cases {
+		dialStr := fmt.Sprintf("%s@%s", v, host)
+		c.Logf("Case %d: %s", i, dialStr)
+		session, err := mgo.Dial(dialStr)
+		c.Assert(err, IsNil)
+		defer session.Close()
+		mycoll := session.DB("admin").C("mycoll")
+		c.Logf("Connected! Testing the need for authentication...")
+		err = mycoll.Find(nil).One(nil)
+		c.Assert(err, Equals, mgo.ErrNotFound)
+	}
 }
 
 func (s *S) TestAuthX509Cred(c *C) {

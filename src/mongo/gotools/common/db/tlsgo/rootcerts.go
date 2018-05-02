@@ -7,7 +7,7 @@
 // Based on https://github.com/hashicorp/go-rootcerts by HashiCorp
 // See THIRD-PARTY-NOTICES for original license terms.
 
-// +build ssl,openssl_pre_1.0,!darwin
+// +build !darwin
 
 package tlsgo
 

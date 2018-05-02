@@ -2,6 +2,11 @@
 
 . ../.env
 
+if versionAtLeast 3 4; then
+	# 3.4 required config servers to be a replica set
+	COMMONCOPTS="--replSet csrs2 $COMMONCOPTS"
+fi
+
 exec mongod $COMMONCOPTS \
 	--port 40102 \
 	--configsvr

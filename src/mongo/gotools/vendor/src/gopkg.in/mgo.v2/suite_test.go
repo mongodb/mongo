@@ -94,6 +94,7 @@ func (s *S) SetUpSuite(c *C) {
 }
 
 func (s *S) SetUpTest(c *C) {
+	s.StartAll()
 	err := run("mongo --nodb harness/mongojs/dropall.js")
 	if err != nil {
 		panic(err.Error())
@@ -147,6 +148,8 @@ func (s *S) Stop(host string) {
 	if err != nil {
 		panic(err)
 	}
+	// Give a second for shutdown to finish
+	time.Sleep(2 * time.Second)
 	s.stopped = true
 }
 
@@ -226,6 +229,7 @@ var supvNames = map[string]string{
 	"40032": "rs3b",
 	"40033": "rs3c",
 	"40041": "rs4a",
+	"40051": "rs5a",
 	"40101": "cfg1",
 	"40102": "cfg2",
 	"40103": "cfg3",

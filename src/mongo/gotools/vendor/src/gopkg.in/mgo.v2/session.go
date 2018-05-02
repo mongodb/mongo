@@ -138,7 +138,8 @@ type Iter struct {
 	docsBeforeMore int
 	timeout        time.Duration
 	timedout       bool
-	findCmd        bool
+	isFindCmd      bool
+	isChangeStream bool
 }
 
 var (
@@ -200,7 +201,7 @@ const (
 //
 //     connect=replicaSet
 //
-//  	   Discover replica sets automatically. Default connection behavior.
+//	   Discover replica sets automatically. Default connection behavior.
 //
 //
 //     replicaSet=<setname>
@@ -280,6 +281,7 @@ func ParseURL(url string) (*DialInfo, error) {
 	setName := ""
 	poolLimit := 0
 	readPreferenceMode := Primary
+	writeConcern := &Safe{}
 	var readPreferenceTagSets []bson.D
 	for _, opt := range uinfo.options {
 		switch opt.key {
@@ -331,6 +333,29 @@ func ParseURL(url string) (*DialInfo, error) {
 				break
 			}
 			fallthrough
+		case "w":
+			intval, err := strconv.Atoi(opt.value)
+			if err == nil {
+				if intval < 0 {
+					return nil, errors.New("w values must be equal or greater than 0")
+				}
+				writeConcern.W = intval
+			} else {
+				writeConcern.WMode = opt.value
+			}
+		case "journal":
+			if opt.value == "true" {
+				writeConcern.J = true
+			} else if opt.value == "false" {
+				writeConcern.J = false
+			}
+		case "wtimeoutMS":
+			intval, err := strconv.Atoi(opt.value)
+			if err == nil && intval >= 0 {
+				writeConcern.WTimeout = intval
+			} else {
+				return nil, errors.New("invalud wtimeoutMS value: " + opt.value)
+			}
 		default:
 			return nil, errors.New("unsupported connection URL option: " + opt.key + "=" + opt.value)
 		}
@@ -354,6 +379,7 @@ func ParseURL(url string) (*DialInfo, error) {
 			Mode:    readPreferenceMode,
 			TagSets: readPreferenceTagSets,
 		},
+		WriteConcern:   writeConcern,
 		ReplicaSetName: setName,
 	}
 	return &info, nil
@@ -424,6 +450,9 @@ type DialInfo struct {
 	// ReadPreference defines the manner in which servers are chosen. See
 	// Session.SetMode and Session.SelectServers.
 	ReadPreference *ReadPreference
+
+	// WriteConcern defines default write concern for sessions.
+	WriteConcern *Safe
 
 	// DialServer optionally specifies the dial function for establishing
 	// connections with the MongoDB servers.
@@ -520,6 +549,10 @@ func DialWithInfo(info *DialInfo) (*Session, error) {
 		session.SetMode(info.ReadPreference.Mode, true)
 	} else {
 		session.SetMode(Strong, true)
+	}
+
+	if info.WriteConcern != nil {
+		session.SetSafe(info.WriteConcern)
 	}
 
 	return session, nil
@@ -934,7 +967,7 @@ func (db *Database) UpsertUser(user *User) error {
 	}
 	err := rundb.runUserCmd("updateUser", user)
 	// retry with createUser when isAuthError in order to enable the "localhost exception"
-	if isNotFound(err) || isAuthError(err) {
+	if isNotFound(err) || isNoMatchingDoc(err) || isAuthError(err) {
 		return rundb.runUserCmd("createUser", user)
 	}
 	if !isNoCmd(err) {
@@ -988,9 +1021,19 @@ func isNotFound(err error) bool {
 	return ok && e.Code == 11
 }
 
+func isNoMatchingDoc(err error) bool {
+	e, ok := err.(*QueryError)
+	return ok && e.Code == 47
+}
+
 func isAuthError(err error) bool {
 	e, ok := err.(*QueryError)
 	return ok && e.Code == 13
+}
+
+func isNotMasterError(err error) bool {
+	e, ok := err.(*QueryError)
+	return ok && strings.Contains(e.Message, "not master")
 }
 
 func (db *Database) runUserCmd(cmdName string, user *User) error {
@@ -1040,7 +1083,7 @@ func (db *Database) AddUser(username, password string, readOnly bool) error {
 		}
 	}
 	err := db.runUserCmd("updateUser", user)
-	if isNotFound(err) {
+	if isNotFound(err) || isNoMatchingDoc(err) {
 		return db.runUserCmd("createUser", user)
 	}
 	if !isNoCmd(err) {
@@ -1063,7 +1106,7 @@ func (db *Database) RemoveUser(user string) error {
 		users := db.C("system.users")
 		return users.Remove(bson.M{"user": user})
 	}
-	if isNotFound(err) {
+	if isNotFound(err) || isNoMatchingDoc(err) {
 		return ErrNotFound
 	}
 	return err
@@ -2381,10 +2424,6 @@ func (c *Collection) NewIter(session *Session, firstBatch []bson.Raw, cursorId i
 		err:     err,
 	}
 
-	if socket.ServerInfo().MaxWireVersion >= 4 && c.FullName != "admin.$cmd" {
-		iter.findCmd = true
-	}
-
 	iter.gotReply.L = &iter.m
 	for _, doc := range firstBatch {
 		iter.docData.Push(doc.Data)
@@ -2394,6 +2433,15 @@ func (c *Collection) NewIter(session *Session, firstBatch []bson.Raw, cursorId i
 		iter.op.collection = c.FullName
 		iter.op.replyFunc = iter.replyFunc()
 	}
+
+	if err != nil {
+		return iter
+	}
+
+	if socket.ServerInfo().MaxWireVersion >= 4 && c.FullName != "admin.$cmd" {
+		iter.isFindCmd = true
+	}
+
 	return iter
 }
 
@@ -3550,7 +3598,7 @@ func (q *Query) Iter() *Iter {
 	op.replyFunc = iter.op.replyFunc
 
 	if prepareFindOp(socket, &op, limit) {
-		iter.findCmd = true
+		iter.isFindCmd = true
 	}
 
 	iter.server = socket.Server()
@@ -3780,7 +3828,12 @@ func (iter *Iter) Next(result interface{}) bool {
 	iter.m.Lock()
 	iter.timedout = false
 	timeout := time.Time{}
+
+	// check should we expect more data.
 	for iter.err == nil && iter.docData.Len() == 0 && (iter.docsToReceive > 0 || iter.op.cursorId != 0) {
+		// we should expect more data.
+
+		// If we have yet to receive data, increment the timer until we timeout.
 		if iter.docsToReceive == 0 {
 			if iter.timeout >= 0 {
 				if timeout.IsZero() {
@@ -3792,6 +3845,7 @@ func (iter *Iter) Next(result interface{}) bool {
 					return false
 				}
 			}
+			// run a getmore to fetch more data.
 			iter.getMore()
 			if iter.err != nil {
 				break
@@ -3800,6 +3854,7 @@ func (iter *Iter) Next(result interface{}) bool {
 		iter.gotReply.Wait()
 	}
 
+	// We have data from the getMore.
 	// Exhaust available data before reporting any errors.
 	if docData, ok := iter.docData.Pop().([]byte); ok {
 		close := false
@@ -3815,6 +3870,7 @@ func (iter *Iter) Next(result interface{}) bool {
 			}
 		}
 		if iter.op.cursorId != 0 && iter.err == nil {
+			// we still have a live cursor and currently expect data.
 			iter.docsBeforeMore--
 			if iter.docsBeforeMore == -1 {
 				iter.getMore()
@@ -3956,6 +4012,9 @@ func (iter *Iter) For(result interface{}, f func() error) (err error) {
 // socket depends on the cluster sync loop, and the cluster sync loop might
 // attempt actions which cause replyFunc to be called, inducing a deadlock.
 func (iter *Iter) acquireSocket() (*mongoSocket, error) {
+	if iter.session.cluster_ == nil {
+		return nil, errors.New("Closed explicitly")
+	}
 	socket, err := iter.session.acquireSocket(true)
 	if err != nil {
 		return nil, err
@@ -4004,7 +4063,7 @@ func (iter *Iter) getMore() {
 		}
 	}
 	var op interface{}
-	if iter.findCmd {
+	if iter.isFindCmd || iter.isChangeStream {
 		op = iter.getMoreCmd()
 	} else {
 		op = &iter.op
@@ -4608,7 +4667,7 @@ func (iter *Iter) replyFunc() replyFunc {
 			} else {
 				iter.err = ErrNotFound
 			}
-		} else if iter.findCmd {
+		} else if iter.isFindCmd {
 			debugf("Iter %p received reply document %d/%d (cursor=%d)", iter, docNum+1, int(op.replyDocs), op.cursorId)
 			var findReply struct {
 				Ok     bool
@@ -4620,7 +4679,7 @@ func (iter *Iter) replyFunc() replyFunc {
 				iter.err = err
 			} else if !findReply.Ok && findReply.Errmsg != "" {
 				iter.err = &QueryError{Code: findReply.Code, Message: findReply.Errmsg}
-			} else if len(findReply.Cursor.FirstBatch) == 0 && len(findReply.Cursor.NextBatch) == 0 {
+			} else if !iter.isChangeStream && len(findReply.Cursor.FirstBatch) == 0 && len(findReply.Cursor.NextBatch) == 0 {
 				iter.err = ErrNotFound
 			} else {
 				batch := findReply.Cursor.FirstBatch

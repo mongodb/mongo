@@ -1,5 +1,5 @@
 
-var ports = [40001, 40002, 40011, 40012, 40013, 40021, 40022, 40023, 40041, 40101, 40102, 40103, 40201, 40202, 40203]
+var ports = [40001, 40002, 40011, 40012, 40013, 40021, 40022, 40023, 40041, 40051, 40101, 40102, 40103, 40201, 40202, 40203]
 var auth = [40002, 40103, 40203, 40031]
 var db1 = new Mongo("localhost:40001")
 
@@ -18,7 +18,9 @@ for (var i in ports) {
         if (auth[j] == port) {
             admin.auth("root", "rapadura")
             admin.system.users.find().forEach(function(u) {
-                if (u.user == "root" || u.user == "reader") {
+                if (u.user == "root" || u.user == "reader" || u.user == "IX"
+                    || u.user == "\u2168" || u.user == "sha1" || u.user == "both"
+                ) {
                         return;
                 }
                 if (typeof admin.dropUser == "function") {

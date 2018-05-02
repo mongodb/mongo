@@ -378,6 +378,7 @@ func (dump *MongoDump) Dump() (err error) {
 	}
 
 	if failpoint.Enabled(failpoint.PauseBeforeDumping) {
+		log.Logvf(log.Info, "failpoint.PauseBeforeDumping: sleeping 15 sec")
 		time.Sleep(15 * time.Second)
 	}
 

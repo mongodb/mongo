@@ -56,6 +56,9 @@ func (c *TLSConfig) AddClientCertFromFile(clientFile, password string) (string, 
 	if err != nil {
 		return "", err
 	}
+	// This check only covers encrypted PEM data with a DEK-Info header. It
+	// does not detect unencrypted PEM containing PKCS#8 format data with an
+	// encrypted private key.
 	if x509.IsEncryptedPEMBlock(keyPEM) {
 		if password == "" {
 			return "", fmt.Errorf("No password provided to decrypt private key")
@@ -64,10 +67,11 @@ func (c *TLSConfig) AddClientCertFromFile(clientFile, password string) (string, 
 		if err != nil {
 			return "", err
 		}
-		keyPEM, err = loadPEMBlock(decrypted, "PRIVATE KEY")
-		if err != nil {
-			return "", err
-		}
+		keyPEM = &pem.Block{Bytes: decrypted, Type: keyPEM.Type}
+	}
+
+	if strings.Contains(keyPEM.Type, "ENCRYPTED") {
+		return "", fmt.Errorf("PKCS#8 encrypted private keys are not supported")
 	}
 
 	cert, err := tls.X509KeyPair(pem.EncodeToMemory(certPEM), pem.EncodeToMemory(keyPEM))

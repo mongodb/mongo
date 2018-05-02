@@ -1,4 +1,4 @@
-gopkg.in/mgo.v2                         39b4000d99037e917f3a3b9d2dcab667a9ef284a    github.com/10gen/mgo
+gopkg.in/mgo.v2                         bb6c39e69bb0cf5be3dcabfce2613da30f42fad5    github.com/10gen/mgo
 gopkg.in/tomb.v2                        14b3d72120e8d10ea6e6b7f87f7175734b1faab8
 github.com/jtolds/gls                   8ddce2a84170772b95dd5d576c48d517b22cac63
 github.com/jacobsa/oglematchers         3ecefc49db07722beca986d9bb71ddd026b133f0
@@ -17,3 +17,5 @@ github.com/google/gopacket              1b0b78901cdd351ecfc68bf1a2adafcd2ff30220
 github.com/patrickmn/go-cache           1881a9bccb818787f68c52bfba648c6cf34c34fa
 github.com/10gen/escaper                17fe61c658dcbdcbf246c783f4f7dc97efde3a8b
 github.com/golang/snappy                d9eb7a3d35ec988b8585d4a0068e462c27d28380
+github.com/xdg/stringprep               v1.0.0
+golang.org/x/text                     v0.3.0                                      github.com/golang/text

@@ -39,6 +39,7 @@ mongo_tools_variables:
       - name: dist
       - name: qa-tests
       - name: native-cert-ssl
+      - name: unit
     ubuntu1404_task_list: &ubuntu1404_tasks
       - name: db
       - name: dist
@@ -143,6 +144,7 @@ mongo_tools_variables:
       - name: legacy30
       - name: qa-tests
       - name: native-cert-ssl
+      - name: unit
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: db
       - name: dist
@@ -425,10 +427,11 @@ functions:
         fi;
         . ./set_gopath.sh
 
+        cwd=$(pwd)
         # run unit tests under common package
-        for i in archive bsonutil failpoint intents json log options progress text util; do
-            cd common/$i
-            COMMON_SUBPKG=$i
+        for i in archive bsonutil db/tlsgo failpoint intents json log options progress text util; do
+            cd $cwd/common/$i
+            COMMON_SUBPKG=$(basename $i)
             COVERAGE_ARGS=""
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$COMMON_SUBPKG.out"
@@ -439,13 +442,12 @@ functions:
                 export exitcode=1
             fi
             cat $COMMON_SUBPKG.suite
-            cp $COMMON_SUBPKG.suite ../../
-            cd ../..
+            cp $COMMON_SUBPKG.suite $cwd
         done
 
         #TODO mongotop needs a test
         for i in mongoimport mongoexport mongostat mongorestore mongodump mongofiles; do
-            cd $i
+            cd $cwd/$i
             COVERAGE_ARGS=""
             if [ "${run_coverage}" ]; then
                 COVERAGE_ARGS="-coverprofile=coverage_$i.out"
@@ -456,8 +458,7 @@ functions:
                 export exitcode=1
             fi
             cat $i.suite
-            cp $i.suite ../.
-            cd ..
+            cp $i.suite $cwd
         done
         exit $exitcode
 
