@@ -42,17 +42,14 @@ namespace repl {
 
 MultiApplier::MultiApplier(executor::TaskExecutor* executor,
                            const Operations& operations,
-                           const ApplyOperationFn& applyOperation,
                            const MultiApplyFn& multiApply,
                            const CallbackFn& onCompletion)
     : _executor(executor),
       _operations(operations),
-      _applyOperation(applyOperation),
       _multiApply(multiApply),
       _onCompletion(onCompletion) {
     uassert(ErrorCodes::BadValue, "null replication executor", executor);
     uassert(ErrorCodes::BadValue, "empty list of operations", !operations.empty());
-    uassert(ErrorCodes::BadValue, "apply operation function cannot be null", applyOperation);
     uassert(ErrorCodes::BadValue, "multi apply function cannot be null", multiApply);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
 }
@@ -139,7 +136,7 @@ void MultiApplier::_callback(const executor::TaskExecutor::CallbackArgs& cbd) {
     StatusWith<OpTime> applyStatus(ErrorCodes::InternalError, "not mutated");
     try {
         auto opCtx = cc().makeOperationContext();
-        applyStatus = _multiApply(opCtx.get(), _operations, _applyOperation);
+        applyStatus = _multiApply(opCtx.get(), _operations);
     } catch (...) {
         applyStatus = exceptionToStatus();
     }

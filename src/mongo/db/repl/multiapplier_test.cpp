@@ -59,10 +59,6 @@ void MultiApplierTest::setUp() {
     launchExecutorThread();
 }
 
-Status applyOperation(OperationContext*, MultiApplier::OperationPtrs*, WorkerMultikeyPathInfo*) {
-    return Status::OK();
-};
-
 /**
  * Generates oplog entries with the given number used for the timestamp.
  */
@@ -87,48 +83,34 @@ OplogEntry makeOplogEntry(int ts) {
 
 TEST_F(MultiApplierTest, InvalidConstruction) {
     const MultiApplier::Operations operations{makeOplogEntry(123)};
-    auto multiApply = [](OperationContext*,
-                         MultiApplier::Operations,
-                         MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+    auto multiApply = [](OperationContext*, MultiApplier::Operations) -> StatusWith<OpTime> {
         return Status(ErrorCodes::InternalError, "not implemented");
     };
     auto callback = [](const Status&) {};
 
     // Null executor.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(nullptr, operations, applyOperation, multiApply, callback),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "null replication executor");
+    ASSERT_THROWS_CODE_AND_WHAT(MultiApplier(nullptr, operations, multiApply, callback),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "null replication executor");
 
     // Empty list of operations.
     ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(
-            &getExecutor(), MultiApplier::Operations(), applyOperation, multiApply, callback),
+        MultiApplier(&getExecutor(), MultiApplier::Operations(), multiApply, callback),
         AssertionException,
         ErrorCodes::BadValue,
         "empty list of operations");
 
-    // Invalid apply operation function.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(
-            &getExecutor(), operations, MultiApplier::ApplyOperationFn(), multiApply, callback),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "apply operation function cannot be null");
-
     // Invalid multiApply operation function.
     ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(
-            &getExecutor(), operations, applyOperation, MultiApplier::MultiApplyFn(), callback),
+        MultiApplier(&getExecutor(), operations, MultiApplier::MultiApplyFn(), callback),
         AssertionException,
         ErrorCodes::BadValue,
         "multi apply function cannot be null");
 
     // Invalid callback function.
     ASSERT_THROWS_CODE_AND_WHAT(
-        MultiApplier(
-            &getExecutor(), operations, applyOperation, multiApply, MultiApplier::CallbackFn()),
+        MultiApplier(&getExecutor(), operations, multiApply, MultiApplier::CallbackFn()),
         AssertionException,
         ErrorCodes::BadValue,
         "callback function cannot be null");
@@ -137,12 +119,12 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
 TEST_F(MultiApplierTest, MultiApplierTransitionsDirectlyToCompleteIfShutdownBeforeStarting) {
     const MultiApplier::Operations operations{makeOplogEntry(123)};
 
-    auto multiApply = [](OperationContext*,
-                         MultiApplier::Operations,
-                         MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> { return OpTime(); };
+    auto multiApply = [](OperationContext*, MultiApplier::Operations) -> StatusWith<OpTime> {
+        return OpTime();
+    };
     auto callback = [](const Status&) {};
 
-    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
 
     multiApplier.shutdown();
@@ -154,8 +136,7 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
 
     bool multiApplyInvoked = false;
     auto multiApply = [&](OperationContext* opCtx,
-                          MultiApplier::Operations operations,
-                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+                          MultiApplier::Operations operations) -> StatusWith<OpTime> {
         multiApplyInvoked = true;
         return operations.back().getOpTime();
     };
@@ -163,7 +144,7 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
     auto callbackResult = getDetectableErrorStatus();
     auto callback = [&](const Status& result) { callbackResult = result; };
 
-    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
     {
         auto net = getNet();
@@ -191,9 +172,7 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
-    auto multiApply = [&](OperationContext*,
-                          MultiApplier::Operations,
-                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+    auto multiApply = [&](OperationContext*, MultiApplier::Operations) -> StatusWith<OpTime> {
         multiApplyInvoked = true;
         return multiApplyError;
     };
@@ -201,7 +180,7 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     auto callbackResult = getDetectableErrorStatus();
     auto callback = [&](const Status& result) { callbackResult = result; };
 
-    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
     {
         auto net = getNet();
@@ -221,8 +200,7 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
     auto multiApply = [&](OperationContext* opCtx,
-                          MultiApplier::Operations operations,
-                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+                          MultiApplier::Operations operations) -> StatusWith<OpTime> {
         multiApplyInvoked = true;
         uassertStatusOK(multiApplyError);
         return operations.back().getOpTime();
@@ -231,7 +209,7 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
     auto callbackResult = getDetectableErrorStatus();
     auto callback = [&](const Status& result) { callbackResult = result; };
 
-    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
     {
         auto net = getNet();
@@ -253,8 +231,7 @@ TEST_F(
     OperationContext* multiApplyTxn = nullptr;
     MultiApplier::Operations operationsToApply;
     auto multiApply = [&](OperationContext* opCtx,
-                          MultiApplier::Operations operations,
-                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+                          MultiApplier::Operations operations) -> StatusWith<OpTime> {
         multiApplyTxn = opCtx;
         operationsToApply = operations;
         return operationsToApply.back().getOpTime();
@@ -267,7 +244,7 @@ TEST_F(
         callbackTxn = cc().getOperationContext();
     };
 
-    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    MultiApplier multiApplier(&getExecutor(), operations, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
     {
         auto net = getNet();
@@ -305,8 +282,7 @@ TEST_F(MultiApplierTest, MultiApplierResetsOnCompletionCallbackFunctionPointerUp
     const MultiApplier::Operations operations{makeOplogEntry(123)};
 
     auto multiApply = [&](OperationContext*,
-                          MultiApplier::Operations operations,
-                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+                          MultiApplier::Operations operations) -> StatusWith<OpTime> {
         return operations.back().getOpTime();
     };
 
@@ -315,7 +291,6 @@ TEST_F(MultiApplierTest, MultiApplierResetsOnCompletionCallbackFunctionPointerUp
     MultiApplier multiApplier(
         &getExecutor(),
         operations,
-        applyOperation,
         multiApply,
         [&callbackResult, sharedCallbackData](const Status& result) { callbackResult = result; });
 
