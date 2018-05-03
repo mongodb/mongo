@@ -32,17 +32,12 @@
 #include <string>
 
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 
 namespace mongo {
-
-namespace rpc {
-class EgressMetadataHook;
-}  // namespace rpc
-
 namespace executor {
-
-class NetworkConnectionHook;
 
 /**
  * Returns a new NetworkInterface.

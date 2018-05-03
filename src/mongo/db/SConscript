@@ -1751,7 +1751,7 @@ asioEnv.CppIntegrationTest(
         'nesting_depth_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/network_interface_asio_fixture',
+        '$BUILD_DIR/mongo/executor/network_interface_fixture',
     ],
 )
 

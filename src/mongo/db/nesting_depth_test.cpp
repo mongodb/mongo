@@ -34,13 +34,13 @@
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/executor/network_interface_asio_integration_fixture.h"
+#include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace executor {
 namespace {
-class NestingDepthFixture : public NetworkInterfaceASIOIntegrationFixture {
+class NestingDepthFixture : public NetworkInterfaceIntegrationFixture {
 public:
     void setUp() final {
         startNet();

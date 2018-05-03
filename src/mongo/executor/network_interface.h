@@ -35,6 +35,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/baton.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -42,6 +43,9 @@ namespace mongo {
 class BSONObjBuilder;
 
 namespace executor {
+
+MONGO_FP_FORWARD_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
+MONGO_FP_FORWARD_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
 
 /**
  * Interface to networking for use by TaskExecutor implementations.
@@ -118,6 +122,18 @@ public:
      * Returns the hostname of the current process.
      */
     virtual std::string getHostName() = 0;
+
+    struct Counters {
+        uint64_t canceled = 0;
+        uint64_t timedOut = 0;
+        uint64_t failed = 0;
+        uint64_t succeeded = 0;
+    };
+    /*
+     * Returns a copy of the operation counters (see struct Counters above). This method should
+     * only be used in tests, and will invariant if getTestCommands() returns false.
+     */
+    virtual Counters getCounters() const = 0;
 
     /**
      * Starts asynchronous execution of the command described by "request".

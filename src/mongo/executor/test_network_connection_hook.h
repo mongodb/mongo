@@ -52,8 +52,9 @@ public:
           _replyFunc(std::forward<ReplyFunc>(replyFunc)) {}
 
     Status validateHost(const HostAndPort& remoteHost,
+                        const BSONObj& request,
                         const RemoteCommandResponse& isMasterReply) override {
-        return _validateFunc(remoteHost, isMasterReply);
+        return _validateFunc(remoteHost, request, isMasterReply);
     }
 
     StatusWith<boost::optional<RemoteCommandRequest>> makeRequest(const HostAndPort& remoteHost) {

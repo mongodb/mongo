@@ -54,6 +54,8 @@ public:
     std::string getDiagnosticString() override;
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
     std::string getHostName() override;
+    Counters getCounters() const override;
+
     void startup() override;
     void shutdown() override;
     bool inShutdown() const override;
@@ -121,6 +123,7 @@ private:
     ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::unique_ptr<ConnectionPool> _pool;
+    Counters _counters;
 
     std::unique_ptr<rpc::EgressMetadataHook> _metadataHook;
     AtomicBool _inShutdown;

@@ -32,6 +32,7 @@
 
 #include "mongo/executor/network_interface_tl.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -68,6 +69,12 @@ void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const
     }();
     if (pool)
         pool->appendConnectionStats(stats);
+}
+
+NetworkInterface::Counters NetworkInterfaceTL::getCounters() const {
+    invariant(getTestCommandsEnabled());
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _counters;
 }
 
 std::string NetworkInterfaceTL::getHostName() {
@@ -174,6 +181,15 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         state->deadline = state->start + state->request.timeout;
     }
 
+    if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsBeforeAcquireConn)) {
+        log() << "Discarding command due to failpoint before acquireConn";
+        std::move(state->mergedFuture)
+            .getAsync([onFinish](StatusWith<RemoteCommandResponse> response) {
+                onFinish(RemoteCommandResponse(response.getStatus(), Milliseconds{0}));
+            });
+        return Status::OK();
+    }
+
     // Interacting with the connection pool can involve more work than just getting a connection
     // out.  In particular, we can end up having to spin up new connections, and fulfilling promises
     // for other requesters.  Returning connections has the same issue.
@@ -254,6 +270,11 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
     std::shared_ptr<CommandState> state,
     CommandState::ConnHandle conn,
     const transport::BatonHandle& baton) {
+    if (MONGO_FAIL_POINT(networkInterfaceDiscardCommandsAfterAcquireConn)) {
+        conn->indicateSuccess();
+        return std::move(state->mergedFuture);
+    }
+
     if (state->done.load()) {
         conn->indicateSuccess();
         uasserted(ErrorCodes::CallbackCanceled, "Command was canceled");
@@ -277,7 +298,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
 
         state->timer = _reactor->makeTimer();
         state->timer->waitUntil(state->deadline, baton)
-            .getAsync([client, state, baton](Status status) {
+            .getAsync([this, client, state, baton](Status status) {
                 if (status == ErrorCodes::CallbackCanceled) {
                     invariant(state->done.load());
                     return;
@@ -285,6 +306,11 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
 
                 if (state->done.swap(true)) {
                     return;
+                }
+
+                if (getTestCommandsEnabled()) {
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
+                    _counters.timedOut++;
                 }
 
                 LOG(2) << "Request " << state->request.id << " timed out"
@@ -324,6 +350,15 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
             if (state->done.swap(true))
                 return;
 
+            if (getTestCommandsEnabled()) {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                if (swr.isOK() && swr.getValue().status.isOK()) {
+                    _counters.succeeded++;
+                } else {
+                    _counters.failed++;
+                }
+            }
+
             if (state->timer) {
                 state->timer->cancel(baton);
             }
@@ -352,6 +387,11 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
 
     if (state->done.swap(true)) {
         return;
+    }
+
+    if (getTestCommandsEnabled()) {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _counters.canceled++;
     }
 
     LOG(2) << "Canceling operation; original request was: " << redact(state->request.toString());

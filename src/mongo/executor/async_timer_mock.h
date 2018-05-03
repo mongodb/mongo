@@ -124,13 +124,7 @@ public:
     /**
      * Create and return a new AsyncTimerMock object.
      */
-    std::unique_ptr<AsyncTimerInterface> make(Milliseconds expiration);
-
-    /**
-     * Create and return a new AsyncTimerMock object.
-     */
-    std::unique_ptr<AsyncTimerInterface> make(asio::io_service::strand* strand,
-                                              Milliseconds expiration) override;
+    std::unique_ptr<AsyncTimerInterface> make(Milliseconds expiration) override;
 
     /**
      * Advance the current "time" and make stale timers expire.

@@ -47,6 +47,7 @@ public:
      * isMaster response.
      */
     Status validateHost(const HostAndPort& remoteHost,
+                        const BSONObj& request,
                         const executor::RemoteCommandResponse& isMasterReply) override;
 
     /**

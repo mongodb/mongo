@@ -29,9 +29,11 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_asio_test_utils.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -39,14 +41,31 @@ class PseudoRandom;
 
 namespace executor {
 
+/**
+ * A mock class mimicking TaskExecutor::CallbackState, does nothing.
+ */
+class MockCallbackState final : public TaskExecutor::CallbackState {
+public:
+    MockCallbackState() = default;
+    void cancel() override {}
+    void waitForCompletion() override {}
+    bool isCanceled() const override {
+        return false;
+    }
+};
+
+inline TaskExecutor::CallbackHandle makeCallbackHandle() {
+    return TaskExecutor::CallbackHandle(std::make_shared<MockCallbackState>());
+}
+
 using StartCommandCB = stdx::function<void(const RemoteCommandResponse&)>;
 
-class NetworkInterfaceASIOIntegrationFixture : public mongo::unittest::Test {
+class NetworkInterfaceIntegrationFixture : public mongo::unittest::Test {
 public:
-    void startNet(NetworkInterfaceASIO::Options options = NetworkInterfaceASIO::Options());
+    void startNet(std::unique_ptr<NetworkConnectionHook> connectHook = nullptr);
     void tearDown() override;
 
-    NetworkInterfaceASIO& net();
+    NetworkInterface& net();
 
     ConnectionString fixture();
 
@@ -58,8 +77,8 @@ public:
                       RemoteCommandRequest& request,
                       StartCommandCB onFinish);
 
-    Deferred<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                               RemoteCommandRequest& request);
+    Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                             RemoteCommandRequest request);
 
     RemoteCommandResponse runCommandSync(RemoteCommandRequest& request);
 
@@ -82,7 +101,7 @@ public:
                           Milliseconds timeoutMillis = Minutes(5));
 
 private:
-    std::unique_ptr<NetworkInterfaceASIO> _net;
+    std::unique_ptr<NetworkInterface> _net;
     PseudoRandom* _rng = nullptr;
 };
 }  // namespace executor

@@ -45,7 +45,9 @@
 namespace mongo {
 
 Status ShardingNetworkConnectionHook::validateHost(
-    const HostAndPort& remoteHost, const executor::RemoteCommandResponse& isMasterReply) {
+    const HostAndPort& remoteHost,
+    const BSONObj&,
+    const executor::RemoteCommandResponse& isMasterReply) {
     return validateHostImpl(remoteHost, isMasterReply);
 }
 

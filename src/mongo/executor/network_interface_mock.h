@@ -84,6 +84,9 @@ public:
     virtual ~NetworkInterfaceMock();
     virtual void appendConnectionStats(ConnectionPoolStats* stats) const;
     virtual std::string getDiagnosticString();
+    Counters getCounters() const override {
+        return Counters();
+    }
 
     /**
      * Logs the contents of the queues for diagnostics.

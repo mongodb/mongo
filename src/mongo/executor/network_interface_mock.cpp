@@ -481,7 +481,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
         ? handshakeReplyIter->second
         : RemoteCommandResponse(BSONObj(), BSONObj(), Milliseconds(0));
 
-    auto valid = _hook->validateHost(target, handshakeReply);
+    auto valid = _hook->validateHost(target, op.getRequest().cmdObj, handshakeReply);
     if (!valid.isOK()) {
         op.setResponse(_now_inlock(), valid);
         op.finishResponse();

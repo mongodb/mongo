@@ -31,11 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connection_string.h"
-#include "mongo/executor/async_stream_factory.h"
-#include "mongo/executor/async_stream_interface.h"
-#include "mongo/executor/async_timer_asio.h"
-#include "mongo/executor/network_interface_asio.h"
-#include "mongo/executor/network_interface_asio_integration_fixture.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -47,62 +44,57 @@
 
 namespace mongo {
 namespace executor {
-void NetworkInterfaceASIOIntegrationFixture::startNet(NetworkInterfaceASIO::Options options) {
-    options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
-    options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+
+void NetworkInterfaceIntegrationFixture::startNet(
+    std::unique_ptr<NetworkConnectionHook> connectHook) {
+    ConnectionPool::Options options;
 #ifdef _WIN32
     // Connections won't queue on widnows, so attempting to open too many connections
     // concurrently will result in refused connections and test failure.
-    options.connectionPoolOptions.maxConnections = 16u;
+    options.maxConnections = 16u;
 #else
-    options.connectionPoolOptions.maxConnections = 256u;
+    options.maxConnections = 256u;
 #endif
-    _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
+    _net = makeNetworkInterface(
+        "NetworkInterfaceIntegrationFixture", std::move(connectHook), nullptr, std::move(options));
+
     _net->startup();
 }
 
-void NetworkInterfaceASIOIntegrationFixture::tearDown() {
+void NetworkInterfaceIntegrationFixture::tearDown() {
     if (!_net->inShutdown()) {
         _net->shutdown();
     }
 }
 
-NetworkInterfaceASIO& NetworkInterfaceASIOIntegrationFixture::net() {
+NetworkInterface& NetworkInterfaceIntegrationFixture::net() {
     return *_net;
 }
 
-ConnectionString NetworkInterfaceASIOIntegrationFixture::fixture() {
+ConnectionString NetworkInterfaceIntegrationFixture::fixture() {
     return unittest::getFixtureConnectionString();
 }
 
-void NetworkInterfaceASIOIntegrationFixture::setRandomNumberGenerator(PseudoRandom* generator) {
+void NetworkInterfaceIntegrationFixture::setRandomNumberGenerator(PseudoRandom* generator) {
     _rng = generator;
 }
 
-PseudoRandom* NetworkInterfaceASIOIntegrationFixture::getRandomNumberGenerator() {
+PseudoRandom* NetworkInterfaceIntegrationFixture::getRandomNumberGenerator() {
     return _rng;
 }
 
-void NetworkInterfaceASIOIntegrationFixture::startCommand(
-    const TaskExecutor::CallbackHandle& cbHandle,
-    RemoteCommandRequest& request,
-    StartCommandCB onFinish) {
+void NetworkInterfaceIntegrationFixture::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                                      RemoteCommandRequest& request,
+                                                      StartCommandCB onFinish) {
     net().startCommand(cbHandle, request, onFinish).transitional_ignore();
 }
 
-Deferred<RemoteCommandResponse> NetworkInterfaceASIOIntegrationFixture::runCommand(
-    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest& request) {
-    Deferred<RemoteCommandResponse> deferred;
-    net()
-        .startCommand(
-            cbHandle,
-            request,
-            [deferred](RemoteCommandResponse resp) mutable { deferred.emplace(std::move(resp)); })
-        .transitional_ignore();
-    return deferred;
+Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
+    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest request) {
+    return net().startCommand(cbHandle, request);
 }
 
-RemoteCommandResponse NetworkInterfaceASIOIntegrationFixture::runCommandSync(
+RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(
     RemoteCommandRequest& request) {
     auto deferred = runCommand(makeCallbackHandle(), request);
     auto& res = deferred.get();
@@ -114,9 +106,9 @@ RemoteCommandResponse NetworkInterfaceASIOIntegrationFixture::runCommandSync(
     return res;
 }
 
-void NetworkInterfaceASIOIntegrationFixture::assertCommandOK(StringData db,
-                                                             const BSONObj& cmd,
-                                                             Milliseconds timeoutMillis) {
+void NetworkInterfaceIntegrationFixture::assertCommandOK(StringData db,
+                                                         const BSONObj& cmd,
+                                                         Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
         fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
@@ -125,16 +117,20 @@ void NetworkInterfaceASIOIntegrationFixture::assertCommandOK(StringData db,
     ASSERT(!res.data["writeErrors"]);
 }
 
-void NetworkInterfaceASIOIntegrationFixture::assertCommandFailsOnClient(
-    StringData db, const BSONObj& cmd, ErrorCodes::Error reason, Milliseconds timeoutMillis) {
+void NetworkInterfaceIntegrationFixture::assertCommandFailsOnClient(StringData db,
+                                                                    const BSONObj& cmd,
+                                                                    ErrorCodes::Error reason,
+                                                                    Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
         fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
     ASSERT_EQ(reason, res.status.code());
 }
 
-void NetworkInterfaceASIOIntegrationFixture::assertCommandFailsOnServer(
-    StringData db, const BSONObj& cmd, ErrorCodes::Error reason, Milliseconds timeoutMillis) {
+void NetworkInterfaceIntegrationFixture::assertCommandFailsOnServer(StringData db,
+                                                                    const BSONObj& cmd,
+                                                                    ErrorCodes::Error reason,
+                                                                    Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
         fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
@@ -143,10 +139,10 @@ void NetworkInterfaceASIOIntegrationFixture::assertCommandFailsOnServer(
     ASSERT_EQ(reason, serverStatus);
 }
 
-void NetworkInterfaceASIOIntegrationFixture::assertWriteError(StringData db,
-                                                              const BSONObj& cmd,
-                                                              ErrorCodes::Error reason,
-                                                              Milliseconds timeoutMillis) {
+void NetworkInterfaceIntegrationFixture::assertWriteError(StringData db,
+                                                          const BSONObj& cmd,
+                                                          ErrorCodes::Error reason,
+                                                          Milliseconds timeoutMillis) {
     RemoteCommandRequest request{
         fixture().getServers()[0], db.toString(), cmd, BSONObj(), nullptr, timeoutMillis};
     auto res = runCommandSync(request);
@@ -158,5 +154,6 @@ void NetworkInterfaceASIOIntegrationFixture::assertWriteError(StringData db,
                             firstWriteError.getStringField("errmsg"));
     ASSERT_EQ(reason, writeErrorStatus);
 }
+
 }  // namespace executor
 }  // namespace mongo

@@ -30,6 +30,8 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
 
 class Status;
@@ -65,6 +67,7 @@ public:
      * std::terminate.
      */
     virtual Status validateHost(const HostAndPort& remoteHost,
+                                const BSONObj& isMasterRequest,
                                 const RemoteCommandResponse& isMasterReply) = 0;
 
     /**

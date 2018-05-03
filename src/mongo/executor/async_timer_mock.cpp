@@ -28,6 +28,7 @@
 
 #include "mongo/executor/async_timer_mock.h"
 
+#include "mongo/base/system_error.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -40,7 +41,7 @@ const Milliseconds kZeroMilliseconds = Milliseconds(0);
 AsyncTimerMockImpl::AsyncTimerMockImpl(Milliseconds expiration) : _timeLeft(expiration) {}
 
 void AsyncTimerMockImpl::cancel() {
-    _callAllHandlers(asio::error::operation_aborted);
+    _callAllHandlers(std::error_code(ErrorCodes::CallbackCanceled, mongoErrorCategory()));
 }
 
 void AsyncTimerMockImpl::asyncWait(AsyncTimerInterface::Handler handler) {
@@ -95,7 +96,7 @@ void AsyncTimerMockImpl::expireAfter(Milliseconds expiration) {
 
     // Call handlers with a "canceled" error code
     for (const auto& handler : tmp) {
-        handler(asio::error::operation_aborted);
+        handler(std::error_code(ErrorCodes::CallbackCanceled, mongoErrorCategory()));
     }
 }
 
@@ -131,11 +132,6 @@ void AsyncTimerMock::expireAfter(Milliseconds expiration) {
 }
 
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(Milliseconds expiration) {
-    return make(nullptr, expiration);
-}
-
-std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryMock::make(asio::io_service::strand* strand,
-                                                                 Milliseconds expiration) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_timersMutex);
     auto elem = _timers.emplace(std::make_shared<AsyncTimerMockImpl>(expiration));
     return stdx::make_unique<AsyncTimerMock>(*elem.first);

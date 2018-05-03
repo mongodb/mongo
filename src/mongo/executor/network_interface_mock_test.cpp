@@ -133,7 +133,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     // Since the contract of these methods is that they do not throw, we run the ASSERTs in
     // the test scope.
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) {
+        [&](const HostAndPort& remoteHost,
+            const BSONObj&,
+            const RemoteCommandResponse& isMasterReply) {
             validateCalled = true;
             hostCorrectForValidate = (remoteHost == testHost());
             replyCorrectForValidate = SimpleBSONObjComparator::kInstance.evaluate(
@@ -219,7 +221,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
 
 TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
+        [&](const HostAndPort& remoteHost,
+            const BSONObj&,
+            const RemoteCommandResponse& isMasterReply) -> Status {
             // We just need some obscure non-OK code.
             return {ErrorCodes::ConflictingOperationInProgress, "blah"};
         },
@@ -260,9 +264,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
 TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
     bool makeRequestCalled = false;
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
-            return Status::OK();
-        },
+        [&](const HostAndPort& remoteHost,
+            const BSONObj&,
+            const RemoteCommandResponse& isMasterReply) -> Status { return Status::OK(); },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {boost::none};
@@ -296,9 +300,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
 TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
     bool makeRequestCalled = false;
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
-            return Status::OK();
-        },
+        [&](const HostAndPort& remoteHost,
+            const BSONObj&,
+            const RemoteCommandResponse& isMasterReply) -> Status { return Status::OK(); },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             makeRequestCalled = true;
             return {ErrorCodes::InvalidSyncSource, "blah"};
@@ -333,9 +337,9 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
 TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     bool handleReplyCalled = false;
     net().setConnectionHook(makeTestHook(
-        [&](const HostAndPort& remoteHost, const RemoteCommandResponse& isMasterReply) -> Status {
-            return Status::OK();
-        },
+        [&](const HostAndPort& remoteHost,
+            const BSONObj&,
+            const RemoteCommandResponse& isMasterReply) -> Status { return Status::OK(); },
         [&](const HostAndPort& remoteHost) -> StatusWith<boost::optional<RemoteCommandRequest>> {
             return boost::make_optional<RemoteCommandRequest>({});
         },

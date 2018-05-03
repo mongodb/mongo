@@ -94,6 +94,7 @@ asioEnv.CppIntegrationTest(
         'ugly_bson_integration_test.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/network_interface_asio_fixture',
+        '$BUILD_DIR/mongo/executor/network_interface_fixture',
+        '$BUILD_DIR/mongo/rpc/protocol'
     ],
 )
