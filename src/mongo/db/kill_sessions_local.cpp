@@ -70,9 +70,9 @@ void killSessionsLocalKillTransactionCursors(OperationContext* opCtx,
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,
                                         SessionKiller::UniformRandomBitGenerator* urbg) {
-    killSessionsLocalKillCursors(opCtx, matcher);
-    uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
     killSessionsLocalKillTransactions(opCtx, matcher);
+    uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
+    killSessionsLocalKillCursors(opCtx, matcher);
     return {std::vector<HostAndPort>{}};
 }
 
