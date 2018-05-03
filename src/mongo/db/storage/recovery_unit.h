@@ -162,12 +162,16 @@ public:
 
     /**
      * Tells the recovery unit to read at the last applied timestamp, tracked by the SnapshotManger.
-     * This should only be set to true for local and available read concerns. This should be used to
-     * read from a consistent state on a secondary while replicated batches are being applied.
+     * For local and available read concerns, this should be used to read from a consistent state on
+     * a secondary while replicated batches are being applied.
+     *
+     * For snapshot read concerns, should be used for "speculative" snapshots which provide a
+     * view of the data which may become majority committed in the future.
      */
     void setShouldReadAtLastAppliedTimestamp(bool value) {
         invariant(!value || _readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
-                  _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern);
+                  _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern ||
+                  _readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
         _shouldReadAtLastAppliedTimestamp = value;
     }
 

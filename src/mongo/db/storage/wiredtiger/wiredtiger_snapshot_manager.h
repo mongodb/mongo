@@ -80,7 +80,7 @@ public:
      *
      * Throws if no local snapshot has been set.
      */
-    void beginTransactionOnLocalSnapshot(WT_SESSION* session, bool ignorePrepare) const;
+    Timestamp beginTransactionOnLocalSnapshot(WT_SESSION* session, bool ignorePrepare) const;
 
 
     /**

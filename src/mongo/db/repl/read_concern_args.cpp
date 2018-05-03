@@ -94,6 +94,10 @@ ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }
 
+ReadConcernLevel ReadConcernArgs::getOriginalLevel() const {
+    return _originalLevel.value_or(getLevel());
+}
+
 bool ReadConcernArgs::hasLevel() const {
     return _level.is_initialized();
 }
@@ -262,6 +266,7 @@ Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
                                     << "' is provided");
     }
 
+    _originalLevel = _level ? *_level : ReadConcernLevel::kLocalReadConcern;
     _level = ReadConcernLevel::kSnapshotReadConcern;
     return Status::OK();
 }

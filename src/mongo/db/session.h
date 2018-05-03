@@ -160,6 +160,11 @@ public:
     void beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber);
 
     /**
+     * Called for speculative transactions to fix the optime of the snapshot to read from.
+     */
+    void setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx);
+
+    /**
      * Called after a write under the specified transaction completes while the node is a primary
      * and specifies the statement ids which were written. Must be called while the caller is still
      * in the write's WUOW. Updates the on-disk state of the session to match the specified
@@ -508,6 +513,10 @@ private:
     // This is unset until a transaction begins on the session, and then reset only when new
     // transactions begin.
     boost::optional<Date_t> _transactionExpireDate;
+
+    // The OpTime a speculative transaction is reading from and also the earliest opTime it
+    // should wait for write concern for on commit.
+    repl::OpTime _speculativeTransactionReadOpTime;
 };
 
 }  // namespace mongo

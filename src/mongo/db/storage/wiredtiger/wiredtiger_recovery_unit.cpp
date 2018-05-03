@@ -338,7 +338,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         }
         uassertStatusOK(status);
         rollbacker.Dismiss();
-    } else if (_isReadingFromPointInTime()) {
+    } else if (_isReadingFromPointInTime() && !_shouldReadAtLastAppliedTimestamp) {
         // We reset _majorityCommittedSnapshot to the actual read timestamp used when the
         // transaction was started.
         _majorityCommittedSnapshot =
@@ -346,13 +346,22 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     } else if (_shouldReadAtLastAppliedTimestamp &&
                _sessionCache->snapshotManager().getLocalSnapshot()) {
         // Read from the last applied timestamp (tracked globally by the SnapshotManager), which is
-        // the timestamp of the most recent completed replication batch operation. This should only
-        // be true for local or available readConcern on secondaries.
-        _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(session, ignorePrepare);
+        // the timestamp of the most recent completed replication batch operation. This should
+        // be true for local or available readConcern on secondaries, or for speculative snapshot
+        // reads in multi-document transactions.
+        auto localSnapshot = _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(
+            session, ignorePrepare);
+        // Record the local timestamp actually used.
+        if (_isReadingFromPointInTime()) {
+            _readAtTimestamp = localSnapshot;
+        }
     } else if (_isOplogReader) {
         _sessionCache->snapshotManager().beginTransactionOnOplog(
             _sessionCache->getKVEngine()->getOplogManager(), session);
     } else {
+        uassert(ErrorCodes::SnapshotUnavailable,
+                "No local snapshot available for snapshot read.",
+                !_isReadingFromPointInTime());
         invariantWTOK(
             session->begin_transaction(session, ignorePrepare ? "ignore_prepare=true" : nullptr));
     }

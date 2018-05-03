@@ -45,6 +45,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -354,6 +355,18 @@ void Session::beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber t
     }
 }
 
+void Session::setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    repl::ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
+    opCtx->recoveryUnit()->setShouldReadAtLastAppliedTimestamp(true);
+    opCtx->recoveryUnit()->preallocateSnapshot();
+    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+    invariant(readTimestamp);
+    // Transactions do not survive term changes, so combining "getTerm" here with the
+    // recovery unit timestamp does not cause races.
+    _speculativeTransactionReadOpTime = {*readTimestamp, replCoord->getTerm()};
+}
 
 void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                           TxnNumber txnNumber,
@@ -441,6 +454,7 @@ void Session::invalidate() {
 
     _activeTxnNumber = kUninitializedTxnNumber;
     _activeTxnCommittedStatements.clear();
+    _speculativeTransactionReadOpTime = repl::OpTime();
     _hasIncompleteHistory = false;
 }
 
@@ -855,6 +869,7 @@ void Session::_abortTransaction(WithLock wl, OperationContext* opCtx, bool* canK
     _transactionOperationBytes = 0;
     _transactionOperations.clear();
     _txnState = MultiDocumentTransactionState::kAborted;
+    _speculativeTransactionReadOpTime = repl::OpTime();
     *canKillCursors = true;
 }
 
@@ -885,6 +900,7 @@ void Session::_setActiveTxn(WithLock wl,
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
     _txnState = MultiDocumentTransactionState::kNone;
+    _speculativeTransactionReadOpTime = repl::OpTime();
 }
 
 void Session::addTransactionOperation(OperationContext* opCtx,
@@ -986,6 +1002,16 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     opCtx->setWriteUnitOfWork(nullptr);
     committed = true;
     lk.lock();
+    auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+    // If no writes have been done and the original read concern was at least "majority", set
+    // the client op time forward to the read timestamp so waiting for write concern will
+    // ensure all read data was committed.
+    auto originalReadConcernLevel = repl::ReadConcernArgs::get(opCtx).getOriginalLevel();
+    if (_speculativeTransactionReadOpTime > clientInfo.getLastOp() &&
+        (originalReadConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+         originalReadConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern)) {
+        clientInfo.setLastOp(_speculativeTransactionReadOpTime);
+    }
     _txnState = MultiDocumentTransactionState::kCommitted;
 }
 

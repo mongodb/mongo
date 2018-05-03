@@ -252,9 +252,7 @@ Status waitForReadConcern(OperationContext* opCtx,
                     "Replica sets running protocol version 0 do not support readConcern: snapshot"};
         }
         if (speculative) {
-            fassert(50807,
-                    opCtx->recoveryUnit()->setPointInTimeReadTimestamp(
-                        replCoord->getMyLastAppliedOpTime().getTimestamp()));
+            session->setSpeculativeTransactionOpTimeToLastApplied(opCtx);
         }
     }
 
@@ -308,6 +306,8 @@ Status waitForReadConcern(OperationContext* opCtx,
 
 
     if (atClusterTime) {
+        // TODO(SERVER-34620): We should be using Session::setSpeculativeTransactionReadOpTime when
+        // doing speculative execution with atClusterTime.
         fassert(39345,
                 opCtx->recoveryUnit()->setPointInTimeReadTimestamp(atClusterTime->asTimestamp()));
         return Status::OK();

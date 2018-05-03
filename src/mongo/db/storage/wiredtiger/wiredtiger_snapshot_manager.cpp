@@ -111,8 +111,8 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     return *_committedSnapshot;
 }
 
-void WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(WT_SESSION* session,
-                                                                bool ignorePrepare) const {
+Timestamp WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(WT_SESSION* session,
+                                                                     bool ignorePrepare) const {
     invariantWTOK(
         session->begin_transaction(session, (ignorePrepare) ? "ignore_prepare=true" : nullptr));
     auto rollbacker =
@@ -125,6 +125,7 @@ void WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(WT_SESSION* sess
     auto status = setTransactionReadTimestamp(_localSnapshot.get(), session);
     fassert(50775, status);
     rollbacker.Dismiss();
+    return *_localSnapshot;
 }
 
 void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* oplogManager,
