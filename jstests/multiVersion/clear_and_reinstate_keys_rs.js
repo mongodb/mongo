@@ -27,6 +27,9 @@
     // The system keys collection should have been dropped.
     assertHasNoKeys(rst.getPrimary());
 
+    // Wait for the FCV document to replicate to all secondaries before downgrading them.
+    rst.awaitReplication();
+
     jsTestLog("Downgrading binaries.");
     rst.upgradeSecondaries(rst.getPrimary(), {binVersion: lastStableVersion});
     rst.upgradePrimary(rst.getPrimary(), {binVersion: lastStableVersion});
