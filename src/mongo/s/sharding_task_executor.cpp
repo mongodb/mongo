@@ -138,12 +138,12 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     auto clusterGLE = ClusterLastErrorInfo::get(request.opCtx->getClient());
 
-    auto shardingCb = [timeTracker, clusterGLE, cb](
+    auto shardingCb = [ timeTracker, clusterGLE, cb, grid = Grid::get(request.opCtx) ](
         const TaskExecutor::RemoteCommandCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
         // Update replica set monitor info.
-        auto shard = grid.shardRegistry()->getShardForHostNoReload(args.request.target);
+        auto shard = grid->shardRegistry()->getShardForHostNoReload(args.request.target);
         if (!shard) {
             LOG(1) << "Could not find shard containing host: " << args.request.target.toString();
         }

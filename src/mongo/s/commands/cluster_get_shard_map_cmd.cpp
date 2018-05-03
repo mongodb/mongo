@@ -32,7 +32,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -42,8 +41,11 @@ class CmdGetShardMap : public BasicCommand {
 public:
     CmdGetShardMap() : BasicCommand("getShardMap") {}
 
+    std::string help() const override {
+        return "lists the set of shards known to this instance";
+    }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -51,33 +53,28 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
-    std::string help() const override {
-        return "lists the set of shards known to this instance";
-    }
-
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::getShardMap);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        // MongoD instances do not know that they are part of a sharded cluster until they
-        // receive a setShardVersion command and that's when the catalog manager and the shard
-        // registry get initialized.
-        if (grid.shardRegistry()) {
-            grid.shardRegistry()->toBSON(&result);
-        }
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        auto const grid = Grid::get(opCtx);
+        uassert(ErrorCodes::ShardingStateNotInitialized,
+                "Sharding is not enabled",
+                grid->isShardingInitialized());
 
+        grid->shardRegistry()->toBSON(&result);
         return true;
     }
 

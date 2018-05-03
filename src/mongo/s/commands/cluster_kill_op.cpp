@@ -58,7 +58,6 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-
         BSONElement element = cmdObj.getField("op");
         uassert(50759, "Did not provide \"op\" field", element.ok());
 
@@ -70,7 +69,7 @@ public:
             return true;
         } else if (element.type() == BSONType::String) {
             // It's a string. Should be of the form shardid:opid.
-            return killShardOperation(opCtx, element.str(), result);
+            return _killShardOperation(opCtx, element.str(), result);
         }
 
         uasserted(50760,
@@ -78,9 +77,9 @@ public:
     }
 
 private:
-    bool killShardOperation(OperationContext* opCtx,
-                            const std::string& opToKill,
-                            BSONObjBuilder& result) {
+    static bool _killShardOperation(OperationContext* opCtx,
+                                    const std::string& opToKill,
+                                    BSONObjBuilder& result) {
         // The format of op is shardid:opid
         // This is different than the format passed to the mongod killOp command.
         const auto opSepPos = opToKill.find(':');
@@ -99,7 +98,7 @@ private:
         log() << "want to kill op: " << redact(opToKill);
 
         // Will throw if shard id is not found
-        auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardIdent);
+        auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIdent);
         if (!shardStatus.isOK()) {
             return CommandHelpers::appendCommandStatus(result, shardStatus.getStatus());
         }
@@ -121,6 +120,7 @@ private:
         // whether the shard reported success or not.
         return true;
     }
+
 } clusterKillOpCommand;
 
 }  // namespace

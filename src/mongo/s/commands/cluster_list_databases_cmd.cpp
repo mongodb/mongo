@@ -83,17 +83,19 @@ public:
              BSONObjBuilder& result) override {
         const bool nameOnly = cmdObj["nameOnly"].trueValue();
 
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
         std::map<std::string, long long> sizes;
         std::map<std::string, std::unique_ptr<BSONObjBuilder>> dbShardInfo;
 
         std::vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIdsNoReload(&shardIds);
+        shardRegistry->getAllShardIdsNoReload(&shardIds);
         shardIds.emplace_back(ShardRegistry::kConfigServerShardId);
 
         auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
 
         for (const ShardId& shardId : shardIds) {
-            const auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
+            const auto shardStatus = shardRegistry->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 continue;
             }

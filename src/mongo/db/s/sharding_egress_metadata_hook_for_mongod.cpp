@@ -50,7 +50,7 @@ repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
     } else {
         // TODO uncomment as part of SERVER-22663
         // invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-        return grid.configOpTime();
+        return Grid::get(_serviceContext)->configOpTime();
     }
 }
 

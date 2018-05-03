@@ -42,36 +42,35 @@ class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
     FsyncCommand() : ErrmsgCommandDeprecated("fsync") {}
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
     std::string help() const override {
         return "invoke fsync on all shards belonging to the cluster";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool adminOnly() const override {
+        return true;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::fsync);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
         if (cmdObj["lock"].trueValue()) {
             errmsg = "can't do lock through mongos";
             return false;
@@ -82,11 +81,12 @@ public:
         bool ok = true;
         int numFiles = 0;
 
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
         std::vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIdsNoReload(&shardIds);
+        shardRegistry->getAllShardIdsNoReload(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
+            auto shardStatus = shardRegistry->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 continue;
             }
@@ -113,6 +113,7 @@ public:
 
         result.append("numFiles", numFiles);
         result.append("all", sub.obj());
+
         return ok;
     }
 

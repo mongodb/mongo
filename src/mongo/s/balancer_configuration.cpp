@@ -177,7 +177,7 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* opCtx)
     ChunkSizeSettingsType settings = ChunkSizeSettingsType::createDefault();
 
     auto settingsObjStatus =
-        grid.catalogClient()->getGlobalSettings(opCtx, ChunkSizeSettingsType::kKey);
+        Grid::get(opCtx)->catalogClient()->getGlobalSettings(opCtx, ChunkSizeSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = ChunkSizeSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {
@@ -203,7 +203,7 @@ Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* opCtx)
     AutoSplitSettingsType settings = AutoSplitSettingsType::createDefault();
 
     auto settingsObjStatus =
-        grid.catalogClient()->getGlobalSettings(opCtx, AutoSplitSettingsType::kKey);
+        Grid::get(opCtx)->catalogClient()->getGlobalSettings(opCtx, AutoSplitSettingsType::kKey);
     if (settingsObjStatus.isOK()) {
         auto settingsStatus = AutoSplitSettingsType::fromBSON(settingsObjStatus.getValue());
         if (!settingsStatus.isOK()) {

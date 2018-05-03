@@ -348,7 +348,7 @@ void appendReplyMetadata(OperationContext* opCtx,
 
     // If we're a shard other than the config shard, attach the last configOpTime we know about.
     if (isShardingAware && !isConfig) {
-        auto opTime = grid.configOpTime();
+        auto opTime = Grid::get(opCtx)->configOpTime();
         rpc::ConfigServerMetadata(opTime).writeToMetadata(metadataBob);
     }
 }

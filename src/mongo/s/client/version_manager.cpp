@@ -115,7 +115,7 @@ bool setShardVersion(OperationContext* opCtx,
     ShardId shardId;
     ConnectionString shardCS;
     {
-        const auto shard = grid.shardRegistry()->getShardForHostNoReload(
+        const auto shard = Grid::get(opCtx)->shardRegistry()->getShardForHostNoReload(
             uassertStatusOK(HostAndPort::parse(conn->getServerAddress())));
         uassert(ErrorCodes::ShardNotFound,
                 str::stream() << conn->getServerAddress() << " is not recognized as a shard",
@@ -184,14 +184,15 @@ bool initShardVersionEmptyNS(OperationContext* opCtx, DBClientBase* conn_in) {
         }
 
         BSONObj result;
-        const bool ok = setShardVersion(opCtx,
-                                        conn,
-                                        "",
-                                        grid.shardRegistry()->getConfigServerConnectionString(),
-                                        ChunkVersion(),
-                                        NULL,
-                                        true,
-                                        result);
+        const bool ok =
+            setShardVersion(opCtx,
+                            conn,
+                            "",
+                            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
+                            ChunkVersion(),
+                            NULL,
+                            true,
+                            result);
 
         LOG(3) << "initial sharding result : " << result;
 

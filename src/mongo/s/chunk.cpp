@@ -33,11 +33,9 @@
 #include "mongo/s/chunk.h"
 
 #include "mongo/platform/random.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
 namespace {
 
 // Test whether we should split once data * kSplitCheckInterval > chunkSize (approximately)

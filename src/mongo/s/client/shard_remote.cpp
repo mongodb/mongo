@@ -182,8 +182,8 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
                                                             const BSONObj& cmdObj) {
 
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
-    if (getId() == "config") {
-        readPrefWithMinOpTime.minOpTime = grid.configOpTime();
+    if (isConfig()) {
+        readPrefWithMinOpTime.minOpTime = Grid::get(opCtx)->configOpTime();
     }
     const auto swHost = _targeter->findHost(opCtx, readPrefWithMinOpTime);
     if (!swHost.isOK()) {
@@ -247,9 +247,11 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    invariant(getId() == "config");
+    invariant(isConfig());
+    auto const grid = Grid::get(opCtx);
+
     ReadPreferenceSetting readPrefWithMinOpTime(readPref);
-    readPrefWithMinOpTime.minOpTime = grid.configOpTime();
+    readPrefWithMinOpTime.minOpTime = grid->configOpTime();
 
     const auto host = _targeter->findHost(opCtx, readPrefWithMinOpTime);
     if (!host.isOK()) {
@@ -303,7 +305,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     BSONObj readConcernObj;
     {
         invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
-        const repl::ReadConcernArgs readConcern{grid.configOpTime(), readConcernLevel};
+        const repl::ReadConcernArgs readConcern(grid->configOpTime(), readConcernLevel);
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
         readConcernObj =
