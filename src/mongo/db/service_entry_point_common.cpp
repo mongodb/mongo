@@ -978,8 +978,7 @@ DbResponse runCommands(OperationContext* opCtx,
                 std::string msg = str::stream() << "no such command: '" << request.getCommandName()
                                                 << "'";
                 LOG(2) << msg;
-                uasserted(ErrorCodes::CommandNotFound,
-                          str::stream() << msg << ", bad cmd: '" << redact(request.body) << "'");
+                uasserted(ErrorCodes::CommandNotFound, str::stream() << msg);
             }
 
             LOG(2) << "run command " << request.getDatabase() << ".$cmd" << ' '

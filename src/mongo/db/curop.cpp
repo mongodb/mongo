@@ -531,8 +531,12 @@ string OpDebug::report(Client* client,
                 curCommand->redactForLogging(&cmdToLog);
                 s << curCommand->getName() << " ";
                 s << redact(cmdToLog.getObject());
-            } else {  // Should not happen but we need to handle curCommand == NULL gracefully.
-                s << redact(query);
+            } else {
+                // Should not happen but we need to handle curCommand == NULL gracefully.
+                // We don't know what the request payload is intended to be, so it might be
+                // sensitive, and we don't know how to redact it properly without a 'Command*'.
+                // So we just don't log it at all.
+                s << "unrecognized";
             }
         } else {
             s << redact(query);
