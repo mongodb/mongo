@@ -143,6 +143,16 @@ protected:
      */
     Session();
 
+    /**
+     * Construct a new session with an ID
+     *
+     * This is used by TransportLayerLegacy to make sure session ID's match the connection ID of
+     * their MessagingPort.
+     *
+     * TransportLayers must ensure that session Id's remain unique across all TransportLayers.
+     */
+    explicit Session(Id id);
+
 private:
     const Id _id;
 

@@ -84,7 +84,8 @@ std::shared_ptr<TransportLayerLegacy::LegacySession> TransportLayerLegacy::Legac
 
 TransportLayerLegacy::LegacySession::LegacySession(std::unique_ptr<AbstractMessagingPort> amp,
                                                    TransportLayerLegacy* tl)
-    : _remote(amp->remote()),
+    : Session(amp->connectionId()),
+      _remote(amp->remote()),
       _local(amp->localAddr().toString(true)),
       _tl(tl),
       _tags(kEmptyTagMask),

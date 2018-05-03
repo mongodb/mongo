@@ -45,6 +45,8 @@ AtomicUInt64 sessionIdCounter(0);
 
 Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kEmptyTagMask) {}
 
+Session::Session(Id id) : _id(id), _tags(kEmptyTagMask) {}
+
 Ticket Session::sourceMessage(Message* message, Date_t expiration) {
     return getTransportLayer()->sourceMessage(shared_from_this(), message, expiration);
 }
