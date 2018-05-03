@@ -352,12 +352,14 @@ CommandInvocation::~CommandInvocation() = default;
 
 void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                                            const OpMsgRequest& request) const {
-    Status status = _checkAuthorizationImpl(opCtx, request);
-    if (!status.isOK()) {
-        log(LogComponent::kAccessControl) << status;
+    try {
+        _checkAuthorizationImpl(opCtx, request);
+        CommandHelpers::logAuthViolation(opCtx, this, request, ErrorCodes::OK);
+    } catch (const DBException& e) {
+        log(LogComponent::kAccessControl) << e.toStatus();
+        CommandHelpers::logAuthViolation(opCtx, this, request, e.code());
+        throw;
     }
-    CommandHelpers::logAuthViolation(opCtx, this, request, status.code());
-    uassertStatusOK(status);
 }
 
 //////////////////////////////////////////////////////////////
@@ -457,43 +459,34 @@ Status BasicCommand::checkAuthForCommand(Client* client,
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
-Status CommandInvocation::_checkAuthorizationImpl(OperationContext* opCtx,
-                                                  const OpMsgRequest& request) const {
-    namespace mmb = mutablebson;
+void CommandInvocation::_checkAuthorizationImpl(OperationContext* opCtx,
+                                                const OpMsgRequest& request) const {
     const Command* c = definition();
     auto client = opCtx->getClient();
     auto dbname = request.getDatabase();
-    if (c->adminOnly() && dbname != "admin") {
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream() << c->getName()
-                                    << " may only be run against the admin database.");
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << c->getName() << " may only be run against the admin database.",
+            !c->adminOnly() || dbname == NamespaceString::kAdminDb);
+    if (!AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
+        // Running without auth, so everything should be allowed except remotely invoked commands
+        // that have the 'localHostOnlyIfNoAuth' restriction.
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << c->getName()
+                              << " must run from localhost when running db without auth",
+                !c->adminOnly() || !c->localHostOnlyIfNoAuth() ||
+                    client->getIsLocalHostConnection());
+        return;  // Blanket authorization: don't need to check anything else.
     }
-    if (AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
-        Status status = [&] {
-            try {
-                doCheckAuthorization(opCtx);
-                return Status::OK();
-            } catch (const DBException& e) {
-                return e.toStatus();
-            }
-        }();
-        if (status == ErrorCodes::Unauthorized) {
-            mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
-            c->redactForLogging(&cmdToLog);
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized on " << dbname << " to execute command "
-                                        << redact(cmdToLog.getObject()));
-        }
-        if (!status.isOK()) {
-            return status;
-        }
-    } else if (c->adminOnly() && c->localHostOnlyIfNoAuth() &&
-               !client->getIsLocalHostConnection()) {
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream() << c->getName()
-                                    << " must run from localhost when running db without auth");
+    try {
+        doCheckAuthorization(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
+        namespace mmb = mutablebson;
+        mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
+        c->redactForLogging(&cmdToLog);
+        uasserted(ErrorCodes::Unauthorized,
+                  str::stream() << "not authorized on " << dbname << " to execute command "
+                                << redact(cmdToLog.getObject()));
     }
-    return Status::OK();
 }
 
 void Command::generateHelpResponse(OperationContext* opCtx,

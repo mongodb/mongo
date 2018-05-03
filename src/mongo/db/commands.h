@@ -532,7 +532,7 @@ private:
      */
     virtual void doCheckAuthorization(OperationContext* opCtx) const = 0;
 
-    Status _checkAuthorizationImpl(OperationContext* opCtx, const OpMsgRequest& request) const;
+    void _checkAuthorizationImpl(OperationContext* opCtx, const OpMsgRequest& request) const;
 
     const Command* const _definition;
 };
