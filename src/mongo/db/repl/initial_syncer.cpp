@@ -1446,8 +1446,6 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
         return Operations();
     }
 
-    const int slaveDelaySecs = durationCount<Seconds>(_opts.getSlaveDelay());
-
     std::uint32_t totalBytes = 0;
     Operations ops;
     BSONObj op;
@@ -1492,21 +1490,6 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
         }
         if (totalBytes + entry.getRawObjSizeBytes() >= _opts.replBatchLimitBytes) {
             return std::move(ops);
-        }
-
-        // Check slaveDelay boundary.
-        if (slaveDelaySecs > 0) {
-            const auto opTimestampSecs = entry.getTimestamp().getSecs();
-            const unsigned int slaveDelayBoundary =
-                static_cast<unsigned int>(time(0) - slaveDelaySecs);
-
-            // Stop the batch as the lastOp is too new to be applied. If we continue
-            // on, we can get ops that are way ahead of the delay and this will
-            // make this thread sleep longer when handleSlaveDelay is called
-            // and apply ops much sooner than we like.
-            if (opTimestampSecs > slaveDelayBoundary) {
-                return std::move(ops);
-            }
         }
 
         // Add op to buffer.
