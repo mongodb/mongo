@@ -81,8 +81,9 @@ template <typename E>
 auto LogDomain<E>::detachAppender(AppenderHandle handle) -> std::unique_ptr<EventAppender> {
     // So technically this could just return a moved unique_ptr reference
     // Still, eliding is a thing so swap is a nice certainty.
-    std::unique_ptr<EventAppender> appender{nullptr};
-    appender.swap(_appenders.at(handle._index));
+    std::unique_ptr<EventAppender> appender;
+    using std::swap;
+    swap(appender, _appenders.at(handle._index));
     return appender;
 }
 

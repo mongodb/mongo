@@ -67,7 +67,7 @@ namespace {
 struct FreeAndDestroy {
     void operator()(mongoc_stream_t* x) {
         auto stream = static_cast<mongoc_stream_embedded_t*>(x);
-        libmongodbcapi_db_client_destroy(stream->clientHandle);
+        libmongodbcapi_client_destroy(stream->clientHandle, nullptr);
         stream->~mongoc_stream_embedded_t();
         free(stream);
     }
@@ -134,12 +134,12 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
         // if we found a complete message, send it
         if (stream->input_length_to_go == 0) {
             auto input_len = (size_t)(stream->inputBuf.data() - stream->hiddenBuf.get());
-            int retVal =
-                libmongodbcapi_db_client_wire_protocol_rpc(stream->clientHandle,
-                                                           stream->hiddenBuf.get(),
-                                                           input_len,
-                                                           &(stream->libmongo_output),
-                                                           &(stream->libmongo_output_size));
+            int retVal = libmongodbcapi_client_invoke(stream->clientHandle,
+                                                      stream->hiddenBuf.get(),
+                                                      input_len,
+                                                      &(stream->libmongo_output),
+                                                      &(stream->libmongo_output_size),
+                                                      nullptr);
             if (retVal != LIBMONGODB_CAPI_SUCCESS) {
                 return -1;
             }
@@ -221,7 +221,8 @@ extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
     stream_buf.release();  // This must be here so we don't have double ownership
     stream->state = RPCState::WaitingForMessageLength;
     // Set up connections to database
-    stream->clientHandle = libmongodbcapi_db_client_new((libmongodbcapi_db*)user_data);
+    stream->clientHandle =
+        libmongodbcapi_client_create(static_cast<libmongodbcapi_instance*>(user_data), nullptr);
 
     // Connect the functions to the stream
     // type is not relevant for us. Has to be set for the C Driver, but it has to do with picking
@@ -247,7 +248,7 @@ struct ClientDeleter {
     }
 };
 
-extern "C" mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_db* db) try {
+extern "C" mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_instance* db) try {
     if (!db) {
         errno = EINVAL;
         return nullptr;
