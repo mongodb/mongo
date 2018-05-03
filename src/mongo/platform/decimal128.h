@@ -123,6 +123,24 @@ public:
     }
 
     /**
+     * Returns true if a valid Decimal can be constructed from the given arguments.
+     */
+    static bool isValid(uint64_t sign,
+                        uint64_t exponent,
+                        uint64_t coefficientHigh,
+                        uint64_t coefficientLow) {
+        if (coefficientHigh >= 0x1ed09bead87c0 &&
+            (coefficientHigh != 0x1ed09bead87c0 || coefficientLow != 0x378d8e63ffffffff)) {
+            return false;
+        }
+        auto value =
+            Value{coefficientLow,
+                  (sign << kSignFieldPos) | (exponent << kExponentFieldPos) | coefficientHigh};
+
+        return Decimal128(value).getBiasedExponent() == exponent;
+    }
+
+    /**
      * Construct a 0E0 valued Decimal128.
      */
     Decimal128() : _value(kNormalizedZero._value) {}
@@ -142,9 +160,7 @@ public:
         : _value(
               Value{coefficientLow,
                     (sign << kSignFieldPos) | (exponent << kExponentFieldPos) | coefficientHigh}) {
-        dassert(coefficientHigh < 0x1ed09bead87c0 ||
-                (coefficientHigh == 0x1ed09bead87c0 && coefficientLow == 0x378d8e63ffffffff));
-        dassert(exponent == getBiasedExponent());
+        dassert(isValid(sign, exponent, coefficientHigh, coefficientLow));
     }
 
     explicit Decimal128(std::int32_t int32Value);
