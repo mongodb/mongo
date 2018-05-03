@@ -1168,6 +1168,7 @@ buildvariants:
     - name: bestbuy_query_WT
     - name: change_streams_throughput
     - name: change_streams_latency
+    - name: snapshot_reads_WT
 
 - name: wtdevelop-standalone
   display_name: WT Develop Standalone
@@ -1219,6 +1220,7 @@ buildvariants:
       distros:
         - rhel70
     - name: industry_benchmarks_WT
+    - name: industry_benchmarks_secondary_reads_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
     - name: misc_workloads_WT
@@ -1231,3 +1233,5 @@ buildvariants:
     - name: bestbuy_query_WT
     - name: change_streams_throughput
     - name: change_streams_latency
+    - name: snapshot_reads_WT
+    - name: secondary_reads_WT
