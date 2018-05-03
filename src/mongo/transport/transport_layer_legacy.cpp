@@ -80,7 +80,8 @@ std::shared_ptr<TransportLayerLegacy::LegacySession> TransportLayerLegacy::Legac
 
 TransportLayerLegacy::LegacySession::LegacySession(std::unique_ptr<AbstractMessagingPort> amp,
                                                    TransportLayerLegacy* tl)
-    : _remote(amp->remoteAddr()),
+    : Session(amp->connectionId()),
+      _remote(amp->remoteAddr()),
       _local(amp->localAddr()),
       _tl(tl),
       _connection(stdx::make_unique<Connection>(std::move(amp))) {}
