@@ -1337,6 +1337,9 @@ void toBsonValue(uint8_t ctype,
                     const uint32_t biasedExponent =
                         isNegative ? whichZero - (Decimal128::kMaxBiasedExponent + 1) : whichZero;
 
+                    uassert(50846,
+                            "Invalid numeric zero decimal.",
+                            Decimal128::isValid(isNegative, biasedExponent, 0, 0));
                     *stream << Decimal128(isNegative, biasedExponent, 0, 0);
                     break;
             }
@@ -1981,6 +1984,9 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
          highExp <= origExp + kMaxExpIncrementForZeroHighCoefficient)) {
         // Increase exponent and decrease (right shift) coefficient.
         uint32_t flags = Decimal128::SignalingFlag::kNoFlag;
+        uassert(50845,
+                "Unexpected exponent values after adjusting Decimal.",
+                Decimal128::isValid(0, highExp, 0, 0));
         auto quantized = num.quantize(Decimal128(0, highExp, 0, 1), &flags);
         uassert(50813,
                 "Unexpected signaling flag for Decimal quantization.",
@@ -1991,7 +1997,7 @@ Decimal128 adjustDecimalExponent(TypeBits::Reader* typeBits, Decimal128 num) {
         uint32_t lowExp = highExp - (1U << KeyString::TypeBits::kStoredDecimalExponentBits);
         uassert(50814,
                 "Unexpected exponent values after adjusting Decimal.",
-                lowExp >= origExp - kMaxExpAdjust);
+                lowExp >= origExp - kMaxExpAdjust && Decimal128::isValid(0, lowExp, 0, 0));
         num = num.add(Decimal128(0, lowExp, 0, 0));
     }
     uassert(50830,
