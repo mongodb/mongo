@@ -350,5 +350,24 @@ TEST(ExpressionOptimizeTest, NormalizeWithInPreservesCollator) {
     ASSERT_EQ(eqMatchExpression->getCollator(), &collator);
 }
 
+TEST(ExpressionOptimizeTest, OrPromotesSingleAlwaysFalseAfterOptimize) {
+    // The nested predicate is always false. This test is designed to reproduce SERVER-34714.
+    BSONObj obj = fromjson("{$or: [{a: {$all: []}}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, OrPromotesSingleAlwaysFalse) {
+    BSONObj obj = fromjson("{$or: [{$alwaysFalse: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
 }  // namespace
 }  // namespace mongo
