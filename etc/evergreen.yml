@@ -7492,7 +7492,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-zseries-small
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     push_path: linux
@@ -10332,7 +10332,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 2880 # 2 days
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
@@ -10756,7 +10756,7 @@ buildvariants:
   - enterprise
   run_on:
   - suse12-zseries-test
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     push_path: linux
