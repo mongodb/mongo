@@ -62,6 +62,7 @@ public:
     public:
         bool allowNamespaceNotFoundErrorsOnCrudOps = false;
         bool relaxUniqueIndexConstraints = false;
+        bool skipWritesToOplog = false;
     };
 
     // Used to report oplog application progress.

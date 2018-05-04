@@ -1357,8 +1357,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         ON_BLOCK_EXIT([&] { _writerPool->waitForIdle(); });
 
         // Write batch of ops into oplog.
-        _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
-        scheduleWritesToOplog(opCtx, _storageInterface, _writerPool, ops);
+        if (!_options.skipWritesToOplog) {
+            _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
+            scheduleWritesToOplog(opCtx, _storageInterface, _writerPool, ops);
+        }
 
         // Holds extracted applyOps operations. Keep in scope until all operations in 'ops' and
         // 'applyOpsOperations' have been applied.
@@ -1378,8 +1380,10 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         _writerPool->waitForIdle();
 
         // Reset consistency markers in case the node fails while applying ops.
-        _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
-        _consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
+        if (!_options.skipWritesToOplog) {
+            _consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
+            _consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
+        }
 
         {
             std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
