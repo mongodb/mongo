@@ -391,14 +391,27 @@ SyncTail::SyncTail(OplogApplier::Observer* observer,
                    ReplicationConsistencyMarkers* consistencyMarkers,
                    StorageInterface* storageInterface,
                    MultiSyncApplyFunc func,
-                   ThreadPool* writerPool)
+                   ThreadPool* writerPool,
+                   const OplogApplier::Options& options)
     : _observer(observer),
       _consistencyMarkers(consistencyMarkers),
       _storageInterface(storageInterface),
       _applyFunc(func),
-      _writerPool(writerPool) {}
+      _writerPool(writerPool),
+      _options(options) {}
+
+SyncTail::SyncTail(OplogApplier::Observer* observer,
+                   ReplicationConsistencyMarkers* consistencyMarkers,
+                   StorageInterface* storageInterface,
+                   MultiSyncApplyFunc func,
+                   ThreadPool* writerPool)
+    : SyncTail(observer, consistencyMarkers, storageInterface, func, writerPool, {}) {}
 
 SyncTail::~SyncTail() {}
+
+const OplogApplier::Options& SyncTail::getOptions() const {
+    return _options;
+}
 
 namespace {
 

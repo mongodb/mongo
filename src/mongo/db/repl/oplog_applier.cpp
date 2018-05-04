@@ -56,7 +56,7 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
       _storageInterface(storageInterface),
       _options(options),
       _syncTail(std::make_unique<SyncTail>(
-          _observer, _consistencyMarkers, _storageInterface, multiSyncApply, writerPool)) {
+          _observer, _consistencyMarkers, _storageInterface, multiSyncApply, writerPool, options)) {
     invariant(!options.allowNamespaceNotFoundErrorsOnCrudOps);
     invariant(!options.relaxUniqueIndexConstraints);
 }

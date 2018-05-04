@@ -98,8 +98,19 @@ public:
              ReplicationConsistencyMarkers* consistencyMarkers,
              StorageInterface* storageInterface,
              MultiSyncApplyFunc func,
+             ThreadPool* writerPool,
+             const OplogApplier::Options& options);
+    SyncTail(OplogApplier::Observer* observer,
+             ReplicationConsistencyMarkers* consistencyMarkers,
+             StorageInterface* storageInterface,
+             MultiSyncApplyFunc func,
              ThreadPool* writerPool);
     virtual ~SyncTail();
+
+    /**
+     * Returns options for oplog application.
+     */
+    const OplogApplier::Options& getOptions() const;
 
     /**
      * Runs oplog application in a loop until shutdown() is called.
@@ -263,6 +274,9 @@ private:
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
     ThreadPool* const _writerPool;
+
+    // Used to configure multiApply() behavior.
+    const OplogApplier::Options _options;
 
     // Protects member data of SyncTail.
     mutable stdx::mutex _mutex;
