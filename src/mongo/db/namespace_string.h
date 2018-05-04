@@ -60,6 +60,7 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    static constexpr StringData kSystemDotJsCollectionName = "system.js"_sd;
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this
@@ -229,6 +230,9 @@ public:
     }
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
+    }
+    bool isSystemDotJs() const {
+        return coll() == kSystemDotJsCollectionName;
     }
     bool isServerConfigurationCollection() const {
         return (db() == kAdminDb) && (coll() == "system.version");

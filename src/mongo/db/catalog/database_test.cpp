@@ -200,6 +200,12 @@ TEST_F(DatabaseTest, DropCollectionReturnsOKIfCollectionDoesNotExist) {
     ASSERT_EQUALS(repl::OpTime(), repl::ReplClientInfo::forClient(&cc()).getLastOp());
 }
 
+TEST_F(DatabaseTest, DropCollectionShouldDropSpecificSystemCollections) {
+    auto systemJsNss = NamespaceString("system.js"); 
+    _testDropCollection(_opCtx.get(), systemJsNss, true);
+    ASSERT_EQUALS(repl::OpTime(), repl::ReplClientInfo::forClient(&cc()).getLastOp());
+}
+
 TEST_F(DatabaseTest, DropCollectionDropsCollectionButDoesNotLogOperationIfWritesAreNotReplicated) {
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     ASSERT_FALSE(_opCtx->writesAreReplicated());
