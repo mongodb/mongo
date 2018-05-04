@@ -137,7 +137,7 @@ class FreeMonWebServer {
         assert.soon(function() {
             const stats = qs();
             print("QS : " + tojson(stats));
-            return stats.registers == count;
+            return stats.registers >= count;
         }, "Failed to web server register", 60 * 1000);
     }
 
@@ -152,7 +152,7 @@ class FreeMonWebServer {
         assert.soon(function() {
             const stats = qs();
             print("QS : " + tojson(stats));
-            return stats.metrics == count;
+            return stats.metrics >= count;
         }, "Failed to web server metrics", 60 * 1000);
     }
 }

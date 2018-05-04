@@ -32,8 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -57,9 +56,7 @@ boost::optional<FreeMonStorageState> FreeMonStorage::read(OperationContext* opCt
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
 
-    Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
-    Lock::CollectionLock lk(
-        opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
+    AutoGetCollectionForRead autoRead(opCtx, NamespaceString::kServerConfigurationNamespace);
 
     auto swObj = storageInterface->findById(
         opCtx, NamespaceString::kServerConfigurationNamespace, elementKey);
@@ -82,18 +79,14 @@ void FreeMonStorage::replace(OperationContext* opCtx, const FreeMonStorageState&
     BSONObj obj = doc.toBSON();
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
-    {
-        Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
-        Lock::CollectionLock lk(
-            opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
+    AutoGetCollection autoWrite(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
 
-        if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
-                opCtx, NamespaceString::kServerConfigurationNamespace)) {
-            auto swObj = storageInterface->upsertById(
-                opCtx, NamespaceString::kServerConfigurationNamespace, elementKey, obj);
-            if (!swObj.isOK()) {
-                uassertStatusOK(swObj);
-            }
+    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+            opCtx, NamespaceString::kServerConfigurationNamespace)) {
+        auto swObj = storageInterface->upsertById(
+            opCtx, NamespaceString::kServerConfigurationNamespace, elementKey, obj);
+        if (!swObj.isOK()) {
+            uassertStatusOK(swObj);
         }
     }
 }
@@ -103,24 +96,20 @@ void FreeMonStorage::deleteState(OperationContext* opCtx) {
     BSONElement elementKey = deleteKey.firstElement();
 
     auto storageInterface = repl::StorageInterface::get(opCtx);
-    {
-        Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
-        Lock::CollectionLock lk(
-            opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
+    AutoGetCollection autoWrite(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
 
-        if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
-                opCtx, NamespaceString::kServerConfigurationNamespace)) {
+    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
+            opCtx, NamespaceString::kServerConfigurationNamespace)) {
 
-            auto swObj = storageInterface->deleteById(
-                opCtx, NamespaceString::kServerConfigurationNamespace, elementKey);
-            if (!swObj.isOK()) {
-                // Ignore errors about no document
-                if (swObj.getStatus() == ErrorCodes::NoSuchKey) {
-                    return;
-                }
-
-                uassertStatusOK(swObj);
+        auto swObj = storageInterface->deleteById(
+            opCtx, NamespaceString::kServerConfigurationNamespace, elementKey);
+        if (!swObj.isOK()) {
+            // Ignore errors about no document
+            if (swObj.getStatus() == ErrorCodes::NoSuchKey) {
+                return;
             }
+
+            uassertStatusOK(swObj);
         }
     }
 }
@@ -128,9 +117,7 @@ void FreeMonStorage::deleteState(OperationContext* opCtx) {
 boost::optional<BSONObj> FreeMonStorage::readClusterManagerState(OperationContext* opCtx) {
     auto storageInterface = repl::StorageInterface::get(opCtx);
 
-    Lock::DBLock dblk(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_IS);
-    Lock::CollectionLock lk(
-        opCtx->lockState(), NamespaceString::kServerConfigurationNamespace.ns(), MODE_IS);
+    AutoGetCollectionForRead autoRead(opCtx, NamespaceString::kServerConfigurationNamespace);
 
     auto swObj = storageInterface->findSingleton(opCtx, localClusterManagerNss);
     if (!swObj.isOK()) {
