@@ -181,9 +181,11 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
 
     def _step_down_all(self):
         self._is_idle_evt.clear()
-        for rs_fixture in self._rs_fixtures:
-            self._step_down(rs_fixture)
-        self._is_idle_evt.set()
+        try:
+            for rs_fixture in self._rs_fixtures:
+                self._step_down(rs_fixture)
+        finally:
+            self._is_idle_evt.set()
 
     def _step_down(self, rs_fixture):
         try:
