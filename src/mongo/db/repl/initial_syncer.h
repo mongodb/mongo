@@ -90,9 +90,6 @@ struct InitialSyncerOptions {
     /** Function to sets this node into a specific follower mode. */
     using SetFollowerModeFn = stdx::function<bool(const MemberState&)>;
 
-    /** Function to get this node's slaveDelay. */
-    using GetSlaveDelayFn = stdx::function<Seconds()>;
-
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
     Milliseconds initialSyncRetryWait{1000};
@@ -116,7 +113,6 @@ struct InitialSyncerOptions {
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     ResetOptimesFn resetOptimes;
-    GetSlaveDelayFn getSlaveDelay;
 
     SyncSourceSelector* syncSourceSelector = nullptr;
 

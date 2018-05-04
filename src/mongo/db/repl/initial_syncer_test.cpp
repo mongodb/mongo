@@ -326,7 +326,6 @@ protected:
             _setMyLastOptime(opTime, consistency);
         };
         options.resetOptimes = [this]() { _myLastOpTime = OpTime(); };
-        options.getSlaveDelay = []() { return Seconds(0); };
         options.syncSourceSelector = this;
 
         _options = options;
@@ -597,7 +596,6 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
     options.setMyLastOptime = [](const OpTime&,
                                  ReplicationCoordinator::DataConsistency consistency) {};
     options.resetOptimes = []() {};
-    options.getSlaveDelay = []() { return Seconds(0); };
     options.syncSourceSelector = this;
     auto callback = [](const StatusWith<OpTimeWithHash>&) {};
 

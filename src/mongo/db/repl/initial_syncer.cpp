@@ -205,7 +205,6 @@ InitialSyncer::InitialSyncer(
     uassert(ErrorCodes::BadValue, "invalid getMyLastOptime function", _opts.getMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid setMyLastOptime function", _opts.setMyLastOptime);
     uassert(ErrorCodes::BadValue, "invalid resetOptimes function", _opts.resetOptimes);
-    uassert(ErrorCodes::BadValue, "invalid getSlaveDelay function", _opts.getSlaveDelay);
     uassert(ErrorCodes::BadValue, "invalid sync source selector", _opts.syncSourceSelector);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", _onCompletion);
 }
