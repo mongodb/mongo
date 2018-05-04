@@ -1213,6 +1213,8 @@ Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+    invariant(st);
+
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
@@ -1272,6 +1274,8 @@ Status multiInitialSyncApply(OperationContext* opCtx,
                              MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+    invariant(st);
+
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
