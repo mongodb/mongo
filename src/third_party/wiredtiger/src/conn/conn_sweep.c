@@ -313,7 +313,7 @@ __sweep_server(void *arg)
 		 * which will stop the cache from moving into the stuck state.
 		 */
 		if (now - last >= WT_LAS_SWEEP_SEC &&
-		    __wt_las_nonempty(session) &&
+		    !__wt_las_empty(session) &&
 		    !__wt_cache_stuck(session)) {
 			oldest_id = __wt_txn_oldest_id(session);
 			if (WT_TXNID_LT(last_las_sweep_id, oldest_id)) {

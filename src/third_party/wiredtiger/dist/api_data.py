@@ -938,7 +938,15 @@ methods = {
 
 'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
 
-'WT_SESSION.alter' : Method(file_runtime_config),
+'WT_SESSION.alter' : Method(file_runtime_config + [
+    Config('exclusive_refreshed', 'true', r'''
+        refresh the in memory state and flush the metadata change to disk,
+        disabling this flag is dangerous - it will only re-write the
+        metadata without refreshing the in-memory information or creating
+        a checkpoint. The update will also only be applied to table URI
+        entries in the metadata, not their sub-entries.''',
+        type='boolean', undoc=True),
+]),
 
 'WT_SESSION.close' : Method([]),
 

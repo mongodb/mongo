@@ -173,7 +173,7 @@ int
 __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_UPDATE **updp;
-	uint64_t sleep_count, yield_count;
+	uint64_t sleep_usecs, yield_count;
 	uint32_t current_state;
 	bool locked;
 
@@ -183,7 +183,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * instantiated or being instantiated.  Loop because it's possible for
 	 * the page to return to the deleted state if instantiation fails.
 	 */
-	for (locked = false, sleep_count = yield_count = 0;;) {
+	for (locked = false, sleep_usecs = yield_count = 0;;) {
 		switch (current_state = ref->state) {
 		case WT_REF_DELETED:
 			/*
@@ -222,9 +222,9 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 		 * and if we've yielded enough times, start sleeping so we
 		 * don't burn CPU to no purpose.
 		 */
-		__wt_state_yield_sleep(&yield_count, &sleep_count);
+		__wt_state_yield_sleep(&yield_count, &sleep_usecs);
 		WT_STAT_CONN_INCRV(session,
-		    page_del_rollback_blocked, sleep_count);
+		    page_del_rollback_blocked, sleep_usecs);
 	}
 
 	/*

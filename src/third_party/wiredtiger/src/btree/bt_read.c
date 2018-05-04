@@ -552,7 +552,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	uint64_t sleep_cnt, wait_cnt;
+	uint64_t sleep_usecs, yield_cnt;
 	uint32_t current_state;
 	int force_attempts;
 	bool busy, cache_work, did_read, stalled, wont_need;
@@ -579,7 +579,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
 	}
 
 	for (did_read = wont_need = stalled = false,
-	    force_attempts = 0, sleep_cnt = wait_cnt = 0;;) {
+	    force_attempts = 0, sleep_usecs = yield_cnt = 0;;) {
 		switch (current_state = ref->state) {
 		case WT_REF_DELETED:
 			if (LF_ISSET(WT_READ_DELETED_SKIP | WT_READ_NO_WAIT))
@@ -788,11 +788,13 @@ skip_evict:		/*
 		 * we've yielded enough times, start sleeping so we don't burn
 		 * CPU to no purpose.
 		 */
-		if (stalled)
-			wait_cnt += WT_THOUSAND;
-		else if (++wait_cnt < WT_THOUSAND) {
-			__wt_yield();
-			continue;
+		if (yield_cnt < WT_THOUSAND) {
+			if (!stalled) {
+				++yield_cnt;
+				__wt_yield();
+				continue;
+			}
+			yield_cnt = WT_THOUSAND;
 		}
 
 		/*
@@ -808,7 +810,7 @@ skip_evict:		/*
 			if (cache_work)
 				continue;
 		}
-		__wt_state_yield_sleep(&wait_cnt, &sleep_cnt);
-		WT_STAT_CONN_INCRV(session, page_sleep, sleep_cnt);
+		__wt_state_yield_sleep(&yield_cnt, &sleep_usecs);
+		WT_STAT_CONN_INCRV(session, page_sleep, sleep_usecs);
 	}
 }

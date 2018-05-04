@@ -1852,6 +1852,15 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, bool final)
 	}
 
 	/*
+	 * Don't flush data from trees when there is a stable timestamp set:
+	 * that can lead to files that are inconsistent on disk after a crash.
+	 */
+	if (btree->modified && !bulk &&
+	    S2C(session)->txn_global.has_stable_timestamp &&
+	    !__wt_btree_immediately_durable(session))
+		return (EBUSY);
+
+	/*
 	 * Turn on metadata tracking if:
 	 * - The session is not already doing metadata tracking.
 	 * - The file was not bulk loaded.

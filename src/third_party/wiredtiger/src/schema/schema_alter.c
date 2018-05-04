@@ -133,7 +133,8 @@ err:	__wt_scr_free(session, &data_source);
  *	Alter a table.
  */
 static int
-__alter_table(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
+__alter_table(WT_SESSION_IMPL *session,
+    const char *uri, const char *newcfg[], bool exclusive_refreshed)
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_RET;
@@ -148,30 +149,39 @@ __alter_table(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 	WT_PREFIX_SKIP_REQUIRED(session, name, "table:");
 
 	/*
-	 * Open the table so we can alter its column groups and indexes, keeping
-	 * the table locked exclusive across the alter.
+	 * If we have exclusive access update all objects in the schema for
+	 * this table and reopen the handle to update the in-memory state.
 	 */
-	WT_RET(__wt_schema_get_table_uri(session, uri, true,
-	    WT_DHANDLE_EXCLUSIVE, &table));
-	/* Meta tracking needs to be used because alter needs to be atomic. */
-	WT_ASSERT(session, WT_META_TRACKING(session));
-	WT_WITH_DHANDLE(session, &table->iface,
-	    ret = __wt_meta_track_handle_lock(session, false));
-	WT_RET(ret);
+	if (exclusive_refreshed) {
+		/*
+		 * Open the table so we can alter its column groups and indexes,
+		 * keeping the table locked exclusive across the alter.
+		 */
+		WT_RET(__wt_schema_get_table_uri(session, uri, true,
+		    WT_DHANDLE_EXCLUSIVE, &table));
+		/*
+		 * Meta tracking needs to be used because alter needs to be
+		 * atomic.
+		 */
+		WT_ASSERT(session, WT_META_TRACKING(session));
+		WT_WITH_DHANDLE(session, &table->iface,
+		    ret = __wt_meta_track_handle_lock(session, false));
+		WT_RET(ret);
 
-	/* Alter the column groups. */
-	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		if ((colgroup = table->cgroups[i]) == NULL)
-			continue;
-		WT_RET(__alter_tree(session, colgroup->name, newcfg));
-	}
+		/* Alter the column groups. */
+		for (i = 0; i < WT_COLGROUPS(table); i++) {
+			if ((colgroup = table->cgroups[i]) == NULL)
+				continue;
+			WT_RET(__alter_tree(session, colgroup->name, newcfg));
+		}
 
-	/* Alter the indices. */
-	WT_RET(__wt_schema_open_indices(session, table));
-	for (i = 0; i < table->nindices; i++) {
-		if ((idx = table->indices[i]) == NULL)
-			continue;
-		WT_RET(__alter_tree(session, idx->name, newcfg));
+		/* Alter the indices. */
+		WT_RET(__wt_schema_open_indices(session, table));
+		for (i = 0; i < table->nindices; i++) {
+			if ((idx = table->indices[i]) == NULL)
+				continue;
+			WT_RET(__alter_tree(session, idx->name, newcfg));
+		}
 	}
 
 	/* Alter the table */
@@ -188,7 +198,24 @@ __alter_table(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 static int
 __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 {
+	WT_CONFIG_ITEM cv;
 	uint32_t flags;
+	bool exclusive_refreshed;
+	const char *cfg[] = {
+	    WT_CONFIG_BASE(session, WT_SESSION_alter), newcfg[0], NULL};
+
+	/*
+	 * Determine what configuration says about exclusive access.
+	 * A non exclusive alter that doesn't refresh in-memory configuration is
+	 * only valid for the table objects.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "exclusive_refreshed", &cv));
+	exclusive_refreshed = (bool)cv.val;
+
+	if (!exclusive_refreshed && !WT_PREFIX_MATCH(uri, "table:"))
+		WT_RET_MSG(session, EINVAL,
+		    "option \"exclusive_refreshed\" "
+		    "is applicable only on simple tables");
 
 	/*
 	 * The alter flag is used so LSM can apply some special logic, the
@@ -208,7 +235,8 @@ __schema_alter(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 		return (__wt_lsm_tree_worker(session, uri, __alter_file,
 		    NULL, newcfg, flags));
 	if (WT_PREFIX_MATCH(uri, "table:"))
-		return (__alter_table(session, uri, newcfg));
+		return (__alter_table(session,
+		    uri, newcfg, exclusive_refreshed));
 
 	return (__wt_bad_object_type(session, uri));
 }
