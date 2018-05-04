@@ -2802,28 +2802,11 @@ def doConfigure(myenv):
         sslLinkDependencies = ["crypto", "dl"]
         if conf.env.TargetOSIs('freebsd'):
             sslLinkDependencies = ["crypto"]
+
         if conf.env.TargetOSIs('windows'):
             sslLibName = "ssleay32"
             cryptoLibName = "libeay32"
             sslLinkDependencies = ["libeay32"]
-
-            # Add the SSL binaries to the zip file distribution
-            def addOpenSslLibraryToDistArchive(file_name):
-                openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
-                full_file_name = os.path.join(openssl_bin_path, file_name)
-                if os.path.exists(full_file_name):
-                    env.Append(ARCHIVE_ADDITIONS=[full_file_name])
-                    env.Append(ARCHIVE_ADDITION_DIR_MAP={
-                            openssl_bin_path: "bin"
-                            })
-                    return True
-                else:
-                    return False
-
-            files = ['ssleay32.dll', 'libeay32.dll']
-            for extra_file in files:
-                if not addOpenSslLibraryToDistArchive(extra_file):
-                    print("WARNING: Cannot find SSL library '%s'" % extra_file)
 
         # Used to import system certificate keychains
         if conf.env.TargetOSIs('darwin'):
@@ -2991,6 +2974,29 @@ def doConfigure(myenv):
         print("Using SSL Provider: {0}".format(ssl_provider))
     else:
         ssl_provider = "none"
+
+    # The Windows build needs the openssl binaries if it targets openssl or includes the tools
+    # since the tools link against openssl
+    if conf.env.TargetOSIs('windows') and (ssl_provider == "openssl" or has_option("use-new-tools")):
+        # Add the SSL binaries to the zip file distribution
+        def addOpenSslLibraryToDistArchive(file_name):
+            openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
+            full_file_name = os.path.join(openssl_bin_path, file_name)
+            if os.path.exists(full_file_name):
+                env.Append(ARCHIVE_ADDITIONS=[full_file_name])
+                env.Append(ARCHIVE_ADDITION_DIR_MAP={
+                        openssl_bin_path: "bin"
+                        })
+                return True
+            else:
+                return False
+
+        files = ['ssleay32.dll', 'libeay32.dll']
+        for extra_file in files:
+            if not addOpenSslLibraryToDistArchive(extra_file):
+                print("WARNING: Cannot find SSL library '%s'" % extra_file)
+
+
 
     if free_monitoring == "auto":
         if "enterprise" not in env['MONGO_MODULES']:
