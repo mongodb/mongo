@@ -12,8 +12,19 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
 
     // Set up a set and grab things for later.
     var name = "read_committed_no_snapshots";
-    var replTest =
-        new ReplSetTest({name: name, nodes: 3, nodeOptions: {enableMajorityReadConcern: ''}});
+    var replTest = new ReplSetTest({
+        name: name,
+        nodes: [
+            {},
+            {rsConfig: {priority: 0}},
+            {
+              setParameter: {"failpoint.disableSnapshotting": "{'mode':'alwaysOn'}"},
+              rsConfig: {priority: 0}
+            }
+        ],
+        nodeOptions: {enableMajorityReadConcern: ''},
+        settings: {protocolVersion: 1}
+    });
 
     if (!startSetIfSupportsReadMajority(replTest)) {
         jsTest.log("skipping test since storage engine doesn't support committed reads");
@@ -21,18 +32,9 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
         return;
     }
 
-    var nodes = replTest.nodeList();
-    var config = {
-        "_id": name,
-        "members": [
-            {"_id": 0, "host": nodes[0]},
-            {"_id": 1, "host": nodes[1], priority: 0},
-            {"_id": 2, "host": nodes[2], priority: 0}
-        ],
-        "protocolVersion": 1
-    };
-
-    replTest.initiate(config);
+    // Cannot wait for a stable checkpoint due to the no-snapshot secondary.
+    replTest.initiateWithAnyNodeAsPrimary(
+        null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
 
     // Get connections and collection.
     var primary = replTest.getPrimary();
@@ -40,8 +42,6 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
     healthySecondary.setSlaveOk();
     var noSnapshotSecondary = replTest._slaves[1];
     noSnapshotSecondary.setSlaveOk();
-    assert.commandWorked(noSnapshotSecondary.adminCommand(
-        {configureFailPoint: 'disableSnapshotting', mode: 'alwaysOn'}));
 
     // Do a write, wait for it to replicate, and ensure it is visible.
     var res = primary.getDB(name).runCommandWithMetadata(  //
