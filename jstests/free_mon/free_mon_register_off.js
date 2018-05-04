@@ -25,7 +25,7 @@ load("jstests/free_mon/libs/free_mon.js");
 
     const retStatus1 = conn.adminCommand({getFreeMonitoringStatus: 1});
     assert.commandWorked(retStatus1);
-    assert.eq(retStatus1.state, "undecided", tojson(retStatus1));
+    assert.eq(retStatus1.state, "disabled", tojson(retStatus1));
 
     const stats = mock_web.queryStats();
     print(tojson(stats));

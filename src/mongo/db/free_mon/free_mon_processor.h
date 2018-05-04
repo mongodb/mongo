@@ -420,10 +420,15 @@ private:
 protected:
     friend class FreeMonController;
 
+    enum FreeMonGetStatusEnum {
+        kServerStatus,
+        kCommandStatus,
+    };
+
     /**
-     * Server status section with state for active processor.
+     *  Populate results for getFreeMonitoringStatus or serverStatus commands.
      */
-    void getServerStatus(OperationContext* opCtx, BSONObjBuilder* status);
+    void getStatus(OperationContext* opCtx, BSONObjBuilder* status, FreeMonGetStatusEnum mode);
 
 private:
     // Collection of collectors to send on registration

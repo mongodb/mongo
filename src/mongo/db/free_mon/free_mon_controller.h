@@ -118,6 +118,11 @@ public:
     boost::optional<Status> unregisterServerCommand(Milliseconds timeout);
 
     /**
+     * Populates an info blob for use by {getFreeMonitoringStatus: 1}
+     */
+    void getStatus(OperationContext* opCtx, BSONObjBuilder* status);
+
+    /**
      * Populates an info blob for use by {serverStatus: 1}
      */
     void getServerStatus(OperationContext* opCtx, BSONObjBuilder* status);

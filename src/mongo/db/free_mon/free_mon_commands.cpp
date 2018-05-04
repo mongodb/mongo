@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/free_mon/free_mon_commands_gen.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
+#include "mongo/db/free_mon/free_mon_options.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
 
 namespace mongo {
@@ -81,7 +82,17 @@ public:
         IDLParserErrorContext ctx("getFreeMonitoringStatus");
         GetFreeMonitoringStatus::parse(ctx, cmdObj);
 
-        FreeMonStorage::getStatus(opCtx, &result);
+        if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOff) {
+            result.append("state", "disabled");
+            return true;
+        }
+
+        auto* controller = FreeMonController::get(opCtx->getServiceContext());
+        if (!controller) {
+            result.append("state", "disabled");
+        } else {
+            controller->getStatus(opCtx, &result);
+        }
         return true;
     }
 } getFreeMonitoringStatusCommand;

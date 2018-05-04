@@ -196,11 +196,20 @@ void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
     _processor->turnCrankForTest(countMessagesToIgnore);
 }
 
+void FreeMonController::getStatus(OperationContext* opCtx, BSONObjBuilder* status) {
+    if (!_processor) {
+        status->append("state", "disabled");
+        return;
+    }
+    _processor->getStatus(opCtx, status, FreeMonProcessor::FreeMonGetStatusEnum::kCommandStatus);
+}
+
 void FreeMonController::getServerStatus(OperationContext* opCtx, BSONObjBuilder* status) {
     if (!_processor) {
         status->append("state", "disabled");
+        return;
     }
-    _processor->getServerStatus(opCtx, status);
+    _processor->getStatus(opCtx, status, FreeMonProcessor::FreeMonGetStatusEnum::kServerStatus);
 }
 
 }  // namespace mongo

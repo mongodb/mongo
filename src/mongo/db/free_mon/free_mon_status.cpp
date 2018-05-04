@@ -30,6 +30,7 @@
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
+#include "mongo/db/free_mon/free_mon_options.h"
 
 namespace mongo {
 namespace {
@@ -48,6 +49,11 @@ public:
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+        if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOff) {
+            return BSON("state"
+                        << "disabled");
+        }
+
         auto* controller = FreeMonController::get(opCtx->getServiceContext());
         if (!controller) {
             return BSON("state"

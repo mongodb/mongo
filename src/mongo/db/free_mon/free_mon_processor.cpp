@@ -848,17 +848,9 @@ void FreeMonProcessor::doAsyncMetricsFail(
                                                _metricsRetry->getNextDeadline(client)));
 }
 
-void FreeMonProcessor::getServerStatus(OperationContext* opCtx, BSONObjBuilder* status) {
-    try {
-        readState(opCtx);
-    } catch (const DBException&) {
-        // readState() may throw if invoked during shutdown (as in ReplSetTest cleanup).
-        // If we have a lastReadState, go ahead and use that, otherwise just give up already.
-        if (!_lastReadState.get()) {
-            return;
-        }
-    }
-
+void FreeMonProcessor::getStatus(OperationContext* opCtx,
+                                 BSONObjBuilder* status,
+                                 FreeMonGetStatusEnum mode) {
     if (!_lastReadState.get()) {
         // _state gets initialized by readState() regardless,
         // use _lastReadState to differential "undecided" from default.
@@ -866,14 +858,23 @@ void FreeMonProcessor::getServerStatus(OperationContext* opCtx, BSONObjBuilder* 
         return;
     }
 
-    status->append("state", StorageState_serializer(_state->getState()));
-    status->append("retryIntervalSecs", durationCount<Seconds>(_metricsRetry->getNextDuration()));
-    auto lastMetricsSend = _lastMetricsSend.get();
-    if (lastMetricsSend) {
-        status->append("lastRunTime", lastMetricsSend->toString());
+    if (mode == FreeMonGetStatusEnum::kServerStatus) {
+        status->append("state", StorageState_serializer(_state->getState()));
+        status->append("retryIntervalSecs",
+                       durationCount<Seconds>(_metricsRetry->getNextDuration()));
+        auto lastMetricsSend = _lastMetricsSend.get();
+        if (lastMetricsSend) {
+            status->append("lastRunTime", lastMetricsSend->toString());
+        }
+        status->append("registerErrors", static_cast<long long>(_registrationRetry->getCount()));
+        status->append("metricsErrors", static_cast<long long>(_metricsRetry->getCount()));
+    } else {
+        auto state = _state.synchronize();
+        status->append("state", StorageState_serializer(state->getState()));
+        status->append("message", state->getMessage());
+        status->append("url", state->getInformationalURL());
+        status->append("userReminder", state->getUserReminder());
     }
-    status->append("registerErrors", static_cast<long long>(_registrationRetry->getCount()));
-    status->append("metricsErrors", static_cast<long long>(_metricsRetry->getCount()));
 }
 
 void FreeMonProcessor::doOnTransitionToPrimary(Client* client) {
