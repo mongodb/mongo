@@ -736,8 +736,8 @@ class ExpressionArrayElemAt final : public ExpressionFixedArity<ExpressionArrayE
 public:
     explicit ExpressionArrayElemAt(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
-    boost::intrusive_ptr<Expression> optimize() final;
 
+    boost::intrusive_ptr<Expression> optimize() final;
     Value evaluate(const Document& root) const final;
     const char* getOpName() const final;
 };

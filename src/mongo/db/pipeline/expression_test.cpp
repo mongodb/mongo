@@ -2926,7 +2926,7 @@ TEST(ExpressionFilter, ExpressionFilterWithASetLimitShouldReturnAnArrayNoGreater
     ASSERT_VALUE_EQ(sixElemArray, Value(BSON_ARRAY(4 << 5 << 6 << 7 << 8 << 9)));
 }
 
-TEST(ExpressionArrayElemAt, ArrayElemAtWithAllConstantValueShouldOptimizeToAnExpressionConstant) {
+TEST(ExpressionArrayElemAt, ArrayElemAtWithAllConstantValuesShouldOptimizeToAnExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
@@ -2971,7 +2971,7 @@ TEST(ExpressionArrayElemAt, ArrayElemAtWithFilterShouldEvaluateCorrectly) {
     ASSERT_VALUE_EQ(optimized->evaluate(Document()), Value(8));
 }
 
-TEST(ExpressionSlice, ExpressionSliceWithAllConstantValueShouldOptimizeToAnExpressionConstant) {
+TEST(ExpressionSlice, ExpressionSliceWithAllConstantValuesShouldOptimizeToAnExpressionConstant) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
