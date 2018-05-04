@@ -60,6 +60,17 @@
 
 namespace mongo {
 
+// Server parameter that dictates the max number of milliseconds that any transaction lock request
+// will wait for lock acquisition. If an operation provides a greater timeout in a lock request,
+// maxTransactionLockRequestTimeoutMillis will override it. If this is set to a negative value, it
+// is inactive and nothing will be overridden.
+//
+// The default of 0 milliseconds will ensure that transaction operations will immediately give up
+// trying to take any lock if it is not immediatley available. This prevents deadlocks between
+// transactions. Setting a non-zero, positive value will also help obviate deadlocks, but won't
+// abort a deadlocked transaction operation to eliminate the deadlock for however long has been set.
+MONGO_EXPORT_SERVER_PARAMETER(maxTransactionLockRequestTimeoutMillis, int, 0);
+
 const OperationContext::Decoration<Session::TransactionState> Session::TransactionState::get =
     OperationContext::declareDecoration<Session::TransactionState>();
 
@@ -778,6 +789,18 @@ void Session::unstashTransactionResources(OperationContext* opCtx, const std::st
                 opCtx->recoveryUnit()->preallocateSnapshot();
                 snapshotPreallocated = true;
 
+                if (_txnState == MultiDocumentTransactionState::kInProgress) {
+                    // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
+                    // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
+                    // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
+                    // operation performance degradations.
+                    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+                    if (maxTransactionLockMillis >= 0) {
+                        opCtx->lockState()->setMaxLockTimeout(
+                            Milliseconds(maxTransactionLockMillis));
+                    }
+                }
+
                 if (_txnState != MultiDocumentTransactionState::kInProgress) {
                     _txnState = MultiDocumentTransactionState::kInSnapshotRead;
                 }
@@ -853,10 +876,11 @@ void Session::abortActiveTransaction(OperationContext* opCtx) {
         if (opCtx->getWriteUnitOfWork()) {
             opCtx->setWriteUnitOfWork(nullptr);
         }
-        // We must clear the recovery unit so any post-transaction writes can run without
+        // We must clear the recovery unit and locker so any post-transaction writes can run without
         // transactional settings such as a read timestamp.
         opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->lockState()->unsetMaxLockTimeout();
     }
     if (canKillCursors) {
         _killTransactionCursors(opCtx, _sessionId, txnNumberAtStart);
@@ -1007,10 +1031,11 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
                 _txnState = MultiDocumentTransactionState::kAborted;
             }
         }
-        // We must clear the recovery unit so any post-transaction writes can run without
+        // We must clear the recovery unit and locker so any post-transaction writes can run without
         // transactional settings such as a read timestamp.
         opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->lockState()->unsetMaxLockTimeout();
         _commitcv.notify_all();
     });
     lk.unlock();

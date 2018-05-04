@@ -108,6 +108,27 @@ public:
     virtual void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) = 0;
 
     /**
+     * This is useful to ensure that potential deadlocks do not occur.
+     *
+     * Overrides provided timeouts in lock requests with 'maxTimeout' if the provided timeout
+     * is greater. Basically, no lock acquisition will take longer than 'maxTimeout'.
+     *
+     * If an UninterruptibleLockGuard is set during a lock request, the max timeout override will
+     * be ignored.
+     *
+     * Future lock requests may throw LockTimeout errors if a lock request provides a Date_t::max()
+     * deadline and 'maxTimeout' is reached. Presumably these callers do not expect to handle lock
+     * acquisition failure, so this is done to ensure the caller does not proceed as if the lock
+     * were successfully acquired.
+     */
+    virtual void setMaxLockTimeout(Milliseconds maxTimeout) = 0;
+
+    /**
+     * Clears the max lock timeout override set by setMaxLockTimeout() above.
+     */
+    virtual void unsetMaxLockTimeout() = 0;
+
+    /**
      * This should be the first method invoked for a particular Locker object. It acquires the
      * Global lock in the specified mode and effectively indicates the mode of the operation.
      * This is what the lock modes on the global lock mean:
@@ -196,6 +217,9 @@ public:
      * Each successful acquisition of a lock on a given resource increments the reference count
      * of the lock. Therefore, each call, which returns LOCK_OK must be matched with a
      * corresponding call to unlock.
+     *
+     * If setLockTimeoutMillis has been called, then a lock request with a Date_t::max() deadline
+     * may throw a LockTimeout error. See setMaxLockTimeout() above for details.
      *
      * @param opCtx If provided, will be used to interrupt a LOCK_WAITING state.
      * @param resId Id of the resource to be locked.

@@ -118,6 +118,14 @@ public:
         _sharedLocksShouldTwoPhaseLock = sharedLocksShouldTwoPhaseLock;
     }
 
+    void setMaxLockTimeout(Milliseconds maxTimeout) override {
+        _maxLockTimeout = maxTimeout;
+    }
+
+    void unsetMaxLockTimeout() override {
+        _maxLockTimeout = boost::none;
+    }
+
     virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode);
     virtual LockResult lockGlobal(LockMode mode) {
         return lockGlobal(nullptr, mode);
@@ -324,6 +332,12 @@ private:
 
     // If true, shared locks will participate in two-phase locking.
     bool _sharedLocksShouldTwoPhaseLock = false;
+
+    // If this is set, dictates the max number of milliseconds that we will wait for lock
+    // acquisition. Effectively resets lock acquisition deadlines to time out sooner. If set to 0,
+    // for example, lock attempts will time out immediately if the lock is not immediately
+    // available.
+    boost::optional<Milliseconds> _maxLockTimeout;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //

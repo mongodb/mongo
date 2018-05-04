@@ -76,9 +76,7 @@ Status _finishDropDatabase(OperationContext* opCtx, const std::string& dbName, D
     if (MONGO_FAIL_POINT(dropDatabaseHangAfterLastCollectionDrop)) {
         log() << "dropDatabase - fail point dropDatabaseHangAfterLastCollectionDrop enabled. "
                  "Blocking until fail point is disabled. ";
-        while (MONGO_FAIL_POINT(dropDatabaseHangAfterLastCollectionDrop)) {
-            mongo::sleepsecs(1);
-        }
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropDatabaseHangAfterLastCollectionDrop);
     }
 
     WriteUnitOfWork wunit(opCtx);

@@ -835,6 +835,13 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(
         timeout = deadline - Date_t::now();
     }
 
+    // If _maxLockTimeout is set and lower than the given timeout, override it.
+    // TODO: there should be an invariant against the simultaneous usage of
+    // _uninterruptibleLocksRequested and _maxLockTimeout (SERVER-34951).
+    if (_maxLockTimeout && _uninterruptibleLocksRequested == 0) {
+        timeout = std::min(timeout, _maxLockTimeout.get());
+    }
+
     // Don't go sleeping without bound in order to be able to report long waits or wake up for
     // deadlock detection.
     Milliseconds waitTime = std::min(timeout, DeadlockTimeout);
@@ -894,6 +901,16 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(
                                               : Milliseconds(0);
 
         if (waitTime == Milliseconds(0)) {
+            // If the caller provided the max deadline then presumably they are not expecting nor
+            // checking for lock acquisition failure. In that case, to prevent the caller from
+            // continuing under the assumption of a successful lock acquisition, we'll throw.
+            if (_maxLockTimeout && deadline == Date_t::max()) {
+                uasserted(ErrorCodes::LockTimeout,
+                          str::stream() << "Unable to acquire lock '" << resId.toString()
+                                        << "' within a max lock request timeout of '"
+                                        << _maxLockTimeout.get()
+                                        << "' milliseconds.");
+            }
             break;
         }
     }

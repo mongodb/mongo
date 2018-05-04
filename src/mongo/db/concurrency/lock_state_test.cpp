@@ -367,6 +367,77 @@ TEST(LockerImpl, MODE_SLocksUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockI
     locker.unlockGlobal();
 }
 
+TEST(LockerImpl, OverrideLockRequestTimeout) {
+    const ResourceId resIdFirstDB(RESOURCE_DATABASE, "FirstDB"_sd);
+    const ResourceId resIdSecondDB(RESOURCE_DATABASE, "SecondDB"_sd);
+
+    DefaultLockerImpl locker1;
+    DefaultLockerImpl locker2;
+
+    // Set up locker2 to override lock requests' provided timeout if greater than 1000 milliseconds.
+    locker2.setMaxLockTimeout(Milliseconds(1000));
+
+    ASSERT_EQ(LOCK_OK, locker1.lockGlobal(MODE_IX));
+    ASSERT_EQ(LOCK_OK, locker2.lockGlobal(MODE_IX));
+
+    // locker1 acquires FirstDB under an exclusive lock.
+    ASSERT_EQ(LOCK_OK, locker1.lock(resIdFirstDB, MODE_X));
+    ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_X));
+
+    // locker2's attempt to acquire FirstDB with unlimited wait time should timeout after 1000
+    // milliseconds and throw because _maxLockRequestTimeout is set to 1000 milliseconds.
+    ASSERT_THROWS_CODE(locker2.lock(resIdFirstDB, MODE_X, Date_t::max()),
+                       AssertionException,
+                       ErrorCodes::LockTimeout);
+
+    // locker2's attempt to acquire an uncontested lock should still succeed normally.
+    ASSERT_EQ(LOCK_OK, locker2.lock(resIdSecondDB, MODE_X));
+
+    ASSERT_TRUE(locker1.unlock(resIdFirstDB));
+    ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_NONE));
+    ASSERT_TRUE(locker2.unlock(resIdSecondDB));
+    ASSERT_TRUE(locker2.isLockHeldForMode(resIdSecondDB, MODE_NONE));
+
+    ASSERT(locker1.unlockGlobal());
+    ASSERT(locker2.unlockGlobal());
+}
+
+TEST(LockerImpl, DoNotWaitForLockAcquisition) {
+    const ResourceId resIdFirstDB(RESOURCE_DATABASE, "FirstDB"_sd);
+    const ResourceId resIdSecondDB(RESOURCE_DATABASE, "SecondDB"_sd);
+
+    DefaultLockerImpl locker1;
+    DefaultLockerImpl locker2;
+
+    // Set up locker2 to immediately return if a lock is unavailable, regardless of supplied
+    // deadlines in the lock request.
+    locker2.setMaxLockTimeout(Milliseconds(0));
+
+    ASSERT_EQ(LOCK_OK, locker1.lockGlobal(MODE_IX));
+    ASSERT_EQ(LOCK_OK, locker2.lockGlobal(MODE_IX));
+
+    // locker1 acquires FirstDB under an exclusive lock.
+    ASSERT_EQ(LOCK_OK, locker1.lock(resIdFirstDB, MODE_X));
+    ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_X));
+
+    // locker2's attempt to acquire FirstDB with unlimited wait time should fail immediately and
+    // throw because _maxLockRequestTimeout was set to 0.
+    ASSERT_THROWS_CODE(locker2.lock(resIdFirstDB, MODE_X, Date_t::max()),
+                       AssertionException,
+                       ErrorCodes::LockTimeout);
+
+    // locker2's attempt to acquire an uncontested lock should still succeed normally.
+    ASSERT_EQ(LOCK_OK, locker2.lock(resIdSecondDB, MODE_X));
+
+    ASSERT_TRUE(locker1.unlock(resIdFirstDB));
+    ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_NONE));
+    ASSERT_TRUE(locker2.unlock(resIdSecondDB));
+    ASSERT_TRUE(locker2.isLockHeldForMode(resIdSecondDB, MODE_NONE));
+
+    ASSERT(locker1.unlockGlobal());
+    ASSERT(locker2.unlockGlobal());
+}
+
 TEST(LockerImpl, MODE_SLocksDoNotUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsFalse) {
     const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
 

@@ -580,6 +580,63 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
     ASSERT_THROWS(session.checkStatementExecuted(opCtx(), txnNum, 2), AssertionException);
 }
 
+// Test that transaction operations will abort if locks cannot be taken immediately.
+TEST_F(SessionTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
+    const std::string dbName = "TestDB";
+
+    /**
+     * Set up a transaction, take a database exclusive lock and then stash the transaction and
+     * Client.
+     */
+
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 20;
+    opCtx()->setLogicalSessionId(sessionId);
+    opCtx()->setTxnNumber(txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
+    session.unstashTransactionResources(opCtx(), "insert");
+
+    { Lock::DBLock dbXLock(opCtx(), dbName, MODE_X); }
+    session.stashTransactionResources(opCtx());
+    auto clientWithDatabaseXLock = Client::releaseCurrent();
+
+    /**
+     * Make a new Session, Client, OperationContext and transaction and then attempt to take the
+     * same database exclusive lock, which should conflict because the other transaction already
+     * took it.
+     */
+
+    auto service = opCtx()->getServiceContext();
+    auto newClientOwned = service->makeClient("newTransactionClient");
+    auto newClient = newClientOwned.get();
+    Client::setCurrent(std::move(newClientOwned));
+    auto newOpCtx = newClient->makeOperationContext();
+
+    const auto newSessionId = makeLogicalSessionIdForTest();
+    Session newSession(newSessionId);
+    newSession.refreshFromStorageIfNeeded(newOpCtx.get());
+
+    const TxnNumber newTxnNum = 10;
+    newOpCtx.get()->setLogicalSessionId(newSessionId);
+    newOpCtx.get()->setTxnNumber(newTxnNum);
+    newSession.beginOrContinueTxn(newOpCtx.get(), newTxnNum, false, true, "testDB", "insert");
+    newSession.unstashTransactionResources(newOpCtx.get(), "insert");
+
+    ASSERT_THROWS_CODE(
+        Lock::DBLock(newOpCtx.get(), dbName, MODE_X), AssertionException, ErrorCodes::LockTimeout);
+
+    // A non-conflicting lock acquisition should work just fine.
+    { Lock::DBLock(newOpCtx.get(), "NewTestDB", MODE_X); }
+
+    // Restore the original client so that teardown works.
+    newOpCtx.reset();
+    Client::releaseCurrent();
+    Client::setCurrent(std::move(clientWithDatabaseXLock));
+}
+
 DEATH_TEST_F(SessionTest, CommitWithoutCursorKillFunctionInvariants, "_cursorKillFunction") {
     Session::registerCursorKillFunction(nullptr);
     const auto sessionId = makeLogicalSessionIdForTest();

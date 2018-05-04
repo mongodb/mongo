@@ -246,8 +246,8 @@ error_code("BrokenPromise", 245)
 error_code("SnapshotUnavailable", 246)
 error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
-error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion");
-error_code("StaleChunkHistory", 250);
+error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion")
+error_code("StaleChunkHistory", 250)
 error_code("NoSuchTransaction", 251)
 error_code("ReentrancyNotAllowed", 252)
 error_code("FreeMonHttpInFlight", 253)
@@ -286,7 +286,8 @@ error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
                              "InterruptedDueToReplStateChange",
                              "ExceededTimeLimit",
-                             "CursorKilled"])
+                             "CursorKilled",
+                             "LockTimeout"])
 
 # isNotMasterError() includes all codes that indicate that the node that received the request was
 # not master at some point during command processing, regardless of whether some write may have

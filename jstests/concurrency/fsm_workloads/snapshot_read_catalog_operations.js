@@ -29,7 +29,11 @@ var $config = (function() {
             // insertDocs.
             const sortOptions = [true, false];
             const sortByAscending = sortOptions[Random.randInt(2)];
-            const readErrorCodes = [ErrorCodes.NoSuchTransaction, ErrorCodes.SnapshotUnavailable];
+            const readErrorCodes = [
+                ErrorCodes.NoSuchTransaction,
+                ErrorCodes.SnapshotUnavailable,
+                ErrorCodes.LockTimeout
+            ];
             const commitTransactionErrorCodes = readErrorCodes;
             doSnapshotFind(sortByAscending, collName, this, readErrorCodes);
             if (this.cursorId) {

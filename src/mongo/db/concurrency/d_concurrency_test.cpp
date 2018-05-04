@@ -728,6 +728,44 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitForLockUntilNotInterruptedWithLeav
     result.get();
 }
 
+TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndDoNotUsingWithInterruptBehavior) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // Take the exclusive lock with the first caller.
+    Lock::GlobalLock g1(opCtx1, MODE_X);
+
+    // Set a max timeout on the second caller that will override provided lock request deadlines.
+    // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown
+    // and then caught by the Lock::InterruptBehavior::kLeaveUnlocked setting.
+    opCtx2->lockState()->setMaxLockTimeout(Milliseconds(100));
+    Lock::GlobalLock g2(opCtx2, MODE_S, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
+
+    ASSERT(g1.isLocked());
+    ASSERT(!g2.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndThrowUsingInterruptBehavior) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // Take the exclusive lock with the first caller.
+    Lock::GlobalLock g1(opCtx1, MODE_X);
+
+    // Set a max timeout on the second caller that will override provided lock request deadlines.
+    // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown.
+    opCtx2->lockState()->setMaxLockTimeout(Milliseconds(100));
+
+    ASSERT_THROWS_CODE(
+        Lock::GlobalLock(opCtx2, MODE_S, Date_t::max(), Lock::InterruptBehavior::kThrow),
+        DBException,
+        ErrorCodes::LockTimeout);
+
+    ASSERT(g1.isLocked());
+}
+
 TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptible) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opCtx1 = clients[0].second.get();
