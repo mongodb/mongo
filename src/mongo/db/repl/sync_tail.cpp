@@ -274,19 +274,6 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op)
 
 }  // namespace
 
-SyncTail::SyncTail(OplogApplier::Observer* observer,
-                   ReplicationConsistencyMarkers* consistencyMarkers,
-                   StorageInterface* storageInterface,
-                   MultiSyncApplyFunc func,
-                   ThreadPool* writerPool)
-    : _observer(observer),
-      _consistencyMarkers(consistencyMarkers),
-      _storageInterface(storageInterface),
-      _applyFunc(func),
-      _writerPool(writerPool) {}
-
-SyncTail::~SyncTail() {}
-
 std::unique_ptr<ThreadPool> SyncTail::makeWriterPool() {
     return makeWriterPool(replWriterThreadCount);
 }
@@ -399,6 +386,19 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     MONGO_UNREACHABLE;
 }
+
+SyncTail::SyncTail(OplogApplier::Observer* observer,
+                   ReplicationConsistencyMarkers* consistencyMarkers,
+                   StorageInterface* storageInterface,
+                   MultiSyncApplyFunc func,
+                   ThreadPool* writerPool)
+    : _observer(observer),
+      _consistencyMarkers(consistencyMarkers),
+      _storageInterface(storageInterface),
+      _applyFunc(func),
+      _writerPool(writerPool) {}
+
+SyncTail::~SyncTail() {}
 
 namespace {
 

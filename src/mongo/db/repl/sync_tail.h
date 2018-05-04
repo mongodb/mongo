@@ -71,6 +71,21 @@ public:
                               WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
+     * Creates thread pool for writer tasks.
+     */
+    static std::unique_ptr<ThreadPool> makeWriterPool();
+    static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
+
+    /**
+     * Applies the operation that is in param o.
+     * Functions for applying operations/commands and increment server status counters may
+     * be overridden for testing.
+     */
+    static Status syncApply(OperationContext* opCtx,
+                            const BSONObj& o,
+                            OplogApplication::Mode oplogApplicationMode);
+
+    /**
      *
      * Constructs a SyncTail.
      * During steady state replication, oplogApplication() obtains batches of operations to apply
@@ -85,21 +100,6 @@ public:
              MultiSyncApplyFunc func,
              ThreadPool* writerPool);
     virtual ~SyncTail();
-
-    /**
-     * Creates thread pool for writer tasks.
-     */
-    static std::unique_ptr<ThreadPool> makeWriterPool();
-    static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
-
-    /**
-     * Applies the operation that is in param o.
-     * Functions for applying operations/commands and increment server status counters may
-     * be overridden for testing.
-     */
-    static Status syncApply(OperationContext* opCtx,
-                            const BSONObj& o,
-                            OplogApplication::Mode oplogApplicationMode);
 
     /**
      * Runs oplog application in a loop until shutdown() is called.
