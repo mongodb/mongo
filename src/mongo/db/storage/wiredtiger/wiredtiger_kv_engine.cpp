@@ -92,6 +92,50 @@
 
 namespace mongo {
 
+namespace {
+bool shouldDowngrade(bool readOnly, bool repairMode, bool hasRecoveryTimestamp) {
+    if (readOnly) {
+        // A read-only state must not have upgraded. Nor could it downgrade.
+        return false;
+    }
+
+    if (repairMode) {
+        // Perhaps overly conservative. Here we argue that running `--repair` shouldn't have
+        // impact on upgrade/downgrade. Alternatively, we could downgrade so long as
+        // `hasRecoveryTimestamp` is false.
+        return false;
+    }
+
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        // Take no action when the FCV document hasn't been read.
+        return false;
+    }
+
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
+        // Only consider downgrading when FCV is set to 3.6
+        return false;
+    }
+
+    if (getGlobalReplSettings().usingReplSets()) {
+        // If this process is run with `--replSet`, it must have run any startup replication
+        // recovery and downgrading at this point is safe.
+        return true;
+    }
+
+    if (hasRecoveryTimestamp) {
+        // If we're not running with `--replSet`, don't allow downgrades if the node needed to run
+        // replication recovery. Having a recovery timestamp implies recovery must be run, but it
+        // was not done so.
+        return false;
+    }
+
+    // If there is no `recoveryTimestamp`, then the data should be consistent with the top of
+    // oplog and downgrading can proceed. This is expected for standalone datasets that use FCV.
+    return true;
+}
+}  // namespace
+
 using std::set;
 using std::string;
 
@@ -353,6 +397,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _sizeStorerSyncTracker(cs, 100000, Seconds(60)),
       _durable(durable),
       _ephemeral(ephemeral),
+      _inRepairMode(repair),
       _readOnly(readOnly) {
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
@@ -551,16 +596,7 @@ void WiredTigerKVEngine::cleanShutdown() {
         closeConfig = "leak_memory=true,";
     }
 
-    // There are two cases to consider where the server will shutdown before the in-memory FCV
-    // state is set. One is when `EncryptionHooks::restartRequired` is true. The other is when the
-    // server shuts down because it refuses to acknowledge an FCV value more than one version
-    // behind (e.g: 4.0 errors when reading 3.4).
-    const bool needsDowngrade = !_readOnly &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36;
-
-    if (!needsDowngrade) {
+    if (!shouldDowngrade(_readOnly, _inRepairMode, !_recoveryTimestamp.isNull())) {
         closeConfig += "use_timestamp=true,";
         invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
         return;
