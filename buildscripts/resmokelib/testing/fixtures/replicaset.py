@@ -23,12 +23,12 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     # Error response codes copied from mongo/base/error_codes.err.
     _NODE_NOT_FOUND = 74
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments, too-many-locals
             self, logger, job_num, mongod_executable=None, mongod_options=None, dbpath_prefix=None,
             preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
             write_concern_majority_journal_default=None, auth_options=None,
             replset_config_options=None, voting_secondaries=None, all_nodes_electable=False,
-            use_replica_set_connection_string=None):
+            use_replica_set_connection_string=None, linear_chain=False):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
@@ -44,6 +44,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.voting_secondaries = voting_secondaries
         self.all_nodes_electable = all_nodes_electable
         self.use_replica_set_connection_string = use_replica_set_connection_string
+        self.linear_chain = linear_chain
 
         # If voting_secondaries has not been set, set a default. By default, secondaries have zero
         # votes unless they are also nodes capable of being elected primary.
@@ -80,8 +81,14 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 node = self._new_mongod(i, self.replset_name)
                 self.nodes.append(node)
 
-        for node in self.nodes:
-            node.setup()
+        for i in xrange(self.num_nodes):
+            if self.linear_chain and i > 0:
+                self.nodes[i].mongod_options["set_parameters"][
+                    "failpoint.forceSyncSourceCandidate"] = {
+                        "mode": "alwaysOn",
+                        "data": {"hostAndPort": self.nodes[i - 1].get_internal_connection_string()}
+                    }
+            self.nodes[i].setup()
 
         if self.start_initial_sync_node:
             if not self.initial_sync_node:
@@ -407,6 +414,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         mongod_options = self.mongod_options.copy()
         mongod_options["replSet"] = replset_name
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node{}".format(index))
+        mongod_options["set_parameters"] = mongod_options.get("set_parameters", {}).copy()
 
         return standalone.MongoDFixture(
             mongod_logger, self.job_num, mongod_executable=self.mongod_executable,

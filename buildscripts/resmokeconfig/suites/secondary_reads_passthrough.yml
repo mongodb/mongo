@@ -122,7 +122,12 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
+        # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
+        # an oplog yet because it has not conducted its own initial sync yet.
+        # We turn on the noop writer to encourage successful sync source selection.
+        numInitialSyncAttempts: 100
+        writePeriodicNoops: true
+    linear_chain: true
     num_nodes: 5
     # We give each of the nodes a vote in a 5-node replica set so that the
     # secondaries have different beliefs about the majority commit point
