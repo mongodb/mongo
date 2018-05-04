@@ -98,9 +98,15 @@ bool BatchedCommandRequest::isInsertIndexRequest() const {
 
 std::size_t BatchedCommandRequest::sizeWriteOps() const {
     struct Visitor {
-        auto operator()(const write_ops::Insert& op) const { return op.getDocuments().size(); }
-        auto operator()(const write_ops::Update& op) const { return op.getUpdates().size(); }
-        auto operator()(const write_ops::Delete& op) const { return op.getDeletes().size(); }
+        auto operator()(const write_ops::Insert& op) const {
+            return op.getDocuments().size();
+        }
+        auto operator()(const write_ops::Update& op) const {
+            return op.getUpdates().size();
+        }
+        auto operator()(const write_ops::Delete& op) const {
+            return op.getDeletes().size();
+        }
     };
     return _visit(Visitor{});
 }
