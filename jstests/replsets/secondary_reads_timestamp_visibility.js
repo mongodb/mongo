@@ -56,6 +56,7 @@
 
     // We should see the previous, un-replicated state on the secondary with every readconcern.
     for (let i in levels) {
+        print("Checking that no new updates are visible yet for readConcern: " + levels[i]);
         assert.eq(secondaryDB.getCollection(collName).find({x: 0}).readConcern(levels[i]).itcount(),
                   100);
         assert.eq(secondaryDB.getCollection(collName).find({x: 1}).readConcern(levels[i]).itcount(),
@@ -73,7 +74,8 @@
     replSet.awaitReplication();
 
     for (let i in levels) {
-        // We should see the previous state on the secondary with every readconcern.
+        print("Checking that new updates are visible for readConcern: " + levels[i]);
+        // We should see the new state on the secondary with every readconcern.
         assert.eq(secondaryDB.getCollection(collName).find({x: 0}).readConcern(levels[i]).itcount(),
                   0);
         assert.eq(secondaryDB.getCollection(collName).find({x: 1}).readConcern(levels[i]).itcount(),
