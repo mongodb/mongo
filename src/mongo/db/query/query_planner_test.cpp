@@ -1113,12 +1113,7 @@ TEST_F(QueryPlannerTest, MaxValid) {
 
 TEST_F(QueryPlannerTest, MinMaxSameValue) {
     addIndex(BSON("a" << 1));
-    runQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), fromjson("{a: 1}"));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, "
-        "node: {ixscan: {filter: null, pattern: {a: 1}}}}}");
+    runInvalidQueryHintMinMax(BSONObj(), BSONObj(), fromjson("{a: 1}"), fromjson("{a: 1}"));
 }
 
 TEST_F(QueryPlannerTest, MaxWithoutIndex) {

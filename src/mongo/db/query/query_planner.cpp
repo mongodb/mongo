@@ -704,7 +704,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
                     // Now we have the final min and max. This index is only relevant for
                     // the min/max query if min < max.
-                    if (0 >=
+                    if (0 >
                         finishedMinObj.woCompare(finishedMaxObj, indexEntry.keyPattern, false)) {
                         // Found a relevant index.
                         idxNo = i;

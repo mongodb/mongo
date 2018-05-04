@@ -1,111 +1,153 @@
-// test min / max query parameters
-load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
-load("jstests/aggregation/extras/utils.js");  // For resultsEq.
+// Test min / max query parameters.
+(function() {
+    "use strict";
 
-addData = function() {
-    t.save({a: 1, b: 1});
-    t.save({a: 1, b: 2});
-    t.save({a: 2, b: 1});
-    t.save({a: 2, b: 2});
-};
+    load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
+    load("jstests/aggregation/extras/utils.js");  // For resultsEq.
 
-t = db.jstests_minmax;
-t.drop();
-t.ensureIndex({a: 1, b: 1});
-addData();
+    const coll = db.jstests_minmax;
+    coll.drop();
 
-printjson(t.find().min({a: 1, b: 2}).max({a: 2, b: 1}).toArray());
-assert.eq(1, t.find().min({a: 1, b: 2}).max({a: 2, b: 1}).toArray().length);
-assert.eq(2, t.find().min({a: 1, b: 2}).max({a: 2, b: 1.5}).toArray().length);
-assert.eq(2, t.find().min({a: 1, b: 2}).max({a: 2, b: 2}).toArray().length);
+    function addData() {
+        assert.commandWorked(coll.save({a: 1, b: 1}));
+        assert.commandWorked(coll.save({a: 1, b: 2}));
+        assert.commandWorked(coll.save({a: 2, b: 1}));
+        assert.commandWorked(coll.save({a: 2, b: 2}));
+    }
 
-// just one bound
-assert.eq(3, t.find().min({a: 1, b: 2}).toArray().length);
-assert.eq(3, t.find().max({a: 2, b: 1.5}).toArray().length);
-assert.eq(3, t.find().min({a: 1, b: 2}).hint({a: 1, b: 1}).toArray().length);
-assert.eq(3, t.find().max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length);
+    assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+    addData();
 
-t.drop();
-t.ensureIndex({a: 1, b: -1});
-addData();
-assert.eq(4, t.find().min({a: 1, b: 2}).toArray().length);
-assert.eq(4, t.find().max({a: 2, b: 0.5}).toArray().length);
-assert.eq(1, t.find().min({a: 2, b: 1}).toArray().length);
-assert.eq(1, t.find().max({a: 1, b: 1.5}).toArray().length);
-assert.eq(4, t.find().min({a: 1, b: 2}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(4, t.find().max({a: 2, b: 0.5}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(1, t.find().min({a: 2, b: 1}).hint({a: 1, b: -1}).toArray().length);
-assert.eq(1, t.find().max({a: 1, b: 1.5}).hint({a: 1, b: -1}).toArray().length);
+    assert.eq(1, coll.find().min({a: 1, b: 2}).max({a: 2, b: 1}).toArray().length);
+    assert.eq(2, coll.find().min({a: 1, b: 2}).max({a: 2, b: 1.5}).toArray().length);
+    assert.eq(2, coll.find().min({a: 1, b: 2}).max({a: 2, b: 2}).toArray().length);
 
-// hint doesn't match
-assert.throws(function() {
-    t.find().min({a: 1}).hint({a: 1, b: -1}).toArray();
-});
-assert.throws(function() {
-    t.find().min({a: 1, b: 1}).max({a: 1}).hint({a: 1, b: -1}).toArray();
-});
-assert.throws(function() {
-    t.find().min({b: 1}).max({a: 1, b: 2}).hint({a: 1, b: -1}).toArray();
-});
-assert.throws(function() {
-    t.find().min({a: 1}).hint({$natural: 1}).toArray();
-});
-assert.throws(function() {
-    t.find().max({a: 1}).hint({$natural: 1}).toArray();
-});
+    // Single bound.
+    assert.eq(3, coll.find().min({a: 1, b: 2}).toArray().length);
+    assert.eq(3, coll.find().max({a: 2, b: 1.5}).toArray().length);
+    assert.eq(3, coll.find().min({a: 1, b: 2}).hint({a: 1, b: 1}).toArray().length);
+    assert.eq(3, coll.find().max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length);
 
-// Reverse direction scan of the a:1 index between a:6 (inclusive) and a:3 (exclusive).
-t.drop();
-t.ensureIndex({a: 1});
-for (i = 0; i < 10; ++i) {
-    t.save({_id: i, a: i});
-}
-if (0) {  // SERVER-3766
-    reverseResult = t.find().min({a: 6}).max({a: 3}).sort({a: -1}).hint({a: 1}).toArray();
-    assert.eq([{_id: 6, a: 6}, {_id: 5, a: 5}, {_id: 4, a: 4}], reverseResult);
-}
+    coll.drop();
+    assert.commandWorked(coll.ensureIndex({a: 1, b: -1}));
+    addData();
+    assert.eq(4, coll.find().min({a: 1, b: 2}).toArray().length);
+    assert.eq(4, coll.find().max({a: 2, b: 0.5}).toArray().length);
+    assert.eq(1, coll.find().min({a: 2, b: 1}).toArray().length);
+    assert.eq(1, coll.find().max({a: 1, b: 1.5}).toArray().length);
+    assert.eq(4, coll.find().min({a: 1, b: 2}).hint({a: 1, b: -1}).toArray().length);
+    assert.eq(4, coll.find().max({a: 2, b: 0.5}).hint({a: 1, b: -1}).toArray().length);
+    assert.eq(1, coll.find().min({a: 2, b: 1}).hint({a: 1, b: -1}).toArray().length);
+    assert.eq(1, coll.find().max({a: 1, b: 1.5}).hint({a: 1, b: -1}).toArray().length);
 
-//
-// SERVER-15015.
-//
+    // Hint doesn't match.
+    assert.throws(function() {
+        coll.find().min({a: 1}).hint({a: 1, b: -1}).toArray();
+    });
+    assert.throws(function() {
+        coll.find().min({a: 1, b: 1}).max({a: 1}).hint({a: 1, b: -1}).toArray();
+    });
+    assert.throws(function() {
+        coll.find().min({b: 1}).max({a: 1, b: 2}).hint({a: 1, b: -1}).toArray();
+    });
+    assert.throws(function() {
+        coll.find().min({a: 1}).hint({$natural: 1}).toArray();
+    });
+    assert.throws(function() {
+        coll.find().max({a: 1}).hint({$natural: 1}).toArray();
+    });
 
-// Test ascending index.
-t.drop();
-t.ensureIndex({a: 1});
-t.insert({a: 3});
-t.insert({a: 4});
-t.insert({a: 5});
+    coll.drop();
+    assert.commandWorked(coll.ensureIndex({a: 1}));
+    for (let i = 0; i < 10; ++i) {
+        assert.commandWorked(coll.save({_id: i, a: i}));
+    }
 
-var cursor = t.find().min({a: 4});
-if (FixtureHelpers.numberOfShardsForCollection(t) === 1) {
-    assert.eq(4, cursor.next().a);
-    assert.eq(5, cursor.next().a);
-} else {
-    // With more than one shard, we cannot assume the results will come back in order, since we
-    // did not request a sort.
-    assert(resultsEq([cursor.next().a, cursor.next().a], [4, 5]));
-}
-assert(!cursor.hasNext());
+    // Reverse direction scan of the a:1 index between a:6 (inclusive) and a:3 (exclusive) is
+    // expected to fail, as max must be > min.
+    let error = assert.throws(function() {
+        coll.find().min({a: 6}).max({a: 3}).sort({a: -1}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
 
-cursor = t.find().max({a: 4});
-assert.eq(3, cursor.next()["a"]);
-assert(!cursor.hasNext());
+    error = assert.throws(function() {
+        coll.find().min({a: 6}).max({a: 3}).sort({a: -1}).hint({a: 1}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
 
-// Test descending index.
-t.dropIndexes();
-t.ensureIndex({a: -1});
+    // A find with identical min and max values is expected to fail, as max is exclusive.
+    error = assert.throws(function() {
+        coll.find().min({a: 2}).max({a: 2}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
 
-cursor = t.find().min({a: 4});
-if (FixtureHelpers.numberOfShardsForCollection(t) === 1) {
-    assert.eq(4, cursor.next().a);
-    assert.eq(3, cursor.next().a);
-} else {
-    // With more than one shard, we cannot assume the results will come back in order, since we
-    // did not request a sort.
-    assert(resultsEq([cursor.next().a, cursor.next().a], [4, 3]));
-}
-assert(!cursor.hasNext());
+    error = assert.throws(function() {
+        coll.find().min({a: 2}).max({a: 2}).hint({a: 1}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
 
-cursor = t.find().max({a: 4});
-assert.eq(5, cursor.next()["a"]);
-assert(!cursor.hasNext());
+    error = assert.throws(function() {
+        coll.find().min({a: 2}).max({a: 2}).sort({a: -1}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
+
+    error = assert.throws(function() {
+        coll.find().min({a: 2}).max({a: 2}).sort({a: -1}).hint({a: 1}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
+
+    coll.drop();
+    addData();
+    assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+
+    error = assert.throws(function() {
+        coll.find().min({a: 1, b: 2}).max({a: 1, b: 2}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
+
+    error = assert.throws(function() {
+        coll.find().min({a: 1, b: 2}).max({a: 1, b: 2}).hint({a: 1, b: 1}).toArray();
+    });
+    assert.eq(error.code, ErrorCodes.BadValue);
+
+    // Test ascending index.
+    coll.drop();
+    assert.commandWorked(coll.ensureIndex({a: 1}));
+    assert.commandWorked(coll.insert({a: 3}));
+    assert.commandWorked(coll.insert({a: 4}));
+    assert.commandWorked(coll.insert({a: 5}));
+
+    let cursor = coll.find().min({a: 4});
+    if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
+        assert.eq(4, cursor.next().a);
+        assert.eq(5, cursor.next().a);
+    } else {
+        // With more than one shard, we cannot assume the results will come back in order, since we
+        // did not request a sort.
+        assert(resultsEq([cursor.next().a, cursor.next().a], [4, 5]));
+    }
+    assert(!cursor.hasNext());
+
+    cursor = coll.find().max({a: 4});
+    assert.eq(3, cursor.next()["a"]);
+    assert(!cursor.hasNext());
+
+    // Test descending index.
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(coll.ensureIndex({a: -1}));
+
+    cursor = coll.find().min({a: 4});
+    if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
+        assert.eq(4, cursor.next().a);
+        assert.eq(3, cursor.next().a);
+    } else {
+        // With more than one shard, we cannot assume the results will come back in order, since we
+        // did not request a sort.
+        assert(resultsEq([cursor.next().a, cursor.next().a], [4, 3]));
+    }
+    assert(!cursor.hasNext());
+
+    cursor = coll.find().max({a: 4});
+    assert.eq(5, cursor.next()["a"]);
+    assert(!cursor.hasNext());
+}());
