@@ -79,8 +79,6 @@ verifyMax({a: {a: 1}}, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 verifyMin({a: 'a'}, []);
 verifyMax({a: 'a'}, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
-verifyResultIds(t.find().min({a: 4}).max({a: 4}).toArray(), []);
-
 // Now with a compound index.
 reset(t);
 assert.commandWorked(t.ensureIndex({a: 1, b: -1}));
@@ -100,8 +98,6 @@ verifyMax({a: {a: 1}, b: 1}, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
 verifyMin({a: 'a', b: 1}, []);
 verifyMax({a: 'a', b: 1}, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
-
-verifyResultIds(t.find().min({a: 4, b: 1}).max({a: 4, b: 1}).toArray(), []);
 
 // Edge cases on b values
 verifyMin({a: 1, b: Infinity}, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -145,8 +141,6 @@ verifyMax({a: {a: 1}}, []);
 
 verifyMin({a: 'a'}, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 verifyMax({a: 'a'}, []);
-
-verifyResultIds(t.find().min({a: 4}).max({a: 4}).toArray(), []);
 
 // Now with a compound index.
 reset(t);
