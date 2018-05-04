@@ -8,10 +8,12 @@ import sys
 
 import yaml
 
-# pylint: disable=unused-argument
-
 DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS = 30 * 60
 DEFAULT_NON_REQUIRED_BUILD_TIMEOUT_SECS = 2 * 60 * 60
+
+SPECIFIC_TASK_OVERRIDES = {
+    "linux-64-debug": {"auth": 60 * 60, },
+}
 
 REQUIRED_BUILD_VARIANTS = {
     "linux-64-debug", "enterprise-windows-64-2k8", "enterprise-rhel-62-64-bit",
@@ -25,6 +27,9 @@ def determine_timeout(task_name, variant, timeout=0):
 
     if timeout and timeout != 0:
         return timeout
+
+    if variant in SPECIFIC_TASK_OVERRIDES and task_name in SPECIFIC_TASK_OVERRIDES[variant]:
+        return SPECIFIC_TASK_OVERRIDES[variant][task_name]
 
     if variant in REQUIRED_BUILD_VARIANTS:
         return DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS

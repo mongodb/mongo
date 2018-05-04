@@ -27,3 +27,6 @@ class DetermineTimeoutTest(unittest.TestCase):
         self.assertEqual(
             ett.determine_timeout("task_name", next(iter(ett.REQUIRED_BUILD_VARIANTS))),
             ett.DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS)
+
+    def test_task_specific_timeout(self):
+        self.assertEqual(ett.determine_timeout("auth", "linux-64-debug"), 60 * 60)
