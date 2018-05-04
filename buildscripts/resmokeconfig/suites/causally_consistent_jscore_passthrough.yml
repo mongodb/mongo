@@ -135,6 +135,10 @@ selector:
   - jstests/core/explain_upsert.js
   # The `dbstats` command builds in-memory structures that are not causally consistent.
   - jstests/core/dbstats.js
+  # TODO SERVER-33248: Remove this test from the blacklist. The secondary can get stuck without a
+  # sync source if the RestartCatalog command kills its oplog fetching cursor, which blocks
+  # secondary majority reads.
+  - jstests/core/restart_catalog.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   ##

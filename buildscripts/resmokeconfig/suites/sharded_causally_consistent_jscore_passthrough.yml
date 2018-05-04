@@ -177,6 +177,10 @@ selector:
   - jstests/core/dbstats.js
   # TODO SERVER-34248
   - jstests/core/function_string_representations.js
+  # TODO SERVER-33248: Remove this test from the blacklist. The secondary can get stuck without a
+  # sync source if the RestartCatalog command kills its oplog fetching cursor, which blocks
+  # secondary majority reads.
+  - jstests/core/restart_catalog.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
