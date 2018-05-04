@@ -1221,10 +1221,11 @@ Status multiSyncApply(OperationContext* opCtx,
 
     ApplierHelpers::stableSortByNamespace(ops);
 
-    // This function is only called in steady state replication.
-    // TODO: This function can be called when we're in recovering as well as secondary. Set this
-    // mode correctly.
-    const OplogApplication::Mode oplogApplicationMode = OplogApplication::Mode::kSecondary;
+    // This function is only called in steady state replication and recovering.
+    // Assume we are recovering if oplog writes are disabled in the options.
+    const auto oplogApplicationMode = st->getOptions().skipWritesToOplog
+        ? OplogApplication::Mode::kRecovering
+        : OplogApplication::Mode::kSecondary;
 
     ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
 
