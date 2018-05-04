@@ -220,19 +220,6 @@ TEST_F(QueryPlannerTest, MinMaxWithStringBoundsCannotBeCoveredWithCollator) {
         "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
-TEST_F(QueryPlannerTest, MinMaxWithoutStringBoundsBoundsCanBeCoveredWithCollator) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    addIndex(fromjson("{a: 1, b: 1}"), &collator);
-
-    runQueryAsCommand(
-        fromjson("{find: 'testns', min: {a: 1, b: 2}, max: {a: 1, b: 2}, "
-                 "projection: {_id: 0, a: 1, b: 1}, collation: {locale: 'reverse'}}"));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
-}
-
 TEST_F(QueryPlannerTest, SimpleRegexCanUseAnIndexWithACollatorWithLooseBounds) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(fromjson("{a: 1}"), &collator);
