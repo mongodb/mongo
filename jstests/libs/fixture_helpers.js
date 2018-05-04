@@ -13,7 +13,7 @@ var FixtureHelpers = (function() {
         return isMaster.setName + "/" + isMaster.hosts.join(",");
     }
 
-    function _isMongos() {
+    function isMongos() {
         return db.runCommand({isdbgrid: 1}).isdbgrid;
     }
 
@@ -23,7 +23,7 @@ var FixtureHelpers = (function() {
      */
     function _getAllReplicas() {
         let replicas = [];
-        if (_isMongos()) {
+        if (isMongos()) {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1});
             replicas = shardObjs.map((shardObj) => new ReplSetTest(shardObj.host));
         } else {
@@ -68,7 +68,7 @@ var FixtureHelpers = (function() {
      * Returns the same connection that 'db' is using if the fixture is not a sharded cluster.
      */
     function getPrimaryForNodeHostingDatabase(db) {
-        if (!_isMongos()) {
+        if (!isMongos()) {
             return db.getMongo();
         }
         const configDB = db.getSiblingDB("config");
@@ -92,6 +92,7 @@ var FixtureHelpers = (function() {
     }
 
     return {
+        isMongos: isMongos,
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
