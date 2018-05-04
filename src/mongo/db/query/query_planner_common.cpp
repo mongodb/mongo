@@ -61,8 +61,8 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         }
 
         if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
-            LOG(5) << "Invalid bounds: " << isn->bounds.toString() << std::endl;
-            invariant(0);
+            severe() << "Invalid bounds: " << isn->bounds.toString();
+            MONGO_UNREACHABLE;
         }
 
         // TODO: we can just negate every value in the already computed properties.
