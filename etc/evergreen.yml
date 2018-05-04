@@ -656,7 +656,7 @@ functions:
           extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
         fi
 
-        ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${task_compile_flags|} ${scons_cache_args|} $extra_args ${targets} MONGO_VERSION=${version}
+        ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${task_compile_flags|} ${scons_cache_args|} $extra_args ${targets} ${additional_targets|} MONGO_VERSION=${version}
 
   "generate compile expansions" :
     command: shell.exec
