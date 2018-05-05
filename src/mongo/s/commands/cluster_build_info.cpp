@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018 MongoDB Inc.
+ *    Copyright (C) 2012-2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,23 +26,47 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
-#include "mongo/db/service_context.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/commands.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
+namespace {
 
-class Client;
-class StorageEngineLockFile;
-
-class ServiceContextMongoEmbedded final : public ServiceContext {
+class ClusterCmdBuildInfo : public BasicCommand {
 public:
-    ServiceContextMongoEmbedded();
+    ClusterCmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
 
-    ~ServiceContextMongoEmbedded();
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
 
-private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
-};
+    virtual bool adminOnly() const {
+        return false;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) const {}  // No auth required
+    std::string help() const override {
+        return "get version #, etc.\n"
+               "{ buildinfo:1 }";
+    }
 
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& jsobj,
+             BSONObjBuilder& result) {
+        VersionInfoInterface::instance().appendBuildInfo(&result);
+        return true;
+    }
+
+} cmdBuildInfo;
+
+}  // namespace
 }  // namespace mongo

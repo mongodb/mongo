@@ -35,33 +35,6 @@
 
 namespace mongo {
 
-void ServiceContextNoop::initializeGlobalStorageEngine() {}
-
-void ServiceContextNoop::shutdownGlobalStorageEngineCleanly() {}
-
-void ServiceContextNoop::registerStorageEngine(const std::string& name,
-                                               const StorageEngine::Factory* factory) {
-    // Takes ownership of 'factory' and deletes it because we don't need it.
-    delete factory;
-}
-
-bool ServiceContextNoop::isRegisteredStorageEngine(const std::string& name) {
-    return false;
-}
-
-StorageFactoriesIterator* ServiceContextNoop::makeStorageFactoriesIterator() {
-    class EmptySFI : public StorageFactoriesIterator {
-    public:
-        virtual bool more() const {
-            return false;
-        }
-        virtual const StorageEngine::Factory* next() {
-            MONGO_UNREACHABLE;
-        }
-    };
-    return new EmptySFI();
-}
-
 std::unique_ptr<OperationContext> ServiceContextNoop::_newOpCtx(Client* client, unsigned opId) {
     return stdx::make_unique<OperationContextNoop>(client, opId);
 }

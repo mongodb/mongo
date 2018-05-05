@@ -64,6 +64,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -97,9 +98,9 @@ MONGO_REGISTER_SHIM(IndexCatalog::prepareInsertDeleteOptions)
     return IndexCatalogImpl::prepareInsertDeleteOptions(opCtx, desc, options);
 }
 
-using std::unique_ptr;
 using std::endl;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
@@ -535,7 +536,7 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
                                         << expression->toString());
     }
 }
-}
+}  // namespace
 
 Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec) const {
     const NamespaceString& nss = _collection->ns();
@@ -764,8 +765,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
                       "Empty \"storageEngine\" options are invalid. "
                       "Please remove the field or include valid options.");
     }
-    Status storageEngineStatus =
-        validateStorageOptions(storageEngineOptions, [](const auto& x, const auto& y) {
+    Status storageEngineStatus = validateStorageOptions(
+        opCtx->getServiceContext(), storageEngineOptions, [](const auto& x, const auto& y) {
             return x->validateIndexStorageOptions(y);
         });
     if (!storageEngineStatus.isOK()) {

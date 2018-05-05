@@ -32,7 +32,6 @@
 
 #include "mongo/client/embedded/embedded.h"
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/initializer.h"
 #include "mongo/client/embedded/replication_coordinator_embedded.h"
 #include "mongo/client/embedded/service_context_embedded.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
@@ -156,7 +156,7 @@ void shutdown(ServiceContext* srvContext) {
 
         // Global storage engine may not be started in all cases before we exit
         if (serviceContext->getStorageEngine()) {
-            serviceContext->shutdownGlobalStorageEngineCleanly();
+            shutdownGlobalStorageEngineCleanly(serviceContext);
         }
 
         Status status = mongo::runGlobalDeinitializers();
@@ -187,7 +187,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     initWireSpec();
 
-    auto serviceContext = checked_cast<ServiceContextMongoEmbedded*>(getGlobalServiceContext());
+    auto serviceContext = getGlobalServiceContext();
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
@@ -210,12 +210,12 @@ ServiceContext* initialize(const char* yaml_config) {
 
     DEV log(LogComponent::kControl) << "DEBUG build (which is slower)" << endl;
 
-    serviceContext->createLockFile();
+    createLockFile(serviceContext);
 
     serviceContext->setServiceEntryPoint(
         std::make_unique<ServiceEntryPointEmbedded>(serviceContext));
 
-    serviceContext->initializeGlobalStorageEngine();
+    initializeStorageEngine(serviceContext);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
     // configuration file/environment.
@@ -229,7 +229,7 @@ ServiceContext* initialize(const char* yaml_config) {
             }
 
             // Warn if field name matches non-active registered storage engine.
-            if (serviceContext->isRegisteredStorageEngine(e.fieldName())) {
+            if (isRegisteredStorageEngine(serviceContext, e.fieldName())) {
                 warning() << "Detected configuration for non-active storage engine "
                           << e.fieldName() << " when current storage engine is "
                           << storageGlobalParams.engine;

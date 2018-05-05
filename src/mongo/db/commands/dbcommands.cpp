@@ -87,6 +87,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/storage_stats.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
@@ -94,6 +95,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -763,6 +765,39 @@ public:
     }
 
 } cmdDBStats;
+
+class CmdBuildInfo : public BasicCommand {
+public:
+    CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    virtual bool adminOnly() const {
+        return false;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) const {}  // No auth required
+    std::string help() const override {
+        return "get version #, etc.\n"
+               "{ buildinfo:1 }";
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& jsobj,
+             BSONObjBuilder& result) {
+        VersionInfoInterface::instance().appendBuildInfo(&result);
+        appendStorageEngineList(opCtx->getServiceContext(), &result);
+        return true;
+    }
+
+} cmdBuildInfo;
 
 }  // namespace
 }  // namespace mongo

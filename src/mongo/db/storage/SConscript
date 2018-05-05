@@ -181,13 +181,29 @@ env.Library(
 env.Library(
     target='storage_engine_lock_file',
     source=[
+        'storage_engine_lock_file.cpp',
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        ]
+        '$BUILD_DIR/mongo/db/service_context',
+        ],
     )
 
+env.Library(
+    target='storage_engine_common',
+    source=[
+        'storage_engine_init.cpp'
+    ],
+    LIBDEPS=[
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+        'storage_engine_lock_file',
+        'storage_engine_metadata',
+        'storage_options',
+    ],
+)
 env.Library(
     target="storage_init_d",
     source=[

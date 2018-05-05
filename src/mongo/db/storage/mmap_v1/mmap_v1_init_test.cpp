@@ -31,6 +31,7 @@
 
 #include "mongo/db/json.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/unittest/unittest.h"
@@ -45,24 +46,13 @@ private:
     virtual void setUp() {
         ServiceContext* globalEnv = getGlobalServiceContext();
         ASSERT_TRUE(globalEnv);
-        ASSERT_TRUE(getGlobalServiceContext()->isRegisteredStorageEngine("mmapv1"));
-        std::unique_ptr<StorageFactoriesIterator> sfi(
-            getGlobalServiceContext()->makeStorageFactoriesIterator());
-        ASSERT_TRUE(sfi);
-        bool found = false;
-        while (sfi->more()) {
-            const StorageEngine::Factory* currentFactory = sfi->next();
-            if (currentFactory->getCanonicalName() == "mmapv1") {
-                found = true;
-                factory = currentFactory;
-                break;
-            }
-        }
-        ASSERT_TRUE(found);
+        ASSERT_TRUE(isRegisteredStorageEngine(globalEnv, "mmapv1"));
+        factory = getFactoryForStorageEngine(globalEnv, "mmapv1");
+        ASSERT_TRUE(factory);
     }
 
     virtual void tearDown() {
-        factory = NULL;
+        factory = nullptr;
     }
 
 protected:

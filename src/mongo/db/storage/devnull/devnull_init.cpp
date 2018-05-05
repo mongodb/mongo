@@ -34,6 +34,7 @@
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -66,7 +67,8 @@ public:
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(DevNullEngineInit, ("ServiceContext"))
 (InitializerContext* context) {
-    getGlobalServiceContext()->registerStorageEngine("devnull", new DevNullStorageEngineFactory());
+    registerStorageEngine(getGlobalServiceContext(),
+                          std::make_unique<DevNullStorageEngineFactory>());
     return Status::OK();
 }
-}
+}  // namespace mongo

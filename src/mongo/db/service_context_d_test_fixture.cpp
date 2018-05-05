@@ -42,6 +42,7 @@
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
@@ -67,8 +68,8 @@ void ServiceContextMongoDTest::setUp() {
         storageGlobalParams.engine = "ephemeralForTest";
         storageGlobalParams.engineSetByUser = true;
 
-        checked_cast<ServiceContextMongoD*>(serviceContext)->createLockFile();
-        serviceContext->initializeGlobalStorageEngine();
+        createLockFile(serviceContext);
+        initializeStorageEngine(serviceContext);
         serviceContext->setOpObserver(stdx::make_unique<OpObserverNoop>());
     }
 

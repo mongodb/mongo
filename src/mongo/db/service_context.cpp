@@ -99,43 +99,6 @@ bool isMMAPV1() {
     return globalStorageEngine->isMmapV1();
 }
 
-Status validateStorageOptions(
-    const BSONObj& storageEngineOptions,
-    stdx::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc) {
-    BSONObjIterator storageIt(storageEngineOptions);
-    while (storageIt.more()) {
-        BSONElement storageElement = storageIt.next();
-        StringData storageEngineName = storageElement.fieldNameStringData();
-        if (storageElement.type() != mongo::Object) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "'storageEngine." << storageElement.fieldNameStringData()
-                                        << "' has to be an embedded document.");
-        }
-
-        std::unique_ptr<StorageFactoriesIterator> sfi(
-            getGlobalServiceContext()->makeStorageFactoriesIterator());
-        invariant(sfi);
-        bool found = false;
-        while (sfi->more()) {
-            const StorageEngine::Factory* const& factory = sfi->next();
-            if (storageEngineName != factory->getCanonicalName()) {
-                continue;
-            }
-            Status status = validateFunc(factory, storageElement.Obj());
-            if (!status.isOK()) {
-                return status;
-            }
-            found = true;
-        }
-        if (!found) {
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream() << storageEngineName
-                                        << " is not a registered storage engine for this server");
-        }
-    }
-    return Status::OK();
-}
-
 ServiceContext::ServiceContext()
     : _tickSource(stdx::make_unique<SystemTickSource>()),
       _fastClockSource(stdx::make_unique<SystemClockSource>()),
@@ -298,29 +261,6 @@ Client* ServiceContext::LockedClientsCursor::next() {
     Client* result = *_curr;
     ++_curr;
     return result;
-}
-
-BSONArray storageEngineList() {
-    if (!hasGlobalServiceContext())
-        return BSONArray();
-
-    std::unique_ptr<StorageFactoriesIterator> sfi(
-        getGlobalServiceContext()->makeStorageFactoriesIterator());
-
-    if (!sfi)
-        return BSONArray();
-
-    BSONArrayBuilder engineArrayBuilder;
-
-    while (sfi->more()) {
-        engineArrayBuilder.append(sfi->next()->getCanonicalName());
-    }
-
-    return engineArrayBuilder.arr();
-}
-
-void appendStorageEngineList(BSONObjBuilder* result) {
-    result->append("storageEngines", storageEngineList());
 }
 
 void ServiceContext::setKillAllOperations() {

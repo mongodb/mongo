@@ -26,23 +26,21 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/service_context.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/storage/storage_engine_lock_file.h"
 
 namespace mongo {
+namespace {
 
-class Client;
-class StorageEngineLockFile;
+auto getLockFile = ServiceContext::declareDecoration<boost::optional<StorageEngineLockFile>>();
 
-class ServiceContextMongoEmbedded final : public ServiceContext {
-public:
-    ServiceContextMongoEmbedded();
+}  // namespace
 
-    ~ServiceContextMongoEmbedded();
-
-private:
-    std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
-};
+boost::optional<StorageEngineLockFile>& StorageEngineLockFile::get(ServiceContext* service) {
+    return getLockFile(service);
+}
 
 }  // namespace mongo

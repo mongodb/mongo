@@ -41,6 +41,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
@@ -182,9 +183,7 @@ public:
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit, ("ServiceContext"))
 (InitializerContext* context) {
-    getGlobalServiceContext()->registerStorageEngine(kWiredTigerEngineName,
-                                                     new WiredTigerFactory());
-
+    registerStorageEngine(getGlobalServiceContext(), std::make_unique<WiredTigerFactory>());
     return Status::OK();
 }
 }

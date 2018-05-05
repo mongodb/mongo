@@ -67,6 +67,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
@@ -92,12 +93,12 @@ namespace {
 MONGO_FP_DECLARE(hangBeforeLoggingCreateCollection);
 }  // namespace
 
-using std::unique_ptr;
 using std::endl;
 using std::list;
 using std::set;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 void uassertNamespaceNotIndex(StringData ns, StringData caller) {
@@ -1019,18 +1020,19 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
         }
     }
 
-    status =
-        validateStorageOptions(collectionOptions.storageEngine, [](const auto& x, const auto& y) {
-            return x->validateCollectionStorageOptions(y);
-        });
+    status = validateStorageOptions(
+        opCtx->getServiceContext(),
+        collectionOptions.storageEngine,
+        [](const auto& x, const auto& y) { return x->validateCollectionStorageOptions(y); });
 
     if (!status.isOK())
         return status;
 
     if (auto indexOptions = collectionOptions.indexOptionDefaults["storageEngine"]) {
-        status = validateStorageOptions(indexOptions.Obj(), [](const auto& x, const auto& y) {
-            return x->validateIndexStorageOptions(y);
-        });
+        status = validateStorageOptions(
+            opCtx->getServiceContext(), indexOptions.Obj(), [](const auto& x, const auto& y) {
+                return x->validateIndexStorageOptions(y);
+            });
 
         if (!status.isOK()) {
             return status;

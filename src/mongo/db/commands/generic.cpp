@@ -38,7 +38,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
-#include "mongo/util/version.h"
 
 #include <sstream>
 #include <string>
@@ -50,39 +49,6 @@ namespace {
 using std::string;
 using std::stringstream;
 using std::vector;
-
-class CmdBuildInfo : public BasicCommand {
-public:
-    CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    virtual bool adminOnly() const {
-        return false;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
-    std::string help() const override {
-        return "get version #, etc.\n"
-               "{ buildinfo:1 }";
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& jsobj,
-             BSONObjBuilder& result) {
-        VersionInfoInterface::instance().appendBuildInfo(&result);
-        appendStorageEngineList(&result);
-        return true;
-    }
-
-} cmdBuildInfo;
 
 class PingCommand : public BasicCommand {
 public:

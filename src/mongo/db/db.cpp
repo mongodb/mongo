@@ -40,7 +40,6 @@
 #include <signal.h>
 #include <string>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
@@ -129,6 +128,7 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/ttl.h"
@@ -209,7 +209,7 @@ void logStartup(OperationContext* opCtx) {
 
     BSONObjBuilder buildinfo(toLog.subobjStart("buildinfo"));
     VersionInfoInterface::instance().appendBuildInfo(&buildinfo);
-    appendStorageEngineList(&buildinfo);
+    appendStorageEngineList(opCtx->getServiceContext(), &buildinfo);
     buildinfo.doneFast();
 
     BSONObj o = toLog.obj();
@@ -270,7 +270,7 @@ ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
     initWireSpec();
-    auto serviceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
+    auto serviceContext = getGlobalServiceContext();
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
@@ -312,7 +312,7 @@ ExitCode _initAndListen(int listenPort) {
 
     logProcessDetails();
 
-    serviceContext->createLockFile();
+    createLockFile(serviceContext);
 
     serviceContext->setServiceEntryPoint(
         stdx::make_unique<ServiceEntryPointMongod>(serviceContext));
@@ -328,7 +328,7 @@ ExitCode _initAndListen(int listenPort) {
         serviceContext->setTransportLayer(std::move(tl));
     }
 
-    serviceContext->initializeGlobalStorageEngine();
+    initializeStorageEngine(serviceContext);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (EncryptionHooks::get(serviceContext)->restartRequired()) {
@@ -348,7 +348,7 @@ ExitCode _initAndListen(int listenPort) {
             }
 
             // Warn if field name matches non-active registered storage engine.
-            if (serviceContext->isRegisteredStorageEngine(e.fieldName())) {
+            if (isRegisteredStorageEngine(serviceContext, e.fieldName())) {
                 warning() << "Detected configuration for non-active storage engine "
                           << e.fieldName() << " when current storage engine is "
                           << storageGlobalParams.engine;
@@ -931,7 +931,7 @@ void shutdownTask() {
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {
-        serviceContext->shutdownGlobalStorageEngineCleanly();
+        shutdownGlobalStorageEngineCleanly(serviceContext);
     }
 
     // We drop the scope cache because leak sanitizer can't see across the

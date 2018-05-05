@@ -44,6 +44,9 @@ env.Library(
         'storage_ephemeral_for_test_core',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+    ],
 )
 
 env.CppUnitTest(
