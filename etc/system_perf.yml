@@ -176,6 +176,7 @@ functions:
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           dsi: ${dsi_rev}
           workloads: ${workloads_rev}
+          linkbench: ${linkbench_rev}
     - command: shell.exec
       params:
         working_dir: work
@@ -190,6 +191,7 @@ functions:
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
+          linkbench_dir: ../src/linkbench/linkbench
           authentication: ${authentication}
           EOF
 
@@ -347,6 +349,18 @@ tasks:
     - func: "compile mongodb"
       vars:
         wtdevelop: -wtdevelop
+
+- name: linkbench
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "linkbench"
+        authentication: disabled
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
 
 - name: industry_benchmarks_WT
   priority: 5
@@ -788,7 +802,6 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
-
 #######################################
 #               Modules               #
 #######################################
@@ -809,6 +822,11 @@ modules:
   repo: git@github.com:wiredtiger/wiredtiger.git
   prefix: src/third_party
   branch: develop
+
+- name: linkbench
+  repo: git@github.com:10gen/linkbench.git
+  prefix: linkbench
+  branch: master
 
 #######################################
 #         Buildvariants               #
@@ -845,6 +863,7 @@ buildvariants:
   modules: &modules
     - dsi
     - workloads
+    - linkbench
   expansions:
     setup: single-replica
     cluster: single
@@ -878,6 +897,7 @@ buildvariants:
     - name: change_streams_throughput
     - name: change_streams_latency
     - name: snapshot_reads_WT
+    - name: linkbench
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -1029,6 +1049,7 @@ buildvariants:
     - name: change_streams_latency
     - name: snapshot_reads_WT
     - name: secondary_reads_WT
+    - name: linkbench
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
@@ -1071,14 +1092,12 @@ buildvariants:
 - name: wtdevelop-1-node-replSet
   display_name: WT Develop 1-Node ReplSet
   batchtime: 1440 # 24 hours
-  modules: &modules
-    - dsi
-    - workloads
+  modules: *modules
   expansions:
     setup: single-replica
     cluster: single
     platform: linux
-    project: &project dsi
+    project: *project
     wtdevelop: -wtdevelop
     authentication: enabled
   run_on:
@@ -1099,6 +1118,7 @@ buildvariants:
     - name: change_streams_throughput
     - name: change_streams_latency
     - name: snapshot_reads_WT
+    - name: linkbench
 
 - name: wtdevelop-standalone
   display_name: WT Develop Standalone
@@ -1159,6 +1179,7 @@ buildvariants:
     - name: change_streams_latency
     - name: snapshot_reads_WT
     - name: secondary_reads_WT
+    - name: linkbench
 
 - name: wtdevelop-shard-lite
   display_name: WT Develop Shard Lite Cluster
