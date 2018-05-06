@@ -19,19 +19,16 @@ from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 
 
-class ContinuousStepdown(interface.CustomBehavior):
-    """The ContinuousStepdown hook regularly connects to replica sets and sends a replSetStepDown
-    command.
-    """
+class ContinuousStepdown(interface.CustomBehavior):  # pylint: disable=too-many-instance-attributes
+    """Regularly connect to replica sets and send a replSetStepDown command."""
+
     DESCRIPTION = ("Continuous stepdown (steps down the primary of replica sets at regular"
                    " intervals)")
 
-    def __init__(self, hook_logger, fixture,
-                 config_stepdown=True,
-                 shard_stepdown=True,
-                 stepdown_duration_secs=10,
-                 stepdown_interval_ms=8000):
-        """Initializes the ContinuousStepdown.
+    def __init__(  # pylint: disable=too-many-arguments
+            self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
+            stepdown_duration_secs=10, stepdown_interval_ms=8000, kill=False):
+        """Initialize the ContinuousStepdown.
 
         Args:
             hook_logger: the logger instance for this hook.
@@ -52,13 +49,14 @@ class ContinuousStepdown(interface.CustomBehavior):
 
         self._rs_fixtures = []
         self._stepdown_thread = None
+        self._kill = kill
 
     def before_suite(self, test_report):
         if not self._rs_fixtures:
             self._add_fixture(self._fixture)
         self._stepdown_thread = _StepdownThread(self.logger, self._rs_fixtures,
                                                 self._stepdown_interval_secs,
-                                                self._stepdown_duration_secs)
+                                                self._stepdown_duration_secs, self._kill)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -102,14 +100,17 @@ class ContinuousStepdown(interface.CustomBehavior):
                 self._add_fixture(fixture.configsvr)
 
 
-class _StepdownThread(threading.Thread):
-    def __init__(self, logger, rs_fixtures, stepdown_interval_secs, stepdown_duration_secs):
+class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, rs_fixtures, stepdown_interval_secs, stepdown_duration_secs, kill):
+        """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
         self.logger = logger
         self._rs_fixtures = rs_fixtures
         self._stepdown_interval_secs = stepdown_interval_secs
         self._stepdown_duration_secs = stepdown_duration_secs
+        self._kill = kill
 
         self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -196,25 +197,37 @@ class _StepdownThread(threading.Thread):
             # We'll try again after self._stepdown_interval_secs seconds.
             return
 
-        self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
-                         primary.port, rs_fixture.replset_name)
-
         secondaries = rs_fixture.get_secondaries()
 
-        try:
-            client = primary.mongo_client()
-            client.admin.command(bson.SON([
-                ("replSetStepDown", self._stepdown_duration_secs),
-                ("force", True),
-            ]))
-        except pymongo.errors.AutoReconnect:
-            # AutoReconnect exceptions are expected as connections are closed during stepdown.
-            pass
-        except pymongo.errors.PyMongoError:
-            self.logger.exception(
-                "Error while stepping down the primary on port %d of replica set '%s'.",
-                primary.port, rs_fixture.replset_name)
-            raise
+        # Check that the fixture is still running before stepping down or killing the primary.
+        # This ensures we still detect some cases in which the fixture has already crashed.
+        if not rs_fixture.is_running():
+            raise errors.ServerFailure("ReplicaSetFixture expected to be running in"
+                                       " ContinuousStepdown, but wasn't.")
+
+        if self._kill:
+            self.logger.info("Killing the primary on port %d of replica set '%s'.", primary.port,
+                             rs_fixture.replset_name)
+            primary.mongod.stop(kill=True)
+            primary.mongod.wait()
+        else:
+            self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
+                             primary.port, rs_fixture.replset_name)
+            try:
+                client = primary.mongo_client()
+                client.admin.command(
+                    bson.SON([
+                        ("replSetStepDown", self._stepdown_duration_secs),
+                        ("force", True),
+                    ]))
+            except pymongo.errors.AutoReconnect:
+                # AutoReconnect exceptions are expected as connections are closed during stepdown.
+                pass
+            except pymongo.errors.PyMongoError:
+                self.logger.exception(
+                    "Error while stepping down the primary on port %d of replica set '%s'.",
+                    primary.port, rs_fixture.replset_name)
+                raise
 
         # We pick arbitrary secondary to run for election immediately in order to avoid a long
         # period where the replica set doesn't have write availability. If none of the secondaries
@@ -239,6 +252,20 @@ class _StepdownThread(threading.Thread):
                 self.logger.info("Failed to step up the secondary on port %d of replica set '%s'.",
                                  chosen.port, rs_fixture.replset_name)
                 secondaries.remove(chosen)
+
+        if self._kill:
+            self.logger.info("Attempting to restart the old primary on port %d of replica set '%s.",
+                             primary.port, rs_fixture.replset_name)
+
+            # Restart the mongod on the old primary and wait until we can contact it again. Keep the
+            # original preserve_dbpath to restore after restarting the mongod.
+            original_preserve_dbpath = primary.preserve_dbpath
+            primary.preserve_dbpath = True
+            try:
+                primary.setup()
+                primary.await_ready()
+            finally:
+                primary.preserve_dbpath = original_preserve_dbpath
 
         # Bump the counter for the chosen secondary to indicate that the replSetStepUp command
         # executed successfully.

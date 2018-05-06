@@ -9,6 +9,7 @@ import sys
 
 from .. import config
 from .. import errors
+from ..testing.hooks import stepdown
 from ..utils import queue as _queue
 
 
@@ -28,6 +29,13 @@ class Job(object):
         self.hooks = hooks
         self.report = report
         self.suite_options = suite_options
+
+        # Don't check fixture.is_running() when using the ContinuousStepdown hook, which kills
+        # and restarts the primary. Even if the fixture is still running as expected, there is a
+        # race where fixture.is_running() could fail if called after the primary was killed but
+        # before it was restarted.
+        self._check_if_fixture_running = not any(
+            isinstance(hook, stepdown.ContinuousStepdown) for hook in self.hooks)
 
     def __call__(self, queue, interrupt_flag, teardown_flag=None):
         """
@@ -102,7 +110,7 @@ class Job(object):
             self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
             raise errors.StopExecution("%s failed" % (test.shortDescription()))
 
-        if not self.fixture.is_running():
+        if self._check_if_fixture_running and not self.fixture.is_running():
             self.logger.error("%s marked as a failure because the fixture crashed during the test.",
                               test.shortDescription())
             self.report.setFailure(test, return_code=2)
