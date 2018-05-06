@@ -1,4 +1,7 @@
 // Test the count command with views.
+//
+// @tags: [requires_fastcount]
+
 (function() {
     "use strict";
 

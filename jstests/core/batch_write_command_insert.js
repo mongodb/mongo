@@ -4,6 +4,7 @@
 // @tags: [
 //   assumes_write_concern_unchanged,
 //   cannot_create_unique_index_when_using_hashed_shard_key,
+//   requires_fastcount,
 // ]
 
 //

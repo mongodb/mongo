@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.error5;
 t.drop();

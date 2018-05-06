@@ -1,4 +1,7 @@
 // signed dates check
+//
+// @tags: [requires_fastcount]
+
 t = db.sort10;
 
 function checkSorting1(opts) {

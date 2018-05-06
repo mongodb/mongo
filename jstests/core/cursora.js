@@ -1,4 +1,4 @@
-// @tags: [requires_getmore, requires_non_retryable_writes]
+// @tags: [requires_getmore, requires_non_retryable_writes, requires_fastcount]
 
 t = db.cursora;
 

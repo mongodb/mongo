@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_fastcount]
 
 /**
  * This test creates a collection with autoIndexId: false. It then copies the database and expects

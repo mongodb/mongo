@@ -1,5 +1,7 @@
 /**
- *   Tests for the db collection
+ * Tests for the db collection
+ *
+ * @tags: [requires_fastcount]
  */
 
 /*

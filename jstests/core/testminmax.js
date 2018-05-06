@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.minmaxtest;
 t.drop();
 t.insert({

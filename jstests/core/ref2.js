@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.ref2;
 t.drop();

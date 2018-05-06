@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_fastcount]
 
 // Test applyops upsert flag SERVER-7452
 

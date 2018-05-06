@@ -1,7 +1,12 @@
 // Cannot implicitly shard accessed collections because of unsupported group operator on sharded
 // collection.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns, requires_getmore,
-// requires_non_retryable_writes]
+// @tags: [
+//   assumes_unsharded_collection,
+//   does_not_support_stepdowns,
+//   requires_getmore,
+//   requires_non_retryable_writes,
+//   requires_fastcount,
+// ]
 
 t = db.jstests_or4;
 t.drop();

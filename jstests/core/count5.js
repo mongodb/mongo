@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.count5;
 t.drop();

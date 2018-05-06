@@ -1,8 +1,13 @@
 // Cannot implicitly shard accessed collections because the error response from the shard about
 // using the empty string as the out collection name is converted to an error and no longer retains
 // the "code" property.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns, requires_getmore,
-// requires_non_retryable_commands]
+// @tags: [
+//   assumes_unsharded_collection,
+//   does_not_support_stepdowns,
+//   requires_getmore,
+//   requires_non_retryable_commands,
+//   requires_fastcount,
+// ]
 
 // This file tests that commands namespace parsing rejects embedded null bytes.
 // Note that for each command, a properly formatted command object must be passed to the helper

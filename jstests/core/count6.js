@@ -1,4 +1,6 @@
 // Some correctness checks for fast and normal count modes, including with skip and limit.
+//
+// @tags: [requires_fastcount]
 
 t = db.jstests_count6;
 

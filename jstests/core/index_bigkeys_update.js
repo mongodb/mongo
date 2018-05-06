@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 bigString = "";
 while (bigString.length < 16000)

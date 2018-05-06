@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, requires_fastcount]
 
 // tests to make sure that the new _id is returned after the insert in the shell
 var l;

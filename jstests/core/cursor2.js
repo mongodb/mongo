@@ -1,9 +1,11 @@
 
 /**
- *  test to see if the count returned from the cursor is the number of objects that would be
- *returned
+ * Test to see if the count returned from the cursor is the number of objects that would be
+ * returned
  *
- *  BUG 884
+ * BUG 884
+ *
+ * @tags: [requires_fastcount]
  */
 function testCursorCountVsArrLen(dbConn) {
     var coll = dbConn.ed_db_cursor2_ccvsal;

@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_non_retryable_writes, requires_fastcount]
 
 // The positional operator allows an update modifier field path to contain a sentinel ('$') path
 // part that is replaced with the numeric position of an array element matched by the update's query

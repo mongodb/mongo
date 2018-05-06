@@ -1,4 +1,6 @@
 // Confirms that the dbStats command returns expected content.
+//
+// @tags: [requires_dbstats]
 
 (function() {
     "use strict";
