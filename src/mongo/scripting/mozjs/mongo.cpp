@@ -31,10 +31,12 @@
 #include "mongo/scripting/mozjs/mongo.h"
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/native_sasl_client_session.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/db/logical_session_id.h"
@@ -72,6 +74,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(insert, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
         isReplicaSetConnection, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_markNodeAsFailed, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(logout, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(remove, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(runCommand, MongoLocalInfo, MongoExternalInfo),
@@ -158,17 +161,22 @@ void setHiddenMongo(JSContext* cx,
         } else {
             scope->getProto<MongoExternalInfo>().newObject(&newMongo);
         }
+
+        auto host = resPtr->getServerAddress();
         JS_SetPrivate(newMongo,
                       scope->trackedNew<std::shared_ptr<DBClientBase>>(std::move(resPtr)));
 
         ObjectWrapper from(cx, args.thisv());
         ObjectWrapper to(cx, newMongo);
-        for (const auto& k :
-             {InternedString::slaveOk, InternedString::defaultDB, InternedString::host}) {
+        for (const auto& k : {InternedString::slaveOk, InternedString::defaultDB}) {
             JS::RootedValue tmpValue(cx);
             from.getValue(k, &tmpValue);
             to.setValue(k, tmpValue);
         }
+
+        // 'newMongo' is a direct connection to an individual server. Its "host" property therefore
+        // reports the stringified HostAndPort of the underlying DBClientConnection.
+        to.setString(InternedString::host, host);
 
         JS::RootedValue value(cx);
         value.setObjectOrNull(newMongo);
@@ -670,6 +678,43 @@ void MongoBase::Functions::isReplicaSetConnection::call(JSContext* cx, JS::CallA
     }
 
     args.rval().setBoolean(conn->type() == ConnectionString::ConnectionType::SET);
+}
+
+void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 3) {
+        uasserted(ErrorCodes::BadValue, "_markNodeAsFailed needs 3 args");
+    }
+
+    if (!args.get(0).isString()) {
+        uasserted(ErrorCodes::BadValue,
+                  "first argument to _markNodeAsFailed must be a stringified host and port");
+    }
+
+    if (!args.get(1).isNumber()) {
+        uasserted(ErrorCodes::BadValue,
+                  "second argument to _markNodeAsFailed must be a numeric error code");
+    }
+
+    if (!args.get(2).isString()) {
+        uasserted(ErrorCodes::BadValue,
+                  "third argument to _markNodeAsFailed must be a stringified reason");
+    }
+
+    auto* rsConn = dynamic_cast<DBClientReplicaSet*>(getConnection(args));
+    if (!rsConn) {
+        uasserted(ErrorCodes::BadValue, "connection object isn't a replica set connection");
+    }
+
+    auto hostAndPort = ValueWriter(cx, args.get(0)).toString();
+    auto code = ValueWriter(cx, args.get(1)).toInt32();
+    auto reason = ValueWriter(cx, args.get(2)).toString();
+
+    const auto& replicaSetName = rsConn->getSetName();
+    ReplicaSetMonitor::get(replicaSetName)
+        ->failedHost(HostAndPort(hostAndPort),
+                     Status{static_cast<ErrorCodes::Error>(code), reason});
+
+    args.rval().setUndefined();
 }
 
 void MongoLocalInfo::construct(JSContext* cx, JS::CallArgs args) {

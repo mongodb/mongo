@@ -282,43 +282,17 @@ var {
 
         /**
          * Returns true if the error code is retryable, assuming the command is idempotent.
+         *
+         * The Retryable Writes specification defines a RetryableError as any network error, any of
+         * the following error codes, or an error response with a different code containing the
+         * phrase "not master" or "node is recovering".
+         *
+         * https://github.com/mongodb/specifications/blob/5b53e0baca18ba111364d479a37fa9195ef801a6/
+         * source/retryable-writes/retryable-writes.rst#terms
          */
         function isRetryableCode(code) {
             return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||
-                // The driver's spec does not allow retrying on writeConcern errors, so only do so
-                // when testing retryable writes.
-                (jsTest.options().alwaysInjectTransactionNumber &&
-                 ErrorCodes.isWriteConcernError(code));
-        }
-
-        /**
-         * Returns the error code from a write response that should be used in the check for
-         * retryability.
-         */
-        function getEffectiveWriteErrorCode(res) {
-            let code;
-            if (res instanceof WriteResult) {
-                if (res.hasWriteError()) {
-                    code = res.getWriteError().code;
-                } else if (res.hasWriteConcernError()) {
-                    code = res.getWriteConcernError().code;
-                }
-            } else if (res instanceof BulkWriteResult) {
-                if (res.hasWriteErrors()) {
-                    code = res.getWriteErrorAt(0).code;
-                } else if (res.hasWriteConcernError()) {
-                    code = res.getWriteConcernError().code;
-                }
-            } else {
-                if (res.writeError) {
-                    code = res.writeError.code;
-                } else if (res.writeErrors) {
-                    code = res.writeErrors[0].code;
-                } else if (res.writeConcernError) {
-                    code = res.writeConcernError.code;
-                }
-            }
-            return code;
+                ErrorCodes.isShutdownError(code) || ErrorCodes.WriteConcernFailed === code;
         }
 
         function runClientFunctionWithRetries(
@@ -342,37 +316,10 @@ var {
             }
 
             do {
+                let res;
+
                 try {
-                    let res = clientFunction.apply(client, clientFunctionArguments);
-
-                    if (numRetries > 0) {
-                        if (!res.ok && isRetryableCode(res.code)) {
-                            // Don't decrement retries, because the command returned before the
-                            // connection was closed, so a subsequent attempt will receive a network
-                            // error (or NotMaster error) and need to retry.
-                            if (jsTest.options().logRetryAttempts) {
-                                print("=-=-=-= Retrying failed response with retryable code: " +
-                                      res.code + ", for command: " + cmdName +
-                                      ", retries remaining: " + numRetries);
-                            }
-                            continue;
-                        }
-
-                        let code = getEffectiveWriteErrorCode(res);
-                        if (isRetryableCode(code)) {
-                            // Don't decrement retries, because the command returned before the
-                            // connection was closed, so a subsequent attempt will receive a network
-                            // error (or NotMaster error) and need to retry.
-                            if (jsTest.options().logRetryAttempts) {
-                                print("=-=-=-= Retrying write with retryable write error code: " +
-                                      code + ", for command: " + cmdName + ", retries remaining: " +
-                                      numRetries);
-                            }
-                            continue;
-                        }
-                    }
-
-                    return res;
+                    res = clientFunction.apply(client, clientFunctionArguments);
                 } catch (e) {
                     if (!isNetworkError(e) || numRetries === 0) {
                         throw e;
@@ -398,12 +345,69 @@ var {
                     }
                 }
 
-                --numRetries;
-                if (jsTest.options().logRetryAttempts) {
-                    print("=-=-=-= Retrying on network error for command: " + cmdName +
-                          ", retries remaining: " + numRetries);
+                if (numRetries > 0) {
+                    --numRetries;
+
+                    if (res === undefined) {
+                        if (jsTest.options().logRetryAttempts) {
+                            jsTest.log("Retrying " + cmdName +
+                                       " due to network error, subsequent retries remaining: " +
+                                       numRetries);
+                        }
+                        continue;
+                    }
+
+                    if (isRetryableCode(res.code)) {
+                        if (jsTest.options().logRetryAttempts) {
+                            jsTest.log("Retrying " + cmdName + " due to retryable error (code=" +
+                                       res.code + "), subsequent retries remaining: " + numRetries);
+                        }
+                        if (client.isReplicaSetConnection()) {
+                            client._markNodeAsFailed(res._mongo.host, res.code, res.errmsg);
+                        }
+                        continue;
+                    }
+
+                    if (Array.isArray(res.writeErrors)) {
+                        // If any of the write operations in the batch fails with a retryable error,
+                        // then we retry the entire batch.
+                        const writeError =
+                            res.writeErrors.find((writeError) => isRetryableCode(writeError.code));
+
+                        if (writeError !== undefined) {
+                            if (jsTest.options().logRetryAttempts) {
+                                jsTest.log("Retrying " + cmdName +
+                                           " due to retryable write error (code=" +
+                                           writeError.code + "), subsequent retries remaining: " +
+                                           numRetries);
+                            }
+                            if (client.isReplicaSetConnection()) {
+                                client._markNodeAsFailed(
+                                    res._mongo.host, writeError.code, writeError.errmsg);
+                            }
+                            continue;
+                        }
+                    }
+
+                    if (res.hasOwnProperty("writeConcernError") &&
+                        isRetryableCode(res.writeConcernError.code)) {
+                        if (jsTest.options().logRetryAttempts) {
+                            jsTest.log("Retrying " + cmdName +
+                                       " due to retryable write concern error (code=" +
+                                       res.writeConcernError.code +
+                                       "), subsequent retries remaining: " + numRetries);
+                        }
+                        if (client.isReplicaSetConnection()) {
+                            client._markNodeAsFailed(res._mongo.host,
+                                                     res.writeConcernError.code,
+                                                     res.writeConcernError.errmsg);
+                        }
+                        continue;
+                    }
                 }
-            } while (numRetries >= 0);
+
+                return res;
+            } while (true);
         }
 
         this.runCommand = function runCommand(driverSession, dbName, cmdObj, options) {
