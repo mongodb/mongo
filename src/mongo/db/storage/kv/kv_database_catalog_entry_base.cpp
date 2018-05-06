@@ -312,20 +312,25 @@ Status KVDatabaseCatalogEntryBase::renameCollection(OperationContext* opCtx,
 
     BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, toNS);
 
-    const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
-    invariant(itFrom != _collections.end());
-    opCtx->recoveryUnit()->registerChange(
-        new RemoveCollectionChange(opCtx, this, fromNS, identFrom, itFrom->second, false));
-    _collections.erase(itFrom);
-
     opCtx->recoveryUnit()->registerChange(
         new AddCollectionChange(opCtx, this, toNS, identTo, false));
 
     auto rs =
         _engine->getEngine()->getGroupedRecordStore(opCtx, toNS, identTo, md.options, md.prefix);
 
+    // Add the destination collection to _collections before erasing the source collection. This
+    // is to ensure that _collections doesn't erroneously appear empty during listDatabases if
+    // a database consists of a single collection and that collection gets renamed (see
+    // SERVER-34531). There is no locking to prevent listDatabases from looking into
+    // _collections as a rename is taking place.
     _collections[toNS.toString()] = new KVCollectionCatalogEntry(
         _engine->getEngine(), _engine->getCatalog(), toNS, identTo, std::move(rs));
+
+    const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
+    invariant(itFrom != _collections.end());
+    opCtx->recoveryUnit()->registerChange(
+        new RemoveCollectionChange(opCtx, this, fromNS, identFrom, itFrom->second, false));
+    _collections.erase(itFrom);
 
     return Status::OK();
 }
