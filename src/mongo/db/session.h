@@ -206,7 +206,7 @@ public:
                                      TxnNumber txnNumber,
                                      std::vector<StmtId> stmtIdsWritten,
                                      const repl::OpTime& lastStmtIdWriteOpTime,
-                                     Date_t lastStmtIdWriteDate);
+                                     Date_t oplogLastStmtIdWriteDate);
 
     /**
      * Marks the session as requiring refresh. Used when the session state has been modified
@@ -419,6 +419,12 @@ private:
     boost::optional<repl::OpTime> _checkStatementExecuted(WithLock,
                                                           TxnNumber txnNumber,
                                                           StmtId stmtId) const;
+
+    // Returns the write date of the last committed write for this session and transaction. If no
+    // write has completed yet, returns an empty date.
+    //
+    // Throws if the session has been invalidated or the active transaction number doesn't match.
+    Date_t _getLastWriteDate(WithLock, TxnNumber txnNumber) const;
 
     UpdateRequest _makeUpdateRequest(WithLock,
                                      TxnNumber newTxnNumber,
