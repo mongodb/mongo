@@ -1,0 +1,23 @@
+# Create certificate using:
+# openssl req -new -config client-custom-oids.csr.in -keyout client-custom-oids.key -out client-custom-oids.csr
+# openssl rsa -in client-custom-oids.key -out client-custom-oids.rsa
+# openssl x509 -in client-custom-oids.csr -out client-custom-oids.pem -req -CA ca.pem -days 3650 -CAcreateserial
+# cat client-custom-oids.rsa >> client-custom-oids.pem
+# rm ca.srl client-custom-oids.key client-custom-oids.rsa client-custom-oids.csr
+
+[ req ]
+default_bits=2048
+prompt=no
+encrypt_key=no
+default_md=sha1
+distinguished_name=dn
+
+[ dn ]
+0.1.2.3.45=Value,Rando
+0.1.2.3.56=RandoValue
+CN=client
+OU=KernelUser
+O=MongoDB
+L=New York City
+ST=New York
+C=US

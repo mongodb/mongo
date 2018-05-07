@@ -50,6 +50,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/private/ssl_expiration.h"
@@ -243,6 +244,9 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN
 // OpenSSL versions.
 const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
     return peerCert->cert_info->extensions;
+}
+inline int X509_NAME_ENTRY_set(const X509_NAME_ENTRY* ne) {
+    return ne->set;
 }
 #endif
 
@@ -450,7 +454,7 @@ private:
      */
     bool _parseAndValidateCertificate(const std::string& keyFile,
                                       const std::string& keyPassword,
-                                      std::string* subjectName,
+                                      SSLX509Name* subjectName,
                                       Date_t* serverNotAfter);
 
 
@@ -553,23 +557,42 @@ SSLManagerInterface* getSSLManager() {
     return NULL;
 }
 
-std::string getCertificateSubjectName(X509* cert) {
-    std::string result;
+SSLX509Name getCertificateSubjectX509Name(X509* cert) {
+    std::vector<std::vector<SSLX509Name::Entry>> entries;
 
-    BIO* out = BIO_new(BIO_s_mem());
-    uassert(16884, "unable to allocate BIO memory", NULL != out);
-    ON_BLOCK_EXIT(BIO_free, out);
+    auto name = X509_get_subject_name(cert);
+    int count = X509_NAME_entry_count(name);
+    int prevSet = -1;
+    std::vector<SSLX509Name::Entry> rdn;
+    for (int i = count - 1; i >= 0; --i) {
+        auto* entry = X509_NAME_get_entry(name, i);
 
-    if (X509_NAME_print_ex(out, X509_get_subject_name(cert), 0, XN_FLAG_RFC2253) >= 0) {
-        if (BIO_number_written(out) > 0) {
-            result.resize(BIO_number_written(out));
-            BIO_read(out, &result[0], result.size());
+        const auto currentSet = X509_NAME_ENTRY_set(entry);
+        if (currentSet != prevSet) {
+            if (!rdn.empty()) {
+                entries.push_back(std::move(rdn));
+                rdn = std::vector<SSLX509Name::Entry>();
+            }
+            prevSet = currentSet;
         }
-    } else {
-        log() << "failed to convert subject name to RFC2253 format";
+
+        char buffer[128];
+        // OBJ_obj2txt can only fail if we pass a nullptr from get_object,
+        // or if OpenSSL's BN library falls over.
+        // In either case, just panic.
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "Unable to parse certiciate subject name",
+                OBJ_obj2txt(buffer, sizeof(buffer), X509_NAME_ENTRY_get_object(entry), 1) > 0);
+
+        const auto* str = X509_NAME_ENTRY_get_data(entry);
+        rdn.emplace_back(
+            buffer, str->type, std::string(reinterpret_cast<const char*>(str->data), str->length));
+    }
+    if (!rdn.empty()) {
+        entries.push_back(std::move(rdn));
     }
 
-    return result;
+    return SSLX509Name(std::move(entries));
 }
 
 SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock, const char* initialBytes, int len)
@@ -602,6 +625,96 @@ SSLConnection::~SSLConnection() {
 }
 
 namespace {
+std::string x509OidToShortName(const std::string& name) {
+    const auto nid = OBJ_txt2nid(name.c_str());
+    if (nid == 0) {
+        return name;
+    }
+    const auto* sn = OBJ_nid2sn(nid);
+    if (!sn) {
+        return name;
+    }
+    return sn;
+}
+
+// Characters that need to be escaped in RFC 2253
+const std::array<char, 7> rfc2253EscapeChars = {',', '+', '"', '\\', '<', '>', ';'};
+
+// See section "2.4 Converting an AttributeValue from ASN.1 to a String" in RFC 2243
+std::string escapeRfc2253(StringData str) {
+    std::string ret;
+
+    if (str.size() > 0) {
+        size_t pos = 0;
+
+        // a space or "#" character occurring at the beginning of the string
+        if (str[0] == ' ') {
+            ret = "\\ ";
+            pos = 1;
+        } else if (str[0] == '#') {
+            ret = "\\#";
+            pos = 1;
+        }
+
+        while (pos < str.size()) {
+            if (static_cast<signed char>(str[pos]) < 0) {
+                ret += '\\';
+                ret += integerToHex(str[pos]);
+            } else {
+                if (std::find(rfc2253EscapeChars.cbegin(), rfc2253EscapeChars.cend(), str[pos]) !=
+                    rfc2253EscapeChars.cend()) {
+                    ret += '\\';
+                }
+
+                ret += str[pos];
+            }
+            ++pos;
+        }
+
+        // a space character occurring at the end of the string
+        if (ret.size() > 2 && ret[ret.size() - 1] == ' ') {
+            ret[ret.size() - 1] = '\\';
+            ret += ' ';
+        }
+    }
+
+    return ret;
+}
+
+}  // namespace
+
+StatusWith<std::string> SSLX509Name::getOID(StringData oid) const {
+    for (const auto& rdn : _entries) {
+        for (const auto& entry : rdn) {
+            if (entry.oid == oid) {
+                return entry.value;
+            }
+        }
+    }
+    return {ErrorCodes::KeyNotFound, "OID does not exist"};
+}
+
+StringBuilder& operator<<(StringBuilder& os, const SSLX509Name& name) {
+    std::string comma;
+    for (const auto& rdn : name._entries) {
+        std::string plus;
+        os << comma;
+        for (const auto& entry : rdn) {
+            os << plus << x509OidToShortName(entry.oid) << "=" << escapeRfc2253(entry.value);
+            plus = "+";
+        }
+        comma = ",";
+    }
+    return os;
+}
+
+std::string SSLX509Name::toString() const {
+    StringBuilder os;
+    os << *this;
+    return os.str();
+}
+
+namespace {
 void canonicalizeClusterDN(std::vector<std::string>* dn) {
     // remove all RDNs we don't care about
     for (size_t i = 0; i < dn->size(); i++) {
@@ -616,30 +729,62 @@ void canonicalizeClusterDN(std::vector<std::string>* dn) {
     }
     std::stable_sort(dn->begin(), dn->end());
 }
+
+constexpr StringData kOID_DC = "0.9.2342.19200300.100.1.25"_sd;
+constexpr StringData kOID_O = "2.5.4.10"_sd;
+constexpr StringData kOID_OU = "2.5.4.11"_sd;
+
+std::vector<SSLX509Name::Entry> canonicalizeClusterDN(
+    const std::vector<std::vector<SSLX509Name::Entry>>& entries) {
+    std::vector<SSLX509Name::Entry> ret;
+
+    for (const auto& rdn : entries) {
+        for (const auto& entry : rdn) {
+            if ((entry.oid != kOID_DC) && (entry.oid != kOID_O) && (entry.oid != kOID_OU)) {
+                continue;
+            }
+            ret.push_back(entry);
+        }
+    }
+    std::stable_sort(ret.begin(), ret.end());
+    return ret;
+}
 }  // namespace
+
+/**
+ * The behavior of isClusterMember() is subtly different when passed
+ * an SSLX509Name versus a StringData.
+ *
+ * The SSLX509Name version (immediately below) compares distinguished
+ * names in their raw, unescaped forms and provides a more reliable match.
+ *
+ * The StringData version attempts to do a simplified string compare
+ * with the serialized version of the server subject name.
+ *
+ * Because escaping is not checked in the StringData version,
+ * some not-strictly matching RDNs will appear to share O/OU/DC with the
+ * server subject name.  Therefore, that variant should be called with care.
+ */
+bool SSLConfiguration::isClusterMember(const SSLX509Name& subject) const {
+    auto client = canonicalizeClusterDN(subject._entries);
+    auto server = canonicalizeClusterDN(serverSubjectName._entries);
+
+    return !client.empty() && (client == server);
+}
 
 bool SSLConfiguration::isClusterMember(StringData subjectName) const {
     std::vector<std::string> clientRDN = StringSplitter::split(subjectName.toString(), ",");
-    std::vector<std::string> serverRDN = StringSplitter::split(serverSubjectName, ",");
+    std::vector<std::string> serverRDN = StringSplitter::split(serverSubjectName.toString(), ",");
 
     canonicalizeClusterDN(&clientRDN);
     canonicalizeClusterDN(&serverRDN);
 
-    if (clientRDN.size() == 0 || clientRDN.size() != serverRDN.size()) {
-        return false;
-    }
-
-    for (size_t i = 0; i < serverRDN.size(); i++) {
-        if (clientRDN[i] != serverRDN[i]) {
-            return false;
-        }
-    }
-    return true;
+    return !clientRDN.empty() && (clientRDN == serverRDN);
 }
 
 BSONObj SSLConfiguration::getServerStatusBSON() const {
     BSONObjBuilder security;
-    security.append("SSLServerSubjectName", serverSubjectName);
+    security.append("SSLServerSubjectName", serverSubjectName.toString());
     security.appendBool("SSLServerHasCertificateAuthority", hasCA);
     security.appendDate("SSLServerCertificateExpirationDate", serverCertificateExpirationDate);
     return security.obj();
@@ -915,7 +1060,7 @@ unsigned long long SSLManager::_convertASN1ToMillis(ASN1_TIME* asn1time) {
 
 bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
                                               const std::string& keyPassword,
-                                              std::string* subjectName,
+                                              SSLX509Name* subjectName,
                                               Date_t* serverCertificateExpirationDate) {
     BIO* inBIO = BIO_new(BIO_s_file());
     if (inBIO == NULL) {
@@ -942,7 +1087,7 @@ bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
     }
     ON_BLOCK_EXIT(X509_free, x509);
 
-    *subjectName = getCertificateSubjectName(x509);
+    *subjectName = getCertificateSubjectX509Name(x509);
     if (serverCertificateExpirationDate != NULL) {
         unsigned long long notBeforeMillis = _convertASN1ToMillis(X509_get_notBefore(x509));
         if (notBeforeMillis == 0) {
@@ -1356,8 +1501,8 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
     }
 
     // TODO: check optional cipher restriction, using cert.
-    std::string peerSubjectName = getCertificateSubjectName(peerCert);
-    LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
+    auto peerSubject = getCertificateSubjectX509Name(peerCert);
+    LOG(2) << "Accepted TLS connection from peer: " << peerSubject;
 
     StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {
@@ -1368,7 +1513,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
     // perform hostname validation of the remote server
     if (remoteHost.empty()) {
         return boost::make_optional(
-            SSLPeerInfo(peerSubjectName, std::move(swPeerCertificateRoles.getValue())));
+            SSLPeerInfo(peerSubject, std::move(swPeerCertificateRoles.getValue())));
     }
 
     // Try to match using the Subject Alternate Name, if it exists.
@@ -1398,19 +1543,19 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
             }
         }
         sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
-    } else if (peerSubjectName.find("CN=") != std::string::npos) {
+    } else {
         // If Subject Alternate Name (SAN) doesn't exist and Common Name (CN) does,
         // check Common Name.
-        int cnBegin = peerSubjectName.find("CN=") + 3;
-        int cnEnd = peerSubjectName.find(",", cnBegin);
-        std::string commonName = peerSubjectName.substr(cnBegin, cnEnd - cnBegin);
-
-        if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
-            cnMatch = true;
+        auto swCN = peerSubject.getOID(kOID_CommonName);
+        if (swCN.isOK()) {
+            auto commonName = std::move(swCN.getValue());
+            if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
+                cnMatch = true;
+            }
+            certificateNames << "CN: " << commonName;
+        } else {
+            certificateNames << "No Common Name (CN) or Subject Alternate Names (SAN) found";
         }
-        certificateNames << "CN: " << commonName;
-    } else {
-        certificateNames << "No Common Name (CN) or Subject Alternate Names (SAN) found";
     }
 
     if (!sanMatch && !cnMatch) {
@@ -1426,7 +1571,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubjectName, stdx::unordered_set<RoleName>()));
+    return boost::make_optional(SSLPeerInfo(peerSubject, stdx::unordered_set<RoleName>()));
 }
 
 
