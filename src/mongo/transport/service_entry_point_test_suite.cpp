@@ -133,7 +133,9 @@ void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
 
 SSLPeerInfo ServiceEntryPointTestSuite::MockTLHarness::getX509PeerInfo(
     const ConstSessionHandle& session) const {
-    return SSLPeerInfo("mock", stdx::unordered_set<RoleName>{});
+    auto name = SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
+        {{{kOID_CommonName.toString(), 19 /* Printable String */, "mock"}}}));
+    return SSLPeerInfo(name, stdx::unordered_set<RoleName>{});
 }
 
 TransportLayer::Stats ServiceEntryPointTestSuite::MockTLHarness::sessionStats() {

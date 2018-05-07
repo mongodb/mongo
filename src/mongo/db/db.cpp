@@ -647,7 +647,7 @@ ExitCode _initAndListen(int listenPort) {
 
     logMongodStartupWarnings(storageGlobalParams, serverGlobalParams);
 
-#if MONGO_CONFIG_SSL
+#ifdef MONGO_CONFIG_SSL
     if (sslGlobalParams.sslAllowInvalidCertificates &&
         ((serverGlobalParams.clusterAuthMode.load() == ServerGlobalParams::ClusterAuthMode_x509) ||
          sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))) {

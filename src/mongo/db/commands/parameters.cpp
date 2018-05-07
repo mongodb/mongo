@@ -577,7 +577,7 @@ public:
                      << saslCommandUserDBFieldName
                      << "$external"
                      << saslCommandUserFieldName
-                     << getSSLManager()->getSSLConfiguration().clientSubjectName));
+                     << getSSLManager()->getSSLConfiguration().clientSubjectName.toString()));
 #endif
         } else if (str == "x509" && oldMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
             serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_x509);

@@ -166,14 +166,14 @@ bool CmdAuthenticate::run(OperationContext* txn,
     if (mechanism.empty()) {
         mechanism = "MONGODB-CR";
     }
-    UserName user;
-    if (mechanism == "MONGODB-X509" && !cmdObj.hasField("user")) {
-        Client* client = txn->getClient();
-        auto clientName = client->session()->getX509PeerInfo().subjectName;
-        user = UserName(clientName, dbname);
-    } else {
-        user = UserName(cmdObj.getStringField("user"), dbname);
+
+    UserName user(cmdObj.getStringField("user"), dbname);
+#ifdef MONGO_CONFIG_SSL
+    if (mechanism == "MONGODB-X509" && user.getUser().empty()) {
+        auto sslPeerInfo = txn->getClient()->session()->getX509PeerInfo();
+        user = UserName(sslPeerInfo.subjectName.toString(), dbname);
     }
+#endif
     uassert(ErrorCodes::AuthenticationFailed, "No user name provided", !user.getUser().empty());
 
     if (Command::testCommandsEnabled && user.getDB() == "admin" &&
@@ -331,7 +331,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != clientName) {
+    } else if (user.getUser() != clientName.toString()) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "There is no x.509 client certificate matching the user.");
     } else {

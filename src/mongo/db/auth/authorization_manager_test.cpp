@@ -32,6 +32,7 @@
  */
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -54,6 +55,12 @@
 
 namespace mongo {
 namespace {
+
+// Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
+SSLX509Name buildX509Name() {
+    return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
+        {{{kOID_CommonName.toString(), 19 /* Printable String */, "mongodb.com"}}}));
+}
 
 using std::vector;
 
@@ -241,13 +248,14 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     authzManager->releaseUser(v2cluster);
 }
 
+#ifdef MONGO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
     transportLayer.setX509PeerInfo(
         session,
-        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("readWrite", "test")}));
+        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
 
@@ -274,6 +282,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
 
     authzManager->releaseUser(x509User);
 }
+#endif
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     ServiceContextNoop serviceContext;
@@ -281,7 +290,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     transport::SessionHandle session = transportLayer.createSession();
     transportLayer.setX509PeerInfo(
         session,
-        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("write", "test")}));
+        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("write", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
 

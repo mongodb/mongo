@@ -324,7 +324,7 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
     // If we didn't have an X509 subject name, see if we have one now
     if (!conn->sslPeerInfo) {
         auto info = conn->amp->getX509PeerInfo();
-        if (info.subjectName != "") {
+        if (!info.subjectName.empty()) {
             conn->sslPeerInfo = info;
         }
     }
