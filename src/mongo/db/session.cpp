@@ -470,7 +470,7 @@ void Session::onMigrateCompletedOnPrimary(OperationContext* opCtx,
                                           TxnNumber txnNumber,
                                           std::vector<StmtId> stmtIdsWritten,
                                           const repl::OpTime& lastStmtIdWriteOpTime,
-                                          Date_t lastStmtIdWriteDate) {
+                                          Date_t oplogLastStmtIdWriteDate) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     stdx::unique_lock<stdx::mutex> ul(_mutex);
@@ -478,8 +478,16 @@ void Session::onMigrateCompletedOnPrimary(OperationContext* opCtx,
     _checkValid(ul);
     _checkIsActiveTransaction(ul, txnNumber, false);
 
+    // If the transaction has a populated lastWriteDate, we will use that as the most up-to-date
+    // value. Using the lastWriteDate from the oplog being migrated may move the lastWriteDate
+    // back. However, in the case that the transaction doesn't have the lastWriteDate populated,
+    // the oplog's value serves as a best-case fallback.
+    const auto txnLastStmtIdWriteDate = _getLastWriteDate(ul, txnNumber);
+    const auto updatedLastStmtIdWriteDate =
+        txnLastStmtIdWriteDate == Date_t::min() ? oplogLastStmtIdWriteDate : txnLastStmtIdWriteDate;
+
     const auto updateRequest =
-        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, lastStmtIdWriteDate);
+        _makeUpdateRequest(ul, txnNumber, lastStmtIdWriteOpTime, updatedLastStmtIdWriteDate);
 
     ul.unlock();
 
@@ -1165,6 +1173,16 @@ boost::optional<repl::OpTime> Session::_checkStatementExecuted(WithLock wl,
     invariant(_lastWrittenSessionRecord->getTxnNum() == txnNumber);
 
     return it->second;
+}
+
+Date_t Session::_getLastWriteDate(WithLock wl, TxnNumber txnNumber) const {
+    _checkValid(wl);
+    _checkIsActiveTransaction(wl, txnNumber, false);
+
+    if (!_lastWrittenSessionRecord || _lastWrittenSessionRecord->getTxnNum() != txnNumber)
+        return {};
+
+    return _lastWrittenSessionRecord->getLastWriteDate();
 }
 
 UpdateRequest Session::_makeUpdateRequest(WithLock,
