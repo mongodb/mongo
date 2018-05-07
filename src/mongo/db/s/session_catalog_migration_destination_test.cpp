@@ -243,7 +243,7 @@ public:
             // up the session state and perform the insert.
             initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
             OperationContextSession sessionTxnState(
-                innerOpCtx.get(), true, boost::none, boost::none);
+                innerOpCtx.get(), true, boost::none, boost::none, "testDB", "insert");
 
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);

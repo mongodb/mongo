@@ -61,16 +61,15 @@
     testSnapshotAggFailsWithCode(kCollName, [{$out: "out"}], ErrorCodes.InvalidOptions);
 
     // Test that $listSessions is disallowed with snapshot reads. This stage must be run against
-    // 'system.sessions' in the config database.
+    // 'system.sessions' in the config database, which cannot be queried in a transaction.
     sessionDB = session.getDatabase(kConfigDB);
-    testSnapshotAggFailsWithCode(
-        "system.sessions", [{$listSessions: {}}], kIllegalStageForSnapshotReadCode);
+    testSnapshotAggFailsWithCode("system.sessions", [{$listSessions: {}}], 50844);
 
     // Test that $currentOp is disallowed with snapshot reads. We have to reassign 'sessionDB' to
     // refer to the admin database, because $currentOp pipelines are required to run against
-    // 'admin'.
+    // 'admin'. Queries against 'admin' are not permitted in a transaction.
     sessionDB = session.getDatabase(kAdminDB);
-    testSnapshotAggFailsWithCode(1, [{$currentOp: {}}], ErrorCodes.InvalidOptions);
+    testSnapshotAggFailsWithCode(1, [{$currentOp: {}}], 50844);
     sessionDB = session.getDatabase(kDBName);
 
     // Helper for testing that aggregation stages which involve a local and foreign collection

@@ -176,7 +176,7 @@ TEST_F(SessionTest, SessionEntryNotWrittenOnBegin) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     ASSERT_EQ(sessionId, session.getSessionId());
     ASSERT(session.getLastWriteOpTime(txnNum).isNull());
@@ -194,7 +194,7 @@ TEST_F(SessionTest, SessionEntryWrittenAtFirstWrite) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 21;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     const auto opTime = [&] {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -227,7 +227,7 @@ TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const auto writeTxnRecordFn = [&](TxnNumber txnNum, StmtId stmtId, repl::OpTime prevOpTime) {
-        session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+        session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
@@ -266,9 +266,10 @@ TEST_F(SessionTest, StartingOldTxnShouldAssert) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
-    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum - 1, boost::none, boost::none),
+    ASSERT_THROWS_CODE(session.beginOrContinueTxn(
+                           opCtx(), txnNum - 1, boost::none, boost::none, "testDB", "insert"),
                        AssertionException,
                        ErrorCodes::TransactionTooOld);
     ASSERT(session.getLastWriteOpTime(txnNum).isNull());
@@ -286,7 +287,7 @@ TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
     ASSERT(client.runCommand(nss.db().toString(), BSON("drop" << nss.coll()), dropResult));
 
     const TxnNumber txnNum = 21;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
@@ -301,7 +302,7 @@ TEST_F(SessionTest, CheckStatementExecuted) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     const auto writeTxnRecordFn = [&](StmtId stmtId, repl::OpTime prevOpTime) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -342,7 +343,7 @@ TEST_F(SessionTest, CheckStatementExecutedForOldTransactionThrows) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     ASSERT_THROWS_CODE(session.checkStatementExecuted(opCtx(), txnNum - 1, 0),
                        AssertionException,
@@ -365,7 +366,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -392,7 +393,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
@@ -412,7 +413,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -507,7 +508,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
 
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert");
 
     auto firstOpTime = ([&]() {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -588,7 +589,7 @@ DEATH_TEST_F(SessionTest, CommitWithoutCursorKillFunctionInvariants, "_cursorKil
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
     session.unstashTransactionResources(opCtx(), "find");
 
     session.commitTransaction(opCtx());
@@ -610,7 +611,7 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -664,7 +665,7 @@ TEST_F(SessionTest, ReportStashedResources) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -734,14 +735,14 @@ TEST_F(SessionTest, CannotSpecifyStartTransactionOnInProgressTxn) {
 
     const TxnNumber txnNum = 100;
     // Must specify startTransaction=true and autocommit=false to start a transaction.
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     // Autocommit should be set to false and we should be in a mult-doc transaction.
     ASSERT_FALSE(session.getAutocommit());
     ASSERT_TRUE(session.inSnapshotReadOrMultiDocumentTransaction());
 
     // Cannot try to start a transaction that already started.
-    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, false, true),
+    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert"),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
 }
@@ -757,7 +758,7 @@ TEST_F(SessionTest, AutocommitRequiredOnEveryTxnOp) {
     const TxnNumber txnNum = 100;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     // We must have stashed transaction resources to do a second operation on the transaction.
     session.unstashTransactionResources(opCtx(), "insert");
@@ -769,17 +770,19 @@ TEST_F(SessionTest, AutocommitRequiredOnEveryTxnOp) {
     ASSERT_FALSE(session.getAutocommit());
 
     // Omitting 'autocommit' after the first statement of a transaction should throw an error.
-    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        session.beginOrContinueTxn(opCtx(), txnNum, boost::none, boost::none, "testDB", "insert"),
+        AssertionException,
+        ErrorCodes::InvalidOptions);
 
     // Setting 'autocommit=true' should throw an error.
-    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, true, boost::none),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        session.beginOrContinueTxn(opCtx(), txnNum, true, boost::none, "testDB", "insert"),
+        AssertionException,
+        ErrorCodes::InvalidOptions);
 
     // Including autocommit=false should succeed.
-    session.beginOrContinueTxn(opCtx(), txnNum, false, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, boost::none, "testDB", "insert");
 }
 
 TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
@@ -792,7 +795,7 @@ TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
     const TxnNumber txnNum = 22;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     // We must have stashed transaction resources to re-open the transaction.
     session.unstashTransactionResources(opCtx(), "insert");
@@ -807,7 +810,7 @@ TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
 
     // Re-opening the same transaction should have no effect.
-    session.beginOrContinueTxn(opCtx(), txnNum, false, boost::none);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, boost::none, "testDB", "insert");
     ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
 }
 
@@ -821,7 +824,7 @@ TEST_F(SessionTest, AbortClearsStoredStatements) {
     const TxnNumber txnNum = 24;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
     session.unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
     session.addTransactionOperation(opCtx(), operation);
@@ -846,7 +849,7 @@ TEST_F(SessionTest, EmptyTransactionCommit) {
     const TxnNumber txnNum = 25;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
     session.unstashTransactionResources(opCtx(), "commitTransaction");
     // The transaction machinery cannot store an empty locker.
     Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
@@ -867,7 +870,7 @@ TEST_F(SessionTest, EmptyTransactionAbort) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "abortTransaction");
     session.unstashTransactionResources(opCtx(), "abortTransaction");
     // The transaction machinery cannot store an empty locker.
     { Lock::GlobalLock lk(opCtx(), MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow); }
@@ -886,7 +889,7 @@ TEST_F(SessionTest, ConcurrencyOfUnstashAndAbort) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
 
     // The transaction may be aborted without checking out the session.
     session.abortArbitraryTransaction(opCtx(), kKillCursors);
@@ -907,7 +910,7 @@ TEST_F(SessionTest, ConcurrencyOfUnstashAndMigration) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
     // The transaction machinery cannot store an empty locker.
@@ -936,7 +939,7 @@ TEST_F(SessionTest, ConcurrencyOfStashAndAbort) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
 
     session.unstashTransactionResources(opCtx(), "find");
 
@@ -957,7 +960,7 @@ TEST_F(SessionTest, ConcurrencyOfStashAndMigration) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
@@ -983,7 +986,7 @@ TEST_F(SessionTest, ConcurrencyOfAddTransactionOperationAndAbort) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
 
@@ -1007,7 +1010,7 @@ TEST_F(SessionTest, ConcurrencyOfAddTransactionOperationAndMigration) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "find");
 
     session.unstashTransactionResources(opCtx(), "find");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
@@ -1034,7 +1037,7 @@ TEST_F(SessionTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndAbort) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
 
@@ -1057,7 +1060,7 @@ TEST_F(SessionTest, ConcurrencyOfEndTransactionAndRetrieveOperationsAndMigration
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
@@ -1084,7 +1087,7 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndAbort) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "admin", "commitTransaction");
 
     session.unstashTransactionResources(opCtx(), "commitTransaction");
 
@@ -1106,7 +1109,7 @@ TEST_F(SessionTest, ConcurrencyOfCommitTransactionAndMigration) {
     const TxnNumber txnNum = 26;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
     auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
@@ -1132,7 +1135,7 @@ TEST_F(SessionTest, TransactionTooLargeWhileBuilding) {
     const TxnNumber txnNum = 28;
     opCtx()->setLogicalSessionId(sessionId);
     opCtx()->setTxnNumber(txnNum);
-    session.beginOrContinueTxn(opCtx(), txnNum, false, true);
+    session.beginOrContinueTxn(opCtx(), txnNum, false, true, "testDB", "insert");
 
     session.unstashTransactionResources(opCtx(), "insert");
 

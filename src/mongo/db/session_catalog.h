@@ -250,7 +250,9 @@ public:
     OperationContextSession(OperationContext* opCtx,
                             bool checkOutSession,
                             boost::optional<bool> autocommit,
-                            boost::optional<bool> startTransaction);
+                            boost::optional<bool> startTransaction,
+                            StringData dbName,
+                            StringData cmdName);
 
     ~OperationContextSession();
 

@@ -148,7 +148,9 @@ void DoTxnTest::setUp() {
     _ocs.emplace(_opCtx.get(),
                  true /* checkOutSession */,
                  false /* autocommit */,
-                 true /* startTransaction */);
+                 true /* startTransaction */,
+                 "admin" /* dbName */,
+                 "doTxn" /* cmdName */);
     OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "doTxn");
 }
 

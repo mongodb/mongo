@@ -50,7 +50,7 @@
             startTransaction: true,
             autocommit: false
         })),
-                                     50767);
+                                     [50767, 50768]);
         assert.commandFailedWithCode(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),
@@ -75,7 +75,7 @@
                 {},
                 command,
                 {txnNumber: NumberLong(txnNumber), stmtId: NumberInt(1), autocommit: false})),
-            50767);
+            [50767, 50768]);
         assert.commandWorked(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),

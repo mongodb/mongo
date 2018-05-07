@@ -307,7 +307,7 @@ public:
                               NamespaceString nss,
                               TxnNumber txnNum,
                               StmtId stmtId) {
-        session->beginOrContinueTxn(opCtx, txnNum, boost::none, boost::none);
+        session->beginOrContinueTxn(opCtx, txnNum, boost::none, boost::none, "testDB", "insert");
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -407,7 +407,9 @@ TEST_F(OpObserverLargeTransactionTest, TransactionTooLargeWhileCommitting) {
     OperationContextSession opSession(opCtx.get(),
                                       true /* checkOutSession */,
                                       false /* autocommit */,
-                                      true /* startTransaction*/);
+                                      true /* startTransaction */,
+                                      "testDB" /* dbName */,
+                                      "insert" /* cmdName */);
 
     session->unstashTransactionResources(opCtx.get(), "insert");
 

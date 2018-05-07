@@ -97,6 +97,27 @@ public:
 
 namespace {
 
+// The command names that are allowed in a multi-document transaction.
+const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
+                                        {"aggregate", 1},
+                                        {"commitTransaction", 1},
+                                        {"count", 1},
+                                        {"delete", 1},
+                                        {"distinct", 1},
+                                        {"doTxn", 1},
+                                        {"find", 1},
+                                        {"findandmodify", 1},
+                                        {"findAndModify", 1},
+                                        {"geoSearch", 1},
+                                        {"getMore", 1},
+                                        {"insert", 1},
+                                        {"prepareTransaction", 1},
+                                        {"update", 1}};
+
+// The commands that can be run on the 'admin' database in multi-document transactions.
+const StringMap<int> txnAdminCommands = {
+    {"abortTransaction", 1}, {"commitTransaction", 1}, {"doTxn", 1}, {"prepareTransaction", 1}};
+
 void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
                                 TxnNumber txnNumber,
                                 StmtId stmtId,
@@ -319,12 +340,25 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
 void Session::beginOrContinueTxn(OperationContext* opCtx,
                                  TxnNumber txnNumber,
                                  boost::optional<bool> autocommit,
-                                 boost::optional<bool> startTransaction) {
+                                 boost::optional<bool> startTransaction,
+                                 StringData dbName,
+                                 StringData cmdName) {
     if (opCtx->getClient()->isInDirectClient()) {
         return;
     }
 
     invariant(!opCtx->lockState()->isLocked());
+
+    uassert(50767,
+            str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
+            !autocommit || txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend());
+
+    uassert(50844,
+            str::stream() << "Cannot run command against the '" << dbName
+                          << "' database in a transaction",
+            !autocommit || (dbName != "config"_sd && dbName != "local"_sd &&
+                            (dbName != "admin"_sd ||
+                             txnAdminCommands.find(cmdName) != txnAdminCommands.cend())));
 
     TxnNumber txnNumberAtStart;
     bool canKillCursors = false;

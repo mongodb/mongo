@@ -159,7 +159,7 @@
     // readConcern 'snapshot' is not supported by non-CRUD commands.
     assert.commandFailedWithCode(
         sessionDb.runCommand({createIndexes: collName, indexes: [{key: {a: 1}, name: "a_1"}]}),
-        50767);
+        50768);
     assert.commandWorked(session.abortTransaction_forTesting());
     session.endSession();
 

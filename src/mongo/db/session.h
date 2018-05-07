@@ -152,7 +152,9 @@ public:
     void beginOrContinueTxn(OperationContext* opCtx,
                             TxnNumber txnNumber,
                             boost::optional<bool> autocommit,
-                            boost::optional<bool> startTransaction);
+                            boost::optional<bool> startTransaction,
+                            StringData dbName,
+                            StringData cmdName);
     /**
      * Similar to beginOrContinueTxn except it is used specifically for shard migrations and does
      * not check or modify the autocommit parameter.
