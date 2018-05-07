@@ -1,6 +1,6 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// expected.  Also, the primary node cannot change because we use the local database in this test.
+// @tags: [assumes_no_implicit_collection_creation_after_drop, does_not_support_stepdowns]
 
 t = db.jstests_index9;
 
