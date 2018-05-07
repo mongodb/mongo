@@ -664,21 +664,20 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // possible an earlier setFCV failed partway, so we handle all possible fcv states. Note, if
     // the state is upgrading (downgrading), a user cannot switch to downgrading (upgrading) without
     // first finishing the upgrade (downgrade).
-    //
-    // Note, we don't explicitly send writeConcern majority to the added shard, because a 3.4 mongod
-    // will reject it (setFCV did not support writeConcern until 3.6), and a 3.6 mongod will still
-    // default to majority writeConcern.
-    // TODO SERVER-32045: propagate the user's writeConcern.
     BSONObj setFCVCmd;
     switch (serverGlobalParams.featureCompatibility.getVersion()) {
         case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
         case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
             setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                             << FeatureCompatibilityVersionParser::kVersion40);
+                             << FeatureCompatibilityVersionParser::kVersion40
+                             << WriteConcernOptions::kWriteConcernField
+                             << opCtx->getWriteConcern().toBSON());
             break;
         default:
             setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                             << FeatureCompatibilityVersionParser::kVersion36);
+                             << FeatureCompatibilityVersionParser::kVersion36
+                             << WriteConcernOptions::kWriteConcernField
+                             << opCtx->getWriteConcern().toBSON());
             break;
     }
     auto versionResponse =
