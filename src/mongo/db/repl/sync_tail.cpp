@@ -1254,6 +1254,13 @@ Status multiSyncApply(OperationContext* opCtx,
                     return status;
                 }
             } catch (const DBException& e) {
+                // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
+                // dropped before initial sync or recovery ends anyways and we should ignore it.
+                if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType() &&
+                    st->getOptions().allowNamespaceNotFoundErrorsOnCrudOps) {
+                    continue;
+                }
+
                 severe() << "writer worker caught exception: " << redact(e)
                          << " on: " << redact(entry.toBSON());
                 return e.toStatus();
