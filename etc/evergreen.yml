@@ -173,6 +173,159 @@ variables:
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
   mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1\"
 
+- &replica_sets_auth
+  name: replica_sets_auth
+  execution_tasks:
+  - replica_sets_auth_0
+  - replica_sets_auth_1
+  - replica_sets_auth_2
+  - replica_sets_auth_3
+  - replica_sets_auth_4
+  - replica_sets_auth_5
+  - replica_sets_auth_6
+  - replica_sets_auth_misc
+
+- &replica_sets_ese
+  name: replica_sets_ese
+  execution_tasks:
+  - replica_sets_ese_0
+  - replica_sets_ese_1
+  - replica_sets_ese_2
+  - replica_sets_ese_3
+  - replica_sets_ese_4
+  - replica_sets_ese_5
+  - replica_sets_ese_6
+  - replica_sets_ese_misc
+
+- &sharding
+  name: sharding
+  execution_tasks:
+  - sharding_0
+  - sharding_1
+  - sharding_2
+  - sharding_3
+  - sharding_4
+  - sharding_5
+  - sharding_6
+  - sharding_7
+  - sharding_8
+  - sharding_9
+  - sharding_10
+  - sharding_11
+  - sharding_12
+  - sharding_13
+  - sharding_14
+  - sharding_misc
+
+- &sharding_auth
+  name: sharding_auth
+  execution_tasks:
+  - sharding_auth_0
+  - sharding_auth_1
+  - sharding_auth_2
+  - sharding_auth_3
+  - sharding_auth_4
+  - sharding_auth_5
+  - sharding_auth_6
+  - sharding_auth_7
+  - sharding_auth_8
+  - sharding_auth_9
+  - sharding_auth_10
+  - sharding_auth_11
+  - sharding_auth_12
+  - sharding_auth_13
+  - sharding_auth_14
+  - sharding_auth_15
+  - sharding_auth_16
+  - sharding_auth_17
+  - sharding_auth_18
+  - sharding_auth_19
+  - sharding_auth_misc
+
+- &sharding_auth_audit
+  name: sharding_auth_audit
+  execution_tasks:
+  - sharding_auth_audit_0
+  - sharding_auth_audit_1
+  - sharding_auth_audit_2
+  - sharding_auth_audit_3
+  - sharding_auth_audit_4
+  - sharding_auth_audit_5
+  - sharding_auth_audit_6
+  - sharding_auth_audit_7
+  - sharding_auth_audit_8
+  - sharding_auth_audit_9
+  - sharding_auth_audit_10
+  - sharding_auth_audit_11
+  - sharding_auth_audit_12
+  - sharding_auth_audit_13
+  - sharding_auth_audit_14
+  - sharding_auth_audit_15
+  - sharding_auth_audit_16
+  - sharding_auth_audit_17
+  - sharding_auth_audit_18
+  - sharding_auth_audit_misc
+
+- &sharding_ese
+  name: sharding_ese
+  execution_tasks:
+  - sharding_ese_0
+  - sharding_ese_1
+  - sharding_ese_2
+  - sharding_ese_3
+  - sharding_ese_4
+  - sharding_ese_5
+  - sharding_ese_6
+  - sharding_ese_7
+  - sharding_ese_8
+  - sharding_ese_9
+  - sharding_ese_10
+  - sharding_ese_11
+  - sharding_ese_12
+  - sharding_ese_13
+  - sharding_ese_14
+  - sharding_ese_15
+  - sharding_ese_16
+  - sharding_ese_17
+  - sharding_ese_18
+  - sharding_ese_19
+  - sharding_ese_20
+  - sharding_ese_misc
+
+- &sharding_last_stable_mongos_and_mixed_shards
+  name: sharding_last_stable_mongos_and_mixed_shards
+  execution_tasks:
+  - sharding_last_stable_mongos_and_mixed_shards_0
+  - sharding_last_stable_mongos_and_mixed_shards_1
+  - sharding_last_stable_mongos_and_mixed_shards_2
+  - sharding_last_stable_mongos_and_mixed_shards_3
+  - sharding_last_stable_mongos_and_mixed_shards_4
+  - sharding_last_stable_mongos_and_mixed_shards_5
+  - sharding_last_stable_mongos_and_mixed_shards_6
+  - sharding_last_stable_mongos_and_mixed_shards_7
+  - sharding_last_stable_mongos_and_mixed_shards_8
+  - sharding_last_stable_mongos_and_mixed_shards_9
+  - sharding_last_stable_mongos_and_mixed_shards_10
+  - sharding_last_stable_mongos_and_mixed_shards_11
+  - sharding_last_stable_mongos_and_mixed_shards_misc
+
+- &sharding_op_query
+  name: sharding_op_query
+  execution_tasks:
+  - sharding_op_query_0
+  - sharding_op_query_1
+  - sharding_op_query_2
+  - sharding_op_query_3
+  - sharding_op_query_4
+  - sharding_op_query_5
+  - sharding_op_query_6
+  - sharding_op_query_7
+  - sharding_op_query_8
+  - sharding_op_query_9
+  - sharding_op_query_10
+  - sharding_op_query_11
+  - sharding_op_query_misc
+
 - &unittests
   name: unittests!
   execution_tasks:
@@ -6711,58 +6864,10 @@ buildvariants:
     tooltags: ""
     build_mongoreplay: true
   display_tasks:
+  - *replica_sets_auth
+  - *sharding
+  - *sharding_auth
   - *unittests
-  - name: replica_sets_auth
-    execution_tasks:
-    - replica_sets_auth_0
-    - replica_sets_auth_1
-    - replica_sets_auth_2
-    - replica_sets_auth_3
-    - replica_sets_auth_4
-    - replica_sets_auth_5
-    - replica_sets_auth_6
-    - replica_sets_auth_misc
-  - name: sharding
-    execution_tasks:
-    - sharding_0
-    - sharding_1
-    - sharding_2
-    - sharding_3
-    - sharding_4
-    - sharding_5
-    - sharding_6
-    - sharding_7
-    - sharding_8
-    - sharding_9
-    - sharding_10
-    - sharding_11
-    - sharding_12
-    - sharding_13
-    - sharding_14
-    - sharding_misc
-  - name: sharding_auth
-    execution_tasks:
-    - sharding_auth_0
-    - sharding_auth_1
-    - sharding_auth_2
-    - sharding_auth_3
-    - sharding_auth_4
-    - sharding_auth_5
-    - sharding_auth_6
-    - sharding_auth_7
-    - sharding_auth_8
-    - sharding_auth_9
-    - sharding_auth_10
-    - sharding_auth_11
-    - sharding_auth_12
-    - sharding_auth_13
-    - sharding_auth_14
-    - sharding_auth_15
-    - sharding_auth_16
-    - sharding_auth_17
-    - sharding_auth_18
-    - sharding_auth_19
-    - sharding_auth_misc
   tasks:
   - name: compile_all_run_unittests_TG
   - name: aggregation
@@ -8000,95 +8105,11 @@ buildvariants:
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
   display_tasks:
-  - name: replica_sets_auth
-    execution_tasks:
-    - replica_sets_auth_0
-    - replica_sets_auth_1
-    - replica_sets_auth_2
-    - replica_sets_auth_3
-    - replica_sets_auth_4
-    - replica_sets_auth_5
-    - replica_sets_auth_6
-    - replica_sets_auth_misc
-  - name: replica_sets_ese
-    execution_tasks:
-    - replica_sets_ese_0
-    - replica_sets_ese_1
-    - replica_sets_ese_2
-    - replica_sets_ese_3
-    - replica_sets_ese_4
-    - replica_sets_ese_5
-    - replica_sets_ese_6
-    - replica_sets_ese_misc
-  - name: sharding_auth
-    execution_tasks:
-    - sharding_auth_0
-    - sharding_auth_1
-    - sharding_auth_2
-    - sharding_auth_3
-    - sharding_auth_4
-    - sharding_auth_5
-    - sharding_auth_6
-    - sharding_auth_7
-    - sharding_auth_8
-    - sharding_auth_9
-    - sharding_auth_10
-    - sharding_auth_11
-    - sharding_auth_12
-    - sharding_auth_13
-    - sharding_auth_14
-    - sharding_auth_15
-    - sharding_auth_16
-    - sharding_auth_17
-    - sharding_auth_18
-    - sharding_auth_19
-    - sharding_auth_misc
-  - name: sharding_auth_audit
-    execution_tasks:
-    - sharding_auth_audit_0
-    - sharding_auth_audit_1
-    - sharding_auth_audit_2
-    - sharding_auth_audit_3
-    - sharding_auth_audit_4
-    - sharding_auth_audit_5
-    - sharding_auth_audit_6
-    - sharding_auth_audit_7
-    - sharding_auth_audit_8
-    - sharding_auth_audit_9
-    - sharding_auth_audit_10
-    - sharding_auth_audit_11
-    - sharding_auth_audit_12
-    - sharding_auth_audit_13
-    - sharding_auth_audit_14
-    - sharding_auth_audit_15
-    - sharding_auth_audit_16
-    - sharding_auth_audit_17
-    - sharding_auth_audit_18
-    - sharding_auth_audit_misc
-  - name: sharding_ese
-    execution_tasks:
-    - sharding_ese_0
-    - sharding_ese_1
-    - sharding_ese_2
-    - sharding_ese_3
-    - sharding_ese_4
-    - sharding_ese_5
-    - sharding_ese_6
-    - sharding_ese_7
-    - sharding_ese_8
-    - sharding_ese_9
-    - sharding_ese_10
-    - sharding_ese_11
-    - sharding_ese_12
-    - sharding_ese_13
-    - sharding_ese_14
-    - sharding_ese_15
-    - sharding_ese_16
-    - sharding_ese_17
-    - sharding_ese_18
-    - sharding_ese_19
-    - sharding_ese_20
-    - sharding_ese_misc
+  - *replica_sets_auth
+  - *replica_sets_ese
+  - *sharding_auth
+  - *sharding_auth_audit
+  - *sharding_ese
   tasks:
   - name: compile_TG
     requires:
@@ -9256,143 +9277,14 @@ buildvariants:
     jstestfuzz_num_generated_files: 40
   display_tasks:
   - *unittests
-  - name: replica_sets_auth
-    execution_tasks:
-    - replica_sets_auth_0
-    - replica_sets_auth_1
-    - replica_sets_auth_2
-    - replica_sets_auth_3
-    - replica_sets_auth_4
-    - replica_sets_auth_5
-    - replica_sets_auth_6
-    - replica_sets_auth_misc
-  - name: replica_sets_ese
-    execution_tasks:
-    - replica_sets_ese_0
-    - replica_sets_ese_1
-    - replica_sets_ese_2
-    - replica_sets_ese_3
-    - replica_sets_ese_4
-    - replica_sets_ese_5
-    - replica_sets_ese_6
-    - replica_sets_ese_misc
-  - name: sharding
-    execution_tasks:
-    - sharding_0
-    - sharding_1
-    - sharding_2
-    - sharding_3
-    - sharding_4
-    - sharding_5
-    - sharding_6
-    - sharding_7
-    - sharding_8
-    - sharding_9
-    - sharding_10
-    - sharding_11
-    - sharding_12
-    - sharding_13
-    - sharding_14
-    - sharding_misc
-  - name: sharding_auth
-    execution_tasks:
-    - sharding_auth_0
-    - sharding_auth_1
-    - sharding_auth_2
-    - sharding_auth_3
-    - sharding_auth_4
-    - sharding_auth_5
-    - sharding_auth_6
-    - sharding_auth_7
-    - sharding_auth_8
-    - sharding_auth_9
-    - sharding_auth_10
-    - sharding_auth_11
-    - sharding_auth_12
-    - sharding_auth_13
-    - sharding_auth_14
-    - sharding_auth_15
-    - sharding_auth_16
-    - sharding_auth_17
-    - sharding_auth_18
-    - sharding_auth_19
-    - sharding_auth_misc
-  - name: sharding_auth_audit
-    execution_tasks:
-    - sharding_auth_audit_0
-    - sharding_auth_audit_1
-    - sharding_auth_audit_2
-    - sharding_auth_audit_3
-    - sharding_auth_audit_4
-    - sharding_auth_audit_5
-    - sharding_auth_audit_6
-    - sharding_auth_audit_7
-    - sharding_auth_audit_8
-    - sharding_auth_audit_9
-    - sharding_auth_audit_10
-    - sharding_auth_audit_11
-    - sharding_auth_audit_12
-    - sharding_auth_audit_13
-    - sharding_auth_audit_14
-    - sharding_auth_audit_15
-    - sharding_auth_audit_16
-    - sharding_auth_audit_17
-    - sharding_auth_audit_18
-    - sharding_auth_audit_misc
-  - name: sharding_ese
-    execution_tasks:
-    - sharding_ese_0
-    - sharding_ese_1
-    - sharding_ese_2
-    - sharding_ese_3
-    - sharding_ese_4
-    - sharding_ese_5
-    - sharding_ese_6
-    - sharding_ese_7
-    - sharding_ese_8
-    - sharding_ese_9
-    - sharding_ese_10
-    - sharding_ese_11
-    - sharding_ese_12
-    - sharding_ese_13
-    - sharding_ese_14
-    - sharding_ese_15
-    - sharding_ese_16
-    - sharding_ese_17
-    - sharding_ese_18
-    - sharding_ese_19
-    - sharding_ese_20
-    - sharding_ese_misc
-  - name: sharding_last_stable_mongos_and_mixed_shards
-    execution_tasks:
-    - sharding_last_stable_mongos_and_mixed_shards_0
-    - sharding_last_stable_mongos_and_mixed_shards_1
-    - sharding_last_stable_mongos_and_mixed_shards_2
-    - sharding_last_stable_mongos_and_mixed_shards_3
-    - sharding_last_stable_mongos_and_mixed_shards_4
-    - sharding_last_stable_mongos_and_mixed_shards_5
-    - sharding_last_stable_mongos_and_mixed_shards_6
-    - sharding_last_stable_mongos_and_mixed_shards_7
-    - sharding_last_stable_mongos_and_mixed_shards_8
-    - sharding_last_stable_mongos_and_mixed_shards_9
-    - sharding_last_stable_mongos_and_mixed_shards_10
-    - sharding_last_stable_mongos_and_mixed_shards_11
-    - sharding_last_stable_mongos_and_mixed_shards_misc
-  - name: sharding_op_query
-    execution_tasks:
-    - sharding_op_query_0
-    - sharding_op_query_1
-    - sharding_op_query_2
-    - sharding_op_query_3
-    - sharding_op_query_4
-    - sharding_op_query_5
-    - sharding_op_query_6
-    - sharding_op_query_7
-    - sharding_op_query_8
-    - sharding_op_query_9
-    - sharding_op_query_10
-    - sharding_op_query_11
-    - sharding_op_query_misc
+  - *replica_sets_auth
+  - *replica_sets_ese
+  - *sharding
+  - *sharding_auth
+  - *sharding_auth_audit
+  - *sharding_ese
+  - *sharding_last_stable_mongos_and_mixed_shards
+  - *sharding_op_query
   tasks:
   - name: compile_all_run_unittests_TG
     requires:
