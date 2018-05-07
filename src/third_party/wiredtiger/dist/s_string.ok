@@ -146,6 +146,7 @@ Fprintf
 FreeBSD
 FreeBSD's
 FreeLibrary
+Fsync
 Fuerst
 GCC
 GIDs
@@ -213,6 +214,7 @@ LSM
 LSN
 LSNs
 LTE
+LWN
 LZ
 LZO
 LeafGreen
@@ -293,6 +295,7 @@ Pandis
 Phong
 PlatformSDK
 Posix
+PostgreSQL
 PowerPC
 Pre
 Preload
