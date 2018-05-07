@@ -62,7 +62,12 @@ std::string NetworkInterfaceTL::getDiagnosticString() {
 }
 
 void NetworkInterfaceTL::appendConnectionStats(ConnectionPoolStats* stats) const {
-    _pool->appendConnectionStats(stats);
+    auto pool = [&] {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _pool.get();
+    }();
+    if (pool)
+        pool->appendConnectionStats(stats);
 }
 
 std::string NetworkInterfaceTL::getHostName() {
@@ -70,6 +75,7 @@ std::string NetworkInterfaceTL::getHostName() {
 }
 
 void NetworkInterfaceTL::startup() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_svcCtx) {
         _tl = _svcCtx->getTransportLayer();
     }
@@ -97,7 +103,7 @@ void NetworkInterfaceTL::shutdown() {
     _inShutdown.store(true);
     _reactor->stop();
     _ioThread.join();
-    _pool.reset();
+    _pool->shutdown();
     LOG(2) << "NetworkInterfaceTL shutdown successfully";
 }
 

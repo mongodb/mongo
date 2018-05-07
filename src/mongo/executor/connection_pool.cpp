@@ -285,6 +285,10 @@ ConnectionPool::~ConnectionPool() {
         _manager->remove(this);
     }
 
+    shutdown();
+}
+
+void ConnectionPool::shutdown() {
     std::vector<SpecificPool*> pools;
 
     // Ensure we decrement active clients for all pools that we inc on (because we intend to process
@@ -297,7 +301,7 @@ ConnectionPool::~ConnectionPool() {
         }
     });
 
-    // Grab all current pools that don't match tags (under the lock)
+    // Grab all current pools (under the lock)
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
 

@@ -117,6 +117,7 @@ private:
     std::unique_ptr<transport::TransportLayer> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
+    mutable stdx::mutex _mutex;
     ConnectionPool::Options _connPoolOpts;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     std::unique_ptr<ConnectionPool> _pool;
@@ -129,7 +130,6 @@ private:
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<CommandState>> _inProgress;
     stdx::unordered_set<std::shared_ptr<transport::ReactorTimer>> _inProgressAlarms;
 
-    stdx::mutex _mutex;
     stdx::condition_variable _workReadyCond;
     bool _isExecutorRunnable = false;
 };
