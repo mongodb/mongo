@@ -1373,13 +1373,13 @@ StatusWith<std::string> mapSubjectLabel(LPSTR label) {
         return {"STREET"};
     } else if (strcmp(label, szOID_DOMAIN_COMPONENT) == 0) {
         return {"DC"};
+    } else if (strcmp(label, szOID_RSA_emailAddr) == 0) {
+        return {"emailAddress"};
     } else if (strcmp(label, "0.9.2342.19200300.100.1.1") == 0) {
         return {"UID"};
     }
 
-    // RFC 2253 specifies #hexstring encoding for unknown OIDs,
-    // however for backward compatibility purposes, we omit these.
-    return {ErrorCodes::InvalidSSLConfiguration, str::stream() << "Unknown OID: " << label};
+    return label;
 }
 
 // MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes

@@ -1,5 +1,7 @@
 // Test that a client can authenicate against the server with roles.
 // Also validates RFC2253
+load('jstests/ssl/libs/ssl_helpers.js');
+
 (function() {
     "use strict";
 
@@ -8,6 +10,8 @@
     const CLIENT_CERT = "jstests/libs/client_roles.pem";
     const CLIENT_ESCAPE_CERT = "jstests/libs/client_escape.pem";
     const CLIENT_UTF8_CERT = "jstests/libs/client_utf8.pem";
+    const CLIENT_EMAIL_CERT = "jstests/libs/client_email.pem";
+    const CLIENT_TITLE_CERT = "jstests/libs/client_title.pem";
 
     const CLIENT_USER =
         "C=US,ST=New York,L=New York City,O=MongoDB,OU=Kernel Users,CN=Kernel Client Peer Role";
@@ -57,6 +61,41 @@
 
         // runMongoProgram returns 0 on success
         assert.eq(0, utf8, "Connection attempt failed");
+
+        const email = runMongoProgram("mongo",
+                                      "--host",
+                                      "localhost",
+                                      "--port",
+                                      port,
+                                      "--ssl",
+                                      "--sslCAFile",
+                                      CA_CERT,
+                                      "--sslPEMKeyFile",
+                                      CLIENT_EMAIL_CERT,
+                                      "jstests/ssl/libs/ssl_x509_role_auth_email.js");
+
+        // runMongoProgram returns 0 on success
+        assert.eq(0, email, "Connection attempt failed");
+
+        // We test the "title" OID is represented as an OID on Apple and Windows
+        // rather then try to make Apple and Windows support every possible OID.
+        requireSSLProvider(['apple', 'windows'], function() {
+
+            const title = runMongoProgram("mongo",
+                                          "--host",
+                                          "localhost",
+                                          "--port",
+                                          port,
+                                          "--ssl",
+                                          "--sslCAFile",
+                                          CA_CERT,
+                                          "--sslPEMKeyFile",
+                                          CLIENT_TITLE_CERT,
+                                          "jstests/ssl/libs/ssl_x509_role_auth_title.js");
+
+            // runMongoProgram returns 0 on success
+            assert.eq(0, title, "Connection attempt failed");
+        });
     }
 
     const x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};

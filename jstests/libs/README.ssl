@@ -18,6 +18,9 @@ Example Commands
 ----------------
 openssl req -config openssl.cnf -newkey rsa:2048 -nodes -keyout roles.key -out roles.csr
 
+Example with subject name:
+openssl req -config openssl.cnf -newkey rsa:2048 -nodes -keyout roles.key -out roles.csr -subj "/C=US/ST=New York/L=New York City/O=MongoDB/OU=KernelUser/CN=client/emailAddress=example@mongodb.com"
+
 openssl x509 -req -sha256 -in roles.csr -days 3650 -out roles.pem -extfile openssl.cnf -extensions MongoDBAuthorizationGrant -CA jstests/libs/ca.pem -CAcreateserial
 
 openssl rsa -in roles.key -out roles2.key
