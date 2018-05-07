@@ -191,7 +191,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     std::string clientName;
 #ifdef MONGO_CONFIG_SSL
     if (getSSLManager()) {
-        clientName = getSSLManager()->getSSLConfiguration().clientSubjectName;
+        clientName = getSSLManager()->getSSLConfiguration().clientSubjectName.toString();
     }
 #endif
 

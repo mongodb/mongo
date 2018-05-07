@@ -7,6 +7,16 @@ cat css.key >> jstests/libs/client-self-signed.pem
 rm css.{csr,rsa,key}
 
 ---------------------------
+client-multivalue-rdn.pem represents the same RDN as client.pem, but grouping some elements together:
+
+openssl req -new -nodes -subj '/CN=client+OU=KernelUser+O=MongoDB/L=New York City+ST=New York+C=US' -multivalue-rdn \
+            -keyout client-multivalue-rdn.key -out client-multivalue-rdn.csr
+openssl rsa -in client-multivalue-rdn.key -out client-multivalue-rdn.rsa
+openssl x509 -in client-multivalue-rdn.csr -out client-multivalue-rdn.pem -req -CA ca.pem -days 3650 -CAcreateserial
+cat client-multivalue-rdn.rsa >> client-multivalue-rdn.pem
+rm ca.srl client-multivalue-rdn.key client-multivalue-rdn.rsa client-multivalue-rdn.csr
+
+---------------------------
 
 The other ceriticates in this directory come from x509gen.
 How to generate a certificate with a custom extension:

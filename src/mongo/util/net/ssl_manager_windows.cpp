@@ -294,7 +294,7 @@ private:
     void _handshake(SSLConnectionWindows* conn, bool client);
 
     Status _validateCertificate(PCCERT_CONTEXT cert,
-                                std::string* subjectName,
+                                SSLX509Name* subjectName,
                                 Date_t* serverCertificateExpirationDate);
 
     Status _initChainEngines(bool hasCAFile);
@@ -1356,34 +1356,8 @@ unsigned long long FiletimeToEpocMillis(FILETIME ft) {
     return ns100 / 1000;
 }
 
-StatusWith<std::string> mapSubjectLabel(LPSTR label) {
-    if (strcmp(label, szOID_COMMON_NAME) == 0) {
-        return {"CN"};
-    } else if (strcmp(label, szOID_COUNTRY_NAME) == 0) {
-        return {"C"};
-    } else if (strcmp(label, szOID_STATE_OR_PROVINCE_NAME) == 0) {
-        return {"ST"};
-    } else if (strcmp(label, szOID_LOCALITY_NAME) == 0) {
-        return {"L"};
-    } else if (strcmp(label, szOID_ORGANIZATION_NAME) == 0) {
-        return {"O"};
-    } else if (strcmp(label, szOID_ORGANIZATIONAL_UNIT_NAME) == 0) {
-        return {"OU"};
-    } else if (strcmp(label, szOID_STREET_ADDRESS) == 0) {
-        return {"STREET"};
-    } else if (strcmp(label, szOID_DOMAIN_COMPONENT) == 0) {
-        return {"DC"};
-    } else if (strcmp(label, szOID_RSA_emailAddr) == 0) {
-        return {"emailAddress"};
-    } else if (strcmp(label, "0.9.2342.19200300.100.1.1") == 0) {
-        return {"UID"};
-    }
-
-    return label;
-}
-
 // MongoDB wants RFC 2253 (LDAP) formatted DN names for auth purposes
-StatusWith<std::string> getCertificateSubjectName(PCCERT_CONTEXT cert) {
+StatusWith<SSLX509Name> getCertificateSubjectName(PCCERT_CONTEXT cert) {
 
     auto swBlob =
         decodeObject(X509_NAME, cert->pCertInfo->Subject.pbData, cert->pCertInfo->Subject.cbData);
@@ -1394,14 +1368,13 @@ StatusWith<std::string> getCertificateSubjectName(PCCERT_CONTEXT cert) {
 
     PCERT_NAME_INFO nameInfo = reinterpret_cast<PCERT_NAME_INFO>(swBlob.getValue().data());
 
-    StringBuilder output;
-
-    bool addComma = false;
+    std::vector<std::vector<SSLX509Name::Entry>> entries;
 
     // Iterate in reverse order
     for (int64_t i = nameInfo->cRDN - 1; i >= 0; i--) {
-        for (DWORD j = 0; j < nameInfo->rgRDN[i].cRDNAttr; j++) {
-            CERT_RDN_ATTR& rdnAttribute = nameInfo->rgRDN[i].rgRDNAttr[j];
+        std::vector<SSLX509Name::Entry> rdn;
+        for (DWORD j = nameInfo->rgRDN[i].cRDNAttr; j > 0; --j) {
+            CERT_RDN_ATTR& rdnAttribute = nameInfo->rgRDN[i].rgRDNAttr[j - 1];
 
             DWORD needed =
                 CertRDNValueToStrW(rdnAttribute.dwValueType, &rdnAttribute.Value, NULL, 0);
@@ -1413,29 +1386,16 @@ StatusWith<std::string> getCertificateSubjectName(PCCERT_CONTEXT cert) {
                                                  const_cast<wchar_t*>(wstr.data()),
                                                  needed);
             invariant(needed == converted);
-
-            auto swLabel = mapSubjectLabel(rdnAttribute.pszObjId);
-            if (!swLabel.isOK()) {
-                return swLabel.getStatus();
-            }
-
-            if (addComma) {
-                output << ',';
-            }
-
-            output << swLabel.getValue();
-            output << '=';
-            output << escapeRfc2253(toUtf8String(wstr));
-
-            addComma = true;
+            rdn.emplace_back(rdnAttribute.pszObjId, rdnAttribute.dwValueType, toUtf8String(wstr));
         }
+        entries.push_back(std::move(rdn));
     }
 
-    return output.str();
+    return SSLX509Name(std::move(entries));
 }
 
 Status SSLManagerWindows::_validateCertificate(PCCERT_CONTEXT cert,
-                                               std::string* subjectName,
+                                               SSLX509Name* subjectName,
                                                Date_t* serverCertificateExpirationDate) {
 
     auto swCert = getCertificateSubjectName(cert);
@@ -1512,7 +1472,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
                                HCERTCHAINENGINE certChainEngine,
                                bool allowInvalidCertificates,
                                bool allowInvalidHostnames,
-                               std::string* peerSubjectName) {
+                               SSLX509Name* peerSubjectName) {
     CERT_CHAIN_PARA certChainPara;
     memset(&certChainPara, 0, sizeof(certChainPara));
     certChainPara.cbSize = sizeof(CERT_CHAIN_PARA);
@@ -1619,7 +1579,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
                           << integerToHex(certChainPolicyStatus.dwError)
                           << "): " << errnoWithDescription(certChainPolicyStatus.dwError);
                 warning() << msg.ss.str();
-                *peerSubjectName = "";
+                *peerSubjectName = SSLX509Name();
                 return Status::OK();
             } else if (allowInvalidHostnames) {
                 warning() << msg.ss.str();
@@ -1667,7 +1627,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
     }
 
     UniqueCertificate certHolder(cert);
-    std::string peerSubjectName;
+    SSLX509Name peerSubjectName;
 
     // Validate against the local machine store first since it is easier to manage programmatically.
     Status validateCertMachine = validatePeerCertificate(remoteHost,

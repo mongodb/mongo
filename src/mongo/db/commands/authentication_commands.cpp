@@ -88,7 +88,7 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != clientName) {
+    } else if (user.getUser() != clientName.toString()) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "There is no x.509 client certificate matching the user.");
     } else {
@@ -236,14 +236,14 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     if (mechanism.empty()) {
         uasserted(ErrorCodes::BadValue, "Auth mechanism not specified");
     }
-    UserName user;
-    auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
 
-    if (mechanism == kX509AuthMechanism && !cmdObj.hasField("user")) {
-        user = UserName(sslPeerInfo.subjectName, dbname);
-    } else {
-        user = UserName(cmdObj.getStringField("user"), dbname);
+    UserName user(cmdObj.getStringField("user"), dbname);
+#ifdef MONGO_CONFIG_SSL
+    if (mechanism == kX509AuthMechanism && user.getUser().empty()) {
+        auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+        user = UserName(sslPeerInfo.subjectName.toString(), dbname);
     }
+#endif
     uassert(ErrorCodes::AuthenticationFailed, "No user name provided", !user.getUser().empty());
 
     if (getTestCommandsEnabled() && user.getDB() == "admin" &&

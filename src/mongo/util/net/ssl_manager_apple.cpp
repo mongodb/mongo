@@ -279,34 +279,33 @@ StatusWith<T> extractDictionaryValue(::CFDictionaryRef dict, ::CFStringRef key) 
     return reinterpret_cast<T>(val);
 }
 
-StatusWith<std::string> mapSubjectLabel(::CFStringRef label) {
-    if (!::CFStringCompare(label, ::kSecOIDCommonName, 0)) {
-        return {"CN"};
-    } else if (!::CFStringCompare(label, ::kSecOIDCountryName, 0)) {
-        return {"C"};
-    } else if (!::CFStringCompare(label, ::kSecOIDStateProvinceName, 0)) {
-        return {"ST"};
-    } else if (!::CFStringCompare(label, ::kSecOIDLocalityName, 0)) {
-        return {"L"};
-    } else if (!::CFStringCompare(label, ::kSecOIDOrganizationName, 0)) {
-        return {"O"};
-    } else if (!::CFStringCompare(label, ::kSecOIDOrganizationalUnitName, 0)) {
-        return {"OU"};
-    } else if (!::CFStringCompare(label, ::kSecOIDStreetAddress, 0)) {
-        return {"STREET"};
-    } else if (!::CFStringCompare(label, CFSTR("0.9.2342.19200300.100.1.25"), 0)) {
-        return {"DC"};
-    } else if (!::CFStringCompare(label, CFSTR("0.9.2342.19200300.100.1.1"), 0)) {
-        return {"UID"};
-    } else if (!::CFStringCompare(label, ::kSecOIDEmailAddress, 0)) {
-        return {"emailAddress"};
+StatusWith<SSLX509Name::Entry> extractSingleOIDEntry(::CFDictionaryRef entry) {
+    auto swLabel = extractDictionaryValue<::CFStringRef>(entry, ::kSecPropertyKeyLabel);
+    if (!swLabel.isOK()) {
+        return swLabel.getStatus();
+    }
+    auto swLabelStr = toString(swLabel.getValue());
+    if (!swLabelStr.isOK()) {
+        return swLabelStr.getStatus();
     }
 
-    return toString(label);
+    auto swValue = extractDictionaryValue<::CFStringRef>(entry, ::kSecPropertyKeyValue);
+    if (!swValue.isOK()) {
+        return swValue.getStatus();
+    }
+    auto swValueStr = toString(swValue.getValue());
+    if (!swValueStr.isOK()) {
+        return swValueStr.getStatus();
+    }
+
+    // Secure Transport doesn't give us access to the specific string type,
+    // so regard all strings as ASN1_PRINTABLESTRING on this platform.
+    return SSLX509Name::Entry(
+        std::move(swLabelStr.getValue()), 19, std::move(swValueStr.getValue()));
 }
 
-// Encode a raw DER subject sequence into a human readable subject name (RFC 2253).
-StatusWith<std::string> extractSubjectName(::CFDictionaryRef dict) {
+// Translate a raw DER subject sequence into a structured subject name.
+StatusWith<SSLX509Name> extractSubjectName(::CFDictionaryRef dict) {
     auto swSubject = extractDictionaryValue<::CFDictionaryRef>(dict, ::kSecOIDX509V1SubjectName);
     if (!swSubject.isOK()) {
         return swSubject.getStatus();
@@ -320,7 +319,7 @@ StatusWith<std::string> extractSubjectName(::CFDictionaryRef dict) {
 
     auto elems = swElems.getValue();
     const auto nElems = ::CFArrayGetCount(elems);
-    StringBuilder ret;
+    std::vector<std::vector<SSLX509Name::Entry>> ret;
     for (auto i = nElems; i; --i) {
         auto elem = reinterpret_cast<::CFDictionaryRef>(::CFArrayGetValueAtIndex(elems, i - 1));
         invariant(elem);
@@ -329,30 +328,46 @@ StatusWith<std::string> extractSubjectName(::CFDictionaryRef dict) {
                     "Subject name element is not a dictionary"};
         }
 
-        auto swLabel = extractDictionaryValue<::CFStringRef>(elem, ::kSecPropertyKeyLabel);
-        if (!swLabel.isOK()) {
-            return swLabel.getStatus();
-        }
-        auto swLabelStr = mapSubjectLabel(swLabel.getValue());
-        if (!swLabelStr.isOK()) {
-            return swLabelStr.getStatus();
+        auto swType = extractDictionaryValue<::CFStringRef>(elem, ::kSecPropertyKeyType);
+        if (!swType.isOK()) {
+            return swType.getStatus();
         }
 
-        auto swValue = extractDictionaryValue<::CFStringRef>(elem, ::kSecPropertyKeyValue);
-        if (!swValue.isOK()) {
-            return swValue.getStatus();
-        }
-        auto swValueStr = toString(swValue.getValue());
-        if (!swValueStr.isOK()) {
-            return swValueStr.getStatus();
-        }
+        if (!::CFStringCompare(swType.getValue(), CFSTR("section"), 0)) {
+            // Multi-value RDN.
+            auto swList = extractDictionaryValue<::CFArrayRef>(elem, ::kSecPropertyKeyValue);
+            if (!swList.isOK()) {
+                return swList.getStatus();
+            }
+            const auto nRDNAttrs = ::CFArrayGetCount(swList.getValue());
+            std::vector<SSLX509Name::Entry> rdn;
+            for (auto j = nRDNAttrs; j; --j) {
+                auto rdnElem = reinterpret_cast<::CFDictionaryRef>(
+                    ::CFArrayGetValueAtIndex(swList.getValue(), j - 1));
+                invariant(rdnElem);
+                if (::CFGetTypeID(rdnElem) != ::CFDictionaryGetTypeID()) {
+                    return {ErrorCodes::InvalidSSLConfiguration,
+                            "Subject name sub-element is not a dictionary"};
+                }
+                auto swEntry = extractSingleOIDEntry(rdnElem);
+                if (!swEntry.isOK()) {
+                    return swEntry.getStatus();
+                }
+                rdn.push_back(std::move(swEntry.getValue()));
+            }
+            ret.push_back(std::move(rdn));
 
-        ret << swLabelStr.getValue() << '=' << escapeRfc2253(swValueStr.getValue());
-        if (i > 1) {
-            ret << ",";
+        } else {
+            // Single Value RDN.
+            auto swEntry = extractSingleOIDEntry(elem);
+            if (!swEntry.isOK()) {
+                return swEntry.getStatus();
+            }
+            ret.push_back(std::vector<SSLX509Name::Entry>({std::move(swEntry.getValue())}));
         }
     }
-    return ret.str();
+
+    return SSLX509Name(std::move(ret));
 }
 
 StatusWith<mongo::Date_t> extractValidityDate(::CFDictionaryRef dict,
@@ -635,7 +650,7 @@ StatusWith<CFUniquePtr<::CFArrayRef>> loadPEM(const std::string& keyfilepath,
     return std::move(cfcerts);
 }
 
-StatusWith<std::string> certificateGetSubject(::SecCertificateRef cert, Date_t* expire = nullptr) {
+StatusWith<SSLX509Name> certificateGetSubject(::SecCertificateRef cert, Date_t* expire = nullptr) {
     // Fetch expiry range and full subject name.
     CFUniquePtr<::CFMutableArrayRef> oids(
         ::CFArrayCreateMutable(nullptr, expire ? 3 : 1, &::kCFTypeArrayCallBacks));
@@ -682,7 +697,7 @@ StatusWith<std::string> certificateGetSubject(::SecCertificateRef cert, Date_t* 
     return subject;
 }
 
-StatusWith<std::string> certificateGetSubject(::CFArrayRef certs, Date_t* expire = nullptr) {
+StatusWith<SSLX509Name> certificateGetSubject(::CFArrayRef certs, Date_t* expire = nullptr) {
     if (::CFArrayGetCount(certs) <= 0) {
         return {ErrorCodes::InvalidSSLConfiguration, "No certificates in certificate list"};
     }
@@ -810,7 +825,7 @@ StatusWith<CFUniquePtr<::CFArrayRef>> copyMatchingCertificate(
             if (!swCertSubject.isOK()) {
                 return swCertSubject.getStatus();
             }
-            if (swCertSubject.getValue() == selector.subject) {
+            if (swCertSubject.getValue().toString() == selector.subject) {
                 ::CFArrayAppendValue(cfresult.get(), ident);
                 break;
             }
@@ -1331,18 +1346,17 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerApple::parseAndValidatePeerCe
             certErr << san << " ";
         }
 
-    } else if (peerSubjectName.find("CN=") != std::string::npos) {
-        const auto cnBegin = peerSubjectName.find("CN=") + 3;
-        auto cnEnd = peerSubjectName.find(",", cnBegin);
-        if (cnEnd == std::string::npos) {
-            cnEnd = peerSubjectName.size();
-        }
-        const auto commonName = peerSubjectName.substr(cnBegin, cnEnd - cnBegin);
-        cnMatch = hostNameMatchForX509Certificates(remoteHost, commonName);
-        certErr << "CN: " << commonName;
-
     } else {
-        certErr << "No Common Name (CN) or Subject Alternate Names (SAN) found";
+        auto swCN = peerSubjectName.getOID(kOID_CommonName);
+        if (swCN.isOK()) {
+            auto commonName = std::move(swCN.getValue());
+            if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
+                cnMatch = true;
+            }
+            certErr << "CN: " << commonName;
+        } else {
+            certErr << "No Common Name (CN) or Subject Alternate Names (SAN) found";
+        }
     }
 
     if (!sanMatch && !cnMatch) {

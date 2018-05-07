@@ -177,12 +177,8 @@ public:
             serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_sendX509);
 #ifdef MONGO_CONFIG_SSL
             setInternalUserAuthParams(
-                BSON(saslCommandMechanismFieldName
-                     << "MONGODB-X509"
-                     << saslCommandUserDBFieldName
-                     << "$external"
-                     << saslCommandUserFieldName
-                     << getSSLManager()->getSSLConfiguration().clientSubjectName));
+                BSON(saslCommandMechanismFieldName << "MONGODB-X509" << saslCommandUserDBFieldName
+                                                   << "$external"));
 #endif
         } else if (str == "x509" && oldMode == ServerGlobalParams::ClusterAuthMode_sendX509) {
             serverGlobalParams.clusterAuthMode.store(ServerGlobalParams::ClusterAuthMode_x509);

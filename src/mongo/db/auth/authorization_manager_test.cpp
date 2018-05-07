@@ -32,6 +32,7 @@
  */
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/config.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
@@ -58,6 +59,12 @@
 
 namespace mongo {
 namespace {
+
+// Construct a simple, structured X509 name equivalent to "CN=mongodb.com"
+SSLX509Name buildX509Name() {
+    return SSLX509Name(std::vector<std::vector<SSLX509Name::Entry>>(
+        {{{kOID_CommonName.toString(), 19 /* Printable String */, "mongodb.com"}}}));
+}
 
 void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) {
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
@@ -257,13 +264,14 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     authzManager->releaseUser(v2cluster);
 }
 
+#ifdef MONGO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
     setX509PeerInfo(
         session,
-        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("readWrite", "test")}));
+        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("readWrite", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 
@@ -290,6 +298,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
 
     authzManager->releaseUser(x509User);
 }
+#endif
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     ServiceContextNoop serviceContext;
@@ -297,7 +306,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     transport::SessionHandle session = transportLayer.createSession();
     setX509PeerInfo(
         session,
-        SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("write", "test")}));
+        SSLPeerInfo(buildX509Name(), {RoleName("read", "test"), RoleName("write", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext opCtx = client->makeOperationContext();
 

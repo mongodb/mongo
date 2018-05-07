@@ -176,6 +176,9 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN
 const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
     return peerCert->cert_info->extensions;
 }
+inline int X509_NAME_ENTRY_set(const X509_NAME_ENTRY* ne) {
+    return ne->set;
+}
 #endif
 
 /**
@@ -394,7 +397,7 @@ private:
      */
     bool _parseAndValidateCertificate(const std::string& keyFile,
                                       const std::string& keyPassword,
-                                      std::string* subjectName,
+                                      SSLX509Name* subjectName,
                                       Date_t* serverNotAfter);
 
 
@@ -497,23 +500,42 @@ SSLManagerInterface* getSSLManager() {
     return NULL;
 }
 
-std::string getCertificateSubjectName(X509* cert) {
-    std::string result;
+SSLX509Name getCertificateSubjectX509Name(X509* cert) {
+    std::vector<std::vector<SSLX509Name::Entry>> entries;
 
-    BIO* out = BIO_new(BIO_s_mem());
-    uassert(16884, "unable to allocate BIO memory", NULL != out);
-    ON_BLOCK_EXIT(BIO_free, out);
+    auto name = X509_get_subject_name(cert);
+    int count = X509_NAME_entry_count(name);
+    int prevSet = -1;
+    std::vector<SSLX509Name::Entry> rdn;
+    for (int i = count - 1; i >= 0; --i) {
+        auto* entry = X509_NAME_get_entry(name, i);
 
-    if (X509_NAME_print_ex(out, X509_get_subject_name(cert), 0, XN_FLAG_RFC2253) >= 0) {
-        if (BIO_number_written(out) > 0) {
-            result.resize(BIO_number_written(out));
-            BIO_read(out, &result[0], result.size());
+        const auto currentSet = X509_NAME_ENTRY_set(entry);
+        if (currentSet != prevSet) {
+            if (!rdn.empty()) {
+                entries.push_back(std::move(rdn));
+                rdn = std::vector<SSLX509Name::Entry>();
+            }
+            prevSet = currentSet;
         }
-    } else {
-        log() << "failed to convert subject name to RFC2253 format";
+
+        char buffer[128];
+        // OBJ_obj2txt can only fail if we pass a nullptr from get_object,
+        // or if OpenSSL's BN library falls over.
+        // In either case, just panic.
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "Unable to parse certiciate subject name",
+                OBJ_obj2txt(buffer, sizeof(buffer), X509_NAME_ENTRY_get_object(entry), 1) > 0);
+
+        const auto* str = X509_NAME_ENTRY_get_data(entry);
+        rdn.emplace_back(
+            buffer, str->type, std::string(reinterpret_cast<const char*>(str->data), str->length));
+    }
+    if (!rdn.empty()) {
+        entries.push_back(std::move(rdn));
     }
 
-    return result;
+    return SSLX509Name(std::move(entries));
 }
 
 SSLConnectionOpenSSL::SSLConnectionOpenSSL(SSL_CTX* context,
@@ -803,7 +825,7 @@ unsigned long long SSLManagerOpenSSL::_convertASN1ToMillis(ASN1_TIME* asn1time) 
 
 bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
                                                      const std::string& keyPassword,
-                                                     std::string* subjectName,
+                                                     SSLX509Name* subjectName,
                                                      Date_t* serverCertificateExpirationDate) {
     BIO* inBIO = BIO_new(BIO_s_file());
     if (inBIO == NULL) {
@@ -830,7 +852,7 @@ bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
     }
     ON_BLOCK_EXIT(X509_free, x509);
 
-    *subjectName = getCertificateSubjectName(x509);
+    *subjectName = getCertificateSubjectX509Name(x509);
     if (serverCertificateExpirationDate != NULL) {
         unsigned long long notBeforeMillis = _convertASN1ToMillis(X509_get_notBefore(x509));
         if (notBeforeMillis == 0) {
@@ -1246,8 +1268,8 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
     }
 
     // TODO: check optional cipher restriction, using cert.
-    std::string peerSubjectName = getCertificateSubjectName(peerCert);
-    LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
+    auto peerSubject = getCertificateSubjectX509Name(peerCert);
+    LOG(2) << "Accepted TLS connection from peer: " << peerSubject;
 
     StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {
@@ -1258,7 +1280,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
     // perform hostname validation of the remote server
     if (remoteHost.empty()) {
         return boost::make_optional(
-            SSLPeerInfo(peerSubjectName, std::move(swPeerCertificateRoles.getValue())));
+            SSLPeerInfo(peerSubject, std::move(swPeerCertificateRoles.getValue())));
     }
 
     // Try to match using the Subject Alternate Name, if it exists.
@@ -1288,19 +1310,19 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
             }
         }
         sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
-    } else if (peerSubjectName.find("CN=") != std::string::npos) {
+    } else {
         // If Subject Alternate Name (SAN) doesn't exist and Common Name (CN) does,
         // check Common Name.
-        int cnBegin = peerSubjectName.find("CN=") + 3;
-        int cnEnd = peerSubjectName.find(",", cnBegin);
-        std::string commonName = peerSubjectName.substr(cnBegin, cnEnd - cnBegin);
-
-        if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
-            cnMatch = true;
+        auto swCN = peerSubject.getOID(kOID_CommonName);
+        if (swCN.isOK()) {
+            auto commonName = std::move(swCN.getValue());
+            if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
+                cnMatch = true;
+            }
+            certificateNames << "CN: " << commonName;
+        } else {
+            certificateNames << "No Common Name (CN) or Subject Alternate Names (SAN) found";
         }
-        certificateNames << "CN: " << commonName;
-    } else {
-        certificateNames << "No Common Name (CN) or Subject Alternate Names (SAN) found";
     }
 
     if (!sanMatch && !cnMatch) {
@@ -1316,7 +1338,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubjectName, stdx::unordered_set<RoleName>()));
+    return boost::make_optional(SSLPeerInfo(peerSubject, stdx::unordered_set<RoleName>()));
 }
 
 

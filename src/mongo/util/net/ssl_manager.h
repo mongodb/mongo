@@ -87,18 +87,11 @@ public:
 };
 
 struct SSLConfiguration {
-    SSLConfiguration() : serverSubjectName(""), clientSubjectName("") {}
-    SSLConfiguration(const std::string& serverSubjectName,
-                     const std::string& clientSubjectName,
-                     const Date_t& serverCertificateExpirationDate)
-        : serverSubjectName(serverSubjectName),
-          clientSubjectName(clientSubjectName),
-          serverCertificateExpirationDate(serverCertificateExpirationDate) {}
-
     bool isClusterMember(StringData subjectName) const;
+    bool isClusterMember(const SSLX509Name& subjectName) const;
     BSONObj getServerStatusBSON() const;
-    std::string serverSubjectName;
-    std::string clientSubjectName;
+    SSLX509Name serverSubjectName;
+    SSLX509Name clientSubjectName;
     Date_t serverCertificateExpirationDate;
     bool hasCA = false;
 };

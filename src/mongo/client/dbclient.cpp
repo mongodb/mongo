@@ -466,7 +466,7 @@ void DBClientBase::_auth(const BSONObj& params) {
     std::string clientName = "";
 #ifdef MONGO_CONFIG_SSL
     if (sslManager() != nullptr) {
-        clientName = sslManager()->getSSLConfiguration().clientSubjectName;
+        clientName = sslManager()->getSSLConfiguration().clientSubjectName.toString();
     }
 #endif
 

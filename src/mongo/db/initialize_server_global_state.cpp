@@ -406,7 +406,7 @@ bool initializeServerGlobalState() {
                  << saslCommandUserDBFieldName
                  << "$external"
                  << saslCommandUserFieldName
-                 << getSSLManager()->getSSLConfiguration().clientSubjectName));
+                 << getSSLManager()->getSSLConfiguration().clientSubjectName.toString()));
     }
 #endif
     return true;

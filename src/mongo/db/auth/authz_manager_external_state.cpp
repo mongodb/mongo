@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/config.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
@@ -42,11 +43,17 @@ AuthzManagerExternalState::~AuthzManagerExternalState() = default;
 
 bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* opCtx,
                                                              const UserName& userName) {
-    if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session())
+#ifdef MONGO_CONFIG_SSL
+    if (!opCtx || !opCtx->getClient() || !opCtx->getClient()->session()) {
         return false;
+    }
+
     auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-    return sslPeerInfo.subjectName == userName.getUser() && userName.getDB() == "$external" &&
-        !sslPeerInfo.roles.empty();
+    return sslPeerInfo.subjectName.toString() == userName.getUser() &&
+        userName.getDB() == "$external" && !sslPeerInfo.roles.empty();
+#else
+    return false;
+#endif
 }
 
 
