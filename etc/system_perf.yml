@@ -16,7 +16,7 @@ post:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: work/dsi-artifacts.tgz
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.${ext|tgz}
+        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -26,7 +26,7 @@ post:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/workloads/workloads/jsdoc/jsdocs-redirect.html
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
+        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
         bucket: mciuploads
         permissions: public-read
         content_type: text/html
@@ -79,7 +79,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb${wtdevelop|}.tar.gz
-        remote_file: ${project}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -124,7 +124,7 @@ functions:
           storageEngine: ${storageEngine}
           test_control: ${test}
           production: true
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz"
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project_dir}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
           EOF
@@ -140,7 +140,7 @@ functions:
           version_id: ${version_id}
           workdir: ${workdir}
           revision: ${revision}
-          project: ${project}
+          project_dir: ${project_dir}
           branch_name: ${branch_name}
 
           # sys-perf expansions
@@ -150,6 +150,7 @@ functions:
           dsi_rev: ${dsi_rev}
           workloads_rev: ${workloads_rev}
           EOF
+
     - command: shell.exec
       params:
         silent: true
@@ -166,6 +167,7 @@ functions:
           aws_secret_key: "${terraform_secret}"
           perf_jira_user: "${perf_jira_user}"
           perf_jira_pw: "${perf_jira_pw}"
+          dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
           EOF
           chmod 400 runtime_secret.yml
     - command: shell.exec
@@ -175,10 +177,7 @@ functions:
         # configure environment, has private information, no logging
         script: |
           set -e
-          virtualenv ./venv
-          source ./venv/bin/activate
-          pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/bootstrap.py
+          ../src/dsi/dsi/run-dsi python ../src/dsi/dsi/bin/bootstrap.py
     - command: shell.exec
       params:
         script: |
@@ -196,10 +195,9 @@ functions:
           set -e
           set -v
           source ./dsienv.sh
-          source ./venv/bin/activate
-          infrastructure_provisioning.py
-          workload_setup.py
-          mongodb_setup.py
+          ../src/dsi/dsi/run-dsi infrastructure_provisioning.py
+          ../src/dsi/dsi/run-dsi workload_setup.py
+          ../src/dsi/dsi/run-dsi mongodb_setup.py
 
   "run test":
     - command: shell.exec
@@ -210,14 +208,18 @@ functions:
           set -e
           set -v
           source ./dsienv.sh
-          source ./venv/bin/activate
-          test_control.py
+          ../src/dsi/dsi/run-dsi test_control.py
     - command: "json.send"
       params:
          name: "perf"
          file: "work/perf.json"
 
   "analyze":
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          ../src/dsi/dsi/run-dsi detect-changes
     - command: shell.exec
       type : test
       params:
@@ -398,7 +400,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     platform: linux
-    project: &project dsi
+    project_dir: &project_dir dsi
     tooltags: ""
     use_scons_cache: true
   run_on:
@@ -421,7 +423,7 @@ buildvariants:
     setup: single-replica
     cluster: single
     platform: linux
-    project: *project
+    project_dir: *project_dir
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-single"
@@ -445,7 +447,7 @@ buildvariants:
     setup: standalone
     cluster: single
     platform: linux
-    project: *project
+    project_dir: *project_dir
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-single"
@@ -470,7 +472,7 @@ buildvariants:
     setup: shard
     cluster: shard
     platform: linux
-    project: *project
+    project_dir: *project_dir
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-shard"
@@ -497,7 +499,7 @@ buildvariants:
     setup: replica
     cluster: replica
     platform: linux
-    project: *project
+    project_dir: *project_dir
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-replset"
@@ -523,7 +525,7 @@ buildvariants:
     setup: replica-2node
     cluster: replica
     platform: linux
-    project: *project
+    project_dir: *project_dir
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-replset"
@@ -544,8 +546,8 @@ buildvariants:
     setup: single-replica
     cluster: single
     platform: linux
-    project: *project
     storageEngine: "mmapv1"
+    project_dir: *project_dir
   run_on:
       - "rhel70-perf-single"
   depends_on:
@@ -568,8 +570,8 @@ buildvariants:
     setup: standalone
     cluster: single
     platform: linux
-    project: *project
     storageEngine: "mmapv1"
+    project_dir: *project_dir
   run_on:
       - "rhel70-perf-single"
   depends_on:
@@ -592,8 +594,8 @@ buildvariants:
     setup: shard
     cluster: shard
     platform: linux
-    project: *project
     storageEngine: "mmapv1"
+    project_dir: *project_dir
   run_on:
       - "rhel70-perf-shard"
   depends_on:
@@ -619,7 +621,7 @@ buildvariants:
     cluster: replica
     platform: linux
     storageEngine: "mmapv1"
-    project: *project
+    project_dir: *project_dir
   run_on:
       - "rhel70-perf-replset"
   depends_on:
@@ -643,8 +645,8 @@ buildvariants:
     setup: replica-2node
     cluster: replica
     platform: linux
-    project: *project
     storageEngine: "mmapv1"
+    project_dir: *project_dir
   run_on:
       - "rhel70-perf-replset"
   depends_on:
