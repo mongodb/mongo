@@ -4064,7 +4064,8 @@ var authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 roles: roles_monitoring,
-                privileges: [{resource: {cluster: true}, actions: ["getShardMap"]}]
+                privileges: [{resource: {cluster: true}, actions: ["getShardMap"]}],
+                expectFail: true
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
