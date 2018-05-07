@@ -1,4 +1,5 @@
 // Ensure that created/updated users have the correct credentials.
+// @tags: [requires_persistence]
 
 (function() {
     'use strict';
