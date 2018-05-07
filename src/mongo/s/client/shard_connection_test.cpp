@@ -97,6 +97,16 @@ protected:
     void checkNewConns(void (*checkFunc)(uint64_t, uint64_t),
                        uint64_t arg2,
                        size_t newConnsToCreate) {
+        // The check below creates new connections and tries to differentiate them from older ones
+        // using the creation timestamp. On certain hardware the clock resolution is not high enough
+        // and the new connections end up getting the same time, which makes the test unreliable.
+        // Adding the sleep below makes the test more robust.
+        //
+        // A more proper solution would be to use a MockTimeSource and explicitly control the time,
+        // but since this test supports legacy functionality only used by map/reduce we won't spend
+        // time rewriting it.
+        sleepmillis(5);
+
         std::vector<std::unique_ptr<ShardConnection>> newConnList;
         for (size_t x = 0; x < newConnsToCreate; x++) {
             auto newConn = std::make_unique<ShardConnection>(
