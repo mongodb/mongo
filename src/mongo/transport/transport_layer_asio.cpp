@@ -459,7 +459,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
 
     sock.non_blocking(false);
     try {
-        return std::make_shared<ASIOSession>(this, std::move(sock));
+        return std::make_shared<ASIOSession>(this, std::move(sock), false);
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -507,7 +507,8 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
             return connector->socket.async_connect(results->endpoint(), UseFuture{});
         })
         .then([this, connector, sslMode]() {
-            connector->session = std::make_shared<ASIOSession>(this, std::move(connector->socket));
+            connector->session =
+                std::make_shared<ASIOSession>(this, std::move(connector->socket), false);
             connector->session->ensureAsync();
 #ifndef MONGO_CONFIG_SSL
             if (sslMode == kEnableSSL) {
@@ -753,7 +754,8 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         }
 
         try {
-            std::shared_ptr<ASIOSession> session(new ASIOSession(this, std::move(peerSocket)));
+            std::shared_ptr<ASIOSession> session(
+                new ASIOSession(this, std::move(peerSocket), true));
             _sep->startSession(std::move(session));
         } catch (const DBException& e) {
             warning() << "Error accepting new connection " << e;

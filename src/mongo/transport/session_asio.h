@@ -78,8 +78,10 @@ class TransportLayerASIO::ASIOSession final : public Session {
 public:
     // If the socket is disconnected while any of these options are being set, this constructor
     // may throw, but it is guaranteed to throw a mongo DBException.
-    ASIOSession(TransportLayerASIO* tl, GenericSocket socket) try : _socket(std::move(socket)),
-                                                                    _tl(tl) {
+    ASIOSession(TransportLayerASIO* tl, GenericSocket socket, bool isIngressSession) try
+        : _socket(std::move(socket)),
+          _tl(tl),
+          _isIngressSession(isIngressSession) {
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
             _socket.set_option(asio::ip::tcp::no_delay(true));
@@ -138,7 +140,11 @@ public:
         ensureSync();
 
         return write(asio::buffer(message.buf(), message.size()))
-            .then([&message] { networkCounter.hitPhysicalOut(message.size()); })
+            .then([this, &message] {
+                if (_isIngressSession) {
+                    networkCounter.hitPhysicalOut(message.size());
+                }
+            })
             .getNoThrow();
     }
 
@@ -146,8 +152,10 @@ public:
                                   const transport::BatonHandle& baton = nullptr) override {
         ensureAsync();
         return write(asio::buffer(message.buf(), message.size()), baton)
-            .then([message /*keep the buffer alive*/]() {
-                networkCounter.hitPhysicalOut(message.size());
+            .then([this, message /*keep the buffer alive*/]() {
+                if (_isIngressSession) {
+                    networkCounter.hitPhysicalOut(message.size());
+                }
             });
     }
 
@@ -345,7 +353,9 @@ private:
 
                 if (msgLen == kHeaderSize) {
                     // This probably isn't a real case since all (current) messages have bodies.
-                    networkCounter.hitPhysicalIn(msgLen);
+                    if (_isIngressSession) {
+                        networkCounter.hitPhysicalIn(msgLen);
+                    }
                     return Future<Message>::makeReady(Message(std::move(headerBuffer)));
                 }
 
@@ -354,8 +364,10 @@ private:
 
                 MsgData::View msgView(buffer.get());
                 return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
-                    .then([ buffer = std::move(buffer), msgLen ]() mutable {
-                        networkCounter.hitPhysicalIn(msgLen);
+                    .then([ this, buffer = std::move(buffer), msgLen ]() mutable {
+                        if (_isIngressSession) {
+                            networkCounter.hitPhysicalIn(msgLen);
+                        }
                         return Message(std::move(buffer));
                     });
             });
@@ -685,6 +697,7 @@ private:
 #endif
 
     TransportLayerASIO* const _tl;
+    bool _isIngressSession;
 };
 
 }  // namespace transport
