@@ -379,9 +379,7 @@ variables:
   - func: "get modified patch files"
   # NOTE: To disable the compile bypass feature, comment out the next line.
   #
-  # TODO SERVER-34680: Uncomment the next line when the mongoe binary is downloaded from the base
-  # commit's compile task and included the artifacts tarball for the jsCore_mobile task to use.
-  # - func: "bypass compile and fetch binaries"
+  - func: "bypass compile and fetch binaries"
   - func: "update bypass expansions"
   - func: "get buildnumber"
   - func: "set up credentials"
