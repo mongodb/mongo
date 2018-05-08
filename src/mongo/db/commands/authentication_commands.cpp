@@ -162,6 +162,8 @@ bool CmdAuthenticate::run(OperationContext* txn,
     }
 
     UserName user(cmdObj.getStringField("user"), dbname);
+    uassert(ErrorCodes::AuthenticationFailed, "No user name provided", !user.getUser().empty());
+
     if (Command::testCommandsEnabled && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
         // Allows authenticating as the internal user against the admin database.  This is to
@@ -315,6 +317,9 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
     ClientBasic* client = ClientBasic::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
     std::string clientSubjectName = client->port()->getX509SubjectName();
+    uassert(ErrorCodes::AuthenticationFailed,
+            "No verified subject name available from client",
+            !clientSubjectName.empty());
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
