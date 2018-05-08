@@ -124,15 +124,7 @@ Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
 void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator->shouldGossipLogicalTime()) {
-        // Add $clusterTime.
         auto now = LogicalClock::get(opCtx)->getClusterTime();
-        if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-            SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
-            rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
-        } else {
-            auto currentTime = validator->signLogicalTime(opCtx, now);
-            rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
-        }
 
         // Add operationTime.
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
@@ -142,6 +134,15 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
             // If we don't know the actual operation time, use the cluster time instead. This is
             // safe but not optimal because we can always return a later operation time than actual.
             responseBuilder->append(kOperationTime, now.asTimestamp());
+        }
+
+        // Add $clusterTime.
+        if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
+            rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
+        } else {
+            auto currentTime = validator->signLogicalTime(opCtx, now);
+            rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
         }
     }
 }
