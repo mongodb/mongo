@@ -238,6 +238,33 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldSortTwoInputsAccordingToOneFieldAs
                  "[{_id:1,a:1},{_id:0,a:2}]");
 }
 
+/** Two identical sorts. */
+TEST_F(DocumentSourceSortExecutionTest, IdenticalSort) {
+    checkResults({Document{{"_id", 0}, {"a", 2}}, Document{{"_id", 1}, {"a", 2}}},
+                 BSON("a" << 1),
+                 "[{_id:0,a:2},{_id:1,a:2}]");
+}
+
+/** 
+ * Same sort spec with first ascendening field and then a descending field. 
+ * The result should follow a descending order
+ * */
+TEST_F(DocumentSourceSortExecutionTest, FirstAscendingThenDescending) {
+    checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", 2}}, Document{{"_id", 2}, {"a", 1}}},
+                 BSON("a" << -1),
+                 "[{_id:1,a:2},{_id:0,a:1},{_id:2,a:1}]");
+}
+
+/** 
+ * Same sort spec with first descending field and then a ascending field. 
+ * The result should follow a ascending order
+*/
+TEST_F(DocumentSourceSortExecutionTest, FirstDescendingThenAscending) {
+    checkResults({Document{{"_id", 0}, {"a", 2}}, Document{{"_id", 1}, {"a", 1}}, Document{{"_id", 2}, {"a", 2}}},
+                 BSON("a" << 1),
+                 "[{_id:1,a:1},{_id:0,a:2},{_id:2,a:2}]");
+}
+
 /** Sort spec with a descending field. */
 TEST_F(DocumentSourceSortExecutionTest, DescendingOrder) {
     checkResults({Document{{"_id", 0}, {"a", 2}}, Document{{"_id", 1}, {"a", 1}}},

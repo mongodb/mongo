@@ -193,12 +193,11 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     invariant(*itr == this);
 
     auto sortItr = std::next(itr);
-    auto curSort = (*sortItr).get();
-
     long long skipSum = 0;
+    DocumentSourceSort* curSort = dynamic_cast<DocumentSourceSort*>((*itr).get());
     while (sortItr != container->end()) {
         auto nextStage = (*sortItr).get();
-        
+
         if (auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage)) {
             skipSum += nextSkip->getSkip();
             ++sortItr;
@@ -209,20 +208,24 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
             sortItr = std::next(itr);
             skipSum = 0;
         } else if (auto nextSort = dynamic_cast<DocumentSourceSort*>(nextStage)) {
-            // If next stage is same $sort, perform merge
-            if (nextSort == curSort) {
-                nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage);
-                nextLimit->setLimit(nextLimit->getLimit() + skipSum);
-                setLimitSrc(nextLimit);
+            container->erase(sortItr);
+            sortItr = std::next(itr);
+            if (pExpCtx->getDocumentComparator().evaluate((nextSort->sortKeyPattern(SortKeySerialization::kForPipelineSerialization) == (curSort->sortKeyPattern(SortKeySerialization::kForPipelineSerialization))))) { // Exact match
                 container->erase(sortItr);
-                sortItr = std::next(itr);
-                skipSum = 0;
-                ++sortItr;
+                sortItr = std::next(itr);   
+            } else {
+                if (nextSort->_sortPattern.size() == 1 && curSort->_sortPattern.size() == 1) {
+                    if ((nextSort->_sortPattern[0].fieldPath) && (curSort->_sortPattern[0].fieldPath)) {
+                        if (nextSort->_sortPattern[0].fieldPath->fullPath() == curSort->_sortPattern[0].fieldPath->fullPath()) {
+                            container->erase(sortItr);
+                            sortItr = std::next(itr); 
+                        }
+                    }
+                }
             }
         } else if (!nextStage->constraints().canSwapWithLimit) {
             return std::next(itr);
         } else {
-            curSort = nextStage;
             ++sortItr;
         }
     }
