@@ -104,7 +104,7 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
-    Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override {
+    Timestamp getAllCommittedTimestamp() const override {
         MONGO_UNREACHABLE;
     }
 

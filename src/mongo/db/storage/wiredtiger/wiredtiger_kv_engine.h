@@ -175,7 +175,7 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
-    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
+    virtual Timestamp getAllCommittedTimestamp() const override;
 
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION

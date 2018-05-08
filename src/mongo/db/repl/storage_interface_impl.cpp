@@ -1034,5 +1034,13 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
     oplog.getCollection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 }
 
+bool StorageInterfaceImpl::supportsDocLocking(ServiceContext* serviceCtx) const {
+    return serviceCtx->getGlobalStorageEngine()->supportsDocLocking();
+}
+
+Timestamp StorageInterfaceImpl::getAllCommittedTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getGlobalStorageEngine()->getAllCommittedTimestamp();
+}
+
 }  // namespace repl
 }  // namespace mongo

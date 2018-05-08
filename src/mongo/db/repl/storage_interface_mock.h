@@ -285,6 +285,10 @@ public:
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
     }
 
+    Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
+
+    bool supportsDocLocking(ServiceContext* serviceCtx) const override;
+
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };
@@ -359,6 +363,9 @@ public:
         return Status{ErrorCodes::IllegalOperation,
                       "UpgradeUUIDSchemaVersionNonReplicatedFn not implemented."};
     };
+
+    bool supportsDocLockingBool = false;
+    Timestamp allCommittedTimestamp = Timestamp::min();
 
 private:
     mutable stdx::mutex _mutex;

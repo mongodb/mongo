@@ -1133,8 +1133,8 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     return _checkpointThread->supportsRecoverToStableTimestamp();
 }
 
-Timestamp WiredTigerKVEngine::getAllCommittedTimestamp(OperationContext* opCtx) const {
-    return Timestamp(_oplogManager->fetchAllCommittedValue(opCtx));
+Timestamp WiredTigerKVEngine::getAllCommittedTimestamp() const {
+    return Timestamp(_oplogManager->fetchAllCommittedValue(_conn));
 }
 
 void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,

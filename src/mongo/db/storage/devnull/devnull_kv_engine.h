@@ -112,7 +112,7 @@ public:
 
     void setJournalListener(JournalListener* jl) final {}
 
-    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override {
+    virtual Timestamp getAllCommittedTimestamp() const override {
         return Timestamp();
     }
 
