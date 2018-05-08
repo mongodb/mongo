@@ -66,6 +66,10 @@ static const std::vector<StringData> kMemKeys{
     "Inactive(file)"_sd,
 };
 
+static const std::vector<StringData> kNetstatKeys{
+    "Tcp:"_sd, "Ip:"_sd, "TcpExt:"_sd, "IpExt:"_sd,
+};
+
 /**
  *  Collect metrics from the Linux /proc file system.
  */
@@ -95,6 +99,17 @@ public:
             BSONObjBuilder subObjBuilder(builder.subobjStart("memory"_sd));
             processStatusErrors(
                 procparser::parseProcMemInfoFile("/proc/meminfo"_sd, kMemKeys, &subObjBuilder),
+                &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("netstat"_sd));
+            processStatusErrors(procparser::parseProcNetstatFile(
+                                    kNetstatKeys, "/proc/net/netstat"_sd, &subObjBuilder),
+                                &subObjBuilder);
+            processStatusErrors(
+                procparser::parseProcNetstatFile(kNetstatKeys, "/proc/net/snmp"_sd, &subObjBuilder),
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
