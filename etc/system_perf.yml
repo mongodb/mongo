@@ -1044,6 +1044,39 @@ buildvariants:
     - name: change_streams_latency
     - name: change_streams_multi_mongos
 
+- name: linux-shard-lite
+  display_name: Linux Shard Lite Cluster
+  batchtime: 1440  # 24 hours
+  modules: *modules
+  expansions:
+    setup: shard-lite
+    cluster: shard-lite
+    platform: linux
+    project: *project
+    authentication: disabled
+  run_on:
+      - "rhel70-perf-shard-lite"
+  tasks:
+    - name: compile_proxy
+      depends_on:
+        - name: compile
+          variant: compile-rhel70
+      distros:
+        - rhel70
+    - name: bestbuy_agg_WT
+    - name: bestbuy_query_WT
+    - name: change_streams_latency
+    - name: change_streams_multi_mongos
+    - name: change_streams_throughput
+    - name: industry_benchmarks_WT
+    - name: industry_benchmarks_wmajority_WT
+    - name: mixed_workloads_WT
+    - name: mongos_workloads_WT
+    - name: move_chunk_workloads_WT
+    - name: move_chunk_waiting_workloads_WT
+    - name: retryable_writes_workloads_WT
+    - name: smoke_test
+
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
   batchtime: 1440  # 24 hours
@@ -1235,3 +1268,37 @@ buildvariants:
     - name: change_streams_latency
     - name: snapshot_reads_WT
     - name: secondary_reads_WT
+
+- name: wtdevelop-shard-lite
+  display_name: WT Develop Shard Lite Cluster
+  batchtime: 1440  # 24 hours
+  modules: *modules
+  expansions:
+    setup: shard-lite
+    cluster: shard-lite
+    platform: linux
+    project: *project
+    wtdevelop: -wtdevelop
+    authentication: enabled
+  run_on:
+      - "rhel70-perf-shard-lite"
+  tasks:
+    - name: compile_proxy
+      depends_on:
+        - name: compile_wtdevelop
+          variant: compile-rhel70
+      distros:
+        - rhel70
+    - name: bestbuy_agg_WT
+    - name: bestbuy_query_WT
+    - name: change_streams_latency
+    - name: change_streams_multi_mongos
+    - name: change_streams_throughput
+    - name: industry_benchmarks_WT
+    - name: industry_benchmarks_wmajority_WT
+    - name: mixed_workloads_WT
+    - name: mongos_workloads_WT
+    - name: move_chunk_workloads_WT
+    - name: move_chunk_waiting_workloads_WT
+    - name: retryable_writes_workloads_WT
+    - name: smoke_test
