@@ -15,7 +15,6 @@ executor:
         TestData:
           ignoreCommandsIncompatibleWithInitialSync: true
   hooks:
-  - class: CheckPrimary
   - class: BackgroundInitialSync
     n: 1
     shell_options:
