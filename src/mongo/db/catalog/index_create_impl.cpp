@@ -82,9 +82,12 @@ bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) 
     }
 
     // Nodes in `startup` may not have yet initialized the `LogicalClock`. Primaries do not need
-    // ghost writes.
+    // ghost writes. Nodes in the `applyOps` (`startup2`) phase of initial sync must not timestamp
+    // index builds before the `initialDataTimestamp`. Nodes doing replication recovery (also
+    // `startup2`) must timestamp index builds. All replication recovery index builds are
+    // foregrounded and have a "commit timestamp" set.
     const auto memberState = replCoord->getMemberState();
-    if (memberState.primary() || memberState.startup()) {
+    if (memberState.primary() || memberState.startup() || memberState.startup2()) {
         return false;
     }
 
