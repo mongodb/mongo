@@ -414,6 +414,8 @@ selector:
   - jstests/sharding/user_flags_sharded.js
   - jstests/sharding/move_chunk_with_session_helper.js
   - jstests/sharding/movechunk_include.js
+  # Enable when SERVER-33538 is backported.
+  - jstests/sharding/mapReduce_outSharded_checkUUID.js
 
 executor:
   config:

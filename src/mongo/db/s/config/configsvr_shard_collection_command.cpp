@@ -834,7 +834,12 @@ public:
             opCtx, nss, proposedKey, shardKeyPattern, primaryShard, conn, request);
 
         // Step 4.
-        auto uuid = getUUIDFromPrimaryShard(nss, conn);
+        boost::optional<UUID> uuid;
+        if (request.getGetUUIDfromPrimaryShard()) {
+            uuid = getUUIDFromPrimaryShard(nss, conn);
+        } else {
+            uuid = UUID::gen();
+        }
 
         // isEmpty is used by multiple steps below.
         bool isEmpty = (conn->count(nss.ns()) == 0);

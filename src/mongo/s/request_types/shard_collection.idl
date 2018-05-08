@@ -88,6 +88,10 @@ structs:
                 type: object
                 description: "The collation to use for the shard key index."
                 optional: true
+            getUUIDfromPrimaryShard:
+                type: bool
+                description: "Whether the collection should be created on the primary shard. This should only be false when used in mapReduce."
+                default: true
 
     ConfigsvrShardCollectionResponse:
         description: "The response format of the internal shardCollection command on the config server"

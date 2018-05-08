@@ -194,6 +194,7 @@ public:
         bool customOutDB = false;
         NamespaceString outputCollNss;
         bool inlineOutput = false;
+        bool replaceOutput = false;
 
         std::string outDB = dbname;
 
@@ -214,6 +215,9 @@ public:
             } else {
                 // Mode must be 1st element
                 const std::string finalColShort = customOut.firstElement().str();
+                if (customOut.hasField("replace")) {
+                    replaceOutput = true;
+                }
 
                 if (customOut.hasField("db")) {
                     customOutDB = true;
@@ -442,10 +446,6 @@ public:
             LOG(1) << "MR with single shard output, NS=" << outputCollNss
                    << " primary=" << outputDbInfo.primaryId();
 
-            // Appending this field informs the shard that it can generate a UUID for the output
-            // collection itself.
-            finalCmd.append("finalOutputCollIsSharded", false);
-
             const auto outputShard =
                 uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
 
@@ -466,27 +466,73 @@ public:
         } else {
             LOG(1) << "MR with sharded output, NS=" << outputCollNss.ns();
 
-            auto outputRoutingInfo =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, outputCollNss));
+            auto outputRoutingInfo = uassertStatusOK(
+                catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, outputCollNss));
 
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
-            // Appending this field informs the shard that if the shard is in fcv>=3.6, the shard
-            // should require a UUID to be sent as part of the mapreduce.shardedfinish request.
-            finalCmd.append("finalOutputCollIsSharded", true);
+            // We need to determine whether we need to drop and shard the output collection and
+            // send the UUID to the shards. We will always do this if we are using replace so we
+            // can skip this check in that case. If using merge or reduce, we only want to do this
+            // if the output collection does not exist or if it exists and is an empty sharded
+            // collection.
+            int count;
+            if (!replaceOutput && outputCollNss.isValid()) {
+                const auto primaryShard =
+                    uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
+                ScopedDbConnection conn(primaryShard->getConnString());
 
-            boost::optional<UUID> shardedOutputCollUUID;
-            if (!outputRoutingInfo.cm()) {
-                // Create the sharded collection if needed and parse the UUID from the response.
-                outputRoutingInfo = createShardedOutputCollection(
-                    opCtx, outputCollNss, splitPts, &shardedOutputCollUUID);
-            } else {
-                // Collection is already sharded; read the collection's UUID from the config server.
-                const auto coll =
-                    uassertStatusOK(catalogClient->getCollection(opCtx, outputCollNss)).value;
-                shardedOutputCollUUID = coll.getUUID();
+                if (!outputRoutingInfo.cm()) {
+                    // The output collection either exists and is unsharded, or does not exist. If
+                    // the output collection exists and is unsharded, fail because we should not go
+                    // from unsharded to sharded.
+                    BSONObj listCollsCmdResponse;
+                    ok = conn->runCommand(
+                        outDB,
+                        BSON("listCollections" << 1 << "filter"
+                                               << BSON("name" << outputCollNss.coll())),
+                        listCollsCmdResponse);
+                    BSONObj cursorObj = listCollsCmdResponse.getObjectField("cursor");
+                    BSONObj collections = cursorObj["firstBatch"].Obj();
+
+                    uassert(ErrorCodes::IllegalOperation,
+                            "Cannot output to a sharded collection because "
+                            "non-sharded collection exists already",
+                            collections.isEmpty());
+                } else {
+                    // The output collection exists and is sharded. We need to determine whether the
+                    // collection is empty in order to decide whether we should drop and re-shard
+                    // it.
+                    // We don't want to do this if the collection is not empty.
+                    count = conn->count(outputCollNss.ns());
+                }
+
+                conn.done();
             }
 
+            // If we are using replace, the output collection exists and is sharded, or the output
+            // collection doesn't exist we need to drop and shard the output collection. We send the
+            // UUID generated during shardCollection to the shards to be used to create the temp
+            // collections.
+            boost::optional<UUID> shardedOutputCollUUID;
+            if (replaceOutput ||
+                (outputCollNss.isValid() && (count == 0 || !outputRoutingInfo.cm()))) {
+                auto dropCmdResponse = uassertStatusOK(
+                    Grid::get(opCtx)
+                        ->shardRegistry()
+                        ->getConfigShard()
+                        ->runCommandWithFixedRetryAttempts(
+                            opCtx,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            "admin",
+                            BSON("_configsvrDropCollection" << outputCollNss.toString()),
+                            Shard::RetryPolicy::kIdempotent));
+                uassertStatusOK(dropCmdResponse.commandStatus);
+                uassertStatusOK(dropCmdResponse.writeConcernStatus);
+
+                outputRoutingInfo = createShardedOutputCollection(
+                    opCtx, outputCollNss, splitPts, &shardedOutputCollUUID);
+            }
             // This mongos might not have seen a UUID if setFCV was called on the cluster just after
             // this mongos tried to obtain the sharded output collection's UUID, so appending the
             // UUID is optional. If setFCV=3.6 has been called on the shard, the shard will error.
@@ -677,6 +723,7 @@ private:
         // constructor automatically respects default values specified in the .idl.
         configShardCollRequest.setNumInitialChunks(0);
         configShardCollRequest.setInitialSplitPoints(sortedSplitPts);
+        configShardCollRequest.setGetUUIDfromPrimaryShard(false);
 
         auto cmdResponse = uassertStatusOK(
             Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
