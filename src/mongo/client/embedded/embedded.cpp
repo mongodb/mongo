@@ -100,7 +100,7 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 // functional to provide any replication logic.
 GlobalInitializerRegisterer replicationManagerInitializer(
     "CreateReplicationManager",
-    {"SSLManager", "default"},
+    {"SSLManager", "ServiceContext", "default"},
     [](InitializerContext* context) {
         auto serviceContext = getGlobalServiceContext();
         repl::StorageInterface::set(serviceContext, std::make_unique<repl::StorageInterfaceImpl>());
