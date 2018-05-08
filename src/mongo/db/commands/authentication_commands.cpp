@@ -174,6 +174,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
     } else {
         user = UserName(cmdObj.getStringField("user"), dbname);
     }
+    uassert(ErrorCodes::AuthenticationFailed, "No user name provided", !user.getUser().empty());
 
     if (Command::testCommandsEnabled && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
@@ -323,6 +324,9 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
     Client* client = Client::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
     auto clientName = client->session()->getX509PeerInfo().subjectName;
+    uassert(ErrorCodes::AuthenticationFailed,
+            "No verified subject name available from client",
+            !clientName.empty());
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,

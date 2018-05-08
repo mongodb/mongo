@@ -48,6 +48,7 @@
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
@@ -136,6 +137,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/sequence_util.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -143,6 +145,10 @@
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
+
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/util/net/ssl_options.h"
+#endif
 
 #if !defined(_WIN32)
 #include <sys/file.h>
@@ -640,6 +646,18 @@ ExitCode _initAndListen(int listenPort) {
     }
 
     logMongodStartupWarnings(storageGlobalParams, serverGlobalParams);
+
+#if MONGO_CONFIG_SSL
+    if (sslGlobalParams.sslAllowInvalidCertificates &&
+        ((serverGlobalParams.clusterAuthMode.load() == ServerGlobalParams::ClusterAuthMode_x509) ||
+         sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))) {
+        log() << "** WARNING: While invalid X509 certificates may be used to" << startupWarningsLog;
+        log() << "**          connect to this server, they will not be considered"
+              << startupWarningsLog;
+        log() << "**          permissible for authentication." << startupWarningsLog;
+        log() << startupWarningsLog;
+    }
+#endif
 
     {
         stringstream ss;
