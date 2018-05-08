@@ -84,8 +84,6 @@ static const int TempKeyMaxSize = 1024;  // this goes away with SERVER-3372
 
 static const WiredTigerItem emptyItem(NULL, 0);
 
-// This is the size constituted by CType byte and the kEnd byte in a Keystring object.
-constexpr std::size_t kCTypeAndKEndSize = 2;
 
 bool hasFieldNames(const BSONObj& obj) {
     BSONForEach(e, obj) {
@@ -1171,7 +1169,7 @@ public:
         auto keySize = KeyString::getKeySize(
             _key.getBuffer(), _key.getSize(), _idx.ordering(), _key.getTypeBits());
 
-        if (_key.getSize() == keySize + kCTypeAndKEndSize) {
+        if (_key.getSize() == keySize) {
             _updateIdAndTypeBitsFromValue();
         } else {
             // The RecordId is in the key at the end. This implementation is provided by the

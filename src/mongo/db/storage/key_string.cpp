@@ -2028,8 +2028,8 @@ size_t KeyString::getKeySize(const char* buffer,
     }
 
     invariant(len > remainingBytes);
-    // Key size = buffer len - (number of bytes starting from kEnd till the end + starting 1 byte)
-    return (len - (remainingBytes + 1));
+    // Key size = buffer len - number of bytes comprising the RecordId
+    return (len - (remainingBytes - 1));
 }
 
 BSONObj KeyString::toBsonSafe(const char* buffer,

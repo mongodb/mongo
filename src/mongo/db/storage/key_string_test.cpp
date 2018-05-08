@@ -63,6 +63,15 @@ BSONObj toBson(const KeyString& ks, Ordering ord) {
     return KeyString::toBson(ks.getBuffer(), ks.getSize(), ord, ks.getTypeBits());
 }
 
+BSONObj toBsonAndCheckKeySize(const KeyString& ks, Ordering ord) {
+    auto keyStringSize = ks.getSize();
+
+    // Validate size of the key in KeyString.
+    ASSERT_EQUALS(keyStringSize,
+                  KeyString::getKeySize(ks.getBuffer(), keyStringSize, ord, ks.getTypeBits()));
+    return KeyString::toBson(ks.getBuffer(), keyStringSize, ord, ks.getTypeBits());
+}
+
 Ordering ALL_ASCENDING = Ordering::make(BSONObj());
 Ordering ONE_ASCENDING = Ordering::make(BSON("a" << 1));
 Ordering ONE_DESCENDING = Ordering::make(BSON("a" << -1));
@@ -98,13 +107,13 @@ TEST_F(KeyStringTest, Simple1) {
                      KeyString(version, b, ALL_ASCENDING, RecordId()));
 }
 
-#define ROUNDTRIP_ORDER(version, x, order)             \
-    do {                                               \
-        const BSONObj _orig = x;                       \
-        const KeyString _ks(version, _orig, order);    \
-        const BSONObj _converted = toBson(_ks, order); \
-        ASSERT_BSONOBJ_EQ(_converted, _orig);          \
-        ASSERT(_converted.binaryEqual(_orig));         \
+#define ROUNDTRIP_ORDER(version, x, order)                            \
+    do {                                                              \
+        const BSONObj _orig = x;                                      \
+        const KeyString _ks(version, _orig, order);                   \
+        const BSONObj _converted = toBsonAndCheckKeySize(_ks, order); \
+        ASSERT_BSONOBJ_EQ(_converted, _orig);                         \
+        ASSERT(_converted.binaryEqual(_orig));                        \
     } while (0)
 
 #define ROUNDTRIP(version, x)                        \
