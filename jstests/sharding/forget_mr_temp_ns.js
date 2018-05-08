@@ -2,8 +2,7 @@
 // Tests whether we forget M/R's temporary namespaces for sharded output
 //
 
-// TODO: SERVER-33599 remove shardAsReplicaSet: false
-var st = new ShardingTest({shards: 1, mongos: 1, other: {shardAsReplicaSet: false}});
+var st = new ShardingTest({shards: 1, mongos: 1});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
