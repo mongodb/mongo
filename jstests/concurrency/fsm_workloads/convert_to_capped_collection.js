@@ -8,6 +8,8 @@
  *
  * MongoDB raises the storage size of a capped collection
  * to an integer multiple of 256.
+ *
+ * @tags: [requires_collstats]
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');
 

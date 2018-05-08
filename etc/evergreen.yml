@@ -4446,6 +4446,14 @@ tasks:
       resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: concurrency_replication_causal_consistency
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger
+
+- <<: *task_template
   name: concurrency_sharded_replication
   commands:
   - func: "do setup"
@@ -6795,6 +6803,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -6848,6 +6857,9 @@ buildvariants:
   - name: parallel
   - name: concurrency
   - name: concurrency_replication
+  # TODO: SERVER-35057 Disable temporarily since the test suite cannot finish in
+  # 6 hours right now.
+  # - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -6900,6 +6912,7 @@ buildvariants:
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -7151,6 +7164,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7264,6 +7278,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7351,6 +7366,9 @@ buildvariants:
     # hosts from the ubuntu1604-arm64-small pool to work around this issue.
     - ubuntu1604-arm64-small
   - name: concurrency_replication
+    distros:
+    - ubuntu1604-arm64-small
+  - name: concurrency_replication_causal_consistency
     distros:
     - ubuntu1604-arm64-small
   - name: concurrency_sharded_replication
@@ -7476,6 +7494,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7538,6 +7557,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7740,6 +7760,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7913,6 +7934,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8017,6 +8039,9 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: concurrency_replication
+    distros:
+    - windows-64-vs2015-large
+  - name: concurrency_replication_causal_consistency
     distros:
     - windows-64-vs2015-large
   - name: concurrency_sharded_replication
@@ -8503,6 +8528,7 @@ buildvariants:
     distros:
     - windows-64-vs2015-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8572,6 +8598,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8726,6 +8753,7 @@ buildvariants:
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -9405,6 +9433,7 @@ buildvariants:
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -9945,6 +9974,7 @@ buildvariants:
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -10171,6 +10201,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -10261,6 +10292,9 @@ buildvariants:
   - name: concurrency_replication
     distros:
     - rhel70
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel70
   - name: concurrency_sharded_replication
     distros:
     - rhel70
@@ -10333,6 +10367,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -10440,6 +10475,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -10544,6 +10580,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -10885,6 +10922,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11014,6 +11052,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11092,7 +11131,6 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
-
 - name: debian81
   display_name: SSL Debian 8.1
   run_on:
@@ -11158,6 +11196,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11306,6 +11345,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11384,6 +11424,7 @@ buildvariants:
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -11709,6 +11750,7 @@ buildvariants:
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11793,6 +11835,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11874,6 +11917,9 @@ buildvariants:
     distros:
     - rhel72-zseries-build
   - name: concurrency_replication
+    distros:
+    - rhel72-zseries-build
+  - name: concurrency_replication_causal_consistency
     distros:
     - rhel72-zseries-build
   - name: concurrency_sharded_replication
@@ -12019,6 +12065,7 @@ buildvariants:
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -12196,6 +12243,7 @@ buildvariants:
   - name: change_streams_whole_cluster_sharded_collections_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -12342,6 +12390,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -12478,6 +12527,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -12598,6 +12648,9 @@ buildvariants:
   - name: concurrency_replication
     distros:
     - windows-64-vs2015-large
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - windows-64-vs2015-large
   - name: concurrency_sharded_replication
     distros:
     - windows-64-vs2015-large
@@ -12709,6 +12762,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -12796,6 +12850,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: concurrency
   - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous

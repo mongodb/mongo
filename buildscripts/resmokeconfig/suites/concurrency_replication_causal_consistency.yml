@@ -1,0 +1,75 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+  ##
+  # Disabled due to MongoDB restrictions and/or workload restrictions
+  ##
+  # These workloads use >100MB of data, which can overwhelm test hosts.
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
+  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+  # TODO: SERVER-35057
+  - jstests/concurrency/fsm_workloads/auth_create_role.js
+  - jstests/concurrency/fsm_workloads/auth_create_user.js
+  - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
+  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+  - jstests/concurrency/fsm_workloads/yield*.js
+  # TODO: SERVER-35130
+  - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
+  # Background index build is not causally consistent because the optime
+  # actually means the time when the index build starts on the secondary.
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+
+  exclude_with_any_tags:
+  - uses_transactions
+  # collStats is not causally consistent
+  - requires_collstats
+  - requires_dbstats
+  - requires_datasize
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      readMode: commands
+      global_vars:
+        TestData:
+          pinningSecondary: true
+          runningWithCausalConsistency: true
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  #
+  # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  # TODO SERVER-35197: Change it to CleanupConcurrencyWorkloads
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
+        # an oplog yet because it has not conducted its own initial sync yet.
+        numInitialSyncAttempts: 10000000
+        # TODO SERVER-35156: Remove the following line to disable the periodic
+        # no-op writer.
+        writePeriodicNoops: 1
+    num_nodes: 5
+    # We give each of the nodes a vote in a 5-node replica set so that the
+    # secondaries have different beliefs about the majority commit point
+    # relative to the cluster's majority commit point.
+    voting_secondaries: true
+    linear_chain: true

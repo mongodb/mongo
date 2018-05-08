@@ -187,6 +187,7 @@ var Cluster = function(options) {
     }
 
     var conn;
+    var secondaryConns;
 
     var st;
     var rawST;  // The raw ShardingTest object for test suites not using resmoke fixtures.
@@ -329,6 +330,7 @@ var Cluster = function(options) {
             }
 
             conn = rst.getPrimary();
+            secondaryConns = rst.getSecondaries();
             replSets = [rst];
 
             this.teardown = function teardown(opts) {
@@ -425,6 +427,15 @@ var Cluster = function(options) {
             return _conns.mongos[nextConn++ % _conns.mongos.length].host;
         }
         return conn.host;
+    };
+
+    this.getSecondaryHost = function getSecondaryHost(dbName) {
+        assert(initialized, 'cluster must be initialized first');
+
+        if (this.isReplication() && !this.isSharded()) {
+            return secondaryConns[nextConn++ % secondaryConns.length].host;
+        }
+        return undefined;
     };
 
     this.getReplSetName = function getReplSetName() {
