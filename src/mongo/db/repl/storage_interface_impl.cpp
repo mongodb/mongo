@@ -1149,5 +1149,13 @@ boost::optional<Timestamp> StorageInterfaceImpl::getLastStableCheckpointTimestam
     return ret;
 }
 
+bool StorageInterfaceImpl::supportsDocLocking(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->supportsDocLocking();
+}
+
+Timestamp StorageInterfaceImpl::getAllCommittedTimestamp(ServiceContext* serviceCtx) const {
+    return serviceCtx->getStorageEngine()->getAllCommittedTimestamp();
+}
+
 }  // namespace repl
 }  // namespace mongo

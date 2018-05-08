@@ -207,7 +207,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(
         _opsWaitingForJournal = false;
         lk.unlock();
 
-        const uint64_t newTimestamp = _fetchAllCommittedValue(sessionCache->conn());
+        const uint64_t newTimestamp = fetchAllCommittedValue(sessionCache->conn());
 
         // The newTimestamp may actually go backward during secondary batch application,
         // where we commit data file changes separately from oplog changes, so ignore
@@ -249,11 +249,7 @@ void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimest
     LOG(2) << "setting new oplogReadTimestamp: " << newTimestamp;
 }
 
-uint64_t WiredTigerOplogManager::fetchAllCommittedValue(OperationContext* opCtx) {
-    return _fetchAllCommittedValue(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
-}
-
-uint64_t WiredTigerOplogManager::_fetchAllCommittedValue(WT_CONNECTION* conn) {
+uint64_t WiredTigerOplogManager::fetchAllCommittedValue(WT_CONNECTION* conn) {
     // Fetch the latest all_committed value from the storage engine.  This value will be a
     // timestamp that has no holes (uncommitted transactions with lower timestamps) behind it.
     char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];

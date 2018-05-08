@@ -89,6 +89,14 @@ Timestamp StorageInterfaceMock::getInitialDataTimestamp() const {
     return _initialDataTimestamp;
 }
 
+Timestamp StorageInterfaceMock::getAllCommittedTimestamp(ServiceContext* serviceCtx) const {
+    return allCommittedTimestamp;
+}
+
+bool StorageInterfaceMock::supportsDocLocking(ServiceContext* serviceCtx) const {
+    return supportsDocLockingBool;
+}
+
 Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     LOG(1) << "CollectionBulkLoaderMock::init called";
     stats->initCalled = true;

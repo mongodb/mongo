@@ -303,6 +303,10 @@ public:
         return boost::none;
     }
 
+    Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
+
+    bool supportsDocLocking(ServiceContext* serviceCtx) const override;
+
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };
@@ -383,6 +387,9 @@ public:
         OperationContext* opCtx, const NamespaceString& nss) -> StatusWith<OptionalCollectionUUID> {
         return Status{ErrorCodes::IllegalOperation, "GetCollectionUUIDFn not implemented."};
     };
+
+    bool supportsDocLockingBool = false;
+    Timestamp allCommittedTimestamp = Timestamp::min();
 
 private:
     mutable stdx::mutex _mutex;

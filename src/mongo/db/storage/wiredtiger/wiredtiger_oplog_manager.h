@@ -80,15 +80,13 @@ public:
 
     // Returns the all committed timestamp. All transactions with timestamps earlier than the
     // all committed timestamp are committed.
-    uint64_t fetchAllCommittedValue(OperationContext* opCtx);
+    uint64_t fetchAllCommittedValue(WT_CONNECTION* conn);
 
 private:
     void _oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
                                  WiredTigerRecordStore* oplogRecordStore) noexcept;
 
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
-
-    uint64_t _fetchAllCommittedValue(WT_CONNECTION* conn);
 
     stdx::thread _oplogJournalThread;
     mutable stdx::mutex _oplogVisibilityStateMutex;

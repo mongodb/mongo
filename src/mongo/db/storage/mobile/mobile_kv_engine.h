@@ -116,7 +116,7 @@ public:
         _journalListener = jl;
     }
 
-    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override {
+    virtual Timestamp getAllCommittedTimestamp() const override {
         MONGO_UNREACHABLE;
     }
 

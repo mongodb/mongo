@@ -166,6 +166,10 @@ public:
 
     boost::optional<Timestamp> getRecoveryTimestamp(ServiceContext* serviceCtx) const override;
 
+    bool supportsDocLocking(ServiceContext* serviceCtx) const override;
+
+    Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const override;
+
     /**
      * Checks that the "admin" database contains a supported version of the auth data schema.
      */

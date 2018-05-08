@@ -1243,8 +1243,8 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     return {stableTimestamp};
 }
 
-Timestamp WiredTigerKVEngine::getAllCommittedTimestamp(OperationContext* opCtx) const {
-    return Timestamp(_oplogManager->fetchAllCommittedValue(opCtx));
+Timestamp WiredTigerKVEngine::getAllCommittedTimestamp() const {
+    return Timestamp(_oplogManager->fetchAllCommittedValue(_conn));
 }
 
 boost::optional<Timestamp> WiredTigerKVEngine::getRecoveryTimestamp() const {

@@ -187,7 +187,7 @@ public:
      */
     virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const override;
 
-    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
+    virtual Timestamp getAllCommittedTimestamp() const override;
 
     bool supportsReadConcernSnapshot() const final;
 

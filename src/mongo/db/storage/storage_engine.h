@@ -403,7 +403,7 @@ public:
      * locking must provide an implementation. Other storage engines may provide a no-op
      * implementation.
      */
-    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;
+    virtual Timestamp getAllCommittedTimestamp() const = 0;
 };
 
 }  // namespace mongo

@@ -292,7 +292,7 @@ public:
     /**
      * See `StorageEngine::getAllCommittedTimestamp`
      */
-    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const = 0;
+    virtual Timestamp getAllCommittedTimestamp() const = 0;
 
     /**
      * See `StorageEngine::supportsReadConcernSnapshot`

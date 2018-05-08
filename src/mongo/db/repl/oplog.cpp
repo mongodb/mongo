@@ -402,25 +402,9 @@ void _logOpsInner(OperationContext* opCtx,
                                         << commitTime->toString());
             }
 
-            auto lastAppliedTimestamp = finalOpTime.getTimestamp();
-            const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-            if (storageEngine->supportsDocLocking()) {
-                // If the storage engine supports document level locking, then it is possible for
-                // oplog writes to commit out of order. In that case, we only want to set our last
-                // applied optime to the all committed timestamp to ensure that all operations
-                // earlier than the last applied optime have been storage-committed. We are
-                // guaranteed that whatever operation occurred at the all committed timestamp
-                // occurred during the same term as 'finalOpTime'. When a primary enters a new term,
-                // it first commits a 'new primary' oplog entry in the new term before accepting any
-                // new writes. This will ensure that the all committed timestamp is in the new term
-                // before any client writes are committed.
-                lastAppliedTimestamp = storageEngine->getAllCommittedTimestamp(opCtx);
-            }
-
             // Optimes on the primary should always represent consistent database states.
             replCoord->setMyLastAppliedOpTimeForward(
-                OpTime(lastAppliedTimestamp, finalOpTime.getTerm()),
-                ReplicationCoordinator::DataConsistency::Consistent);
+                finalOpTime, ReplicationCoordinator::DataConsistency::Consistent);
 
             // We set the last op on the client to 'finalOpTime', because that contains the
             // timestamp of the operation that the client actually performed.

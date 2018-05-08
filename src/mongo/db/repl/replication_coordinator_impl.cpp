@@ -1133,6 +1133,8 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     // RECOVERING after a rollback using the 'rollbackViaRefetch' algorithm, we will be inconsistent
     // until we reach the 'minValid' optime.
     if (consistency == DataConsistency::Consistent) {
+        invariant(opTime.getTimestamp().getInc() > 0,
+                  str::stream() << "Impossible optime received: " << opTime.toString());
         _stableOpTimeCandidates.insert(opTime);
         // If we are lagged behind the commit optime, set a new stable timestamp here.
         if (opTime <= _topCoord->getLastCommittedOpTime()) {
@@ -3029,7 +3031,7 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     _wakeReadyWaiters_inlock();
 }
 
-boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
+boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime_inlock(
     const std::set<OpTime>& candidates, const OpTime& commitPoint) {
 
     // No optime candidates.
@@ -3037,12 +3039,33 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_calculateStableOpTime(
         return boost::none;
     }
 
+    auto maximumStableTimestamp = commitPoint.getTimestamp();
+    if (_canAcceptNonLocalWrites && _storage->supportsDocLocking(_service)) {
+        // If the storage engine supports document level locking, then it is possible for oplog
+        // writes to commit out of order. In that case, we don't want to set the stable timestamp
+        // ahead of the all committed timestamp. This is not a problem for oplog application
+        // because we only set lastApplied between batches when the all committed timestamp cannot
+        // be behind. During oplog application the all committed timestamp can jump around since
+        // we first write oplog entries to the oplog and then go back and apply them.
+        //
+        // If the all committed timestamp is less than the commit point, then we are guaranteed that
+        // there are no stable timestamp candidates with a greater timestamp than the all committed
+        // timestamp and a lower term than the commit point. Thus we can consider the all committed
+        // timestamp to have the same term as the commit point. When a primary enters a new term, it
+        // first storage-commits a 'new primary' oplog entry in the new term before accepting any
+        // new writes. This will ensure that the all committed timestamp is in the new term before
+        // any writes in the new term are replication committed.
+        maximumStableTimestamp =
+            std::min(_storage->getAllCommittedTimestamp(_service), commitPoint.getTimestamp());
+    }
+    const auto maximumStableOpTime = OpTime(maximumStableTimestamp, commitPoint.getTerm());
+
     // Find the greatest optime candidate that is less than or equal to the commit point.
     // To do this we first find the upper bound of 'commitPoint', which points to the smallest
     // element in 'candidates' that is greater than 'commitPoint'. We then step back one element,
     // which should give us the largest element in 'candidates' that is less than or equal to the
     // 'commitPoint'.
-    auto upperBoundIter = candidates.upper_bound(commitPoint);
+    auto upperBoundIter = candidates.upper_bound(maximumStableOpTime);
 
     // All optime candidates are greater than the commit point.
     if (upperBoundIter == candidates.begin()) {
@@ -3068,7 +3091,8 @@ void ReplicationCoordinatorImpl::_cleanupStableOpTimeCandidates(std::set<OpTime>
 
 boost::optional<OpTime> ReplicationCoordinatorImpl::calculateStableOpTime_forTest(
     const std::set<OpTime>& candidates, const OpTime& commitPoint) {
-    return _calculateStableOpTime(candidates, commitPoint);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _calculateStableOpTime_inlock(candidates, commitPoint);
 }
 void ReplicationCoordinatorImpl::cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates,
                                                                        OpTime stableOpTime) {
@@ -3093,7 +3117,7 @@ boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime_inlock() {
     }
 
     // Compute the current stable optime.
-    auto stableOpTime = _calculateStableOpTime(_stableOpTimeCandidates, commitPoint);
+    auto stableOpTime = _calculateStableOpTime_inlock(_stableOpTimeCandidates, commitPoint);
     if (stableOpTime) {
         // By definition, the stable optime should never be greater than the commit point.
         invariant(stableOpTime->getTimestamp() <= commitPoint.getTimestamp());

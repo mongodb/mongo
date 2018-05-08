@@ -632,8 +632,8 @@ void KVStorageEngine::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }
 
-Timestamp KVStorageEngine::getAllCommittedTimestamp(OperationContext* opCtx) const {
-    return _engine->getAllCommittedTimestamp(opCtx);
+Timestamp KVStorageEngine::getAllCommittedTimestamp() const {
+    return _engine->getAllCommittedTimestamp();
 }
 
 void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {

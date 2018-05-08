@@ -394,8 +394,8 @@ void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) {
 }
 
 void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
-    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(1, 0), 0));
-    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(1, 0), 0));
+    getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(1, 1), 0));
+    getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(1, 1), 0));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->waitForElectionFinish_forTest();
 

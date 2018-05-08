@@ -381,6 +381,19 @@ public:
     virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) = 0;
 
     /**
+     * Returns the all committed timestamp. All transactions with timestamps earlier than the
+     * all committed timestamp are committed. Only storage engines that support document level
+     * locking must provide an implementation. Other storage engines may provide a no-op
+     * implementation.
+     */
+    virtual Timestamp getAllCommittedTimestamp(ServiceContext* serviceCtx) const = 0;
+
+    /**
+     * Returns true if the storage engine supports document level locking.
+     */
+    virtual bool supportsDocLocking(ServiceContext* serviceCtx) const = 0;
+
+    /**
      * Registers a timestamp with the storage engine so that it can enforce oplog visiblity rules.
      * orderedCommit - specifies whether the timestamp provided is ordered w.r.t. commits; that is,
      * all commits with older timestamps have already occurred, and any commits with newer
