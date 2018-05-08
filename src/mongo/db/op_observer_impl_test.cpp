@@ -482,6 +482,265 @@ TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
 }
 
+/**
+ * Test fixture for testing OpObserver behavior specific to multi-document transactions.
+ */
+
+class OpObserverTransactionTest : public OpObserverSessionCatalogTest {
+public:
+    void setUp() override {
+        OpObserverSessionCatalogTest::setUp();
+
+        // Create a session.
+        _opCtx = cc().makeOperationContext();
+        auto sessionCatalog = SessionCatalog::get(getServiceContext());
+        auto sessionId = makeLogicalSessionIdForTest();
+        _session = sessionCatalog->getOrCreateSession(opCtx(), sessionId);
+        opCtx()->setLogicalSessionId(sessionId);
+        _opObserver.emplace();
+        _times.emplace(opCtx());
+    }
+
+    void tearDown() override {
+        _times.reset();
+        _opCtx.reset();
+        OpObserverSessionCatalogTest::tearDown();
+    }
+
+
+protected:
+    void checkCommonFields(const BSONObj& oplogEntry) {
+        ASSERT_EQ("c"_sd, oplogEntry.getStringField("op"));
+        ASSERT_EQ("admin.$cmd"_sd, oplogEntry.getStringField("ns"));
+        ASSERT_BSONOBJ_EQ(session()->getSessionId().toBSON(), oplogEntry.getObjectField("lsid"));
+        ASSERT_EQ(*opCtx()->getTxnNumber(), oplogEntry.getField("txnNumber").safeNumberLong());
+        ASSERT_EQ(0, oplogEntry.getIntField("stmtId"));
+    }
+
+    OperationContext* opCtx() {
+        return _opCtx.get();
+    }
+
+    Session* session() {
+        return _session->get();
+    }
+
+    OpObserverImpl& opObserver() {
+        return *_opObserver;
+    }
+
+private:
+    class ExposeOpObserverTimes : public OpObserver {
+    public:
+        typedef OpObserver::ReservedTimes ReservedTimes;
+    };
+
+    ServiceContext::UniqueOperationContext _opCtx;
+    boost::optional<OpObserverImpl> _opObserver;
+    boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
+    boost::optional<ScopedSession> _session;
+};
+
+TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
+    const NamespaceString nss1("testDB", "testColl");
+    const NamespaceString nss2("testDB2", "testColl2");
+    auto uuid1 = CollectionUUID::gen();
+    auto uuid2 = CollectionUUID::gen();
+    const TxnNumber txnNum = 2;
+    opCtx()->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx(),
+                                      true /* checkOutSession */,
+                                      false /* autocommit */,
+                                      true /* startTransaction*/,
+                                      "testDB",
+                                      "insert");
+
+    session()->unstashTransactionResources(opCtx(), "insert");
+
+    std::vector<InsertStatement> inserts1;
+    inserts1.emplace_back(0,
+                          BSON("_id" << 0 << "data"
+                                     << "x"));
+    inserts1.emplace_back(1,
+                          BSON("_id" << 1 << "data"
+                                     << "y"));
+    std::vector<InsertStatement> inserts2;
+    inserts2.emplace_back(0,
+                          BSON("_id" << 2 << "data"
+                                     << "z"));
+    inserts2.emplace_back(1,
+                          BSON("_id" << 3 << "data"
+                                     << "w"));
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+    opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
+    opObserver().onInserts(opCtx(), nss2, uuid2, inserts2.begin(), inserts2.end(), false);
+    opObserver().onTransactionCommit(opCtx());
+    auto oplogEntry = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntry);
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("_id" << 0 << "data"
+                                                                      << "x"))
+                                                   << BSON("op"
+                                                           << "i"
+                                                           << "ns"
+                                                           << nss1.toString()
+                                                           << "ui"
+                                                           << uuid1
+                                                           << "o"
+                                                           << BSON("_id" << 1 << "data"
+                                                                         << "y"))
+                                                   << BSON("op"
+                                                           << "i"
+                                                           << "ns"
+                                                           << nss2.toString()
+                                                           << "ui"
+                                                           << uuid2
+                                                           << "o"
+                                                           << BSON("_id" << 2 << "data"
+                                                                         << "z"))
+                                                   << BSON("op"
+                                                           << "i"
+                                                           << "ns"
+                                                           << nss2.toString()
+                                                           << "ui"
+                                                           << uuid2
+                                                           << "o"
+                                                           << BSON("_id" << 3 << "data"
+                                                                         << "w"))));
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+}
+
+TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
+    const NamespaceString nss1("testDB", "testColl");
+    const NamespaceString nss2("testDB2", "testColl2");
+    auto uuid1 = CollectionUUID::gen();
+    auto uuid2 = CollectionUUID::gen();
+    const TxnNumber txnNum = 3;
+    opCtx()->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx(),
+                                      true /* checkOutSession */,
+                                      false /* autocommit */,
+                                      true /* startTransaction*/,
+                                      "testDB",
+                                      "update");
+
+    session()->unstashTransactionResources(opCtx(), "update");
+
+    OplogUpdateEntryArgs update1;
+    update1.nss = nss1;
+    update1.uuid = uuid1;
+    update1.stmtId = 0;
+    update1.updatedDoc = BSON("_id" << 0 << "data"
+                                    << "x");
+    update1.update = BSON("$set" << BSON("data"
+                                         << "x"));
+    update1.criteria = BSON("_id" << 0);
+
+    OplogUpdateEntryArgs update2;
+    update2.nss = nss2;
+    update2.uuid = uuid2;
+    update2.stmtId = 1;
+    update2.updatedDoc = BSON("_id" << 1 << "data"
+                                    << "y");
+    update2.update = BSON("$set" << BSON("data"
+                                         << "y"));
+    update2.criteria = BSON("_id" << 1);
+
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+    opObserver().onUpdate(opCtx(), update1);
+    opObserver().onUpdate(opCtx(), update2);
+    opObserver().onTransactionCommit(opCtx());
+    auto oplogEntry = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntry);
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "u"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("$set" << BSON("data"
+                                                                               << "x"))
+                                                        << "o2"
+                                                        << BSON("_id" << 0))
+                                                   << BSON("op"
+                                                           << "u"
+                                                           << "ns"
+                                                           << nss2.toString()
+                                                           << "ui"
+                                                           << uuid2
+                                                           << "o"
+                                                           << BSON("$set" << BSON("data"
+                                                                                  << "y"))
+                                                           << "o2"
+                                                           << BSON("_id" << 1))));
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+}
+
+TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
+    const NamespaceString nss1("testDB", "testColl");
+    const NamespaceString nss2("testDB2", "testColl2");
+    auto uuid1 = CollectionUUID::gen();
+    auto uuid2 = CollectionUUID::gen();
+    const TxnNumber txnNum = 3;
+    opCtx()->setTxnNumber(txnNum);
+    OperationContextSession opSession(opCtx(),
+                                      true /* checkOutSession */,
+                                      false /* autocommit */,
+                                      true /* startTransaction*/,
+                                      "testDB",
+                                      "delete");
+
+    session()->unstashTransactionResources(opCtx(), "delete");
+
+    WriteUnitOfWork wuow(opCtx());
+    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
+    AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
+    opObserver().aboutToDelete(opCtx(),
+                               nss1,
+                               BSON("_id" << 0 << "data"
+                                          << "x"));
+    opObserver().onDelete(opCtx(), nss1, uuid1, 0, false, boost::none);
+    opObserver().aboutToDelete(opCtx(),
+                               nss2,
+                               BSON("_id" << 1 << "data"
+                                          << "y"));
+    opObserver().onDelete(opCtx(), nss2, uuid2, 0, false, boost::none);
+    opObserver().onTransactionCommit(opCtx());
+    auto oplogEntry = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntry);
+    auto o = oplogEntry.getObjectField("o");
+    auto oExpected = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "d"
+                                                        << "ns"
+                                                        << nss1.toString()
+                                                        << "ui"
+                                                        << uuid1
+                                                        << "o"
+                                                        << BSON("_id" << 0))
+                                                   << BSON("op"
+                                                           << "d"
+                                                           << "ns"
+                                                           << nss2.toString()
+                                                           << "ui"
+                                                           << uuid2
+                                                           << "o"
+                                                           << BSON("_id" << 1))));
+    ASSERT_BSONOBJ_EQ(oExpected, o);
+}
+
 DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
