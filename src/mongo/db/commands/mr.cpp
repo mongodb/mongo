@@ -457,20 +457,6 @@ void State::prepTempCollection() {
         if (finalColl) {
             finalOptions = finalColl->getCatalogEntry()->getCollectionOptions(_opCtx);
 
-            if (_config.finalOutputCollUUID) {
-                // The final output collection's UUID is passed from mongos if the final output
-                // collection is sharded. If a UUID was sent, ensure it matches what's on this
-                // shard.
-                uassert(ErrorCodes::InternalError,
-                        str::stream()
-                            << "UUID sent by mongos for sharded final output collection "
-                            << _config.outputOptions.finalNamespace.ns()
-                            << " does not match UUID for the existing collection with that "
-                               "name on this shard",
-                        finalColl->getCatalogEntry()->isEqualToMetadataUUID(
-                            _opCtx, _config.finalOutputCollUUID));
-            }
-
             IndexCatalog::IndexIterator ii =
                 finalColl->getIndexCatalog()->getIndexIterator(_opCtx, true);
             // Iterate over finalColl's indexes.
