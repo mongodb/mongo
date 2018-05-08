@@ -19,6 +19,10 @@
     let primaryDB = secondaryReadsTest.getPrimaryDB();
     let secondaryDB = secondaryReadsTest.getSecondaryDB();
 
+    if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
+        secondaryReadsTest.stop();
+        return;
+    }
     let primaryColl = primaryDB.getCollection(collName);
 
     // Create a collection and an index. Insert some data.
