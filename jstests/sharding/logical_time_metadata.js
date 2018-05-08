@@ -52,6 +52,10 @@
     assert.commandFailed(res);
     assertHasClusterTimeAndOperationTime(res);
 
+    res = db.runCommand({find: "user", writeConcern: {w: 1}});
+    assert.commandFailed(res);
+    assertHasClusterTimeAndOperationTime(res);
+
     st.stop();
 
 })();

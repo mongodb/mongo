@@ -43,7 +43,7 @@
         testDB.runCommand({insert: collectionName, documents: [localDoc], writeConcern: {w: 1}}));
     var localWriteOperationTime = res.operationTime;
 
-    assert(localWriteOperationTime > majorityWriteOperationTime);
+    assert.gt(localWriteOperationTime, majorityWriteOperationTime);
 
     res = assert.commandWorked(testDB.runCommand({
         find: collectionName,
