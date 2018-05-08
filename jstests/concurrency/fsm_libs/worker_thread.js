@@ -3,6 +3,7 @@
 load('jstests/concurrency/fsm_libs/assert.js');
 load('jstests/concurrency/fsm_libs/cluster.js');       // for Cluster.isStandalone
 load('jstests/concurrency/fsm_libs/parse_config.js');  // for parseConfig
+load('jstests/libs/specific_secondary_reader_mongo.js');
 
 var workerThread = (function() {
 
@@ -44,6 +45,13 @@ var workerThread = (function() {
                 gc();
             }
 
+            let mongo;
+            if (TestData.pinningSecondary) {
+                mongo = new SpecificSecondaryReaderMongo(connectionString, args.secondaryHost);
+            } else {
+                mongo = new Mongo(connectionString);
+            }
+
             if (typeof args.sessionOptions !== 'undefined') {
                 let initialClusterTime;
                 let initialOperationTime;
@@ -72,8 +80,6 @@ var workerThread = (function() {
                     delete args.sessionOptions.initialOperationTime;
                 }
 
-                const mongo = new Mongo(connectionString);
-
                 const session = mongo.startSession(args.sessionOptions);
                 const readPreference = session.getOptions().getReadPreference();
                 if (readPreference && readPreference.mode === 'secondary') {
@@ -98,7 +104,7 @@ var workerThread = (function() {
 
                 myDB = session.getDatabase(args.dbName);
             } else {
-                myDB = new Mongo(connectionString).getDB(args.dbName);
+                myDB = mongo.getDB(args.dbName);
             }
 
             {
@@ -234,5 +240,4 @@ var workerThread = (function() {
     }
 
     return {main: main};
-
 })();

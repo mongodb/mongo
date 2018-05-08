@@ -111,6 +111,7 @@ var ThreadManager = function(clusterOptions, executionMode = {composed: false}) 
                     tid: tid++,
                     data: workloadData,
                     host: cluster.getHost(),
+                    secondaryHost: cluster.getSecondaryHost(),
                     replSetName: cluster.getReplSetName(),
                     latch: latch,
                     dbName: _context[workload].dbName,

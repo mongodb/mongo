@@ -12,6 +12,8 @@
  * Make sure that we can create indexes on any collection
  * but that only the _id index remains after (re-)converting
  * to a capped collection.
+ *
+ * @tags: [requires_collstats]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                    // for extendWorkload
 load('jstests/concurrency/fsm_workloads/convert_to_capped_collection.js');  // for $config

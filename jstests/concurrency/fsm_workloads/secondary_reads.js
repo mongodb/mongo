@@ -67,7 +67,10 @@ var $config = (function() {
     }
 
     function getReadConcernLevel(supportsCommittedReads) {
-        const readConcernLevels = ['local', 'available'];
+        const readConcernLevels = ['local'];
+        if (!TestData.runningWithCausalConsistency) {
+            readConcernLevels.push('available');
+        }
         if (supportsCommittedReads) {
             readConcernLevels.push('majority');
         }
