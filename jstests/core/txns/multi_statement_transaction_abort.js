@@ -87,7 +87,7 @@
         autocommit: false
     });
     assert.commandFailedWithCode(res, ErrorCodes.NoSuchTransaction);
-    assert.eq(res.errorLabels, ["TransientTxnError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     jsTest.log("Abort transaction on duplicated key errors");
     assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
@@ -158,7 +158,7 @@
         autocommit: false
     });
     assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
-    assert.eq(res.errorLabels, ["TransientTxnError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     // Session 1 isn't affected.
     // commitTransaction can only be called on the admin database.

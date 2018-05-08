@@ -226,15 +226,15 @@ BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& se
     }
 
     bool isRetryable = ErrorCodes::isNotMasterError(code) || ErrorCodes::isShutdownError(code);
-    bool isTransientTxnError = code == ErrorCodes::WriteConflict  //
-        || code == ErrorCodes::SnapshotUnavailable                //
-        || code == ErrorCodes::NoSuchTransaction                  //
+    bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
+        || code == ErrorCodes::SnapshotUnavailable                        //
+        || code == ErrorCodes::NoSuchTransaction                          //
         // Clients can retry a single commitTransaction command, but cannot retry the whole
         // transaction if commitTransaction fails due to NotMaster.
         || (isRetryable && (commandName != "commitTransaction"));
 
-    if (isTransientTxnError) {
-        return BSON("errorLabels" << BSON_ARRAY("TransientTxnError"));
+    if (isTransientTransactionError) {
+        return BSON("errorLabels" << BSON_ARRAY("TransientTransactionError"));
     }
     return {};
 }

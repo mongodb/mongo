@@ -1,4 +1,4 @@
-// Test TransientTxnErrors error label in transactions.
+// Test TransientTransactionErrors error label in transactions.
 // @tags: [uses_transactions]
 (function() {
     "use strict";
@@ -36,7 +36,7 @@
         autocommit: false
     });
     assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
-    assert.eq(res.errorLabels, ["TransientTxnError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
     jsTest.log("Insert outside a transaction on secondary should fail but not return error labels");
     txnNumber++;
@@ -62,7 +62,7 @@
     assert(!res.hasOwnProperty("errorLabels"));
     restartServerReplication(secondary);
 
-    jsTest.log("failCommand should be able to return errors with TransientTxnError");
+    jsTest.log("failCommand should be able to return errors with TransientTransactionError");
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
@@ -73,7 +73,7 @@
     res = sessionColl.insert({_id: "write-fail-point"});
     assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
     assert(res instanceof WriteCommandError);
-    assert.eq(res.errorLabels, ["TransientTxnError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
     res = testColl.insert({_id: "write-fail-point-outside-txn"});
     jsTest.log("WriteCommandError should not have error labels outside transactions.");
     // WriteConflict will not be returned outside transactions in real cases, but it's fine for
@@ -84,7 +84,7 @@
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
     session.abortTransaction();
 
-    jsTest.log("WriteConflict returned by commitTransaction command is TransientTxnError");
+    jsTest.log("WriteConflict returned by commitTransaction command is TransientTransactionError");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "commitTransaction-fail-point"}));
     assert.commandWorked(testDB.adminCommand({
@@ -94,10 +94,10 @@
     }));
     res = session.commitTransaction_forTesting();
     assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
-    assert.eq(res.errorLabels, ["TransientTxnError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-    jsTest.log("NotMaster returned by commitTransaction command is not TransientTxnError");
+    jsTest.log("NotMaster returned by commitTransaction command is not TransientTransactionError");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "commitTransaction-fail-point"}));
     assert.commandWorked(testDB.adminCommand({
@@ -110,7 +110,7 @@
     assert(!res.hasOwnProperty("errorLabels"));
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-    jsTest.log("ShutdownInProgress returned by write commands is TransientTxnError");
+    jsTest.log("ShutdownInProgress returned by write commands is TransientTransactionError");
     session.startTransaction();
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
@@ -120,11 +120,12 @@
     res = sessionColl.insert({_id: "commitTransaction-fail-point"});
     assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
     assert(res instanceof WriteCommandError);
-    assert.eq(res.errorLabels, ["TransientTxnError"]);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
     session.abortTransaction();
 
-    jsTest.log("ShutdownInProgress returned by commitTransaction command is not TransientTxnError");
+    jsTest.log(
+        "ShutdownInProgress returned by commitTransaction command is not TransientTransactionError");
     session.startTransaction();
     assert.commandWorked(sessionColl.insert({_id: "commitTransaction-fail-point"}));
     assert.commandWorked(testDB.adminCommand({

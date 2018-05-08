@@ -54,7 +54,8 @@
                 "session.startTransaction({readConcern: {level: 'snapshot'}});" +
                 "const res = sessionDb.runCommand(" + tojson(cmd) + ");" +
                 "assert.commandFailedWithCode(res, ErrorCodes.SnapshotUnavailable);" +
-                "assert.eq(res.errorLabels, ['TransientTxnError']);" + "session.endSession();",
+                "assert.eq(res.errorLabels, ['TransientTransactionError']);" +
+                "session.endSession();",
             rst.ports[0]);
 
         waitForOp(curOpFilter);
