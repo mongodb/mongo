@@ -1511,7 +1511,8 @@ Status validatePeerCertificate(const std::string& remoteHost,
                                PCCERT_CONTEXT cert,
                                HCERTCHAINENGINE certChainEngine,
                                bool allowInvalidCertificates,
-                               bool allowInvalidHostnames) {
+                               bool allowInvalidHostnames,
+                               std::string* peerSubjectName) {
     CERT_CHAIN_PARA certChainPara;
     memset(&certChainPara, 0, sizeof(certChainPara));
     certChainPara.cbSize = sizeof(CERT_CHAIN_PARA);
@@ -1584,6 +1585,13 @@ Status validatePeerCertificate(const std::string& remoteHost,
                                     << errnoWithDescription(gle));
     }
 
+    auto swSubjectName = getCertificateSubjectName(cert);
+    if (!swSubjectName.isOK()) {
+        return swSubjectName.getStatus();
+    }
+    invariant(peerSubjectName);
+    *peerSubjectName = swSubjectName.getValue();
+
     // This means the certificate chain is not valid.
     // Ignore CRYPT_E_NO_REVOCATION_CHECK since most CAs lack revocation information especially test
     // certificates
@@ -1600,7 +1608,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
                 }
             };
 
-            certificateNames << ", Subject Name: " << getCertificateSubjectName(cert);
+            certificateNames << ", Subject Name: " << *peerSubjectName;
 
             str::stream msg;
             msg << "The server certificate does not match the host name. Hostname: " << remoteHost
@@ -1611,6 +1619,7 @@ Status validatePeerCertificate(const std::string& remoteHost,
                           << integerToHex(certChainPolicyStatus.dwError)
                           << "): " << errnoWithDescription(certChainPolicyStatus.dwError);
                 warning() << msg.ss.str();
+                *peerSubjectName = "";
                 return Status::OK();
             } else if (allowInvalidHostnames) {
                 warning() << msg.ss.str();
@@ -1658,13 +1667,15 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
     }
 
     UniqueCertificate certHolder(cert);
+    std::string peerSubjectName;
 
     // Validate against the local machine store first since it is easier to manage programmatically.
     Status validateCertMachine = validatePeerCertificate(remoteHost,
                                                          certHolder.get(),
                                                          _chainEngineMachine,
                                                          _allowInvalidCertificates,
-                                                         _allowInvalidHostnames);
+                                                         _allowInvalidHostnames,
+                                                         &peerSubjectName);
     if (!validateCertMachine.isOK()) {
         // Validate against the current user store since this is easier for unprivileged users to
         // manage.
@@ -1672,20 +1683,18 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerWindows::parseAndValidatePeer
                                                           certHolder.get(),
                                                           _chainEngineUser,
                                                           _allowInvalidCertificates,
-                                                          _allowInvalidHostnames);
+                                                          _allowInvalidHostnames,
+                                                          &peerSubjectName);
         if (!validateCertUser.isOK()) {
             // Return the local machine status
             return validateCertMachine;
         }
     }
 
-    auto swCert = getCertificateSubjectName(cert);
-
-    if (!swCert.isOK()) {
-        return swCert.getStatus();
+    if (peerSubjectName.empty()) {
+        return {boost::none};
     }
 
-    std::string peerSubjectName = swCert.getValue();
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
 
     // On the server side, parse the certificate for roles

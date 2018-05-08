@@ -1,3 +1,13 @@
+client-self-signed.pem represents the same RDN as client.pem, but using itself as a CA:
+
+openssl req -nodes -new -subj '/CN=client/OU=KernelUser/O=MongoDB/L=New York City/ST=New York/C=US' -out css.csr -keyout css.rsa
+openssl rsa -in css.rsa -out css.key
+openssl x509 -in css.csr -out jstests/libs/client-self-signed.pem -req -signkey client-self-signed.key -days 3650
+cat css.key >> jstests/libs/client-self-signed.pem
+rm css.{csr,rsa,key}
+
+---------------------------
+
 The other ceriticates in this directory come from x509gen.
 How to generate a certificate with a custom extension:
 

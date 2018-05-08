@@ -81,6 +81,9 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
     Client* client = Client::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
     auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
+    uassert(ErrorCodes::AuthenticationFailed,
+            "No verified subject name available from client",
+            !clientName.empty());
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
@@ -235,11 +238,13 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     }
     UserName user;
     auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
+
     if (mechanism == kX509AuthMechanism && !cmdObj.hasField("user")) {
         user = UserName(sslPeerInfo.subjectName, dbname);
     } else {
         user = UserName(cmdObj.getStringField("user"), dbname);
     }
+    uassert(ErrorCodes::AuthenticationFailed, "No user name provided", !user.getUser().empty());
 
     if (getTestCommandsEnabled() && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {

@@ -1235,6 +1235,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         if (_allowInvalidCertificates) {
             warning() << "SSL peer certificate validation failed: "
                       << X509_verify_cert_error_string(result);
+            return {boost::none};
         } else {
             str::stream msg;
             msg << "SSL peer certificate validation failed: "
