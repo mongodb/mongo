@@ -46,7 +46,7 @@ public:
                   std::unique_ptr<NetworkConnectionHook> onConnectHook)
         : _reactor(std::move(reactor)), _tl(tl), _onConnectHook(std::move(onConnectHook)) {}
 
-    std::unique_ptr<ConnectionPool::ConnectionInterface> makeConnection(
+    std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort, size_t generation) override;
     std::unique_ptr<ConnectionPool::TimerInterface> makeTimer() override;
 
@@ -87,7 +87,7 @@ public:
 
     void indicateSuccess() override;
     void indicateFailure(Status status) override;
-    const HostAndPort& getHostAndPort() const;
+    const HostAndPort& getHostAndPort() const override;
     bool isHealthy() override;
     AsyncDBClient* client();
 

@@ -323,9 +323,9 @@ std::unique_ptr<ConnectionPool::TimerInterface> ASIOImpl::makeTimer() {
     return stdx::make_unique<ASIOTimer>(&_impl->_strand);
 }
 
-std::unique_ptr<ConnectionPool::ConnectionInterface> ASIOImpl::makeConnection(
+std::shared_ptr<ConnectionPool::ConnectionInterface> ASIOImpl::makeConnection(
     const HostAndPort& hostAndPort, size_t generation) {
-    return stdx::make_unique<ASIOConnection>(hostAndPort, generation, this);
+    return std::make_shared<ASIOConnection>(hostAndPort, generation, this);
 }
 
 }  // namespace connection_pool_asio

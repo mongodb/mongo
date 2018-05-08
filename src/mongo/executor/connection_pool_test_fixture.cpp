@@ -224,9 +224,9 @@ std::deque<ConnectionImpl*> ConnectionImpl::_setupQueue;
 std::deque<ConnectionImpl*> ConnectionImpl::_refreshQueue;
 size_t ConnectionImpl::_idCounter = 1;
 
-std::unique_ptr<ConnectionPool::ConnectionInterface> PoolImpl::makeConnection(
+std::shared_ptr<ConnectionPool::ConnectionInterface> PoolImpl::makeConnection(
     const HostAndPort& hostAndPort, size_t generation) {
-    return stdx::make_unique<ConnectionImpl>(hostAndPort, generation, this);
+    return std::make_shared<ConnectionImpl>(hostAndPort, generation, this);
 }
 
 std::unique_ptr<ConnectionPool::TimerInterface> PoolImpl::makeTimer() {

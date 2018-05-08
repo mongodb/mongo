@@ -218,7 +218,9 @@ public:
  * specifically callbacks to set them up (connect + auth + whatever else),
  * refresh them (issue some kind of ping) and manage a timer.
  */
-class ConnectionPool::ConnectionInterface : public TimerInterface {
+class ConnectionPool::ConnectionInterface
+    : public TimerInterface,
+      public std::enable_shared_from_this<ConnectionPool::ConnectionInterface> {
     MONGO_DISALLOW_COPYING(ConnectionInterface);
 
     friend class ConnectionPool;
@@ -321,7 +323,7 @@ public:
     /**
      * Makes a new connection given a host and port
      */
-    virtual std::unique_ptr<ConnectionInterface> makeConnection(const HostAndPort& hostAndPort,
+    virtual std::shared_ptr<ConnectionInterface> makeConnection(const HostAndPort& hostAndPort,
                                                                 size_t generation) = 0;
 
     /**

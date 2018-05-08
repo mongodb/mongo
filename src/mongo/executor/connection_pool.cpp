@@ -181,7 +181,7 @@ public:
     }
 
 private:
-    using OwnedConnection = std::unique_ptr<ConnectionInterface>;
+    using OwnedConnection = std::shared_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
     using LRUOwnershipPool = LRUCache<OwnershipPool::key_type, OwnershipPool::mapped_type>;
     using Request = std::pair<Date_t, SharedPromise<ConnectionHandle>>;
@@ -755,7 +755,7 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
     // While all of our inflight connections are less than our target
     while ((_readyPool.size() + _processingPool.size() + _checkedOutPool.size() < target()) &&
            (_processingPool.size() < _parent->_options.maxConnecting)) {
-        std::unique_ptr<ConnectionPool::ConnectionInterface> handle;
+        OwnedConnection handle;
         try {
             // make a new connection and put it in processing
             handle = _parent->_factory->makeConnection(_hostAndPort, _generation);
