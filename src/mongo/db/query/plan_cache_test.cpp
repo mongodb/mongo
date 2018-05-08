@@ -1436,6 +1436,26 @@ TEST(PlanCacheTest, ComputeKeyGeoNear) {
         "gnanrsp");
 }
 
+TEST(PlanCacheTest, ComputeKeyRegexDependsOnFlags) {
+    testComputeKey("{a: {$regex: \"sometext\"}}", "{}", "{}", "rea");
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"\"}}", "{}", "{}", "rea");
+
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"s\"}}", "{}", "{}", "reas");
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"ms\"}}", "{}", "{}", "reams");
+
+    // Test that the ordering of $options doesn't matter.
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"im\"}}", "{}", "{}", "reaim");
+    testComputeKey("{a: {$regex: \"sometext\", $options: \"mi\"}}", "{}", "{}", "reaim");
+
+    // Test that only the options affect the key. Two regex match expressions with the same options
+    // but different $regex values should have the same shape.
+    testComputeKey("{a: {$regex: \"abc\", $options: \"mi\"}}", "{}", "{}", "reaim");
+    testComputeKey("{a: {$regex: \"efg\", $options: \"mi\"}}", "{}", "{}", "reaim");
+
+    testComputeKey("{a: {$regex: \"\", $options: \"ms\"}}", "{}", "{}", "reams");
+    testComputeKey("{a: {$regex: \"___\", $options: \"ms\"}}", "{}", "{}", "reams");
+}
+
 // When a sparse index is present, computeKey() should generate different keys depending on
 // whether or not the predicates in the given query can use the index.
 TEST(PlanCacheTest, ComputeKeySparseIndex) {

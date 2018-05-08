@@ -578,6 +578,17 @@ void PlanCache::encodeKeyForMatch(const MatchExpression* tree, StringBuilder* ke
         encodeGeoNearMatchExpression(static_cast<const GeoNearMatchExpression*>(tree), keyBuilder);
     }
 
+    // REGEX requires that we encode the flags so that regexes with different options appear
+    // as different query shapes.
+    if (MatchExpression::REGEX == tree->matchType()) {
+        const auto reMatchExpression = static_cast<const RegexMatchExpression*>(tree);
+        std::string flags = reMatchExpression->getFlags();
+        // Sort the flags, so that queries with the same regex flags in different orders will have
+        // the same shape.
+        std::sort(flags.begin(), flags.end());
+        encodeUserString(flags, keyBuilder);
+    }
+
     // Encode indexability.
     const IndexToDiscriminatorMap& discriminators =
         _indexabilityState.getDiscriminators(tree->path());
