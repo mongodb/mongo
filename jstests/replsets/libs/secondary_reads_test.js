@@ -6,8 +6,8 @@
 
 load("jstests/replsets/rslib.js");
 
-function SecondaryReadsTest(name = "secondary_reads_test", replSet) {
-    let rst = (replSet) ? replSet : performStandardSetup();
+function SecondaryReadsTest(name = "secondary_reads_test") {
+    let rst = performStandardSetup();
     let dbName = name;
 
     let primary = rst.getPrimary();
@@ -24,7 +24,9 @@ function SecondaryReadsTest(name = "secondary_reads_test", replSet) {
      * two-node replica set running with the latest version.
      */
     function performStandardSetup() {
-        let replSet = new ReplSetTest({name, nodes: 2});
+        // TODO: Periodic noop writes can be removed once SERVER-33248 is complete.
+        let replSet = new ReplSetTest(
+            {name, nodes: 2, nodeOptions: {setParameter: {writePeriodicNoops: true}}});
         replSet.startSet();
 
         const nodes = replSet.nodeList();

@@ -71,7 +71,7 @@
     // Disable the failpoint and let the batch complete.
     secondaryReadsTest.resumeSecondaryBatchApplication();
 
-    replSet.awaitReplication();
+    replSet.awaitLastOpCommitted();
 
     for (let i in levels) {
         print("Checking that new updates are visible for readConcern: " + levels[i]);
