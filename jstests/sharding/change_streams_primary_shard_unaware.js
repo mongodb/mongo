@@ -165,7 +165,7 @@
     cstMongos2.assertNextChangesEqual({
         cursor: cursorMongos2,
         expectedChanges: [{
-            documentKey: {_id: 2},
+            documentKey: {_id: 2, a: 2},
             fullDocument: {_id: 2, a: 2},
             ns: {db: mongos2DB.getName(), coll: mongos2Coll.getName()},
             operationType: "insert",
