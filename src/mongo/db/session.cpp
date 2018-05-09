@@ -60,40 +60,24 @@
 
 namespace mongo {
 
-// Server parameter that dictates the lifetime given to each transaction.
-// Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
-server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
-    transactionLifetimeLimitSeconds(60);
-
 const OperationContext::Decoration<Session::TransactionState> Session::TransactionState::get =
     OperationContext::declareDecoration<Session::TransactionState>();
 
 Session::CursorKillFunction Session::_cursorKillFunction;
 Session::CursorExistsFunction Session::_cursorExistsFunction;
 
-/**
- * Implements a validation function for server parameter 'transactionLifetimeLimitSeconds'
- * instantiated above. 'transactionLifetimeLimitSeconds' can only be set to >= 1.
- */
-class ExportedTransactionLifetimeLimitSeconds
-    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
-public:
-    ExportedTransactionLifetimeLimitSeconds()
-        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(),
-              "transactionLifetimeLimitSeconds",
-              &transactionLifetimeLimitSeconds) {}
-
-    Status validate(const std::int32_t& potentialNewValue) override {
+// Server parameter that dictates the lifetime given to each transaction.
+// Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
+MONGO_EXPORT_SERVER_PARAMETER_WITH_VALIDATOR(
+    transactionLifetimeLimitSeconds, std::int32_t, 60, [](const auto& potentialNewValue) {
         if (potentialNewValue < 1) {
             return Status(ErrorCodes::BadValue,
                           "transactionLifetimeLimitSeconds must be greater than or equal to 1s");
         }
 
         return Status::OK();
-    }
+    });
 
-} exportedTransactionLifetimeLimitSeconds;
 
 namespace {
 
