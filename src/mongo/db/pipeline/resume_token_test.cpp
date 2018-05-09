@@ -304,7 +304,7 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyStringBinData) {
     Timestamp ts(1010, 4);
     ResumeTokenData tokenData;
     tokenData.clusterTime = ts;
-    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument(Format::kBinData);
+    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument();
     auto goodData = goodTokenDocBinData["_data"].getBinData();
     const unsigned char zeroes[] = {0, 0, 0, 0, 0};
     const unsigned char nonsense[] = {165, 85, 77, 86, 255};
@@ -313,9 +313,6 @@ TEST(ResumeToken, FailsToDecodeInvalidKeyStringBinData) {
     auto emptyToken =
         ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 0, BinDataGeneral)}});
     ASSERT_THROWS_CODE(emptyToken.getData(), AssertionException, 40649);
-
-    auto incorrectType = ResumeToken::parse(Document{{"_data"_sd, "string"_sd}});
-    ASSERT_THROWS_CODE(incorrectType.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Data of correct type with a bunch of zeros.
     auto zeroesToken = ResumeToken::parse(

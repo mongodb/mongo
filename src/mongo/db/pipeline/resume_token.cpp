@@ -97,10 +97,10 @@ ResumeTokenData ResumeToken::getData() const {
     }
 
     BSONBinData keyStringBinData = _keyStringData.getBinData();
-    auto internalBson = KeyString::toBson(static_cast<const char*>(keyStringBinData.data),
-                                          keyStringBinData.length,
-                                          Ordering::make(BSONObj()),
-                                          typeBits);
+    auto internalBson = KeyString::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
+                                              keyStringBinData.length,
+                                              Ordering::make(BSONObj()),
+                                              typeBits);
 
     BSONObjIterator i(internalBson);
     ResumeTokenData result;
