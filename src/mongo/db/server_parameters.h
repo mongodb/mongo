@@ -392,7 +392,33 @@ protected:
 
     storage_type* const _value;  // owned elsewhere
 };
-}
+
+/**
+ * An exported server parameter with a validation function.
+ */
+template <typename T, ServerParameterType paramType>
+class ExportedServerParameterWithValidator : public ExportedServerParameter<T, paramType> {
+public:
+    using storage_type = typename server_parameter_storage_type<T, paramType>::value_type;
+    using validator_function = stdx::function<Status(const T&)>;
+
+    ExportedServerParameterWithValidator(ServerParameterSet* sps,
+                                         const std::string& name,
+                                         storage_type* value,
+                                         validator_function validator)
+        : ExportedServerParameter<T, paramType>(sps, name, value),
+          _validator(std::move(validator)) {}
+
+protected:
+    Status validate(const T& potentialNewValue) final {
+        return _validator(potentialNewValue);
+    }
+
+private:
+    validator_function _validator;
+};
+}  // namespace mongo
+
 
 #define MONGO_EXPORT_SERVER_PARAMETER_IMPL(NAME, TYPE, INITIAL_VALUE, PARAM_TYPE)    \
     server_parameter_storage_type<TYPE, PARAM_TYPE>::value_type NAME(INITIAL_VALUE); \
@@ -417,3 +443,26 @@ protected:
  */
 #define MONGO_EXPORT_RUNTIME_SERVER_PARAMETER(NAME, TYPE, INITIAL_VALUE) \
     MONGO_EXPORT_SERVER_PARAMETER_IMPL(NAME, TYPE, INITIAL_VALUE, ServerParameterType::kRuntimeOnly)
+
+
+/**
+ * Copies of above macros, but with the ability to pass in a callable to validate the input
+ */
+#define MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                           \
+    NAME, TYPE, INITIAL_VALUE, VALIDATOR, PARAM_TYPE)                                \
+    server_parameter_storage_type<TYPE, PARAM_TYPE>::value_type NAME(INITIAL_VALUE); \
+    ExportedServerParameterWithValidator<TYPE, PARAM_TYPE> _##NAME(                  \
+        ServerParameterSet::getGlobal(), #NAME, &NAME, VALIDATOR)
+
+
+#define MONGO_EXPORT_SERVER_PARAMETER_WITH_VALIDATOR(NAME, TYPE, INITIAL_VALUE, VALIDATOR) \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                                     \
+        NAME, TYPE, INITIAL_VALUE, VALIDATOR, ServerParameterType::kStartupAndRuntime)
+
+#define MONGO_EXPORT_STARTUP_SERVER_PARAMETER_WITH_VALIDATOR(NAME, TYPE, INITIAL_VALUE, VALIDATOR) \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                                             \
+        NAME, TYPE, INITIAL_VALUE, VALIDATOR, ServerParameterType::kStartupOnly)
+
+#define MONGO_EXPORT_RUNTIME_SERVER_PARAMETER_WITH_VALIDATOR(NAME, TYPE, INITIAL_VALUE, VALIDATOR) \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                                             \
+        NAME, TYPE, INITIAL_VALUE, VALIDATOR, ServerParameterType::kRuntimeOnly)
