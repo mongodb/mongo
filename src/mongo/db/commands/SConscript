@@ -134,13 +134,12 @@ env.Library(
 )
 
 env.Library(
-    target="dcommands_fcv",
+    target='feature_compatibility_version',
     source=[
-        "feature_compatibility_version.cpp",
+        'feature_compatibility_version.cpp',
     ],
     LIBDEPS=[
         'core',
-        '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/dbdirectclient',
     ],
 )
@@ -231,7 +230,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/parallel',
         'core',
         'current_op_common',
-        'dcommands_fcv',
+        'feature_compatibility_version',
         'dcommands_fsync',
         'killcursors_common',
         'write_commands_common',

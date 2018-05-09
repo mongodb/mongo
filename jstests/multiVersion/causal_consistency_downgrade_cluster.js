@@ -5,6 +5,7 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/sessions_collection.js");
     load("jstests/multiVersion/libs/multi_rs.js");
     load("jstests/multiVersion/libs/multi_cluster.js");
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
@@ -50,6 +51,14 @@
     assertAfterClusterTimeReadSucceeds(st.rs0.getPrimary().getDB("test"), "foo");
     assertAfterClusterTimeReadSucceeds(st.rs1.getPrimary().getDB("test"), "foo");
 
+    // force config server to create sessions collection
+    assert.commandWorked(
+        st.configRS.getPrimary().getDB('admin').runCommand({refreshLogicalSessionCacheNow: 1}));
+    validateSessionsCollection(st.configRS.getPrimary(), false, false, true);
+    // initially system.sessions collection has just one chunk.
+    assert(validateSessionsCollection(st.rs0.getPrimary(), true, false, false) ||
+           validateSessionsCollection(st.rs1.getPrimary(), true, false, false));
+
     // Change featureCompatibilityVersion to 3.4.
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
@@ -77,6 +86,10 @@
     st._rs.forEach(rs => {
         assertHasNoKeys(rs.test.getPrimary());
     });
+
+    // Confirm that the system.sessions was dropped on the downgrade.
+    validateSessionsCollection(st.rs0.getPrimary(), false, false, true);
+    validateSessionsCollection(st.rs1.getPrimary(), false, false, true);
 
     // Downgrade mongos first.
     jsTest.log("Downgrading mongos servers.");

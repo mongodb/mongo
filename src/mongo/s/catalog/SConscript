@@ -148,7 +148,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_raii',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/executor/network_interface',

@@ -14,7 +14,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -1451,7 +1451,7 @@ env.Library(
         'rollback_checker',
         'storage_interface',
         '$BUILD_DIR/mongo/client/fetcher',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version',
     ],
 )
 
@@ -1536,7 +1536,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authcore',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/cloner',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

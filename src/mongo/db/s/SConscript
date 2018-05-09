@@ -190,7 +190,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -305,7 +305,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/catalog/catalog_raii',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_version',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
