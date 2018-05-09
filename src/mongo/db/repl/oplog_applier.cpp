@@ -83,5 +83,56 @@ void OplogApplier::shutdown() {
  */
 void OplogApplier::enqueue(const Operations& operations) {}
 
+StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
+    OperationContext* opCtx, const BatchLimits& batchLimits) {
+    std::uint32_t totalBytes = 0;
+    Operations ops;
+    BSONObj op;
+    while (_oplogBuffer->peek(opCtx, &op)) {
+        auto entry = OplogEntry(op);
+
+        // Check for oplog version change. If it is absent, its value is one.
+        if (entry.getVersion() != OplogEntry::kOplogVersion) {
+            std::string message = str::stream()
+                << "expected oplog version " << OplogEntry::kOplogVersion << " but found version "
+                << entry.getVersion() << " in oplog entry: " << redact(entry.toBSON());
+            severe() << message;
+            return {ErrorCodes::BadValue, message};
+        }
+
+        // Commands must be processed one at a time. The only exception to this is applyOps because
+        // applyOps oplog entries are effectively containers for CRUD operations. Therefore, it is
+        // safe to batch applyOps commands with CRUD operations when reading from the oplog buffer.
+        if (entry.isCommand() && entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
+            if (ops.empty()) {
+                // Apply commands one-at-a-time.
+                ops.push_back(std::move(entry));
+                BSONObj opToPopAndDiscard;
+                invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard));
+                dassert(ops.back() == OplogEntry(opToPopAndDiscard));
+            }
+
+            // Otherwise, apply what we have so far and come back for the command.
+            return std::move(ops);
+        }
+
+        // Apply replication batch limits.
+        if (ops.size() >= batchLimits.ops) {
+            return std::move(ops);
+        }
+        if (totalBytes + entry.getRawObjSizeBytes() >= batchLimits.bytes) {
+            return std::move(ops);
+        }
+
+        // Add op to buffer.
+        ops.push_back(std::move(entry));
+        totalBytes += entry.getRawObjSizeBytes();
+        BSONObj opToPopAndDiscard;
+        invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard));
+        dassert(ops.back() == OplogEntry(opToPopAndDiscard));
+    }
+    return std::move(ops);
+}
+
 }  // namespace repl
 }  // namespace mongo

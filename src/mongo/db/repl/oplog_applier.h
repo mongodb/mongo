@@ -117,6 +117,16 @@ public:
      */
     void enqueue(const Operations& operations);
 
+    /**
+     * Returns a new batch of ops to apply.
+     * A batch may consist of:
+     *     at most "BatchLimits::ops" OplogEntries
+     *     at most "BatchLimits::bytes" worth of OplogEntries
+     *     only OplogEntries from before the "BatchLimits::slaveDelayLatestTimestamp" point
+     *     a single command OplogEntry (excluding applyOps, which are grouped with CRUD ops)
+     */
+    StatusWith<Operations> getNextApplierBatch(OperationContext* opCtx,
+                                               const BatchLimits& batchLimits);
 
 private:
     // Used to schedule task for oplog application loop.
