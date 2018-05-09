@@ -59,6 +59,7 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
     // run until we reach transactionLifetimeLimitSeconds/2, at which point we run the code and
     // reset 'seconds'. Etc.
     PeriodicRunner::PeriodicJob job(
+        "startPeriodicThreadToAbortExpiredTransactions",
         [](Client* client) {
             try {
                 static int seconds = 0;
@@ -78,7 +79,7 @@ void startPeriodicThreadToAbortExpiredTransactions(ServiceContext* serviceContex
                 seconds = 0;
 
                 // The opCtx destructor handles unsetting itself from the Client.
-                // (The PeriodicRunnerASIO's Client must be reset before returning.)
+                // (The PeriodicRunner's Client must be reset before returning.)
                 auto opCtx = client->makeOperationContext();
 
                 killAllExpiredTransactions(opCtx.get());

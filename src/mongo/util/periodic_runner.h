@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
@@ -51,8 +53,13 @@ public:
     using Job = stdx::function<void(Client* client)>;
 
     struct PeriodicJob {
-        PeriodicJob(Job callable, Milliseconds period)
-            : job(std::move(callable)), interval(period) {}
+        PeriodicJob(std::string name, Job callable, Milliseconds period)
+            : name(std::move(name)), job(std::move(callable)), interval(period) {}
+
+        /**
+         * name of the job
+         */
+        std::string name;
 
         /**
          * A task to be run at regular intervals by the runner.
@@ -60,7 +67,7 @@ public:
         Job job;
 
         /**
-         * An interval at which the job should be run. Defaults to 1 minute.
+         * An interval at which the job should be run.
          */
         Milliseconds interval;
     };
@@ -79,10 +86,9 @@ public:
      * Starts up this periodic runner.
      *
      * This method may safely be called multiple times, either with or without
-     * calls to shutdown() in between, but implementations may choose whether to
-     * restart or error on subsequent calls to startup().
+     * calls to shutdown() in between.
      */
-    virtual Status startup() = 0;
+    virtual void startup() = 0;
 
     /**
      * Shuts down this periodic runner. Stops all jobs from running.

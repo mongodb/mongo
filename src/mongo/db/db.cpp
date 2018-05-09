@@ -594,8 +594,8 @@ ExitCode _initAndListen(int listenPort) {
     PeriodicTask::startRunningPeriodicTasks();
 
     // Set up the periodic runner for background job execution
-    auto runner = makePeriodicRunner();
-    runner->startup().transitional_ignore();
+    auto runner = makePeriodicRunner(serviceContext);
+    runner->startup();
     serviceContext->setPeriodicRunner(std::move(runner));
 
     SessionKiller::set(serviceContext,
