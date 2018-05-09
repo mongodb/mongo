@@ -1509,10 +1509,10 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
         }
 
         // Apply replication batch limits.
-        if (ops.size() >= _opts.replBatchLimitOperations) {
+        if (ops.size() >= _opts.batchLimits.ops) {
             return std::move(ops);
         }
-        if (totalBytes + entry.raw.objsize() >= _opts.replBatchLimitBytes) {
+        if (totalBytes + entry.raw.objsize() >= _opts.batchLimits.bytes) {
             return std::move(ops);
         }
 
