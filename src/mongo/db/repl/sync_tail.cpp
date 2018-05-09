@@ -275,6 +275,14 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op)
 
 }  // namespace
 
+std::size_t SyncTail::calculateBatchLimitBytes(OperationContext* opCtx,
+                                               StorageInterface* storageInterface) {
+    auto oplogMaxSizeResult =
+        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
+    auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
+    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
+}
+
 std::unique_ptr<ThreadPool> SyncTail::makeWriterPool() {
     return makeWriterPool(replWriterThreadCount);
 }
@@ -757,19 +765,6 @@ public:
 
 private:
     /**
-     * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
-     * size.
-     * Batches are limited to 10% of the oplog.
-     */
-    std::size_t _calculateBatchLimitBytes() {
-        auto opCtx = cc().makeOperationContext();
-        auto oplogMaxSizeResult =
-            _storageInterface->getOplogMaxSize(opCtx.get(), NamespaceString::kRsOplogNamespace);
-        auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
-        return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
-    }
-
-    /**
      * If slaveDelay is enabled, this function calculates the most recent timestamp of any oplog
      * entries that can be be returned in a batch.
      */
@@ -788,7 +783,8 @@ private:
         Client::initThread("ReplBatcher");
 
         BatchLimits batchLimits;
-        batchLimits.bytes = _calculateBatchLimitBytes();
+        batchLimits.bytes =
+            calculateBatchLimitBytes(cc().makeOperationContext().get(), _storageInterface);
 
         while (true) {
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();

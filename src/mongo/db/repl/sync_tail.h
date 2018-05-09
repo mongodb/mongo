@@ -81,6 +81,14 @@ public:
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
 
     /**
+     * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
+     * size.
+     * Batches are limited to 10% of the oplog.
+     */
+    static std::size_t calculateBatchLimitBytes(OperationContext* opCtx,
+                                                StorageInterface* storageInterface);
+
+    /**
      * Creates thread pool for writer tasks.
      */
     static std::unique_ptr<ThreadPool> makeWriterPool();
