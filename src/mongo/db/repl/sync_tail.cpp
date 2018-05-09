@@ -742,6 +742,7 @@ public:
         : _syncTail(syncTail),
           _storageInterface(storageInterface),
           _oplogBuffer(oplogBuffer),
+          _ops(0),
           _thread([this] { run(); }) {}
     ~OpQueueBatcher() {
         invariant(_isDead);
@@ -757,7 +758,7 @@ public:
         }
 
         OpQueue ops = std::move(_ops);
-        _ops = {};
+        _ops = OpQueue(0);
         _cv.notify_all();
 
         return ops;
@@ -792,7 +793,7 @@ private:
             // Check this once per batch since users can change it at runtime.
             batchLimits.ops = replBatchLimitOperations.load();
 
-            OpQueue ops;
+            OpQueue ops(batchLimits.ops);
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
             {
                 auto opCtx = cc().makeOperationContext();

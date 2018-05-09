@@ -150,8 +150,8 @@ public:
 
     class OpQueue {
     public:
-        OpQueue() : _bytes(0) {
-            _batch.reserve(replBatchLimitOperations.load());
+        explicit OpQueue(std::size_t batchLimitOps) : _bytes(0) {
+            _batch.reserve(batchLimitOps);
         }
 
         size_t getBytes() const {
