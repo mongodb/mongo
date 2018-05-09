@@ -206,9 +206,13 @@ public:
         bool _mustShutdown = false;
     };
 
+    /**
+     * Batch settings used when retrieving operations from an OplogBuffer.
+     * Set in SyncTail::OpQueueBatcher thread.
+     */
     struct BatchLimits {
-        size_t bytes = replBatchLimitBytes;
-        size_t ops = replBatchLimitOperations.load();
+        size_t bytes = 0;
+        size_t ops = 0;
 
         // If provided, the batch will not include any operations with timestamps after this point.
         // This is intended for implementing slaveDelay, so it should be some number of seconds
