@@ -38,6 +38,10 @@ class CmdWhatsMyUri : public BasicCommand {
 public:
     CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
 
+    bool requiresAuth() const override {
+        return false;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }

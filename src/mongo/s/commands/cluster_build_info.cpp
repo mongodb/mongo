@@ -44,6 +44,9 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+    bool requiresAuth() const override {
+        return false;
+    }
     virtual bool adminOnly() const {
         return false;
     }
