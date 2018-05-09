@@ -128,6 +128,24 @@ public:
     StatusWith<Operations> getNextApplierBatch(OperationContext* opCtx,
                                                const BatchLimits& batchLimits);
 
+    /**
+     * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
+     * using a set of threads to apply the operations.
+     *
+     * If the batch application is successful, returns the optime of the last op applied, which
+     * should be the last op in the batch.
+     * Returns ErrorCodes::CannotApplyOplogWhilePrimary if the node has become primary.
+     *
+     * To provide crash resilience, this function will advance the persistent value of 'minValid'
+     * to at least the last optime of the batch. If 'minValid' is already greater than or equal
+     * to the last optime of this batch, it will not be updated.
+     *
+     * Passthrough function for SyncTail::multiApply().
+     *
+     * TODO: remove when enqueue() is implemented.
+     */
+    StatusWith<OpTime> multiApply(OperationContext* opCtx, Operations ops);
+
 private:
     // Used to schedule task for oplog application loop.
     // Not owned by us.

@@ -134,5 +134,9 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
     return std::move(ops);
 }
 
+StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx, Operations ops) {
+    return _syncTail->multiApply(opCtx, std::move(ops));
+}
+
 }  // namespace repl
 }  // namespace mongo
