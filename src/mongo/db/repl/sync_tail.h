@@ -71,6 +71,16 @@ public:
                               WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
+     * Maximum number of operations in each batch that can be applied using multiApply().
+     */
+    static AtomicInt32 replBatchLimitOperations;
+
+    /**
+     * Lower bound of batch limit size (in bytes) returned by calculateBatchLimitBytes().
+     */
+    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
+
+    /**
      * Creates thread pool for writer tasks.
      */
     static std::unique_ptr<ThreadPool> makeWriterPool();
@@ -233,8 +243,6 @@ public:
 
     void setHostname(const std::string& hostname);
 
-    static AtomicInt32 replBatchLimitOperations;
-
     /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
      * using a set of threads to apply the operations.
@@ -248,9 +256,6 @@ public:
      * to the last optime of this batch, it will not be updated.
      */
     StatusWith<OpTime> multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
-
-protected:
-    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
 
 private:
     /**
