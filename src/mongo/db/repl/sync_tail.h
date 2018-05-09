@@ -251,7 +251,6 @@ public:
 
 protected:
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
-    static const int replBatchLimitSeconds = 1;
 
 private:
     /**
