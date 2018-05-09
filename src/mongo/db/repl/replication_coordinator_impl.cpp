@@ -318,7 +318,8 @@ InitialSyncerOptions createInitialSyncerOptions(
     };
     options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
     options.syncSourceSelector = replCoord;
-    options.replBatchLimitBytes = dur::UncommittedBytesLimit;
+    options.batchLimits.bytes = dur::UncommittedBytesLimit;
+    options.batchLimits.ops = 5000U;
     options.oplogFetcherMaxFetcherRestarts = externalState->getOplogFetcherMaxFetcherRestarts();
     return options;
 }
