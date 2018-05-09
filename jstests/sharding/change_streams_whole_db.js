@@ -5,6 +5,7 @@
     load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
     load('jstests/aggregation/extras/utils.js');       // For assertErrorCode().
     load('jstests/libs/change_stream_util.js');        // For ChangeStreamTest.
+    load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
 
     // For supportsMajorityReadConcern().
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
@@ -151,7 +152,38 @@
           operationType: "insert",
         },
     ];
-    cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+
+    const results = cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+    // Store the resume token of the first insert to use after dropping the collection.
+    const resumeTokenBeforeDrop = results[0]._id;
+
+    // Write one more document to the collection that will be dropped, to be returned after
+    // resuming.
+    assert.writeOK(mongosCollShardedOnX.insert({_id: 4, x: 4}));
+
+    // Drop the collection, invalidating the open change stream.
+    assertDropCollection(mongosDB, mongosCollShardedOnX.getName());
+
+    // Resume the change stream from before the collection drop, and verify that the documentKey
+    // field contains the extracted shard key from the resume token.
+    cursor = cst.startWatchingChanges({
+        pipeline: [
+            {$changeStream: {resumeAfter: resumeTokenBeforeDrop}},
+            {$match: {"ns.coll": mongosCollShardedOnX.getName()}}
+        ],
+        collection: 1
+    });
+    cst.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: [
+            {
+              documentKey: {_id: 4, x: 4},
+              fullDocument: {_id: 4, x: 4},
+              ns: {db: mongosDB.getName(), coll: mongosCollShardedOnX.getName()},
+              operationType: "insert",
+            },
+        ]
+    });
 
     cst.cleanUp();
 

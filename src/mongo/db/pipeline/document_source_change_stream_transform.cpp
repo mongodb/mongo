@@ -81,6 +81,37 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
       _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {
 
     _nsRegex.emplace(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns));
+
+    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
+                                                      _changeStreamSpec);
+
+    // If the change stream spec includes a resumeToken with a shard key, populate the document key
+    // cache with the field paths.
+    if (auto resumeAfter = spec.getResumeAfter()) {
+        ResumeToken token = resumeAfter.get();
+        ResumeTokenData tokenData = token.getData();
+
+        // TODO SERVER-34710: Resuming from an "invalidate" means that the resume token may not
+        // always contain a UUID.
+        invariant(tokenData.uuid);
+        if (!tokenData.documentKey.missing()) {
+            std::vector<FieldPath> docKeyFields;
+            auto docKey = tokenData.documentKey.getDocument();
+
+            auto iter = docKey.fieldIterator();
+            while (iter.more()) {
+                auto fieldPair = iter.next();
+                docKeyFields.push_back(fieldPair.first);
+            }
+
+            // If the document key from the resume token has more than one field, that means it
+            // includes the shard key and thus should never change.
+            auto isFinal = docKey.size() > 1;
+
+            _documentKeyCache[tokenData.uuid.get()] =
+                DocumentKeyCacheEntry({docKeyFields, isFinal});
+        }
+    }
 }
 
 DocumentSource::StageConstraints DocumentSourceChangeStreamTransform::constraints(
