@@ -1035,13 +1035,12 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
     committed = true;
     lk.lock();
     auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
-    // If no writes have been done and the original read concern was at least "majority", set
-    // the client op time forward to the read timestamp so waiting for write concern will
-    // ensure all read data was committed.
-    auto originalReadConcernLevel = repl::ReadConcernArgs::get(opCtx).getOriginalLevel();
-    if (_speculativeTransactionReadOpTime > clientInfo.getLastOp() &&
-        (originalReadConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
-         originalReadConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern)) {
+    // If no writes have been done, set the client optime forward to the read timestamp so waiting
+    // for write concern will ensure all read data was committed.
+    //
+    // TODO(SERVER-34881): Once the default read concern is speculative majority, only set the
+    // client optime forward if the original read concern level is "majority" or "snapshot".
+    if (_speculativeTransactionReadOpTime > clientInfo.getLastOp()) {
         clientInfo.setLastOp(_speculativeTransactionReadOpTime);
     }
     _txnState = MultiDocumentTransactionState::kCommitted;

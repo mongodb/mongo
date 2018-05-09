@@ -67,18 +67,31 @@
     // Do another local update from another client
     assert.commandWorked(otherclient.getDB(dbName)[collName].update({_id: 0}, {x: 2}, {w: 1}));
 
-    // This transaction should complete because it uses local read concern.
+    // This transaction should not complete because it uses local read concern upconverted to
+    // snapshot.
+    // TODO(SERVER-34881): Once default read concern is speculative majority, local read
+    //                     concern should not wait for the majority commit point to advance.
     jsTestLog("Starting majority-commit local-read transaction");
-    session.startTransaction({readConcern: {level: "local"}, writeConcern: {w: "majority"}});
+    session.startTransaction(
+        {readConcern: {level: "local"}, writeConcern: {w: "majority", wtimeout: 5000}});
     assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 2});
-    session.commitTransaction();
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                 ErrorCodes.WriteConcernFailed);
+
+    // Allow the majority commit point to advance to allow the failed write concern to clear.
+    restartServerReplication(secondary);
+    rst.awaitReplication();
+    stopServerReplication(secondary);
+
+    // Do another local update from another client
+    assert.commandWorked(otherclient.getDB(dbName)[collName].update({_id: 0}, {x: 3}, {w: 1}));
 
     // This transaction should not complete because it uses majority read concern, majority write
     // concern, and the commit point is not advancing.
     jsTestLog("Starting majority-commit majority-read transaction");
     session.startTransaction(
         {readConcern: {level: "majority"}, writeConcern: {w: "majority", wtimeout: 5000}});
-    assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 2});
+    assert.eq(sessionColl.findOne({_id: 0}), {_id: 0, x: 3});
     assert.commandFailedWithCode(session.commitTransaction_forTesting(),
                                  ErrorCodes.WriteConcernFailed);
 
