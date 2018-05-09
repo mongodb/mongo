@@ -946,7 +946,7 @@ envWithAsio.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/async_timer_mock',
-        '$BUILD_DIR/mongo/util/periodic_runner_asio',
+        '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'kill_sessions',
         'service_liaison',
     ],

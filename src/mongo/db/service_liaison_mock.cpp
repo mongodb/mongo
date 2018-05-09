@@ -32,14 +32,14 @@
 
 #include "mongo/db/service_liaison_mock.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
 
 MockServiceLiaisonImpl::MockServiceLiaisonImpl() {
-    auto timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
-    _timerFactory = timerFactory.get();
-    _runner = stdx::make_unique<PeriodicRunnerASIO>(std::move(timerFactory));
-    _runner->startup().transitional_ignore();
+    _timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
+    _runner = makePeriodicRunner(getGlobalServiceContext());
+    _runner->startup();
 }
 
 LogicalSessionIdSet MockServiceLiaisonImpl::getActiveOpSessions() const {

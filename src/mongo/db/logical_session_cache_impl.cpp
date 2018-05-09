@@ -71,12 +71,12 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(
     _stats.setLastTransactionReaperJobTimestamp(now());
 
     if (!disableLogicalSessionCacheRefresh) {
-        _service->scheduleJob(
-            {[this](Client* client) { _periodicRefresh(client); }, _refreshInterval});
-        if (_transactionReaper) {
-            _service->scheduleJob(
-                {[this](Client* client) { _periodicReap(client); }, _refreshInterval});
-        }
+        _service->scheduleJob({"LogicalSessionCacheRefresh",
+                               [this](Client* client) { _periodicRefresh(client); },
+                               _refreshInterval});
+        _service->scheduleJob({"LogicalSessionCacheReap",
+                               [this](Client* client) { _periodicReap(client); },
+                               _refreshInterval});
     }
 }
 

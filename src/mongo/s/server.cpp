@@ -439,8 +439,8 @@ static ExitCode runMongosServer() {
     PeriodicTask::startRunningPeriodicTasks();
 
     // Set up the periodic runner for background job execution
-    auto runner = makePeriodicRunner();
-    runner->startup().transitional_ignore();
+    auto runner = makePeriodicRunner(getGlobalServiceContext());
+    runner->startup();
     getGlobalServiceContext()->setPeriodicRunner(std::move(runner));
 
     SessionKiller::set(

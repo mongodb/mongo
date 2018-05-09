@@ -30,15 +30,13 @@
 
 #include "mongo/util/periodic_runner_factory.h"
 
-#include "mongo/executor/async_timer_asio.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/periodic_runner_asio.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/periodic_runner_impl.h"
 
 namespace mongo {
 
-std::unique_ptr<PeriodicRunner> makePeriodicRunner() {
-    return stdx::make_unique<PeriodicRunnerASIO>(
-        stdx::make_unique<executor::AsyncTimerFactoryASIO>());
+std::unique_ptr<PeriodicRunner> makePeriodicRunner(ServiceContext* svc) {
+    return std::make_unique<PeriodicRunnerImpl>(svc, svc->getPreciseClockSource());
 }
 
 }  // namespace

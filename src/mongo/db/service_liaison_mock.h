@@ -35,7 +35,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/periodic_runner_asio.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -82,8 +82,8 @@ public:
                                                            const SessionKiller::Matcher& matcher);
 
 private:
-    executor::AsyncTimerFactoryMock* _timerFactory;
-    std::unique_ptr<PeriodicRunnerASIO> _runner;
+    std::unique_ptr<executor::AsyncTimerFactoryMock> _timerFactory;
+    std::unique_ptr<PeriodicRunner> _runner;
 
     boost::optional<SessionKiller::Matcher> _matcher;
 
