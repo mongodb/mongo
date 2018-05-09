@@ -36,7 +36,7 @@ extern "C" {
 #if defined(DOXYGEN) || defined(SWIG)
 #define	__F(func) func
 #else
-#define	__F(func) (*(func))
+#define	__F(func) (*func)
 #endif
 
 /*
