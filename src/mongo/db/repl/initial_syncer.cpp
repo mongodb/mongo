@@ -1469,8 +1469,10 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
             return {ErrorCodes::BadValue, message};
         }
 
-        // Check for ops that must be processed one at a time.
-        if (entry.isCommand()) {
+        // Commands must be processed one at a time. The only exception to this is applyOps because
+        // applyOps oplog entries are effectively containers for CRUD operations. Therefore, it is
+        // safe to batch applyOps commands with CRUD operations when reading from the oplog buffer.
+        if (entry.isCommand() && entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
             if (ops.empty()) {
                 // Apply commands one-at-a-time.
                 ops.push_back(std::move(entry));
