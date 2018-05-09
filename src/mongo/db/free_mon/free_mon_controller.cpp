@@ -107,6 +107,7 @@ boost::optional<Status> FreeMonController::unregisterServerCommand(Milliseconds 
 }
 
 void FreeMonController::notifyOnUpsert(const BSONObj& doc) {
+    invariant(doc.isOwned());
     _enqueue(FreeMonMessageWithPayload<FreeMonMessageType::NotifyOnUpsert>::createNow(doc));
 }
 
@@ -197,18 +198,28 @@ void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
 }
 
 void FreeMonController::getStatus(OperationContext* opCtx, BSONObjBuilder* status) {
-    if (!_processor) {
-        status->append("state", "disabled");
-        return;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+        if (_state != State::kStarted) {
+            status->append("state", "disabled");
+            return;
+        }
     }
+
     _processor->getStatus(opCtx, status, FreeMonProcessor::FreeMonGetStatusEnum::kCommandStatus);
 }
 
 void FreeMonController::getServerStatus(OperationContext* opCtx, BSONObjBuilder* status) {
-    if (!_processor) {
-        status->append("state", "disabled");
-        return;
+    {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+        if (_state != State::kStarted) {
+            status->append("state", "disabled");
+            return;
+        }
     }
+
     _processor->getStatus(opCtx, status, FreeMonProcessor::FreeMonGetStatusEnum::kServerStatus);
 }
 

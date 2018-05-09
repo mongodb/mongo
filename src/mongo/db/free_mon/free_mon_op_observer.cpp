@@ -83,7 +83,7 @@ void FreeMonOpObserver::onInserts(OperationContext* opCtx,
                     auto controller = FreeMonController::get(opCtx->getServiceContext());
 
                     if (controller != nullptr) {
-                        controller->notifyOnUpsert(insertedDoc);
+                        controller->notifyOnUpsert(insertedDoc.getOwned());
                     }
                 }
             }
@@ -101,7 +101,7 @@ void FreeMonOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntry
             auto controller = FreeMonController::get(opCtx->getServiceContext());
 
             if (controller != nullptr) {
-                controller->notifyOnUpsert(args.updatedDoc);
+                controller->notifyOnUpsert(args.updatedDoc.getOwned());
             }
         }
     }

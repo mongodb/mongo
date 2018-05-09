@@ -32,6 +32,7 @@
 
 #include <chrono>
 
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -78,6 +79,8 @@ boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
                     deadlineCV = clockSource->now() + Hours(24);
                 }
             }
+
+            MONGO_IDLE_THREAD_BLOCK;
 
             _condvar.wait_until(lock, deadlineCV.toSystemTimePoint(), [this, clockSource]() {
                 if (_stop) {
