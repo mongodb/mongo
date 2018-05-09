@@ -89,7 +89,7 @@ major_version = "%s.%s" % (mv[0], mv[1])
 #    It allows upgrade from 3.2.0 to 3.2.1 in place instead of side-by-side.
 # 3. Update the check for the next major release below so we bump the GUIDs in the future.
 #
-if float(major_version) > 3.8:
+if float(major_version) > 4.0:
     # If you are troubleshooting this error, see the comment above
     env.FatalError("The upgrade codes are out of date for this release. Please \n" +
     "replace the existing GUIDs listed in this file with new GUIDs so " +
