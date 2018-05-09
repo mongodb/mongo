@@ -625,6 +625,10 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         return connection->get();
     };
 
+    // Because oplog visibility is updated asynchronously, wait until all uncommitted oplog entries
+    // are visible before potentially truncating the oplog.
+    storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     if (!forceRollbackViaRefetch.load() && storageEngine->supportsRecoverToStableTimestamp()) {
         log() << "Rollback using 'recoverToStableTimestamp' method.";
