@@ -88,6 +88,16 @@ public:
     using ApplyCommandInLockFn = stdx::function<Status(
         OperationContext*, const BSONObj&, OplogApplication::Mode oplogApplicationMode)>;
 
+    /**
+     * Maximum number of operations in each batch that can be applied using multiApply().
+     */
+    static AtomicInt32 replBatchLimitOperations;
+
+    /**
+     * Lower bound of batch limit size (in bytes) returned by calculateBatchLimitBytes().
+     */
+    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
+
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<OldThreadPool> writerPool);
     virtual ~SyncTail();
@@ -221,11 +231,7 @@ public:
      */
     OldThreadPool* getWriterPool();
 
-    static AtomicInt32 replBatchLimitOperations;
-
 protected:
-    static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
-
     // Apply a batch of operations, using multiple threads.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
     OpTime multiApply(OperationContext* opCtx, MultiApplier::Operations ops);
