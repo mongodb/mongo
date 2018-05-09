@@ -318,6 +318,10 @@ if (typeof _threadInject != "undefined") {
         args.forEach(function(x) {
             print("         S" + suite + " Test : " + x + " ...");
             var time = Date.timeFunc(function() {
+                // Create a new connection to the db for each file. If tests share the same
+                // connection it can create difficult to debug issues.
+                db = new Mongo(db.getMongo().host).getDB(db.getName());
+                gc();
                 load(x);
             }, 1);
             print("         S" + suite + " Test : " + x + " " + time + "ms");
