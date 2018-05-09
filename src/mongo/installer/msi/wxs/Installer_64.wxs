@@ -55,6 +55,7 @@
         DllEntry="UpdateMongoYAML"
         Execute="deferred"
         Return="check"
+        Impersonate="no"
         HideTarget="no" />
 
     <CustomAction Id="UpdateMongoYAML.SetProperty" 

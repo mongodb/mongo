@@ -8,7 +8,7 @@
             <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="LicenseAgreementDlg" Control="Next">LicenseAccepted = "1"</Publish>
             <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
             <Publish Event="NewDialog" Value="ServiceDlg" Dialog="CustomizeDlg" Control="Next"></Publish>
-	        <Publish Event="NewDialog" Value="ServiceDlg" Dialog="VerifyReadyDlg" Control="Back"></Publish>
+	        <Publish Event="NewDialog" Value="CompassDlg" Dialog="VerifyReadyDlg" Control="Back"></Publish>
 
             <!-- A custom setup type dialog box with only Complete and Custom buttons -->
             <Dialog Id="MongoSetupTypeDlg" X="50" Y="50" Width="370" Height="270" Title="[ProductName] Setup">
