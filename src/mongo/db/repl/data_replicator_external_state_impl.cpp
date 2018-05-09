@@ -147,6 +147,15 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
     }
 }
 
+StatusWith<OplogApplier::Operations> DataReplicatorExternalStateImpl::getNextApplierBatch(
+    OperationContext* opCtx,
+    OplogBuffer* oplogBuffer,
+    const OplogApplier::BatchLimits& batchLimits) {
+    OplogApplier oplogApplier(
+        nullptr, oplogBuffer, nullptr, nullptr, nullptr, nullptr, {}, nullptr);
+    return oplogApplier.getNextApplierBatch(opCtx, batchLimits);
+}
+
 StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {
     return _replicationCoordinator->getConfig();
 }

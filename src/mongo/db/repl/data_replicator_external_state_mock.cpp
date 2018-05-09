@@ -81,6 +81,23 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOpl
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
+StatusWith<OplogApplier::Operations> DataReplicatorExternalStateMock::getNextApplierBatch(
+    OperationContext* opCtx, OplogBuffer* oplogBuffer, const OplogApplier::BatchLimits&) {
+    OplogApplier::Operations ops;
+    OplogBuffer::Value op;
+    // For testing only. Return a single batch containing all of the operations in the oplog buffer.
+    while (oplogBuffer->tryPop(opCtx, &op)) {
+        OplogEntry entry(op);
+        // The "InitialSyncerPassesThroughGetNextApplierBatchInLockError" test case expects
+        // ErrorCodes::BadValue on an unexpected oplog entry version.
+        if (entry.getVersion() != OplogEntry::kOplogVersion) {
+            return {ErrorCodes::BadValue, ""};
+        }
+        ops.push_back(entry);
+    }
+    return std::move(ops);
+}
+
 StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
     return replSetConfigResult;
 }

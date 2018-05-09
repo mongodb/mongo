@@ -108,6 +108,16 @@ public:
         OperationContext* opCtx) const = 0;
 
     /**
+     * Returns a new batch of operations to apply.
+     *
+     * This function is a passthrough for OplogApplier::getNextApplierBatch()
+     */
+    virtual StatusWith<OplogApplier::Operations> getNextApplierBatch(
+        OperationContext* opCtx,
+        OplogBuffer* oplogBuffer,
+        const OplogApplier::BatchLimits& batchLimits) = 0;
+
+    /**
      * Returns the current replica set config if there is one, or an error why there isn't.
      */
     virtual StatusWith<ReplSetConfig> getCurrentConfig() const = 0;

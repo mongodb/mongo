@@ -56,6 +56,11 @@ public:
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 
+    StatusWith<OplogApplier::Operations> getNextApplierBatch(
+        OperationContext* opCtx,
+        OplogBuffer* oplogBuffer,
+        const OplogApplier::BatchLimits& batchLimits) final;
+
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
     // Task executor. Not owned by us.
