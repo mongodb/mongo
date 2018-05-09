@@ -225,7 +225,6 @@ public:
 
 protected:
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
-    static const int replBatchLimitSeconds = 1;
 
     // Apply a batch of operations, using multiple threads.
     // Returns the last OpTime applied during the apply batch, ops.end["ts"] basically.
