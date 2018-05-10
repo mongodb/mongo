@@ -56,7 +56,11 @@ public:
      */
     long long getOplogSizeBytes() const;
     std::string getReplSetString() const;
-    bool getShouldRecoverFromOplogAsStandalone() const;
+
+    /**
+     * Static getter for the 'recoverFromOplogAsStandalone' server parameter.
+     */
+    static bool shouldRecoverFromOplogAsStandalone();
 
     /**
      * Note: _prefetchIndexMode is initialized to UNINITIALIZED by default.
@@ -76,14 +80,11 @@ public:
     void setOplogSizeBytes(long long oplogSizeBytes);
     void setReplSetString(std::string replSetString);
     void setPrefetchIndexMode(std::string prefetchIndexModeString);
-    void setShouldRecoverFromOplogAsStandalone(bool shouldRecover);
 
 private:
     long long _oplogSizeBytes = 0;  // --oplogSize
 
     std::string _replSetString;  // --replSet[/<seedlist>]
-
-    bool _shouldRecoverFromOplogAsStandalone = false;  // --shouldRecoverFromOplogAsStandalone
 
     // --indexPrefetch
     IndexPrefetchConfig _prefetchIndexMode = IndexPrefetchConfig::UNINITIALIZED;

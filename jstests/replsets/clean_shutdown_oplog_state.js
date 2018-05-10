@@ -60,7 +60,8 @@
 
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
     if (storageEngine === "wiredTiger") {
-        options.recoverFromOplogAsStandalone = "";
+        options.setParameter = options.setParameter || {};
+        options.setParameter.recoverFromOplogAsStandalone = true;
     }
 
     var conn = MongoRunner.runMongod(options);

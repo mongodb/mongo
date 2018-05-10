@@ -57,8 +57,11 @@
 
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
     if (storageEngine === "wiredTiger") {
-        secondaryConn = MongoRunner.runMongod(
-            {dbpath: secondaryConn.dbpath, noCleanData: true, recoverFromOplogAsStandalone: ""});
+        secondaryConn = MongoRunner.runMongod({
+            dbpath: secondaryConn.dbpath,
+            noCleanData: true,
+            setParameter: {recoverFromOplogAsStandalone: true}
+        });
     } else {
         secondaryConn = MongoRunner.runMongod({dbpath: secondaryConn.dbpath, noCleanData: true});
     }

@@ -248,7 +248,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     ss << generateAppMetadataString(desc);
 
     bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
-        getGlobalReplSettings().getShouldRecoverFromOplogAsStandalone();
+        repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
     if (WiredTigerUtil::useTableLogging(NamespaceString(desc.parentNS()), replicatedWrites)) {
         ss << "log=(enabled=true)";
     } else {
@@ -306,7 +306,7 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
 
     if (!isReadOnly) {
         bool replicatedWrites = getGlobalReplSettings().usingReplSets() ||
-            getGlobalReplSettings().getShouldRecoverFromOplogAsStandalone();
+            repl::ReplSettings::shouldRecoverFromOplogAsStandalone();
         uassertStatusOK(WiredTigerUtil::setTableLogging(
             ctx,
             uri,

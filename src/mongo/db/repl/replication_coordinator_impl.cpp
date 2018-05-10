@@ -736,7 +736,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
 
 void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
     if (!isReplEnabled()) {
-        if (_settings.getShouldRecoverFromOplogAsStandalone()) {
+        if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
             if (!_storage->supportsRecoverToStableTimestamp(opCtx->getServiceContext())) {
                 severe() << "Cannot use 'recoverFromOplogAsStandalone' with a storage engine that "
                             "does not support recover to stable timestamp.";
@@ -763,7 +763,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
         return;
     }
     invariant(_settings.usingReplSets());
-    invariant(!_settings.getShouldRecoverFromOplogAsStandalone());
+    invariant(!ReplSettings::shouldRecoverFromOplogAsStandalone());
 
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
