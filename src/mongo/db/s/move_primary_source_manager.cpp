@@ -349,16 +349,12 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
 
-        if (!autoDb.getDb()) {
-            uasserted(ErrorCodes::ConflictingOperationInProgress,
-                      str::stream() << "The database " << getNss().toString()
-                                    << " was dropped during the movePrimary operation.");
+        if (autoDb.getDb()) {
+            DatabaseShardingState::get(autoDb.getDb()).clearMovePrimarySourceManager(opCtx);
+
+            // Leave the critical section if we're still registered.
+            DatabaseShardingState::get(autoDb.getDb()).exitCriticalSection(opCtx, boost::none);
         }
-
-        DatabaseShardingState::get(autoDb.getDb()).clearMovePrimarySourceManager(opCtx);
-
-        // Leave the critical section if we're still registered.
-        DatabaseShardingState::get(autoDb.getDb()).exitCriticalSection(opCtx, boost::none);
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {
