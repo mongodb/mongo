@@ -6817,7 +6817,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
     scons_cache_scope: shared
@@ -6855,7 +6855,7 @@ buildvariants:
     push_name: linux-debug
     push_arch: x86_64
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     scons_cache_scope: shared
     shared_scons_pruning: true
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
@@ -6993,7 +6993,7 @@ buildvariants:
   expansions:
     use_wt_develop: true
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     use_scons_cache: true
     build_mongoreplay: true
 
@@ -7007,7 +7007,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux-duroff
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off 
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     # Running WiredTiger with --nojournal in a replica set is no longer supported, so this variant
     # does not include replica set tests. Since transactions are only supported on replica sets, we
@@ -11844,7 +11844,7 @@ buildvariants:
   - rocksdb
   run_on:
   - ubuntu1404-test
-  batchtime: 1440 # 1 day
+  batchtime: 120960 # 12 weeks
   expansions:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
