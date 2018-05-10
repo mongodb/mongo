@@ -1233,6 +1233,11 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
                 "node needs to be a replica set member to use read concern"};
     }
 
+    if (_rsConfigState == kConfigUninitialized || _rsConfigState == kConfigInitiating) {
+        return {ErrorCodes::NotYetInitialized,
+                "Cannot use non-local read concern until replica set is finished initializing."};
+    }
+
     if (readConcern.getArgsAfterClusterTime() || readConcern.getArgsAtClusterTime()) {
         return _waitUntilClusterTimeForRead(opCtx, readConcern, deadline);
     } else {
@@ -3360,6 +3365,9 @@ void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* op
                                                             const Timestamp& untilSnapshot) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
+    uassert(ErrorCodes::NotYetInitialized,
+            "Cannot use snapshots until replica set is finished initializing.",
+            _rsConfigState != kConfigUninitialized && _rsConfigState != kConfigInitiating);
     while (!_currentCommittedSnapshot ||
            _currentCommittedSnapshot->getTimestamp() < untilSnapshot) {
         opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock);
