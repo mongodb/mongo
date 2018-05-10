@@ -134,10 +134,7 @@ executor:
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections
-  # TODO SERVER-30204: Avoid restarting the MongoDB deployment in order to delete all of the data
-  # files from earlier FSM workloads.
-  - class: CleanEveryN
-    n: 20
+  - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
     mongos_options:

@@ -18,10 +18,7 @@ executor:
       global_vars:
         TestData:
           skipValidationOnNamespaceNotFound: false
-  # TODO SERVER-30204: Avoid restarting the MongoDB deployment in order to delete all of the data
-  # files from earlier FSM workloads.
-  - class: CleanEveryN
-    n: 20
+  - class: CleanupConcurrencyWorkloads
   fixture:
     class: MongoDFixture
     mongod_options:
