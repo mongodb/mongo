@@ -229,7 +229,7 @@ public:
      */
     void dropAllIndexes(OperationContext* opCtx,
                         bool includingIdIndex,
-                        std::map<std::string, BSONObj>* droppedIndexes = nullptr) override;
+                        stdx::function<void(const IndexDescriptor*)> onDropFn = nullptr) override;
 
     Status dropIndex(OperationContext* opCtx, IndexDescriptor* desc) override;
 

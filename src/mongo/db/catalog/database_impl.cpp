@@ -553,9 +553,11 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             log() << "dropCollection: " << fullns << " (" << uuidString << ") - index namespace '"
                   << index->indexNamespace()
                   << "' would be too long after drop-pending rename. Dropping index immediately.";
-            fassert(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
+            // Log the operation before the drop so that each drop is timestamped at the same time
+            // as the oplog entry.
             opObserver->onDropIndex(
                 opCtx, fullns, collection->uuid(), index->indexName(), index->infoObj());
+            fassert(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
         }
 
         // Log oplog entry for collection drop and proceed to complete rest of two phase drop

@@ -60,14 +60,15 @@ Status wrappedRun(OperationContext* opCtx,
         std::string indexToDelete = f.valuestr();
 
         if (indexToDelete == "*") {
-            std::map<std::string, BSONObj> droppedIndexes;
-            indexCatalog->dropAllIndexes(opCtx, false, &droppedIndexes);
+            indexCatalog->dropAllIndexes(
+                opCtx, false, [opCtx, collection](const IndexDescriptor* desc) {
+                    opCtx->getServiceContext()->getOpObserver()->onDropIndex(opCtx,
+                                                                             collection->ns(),
+                                                                             collection->uuid(),
+                                                                             desc->indexName(),
+                                                                             desc->infoObj());
 
-            // We log one op for every dropped index so that we can roll them back if necessary.
-            for (auto const& idx : droppedIndexes) {
-                opCtx->getServiceContext()->getOpObserver()->onDropIndex(
-                    opCtx, collection->ns(), collection->uuid(), idx.first, idx.second);
-            }
+                });
 
             anObjBuilder->append("msg", "non-_id indexes dropped for collection");
             return Status::OK();

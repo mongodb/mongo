@@ -894,7 +894,7 @@ BSONObj IndexCatalogImpl::getDefaultIdIndexSpec() const {
 
 void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
                                       bool includingIdIndex,
-                                      std::map<std::string, BSONObj>* droppedIndexes) {
+                                      stdx::function<void(const IndexDescriptor*)> onDropFn) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));
 
     BackgroundOperation::assertNoBgOpInProgForNs(_collection->ns().ns());
@@ -934,11 +934,13 @@ void IndexCatalogImpl::dropAllIndexes(OperationContext* opCtx,
         LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
         IndexCatalogEntry* entry = _entries.find(desc);
         invariant(entry);
-        _dropIndex(opCtx, entry).transitional_ignore();
 
-        if (droppedIndexes != nullptr) {
-            droppedIndexes->emplace(desc->indexName(), desc->infoObj());
+        // If the onDrop function creates an oplog entry, it should run first so that the drop is
+        // timestamped at the same optime.
+        if (onDropFn) {
+            onDropFn(desc);
         }
+        _dropIndex(opCtx, entry).transitional_ignore();
     }
 
     // verify state is sane post cleaning

@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/uuid_catalog.h"
@@ -218,6 +219,32 @@ public:
         ASSERT_OK(coll->insertDocument(_opCtx, stmt, nullOpDebug, enforceQuota, fromMigrate));
     }
 
+    void createIndex(Collection* coll, std::string indexName, const BSONObj& indexKey) {
+
+        // Build an index.
+        MultiIndexBlock indexer(_opCtx, coll);
+        BSONObj indexInfoObj;
+        {
+            auto swIndexInfoObj = indexer.init({BSON(
+                "v" << 2 << "name" << indexName << "ns" << coll->ns().ns() << "key" << indexKey)});
+            ASSERT_OK(swIndexInfoObj.getStatus());
+            indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
+        }
+
+        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            // Timestamping index completion. Primaries write an oplog entry.
+            indexer.commit();
+            // The op observer is not called from the index builder, but rather the
+            // `createIndexes` command.
+            _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                _opCtx, coll->ns(), coll->uuid(), indexInfoObj, false);
+            wuow.commit();
+        }
+    }
+
     std::int32_t itCount(Collection* coll) {
         std::uint64_t ret = 0;
         auto cursor = coll->getRecordStore()->getCursor(_opCtx);
@@ -364,6 +391,23 @@ public:
                             identsWithColl.end(),
                             origIdents.begin(),
                             origIdents.end(),
+                            std::back_inserter(collAndIdxIdents));
+
+        ASSERT(collAndIdxIdents.size() == 1) << "Num idents: " << collAndIdxIdents.size();
+        return collAndIdxIdents[0];
+    }
+
+    std::string getDroppedIndexIdent(KVCatalog* kvCatalog, std::vector<std::string>& origIdents) {
+        // Find the collection and index ident by performing a set difference on the original
+        // idents and the current idents.
+        std::vector<std::string> identsWithColl = kvCatalog->getAllIdents(_opCtx);
+        std::sort(origIdents.begin(), origIdents.end());
+        std::sort(identsWithColl.begin(), identsWithColl.end());
+        std::vector<std::string> collAndIdxIdents;
+        std::set_difference(origIdents.begin(),
+                            origIdents.end(),
+                            identsWithColl.begin(),
+                            identsWithColl.end(),
                             std::back_inserter(collAndIdxIdents));
 
         ASSERT(collAndIdxIdents.size() == 1) << "Num idents: " << collAndIdxIdents.size();
@@ -1842,6 +1886,87 @@ public:
     }
 };
 
+class TimestampIndexDrops : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+        auto kvStorageEngine =
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
+        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+
+        NamespaceString nss("unittests.timestampIndexDrops");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+        const LogicalTime insertTimestamp = _clock->reserveTicks(1);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 0 << "a" << 1 << "b" << 2 << "c" << 3),
+                                           insertTimestamp.asTimestamp(),
+                                           0LL));
+            wuow.commit();
+            ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        }
+
+
+        const Timestamp beforeIndexBuild = _clock->reserveTicks(1).asTimestamp();
+
+        // Save the pre-state idents so we can capture the specific ident related to index
+        // creation.
+        std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
+
+        std::vector<Timestamp> afterCreateTimestamps;
+        std::vector<std::string> indexIdents;
+        // Create an index and get the ident for each index.
+        for (auto key : {"a", "b", "c"}) {
+            createIndex(autoColl.getCollection(), str::stream() << key << "_1", BSON(key << 1));
+
+            // Timestamps at the completion of each index build.
+            afterCreateTimestamps.push_back(_clock->reserveTicks(1).asTimestamp());
+
+            // Add the new ident to the vector and reset the current idents.
+            indexIdents.push_back(getNewIndexIdent(kvCatalog, origIdents));
+            origIdents = kvCatalog->getAllIdents(_opCtx);
+        }
+
+        // Ensure each index is visible at the correct timestamp, and not before.
+        for (size_t i = 0; i < indexIdents.size(); i++) {
+            auto beforeTs = (i == 0) ? beforeIndexBuild : afterCreateTimestamps[i - 1];
+            assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdents[i], beforeTs);
+            assertIdentsExistAtTimestamp(kvCatalog, "", indexIdents[i], afterCreateTimestamps[i]);
+        }
+
+        const LogicalTime beforeDropTs = _clock->getClusterTime();
+
+        // Drop all of the indexes.
+        BSONObjBuilder result;
+        ASSERT_OK(dropIndexes(_opCtx,
+                              nss,
+                              BSON("index"
+                                   << "*"),
+                              &result));
+
+        // Assert that each index is dropped individually and with its own timestamp. The order of
+        // dropping and creating are not guaranteed to be the same, but assert all of the created
+        // indexes were also dropped.
+        size_t nIdents = indexIdents.size();
+        for (size_t i = 0; i < nIdents; i++) {
+            OneOffRead oor(_opCtx, beforeDropTs.addTicks(i + 1).asTimestamp());
+
+            auto ident = getDroppedIndexIdent(kvCatalog, origIdents);
+            indexIdents.erase(std::remove(indexIdents.begin(), indexIdents.end(), ident));
+
+            origIdents = kvCatalog->getAllIdents(_opCtx);
+        }
+        ASSERT_EQ(indexIdents.size(), 0ul) << "Dropped idents should match created idents";
+    }
+};
+
 class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTest {
 public:
     void run() {
@@ -2077,6 +2202,7 @@ public:
         // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
+        add<TimestampIndexDrops>();
         // TimestampIndexBuilderOnPrimary<Background>
         add<TimestampIndexBuilderOnPrimary<false>>();
         add<TimestampIndexBuilderOnPrimary<true>>();
