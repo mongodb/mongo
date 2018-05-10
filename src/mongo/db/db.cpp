@@ -493,7 +493,7 @@ ExitCode _initAndListen(int listenPort) {
 
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
             log() << "This server is using MONGODB-CR, an authentication mechanism which "
-                  << "has been removed from MongoDB 3.8. In order to upgrade the auth schema, "
+                  << "has been removed from MongoDB 4.0. In order to upgrade the auth schema, "
                   << "first downgrade MongoDB binaries to version 3.6 and then run the "
                   << "authSchemaUpgrade command. "
                   << "See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1";
