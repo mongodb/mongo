@@ -256,9 +256,7 @@ protected:
         BSONObj info;
         // Create a collection with specified extent sizes
         BSONObj command =
-            BSON("create" << nss.coll() << "capped" << true << "$nExtents" << extentSizes()
-                          << "autoIndexId"
-                          << false);
+            BSON("create" << nss.coll() << "capped" << true << "$nExtents" << extentSizes());
         ASSERT(client()->runCommand(nss.db().toString(), command, info));
 
         // Populate documents.
@@ -441,7 +439,7 @@ public:
 
         // These tests rely on extent allocation details specific to mmapv1.
         // TODO figure out a way to generically test this.
-        if (getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        if (getGlobalServiceContext()->getStorageEngine()->isMmapV1()) {
             add<OplogStartIsNewestExtentHop>();
             add<OplogStartOneEmptyExtent>();
             add<OplogStartTwoEmptyExtents>();

@@ -105,9 +105,28 @@ public:
     }
 
 private:
+    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
+    // with secondary batch application. This stays in scope with the _autoColl so that locks are
+    // taken and released in the right order.
+    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
+        _shouldNotConflictWithSecondaryBatchApplicationBlock;
+
     // This field is optional, because the code to wait for majority committed snapshot needs to
     // release locks in order to block waiting
     boost::optional<AutoGetCollection> _autoColl;
+
+    // Returns true if we should read at the last applied timestamp instead of at "no" timestamp
+    // (i.e. reading with the "latest" snapshot reflecting all writes).  Reading at the last applied
+    // timestamp avoids reading in-flux data actively being written by the replication system.
+    bool _shouldReadAtLastAppliedTimestamp(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           repl::ReadConcernLevel readConcernLevel) const;
+
+    // Returns true if the minSnapshot causes conflicting catalog changes for either the provided
+    // lastAppliedTimestamp or the point-in-time snapshot of the RecoveryUnit on 'opCtx'.
+    bool _conflictingCatalogChanges(OperationContext* opCtx,
+                                    boost::optional<Timestamp> minSnapshot,
+                                    boost::optional<Timestamp> lastAppliedTimestamp) const;
 };
 
 /**

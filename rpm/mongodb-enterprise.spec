@@ -202,6 +202,10 @@ if test $1 = 1
 then
     /usr/bin/systemctl enable mongod
 fi
+if test $1 = 2
+then
+    /usr/bin/systemctl daemon-reload
+fi
 
 %preun server
 if test $1 = 0
@@ -261,7 +265,6 @@ fi
 %{_bindir}/mongoexport
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
-%{_bindir}/mongoperf
 %{_bindir}/mongorestore
 %{_bindir}/mongotop
 %{_bindir}/mongostat
@@ -271,7 +274,6 @@ fi
 %{_mandir}/man1/mongoexport.1*
 %{_mandir}/man1/mongofiles.1*
 %{_mandir}/man1/mongoimport.1*
-%{_mandir}/man1/mongoperf.1*
 %{_mandir}/man1/mongorestore.1*
 %{_mandir}/man1/mongotop.1*
 %{_mandir}/man1/mongostat.1*

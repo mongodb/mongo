@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <map>
-
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -39,52 +37,12 @@ class StorageEngineLockFile;
 
 class ServiceContextMongoEmbedded final : public ServiceContext {
 public:
-    using FactoryMap = std::map<std::string, const StorageEngine::Factory*>;
-
     ServiceContextMongoEmbedded();
 
     ~ServiceContextMongoEmbedded();
 
-    StorageEngine* getGlobalStorageEngine() override;
-
-    void createLockFile();
-
-    void initializeGlobalStorageEngine() override;
-
-    void shutdownGlobalStorageEngineCleanly() override;
-
-    void registerStorageEngine(const std::string& name,
-                               const StorageEngine::Factory* factory) override;
-
-    bool isRegisteredStorageEngine(const std::string& name) override;
-
-    StorageFactoriesIterator* makeStorageFactoriesIterator() override;
-
 private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
-
-    std::unique_ptr<StorageEngineLockFile> _lockFile;
-
-    // logically owned here, but never deleted by anyone.
-    StorageEngine* _storageEngine = nullptr;
-
-    // All possible storage engines are registered here through MONGO_INIT.
-    FactoryMap _storageFactories;
-};
-
-class StorageFactoriesIteratorMongoEmbedded final : public StorageFactoriesIterator {
-public:
-    typedef ServiceContextMongoEmbedded::FactoryMap::const_iterator FactoryMapIterator;
-
-    StorageFactoriesIteratorMongoEmbedded(const FactoryMapIterator& begin,
-                                          const FactoryMapIterator& end);
-
-    bool more() const override;
-    const StorageEngine::Factory* next() override;
-
-private:
-    FactoryMapIterator _curr;
-    FactoryMapIterator _end;
 };
 
 }  // namespace mongo

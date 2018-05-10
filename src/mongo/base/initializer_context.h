@@ -27,14 +27,14 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/service_context_fwd.h"
+
 #include <map>
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
-
 namespace mongo {
-
 /**
  * Context of an initialization process.  Passed as a parameter to initialization functions.
  *
@@ -47,7 +47,8 @@ public:
     typedef std::vector<std::string> ArgumentVector;
     typedef std::map<std::string, std::string> EnvironmentMap;
 
-    InitializerContext(const ArgumentVector& args, const EnvironmentMap& env);
+    InitializerContext(const ArgumentVector& args, const EnvironmentMap& env)
+        : _args(args), _env(env) {}
 
     const ArgumentVector& args() const {
         return _args;

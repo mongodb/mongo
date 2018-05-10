@@ -50,7 +50,9 @@ class SyslogAppender : public Appender<Event> {
 public:
     typedef Encoder<Event> EventEncoder;
 
+    // TODO: Remove this ctor once raw pointer use is gone
     explicit SyslogAppender(EventEncoder* encoder) : _encoder(encoder) {}
+    explicit SyslogAppender(std::unique_ptr<EventEncoder> encoder) : _encoder(std::move(encoder)) {}
     virtual Status append(const Event& event) {
         std::ostringstream os;
         _encoder->encode(event, os);

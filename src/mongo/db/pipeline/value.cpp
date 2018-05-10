@@ -693,7 +693,7 @@ int Value::compare(const Value& rL,
                     return compareDecimalToDouble(rL._storage.getDecimal(),
                                                   rR._storage.doubleValue);
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 
@@ -710,7 +710,7 @@ int Value::compare(const Value& rL,
                 case NumberDecimal:
                     return compareIntToDecimal(rL._storage.intValue, rR._storage.getDecimal());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 
@@ -725,7 +725,7 @@ int Value::compare(const Value& rL,
                 case NumberDecimal:
                     return compareLongToDecimal(rL._storage.longValue, rR._storage.getDecimal());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 
@@ -741,7 +741,7 @@ int Value::compare(const Value& rL,
                     return compareDoubleToDecimal(rL._storage.doubleValue,
                                                   rR._storage.getDecimal());
                 default:
-                    invariant(false);
+                    MONGO_UNREACHABLE;
             }
         }
 

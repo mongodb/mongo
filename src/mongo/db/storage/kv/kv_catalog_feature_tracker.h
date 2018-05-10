@@ -168,10 +168,6 @@ public:
         _usedRepairableFeaturesMask = mask;
     }
 
-private:
-    // Must go through FeatureTracker::get() or FeatureTracker::create().
-    FeatureTracker(KVCatalog* catalog, RecordId rid) : _catalog(catalog), _rid(rid) {}
-
     struct FeatureBits {
         NonRepairableFeatureMask nonRepairableFeatures;
         RepairableFeatureMask repairableFeatures;
@@ -180,6 +176,10 @@ private:
     FeatureBits getInfo(OperationContext* opCtx) const;
 
     void putInfo(OperationContext* opCtx, const FeatureBits& versionInfo);
+
+private:
+    // Must go through FeatureTracker::get() or FeatureTracker::create().
+    FeatureTracker(KVCatalog* catalog, RecordId rid) : _catalog(catalog), _rid(rid) {}
 
     KVCatalog* _catalog;
     RecordId _rid;

@@ -1,4 +1,6 @@
 // index5.js - test reverse direction index
+//
+// @tags: [requires_fastcount]
 
 function validate() {
     assert.eq(2, t.find().count());

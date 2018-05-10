@@ -38,6 +38,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -59,10 +60,10 @@ struct ConnectionPoolStats;
  * HostAndPort. See comments on the various Options for how the pool operates.
  */
 class ConnectionPool : public EgressTagCloser {
-    class ConnectionHandleDeleter;
     class SpecificPool;
 
 public:
+    class ConnectionHandleDeleter;
     class ConnectionInterface;
     class DependentTypeFactoryInterface;
     class TimerInterface;
@@ -136,6 +137,8 @@ public:
 
     ~ConnectionPool();
 
+    void shutdown();
+
     void dropConnections(const HostAndPort& hostAndPort);
 
     void dropConnections(transport::Session::TagMask tags) override;
@@ -144,6 +147,7 @@ public:
                     const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
+    Future<ConnectionHandle> get(const HostAndPort& hostAndPort, Milliseconds timeout);
     void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;
@@ -173,7 +177,7 @@ public:
     ConnectionHandleDeleter() = default;
     ConnectionHandleDeleter(ConnectionPool* pool) : _pool(pool) {}
 
-    void operator()(ConnectionInterface* connection) {
+    void operator()(ConnectionInterface* connection) const {
         if (_pool && connection)
             _pool->returnConnection(connection);
     }
@@ -216,7 +220,9 @@ public:
  * specifically callbacks to set them up (connect + auth + whatever else),
  * refresh them (issue some kind of ping) and manage a timer.
  */
-class ConnectionPool::ConnectionInterface : public TimerInterface {
+class ConnectionPool::ConnectionInterface
+    : public TimerInterface,
+      public std::enable_shared_from_this<ConnectionPool::ConnectionInterface> {
     MONGO_DISALLOW_COPYING(ConnectionInterface);
 
     friend class ConnectionPool;
@@ -319,7 +325,7 @@ public:
     /**
      * Makes a new connection given a host and port
      */
-    virtual std::unique_ptr<ConnectionInterface> makeConnection(const HostAndPort& hostAndPort,
+    virtual std::shared_ptr<ConnectionInterface> makeConnection(const HostAndPort& hostAndPort,
                                                                 size_t generation) = 0;
 
     /**

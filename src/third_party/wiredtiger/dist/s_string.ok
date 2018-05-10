@@ -138,6 +138,7 @@ FULLFSYNC
 Facebook
 FindClose
 FindFirstFile
+FindNextFileW
 Fixup
 Fk
 FlushFileBuffers
@@ -145,6 +146,7 @@ Fprintf
 FreeBSD
 FreeBSD's
 FreeLibrary
+Fsync
 Fuerst
 GCC
 GIDs
@@ -175,6 +177,7 @@ INCR
 INIT
 INITIALIZER
 INMEM
+INPROGRESS
 INSN
 INTL
 INULL
@@ -211,6 +214,7 @@ LSM
 LSN
 LSNs
 LTE
+LWN
 LZ
 LZO
 LeafGreen
@@ -291,6 +295,7 @@ Pandis
 Phong
 PlatformSDK
 Posix
+PostgreSQL
 PowerPC
 Pre
 Preload
@@ -523,7 +528,7 @@ ccr
 cd
 centric
 cfg
-cfkos
+cfko
 change's
 changelog
 chdir
@@ -684,6 +689,7 @@ enqueue
 enqueued
 env
 eof
+epi
 eq
 equalp
 errhandler
@@ -946,6 +952,7 @@ mkdir
 mmap
 mmrand
 mnt
+movemask
 msecs
 msg
 msvc
@@ -1197,6 +1204,7 @@ sx
 sy
 sys
 syscall
+sysinfo
 sz
 t's
 tV

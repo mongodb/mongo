@@ -450,17 +450,20 @@ void NamespaceDetailsCollectionCatalogEntry::addUUID(OperationContext* opCtx,
 }
 
 bool NamespaceDetailsCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
-                                                                   CollectionUUID uuid) {
-    if (ns().coll() != "system.namespaces") {
-        RecordData namespaceData;
-        invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
-
-        auto namespacesBson = namespaceData.releaseToBson();
-        auto optionsObj = namespacesBson["options"].Obj();
-        return !optionsObj["uuid"].eoo() && UUID::parse(optionsObj["uuid"]).getValue() == uuid;
-    } else {
+                                                                   OptionalCollectionUUID uuid) {
+    if (ns().coll() == "system.namespaces") {
         return true;
     }
+    RecordData namespaceData;
+    invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
+
+    auto namespacesBson = namespaceData.releaseToBson();
+    if (ns().coll() == "system.indexes") {
+        return !uuid && (!namespacesBson["options"].isABSONObj() ||
+                         namespacesBson["options"].Obj()["uuid"].eoo());
+    }
+    auto optionsObj = namespacesBson["options"].Obj();
+    return !optionsObj["uuid"].eoo() && UUID::parse(optionsObj["uuid"]).getValue() == uuid;
 }
 
 void NamespaceDetailsCollectionCatalogEntry::updateValidator(OperationContext* opCtx,
@@ -501,6 +504,6 @@ void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(OperationCont
 
 void NamespaceDetailsCollectionCatalogEntry::updateCappedSize(OperationContext* opCtx,
                                                               long long size) {
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 }

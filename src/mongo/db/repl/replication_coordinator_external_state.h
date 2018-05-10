@@ -35,6 +35,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
@@ -209,9 +210,14 @@ public:
 
     /**
      * Kills all operations that have a Client that is associated with an incoming user
-     * connection.  Used during stepdown.
+     * connection. Also kills stashed transaction resources. Used during stepdown.
      */
     virtual void killAllUserOperations(OperationContext* opCtx) = 0;
+
+    /**
+     * Kills all transaction owned client cursors. Used during stepdown.
+     */
+    virtual void killAllTransactionCursors(OperationContext* opCtx) = 0;
 
     /**
      * Resets any active sharding metadata on this server and stops any sharding-related threads
@@ -248,6 +254,13 @@ public:
     virtual void updateCommittedSnapshot(const OpTime& newCommitPoint) = 0;
 
     /**
+     * Updates the local snapshot to a consistent point for secondary reads.
+     *
+     * It is illegal to call with a optime that does not name an existing snapshot.
+     */
+    virtual void updateLocalSnapshot(const OpTime& optime) = 0;
+
+    /**
      * Returns whether or not the SnapshotThread is active.
      */
     virtual bool snapshotsEnabled() const = 0;
@@ -256,6 +269,12 @@ public:
      * Notifies listeners of a change in the commit level.
      */
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime) = 0;
+
+    /**
+     * Returns earliest drop optime of drop pending collections.
+     * Returns boost::none if there are no drop pending collections.
+     */
+    virtual boost::optional<OpTime> getEarliestDropPendingOpTime() const = 0;
 
     /**
      * Returns multiplier to apply to election timeout to obtain upper bound
@@ -274,37 +293,15 @@ public:
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const = 0;
 
     /**
-     * Applies the operations described in the oplog entries contained in "ops" using the
-     * "applyOperation" function.
-     */
-    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                          MultiApplier::Operations ops,
-                                          MultiApplier::ApplyOperationFn applyOperation) = 0;
-
-    /**
-     * Used by multiApply() to writes operations to database during initial sync. `fetchCount` is a
-     * pointer to a counter that is incremented every time we fetch a missing document.
-     * `workerMultikeyPathInfo` is a pointer to a list of objects tracking which indexes to set as
-     * multikey at the end of the batch.
-     *
-     */
-    virtual Status multiInitialSyncApply(OperationContext* opCtx,
-                                         MultiApplier::OperationPtrs* ops,
-                                         const HostAndPort& source,
-                                         AtomicUInt32* fetchCount,
-                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) = 0;
-
-    /**
-     * This function creates an oplog buffer of the type specified at server startup.
-     */
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* opCtx) const = 0;
-
-    /**
      * Returns maximum number of times that the oplog fetcher will consecutively restart the oplog
      * tailing query on non-cancellation errors.
      */
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const = 0;
+
+    /**
+     * Returns initial sync oplog application batch limits.
+     */
+    virtual OplogApplier::BatchLimits getInitialSyncBatchLimits() const = 0;
 
     /*
      * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,

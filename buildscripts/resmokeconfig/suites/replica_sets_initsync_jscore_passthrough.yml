@@ -75,11 +75,9 @@ selector:
   - jstests/core/profile_insert.js
   - jstests/core/profile_sampling.js
   - jstests/core/profile_update.js
+  - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
-  # Restarting the catalog on the sync source will cause the downstream node to copy only a subset
-  # of the required data.
-  - jstests/core/restart_catalog.js
 
 run_hook_interval: &run_hook_interval 20
 executor:
@@ -91,7 +89,6 @@ executor:
       eval: "testingReplication = true;"
       readMode: commands
   hooks:
-  - class: CheckPrimary
   - class: BackgroundInitialSync
     n: *run_hook_interval
   - class: CleanEveryN

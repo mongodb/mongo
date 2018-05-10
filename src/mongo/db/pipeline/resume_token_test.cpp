@@ -26,24 +26,31 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/pipeline/resume_token.h"
 
+#include <algorithm>
 #include <boost/optional/optional_io.hpp>
+#include <random>
 
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
+using Format = ResumeToken::SerializationFormat;
 
 TEST(ResumeToken, EncodesFullTokenFromData) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
     Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, Value(documentKey), testUuid);
+    ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
     ResumeToken token(resumeTokenDataIn);
     ResumeTokenData tokenData = token.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
@@ -59,45 +66,81 @@ TEST(ResumeToken, EncodesTimestampOnlyTokenFromData) {
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
 
-TEST(ResumeToken, RoundTripThroughBsonFullToken) {
+TEST(ResumeToken, ShouldRoundTripThroughHexStringEncoding) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
     Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, Value(documentKey), testUuid);
-    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toBSON());
+    ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
+
+    // Test serialization/parsing through Document.
+    auto rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString));
     ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // Test serialization/parsing through BSON.
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
 
-TEST(ResumeToken, RoundTripThroughBsonTimestampOnlyToken) {
-    Timestamp ts(1001, 3);
-
-    ResumeTokenData resumeTokenDataIn;
-    resumeTokenDataIn.clusterTime = ts;
-    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toBSON());
-    ResumeTokenData tokenData = rtToken.getData();
-    ASSERT_EQ(resumeTokenDataIn, tokenData);
-}
-
-TEST(ResumeToken, RoundTripThroughDocumentFullToken) {
+TEST(ResumeToken, ShouldRoundTripThroughBinDataEncoding) {
     Timestamp ts(1000, 2);
     UUID testUuid = UUID::gen();
     Document documentKey{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
 
-    ResumeTokenData resumeTokenDataIn(ts, Value(documentKey), testUuid);
-    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument());
+    ResumeTokenData resumeTokenDataIn(ts, 0, 0, Value(documentKey), testUuid);
+
+    // Test serialization/parsing through Document.
+    auto rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
     ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // Test serialization/parsing through BSON.
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
+    tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
 
-TEST(ResumeToken, RoundTripThroughDocumentTimestampOnlyToken) {
+TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughHexStringEncoding) {
     Timestamp ts(1001, 3);
 
     ResumeTokenData resumeTokenDataIn;
     resumeTokenDataIn.clusterTime = ts;
-    auto rtToken = ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument());
+
+    // Test serialization/parsing through Document.
+    auto rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
     ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // Test serialization/parsing through BSON.
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+}
+
+TEST(ResumeToken, TimestampOnlyTokenShouldRoundTripThroughBinDataEncoding) {
+    Timestamp ts(1001, 3);
+
+    ResumeTokenData resumeTokenDataIn;
+    resumeTokenDataIn.clusterTime = ts;
+
+    // Test serialization/parsing through Document.
+    auto rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
+    ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // Test serialization/parsing through BSON.
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kBinData).toBson());
+    tokenData = rtToken.getData();
     ASSERT_EQ(resumeTokenDataIn, tokenData);
 }
 
@@ -105,13 +148,14 @@ TEST(ResumeToken, TestMissingTypebitsOptimization) {
     Timestamp ts(1000, 1);
     UUID testUuid = UUID::gen();
 
-    ResumeTokenData hasTypeBitsData(ts, Value(Document{{"_id", 1.0}}), testUuid);
-    ResumeTokenData noTypeBitsData(ResumeTokenData(ts, Value(Document{{"_id", 1}}), testUuid));
+    ResumeTokenData hasTypeBitsData(ts, 0, 0, Value(Document{{"_id", 1.0}}), testUuid);
+    ResumeTokenData noTypeBitsData(
+        ResumeTokenData(ts, 0, 0, Value(Document{{"_id", 1}}), testUuid));
     ResumeToken hasTypeBitsToken(hasTypeBitsData);
     ResumeToken noTypeBitsToken(noTypeBitsData);
     ASSERT_EQ(noTypeBitsToken, hasTypeBitsToken);
-    auto hasTypeBitsDoc = hasTypeBitsToken.toDocument();
-    auto noTypeBitsDoc = noTypeBitsToken.toDocument();
+    auto hasTypeBitsDoc = hasTypeBitsToken.toDocument(Format::kHexString);
+    auto noTypeBitsDoc = noTypeBitsToken.toDocument(Format::kHexString);
     ASSERT_FALSE(hasTypeBitsDoc["_typeBits"].missing());
     ASSERT_TRUE(noTypeBitsDoc["_typeBits"].missing()) << noTypeBitsDoc["_typeBits"];
     auto rtHasTypeBitsData = ResumeToken::parse(hasTypeBitsDoc).getData();
@@ -122,168 +166,28 @@ TEST(ResumeToken, TestMissingTypebitsOptimization) {
     ASSERT_EQ(BSONType::NumberInt, rtNoTypeBitsData.documentKey["_id"].getType());
 }
 
-// Tests comparison functions for tokens constructed from oplog data.
-TEST(ResumeToken, CompareFromData) {
-    Timestamp ts1(1000, 1);
-    Timestamp ts2(1000, 2);
-    Timestamp ts3(1001, 1);
-    UUID testUuid = UUID::gen();
-    UUID testUuid2 = UUID::gen();
-    Document documentKey1a{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
-    Document documentKey1b{{"_id"_sd, "stuff"_sd},
-                           {"otherkey"_sd, Document{{"otherstuff"_sd, 2.0}}}};
-    Document documentKey2{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 3}}}};
-    Document documentKey3{{"_id"_sd, "ztuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 0}}}};
-
-    ResumeToken token1a(ResumeTokenData(ts1, Value(documentKey1a), testUuid));
-    ResumeToken token1b(ResumeTokenData(ts1, Value(documentKey1b), testUuid));
-
-    // Equivalent types don't matter.
-    ASSERT_EQ(token1a, token1b);
-    ASSERT_LTE(token1a, token1b);
-    ASSERT_GTE(token1a, token1b);
-
-    // UUIDs matter, but all that really matters is they compare unequal.
-    ResumeToken tokenOtherCollection(ResumeTokenData(ts1, Value(documentKey1a), testUuid2));
-    ASSERT_NE(token1a, tokenOtherCollection);
-
-    ResumeToken token2(ResumeTokenData(ts1, Value(documentKey2), testUuid));
-
-    // Document keys matter.
-    ASSERT_LT(token1a, token2);
-    ASSERT_LTE(token1a, token2);
-    ASSERT_GT(token2, token1a);
-    ASSERT_GTE(token2, token1a);
-
-    ResumeToken token3(ResumeTokenData(ts1, Value(documentKey3), testUuid));
-
-    // Order within document keys matters.
-    ASSERT_LT(token1a, token3);
-    ASSERT_LTE(token1a, token3);
-    ASSERT_GT(token3, token1a);
-    ASSERT_GTE(token3, token1a);
-
-    ASSERT_LT(token2, token3);
-    ASSERT_LTE(token2, token3);
-    ASSERT_GT(token3, token2);
-    ASSERT_GTE(token3, token2);
-
-    ResumeToken token4(ResumeTokenData(ts2, Value(documentKey1a), testUuid));
-
-    // Timestamps matter.
-    ASSERT_LT(token1a, token4);
-    ASSERT_LTE(token1a, token4);
-    ASSERT_GT(token4, token1a);
-    ASSERT_GTE(token4, token1a);
-
-    // Timestamps matter more than document key.
-    ASSERT_LT(token3, token4);
-    ASSERT_LTE(token3, token4);
-    ASSERT_GT(token4, token3);
-    ASSERT_GTE(token4, token3);
-
-    ResumeToken token5(ResumeTokenData(ts3, Value(documentKey1a), testUuid));
-
-    // Time matters more than increment in timestamp
-    ASSERT_LT(token4, token5);
-    ASSERT_LTE(token4, token5);
-    ASSERT_GT(token5, token4);
-    ASSERT_GTE(token5, token4);
-}
-
-// Tests comparison functions for tokens constructed from the keystring-encoded form.
-TEST(ResumeToken, CompareFromEncodedData) {
-    Timestamp ts1(1000, 1);
-    Timestamp ts2(1000, 2);
-    Timestamp ts3(1001, 1);
-    UUID testUuid = UUID::gen();
-    UUID testUuid2 = UUID::gen();
-    Document documentKey1a{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 2}}}};
-    Document documentKey1b{{"_id"_sd, "stuff"_sd},
-                           {"otherkey"_sd, Document{{"otherstuff"_sd, 2.0}}}};
-    Document documentKey2{{"_id"_sd, "stuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 3}}}};
-    Document documentKey3{{"_id"_sd, "ztuff"_sd}, {"otherkey"_sd, Document{{"otherstuff"_sd, 0}}}};
-
-    auto token1a = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts1, Value(documentKey1a), testUuid)).toDocument());
-    auto token1b = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts1, Value(documentKey1b), testUuid)).toDocument());
-
-    // Equivalent types don't matter.
-    ASSERT_EQ(token1a, token1b);
-    ASSERT_LTE(token1a, token1b);
-    ASSERT_GTE(token1a, token1b);
-
-    // UUIDs matter, but all that really matters is they compare unequal.
-    auto tokenOtherCollection = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts1, Value(documentKey1a), testUuid2)).toDocument());
-    ASSERT_NE(token1a, tokenOtherCollection);
-
-    auto token2 = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts1, Value(documentKey2), testUuid)).toDocument());
-
-    // Document keys matter.
-    ASSERT_LT(token1a, token2);
-    ASSERT_LTE(token1a, token2);
-    ASSERT_GT(token2, token1a);
-    ASSERT_GTE(token2, token1a);
-
-    auto token3 = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts1, Value(documentKey3), testUuid)).toDocument());
-
-    // Order within document keys matters.
-    ASSERT_LT(token1a, token3);
-    ASSERT_LTE(token1a, token3);
-    ASSERT_GT(token3, token1a);
-    ASSERT_GTE(token3, token1a);
-
-    ASSERT_LT(token2, token3);
-    ASSERT_LTE(token2, token3);
-    ASSERT_GT(token3, token2);
-    ASSERT_GTE(token3, token2);
-
-    auto token4 = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts2, Value(documentKey1a), testUuid)).toDocument());
-
-    // Timestamps matter.
-    ASSERT_LT(token1a, token4);
-    ASSERT_LTE(token1a, token4);
-    ASSERT_GT(token4, token1a);
-    ASSERT_GTE(token4, token1a);
-
-    // Timestamps matter more than document key.
-    ASSERT_LT(token3, token4);
-    ASSERT_LTE(token3, token4);
-    ASSERT_GT(token4, token3);
-    ASSERT_GTE(token4, token3);
-
-    auto token5 = ResumeToken::parse(
-        ResumeToken(ResumeTokenData(ts3, Value(documentKey1a), testUuid)).toDocument());
-
-    // Time matters more than increment in timestamp
-    ASSERT_LT(token4, token5);
-    ASSERT_LTE(token4, token5);
-    ASSERT_GT(token5, token4);
-    ASSERT_GTE(token5, token4);
-}
-
-TEST(ResumeToken, CorruptTokens) {
+TEST(ResumeToken, FailsToParseForInvalidTokenFormats) {
     // Missing document.
     ASSERT_THROWS(ResumeToken::parse(Document()), AssertionException);
     // Missing data field.
     ASSERT_THROWS(ResumeToken::parse(Document{{"somefield"_sd, "stuff"_sd}}), AssertionException);
     // Wrong type data field
-    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, "string"_sd}}), AssertionException);
+    ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, BSONNULL}}), AssertionException);
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, 0}}), AssertionException);
 
     // Valid data field, but wrong type typeBits.
     Timestamp ts(1010, 4);
     ResumeTokenData tokenData;
     tokenData.clusterTime = ts;
-    auto goodTokenDoc = ResumeToken(tokenData).toDocument();
-    auto goodData = goodTokenDoc["_data"].getBinData();
+    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument(Format::kBinData);
+    auto goodData = goodTokenDocBinData["_data"].getBinData();
     ASSERT_THROWS(ResumeToken::parse(Document{{"_data"_sd, goodData}, {"_typeBits", "string"_sd}}),
                   AssertionException);
+    auto goodTokenDocString = ResumeToken(tokenData).toDocument(Format::kHexString);
+    auto goodString = goodTokenDocString["_data"].getString();
+    ASSERT_THROWS(
+        ResumeToken::parse(Document{{"_data"_sd, goodString}, {"_typeBits", "string"_sd}}),
+        AssertionException);
 
     // Valid data except wrong bindata type.
     ASSERT_THROWS(ResumeToken::parse(
@@ -294,28 +198,184 @@ TEST(ResumeToken, CorruptTokens) {
         ResumeToken::parse(Document{{"_data"_sd, goodData},
                                     {"_typeBits", BSONBinData(goodData.data, 0, newUUID)}}),
         AssertionException);
+}
 
+TEST(ResumeToken, FailsToDecodeInvalidKeyStringBinData) {
+    Timestamp ts(1010, 4);
+    ResumeTokenData tokenData;
+    tokenData.clusterTime = ts;
+    auto goodTokenDocBinData = ResumeToken(tokenData).toDocument(Format::kBinData);
+    auto goodData = goodTokenDocBinData["_data"].getBinData();
     const unsigned char zeroes[] = {0, 0, 0, 0, 0};
     const unsigned char nonsense[] = {165, 85, 77, 86, 255};
+
     // Data of correct type, but empty.  This won't fail until we try to decode the data.
     auto emptyToken =
         ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 0, BinDataGeneral)}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    ASSERT_THROWS_CODE(emptyToken.getData(), AssertionException, 40649);
+
+    auto incorrectType = ResumeToken::parse(Document{{"_data"_sd, "string"_sd}});
+    ASSERT_THROWS_CODE(incorrectType.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Data of correct type with a bunch of zeros.
-    auto zeroesToken =
-        ResumeToken::parse(Document{{"_data"_sd, BSONBinData(zeroes, 5, BinDataGeneral)}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    auto zeroesToken = ResumeToken::parse(
+        Document{{"_data"_sd, BSONBinData(zeroes, sizeof(zeroes), BinDataGeneral)}});
+    ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, 50811);
+    zeroesToken = ResumeToken::parse(Document{{"_data"_sd, "00000"_sd}});
+    ASSERT_THROWS_CODE(zeroesToken.getData(), AssertionException, ErrorCodes::FailedToParse);
 
-    // Data of correct type with a bunch of nonsense
-    auto nonsenseToken =
-        ResumeToken::parse(Document{{"_data"_sd, BSONBinData(nonsense, 5, BinDataGeneral)}});
-    ASSERT_THROWS(emptyToken.getData(), AssertionException);
+    // Data of correct type with a bunch of nonsense.
+    auto nonsenseToken = ResumeToken::parse(
+        Document{{"_data"_sd, BSONBinData(nonsense, sizeof(nonsense), BinDataGeneral)}});
+    ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, 50811);
+    nonsenseToken = ResumeToken::parse(Document{{"_data"_sd, "nonsense"_sd}});
+    ASSERT_THROWS_CODE(nonsenseToken.getData(), AssertionException, ErrorCodes::FailedToParse);
 
     // Valid data, bad typeBits; note that an all-zeros typebits is valid so it is not tested here.
     auto badTypeBitsToken = ResumeToken::parse(
-        Document{{"_data"_sd, goodData}, {"_typeBits", BSONBinData(nonsense, 5, BinDataGeneral)}});
-    ASSERT_THROWS(badTypeBitsToken.getData(), AssertionException);
+        Document{{"_data"_sd, goodData},
+                 {"_typeBits", BSONBinData(nonsense, sizeof(nonsense), BinDataGeneral)}});
+    ASSERT_THROWS_CODE(badTypeBitsToken.getData(), AssertionException, ErrorCodes::Overflow);
+
+    const unsigned char invalidString[] = {
+        60,  // CType::kStringLike
+        55,  // Non-null terminated
+    };
+    auto invalidStringToken = ResumeToken::parse(
+        Document{{"_data"_sd, BSONBinData(invalidString, sizeof(invalidString), BinDataGeneral)}});
+    ASSERT_THROWS_WITH_CHECK(
+        invalidStringToken.getData(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), 50816);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Failed to find null terminator in string");
+        });
+}
+
+TEST(ResumeToken, WrongVersionToken) {
+    Timestamp ts(1001, 3);
+
+    ResumeTokenData resumeTokenDataIn;
+    resumeTokenDataIn.clusterTime = ts;
+    resumeTokenDataIn.version = 0;
+
+    // This one with version 0 should succeed.
+    auto rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // With version 1 it should fail.
+    resumeTokenDataIn.version = 1;
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+
+    ASSERT_THROWS(rtToken.getData(), AssertionException);
+}
+
+TEST(ResumeToken, InvalidApplyOpsIndex) {
+    Timestamp ts(1001, 3);
+
+    ResumeTokenData resumeTokenDataIn;
+    resumeTokenDataIn.clusterTime = ts;
+    resumeTokenDataIn.applyOpsIndex = 1234;
+
+    // Should round trip with a non-negative applyOpsIndex.
+    auto rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+    ResumeTokenData tokenData = rtToken.getData();
+    ASSERT_EQ(resumeTokenDataIn, tokenData);
+
+    // Should fail with a negative applyOpsIndex.
+    resumeTokenDataIn.applyOpsIndex = std::numeric_limits<size_t>::max();
+    rtToken =
+        ResumeToken::parse(ResumeToken(resumeTokenDataIn).toDocument(Format::kHexString).toBson());
+
+    ASSERT_THROWS(rtToken.getData(), AssertionException);
+}
+
+TEST(ResumeToken, StringEncodingSortsCorrectly) {
+    // Make sure that the string encoding of the resume tokens will compare in the correct order,
+    // namely timestamp, version, applyOpsIndex, uuid, then documentKey.
+    Timestamp ts2_2(2, 2);
+    Timestamp ts10_4(10, 4);
+    Timestamp ts10_5(10, 5);
+    Timestamp ts11_3(11, 3);
+
+    // Generate two different UUIDs, and figure out which one is smaller. Store the smaller one in
+    // 'lower_uuid'.
+    UUID lower_uuid = UUID::gen();
+    UUID higher_uuid = UUID::gen();
+    if (lower_uuid > higher_uuid) {
+        std::swap(lower_uuid, higher_uuid);
+    }
+
+    auto assertLt = [](const ResumeTokenData& lower, const ResumeTokenData& higher) {
+        auto lowerString = ResumeToken(lower).toDocument(Format::kHexString)["_data"].getString();
+        auto higherString = ResumeToken(higher).toDocument(Format::kHexString)["_data"].getString();
+        ASSERT_LT(lowerString, higherString);
+    };
+
+    // Test using only Timestamps.
+    assertLt({ts2_2, 0, 0, Value(), boost::none}, {ts10_4, 0, 0, Value(), boost::none});
+    assertLt({ts2_2, 0, 0, Value(), boost::none}, {ts10_5, 0, 0, Value(), boost::none});
+    assertLt({ts2_2, 0, 0, Value(), boost::none}, {ts11_3, 0, 0, Value(), boost::none});
+    assertLt({ts10_4, 0, 0, Value(), boost::none}, {ts10_5, 0, 0, Value(), boost::none});
+    assertLt({ts10_4, 0, 0, Value(), boost::none}, {ts11_3, 0, 0, Value(), boost::none});
+    assertLt({ts10_5, 0, 0, Value(), boost::none}, {ts11_3, 0, 0, Value(), boost::none});
+
+    // Test using Timestamps and version.
+    assertLt({ts2_2, 0, 0, Value(), boost::none}, {ts2_2, 1, 0, Value(), boost::none});
+    assertLt({ts10_4, 5, 0, Value(), boost::none}, {ts10_4, 10, 0, Value(), boost::none});
+
+    // Test that the Timestamp is more important than the version, applyOpsIndex, UUID and
+    // documentKey.
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_5, 0, 0, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts2_2, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_5, 0, 0, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 1}}), lower_uuid},
+             {ts10_5, 0, 0, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 0}}), higher_uuid},
+             {ts10_5, 0, 0, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_5, 0, 0, Value(Document{{"_id", 0}}), higher_uuid});
+
+    // Test that when the Timestamp is the same, the version breaks the tie.
+    assertLt({ts10_4, 1, 50, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_4, 5, 1, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts2_2, 1, 0, Value(Document{{"_id", 0}}), higher_uuid},
+             {ts2_2, 2, 0, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts10_4, 1, 0, Value(Document{{"_id", 1}}), lower_uuid},
+             {ts10_4, 2, 0, Value(Document{{"_id", 0}}), lower_uuid});
+
+    // Test that when the Timestamp and version are the same, the applyOpsIndex breaks the tie.
+    assertLt({ts10_4, 1, 6, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_4, 1, 50, Value(Document{{"_id", 0}}), lower_uuid});
+    assertLt({ts2_2, 0, 0, Value(Document{{"_id", 0}}), higher_uuid},
+             {ts2_2, 0, 4, Value(Document{{"_id", 0}}), lower_uuid});
+
+    // Test that when the Timestamp, version, and applyOpsIndex are the same, the UUID breaks the
+    // tie.
+    assertLt({ts2_2, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts2_2, 0, 0, Value(Document{{"_id", 0}}), higher_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_4, 0, 0, Value(Document{{"_id", 0}}), higher_uuid});
+    assertLt({ts10_4, 1, 2, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_4, 1, 2, Value(Document{{"_id", 0}}), higher_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 1}}), lower_uuid},
+             {ts10_4, 0, 0, Value(Document{{"_id", 0}}), higher_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 1}}), lower_uuid},
+             {ts10_4, 0, 0, Value(Document{{"_id", 2}}), higher_uuid});
+
+    // Test that when the Timestamp, version, applyOpsIndex, and UUID are the same, the documentKey
+    // breaks the tie.
+    assertLt({ts2_2, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts2_2, 0, 0, Value(Document{{"_id", 1}}), lower_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 0}}), lower_uuid},
+             {ts10_4, 0, 0, Value(Document{{"_id", 1}}), lower_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", 1}}), lower_uuid},
+             {ts10_4, 0, 0, Value(Document{{"_id", "string"_sd}}), lower_uuid});
+    assertLt({ts10_4, 0, 0, Value(Document{{"_id", BSONNULL}}), lower_uuid},
+             {ts10_4, 0, 0, Value(Document{{"_id", 0}}), lower_uuid});
 }
 
 }  // namspace

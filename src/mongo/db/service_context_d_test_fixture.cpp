@@ -42,6 +42,7 @@
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
@@ -59,7 +60,7 @@ void ServiceContextMongoDTest::setUp() {
     auto logicalClock = stdx::make_unique<LogicalClock>(serviceContext);
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
-    if (!serviceContext->getGlobalStorageEngine()) {
+    if (!serviceContext->getStorageEngine()) {
         // When using the "ephemeralForTest" storage engine, it is fine for the temporary directory
         // to go away after the global storage engine is initialized.
         unittest::TempDir tempDir("service_context_d_test_fixture");
@@ -67,8 +68,8 @@ void ServiceContextMongoDTest::setUp() {
         storageGlobalParams.engine = "ephemeralForTest";
         storageGlobalParams.engineSetByUser = true;
 
-        checked_cast<ServiceContextMongoD*>(serviceContext)->createLockFile();
-        serviceContext->initializeGlobalStorageEngine();
+        createLockFile(serviceContext);
+        initializeStorageEngine(serviceContext);
         serviceContext->setOpObserver(stdx::make_unique<OpObserverNoop>());
     }
 
@@ -99,7 +100,7 @@ void ServiceContextMongoDTest::_doTest() {
 }
 
 void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
-    dropAllDatabasesExceptLocal(opCtx);
+    Database::dropAllDatabasesExceptLocal(opCtx);
 
     Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDBLocal(opCtx, "local", MODE_X);
@@ -111,10 +112,11 @@ void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
         });
     }
 
-    // dropAllDatabasesExceptLocal() does not close empty databases. However the holder still
-    // allocates resources to track these empty databases. These resources not released by
-    // dropAllDatabasesExceptLocal() will be leaked at exit unless we call DatabaseHolder::closeAll.
-    dbHolder().closeAll(opCtx, "all databases dropped");
+    // Database::dropAllDatabasesExceptLocal() does not close empty databases. However the holder
+    // still allocates resources to track these empty databases. These resources not released by
+    // Database::dropAllDatabasesExceptLocal() will be leaked at exit unless we call
+    // DatabaseHolder::closeAll.
+    DatabaseHolder::getDatabaseHolder().closeAll(opCtx, "all databases dropped");
 }
 
 }  // namespace mongo

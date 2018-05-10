@@ -445,7 +445,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		return (0);
 
 	__wt_epoch(session, &now);
-	if (WT_TIMEDIFF_SEC(now, cache->stuck_time) > 300) {
+	if (WT_TIMEDIFF_SEC(now, cache->stuck_time) > WT_MINUTE * 5) {
 #if defined(HAVE_DIAGNOSTIC)
 		__wt_err(session, ETIMEDOUT,
 		    "Cache stuck for too long, giving up");
@@ -1224,13 +1224,6 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	    cache->evict_empty_score < WT_EVICT_SCORE_CUTOFF)
 		goto err;
 
-	/* Get some more pages to consider for eviction. */
-	if ((ret = __evict_walk(cache->walk_session, queue)) == EBUSY) {
-		ret = 0;
-		goto err;     /* An interrupt was requested, give up. */
-	}
-	WT_ERR_NOTFOUND_OK(ret);
-
 	/*
 	 * If the queue we are filling is empty, pages are being requested
 	 * faster than they are being queued.
@@ -1244,6 +1237,16 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 		WT_STAT_CONN_INCR(session, cache_eviction_queue_empty);
 	} else
 		WT_STAT_CONN_INCR(session, cache_eviction_queue_not_empty);
+
+	/*
+	 * Get some more pages to consider for eviction.
+	 *
+	 * If the walk is interrupted, we still need to sort the queue: the
+	 * next walk assumes there are no entries beyond WT_EVICT_WALK_BASE.
+	 */
+	if ((ret = __evict_walk(cache->walk_session, queue)) == EBUSY)
+		ret = 0;
+	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &queue->evict_lock);
@@ -2372,11 +2375,14 @@ __wt_cache_eviction_worker(
 	for (initial_progress = cache->eviction_progress;; ret = 0) {
 		/*
 		 * A pathological case: if we're the oldest transaction in the
-		 * system and the eviction server is stuck trying to find space,
-		 * abort the transaction to give up all hazard pointers before
-		 * trying again.
+		 * system and the eviction server is stuck trying to find space
+		 * (and we're not in recovery, because those transactions can't
+		 * be rolled back), abort the transaction to give up all hazard
+		 * pointers before trying again.
 		 */
-		if (__wt_cache_stuck(session) && __wt_txn_am_oldest(session)) {
+		if (__wt_cache_stuck(session) &&
+		    __wt_txn_am_oldest(session) &&
+		    !F_ISSET(conn, WT_CONN_RECOVERING)) {
 			--cache->evict_aggressive_score;
 			WT_STAT_CONN_INCR(session, txn_fail_cache);
 			WT_ERR(__wt_txn_rollback_required(session,

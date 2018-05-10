@@ -1,6 +1,4 @@
-"""
-unittest.TestCase for dbtests.
-"""
+"""The unittest.TestCase for dbtests."""
 
 from __future__ import absolute_import
 
@@ -15,20 +13,12 @@ from ... import utils
 
 
 class DBTestCase(interface.ProcessTestCase):
-    """
-    A dbtest to execute.
-    """
+    """A dbtest to execute."""
 
     REGISTERED_NAME = "db_test"
 
-    def __init__(self,
-                 logger,
-                 dbtest_suite,
-                 dbtest_executable=None,
-                 dbtest_options=None):
-        """
-        Initializes the DBTestCase with the dbtest suite to run.
-        """
+    def __init__(self, logger, dbtest_suite, dbtest_executable=None, dbtest_options=None):
+        """Initialize the DBTestCase with the dbtest suite to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suite)
 
@@ -39,6 +29,7 @@ class DBTestCase(interface.ProcessTestCase):
         self.dbtest_options = utils.default_if_none(dbtest_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
+        """Configure DBTestCase."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # If a dbpath was specified, then use it as a container for all other dbpaths.
@@ -62,16 +53,13 @@ class DBTestCase(interface.ProcessTestCase):
         shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
-        return core.programs.dbtest_program(self.logger,
-                                            executable=self.dbtest_executable,
-                                            suites=[self.dbtest_suite],
-                                            **self.dbtest_options)
+        return core.programs.dbtest_program(self.logger, executable=self.dbtest_executable,
+                                            suites=[self.dbtest_suite], **self.dbtest_options)
 
     @staticmethod
     def _get_dbpath_prefix():
         """
-        Returns the prefix of the dbpath to use for the dbtest
-        executable.
+        Return the prefix of the dbpath to use for the dbtest executable.
 
         Order of preference:
           1. The --dbpathPrefix specified at the command line.

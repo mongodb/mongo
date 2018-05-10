@@ -94,6 +94,10 @@ ReadConcernLevel ReadConcernArgs::getLevel() const {
     return _level.value_or(ReadConcernLevel::kLocalReadConcern);
 }
 
+ReadConcernLevel ReadConcernArgs::getOriginalLevel() const {
+    return _originalLevel.value_or(getLevel());
+}
+
 bool ReadConcernArgs::hasLevel() const {
     return _level.is_initialized();
 }
@@ -243,6 +247,27 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
                       str::stream() << kAtClusterTimeFieldName << " cannot be a null timestamp");
     }
 
+    return Status::OK();
+}
+
+Status ReadConcernArgs::upconvertReadConcernLevelToSnapshot() {
+    if (_level && *_level != ReadConcernLevel::kSnapshotReadConcern &&
+        *_level != ReadConcernLevel::kMajorityReadConcern &&
+        *_level != ReadConcernLevel::kLocalReadConcern) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "The readConcern level must be either 'local' or 'majority' in order to "
+                      "upconvert the readConcern level to 'snapshot'");
+    }
+
+    if (_opTime) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Cannot upconvert the readConcern level to 'snapshot' when '"
+                                    << kAfterOpTimeFieldName
+                                    << "' is provided");
+    }
+
+    _originalLevel = _level ? *_level : ReadConcernLevel::kLocalReadConcern;
+    _level = ReadConcernLevel::kSnapshotReadConcern;
     return Status::OK();
 }
 

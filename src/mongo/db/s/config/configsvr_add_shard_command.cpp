@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -92,10 +93,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrAddShard can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrAddShard can only be run on config servers");
         }
 
         // Do not allow adding shards while a featureCompatibilityVersion upgrade or downgrade is in
@@ -103,19 +102,19 @@ public:
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
-        if (!swParsedRequest.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, swParsedRequest.getStatus());
-        }
+        uassertStatusOK(swParsedRequest.getStatus());
         auto parsedRequest = std::move(swParsedRequest.getValue());
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto rsConfig = replCoord->getConfig();
 
         auto validationStatus = parsedRequest.validate(rsConfig.isLocalHostAllowed());
-        if (!validationStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, validationStatus);
-        }
+        uassertStatusOK(validationStatus);
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "addShard must be called with majority writeConcern, got "
@@ -137,7 +136,7 @@ public:
         if (!addShardResult.isOK()) {
             log() << "addShard request '" << parsedRequest << "'"
                   << "failed" << causedBy(addShardResult.getStatus());
-            return CommandHelpers::appendCommandStatus(result, addShardResult.getStatus());
+            uassertStatusOK(addShardResult.getStatus());
         }
 
         result << "shardAdded" << addShardResult.getValue();

@@ -6,7 +6,6 @@ load("jstests/libs/kill_sessions.js");
     function runTests(needAuth) {
         var other = {
             rs: true,
-            rsOptions: {nojournal: ""},
             rs0: {nodes: 3},
             rs1: {nodes: 3},
         };

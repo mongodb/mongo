@@ -9,6 +9,11 @@ package mongofiles
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"regexp"
+	"time"
+
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/json"
@@ -17,10 +22,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"io"
-	"os"
-	"regexp"
-	"time"
 )
 
 // List of possible commands for mongofiles.
@@ -162,46 +163,59 @@ func (mf *MongoFiles) getLocalFileName(gridFile *mgo.GridFile) string {
 }
 
 // handle logic for 'get' command
-func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
+func (mf *MongoFiles) handleGet(gfs *mgo.GridFS) error {
 	gFile, err := gfs.Open(mf.FileName)
 	if err != nil {
-		return "", fmt.Errorf("error opening GridFS file '%s': %v", mf.FileName, err)
+		return fmt.Errorf("error opening GridFS file '%s': %v", mf.FileName, err)
 	}
 	defer gFile.Close()
 	if err = mf.writeFile(gFile); err != nil {
-		return "", err
+		return err
 	}
-	return fmt.Sprintf("finished writing to %s\n", mf.getLocalFileName(gFile)), nil
+	log.Logvf(log.Always, fmt.Sprintf("finished writing to %s\n", mf.getLocalFileName(gFile)))
+	return nil
 }
 
 // handle logic for 'get_id' command
-func (mf *MongoFiles) handleGetID(gfs *mgo.GridFS) (string, error) {
+func (mf *MongoFiles) handleGetID(gfs *mgo.GridFS) error {
 	id, err := mf.parseID()
 	if err != nil {
-		return "", err
+		return err
 	}
 	// with the parsed _id, grab the file and write it to disk
 	gFile, err := gfs.OpenId(id)
 	if err != nil {
-		return "", fmt.Errorf("error opening GridFS file with _id %s: %v", mf.Id, err)
+		return fmt.Errorf("error opening GridFS file with _id %s: %v", mf.Id, err)
 	}
 	defer gFile.Close()
 	if err = mf.writeFile(gFile); err != nil {
-		return "", err
+		return err
 	}
-	return fmt.Sprintf("finished writing to: %s\n", mf.getLocalFileName(gFile)), nil
+	log.Logvf(log.Always, fmt.Sprintf("finished writing to: %s\n", mf.getLocalFileName(gFile)))
+	return nil
+}
+
+// logic for deleting a file
+func (mf *MongoFiles) handleDelete(gfs *mgo.GridFS) error {
+	err := gfs.Remove(mf.FileName)
+	if err != nil {
+		return fmt.Errorf("error while removing '%v' from GridFS: %v\n", mf.FileName, err)
+	}
+	log.Logvf(log.Always, "successfully deleted all instances of '%v' from GridFS\n", mf.FileName)
+	return nil
 }
 
 // logic for deleting a file with 'delete_id'
-func (mf *MongoFiles) handleDeleteID(gfs *mgo.GridFS) (string, error) {
+func (mf *MongoFiles) handleDeleteID(gfs *mgo.GridFS) error {
 	id, err := mf.parseID()
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err = gfs.RemoveId(id); err != nil {
-		return "", fmt.Errorf("error while removing file with _id %v from GridFS: %v\n", mf.Id, err)
+		return fmt.Errorf("error while removing file with _id %v from GridFS: %v\n", mf.Id, err)
 	}
-	return fmt.Sprintf("successfully deleted file with _id %v from GridFS\n", mf.Id), nil
+	log.Logvf(log.Always, fmt.Sprintf("successfully deleted file with _id %v from GridFS\n", mf.Id))
+	return nil
 }
 
 // parse and convert extended JSON
@@ -240,14 +254,14 @@ func (mf *MongoFiles) writeFile(gridFile *mgo.GridFile) (err error) {
 	return nil
 }
 
-func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (output string, err error) {
+func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (err error) {
 	localFileName := mf.getLocalFileName(nil)
 
 	// check if --replace flag turned on
 	if mf.StorageOptions.Replace {
-		err := gfs.Remove(mf.FileName)
+		err = gfs.Remove(mf.FileName)
 		if err != nil {
-			return "", err
+			return err
 		}
 		// always log that data has been removed
 		log.Logvf(log.Always, "removed all instances of '%v' from GridFS\n", mf.FileName)
@@ -260,7 +274,7 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (output string, err
 	} else {
 		localFile, err = os.Open(localFileName)
 		if err != nil {
-			return "", fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
+			return fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
 		}
 		defer localFile.Close()
 		log.Logvf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", mf.FileName, localFileName)
@@ -268,7 +282,7 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (output string, err
 
 	gridFile, err := gfs.Create(mf.FileName)
 	if err != nil {
-		return "", fmt.Errorf("error while creating '%v' in GridFS: %v\n", mf.FileName, err)
+		return fmt.Errorf("error while creating '%v' in GridFS: %v\n", mf.FileName, err)
 	}
 	defer func() {
 		// GridFS files flush a buffer on Close(), so it's important we
@@ -283,7 +297,7 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (output string, err
 	if hasID {
 		id, err := mf.parseID()
 		if err != nil {
-			return "", err
+			return err
 		}
 		gridFile.SetId(id)
 	}
@@ -295,12 +309,12 @@ func (mf *MongoFiles) handlePut(gfs *mgo.GridFS, hasID bool) (output string, err
 
 	n, err := io.Copy(gridFile, localFile)
 	if err != nil {
-		return "", fmt.Errorf("error while storing '%v' into GridFS: %v\n", localFileName, err)
+		return fmt.Errorf("error while storing '%v' into GridFS: %v\n", localFileName, err)
 	}
 	log.Logvf(log.DebugLow, "copied %v bytes to server", n)
 
-	output += fmt.Sprintf("added file: %v\n", gridFile.Name())
-	return output, nil
+	log.Logvf(log.Always, fmt.Sprintf("added file: %v\n", gridFile.Name()))
+	return nil
 }
 
 // Run the mongofiles utility. If displayHost is true, the connected host/port is
@@ -404,43 +418,42 @@ func (mf *MongoFiles) Run(displayHost bool) (string, error) {
 
 	case Get:
 
-		output, err = mf.handleGet(gfs)
+		err = mf.handleGet(gfs)
 		if err != nil {
 			return "", err
 		}
 
 	case GetID:
 
-		output, err = mf.handleGetID(gfs)
+		err = mf.handleGetID(gfs)
 		if err != nil {
 			return "", err
 		}
 
 	case Put:
 
-		output, err = mf.handlePut(gfs, false)
+		err = mf.handlePut(gfs, false)
 		if err != nil {
 			return "", err
 		}
 
 	case PutID:
 
-		output, err = mf.handlePut(gfs, true)
+		err = mf.handlePut(gfs, true)
 		if err != nil {
 			return "", err
 		}
 
 	case Delete:
 
-		err = gfs.Remove(mf.FileName)
+		err = mf.handleDelete(gfs)
 		if err != nil {
-			return "", fmt.Errorf("error while removing '%v' from GridFS: %v\n", mf.FileName, err)
+			return "", err
 		}
-		output = fmt.Sprintf("successfully deleted all instances of '%v' from GridFS\n", mf.FileName)
 
 	case DeleteID:
 
-		output, err = mf.handleDeleteID(gfs)
+		err = mf.handleDeleteID(gfs)
 		if err != nil {
 			return "", err
 		}

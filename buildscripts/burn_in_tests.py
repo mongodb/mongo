@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-
-"""
-Command line utility for determining what jstests have been added or modified
-"""
+"""Command line utility for determining what jstests have been added or modified."""
 
 from __future__ import absolute_import
 
@@ -13,24 +10,24 @@ import optparse
 import os.path
 import subprocess
 import re
-import requests
 import shlex
 import sys
 import urlparse
-import yaml
 
+import requests
+import yaml
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from buildscripts import resmokelib
-from buildscripts.ciconfig import evergreen
-
+from buildscripts import resmokelib  # pylint: disable=wrong-import-position
+from buildscripts.ciconfig import evergreen  # pylint: disable=wrong-import-position
 
 API_SERVER_DEFAULT = "https://evergreen.mongodb.com"
 
 
 def parse_command_line():
+    """Parse command line options."""
     parser = optparse.OptionParser(usage="Usage: %prog [options] [resmoke command]")
 
     parser.add_option("--maxRevisions", dest="max_revisions",
@@ -43,12 +40,12 @@ def parse_command_line():
                       help="The base commit to compare to for determining changes.")
 
     parser.add_option("--buildVariant", dest="buildvariant",
-                      help="The buildvariant the tasks will execute on. \
-                            Required when generating the JSON file with test executor information")
+                      help=("The buildvariant the tasks will execute on. Required when"
+                            " generating the JSON file with test executor information"))
 
     parser.add_option("--checkEvergreen", dest="check_evergreen", action="store_true",
-                      help="Checks Evergreen for the last commit that was scheduled. \
-                            This way all the tests that haven't been burned in will be run.")
+                      help=("Checks Evergreen for the last commit that was scheduled."
+                            " This way all the tests that haven't been burned in will be run."))
 
     parser.add_option("--noExec", dest="no_exec", action="store_true",
                       help="Do not run resmoke loop on new tests.")
@@ -64,18 +61,10 @@ def parse_command_line():
 
     # The executor_file and suite_files defaults are required to make the
     # suite resolver work correctly.
-    parser.set_defaults(base_commit=None,
-                        branch="master",
-                        buildvariant=None,
-                        check_evergreen=False,
-                        evergreen_file="etc/evergreen.yml",
-                        selector_file="etc/burn_in_tests.yml",
-                        max_revisions=25,
-                        no_exec=False,
-                        executor_file=None,
-                        report_file="report.json",
-                        suite_files="with_server",
-                        test_list_file=None,
+    parser.set_defaults(base_commit=None, branch="master", buildvariant=None, check_evergreen=False,
+                        evergreen_file="etc/evergreen.yml", selector_file="etc/burn_in_tests.yml",
+                        max_revisions=25, no_exec=False, executor_file=None,
+                        report_file="report.json", suite_files="with_server", test_list_file=None,
                         test_list_outfile=None)
 
     # This disables argument parsing on the first unrecognized parameter. This allows us to pass
@@ -86,17 +75,18 @@ def parse_command_line():
 
 
 def callo(args):
-    """Call a program, and capture its output
-    """
+    """Call a program, and capture its output."""
     return subprocess.check_output(args)
 
 
 def read_evg_config():
+    """Read evg config file."""
     # Expand out evergreen config file possibilities
     file_list = [
         "./.evergreen.yml",
         os.path.expanduser("~/.evergreen.yml"),
-        os.path.expanduser("~/cli_bin/.evergreen.yml")]
+        os.path.expanduser("~/cli_bin/.evergreen.yml")
+    ]
 
     for filename in file_list:
         if os.path.isfile(filename):
@@ -106,7 +96,7 @@ def read_evg_config():
 
 
 def find_last_activated_task(revisions, variant, branch_name):
-    """ Get the git hash of the most recently activated build before this one """
+    """Get the git hash of the most recently activated build before this one."""
     rest_prefix = "/rest/v1/"
     project = "mongodb-mongo-" + branch_name
     build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
@@ -131,15 +121,16 @@ def find_last_activated_task(revisions, variant, branch_name):
                     build_data = build_resp.json()
                     if build_data["activated"]:
                         return build_data["revision"]
-        except:
+        except:  # pylint: disable=bare-except
             # Sometimes build data is incomplete, as was the related build.
-            next
+            pass
 
     return None
 
 
 def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, check_evergreen):
-    """
+    """Find the changed tests.
+
     Use git to find which files have changed in this patch.
     TODO: This should be expanded to search for enterprise modules.
     The returned file paths are in normalized form (see os.path.normpath(path)).
@@ -153,8 +144,8 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
         # The current commit will be activated in Evergreen; we use --skip to start at the
         # previous commit when trying to find the most recent preceding commit that has been
         # activated.
-        revs_to_check = callo(["git", "rev-list", base_commit,
-                               "--max-count=200", "--skip=1"]).splitlines()
+        revs_to_check = callo(["git", "rev-list", base_commit, "--max-count=200",
+                               "--skip=1"]).splitlines()
         last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
         if last_activated is None:
             # When the current commit is the first time 'buildvariant' has run, there won't be a
@@ -182,7 +173,7 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
     # The lines with untracked files start with '?? '.
     for line in untracked_files:
         if line.startswith("?"):
-            (status, line) = line.split(" ", 1)
+            (_, line) = line.split(" ", 1)
             changed_files.append(line)
 
     for line in changed_files:
@@ -197,9 +188,7 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
 
 
 def find_exclude_tests(selector_file):
-    """
-    Parses etc/burn_in_tests.yml. Returns lists of excluded suites, tasks & tests.
-    """
+    """Parse etc/burn_in_tests.yml. Returns lists of excluded suites, tasks & tests."""
 
     if not selector_file:
         return ([], [], [])
@@ -210,8 +199,8 @@ def find_exclude_tests(selector_file):
     try:
         js_test = yml['selector']['js_test']
     except KeyError:
-        raise Exception("The selector file " + selector_file +
-                        " is missing the 'selector.js_test' key")
+        raise Exception(
+            "The selector file " + selector_file + " is missing the 'selector.js_test' key")
 
     return (resmokelib.utils.default_if_none(js_test.get("exclude_suites"), []),
             resmokelib.utils.default_if_none(js_test.get("exclude_tasks"), []),
@@ -219,8 +208,8 @@ def find_exclude_tests(selector_file):
 
 
 def filter_tests(tests, exclude_tests):
-    """
-    Excludes tests which have been blacklisted.
+    """Exclude tests which have been blacklisted.
+
     A test is in the tests list, i.e., ['jstests/core/a.js']
     The tests paths must be in normalized form (see os.path.normpath(path)).
     """
@@ -237,7 +226,8 @@ def filter_tests(tests, exclude_tests):
 
 
 def find_tests_by_executor(suites):
-    """
+    """Find tests by executor.
+
     Looks up what other resmoke suites run the tests specified in the suites
     parameter. Returns a dict keyed by test name, value is array of suite names.
     """
@@ -251,7 +241,8 @@ def find_tests_by_executor(suites):
 
 
 def create_executor_list(suites, exclude_suites):
-    """
+    """Create the executor list.
+
     Looks up what other resmoke suites run the tests specified in the suites
     parameter. Returns a dict keyed by suite name / executor, value is tests
     to run under that executor.
@@ -267,8 +258,7 @@ def create_executor_list(suites, exclude_suites):
 
 
 def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
-    """
-    Finds associated tasks for the specified buildvariant and suites.
+    """Find associated tasks for the specified buildvariant and suites.
 
     Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
     {'jsCore_small_oplog':
@@ -298,28 +288,25 @@ def create_task_list(evergreen_conf, buildvariant, suites, exclude_tasks):
     for suite in suites.keys():
         for task_name, task_arg in variant_task_args.items():
             # Find the resmoke_args for matching suite names.
-            if re.compile('--suites=' + suite + '(?:\s+|$)').match(task_arg):
-                tasks_to_run[task_name] = {
-                    "resmoke_args": task_arg,
-                    "tests": suites[suite]
-                }
+            if re.compile('--suites=' + suite + r'(?:\s+|$)').match(task_arg):
+                tasks_to_run[task_name] = {"resmoke_args": task_arg, "tests": suites[suite]}
 
     return tasks_to_run
 
 
 def _write_report_file(tests_by_executor, pathname):
-    """
-    Writes out a JSON file containing the tests_by_executor dict.  This should
-    be done during the compile task when the git repo is available.
+    """Write out a JSON file containing the tests_by_executor dict.
+
+    This should be done during the compile task when the git repo is available.
     """
     with open(pathname, "w") as fstream:
         json.dump(tests_by_executor, fstream)
 
 
 def _load_tests_file(pathname):
-    """
-    Load the list of tests and executors from the specified file. The file might
-    not exist, and this is fine. The task running this becomes a nop.
+    """Load the list of tests and executors from the specified file.
+
+    The file might not exist, and this is fine. The task running this becomes a nop.
     """
     if not os.path.isfile(pathname):
         return None
@@ -328,12 +315,12 @@ def _load_tests_file(pathname):
 
 
 def _save_report_data(saved_data, pathname, task):
-    """
-    Read in the report file from the previous resmoke.py run if it exists. We'll concat it to the
-    passed saved_data dict.
+    """Read in the report file from the previous resmoke.py run if it exists.
+
+    We'll concat it to the passed saved_data dict.
     """
     if not os.path.isfile(pathname):
-        return None
+        return
 
     with open(pathname, "r") as fstream:
         current_data = json.load(fstream)
@@ -345,6 +332,7 @@ def _save_report_data(saved_data, pathname, task):
 
 
 def main():
+    """Execute Main program."""
     values, args = parse_command_line()
 
     # If a resmoke.py command wasn't passed in, use a simple version.
@@ -371,11 +359,8 @@ def main():
                   "\t", "\n\t".join(sorted(evergreen_conf.variant_names))
             sys.exit(1)
 
-        changed_tests = find_changed_tests(values.branch,
-                                           values.base_commit,
-                                           values.max_revisions,
-                                           values.buildvariant,
-                                           values.check_evergreen)
+        changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions,
+                                           values.buildvariant, values.check_evergreen)
         exclude_suites, exclude_tasks, exclude_tests = find_exclude_tests(values.selector_file)
         changed_tests = filter_tests(changed_tests, exclude_tests)
         # If there are no changed tests, exit cleanly.
@@ -385,12 +370,9 @@ def main():
                 _write_report_file({}, values.test_list_outfile)
             sys.exit(0)
         suites = resmokelib.suitesconfig.get_suites(
-            suite_files=values.suite_files.split(","),
-            test_files=changed_tests)
+            suite_files=values.suite_files.split(","), test_files=changed_tests)
         tests_by_executor = create_executor_list(suites, exclude_suites)
-        tests_by_task = create_task_list(evergreen_conf,
-                                         values.buildvariant,
-                                         tests_by_executor,
+        tests_by_task = create_task_list(evergreen_conf, values.buildvariant, tests_by_executor,
                                          exclude_tasks)
         if values.test_list_outfile is not None:
             _write_report_file(tests_by_task, values.test_list_outfile)

@@ -84,6 +84,10 @@ void RouterStagePipeline::kill(OperationContext* opCtx) {
     _mergePipeline->dispose(opCtx);
 }
 
+std::size_t RouterStagePipeline::getNumRemotes() const {
+    return _mongosOnlyPipeline ? 0 : _routerAdapter->getNumRemotes();
+}
+
 bool RouterStagePipeline::remotesExhausted() {
     return _mongosOnlyPipeline || _routerAdapter->remotesExhausted();
 }

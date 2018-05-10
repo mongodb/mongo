@@ -45,7 +45,9 @@
         conf.members[1].slaveDelay = 24 * 60 * 60;
 
         rst.startSet();
-        rst.initiateWithAnyNodeAsPrimary(conf);
+        // We cannot wait for a stable checkpoint due to the slaveDelay.
+        rst.initiateWithAnyNodeAsPrimary(
+            conf, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
         var master = rst.getPrimary();  // Waits for PRIMARY state.
 
         // Reconfigure primary with a small cache size so less data needs to be

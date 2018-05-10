@@ -132,6 +132,8 @@ public:
 
         uassertStatusOK(getStatusFromCommandResult(cloneResult));
 
+        result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cloneResult));
+
         return true;
     }
 

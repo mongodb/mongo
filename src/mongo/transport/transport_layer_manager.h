@@ -34,7 +34,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -60,14 +59,15 @@ public:
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
                                       Milliseconds timeout) override;
-    void asyncConnect(HostAndPort peer,
-                      ConnectSSLMode sslMode,
-                      Milliseconds timeout,
-                      std::function<void(StatusWith<SessionHandle>)> callback) override;
+    Future<SessionHandle> asyncConnect(HostAndPort peer,
+                                       ConnectSSLMode sslMode,
+                                       const ReactorHandle& reactor) override;
 
     Status start() override;
     void shutdown() override;
     Status setup() override;
+
+    ReactorHandle getReactor(WhichReactor which) override;
 
     // TODO This method is not called anymore, but may be useful to add new TransportLayers
     // to the manager after it's been created.
@@ -84,6 +84,15 @@ public:
      */
     static std::unique_ptr<TransportLayer> createWithConfig(const ServerGlobalParams* config,
                                                             ServiceContext* ctx);
+
+    static std::unique_ptr<TransportLayer> makeAndStartDefaultEgressTransportLayer();
+
+    BatonHandle makeBaton(OperationContext* opCtx) override {
+        stdx::lock_guard<stdx::mutex> lk(_tlsMutex);
+        // TODO: figure out what to do about managers with more than one transport layer.
+        invariant(_tls.size() == 1);
+        return _tls[0]->makeBaton(opCtx);
+    }
 
 private:
     template <typename Callable>

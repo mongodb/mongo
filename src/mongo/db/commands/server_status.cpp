@@ -51,7 +51,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostname_canonicalization.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"

@@ -1,6 +1,4 @@
-"""
-Configuration options for resmoke.py.
-"""
+"""Configuration options for resmoke.py."""
 
 from __future__ import absolute_import
 
@@ -9,7 +7,6 @@ import datetime
 import itertools
 import os.path
 import time
-
 
 # Subdirectory under the dbpath prefix that contains directories with data files of mongod's started
 # by resmoke.py.
@@ -79,14 +76,17 @@ DEFAULTS = {
     "transport_layer": None,
 
     # Evergreen options.
+    "build_id": None,
     "distro_id": None,
     "execution_number": 0,
     "git_revision": None,
     "patch_build": False,
     "project_name": "mongodb-mongo-master",
+    "revision_order_id": None,
     "task_id": None,
     "task_name": None,
     "variant_name": None,
+    "version_id": None,
 
     # WiredTiger options.
     "wt_coll_config": None,
@@ -111,19 +111,16 @@ _SuiteOptions = collections.namedtuple("_SuiteOptions", [
 
 
 class SuiteOptions(_SuiteOptions):
-    """
-    A class for representing top-level options to resmoke.py that can also be set at the
-    suite-level.
-    """
+    """Represent top-level options to resmoke.py that can also be set at the suite-level."""
 
     INHERIT = object()
     ALL_INHERITED = None
 
     @classmethod
     def combine(cls, *suite_options_list):
-        """
-        Returns a SuiteOptions instance representing the combination of all SuiteOptions in
-        'suite_options_list'.
+        """Return SuiteOptions instance.
+
+        This object represents the combination of all SuiteOptions in 'suite_options_list'.
         """
 
         combined_options = cls.ALL_INHERITED._asdict()
@@ -156,21 +153,23 @@ class SuiteOptions(_SuiteOptions):
         return cls(**combined_options)
 
     def resolve(self):
-        """
-        Returns a SuiteOptions instance representing the options overridden at the suite-level and
+        """Return a SuiteOptions instance.
+
+        This represents the options overridden at the suite-level and
         the inherited options from the top-level.
         """
 
         description = None
         include_tags = None
-        parent = dict(zip(SuiteOptions._fields, [
-            description,
-            FAIL_FAST,
-            include_tags,
-            JOBS,
-            REPEAT,
-            REPORT_FAILURE_STATUS,
-        ]))
+        parent = dict(
+            zip(SuiteOptions._fields, [
+                description,
+                FAIL_FAST,
+                include_tags,
+                JOBS,
+                REPEAT,
+                REPORT_FAILURE_STATUS,
+            ]))
 
         options = self._asdict()
         for field in SuiteOptions._fields:
@@ -180,8 +179,8 @@ class SuiteOptions(_SuiteOptions):
         return SuiteOptions(**options)
 
 
-SuiteOptions.ALL_INHERITED = SuiteOptions(**dict(zip(SuiteOptions._fields,
-                                                     itertools.repeat(SuiteOptions.INHERIT))))
+SuiteOptions.ALL_INHERITED = SuiteOptions(  # type: ignore
+    **dict(zip(SuiteOptions._fields, itertools.repeat(SuiteOptions.INHERIT))))
 
 ##
 # Variables that are set by the user at the command line or with --options.
@@ -214,6 +213,10 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
+# An identifier consisting of the project name, build variant name, commit hash, and the timestamp.
+# For patch builds, it also includes the patch version id.
+EVERGREEN_BUILD_ID = None
+
 # The identifier for the Evergreen distro that resmoke.py is being run on.
 EVERGREEN_DISTRO_ID = None
 
@@ -229,6 +232,9 @@ EVERGREEN_PROJECT_NAME = None
 # The git revision of the Evergreen task that resmoke.py is being run on.
 EVERGREEN_REVISION = None
 
+# A number for the chronological order of this revision.
+EVERGREEN_REVISION_ORDER_ID = None
+
 # The identifier for the Evergreen task that resmoke.py is being run under. If set, then the
 # Evergreen task id value will be transmitted to logkeeper when creating builds and tests.
 EVERGREEN_TASK_ID = None
@@ -238,6 +244,10 @@ EVERGREEN_TASK_NAME = None
 
 # The name of the Evergreen build variant that resmoke.py is being run on.
 EVERGREEN_VARIANT_NAME = None
+
+# The identifier consisting of the project name and the commit hash. For patch builds, it is just
+# the commit hash.
+EVERGREEN_VERSION_ID = None
 
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
@@ -366,7 +376,5 @@ DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
-EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST,
-                            DEFAULT_UNIT_TEST_LIST,
-                            DEFAULT_INTEGRATION_TEST_LIST,
-                            DEFAULT_DBTEST_EXECUTABLE)
+EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
+                            DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE)

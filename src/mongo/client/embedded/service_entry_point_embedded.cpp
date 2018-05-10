@@ -63,6 +63,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
@@ -70,12 +71,11 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/op_msg.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -90,10 +90,10 @@ public:
                             const CommandInvocation*,
                             const OpMsgRequest&) const override {}
 
-    void waitForWriteConcern(OperationContext* opCtx,
-                             const std::string& commandName,
-                             const repl::OpTime& lastOpBeforeRun,
-                             BSONObjBuilder commandResponseBuilder) const override {}
+    void waitForWriteConcern(OperationContext*,
+                             const CommandInvocation*,
+                             const repl::OpTime&,
+                             BSONObjBuilder&) const override {}
 
     void waitForLinearizableReadConcern(OperationContext*) const override {}
 

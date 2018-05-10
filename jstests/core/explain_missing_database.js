@@ -1,4 +1,8 @@
 // Test explain of various operations against a non-existent database
+// @tags: [
+//    # group requires javascript
+//    requires_scripting,
+//]
 (function() {
     var explainMissingDb = db.getSiblingDB("explainMissingDb");
 

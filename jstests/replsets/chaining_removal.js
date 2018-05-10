@@ -64,7 +64,8 @@
 
     // ensure writing to all four nodes still works
     primary = replTest.getPrimary();
-    replTest.awaitReplication();
+    const liveSlaves = [nodes[1], nodes[2], nodes[3]];
+    replTest.awaitReplication(null, null, liveSlaves);
     options.writeConcern.w = 4;
     assert.writeOK(primary.getDB(name).foo.insert({x: 2}, options));
 

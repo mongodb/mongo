@@ -52,6 +52,8 @@ void ConfigServerOpObserver::onDelete(OperationContext* opCtx,
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40302, "cannot delete config.version document while in --configsvr mode");
         } else {
+            // TODO (SERVER-34165): this is only used for rollback via refetch and can be removed
+            // with it.
             // Throw out any cached information related to the cluster ID.
             ShardingCatalogManager::get(opCtx)->discardCachedConfigDatabaseInitializationState();
             ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
@@ -66,6 +68,8 @@ repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
         if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
             uasserted(40303, "cannot drop config.version document while in --configsvr mode");
         } else {
+            // TODO (SERVER-34165): this is only used for rollback via refetch and can be removed
+            // with it.
             // Throw out any cached information related to the cluster ID.
             ShardingCatalogManager::get(opCtx)->discardCachedConfigDatabaseInitializationState();
             ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
@@ -73,6 +77,15 @@ repl::OpTime ConfigServerOpObserver::onDropCollection(OperationContext* opCtx,
     }
 
     return {};
+}
+
+void ConfigServerOpObserver::onReplicationRollback(OperationContext* opCtx,
+                                                   const RollbackObserverInfo& rbInfo) {
+    if (rbInfo.configServerConfigVersionRolledBack) {
+        // Throw out any cached information related to the cluster ID.
+        ShardingCatalogManager::get(opCtx)->discardCachedConfigDatabaseInitializationState();
+        ClusterIdentityLoader::get(opCtx)->discardCachedClusterId();
+    }
 }
 
 }  // namespace mongo

@@ -1,5 +1,7 @@
 // SERVER-4516 and SERVER-6913: test that update and findAndModify tolerate
 // an _id in the update document, as long as the _id will not be modified
+//
+// @tags: [requires_fastcount]
 
 var t = db.jstests_server4516;
 var startingDoc = {_id: 1, a: 1};

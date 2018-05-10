@@ -704,12 +704,13 @@ err:		WT_TRET(cursor->reopen(cursor, false));
  */
 int
 __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
-    const char *cfg[], WT_CURSOR **cursorp)
+    WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	uint64_t bucket, hash_value;
+	uint32_t overwrite_flag;
 	bool have_config;
 
 	if (!F_ISSET(session, WT_SESSION_CACHE_CURSORS))
@@ -718,6 +719,14 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 	/* If original config string is NULL or "", don't check it. */
 	have_config = (cfg != NULL && cfg[0] != NULL && cfg[1] != NULL &&
 	    (cfg[2] != NULL || cfg[1][0] != '\0'));
+
+	/* Fast path overwrite configuration */
+	if (have_config && cfg[2] == NULL &&
+	    WT_STREQ(cfg[1], "overwrite=false")) {
+		have_config = false;
+		overwrite_flag = 0;
+	} else
+		overwrite_flag = WT_CURSTD_OVERWRITE;
 
 	if (have_config) {
 		/*
@@ -752,10 +761,22 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 	}
 
 	/*
+	 * Caller guarantees that exactly one of the URI and the
+	 * duplicate cursor is non-NULL.
+	 */
+	if (to_dup != NULL) {
+		WT_ASSERT(session, uri == NULL);
+		uri = to_dup->uri;
+		hash_value = to_dup->uri_hash;
+	} else {
+		WT_ASSERT(session, uri != NULL);
+		hash_value = __wt_hash_city64(uri, strlen(uri));
+	}
+
+	/*
 	 * Walk through all cursors, if there is a cached
 	 * cursor that matches uri and configuration, use it.
 	 */
-	hash_value = __wt_hash_city64(uri, strlen(uri));
 	bucket = hash_value % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(cursor, &session->cursor_cache[bucket], q) {
 		if (cursor->uri_hash == hash_value &&
@@ -773,8 +794,9 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri,
 			 * cursor other than flag values, so fix
 			 * them up according to the given configuration.
 			 */
-			F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_RAW);
-			F_SET(cursor, WT_CURSTD_OVERWRITE);
+			F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_RAW |
+			    WT_CURSTD_OVERWRITE);
+			F_SET(cursor, overwrite_flag);
 
 			if (have_config) {
 				/*

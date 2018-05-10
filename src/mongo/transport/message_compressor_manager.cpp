@@ -36,10 +36,10 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace {

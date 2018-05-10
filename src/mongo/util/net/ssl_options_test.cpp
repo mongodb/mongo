@@ -61,9 +61,6 @@ TEST(SSLOptions, validCases) {
 
     ASSERT_OK(parseCertificateSelector(&selector, "hash", "thumbprint=0123456789"));
     ASSERT_EQ(test::Vector(selector.thumbprint), test::Vector({0x01, 0x23, 0x45, 0x67, 0x89}));
-
-    ASSERT_OK(parseCertificateSelector(&selector, "serno", "serial=ABCdef"));
-    ASSERT_EQ(test::Vector(selector.serial), test::Vector({0xAB, 0xCD, 0xEF}));
 }
 
 TEST(SSLOptions, invalidCases) {

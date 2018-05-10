@@ -80,7 +80,7 @@ public:
     }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -200,10 +200,8 @@ public:
         }
 
         if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
-                    "Executor error while checking sharding index"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
+                "Executor error while checking sharding index"));
         }
 
         return true;

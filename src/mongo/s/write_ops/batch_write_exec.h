@@ -88,7 +88,9 @@ public:
         : numRounds(0), numTargetErrors(0), numResolveErrors(0), numStaleBatches(0) {}
 
     void noteWriteAt(const HostAndPort& host, repl::OpTime opTime, const OID& electionId);
+    void noteTargetedShard(const ShardId& shardId);
 
+    const std::set<ShardId>& getTargetedShards() const;
     const HostOpTimeMap& getWriteOpTimes() const;
 
     // Expose via helpers if this gets more complex
@@ -103,6 +105,7 @@ public:
     int numStaleBatches;
 
 private:
+    std::set<ShardId> _targetedShards;
     HostOpTimeMap _writeOpTimes;
 };
 

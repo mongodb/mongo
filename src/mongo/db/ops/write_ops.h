@@ -29,8 +29,8 @@
 #pragma once
 
 #include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/op_msg.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 

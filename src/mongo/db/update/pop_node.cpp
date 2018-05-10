@@ -63,7 +63,7 @@ ModifierNode::ModifyResult PopNode::updateExistingElement(
     }
 
     auto elementToRemove = _popFromFront ? element->leftChild() : element->rightChild();
-    invariantOK(elementToRemove.remove());
+    invariant(elementToRemove.remove());
 
     return ModifyResult::kNormalUpdate;
 }

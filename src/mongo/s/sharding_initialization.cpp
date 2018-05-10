@@ -70,7 +70,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 
@@ -130,11 +130,11 @@ std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     const auto poolSize = taskExecutorPoolSize.value_or(TaskExecutorPool::getSuggestedPoolSize());
 
     for (size_t i = 0; i < poolSize; ++i) {
-        auto exec = makeShardingTaskExecutor(executor::makeNetworkInterface(
-            "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
-            stdx::make_unique<ShardingNetworkConnectionHook>(),
-            metadataHookBuilder(),
-            connPoolOptions));
+        auto exec = makeShardingTaskExecutor(
+            executor::makeNetworkInterface("TaskExecutorPool-" + std::to_string(i),
+                                           stdx::make_unique<ShardingNetworkConnectionHook>(),
+                                           metadataHookBuilder(),
+                                           connPoolOptions));
 
         executors.emplace_back(std::move(exec));
     }
@@ -219,7 +219,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
     }
 
     auto network =
-        executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
+        executor::makeNetworkInterface("ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
                                        hookBuilder(),
                                        connPoolOptions);

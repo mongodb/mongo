@@ -35,7 +35,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

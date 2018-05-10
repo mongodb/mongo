@@ -210,7 +210,7 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
                 // 2) PlanExecutor::FAILURE is only returned on PlanStage::FAILURE. The
                 //    CollectionScan PlanStage does not have a FAILURE scenario.
                 // 3) All other PlanExecutor states are handled above
-                invariant(false);
+                MONGO_UNREACHABLE;
         }
 
         try {
@@ -246,7 +246,7 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
         }
     }
 
-    invariant(false);  // unreachable
+    MONGO_UNREACHABLE;
 }
 
 mongo::Status mongo::convertToCapped(OperationContext* opCtx,

@@ -166,25 +166,55 @@ env.Library(
         ],
     )
 
+
+env.Library(
+    target='recovery_unit_test_harness',
+    source=[
+        'recovery_unit_test_harness.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'test_harness_helper',
+        ],
+    )
+
 env.Library(
     target='storage_engine_lock_file',
     source=[
+        'storage_engine_lock_file.cpp',
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        ]
+        '$BUILD_DIR/mongo/db/service_context',
+        ],
     )
 
+env.Library(
+    target='storage_engine_common',
+    source=[
+        'storage_engine_init.cpp'
+    ],
+    LIBDEPS=[
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+        'storage_engine_lock_file',
+        'storage_engine_metadata',
+        'storage_options',
+    ],
+)
 env.Library(
     target="storage_init_d",
     source=[
         "storage_init.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
         "storage_options",
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/server_status',
+    ]
 )
 
 env.Library(

@@ -106,7 +106,7 @@ ModifierNode::ModifyResult BitNode::updateExistingElement(
     SafeNum value = applyOpList(element->getValueSafeNum());
 
     if (!value.isIdentical(element->getValueSafeNum())) {
-        invariantOK(element->setValueSafeNum(value));
+        invariant(element->setValueSafeNum(value));
         return ModifyResult::kNormalUpdate;
     } else {
         return ModifyResult::kNoOp;
@@ -115,7 +115,7 @@ ModifierNode::ModifyResult BitNode::updateExistingElement(
 
 void BitNode::setValueForNewElement(mutablebson::Element* element) const {
     SafeNum value = applyOpList(SafeNum(static_cast<int32_t>(0)));
-    invariantOK(element->setValueSafeNum(value));
+    invariant(element->setValueSafeNum(value));
 }
 
 SafeNum BitNode::applyOpList(SafeNum value) const {

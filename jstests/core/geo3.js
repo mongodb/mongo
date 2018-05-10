@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.geo3;
 t.drop();
 

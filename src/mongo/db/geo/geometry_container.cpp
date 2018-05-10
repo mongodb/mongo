@@ -958,7 +958,7 @@ Status GeometryContainer::parseFromGeoJSON(const BSONObj& obj, bool skipValidati
         }
     } else {
         // Should not reach here.
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     // Check parsing result.
@@ -1089,7 +1089,7 @@ string GeometryContainer::getDebugType() const {
     } else if (NULL != _geometryCollection) {
         return "gc";
     } else {
-        invariant(false);
+        MONGO_UNREACHABLE;
         return "";
     }
 }
@@ -1116,7 +1116,7 @@ CRS GeometryContainer::getNativeCRS() const {
     } else if (NULL != _geometryCollection) {
         return SPHERE;
     } else {
-        invariant(false);
+        MONGO_UNREACHABLE;
         return FLAT;
     }
 }

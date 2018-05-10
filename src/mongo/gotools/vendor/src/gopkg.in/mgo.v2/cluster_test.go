@@ -548,14 +548,17 @@ func (s *S) TestModeMonotonicFallover(c *C) {
 	// Kill the master.
 	host := result.Host
 	s.Stop(host)
+	// Wait a bit for this to be take effect as recent servers do some cleanup
+	// before shutdown
+	time.Sleep(2 * time.Second)
 
 	// This must fail, since the connection was broken.
 	err = session.Run("serverStatus", result)
-	c.Assert(err, Equals, io.EOF)
+	c.Assert(err, NotNil)
 
 	// With monotonic consistency, it fails again until reset.
 	err = session.Run("serverStatus", result)
-	c.Assert(err, Equals, io.EOF)
+	c.Assert(err, NotNil)
 
 	session.Refresh()
 
@@ -1466,12 +1469,16 @@ func (s *S) TestSecondaryModeWithMongosInsert(c *C) {
 	defer session.Close()
 
 	session.SetMode(mgo.Secondary, true)
+	session.SetSafe(&mgo.Safe{WMode:"majority"})
 	session.SetSyncTimeout(4 * time.Second)
 
 	coll := session.DB("mydb").C("mycoll")
 	err = coll.Insert(M{"a": 1})
 	c.Assert(err, IsNil)
 
+	// give time for replication
+	time.Sleep(1 * time.Second)
+	
 	var result struct{ A int }
 	coll.Find(nil).One(&result)
 	c.Assert(result.A, Equals, 1)
@@ -1785,10 +1792,6 @@ func (s *S) TestPrimaryShutdownOnAuthShard(c *C) {
 	err = rs.Run("serverStatus", result)
 	c.Assert(err, Equals, io.EOF)
 
-	// This won't work because the master just died.
-	err = coll.Insert(bson.M{"n": 2})
-	c.Assert(err, NotNil)
-
 	// Refresh session and wait for re-election.
 	session.Refresh()
 	for i := 0; i < 60; i++ {
@@ -2067,16 +2070,24 @@ func (s *S) TestDoNotFallbackToMonotonic(c *C) {
 		c.Skip("command-counting logic depends on 3.0+")
 	}
 
-	session, err := mgo.Dial("localhost:40012")
+	session1, err := mgo.Dial("localhost:40011")
 	c.Assert(err, IsNil)
-	defer session.Close()
+	defer session1.Close()
+	err = session1.DB("mydb").C("mycoll").EnsureIndex(
+		mgo.Index{Key: []string{"x", "y"}},
+	)
+	c.Assert(err, IsNil)
+
+	session2, err := mgo.Dial("localhost:40012")
+	c.Assert(err, IsNil)
+	defer session2.Close()
 
 	for i := 0; i < 15; i++ {
 		q11a := s.countCommands(c, "localhost:40011", "listIndexes")
 		q12a := s.countCommands(c, "localhost:40012", "listIndexes")
 		q13a := s.countCommands(c, "localhost:40013", "listIndexes")
 
-		_, err := session.DB("local").C("system.indexes").Indexes()
+		_, err := session2.DB("mydb").C("mycoll").Indexes()
 		c.Assert(err, IsNil)
 
 		q11b := s.countCommands(c, "localhost:40011", "listIndexes")

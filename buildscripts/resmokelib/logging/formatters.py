@@ -1,22 +1,20 @@
-"""
-Custom formatters for the logging handlers.
-"""
+"""Custom formatters for the logging handlers."""
 
 from __future__ import absolute_import
 
 import logging
-import sys
 import time
 
 
 class ISO8601Formatter(logging.Formatter):
-    """
-    An ISO 8601 compliant formatter for log messages. It formats the
-    timezone as an hour/minute offset and uses a period as the
+    """An ISO 8601 compliant formatter for log messages.
+
+    It formats the timezone as an hour/minute offset and uses a period as the
     millisecond separator in order to match the log messages of MongoDB.
     """
 
     def formatTime(self, record, datefmt=None):
+        """Return formatted time."""
         converted_time = self.converter(record.created)
 
         if datefmt is not None:
@@ -28,10 +26,7 @@ class ISO8601Formatter(logging.Formatter):
 
     @staticmethod
     def _format_timezone_offset(converted_time):
-        """
-        Returns the timezone as an hour/minute offset in the form
-        "+HHMM" or "-HHMM".
-        """
+        """Return the timezone as an hour/minute offset in the form "+HHMM" or "-HHMM"."""
 
         # Windows treats %z in the format string as %Z, so we compute the hour/minute offset
         # manually.
@@ -42,7 +37,7 @@ class ISO8601Formatter(logging.Formatter):
 
         # The offset is positive if the local timezone is behind (east of) UTC, and negative if it
         # is ahead (west) of UTC.
-        utc_offset_prefix =  "-" if utc_offset_secs > 0 else "+"
+        utc_offset_prefix = "-" if utc_offset_secs > 0 else "+"
         utc_offset_secs = abs(utc_offset_secs)
 
         utc_offset_mins = (utc_offset_secs / 60) % 60

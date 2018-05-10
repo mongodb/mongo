@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/active_move_primaries_registry.h"
+#include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
@@ -40,6 +41,17 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * If the specified status is not OK logs a warning and throws a DBException corresponding to the
+ * specified status.
+ */
+void uassertStatusOKWithWarning(const Status& status) {
+    if (!status.isOK()) {
+        warning() << "movePrimary failed" << causedBy(redact(status));
+        uassertStatusOK(status);
+    }
+}
 
 class MovePrimaryCommand : public BasicCommand {
 public:
@@ -120,7 +132,7 @@ public:
         if (scopedMovePrimary.mustExecute()) {
             auto status = [&] {
                 try {
-                    // TODO: Implement _movePrimary
+                    _runImpl(opCtx, movePrimaryRequest, dbname);
                     return Status::OK();
                 } catch (const DBException& ex) {
                     return ex.toStatus();
@@ -133,6 +145,22 @@ public:
         }
 
         return true;
+    }
+
+private:
+    static void _runImpl(OperationContext* opCtx,
+                         const ShardMovePrimary movePrimaryRequest,
+                         const StringData dbname) {
+        ShardId fromShardId = ShardingState::get(opCtx)->getShardName();
+        ShardId toShardId = movePrimaryRequest.getTo().toString();
+
+        MovePrimarySourceManager movePrimarySourceManager(
+            opCtx, movePrimaryRequest, dbname, fromShardId, toShardId);
+
+        uassertStatusOKWithWarning(movePrimarySourceManager.clone(opCtx));
+        uassertStatusOKWithWarning(movePrimarySourceManager.enterCriticalSection(opCtx));
+        uassertStatusOKWithWarning(movePrimarySourceManager.commitOnConfig(opCtx));
+        uassertStatusOKWithWarning(movePrimarySourceManager.cleanStaleData(opCtx));
     }
 
 } movePrimaryCmd;

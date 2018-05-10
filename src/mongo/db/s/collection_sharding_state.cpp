@@ -37,10 +37,8 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -109,15 +107,16 @@ class CollectionShardingStateMap {
 public:
     CollectionShardingStateMap() = default;
 
-    CollectionShardingState& getOrCreate(OperationContext* opCtx, const std::string& ns) {
+    static const ServiceContext::Decoration<CollectionShardingStateMap> get;
+
+    CollectionShardingState& getOrCreate(const std::string& ns) {
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         auto it = _collections.find(ns);
         if (it == _collections.end()) {
-            auto inserted =
-                _collections.emplace(ns,
-                                     std::make_unique<CollectionShardingState>(
-                                         opCtx->getServiceContext(), NamespaceString(ns)));
+            auto inserted = _collections.emplace(
+                ns,
+                std::make_unique<CollectionShardingState>(get.owner(this), NamespaceString(ns)));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -125,14 +124,24 @@ public:
         return *it->second;
     }
 
-    void report(BSONObjBuilder* builder) {
+    void resetAll() {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+        for (auto it = _collections.begin(); it != _collections.end(); ++it) {
+            // This is a hack to get around CollectionShardingState::refreshMetadata() requiring
+            // the X lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary
+            // measure until SERVER-31595 removes the X lock requirement.
+            it->second->markNotShardedAtStepdown();
+        }
+    }
+
+    void report(OperationContext* opCtx, BSONObjBuilder* builder) {
         BSONObjBuilder versionB(builder->subobjStart("versions"));
 
         {
             stdx::lock_guard<stdx::mutex> lg(_mutex);
 
             for (auto& coll : _collections) {
-                ScopedCollectionMetadata metadata = coll.second->getMetadata();
+                ScopedCollectionMetadata metadata = coll.second->getMetadata(opCtx);
                 if (metadata) {
                     versionB.appendTimestamp(coll.first, metadata->getShardVersion().toLong());
                 } else {
@@ -152,7 +161,7 @@ private:
     CollectionsMap _collections;
 };
 
-const auto getCollectionShardingStateMap =
+const ServiceContext::Decoration<CollectionShardingStateMap> CollectionShardingStateMap::get =
     ServiceContext::declareDecoration<CollectionShardingStateMap>();
 
 }  // namespace
@@ -161,10 +170,6 @@ CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceSt
     : _nss(std::move(nss)),
       _metadataManager(std::make_shared<MetadataManager>(
           sc, _nss, getRangeDeleterExecutorHolder(sc).getOrCreateExecutor())) {}
-
-CollectionShardingState::~CollectionShardingState() {
-    invariant(!_sourceMgr);
-}
 
 CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
@@ -176,17 +181,25 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     // Collection lock must be held to have a reference to the collection's sharding state
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS));
 
-    auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
-    return &collectionsMap.getOrCreate(opCtx, ns);
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    return &collectionsMap.getOrCreate(ns);
+}
+
+void CollectionShardingState::resetAll(OperationContext* opCtx) {
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    collectionsMap.resetAll();
 }
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
-    auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
-    collectionsMap.report(builder);
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    collectionsMap.report(opCtx, builder);
 }
 
-ScopedCollectionMetadata CollectionShardingState::getMetadata() {
-    return _metadataManager->getActiveMetadata(_metadataManager);
+ScopedCollectionMetadata CollectionShardingState::getMetadata(OperationContext* opCtx) {
+    // TODO: SERVER-34276 - find an alternative to get the atClusterTime.
+    auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    return atClusterTime ? _metadataManager->createMetadataAt(opCtx, atClusterTime.get())
+                         : _metadataManager->getActiveMetadata(_metadataManager);
 }
 
 void CollectionShardingState::refreshMetadata(OperationContext* opCtx,
@@ -235,22 +248,6 @@ void CollectionShardingState::exitCriticalSection(OperationContext* opCtx) {
     _critSec.exitCriticalSection();
 }
 
-void CollectionShardingState::setMigrationSourceManager(OperationContext* opCtx,
-                                                        MigrationSourceManager* sourceMgr) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    invariant(sourceMgr);
-    invariant(!_sourceMgr);
-
-    _sourceMgr = sourceMgr;
-}
-
-void CollectionShardingState::clearMigrationSourceManager(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
-    invariant(_sourceMgr);
-
-    _sourceMgr = nullptr;
-}
-
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
     std::string errmsg;
     ChunkVersion received;
@@ -261,8 +258,8 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     }
 }
 
-bool CollectionShardingState::collectionIsSharded() {
-    auto metadata = getMetadata().getMetadata();
+bool CollectionShardingState::collectionIsSharded(OperationContext* opCtx) {
+    auto metadata = getMetadata(opCtx).getMetadata();
     if (metadata && (metadata->getCollVersion().isStrictlyEqualTo(ChunkVersion::UNSHARDED()))) {
         return false;
     }
@@ -327,54 +324,10 @@ boost::optional<ChunkRange> CollectionShardingState::getNextOrphanRange(BSONObj 
     return _metadataManager->getNextOrphanRange(from);
 }
 
-void CollectionShardingState::onInsertOp(OperationContext* opCtx,
-                                         const BSONObj& insertedDoc,
-                                         const repl::OpTime& opTime) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    checkShardVersionOrThrow(opCtx);
-
-    if (_sourceMgr) {
-        _sourceMgr->getCloner()->onInsertOp(opCtx, insertedDoc, opTime);
-    }
-}
-
-void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
-                                         const BSONObj& updatedDoc,
-                                         const repl::OpTime& opTime,
-                                         const repl::OpTime& prePostImageOpTime) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    checkShardVersionOrThrow(opCtx);
-
-    if (_sourceMgr) {
-        _sourceMgr->getCloner()->onUpdateOp(opCtx, updatedDoc, opTime, prePostImageOpTime);
-    }
-}
-
-auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState {
-    return {getMetadata().extractDocumentKey(doc).getOwned(),
-            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
-}
-
-void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
-                                         const DeleteState& deleteState,
-                                         const repl::OpTime& opTime,
-                                         const repl::OpTime& preImageOpTime) {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
-
-    checkShardVersionOrThrow(opCtx);
-
-    if (_sourceMgr && deleteState.isMigrating) {
-        _sourceMgr->getCloner()->onDeleteOp(opCtx, deleteState.documentKey, opTime, preImageOpTime);
-    }
-}
-
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
                                                    std::string* errmsg,
                                                    ChunkVersion* expectedShardVersion,
                                                    ChunkVersion* actualShardVersion) {
-    auto* const client = opCtx->getClient();
     auto& oss = OperationShardingState::get(opCtx);
 
     // If there is a version attached to the OperationContext, use it as the received version.
@@ -382,7 +335,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
     if (oss.hasShardVersion()) {
         *expectedShardVersion = oss.getShardVersion(_nss);
     } else {
-        ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
+        auto const info = ShardedConnectionInfo::get(opCtx->getClient(), false);
         if (!info) {
             // There is no shard version information on either 'opCtx' or 'client'. This means that
             // the operation represented by 'opCtx' is unversioned, and the shard version is always
@@ -407,7 +360,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
     }
 
     // Set this for error messaging purposes before potentially returning false.
-    auto metadata = getMetadata();
+    auto metadata = getMetadata(opCtx);
     *actualShardVersion = metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
 
     auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()

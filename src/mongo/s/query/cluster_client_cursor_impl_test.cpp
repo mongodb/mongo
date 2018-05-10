@@ -222,6 +222,47 @@ TEST_F(ClusterClientCursorImplTest, LogicalSessionIdsOnCursors) {
     ASSERT(*(cursor2.getLsid()) == lsid);
 }
 
+TEST_F(ClusterClientCursorImplTest, ShouldStoreLSIDIfSetOnOpCtx) {
+    {
+        // Make a cursor with no lsid or txnNumber.
+        ClusterClientCursorParams params(NamespaceString("test"), {});
+        params.lsid = _opCtx->getLogicalSessionId();
+        params.txnNumber = _opCtx->getTxnNumber();
+
+        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullptr, std::move(params));
+        ASSERT_FALSE(cursor->getLsid());
+        ASSERT_FALSE(cursor->getTxnNumber());
+    }
+
+    const auto lsid = makeLogicalSessionIdForTest();
+    _opCtx->setLogicalSessionId(lsid);
+
+    {
+        // Make a cursor with an lsid and no txnNumber.
+        ClusterClientCursorParams params(NamespaceString("test"), {});
+        params.lsid = _opCtx->getLogicalSessionId();
+        params.txnNumber = _opCtx->getTxnNumber();
+
+        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullptr, std::move(params));
+        ASSERT_EQ(*cursor->getLsid(), lsid);
+        ASSERT_FALSE(cursor->getTxnNumber());
+    }
+
+    const TxnNumber txnNumber = 5;
+    _opCtx->setTxnNumber(txnNumber);
+
+    {
+        // Make a cursor with an lsid and txnNumber.
+        ClusterClientCursorParams params(NamespaceString("test"), {});
+        params.lsid = _opCtx->getLogicalSessionId();
+        params.txnNumber = _opCtx->getTxnNumber();
+
+        auto cursor = ClusterClientCursorImpl::make(_opCtx.get(), nullptr, std::move(params));
+        ASSERT_EQ(*cursor->getLsid(), lsid);
+        ASSERT_EQ(*cursor->getTxnNumber(), txnNumber);
+    }
+}
+
 }  // namespace
 
 }  // namespace mongo

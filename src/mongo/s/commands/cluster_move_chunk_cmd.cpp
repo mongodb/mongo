@@ -87,7 +87,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -121,8 +121,7 @@ public:
                                           << toString
                                           << "' because that shard does not exist");
             log() << msg;
-            return CommandHelpers::appendCommandStatus(result,
-                                                       Status(ErrorCodes::ShardNotFound, msg));
+            uasserted(ErrorCodes::ShardNotFound, msg);
         }
 
         const auto to = toStatus.getValue();
@@ -143,7 +142,7 @@ public:
             return false;
         }
 
-        std::shared_ptr<Chunk> chunk;
+        boost::optional<Chunk> chunk;
 
         if (!find.isEmpty()) {
             // find
@@ -154,7 +153,7 @@ public:
                 return false;
             }
 
-            chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
+            chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(shardKey));
         } else {
             // bounds
             if (!cm->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
@@ -169,7 +168,7 @@ public:
             BSONObj minKey = cm->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
             BSONObj maxKey = cm->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
-            chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+            chunk.emplace(cm->findIntersectingChunkWithSimpleCollation(minKey));
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
                 errmsg = str::stream() << "no chunk found with the shard key bounds "
@@ -196,7 +195,7 @@ public:
                                                     cmdObj["_waitForDelete"].trueValue() ||
                                                         cmdObj["waitForDelete"].trueValue()));
 
-        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
+        Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(routingInfo));
 
         result.append("millis", t.millis());
         return true;

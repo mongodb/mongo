@@ -218,6 +218,10 @@ void AuthorizationSession::logoutDatabase(const std::string& dbname) {
     _buildAuthenticatedRolesVector();
 }
 
+bool AuthorizationSession::isAuthenticated() {
+    return _authenticatedUsers.begin() != _authenticatedUsers.end();
+}
+
 UserNameIterator AuthorizationSession::getAuthenticatedUserNames() {
     return _authenticatedUsers.getNames();
 }
@@ -300,7 +304,7 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& nss,
     }
 
     // We require at least one authenticated user when running aggregate with auth enabled.
-    if (!getAuthenticatedUserNames().more()) {
+    if (!isAuthenticated()) {
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
@@ -382,7 +386,7 @@ Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
                                                  bool hasTerm) {
     // Since users can only getMore their own cursors, we verify that a user either is authenticated
     // or does not need to be.
-    if (!_externalState->shouldIgnoreAuthChecks() && !getAuthenticatedUserNames().more()) {
+    if (!_externalState->shouldIgnoreAuthChecks() && !isAuthenticated()) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized for getMore on " << ns.db());
     }
@@ -974,7 +978,7 @@ bool AuthorizationSession::isCoauthorizedWith(UserNameIterator userNameIter) {
     if (!getAuthorizationManager().isAuthEnabled()) {
         return true;
     }
-    if (!userNameIter.more() && !getAuthenticatedUserNames().more()) {
+    if (!userNameIter.more() && !isAuthenticated()) {
         return true;
     }
 
@@ -1025,10 +1029,6 @@ auto mongo::checkCursorSessionPrivilege(OperationContext* const opCtx,
     }
     auto* const authSession = AuthorizationSession::get(opCtx->getClient());
 
-    auto nobodyIsLoggedIn = [authSession] {
-        return !authSession->getAuthenticatedUserNames().more();
-    };
-
     auto authHasImpersonatePrivilege = [authSession] {
         return authSession->isAuthorizedForPrivilege(
             Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate));
@@ -1057,8 +1057,9 @@ auto mongo::checkCursorSessionPrivilege(OperationContext* const opCtx,
                                                             // the Operation Context's session, then
                                                             // we should forbid the operation even
                                                             // when the cursor has no session.
-        !nobodyIsLoggedIn() &&          // Unless, for some reason a user isn't actually using this
-                                        // Operation Context (which implies a background job
+        authSession->isAuthenticated() &&  // Unless, for some reason a user isn't actually using
+                                           // this Operation Context (which implies a background
+                                           // job)
         !authHasImpersonatePrivilege()  // Or if the user has an impersonation privilege, in which
                                         // case, the user gets to sidestep certain checks.
         ) {

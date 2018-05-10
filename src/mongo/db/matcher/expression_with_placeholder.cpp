@@ -118,7 +118,7 @@ void ExpressionWithPlaceholder::optimizeFilter() {
     _filter = MatchExpression::optimize(std::move(_filter));
 
     auto newPlaceholder = parseTopLevelFieldName(_filter.get());
-    invariantOK(newPlaceholder.getStatus());
+    invariant(newPlaceholder.getStatus());
 
     if (newPlaceholder.getValue()) {
         _placeholder = newPlaceholder.getValue()->toString();

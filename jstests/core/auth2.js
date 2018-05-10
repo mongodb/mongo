@@ -1,4 +1,5 @@
 // just make sure logout doesn't break anything
+// @tags: [requires_auth]
 
 // SERVER-724
 db.runCommand({logout: 1});

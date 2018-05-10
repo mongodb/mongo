@@ -1345,7 +1345,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * globally visible, need to check the update state as well.
 		 */
 		if (F_ISSET(r, WT_REC_EVICT) &&
-		    (upd->state != WT_UPDATE_STATE_READY ||
+		    (upd->prepare_state == WT_PREPARE_LOCKED ||
+		    upd->prepare_state == WT_PREPARE_INPROGRESS ||
 		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    WT_TXNID_LE(r->last_running, txnid) :
 		    !__txn_visible_id(session, txnid)))) {
@@ -1631,10 +1632,12 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * it holds the transaction ID we care about.
 	 *
 	 * In some cases, there had better not be any updates we can't see.
+	 *
+	 * A visible update to be in READY state (i.e. not in LOCKED or
+	 * PREPARED state), for truly visible to others.
 	 */
 	if (F_ISSET(r, WT_REC_VISIBILITY_ERR) && page_del != NULL &&
-	    !__wt_txn_visible(session,
-	    page_del->txnid, WT_TIMESTAMP_NULL(&page_del->timestamp)))
+	    __wt_page_del_active(session, ref, false))
 		WT_PANIC_RET(session, EINVAL,
 		    "reconciliation illegally skipped an update");
 
@@ -1662,18 +1665,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * read into this part of the name space again, the cache read function
 	 * instantiates an entirely new page.)
 	 */
-	if (ref->addr != NULL &&
-	    (page_del == NULL || __wt_txn_visible_all(
-	    session, page_del->txnid, WT_TIMESTAMP_NULL(&page_del->timestamp))))
-		WT_RET(__wt_ref_block_free(session, ref));
-
-	/*
-	 * If the original page is gone, we can skip the slot on the internal
-	 * page.
-	 */
-	if (ref->addr == NULL) {
-		*statep = WT_CHILD_IGNORE;
-
+	if (ref->addr != NULL && !__wt_page_del_active(session, ref, true)) {
 		/*
 		 * Minor memory cleanup: if a truncate call deleted this page
 		 * and we were ever forced to instantiate the page in memory,
@@ -1686,6 +1678,15 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 			__wt_free(session, ref->page_del);
 		}
 
+		WT_RET(__wt_ref_block_free(session, ref));
+	}
+
+	/*
+	 * If the original page is gone, we can skip the slot on the internal
+	 * page.
+	 */
+	if (ref->addr == NULL) {
+		*statep = WT_CHILD_IGNORE;
 		return (0);
 	}
 
@@ -1709,10 +1710,11 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	 * page to reference it from the parent page.
 	 *
 	 * If the delete is not visible in this checkpoint, write the original
-	 * address normally.  Otherwise, we have to write a proxy record.
+	 * address normally. Otherwise, we have to write a proxy record.
+	 * If the delete state is not ready, then delete is not visible as it
+	 * is in prepared state.
 	 */
-	if (__wt_txn_visible(
-	    session, page_del->txnid, WT_TIMESTAMP_NULL(&page_del->timestamp)))
+	if (!__wt_page_del_active(session, ref, false))
 		*statep = WT_CHILD_PROXY;
 
 	return (0);
@@ -1785,12 +1787,12 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/*
 			 * If called during checkpoint, the child is being
 			 * considered by the eviction server or the child is a
-			 * fast-delete page being read.  The eviction may have
+			 * truncated page being read.  The eviction may have
 			 * started before the checkpoint and so we must wait
 			 * for the eviction to be resolved.  I suspect we could
-			 * handle fast-delete reads, but we can't distinguish
-			 * between the two and fast-delete reads aren't expected
-			 * to be common.
+			 * handle reads of truncated pages, but we can't
+			 * distinguish between the two and reads of truncated
+			 * pages aren't expected to be common.
 			 */
 			break;
 
@@ -1838,6 +1840,11 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 *
 			 * This call cannot return split/restart, we have a lock
 			 * on the parent which prevents a child page split.
+			 *
+			 * Set WT_READ_NO_WAIT because we're only interested in
+			 * the WT_REF's final state. Pages in transition might
+			 * change WT_REF state during our read, and then return
+			 * WT_NOTFOUND to us. In that case, loop and look again.
 			 */
 			ret = __wt_page_in(session, ref,
 			    WT_READ_CACHE | WT_READ_NO_EVICT |
@@ -5297,7 +5304,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BTREE *btree;
-	WT_CELL *cell, *val_cell;
+	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_ITEM(tmpkey);
@@ -5321,6 +5328,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 	key = &r->k;
 	val = &r->v;
+	vpack = &_vpack;
 
 	WT_RET(__rec_split_init(session, r, page, 0, btree->maxleafpage));
 
@@ -5370,13 +5378,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		}
 
 		/* Unpack the on-page value cell, and look for an update. */
-		if ((val_cell =
-		    __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
-			vpack = NULL;
-		else {
-			vpack = &_vpack;
-			__wt_cell_unpack(val_cell, vpack);
-		}
+		__wt_row_leaf_value_cell(page, rip, NULL, vpack);
 		WT_ERR(__rec_txn_read(
 		    session, r, NULL, rip, vpack, NULL, &upd));
 
@@ -5392,10 +5394,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * copy, we have to create a new value item as the old
 			 * item might have been discarded from the page.
 			 */
-			if (vpack == NULL) {
-				val->buf.data = NULL;
-				val->cell_len = val->len = val->buf.size = 0;
-			} else if (vpack->raw == WT_CELL_VALUE_COPY) {
+			if (vpack->raw == WT_CELL_VALUE_COPY) {
 				/* If the item is Huffman encoded, decode it. */
 				if (btree->huffman_value == NULL) {
 					p = vpack->data;
@@ -5457,7 +5456,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				    "ovfl-unused", strlen("ovfl-unused"),
 				    (uint64_t)0));
 			} else {
-				val->buf.data = val_cell;
+				val->buf.data = vpack->cell;
 				val->buf.size = __wt_cell_total_len(vpack);
 				val->cell_len = 0;
 				val->len = val->buf.size;
@@ -5471,8 +5470,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * The first time we find an overflow record we're not
 			 * going to use, discard the underlying blocks.
 			 */
-			if (vpack != NULL &&
-			    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)
+			if (vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)
 				WT_ERR(__wt_ovfl_remove(session,
 				    page, vpack, F_ISSET(r, WT_REC_EVICT)));
 
@@ -5632,8 +5630,7 @@ build:
 				if (key_onpage_ovfl) {
 					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, kpack, r->cur));
-					key_onpage_ovfl = false;
-					WT_NOT_READ(key_onpage_ovfl);
+					WT_NOT_READ(key_onpage_ovfl, false);
 				}
 
 				/*
@@ -6177,18 +6174,18 @@ __rec_las_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	WT_DECL_RET;
 	WT_MULTI *multi;
-	uint32_t btree_id, i;
-
-	btree_id = S2BT(session)->id;
+	uint64_t las_pageid;
+	uint32_t i;
 
 	/*
 	 * Note the additional check for a non-zero lookaside page ID, that
 	 * flags if lookaside table entries for this page have been written.
 	 */
 	for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-		if (multi->supd != NULL && multi->page_las.las_pageid != 0)
-			WT_TRET(__wt_las_remove_block(session,
-			    btree_id, multi->page_las.las_pageid));
+		if (multi->supd != NULL &&
+		    (las_pageid = multi->page_las.las_pageid) != 0)
+			WT_TRET(
+			    __wt_las_remove_block(session, las_pageid, true));
 
 	return (ret);
 }

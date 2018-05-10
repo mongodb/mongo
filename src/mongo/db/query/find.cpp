@@ -228,7 +228,7 @@ Message getMore(OperationContext* opCtx,
 
     // For testing, we may want to fail if we receive a getmore.
     if (MONGO_FAIL_POINT(failReceivedGetmore)) {
-        invariant(0);
+        MONGO_UNREACHABLE;
     }
 
     *exhaust = false;
@@ -527,19 +527,13 @@ std::string runQuery(OperationContext* opCtx,
 
     // Parse the qm into a CanonicalQuery.
     const boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto statusWithCQ =
+    auto cq = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
                                      q,
                                      expCtx,
                                      ExtensionsCallbackReal(opCtx, &nss),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kIsolated);
-    if (!statusWithCQ.isOK()) {
-        uasserted(17287,
-                  str::stream() << "Can't canonicalize query: "
-                                << statusWithCQ.getStatus().toString());
-    }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+                                     MatchExpressionParser::kAllowAllSpecialFeatures),
+        "Can't canonicalize query");
     invariant(cq.get());
 
     LOG(5) << "Running query:\n" << redact(cq->toString());

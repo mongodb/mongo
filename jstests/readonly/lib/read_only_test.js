@@ -52,7 +52,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     };
 
     ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-        // TODO: SERVER-33444 remove shardAsReplicaSet: false
+        // TODO: SERVER-33830 remove shardAsReplicaSet: false
         this.shardingTest = new ShardingTest({
             nopreallocj: true,
             mongos: 1,

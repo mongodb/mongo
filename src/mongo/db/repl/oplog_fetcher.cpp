@@ -367,10 +367,9 @@ BSONObj OplogFetcher::_makeFindCommandObject(const NamespaceString& nss,
         cmdBob.append("term", term);
     }
 
-    // TODO(SERVER-30977): Remove the term comparison when this ticket is fixed.
-    if (term == lastOpTimeFetched.getTerm()) {
-        cmdBob.append("readConcern", BSON("afterClusterTime" << lastOpTimeFetched.getTimestamp()));
-    }
+    // This ensures that the sync source never returns an empty batch of documents for the first set
+    // of results.
+    cmdBob.append("readConcern", BSON("afterClusterTime" << lastOpTimeFetched.getTimestamp()));
 
     return cmdBob.obj();
 }

@@ -32,15 +32,14 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-structs:
-    ConfigsvrCreateCollection:
+commands:
+    _configsvrCreateCollection:
+        cpp_name: ConfigsvrCreateCollection
         description: "The internal createCollection command on the config server"
         strict: false
+        namespace: type
+        type: namespacestring
         fields:
-            _configsvrCreateCollection:
-                cpp_name: ns
-                type: namespacestring
-                description: "The namespace of the collection to be created."
             options:
                 type: object
                 optional: true

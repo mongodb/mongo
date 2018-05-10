@@ -7,6 +7,11 @@
  * 3.) Repair "repairdb", expect an input validation error.
  * 4.) Repair "nonExistantDb", expect an OK.
  * 5.) Using "listDatabases" verify only "repairDB" exists.
+ *
+ * @tags: [
+ *  # repairDatabase command is not available on embedded
+ *  incompatible_with_embedded,
+ * ]
  */
 
 (function() {

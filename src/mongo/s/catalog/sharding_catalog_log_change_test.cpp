@@ -109,7 +109,7 @@ protected:
         });
 
         BSONObjBuilder createResponseBuilder;
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             createResponseBuilder, Status(ErrorCodes::NamespaceExists, "coll already exists"));
         expectConfigCollectionCreate(
             configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());
@@ -146,7 +146,7 @@ protected:
         });
 
         BSONObjBuilder createResponseBuilder;
-        CommandHelpers::appendCommandStatus(
+        CommandHelpers::appendCommandStatusNoThrow(
             createResponseBuilder, Status(ErrorCodes::ExceededTimeLimit, "operation timed out"));
         expectConfigCollectionCreate(
             configHost, getConfigCollName(), _cappedSize, createResponseBuilder.obj());

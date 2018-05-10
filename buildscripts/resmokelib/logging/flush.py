@@ -1,6 +1,6 @@
-"""
-Manages a thread responsible for periodically calling flush() on
-logging.Handler instances used to send logs to buildlogger.
+"""Manage a thread responsible for periodically calling flush() on logging.Handler instances.
+
+These instances are used to send logs to buildlogger.
 """
 
 from __future__ import absolute_import
@@ -11,17 +11,14 @@ import time
 
 from ..utils import scheduler
 
-
 _FLUSH_THREAD_LOCK = threading.Lock()
 _FLUSH_THREAD = None
 
 
 def start_thread():
-    """
-    Starts the flush thread.
-    """
+    """Start the flush thread."""
 
-    global _FLUSH_THREAD
+    global _FLUSH_THREAD  # pylint: disable=global-statement
     with _FLUSH_THREAD_LOCK:
         if _FLUSH_THREAD is not None:
             raise ValueError("FlushThread has already been started")
@@ -31,9 +28,7 @@ def start_thread():
 
 
 def stop_thread():
-    """
-    Signals the flush thread to stop and waits until it does.
-    """
+    """Signal the flush thread to stop and wait until it does."""
 
     with _FLUSH_THREAD_LOCK:
         if _FLUSH_THREAD is None:
@@ -45,12 +40,9 @@ def stop_thread():
 
 
 def flush_after(handler, delay):
-    """
-    Adds 'handler' to the queue so that it is flushed after 'delay'
-    seconds by the flush thread.
+    """Add 'handler' to the queue so that it is flushed after 'delay' seconds by the flush thread.
 
-    Returns the scheduled event which may be used for later cancellation
-    (see cancel()).
+    Return the scheduled event which may be used for later cancellation (see cancel()).
     """
 
     if not isinstance(handler, logging.Handler):
@@ -60,12 +52,9 @@ def flush_after(handler, delay):
 
 
 def close_later(handler):
-    """
-    Adds 'handler' to the queue so that it is closed later by the flush
-    thread.
+    """Add 'handler' to the queue so that it is closed later by the flush thread.
 
-    Returns the scheduled event which may be used for later cancelation
-    (see cancel()).
+    Return the scheduled event which may be used for later cancelation (see cancel()).
     """
 
     if not isinstance(handler, logging.Handler):
@@ -79,36 +68,27 @@ def close_later(handler):
 
 
 def cancel(event):
-    """
-    Attempts to cancel the specified event.
+    """Attempt to cancel the specified event.
 
-    Returns true if the event was successfully canceled, and returns
-    false otherwise.
+    Returns true if the event was successfully canceled, and returns false otherwise.
     """
     return _FLUSH_THREAD.cancel_event(event)
 
 
 class _FlushThread(threading.Thread):
-    """
-    Asynchronously flushes and closes logging handlers.
-    """
+    """Asynchronously flush and close logging handlers."""
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
     def __init__(self):
-        """
-        Initializes the flush thread.
-        """
+        """Initialize the flush thread."""
 
         threading.Thread.__init__(self, name="FlushThread")
         # Do not wait to flush the logs if interrupted by the user.
         self.daemon = True
 
         def interruptible_sleep(secs):
-            """
-            Waits up to 'secs' seconds or for the
-            'self.__schedule_updated' event to be set.
-            """
+            """Wait up to 'secs' seconds or for the 'self.__schedule_updated' event to be set."""
 
             # Setting 'self.__schedule_updated' in submit() will cause the scheduler to return early
             # from its 'delayfunc'. This makes it so that if a new event is scheduled with
@@ -122,9 +102,7 @@ class _FlushThread(threading.Thread):
         self.__terminated = threading.Event()
 
     def run(self):
-        """
-        Continuously flushes and closes logging handlers.
-        """
+        """Continuously flush and close logging handlers."""
 
         try:
             while not (self.__should_stop.is_set() and self.__scheduler.empty()):
@@ -147,9 +125,9 @@ class _FlushThread(threading.Thread):
             self.__terminated.set()
 
     def signal_shutdown(self):
-        """
-        Indicates to the flush thread that it should exit once its
-        current queue of logging handlers are flushed and closed.
+        """Indicate to the flush thread that it should exit.
+
+        This will happen once its current queue of logging handlers are flushed and closed.
         """
 
         self.__should_stop.set()
@@ -159,21 +137,16 @@ class _FlushThread(threading.Thread):
         self.__schedule_updated.set()
 
     def await_shutdown(self):
-        """
-        Waits for the flush thread to finish processing its current
-        queue of logging handlers.
-        """
+        """Wait for the flush thread to finish processing its current queue of logging handlers."""
 
         while not self.__terminated.is_set():
             # Need to pass a timeout to wait() so that KeyboardInterrupt exceptions are propagated.
             self.__terminated.wait(_FlushThread._TIMEOUT)
 
     def submit(self, action, delay):
-        """
-        Schedules 'action' for 'delay' seconds from now.
+        """Schedule 'action' for 'delay' seconds from now.
 
-        Returns the scheduled event which may be used for later
-        cancelation (see cancel_event()).
+        Return the scheduled event which may be used for later cancelation (see cancel_event()).
         """
 
         event = self.__scheduler.enter(delay, 0, action, ())
@@ -181,11 +154,9 @@ class _FlushThread(threading.Thread):
         return event
 
     def cancel_event(self, event):
-        """
-        Attempts to cancel the specified event.
+        """Attempt to cancel the specified event.
 
-        Returns true if the event was successfully canceled, and returns
-        false otherwise.
+        Return true if the event was successfully canceled, and returns false otherwise.
         """
 
         try:

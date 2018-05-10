@@ -29,18 +29,19 @@
 #include <bson.h>
 #include <mongoc.h>
 
-#include "mongo/client/embedded/libmongodbcapi.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
-struct mongoc_stream_embedded_t;
 
-/* Creates a client with the correct stream intiator set
+struct libmongodbcapi_instance;
+
+/**
+ * Creates a client with the correct stream intiator set
  * @param db must be a valid db handle created by libmongodbcapi
- * @return a mongoc client or null on error
+ * @returns a mongoc client or `NULL` on error
  */
-mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_db* db);
+mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_instance* db);
 
 #ifdef __cplusplus
-}
+}  // extern "C"
 #endif

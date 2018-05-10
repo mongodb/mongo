@@ -1,6 +1,4 @@
-"""
-Helper functions.
-"""
+"""Helper functions."""
 
 from __future__ import absolute_import
 from __future__ import print_function
@@ -16,9 +14,7 @@ from . import archival
 
 @contextlib.contextmanager
 def open_or_use_stdout(filename):
-    """
-    Opens the specified file for writing, or returns sys.stdout if filename is "-".
-    """
+    """Open the specified file for writing, or returns sys.stdout if filename is "-"."""
 
     if filename == "-":
         yield sys.stdout
@@ -38,42 +34,32 @@ def open_or_use_stdout(filename):
 
 
 def default_if_none(value, default):
+    """Set default if value is 'None'."""
     return value if value is not None else default
 
 
 def is_string_list(lst):
-    """
-    Returns true if 'lst' is a list of strings, and false otherwise.
-    """
+    """Return true if 'lst' is a list of strings, and false otherwise."""
     return isinstance(lst, list) and all(isinstance(x, basestring) for x in lst)
 
 
 def is_string_set(value):
-    """
-    Returns true if 'value' is a set of strings, and false otherwise.
-    """
+    """Return true if 'value' is a set of strings, and false otherwise."""
     return isinstance(value, set) and all(isinstance(x, basestring) for x in value)
 
 
 def is_js_file(filename):
-    """
-    Returns true if 'filename' ends in .js, and false otherwise.
-    """
+    """Return true if 'filename' ends in .js, and false otherwise."""
     return os.path.splitext(filename)[1] == ".js"
 
 
 def is_yaml_file(filename):
-    """
-    Returns true if 'filename' ends in .yml or .yaml, and false
-    otherwise.
-    """
+    """Return true if 'filename' ends in .yml or .yaml, and false otherwise."""
     return os.path.splitext(filename)[1] in (".yaml", ".yml")
 
 
 def load_yaml_file(filename):
-    """
-    Attempts to read 'filename' as YAML.
-    """
+    """Attempt to read 'filename' as YAML."""
     try:
         with open(filename, "r") as fp:
             return yaml.safe_load(fp)
@@ -82,17 +68,13 @@ def load_yaml_file(filename):
 
 
 def dump_yaml(value):
-    """
-    Returns 'value' formatted as YAML.
-    """
+    """Return 'value' formatted as YAML."""
     # Use block (indented) style for formatting YAML.
     return yaml.safe_dump(value, default_flow_style=False).rstrip()
 
 
 def load_yaml(value):
-    """
-    Attempts to parse 'value' as YAML.
-    """
+    """Attempt to parse 'value' as YAML."""
     try:
         return yaml.safe_load(value)
     except yaml.YAMLError as err:

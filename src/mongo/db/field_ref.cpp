@@ -38,17 +38,15 @@ const size_t FieldRef::kReserveAhead;
 
 FieldRef::FieldRef() : _size(0), _cachedSize(0) {}
 
-FieldRef::FieldRef(StringData path) : _size(0) {
+FieldRef::FieldRef(StringData path) {
     parse(path);
 }
 
 void FieldRef::parse(StringData path) {
+    clear();
+
     if (path.size() == 0) {
         return;
-    }
-
-    if (_size != 0) {
-        clear();
     }
 
     // We guarantee that accesses through getPart() will be valid while 'this' is. So we

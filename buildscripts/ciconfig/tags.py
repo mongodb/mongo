@@ -14,7 +14,9 @@ import yaml
 def _represent_dict_order(self, data):
     return self.represent_mapping("tag:yaml.org,2002:map", data.items())
 
+
 yaml.add_representer(collections.OrderedDict, _represent_dict_order)
+
 # End setup
 
 
@@ -108,11 +110,8 @@ class TagsConfig(object):
         """
         with open(filename, "w") as fstream:
             if preamble:
-                print(textwrap.fill(preamble,
-                                    width=100,
-                                    initial_indent="# ",
-                                    subsequent_indent="# "),
-                      file=fstream)
+                print(textwrap.fill(preamble, width=100, initial_indent="# ",
+                                    subsequent_indent="# "), file=fstream)
 
             # We use yaml.safe_dump() in order avoid having strings being written to the file as
             # "!!python/unicode ..." and instead have them written as plain 'str' instances.
@@ -120,22 +119,23 @@ class TagsConfig(object):
 
 
 def getdefault(doc, key, default):
-    """Return the value in 'doc' with key 'key' if it is present and not None, returns
-    the specified default value otherwise."""
+    """Return the value in 'doc' with key 'key' if present and not None.
+
+    Return the specified default value otherwise.
+    """
     value = doc.get(key)
     if value is not None:
         return value
-    else:
-        return default
+    return default
 
 
 def setdefault(doc, key, default):
-    """Return the value in 'doc' with key 'key' if it is present and not None, sets the value
-    to default and return it otherwise."""
+    """Return the value in 'doc' with key 'key' if present and not None.
+
+    Otherwise set the value to default and return it.
+    """
     value = doc.setdefault(key, default)
     if value is not None:
         return value
-    else:
-        doc[key] = default
-        return default
-
+    doc[key] = default
+    return default

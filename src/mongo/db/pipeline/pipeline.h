@@ -39,6 +39,8 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
@@ -163,14 +165,6 @@ public:
     std::unique_ptr<Pipeline, PipelineDeleter> splitForSharded();
 
     /**
-     * Reassemble a split shard pipeline into its original form. Upon return, this pipeline will
-     * contain the original source list. Must be called on the shards part of a split pipeline
-     * returned by a call to splitForSharded(). It is an error to call this on the merge part of the
-     * pipeline, or on a pipeline that has not been split.
-     */
-    void unsplitFromSharded(std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMergingShard);
-
-    /**
      * Returns true if this pipeline has not been split.
      */
     bool isUnsplit() const {
@@ -268,13 +262,34 @@ public:
     }
 
     /**
+     * Removes and returns the first stage of the pipeline. Returns nullptr if the pipeline is
+     * empty.
+     */
+    boost::intrusive_ptr<DocumentSource> popFront();
+
+    /**
+     * Removes and returns the last stage of the pipeline. Returns nullptr if the pipeline is empty.
+     */
+    boost::intrusive_ptr<DocumentSource> popBack();
+
+    /**
+     * Adds the given stage to the end of the pipeline.
+     */
+    void pushBack(boost::intrusive_ptr<DocumentSource>);
+
+    /**
+     * Removes and returns the first stage of the pipeline if its name is 'targetStageName'.
+     * Returns nullptr if there is no first stage with that name.
+     */
+    boost::intrusive_ptr<DocumentSource> popFrontWithName(StringData targetStageName);
+
+    /**
      * Removes and returns the first stage of the pipeline if its name is 'targetStageName' and the
      * given 'predicate' function, if present, returns 'true' when called with a pointer to the
      * stage. Returns nullptr if there is no first stage which meets these criteria.
      */
-    boost::intrusive_ptr<DocumentSource> popFrontWithCriteria(
-        StringData targetStageName,
-        stdx::function<bool(const DocumentSource* const)> predicate = nullptr);
+    boost::intrusive_ptr<DocumentSource> popFrontWithNameAndCriteria(
+        StringData targetStageName, stdx::function<bool(const DocumentSource* const)> predicate);
 
     /**
      * PipelineD is a "sister" class that has additional functionality for the Pipeline. It exists
@@ -286,15 +301,6 @@ public:
     friend class PipelineD;
 
 private:
-    class Optimizations {
-    public:
-        // This contains static functions that optimize pipelines in various ways.
-        // This is a class rather than a namespace so that it can be a friend of Pipeline.
-        // It is defined in pipeline_optimizations.h.
-        class Sharded;
-    };
-
-    friend class Optimizations::Sharded;
     friend class PipelineDeleter;
 
     /**
@@ -369,12 +375,6 @@ private:
     Status _pipelineCanRunOnMongoS() const;
 
     SourceContainer _sources;
-
-    // When a pipeline is split via splitForSharded(), the resulting shards pipeline will set
-    // '_unsplitSources' to be the original list of DocumentSources representing the full pipeline.
-    // This is to allow the split pipelines to be subsequently reassembled into the original
-    // pipeline, if necessary.
-    boost::optional<SourceContainer> _unsplitSources;
 
     SplitState _splitState = SplitState::kUnsplit;
     boost::intrusive_ptr<ExpressionContext> pCtx;

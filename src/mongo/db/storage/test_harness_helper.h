@@ -51,7 +51,8 @@ public:
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
         auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(newRecoveryUnit().release(), OperationContext::kNotInUnitOfWork);
+        opCtx->setRecoveryUnit(newRecoveryUnit().release(),
+                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
 

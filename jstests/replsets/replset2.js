@@ -28,7 +28,7 @@ doTest = function(signal) {
     // Wait for states to become PRI,SEC,SEC
     waitForAllMembers(master.getDB(testDB));
 
-    var slaves = replTest.liveNodes.slaves;
+    var slaves = replTest._slaves;
     slaves.forEach(function(slave) {
         slave.setSlaveOk();
     });

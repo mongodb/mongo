@@ -1,8 +1,8 @@
 #!/bin/sh
 
-if [ "$#" != "2" ]; then
+if [ "$#" -lt "4" ]; then
     echo "usage:"
-    echo "$0 <android-sdk-path> <test>"
+    echo "$0 <android-sdk-path> <sysarch> <directory> <test-path-in-directory>"
     exit 1
 fi
 
@@ -10,8 +10,13 @@ set -o verbose
 set -o errexit
 
 ANDROID_SDK=$1
-TEST_PATH=$2
-TEST_FILE=`basename $TEST_PATH`
+shift
+ANDROID_SYSTEM_IMAGE_ARCH=$1
+shift
+DIRECTORY=$1
+shift
+TEST_PATH_IN_DIRECTORY=$1
+shift
 
 EMULATOR_PID=''
 cleanup() {
@@ -23,7 +28,7 @@ cleanup() {
 trap cleanup EXIT
 
 # create a virtual device
-echo no | $ANDROID_SDK/tools/bin/avdmanager create avd --force -k 'system-images;android-24;google_apis;arm64-v8a' --name android_avd --abi google_apis/arm64-v8a -p android_avd
+echo no | $ANDROID_SDK/tools/bin/avdmanager create avd --force -k "system-images;android-24;google_apis;$ANDROID_SYSTEM_IMAGE_ARCH" --name android_avd --abi google_apis/$ANDROID_SYSTEM_IMAGE_ARCH -p android_avd
 
 # start the device on the emulator
 $ANDROID_SDK/emulator/emulator @android_avd -no-window -no-audio &
@@ -36,7 +41,7 @@ $ANDROID_SDK/platform-tools/adb wait-for-device
 $ANDROID_SDK/platform-tools/adb root
 
 #move the test to the device
-$ANDROID_SDK/platform-tools/adb push $TEST_PATH /data
+$ANDROID_SDK/platform-tools/adb push $DIRECTORY /data
 
 #run the device
-$ANDROID_SDK/platform-tools/adb shell /data/$TEST_FILE --tempPath /data
+$ANDROID_SDK/platform-tools/adb shell /data/$(basename $DIRECTORY)/$TEST_PATH_IN_DIRECTORY "$@"

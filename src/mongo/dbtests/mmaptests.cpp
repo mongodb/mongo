@@ -193,7 +193,7 @@ class All : public Suite {
 public:
     All() : Suite("mmap") {}
     void setupTests() {
-        if (!getGlobalServiceContext()->getGlobalStorageEngine()->isMmapV1())
+        if (!getGlobalServiceContext()->getStorageEngine()->isMmapV1())
             return;
 
         add<LeakTest>();

@@ -3,7 +3,10 @@
     "use strict";
 
     load("jstests/replsets/rslib.js");           // For startSetIfSupportsReadMajority.
+    load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+    load("jstests/libs/namespace_utils.js");     // For getCollectionNameFromFullNamespace.
     load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
+
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
     // Skip this test if running with --nojournal and WiredTiger.
@@ -22,46 +25,11 @@
 
     rst.initiate();
 
-    const oplogProjection = {$project: {"_id.clusterTime": 0}};
     const name = "change_stream_require_majority_read_concern";
     const db = rst.getPrimary().getDB(name);
 
-    function getCollectionNameFromFullNamespace(ns) {
-        return ns.split(/\.(.+)/)[1];
-    }
-
-    // Helpers for testing that pipeline returns correct set of results.  Run startWatchingChanges
-    // with the pipeline, then insert the changes, then run assertNextBatchMatches with the result
-    // of startWatchingChanges and the expected set of results.
-    function startWatchingChanges({pipeline, collection, includeTs, aggregateOptions}) {
-        aggregateOptions = aggregateOptions || {cursor: {}};
-
-        if (!includeTs) {
-            // Strip the oplog fields we aren't testing.
-            pipeline.push(oplogProjection);
-        }
-
-        let res = assert.commandWorked(db.runCommand(
-            Object.merge({aggregate: collection.getName(), pipeline: pipeline}, aggregateOptions)));
-        assert.neq(res.cursor.id, 0);
-        return res.cursor;
-    }
-
-    // Gets one document from the cursor using getMore with awaitData disabled. Asserts if no
-    // document is present.
-    function getOneDoc(cursor) {
-        assert.commandWorked(db.adminCommand(
-            {configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "alwaysOn"}));
-        let res = assert.commandWorked(db.runCommand({
-            getMore: cursor.id,
-            collection: getCollectionNameFromFullNamespace(cursor.ns),
-            batchSize: 1
-        }));
-        assert.eq(res.cursor.nextBatch.length, 1);
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: "disableAwaitDataForGetMoreCmd", mode: "off"}));
-        return res.cursor.nextBatch[0];
-    }
+    // Use ChangeStreamTest to verify that the pipeline returns expected results.
+    const cst = new ChangeStreamTest(db);
 
     // Attempts to get a document from the cursor with awaitData disabled, and asserts if a
     // document is present.
@@ -108,7 +76,8 @@
     // Test not specifying readConcern defaults to "majority" read concern.
     stopReplicationOnSecondaries(rst);
     // Verify that the document just inserted cannot be returned.
-    let cursor = startWatchingChanges({pipeline: [{$changeStream: {}}], collection: primaryColl});
+    let cursor =
+        cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: primaryColl});
     assert.eq(cursor.firstBatch.length, 0);
 
     // Insert a document on the primary only.
@@ -120,7 +89,7 @@
     rst.awaitLastOpCommitted();
 
     // Verify that the expected doc is returned because it has been committed.
-    let doc = getOneDoc(cursor);
+    let doc = cst.getOneChange(cursor);
     assert.docEq(doc.operationType, "insert");
     assert.docEq(doc.fullDocument, {_id: 2});
     rst.stopSet();

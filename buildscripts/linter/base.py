@@ -11,16 +11,18 @@ class LinterBase(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, cmd_name, required_version):
-        # type: (str, str) -> None
+    def __init__(self, cmd_name, required_version, cmd_location=None):
+        # type: (str, str, Optional[str]) -> None
         """
         Create a linter.
 
         cmd_name - short friendly name
         required_version - the required version string to check against
+        cmd_location - location of executable
         """
         self.cmd_name = cmd_name
         self.required_version = required_version
+        self.cmd_location = cmd_location
 
     @abstractmethod
     def get_lint_cmd_args(self, file_name):

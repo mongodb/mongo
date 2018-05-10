@@ -82,6 +82,7 @@ const Seconds kDefaultFindHostMaxWaitTime(20);
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
+const char kWriteConcernField[] = "writeConcern";
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObjBuilder countBuilder;
@@ -186,22 +187,21 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         BSON(ShardType::name() << primaryShardName << ShardType::draining(true))));
 
     const bool primaryDraining = (drainingCount > 0);
-    auto getPrimaryOrFirstNonDrainingShard =
-        [&opCtx, primaryShardId, &shardIds, primaryDraining]() {
-            if (primaryDraining) {
-                vector<ShardId> allShardIds;
-                Grid::get(opCtx)->shardRegistry()->getAllShardIds(&allShardIds);
+    auto getPrimaryOrFirstNonDrainingShard = [&opCtx, primaryShardId, primaryDraining]() {
+        if (primaryDraining) {
+            vector<ShardId> allShardIds;
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
 
-                auto dbShardId = allShardIds[0];
-                if (allShardIds[0] == primaryShardId && allShardIds.size() > 1) {
-                    dbShardId = allShardIds[1];
-                }
-
-                return dbShardId;
-            } else {
-                return primaryShardId;
+            auto dbShardId = allShardIds[0];
+            if (allShardIds[0] == primaryShardId && allShardIds.size() > 1) {
+                dbShardId = allShardIds[1];
             }
-        };
+
+            return dbShardId;
+        } else {
+            return primaryShardId;
+        }
+    };
 
     if (initPoints.empty()) {
         // If no split points were specified use the shard's data distribution to determine them
@@ -237,7 +237,7 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         // If docs already exist for the collection, must use primary shard,
         // otherwise defer to passed-in distribution option.
         if (numObjects == 0 && distributeInitialChunks) {
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
             if (primaryDraining && shardIds.size() > 1) {
                 shardIds.erase(std::remove(shardIds.begin(), shardIds.end(), primaryShardId),
                                shardIds.end());
@@ -258,7 +258,7 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         }
 
         if (distributeInitialChunks) {
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
             if (primaryDraining) {
                 shardIds.erase(std::remove(shardIds.begin(), shardIds.end(), primaryShardId),
                                shardIds.end());
@@ -293,10 +293,12 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         chunk.setMax(max);
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
-        // TODO SERVER-33781 write history only when FCV4.0 config.
-        std::vector<ChunkHistory> initialHistory;
-        initialHistory.emplace_back(ChunkHistory(validAfter, shardIds[i % shardIds.size()]));
-        chunk.setHistory(std::move(initialHistory));
+        if (serverGlobalParams.featureCompatibility.getVersion() >=
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+            std::vector<ChunkHistory> initialHistory;
+            initialHistory.emplace_back(ChunkHistory(validAfter, shardIds[i % shardIds.size()]));
+            chunk.setHistory(std::move(initialHistory));
+        }
 
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,
@@ -653,11 +655,12 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
     BSONObjBuilder createCmdBuilder;
     createCmdBuilder.append("create", ns.coll());
     collOptions.appendBSON(&createCmdBuilder);
+    createCmdBuilder.append(kWriteConcernField, opCtx->getWriteConcern().toBSON());
     auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         ns.db().toString(),
-        CommandHelpers::appendMajorityWriteConcern(createCmdBuilder.obj()),
+        createCmdBuilder.obj(),
         Shard::RetryPolicy::kIdempotent);
 
     auto createStatus = Shard::CommandResponse::getEffectiveStatus(swResponse);

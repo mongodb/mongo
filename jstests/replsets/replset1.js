@@ -32,13 +32,6 @@ var doTest = function(signal) {
     // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
     assert.gt(master.getDB("local").oplog.rs.count({op: 'n', o: {msg: 'new primary'}}), 0);
 
-    // Calling getPrimary also makes available the liveNodes structure,
-    // which looks like this:
-    // liveNodes = {master: masterNode,
-    //              slaves: [slave1, slave2]
-    //             }
-    printjson(replTest.liveNodes);
-
     // Here's how you save something to master
     master.getDB("foo").foo.save({a: 1000});
 
@@ -102,7 +95,7 @@ var doTest = function(signal) {
     replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
 
-    var slaves = replTest.liveNodes.slaves;
+    var slaves = replTest._slaves;
     assert(slaves.length == 2, "Expected 2 slaves but length was " + slaves.length);
     slaves.forEach(function(slave) {
         slave.setSlaveOk();
@@ -113,8 +106,7 @@ var doTest = function(signal) {
 
     // last error
     master = replTest.getPrimary();
-    slaves = replTest.liveNodes.slaves;
-    printjson(replTest.liveNodes);
+    slaves = replTest._slaves;
 
     var db = master.getDB("foo");
     var t = db.foo;

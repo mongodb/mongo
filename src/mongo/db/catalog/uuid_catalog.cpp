@@ -86,14 +86,13 @@ repl::OpTime UUIDCatalogObserver::onRenameCollection(OperationContext* opCtx,
                                                      const NamespaceString& fromCollection,
                                                      const NamespaceString& toCollection,
                                                      OptionalCollectionUUID uuid,
-                                                     bool dropTarget,
                                                      OptionalCollectionUUID dropTargetUUID,
                                                      bool stayTemp) {
 
     if (!uuid)
         return {};
     auto getNewCollection = [opCtx, toCollection] {
-        auto db = dbHolder().get(opCtx, toCollection.db());
+        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, toCollection.db());
         auto newColl = db->getCollection(opCtx, toCollection);
         invariant(newColl);
         return newColl;
@@ -128,7 +127,7 @@ void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
                                      GetNewCollectionFunction getNewCollection,
                                      CollectionUUID uuid) {
     Collection* oldColl = removeUUIDCatalogEntry(uuid);
-    opCtx->recoveryUnit()->onCommit([this, getNewCollection, uuid] {
+    opCtx->recoveryUnit()->onCommit([this, getNewCollection, uuid](boost::optional<Timestamp>) {
         // Reset current UUID entry in case some other operation updates the UUID catalog before the
         // WUOW is committed. registerUUIDCatalogEntry() is a no-op if there's an existing UUID
         // entry.
@@ -156,6 +155,20 @@ void UUIDCatalog::onCloseDatabase(Database* db) {
     }
 }
 
+void UUIDCatalog::onCloseCatalog() {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    invariant(!_shadowCatalog);
+    _shadowCatalog.emplace();
+    for (auto entry : _catalog)
+        _shadowCatalog->insert({entry.first, entry.second->ns()});
+}
+
+void UUIDCatalog::onOpenCatalog() {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    invariant(_shadowCatalog);
+    _shadowCatalog.reset();
+}
+
 Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
@@ -165,8 +178,18 @@ Collection* UUIDCatalog::lookupCollectionByUUID(CollectionUUID uuid) const {
 NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
-    Collection* coll = foundIt == _catalog.end() ? nullptr : foundIt->second;
-    return foundIt == _catalog.end() ? NamespaceString() : coll->ns();
+    if (foundIt != _catalog.end())
+        return foundIt->second->ns();
+
+    // Only in the case that the catalog is closed and a UUID is currently unknown, resolve it
+    // using the pre-close state. This ensures that any tasks reloading the catalog can see their
+    // own updates.
+    if (_shadowCatalog) {
+        auto shadowIt = _shadowCatalog->find(uuid);
+        if (shadowIt != _shadowCatalog->end())
+            return shadowIt->second;
+    }
+    return NamespaceString();
 }
 
 void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {

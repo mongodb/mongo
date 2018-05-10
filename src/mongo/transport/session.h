@@ -32,11 +32,11 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -44,6 +44,8 @@ namespace transport {
 
 class TransportLayer;
 class Session;
+class Baton;
+using BatonHandle = std::shared_ptr<Baton>;
 
 using SessionHandle = std::shared_ptr<Session>;
 using ConstSessionHandle = std::shared_ptr<const Session>;
@@ -103,7 +105,7 @@ public:
      * Source (receive) a new Message from the remote host for this Session.
      */
     virtual StatusWith<Message> sourceMessage() = 0;
-    virtual Future<Message> asyncSourceMessage() = 0;
+    virtual Future<Message> asyncSourceMessage(const transport::BatonHandle& handle = nullptr) = 0;
 
     /**
      * Sink (send) a Message to the remote host for this Session.
@@ -111,7 +113,15 @@ public:
      * Async version will keep the buffer alive until the operation completes.
      */
     virtual Status sinkMessage(Message message) = 0;
-    virtual Future<void> asyncSinkMessage(Message message) = 0;
+    virtual Future<void> asyncSinkMessage(Message message,
+                                          const transport::BatonHandle& handle = nullptr) = 0;
+
+    /**
+     * Cancel any outstanding async operations. There is no way to cancel synchronous calls.
+     * Futures will finish with an ErrorCodes::CallbackCancelled error if they haven't already
+     * completed.
+     */
+    virtual void cancelAsyncOperations(const transport::BatonHandle& handle = nullptr) = 0;
 
     /**
     * This should only be used to detect when the remote host has disappeared without

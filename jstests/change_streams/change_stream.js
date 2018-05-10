@@ -1,29 +1,69 @@
 // Basic $changeStream tests.
+// Mark as assumes_read_preference_unchanged since reading from the non-replicated "system.profile"
+// collection results in a failure in the secondary reads suite.
+// @tags: [assumes_read_preference_unchanged]
 (function() {
     "use strict";
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load("jstests/libs/change_stream_util.js");
-    load('jstests/libs/uuid_util.js');
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
+    load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest and
+                                                       // assert[Valid|Invalid]ChangeStreamNss.
 
-    jsTestLog("Testing $changeStream on non-existent database");
-    const dbDoesNotExist = db.getSiblingDB("database-does-not-exist");
-    assert.commandWorked(dbDoesNotExist.dropDatabase());
-    assert.commandFailedWithCode(
-        dbDoesNotExist.runCommand(
-            {aggregate: dbDoesNotExist.getName(), pipeline: [{$changeStream: {}}], cursor: {}}),
-        ErrorCodes.NamespaceNotFound);
+    const isMongos = FixtureHelpers.isMongos(db);
+
+    // Drop and recreate the collections to be used in this set of tests.
+    assertDropAndRecreateCollection(db, "t1");
+    assertDropAndRecreateCollection(db, "t2");
+
+    // Test that $changeStream only accepts an object as its argument.
+    function checkArgFails(arg) {
+        assert.commandFailedWithCode(
+            db.runCommand({aggregate: "t1", pipeline: [{$changeStream: arg}], cursor: {}}), 50808);
+    }
+
+    checkArgFails(1);
+    checkArgFails("invalid");
+    checkArgFails(false);
+    checkArgFails([1, 2, "invalid", {x: 1}]);
+
+    // Test that a change stream cannot be opened on collections in the "admin", "config", or
+    // "local" databases.
+    assertInvalidChangeStreamNss("admin", "testColl");
+    assertInvalidChangeStreamNss("config", "testColl");
+    // Not allowed to access 'local' database through mongos.
+    if (!isMongos) {
+        assertInvalidChangeStreamNss("local", "testColl");
+    }
+
+    // Test that a change stream cannot be opened on 'system.' collections.
+    assertInvalidChangeStreamNss(db.getName(), "system.users");
+    assertInvalidChangeStreamNss(db.getName(), "system.profile");
+    assertInvalidChangeStreamNss(db.getName(), "system.version");
+
+    // Test that a change stream can be opened on namespaces with 'system' in the name, but not
+    // considered an internal 'system dot' namespace.
+    assertValidChangeStreamNss(db.getName(), "systemindexes");
+    assertValidChangeStreamNss(db.getName(), "system_users");
+
+    // Similar test but for DB names that are not considered internal.
+    assert.writeOK(db.getSiblingDB("admincustomDB")["test"].insert({}));
+    assertValidChangeStreamNss("admincustomDB");
+
+    assert.writeOK(db.getSiblingDB("local_")["test"].insert({}));
+    assertValidChangeStreamNss("local_");
+
+    assert.writeOK(db.getSiblingDB("_config_")["test"].insert({}));
+    assertValidChangeStreamNss("_config_");
 
     let cst = new ChangeStreamTest(db);
+    let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
 
     jsTestLog("Testing single insert");
-    assertDropAndRecreateCollection(db, "t1");
-    let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     // Test that if there are no changes, we return an empty batch.
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
 
     assert.writeOK(db.t1.insert({_id: 0, a: 1}));
-    const t1Uuid = getUUIDFromListCollections(db, db.t1.getName());
     let expected = {
         documentKey: {_id: 0},
         fullDocument: {_id: 0, a: 1},
@@ -103,11 +143,9 @@
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
     jsTestLog("Testing intervening write on another collection");
-    assertDropCollection(db, "t2");
     cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     let t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
     assert.writeOK(db.t2.insert({_id: 100, c: 1}));
-    const t2Uuid = getUUIDFromListCollections(db, db.t2.getName());
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: []});
     expected = {
         documentKey: {_id: 100},
@@ -123,7 +161,7 @@
     // Should still see the previous change from t2, shouldn't see anything about 'dropping'.
 
     // Test collection renaming. Sharded collections cannot be renamed.
-    if (!db.t2.stats().sharded) {
+    if (!FixtureHelpers.isSharded(db.t2)) {
         jsTestLog("Testing rename");
         assertDropCollection(db, "t3");
         t2cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t2});
@@ -144,12 +182,11 @@
     cst.assertNextChangesEqual({cursor: dne1cursor, expectedChanges: []});
     cst.assertNextChangesEqual({cursor: dne2cursor, expectedChanges: []});
 
-    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
     if (!isMongos) {
         jsTestLog("Ensuring attempt to read with legacy operations fails.");
         db.getMongo().forceReadMode('legacy');
-        const legacyCursor = db.tailable2.aggregate([{$changeStream: {}}, cst.oplogProjection],
-                                                    {cursor: {batchSize: 0}});
+        const legacyCursor =
+            db.tailable2.aggregate([{$changeStream: {}}], {cursor: {batchSize: 0}});
         assert.throws(function() {
             legacyCursor.next();
         }, [], "Legacy getMore expected to fail on changeStream cursor.");
@@ -160,8 +197,8 @@
     assertDropAndRecreateCollection(db, "resume1");
 
     // Note we do not project away 'id.ts' as it is part of the resume token.
-    let resumeCursor = cst.startWatchingChanges(
-        {pipeline: [{$changeStream: {}}], collection: db.resume1, includeToken: true});
+    let resumeCursor =
+        cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.resume1});
 
     // Insert a document and save the resulting change stream.
     assert.writeOK(db.resume1.insert({_id: 1}));
@@ -172,7 +209,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
 
@@ -188,7 +224,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: firstInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), secondInsertChangeDoc);
@@ -198,7 +233,6 @@
     resumeCursor = cst.startWatchingChanges({
         pipeline: [{$changeStream: {resumeAfter: secondInsertChangeDoc._id}}],
         collection: db.resume1,
-        includeToken: true,
         aggregateOptions: {cursor: {batchSize: 0}},
     });
     assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);

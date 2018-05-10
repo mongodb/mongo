@@ -324,7 +324,7 @@ public:
             // Need to always return err
             result.appendNull("err");
 
-            return CommandHelpers::appendCommandStatus(
+            return CommandHelpers::appendCommandStatusNoThrow(
                 result,
                 Status(ErrorCodes::WriteConcernFailed, "multiple write concern errors occurred"));
         }

@@ -27,14 +27,14 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/service_context_fwd.h"
+
 #include <map>
 #include <string>
 #include <vector>
 
-#include "mongo/base/disallow_copying.h"
-
 namespace mongo {
-
 /**
  * Context of a deinitialization process. Passed as a parameter to deinitialization functions.
  *
@@ -42,8 +42,6 @@ namespace mongo {
  */
 class DeinitializerContext {
 public:
-    DeinitializerContext() = default;
-
     DeinitializerContext(DeinitializerContext const&) = delete;
     DeinitializerContext& operator=(DeinitializerContext const&) = delete;
 };

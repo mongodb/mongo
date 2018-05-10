@@ -1,16 +1,15 @@
-"""Script to fix up our MSI files """
+"""Script to fix up our MSI files."""
 
-import argparse;
+from __future__ import print_function
+
+import argparse
+import shutil
+
 import msilib
-import shutil;
 
-parser = argparse.ArgumentParser(description='Trim MSI.')
-parser.add_argument('file', type=argparse.FileType('r'), help='file to trim')
-parser.add_argument('out', type=argparse.FileType('w'), help='file to output to')
 
-args = parser.parse_args()
-
-def exec_delete(query):
+def exec_delete(db, query):
+    """Execute delete on db."""
     view = db.OpenView(query)
     view.Execute(None)
 
@@ -19,7 +18,8 @@ def exec_delete(query):
     view.Close()
 
 
-def exec_update(query, column, value):
+def exec_update(db, query, column, value):
+    """Execute update on db."""
     view = db.OpenView(query)
     view.Execute(None)
 
@@ -29,15 +29,38 @@ def exec_update(query, column, value):
     view.Close()
 
 
-print "Trimming MSI"
+def main():
+    """Execute Main program."""
+    parser = argparse.ArgumentParser(description='Trim MSI.')
+    parser.add_argument('file', type=argparse.FileType('r'), help='file to trim')
+    parser.add_argument('out', type=argparse.FileType('w'), help='file to output to')
 
-db = msilib.OpenDatabase(args.file.name, msilib.MSIDBOPEN_DIRECT)
+    args = parser.parse_args()
+    print("Trimming MSI")
 
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'")
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'")
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'")
-exec_delete("select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'")
+    db = msilib.OpenDatabase(args.file.name, msilib.MSIDBOPEN_DIRECT)
 
-db.Commit()
+    exec_delete(
+        db,
+        "select * from ControlEvent WHERE Dialog_ = 'LicenseAgreementDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'"
+    )
+    exec_delete(
+        db,
+        "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'LicenseAgreementDlg'"
+    )
+    exec_delete(
+        db,
+        "select * from ControlEvent WHERE Dialog_ = 'CustomizeDlg' AND Control_ = 'Next' AND Event = 'NewDialog' AND Argument = 'VerifyReadyDlg'"
+    )
+    exec_delete(
+        db,
+        "select * from ControlEvent WHERE Dialog_ = 'VerifyReadyDlg' AND Control_ = 'Back' AND Event = 'NewDialog' AND Argument = 'CustomizeDlg'"
+    )
 
-shutil.copyfile(args.file.name, args.out.name);
+    db.Commit()
+
+    shutil.copyfile(args.file.name, args.out.name)
+
+
+if __name__ == "__main__":
+    main()

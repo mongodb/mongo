@@ -38,9 +38,12 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -106,11 +109,13 @@ public:
              BSONObjBuilder& result) override {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrMovePrimary can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrMovePrimary can only be run on config servers");
         }
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto movePrimaryRequest =
             MovePrimary::parse(IDLParserErrorContext("ConfigSvrMovePrimary"), cmdObj);
@@ -123,10 +128,8 @@ public:
 
         if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kConfigDb ||
             dbname == NamespaceString::kLocalDb) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 str::stream() << "Can't move primary for " << dbname << " database"});
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "Can't move primary for " << dbname << " database");
         }
 
         uassert(ErrorCodes::InvalidOptions,
@@ -137,10 +140,8 @@ public:
         const std::string to = movePrimaryRequest.getTo().toString();
 
         if (to.empty()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 str::stream() << "you have to specify where you want to move it"});
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream() << "you have to specify where you want to move it");
         }
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
@@ -150,33 +151,12 @@ public:
         auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
             opCtx, dbname, "movePrimary", DistLockManager::kDefaultLockTimeout));
 
-        auto dbType = uassertStatusOK(catalogClient->getDatabase(
-                                          opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern))
-                          .value;
+        auto dbType =
+            uassertStatusOK(catalogClient->getDatabase(
+                                opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel()))
+                .value;
 
         const auto fromShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
-
-        // fcv 4.0 logic for movePrimary (being tested under the 'forTest' flag while in
-        // development).
-        if (movePrimaryRequest.getForTest()) {
-            const NamespaceString nss(dbname);
-
-            ShardMovePrimary shardMovePrimaryRequest;
-            shardMovePrimaryRequest.set_movePrimary(nss);
-            shardMovePrimaryRequest.setTo(movePrimaryRequest.getTo());
-
-            auto cmdResponse = uassertStatusOK(fromShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                    cmdObj, shardMovePrimaryRequest.toBSON())),
-                Shard::RetryPolicy::kIdempotent));
-
-            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
-
-            return true;
-        }
 
         const auto toShard = [&]() {
             auto toShardStatus = shardRegistry->getShard(opCtx, to);
@@ -203,11 +183,37 @@ public:
             return true;
         }
 
+        // FCV 4.0 logic exists inside the if statement.
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+            const NamespaceString nss(dbname);
+
+            ShardMovePrimary shardMovePrimaryRequest;
+            shardMovePrimaryRequest.set_movePrimary(nss);
+            shardMovePrimaryRequest.setTo(toShard->getId().toString());
+
+            auto cmdResponse = uassertStatusOK(fromShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                    cmdObj, shardMovePrimaryRequest.toBSON())),
+                Shard::RetryPolicy::kIdempotent));
+
+            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+
+            return true;
+        }
+
+        // The rest of this function will only be executed under FCV 3.6 (or downgrading).
+
         log() << "Moving " << dbname << " primary from: " << fromShard->toString()
               << " to: " << toShard->toString();
 
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern);
+            opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
 
         // Record start in changelog
         uassertStatusOK(catalogClient->logChange(
@@ -243,8 +249,7 @@ public:
 
             if (!worked) {
                 log() << "clone failed" << redact(cloneRes);
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::OperationFailed, str::stream() << "clone failed"});
+                uasserted(ErrorCodes::OperationFailed, str::stream() << "clone failed");
             }
 
             if (auto wcErrorElem = cloneRes["writeConcernError"]) {
@@ -253,9 +258,26 @@ public:
             }
         }
 
-        // Update the new primary in the config server metadata.
-        dbType.setPrimary(toShard->getId());
-        uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbType));
+        {
+            // Check if the FCV has been changed under us.
+            invariant(!opCtx->lockState()->isLocked());
+            Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+
+            // If we are upgrading to (or are fully on) FCV 4.0, then fail. If we do not fail, we
+            // will potentially write an unversioned database in a schema that requires versions.
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 ||
+                serverGlobalParams.featureCompatibility.getVersion() ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+                uasserted(ErrorCodes::ConflictingOperationInProgress,
+                          "committing movePrimary failed due to version mismatch");
+            }
+
+            // Update the new primary in the config server metadata.
+            dbType.setPrimary(toShard->getId());
+            uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbType));
+        }
+
 
         // Ensure the next attempt to retrieve the database or any of its collections will do a full
         // reload
@@ -267,7 +289,6 @@ public:
         ON_BLOCK_EXIT([&fromconn] { fromconn.done(); });
 
         if (shardedColls.empty()) {
-            // TODO: Collections can be created in the meantime, and we should handle in the future.
             log() << "movePrimary dropping database on " << oldPrimary
                   << ", no sharded collections in " << dbname;
 
@@ -295,7 +316,8 @@ public:
                       << "User must manually remove unsharded collections in database " << dbname
                       << " on " << oldPrimary;
         } else {
-            // We moved some unsharded collections, but not all
+            // Sharded collections exist on the old primary, so drop only the cloned (unsharded)
+            // collections.
             BSONObjIterator it(cloneRes["clonedColls"].Obj());
 
             while (it.more()) {

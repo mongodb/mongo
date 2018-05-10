@@ -48,13 +48,25 @@ public:
     WiredTigerSnapshotManager() = default;
 
     void setCommittedSnapshot(const Timestamp& timestamp) final;
+    void setLocalSnapshot(const Timestamp& timestamp) final;
+    boost::optional<Timestamp> getLocalSnapshot() final;
     void dropAllSnapshots() final;
 
     //
     // WT-specific methods
     //
 
-    Status beginTransactionAtTimestamp(Timestamp pointInTime, WT_SESSION* session) const;
+    /**
+     * Sets the read timestamp on a transaction.
+     *
+     * Reads will be reflect the state of data as of the specified timestamp.
+     *
+     * If roundToOldest is true, rounds the timestamp up to the oldest_timestamp if it is larger.
+     * The default is false.
+     */
+    Status setTransactionReadTimestamp(Timestamp pointInTime,
+                                       WT_SESSION* session,
+                                       bool roundToOldest = false) const;
 
     /**
      * Starts a transaction and returns the SnapshotName used.
@@ -62,6 +74,14 @@ public:
      * Throws if there is currently no committed snapshot.
      */
     Timestamp beginTransactionOnCommittedSnapshot(WT_SESSION* session) const;
+
+    /**
+     * Starts a transaction on the last stable local timestamp, set by setLocalSnapshot.
+     *
+     * Throws if no local snapshot has been set.
+     */
+    Timestamp beginTransactionOnLocalSnapshot(WT_SESSION* session, bool ignorePrepare) const;
+
 
     /**
      * Starts a transaction on the oplog using an appropriate timestamp for oplog visiblity.
@@ -79,7 +99,12 @@ public:
     boost::optional<Timestamp> getMinSnapshotForNextCommittedRead() const;
 
 private:
-    mutable stdx::mutex _mutex;  // Guards _committedSnapshot.
+    // Snapshot to use for reads at a commit timestamp.
+    mutable stdx::mutex _committedSnapshotMutex;  // Guards _committedSnapshot.
     boost::optional<Timestamp> _committedSnapshot;
+
+    // Snapshot to use for reads at a local stable timestamp.
+    mutable stdx::mutex _localSnapshotMutex;  // Guards _localSnapshot.
+    boost::optional<Timestamp> _localSnapshot;
 };
 }

@@ -33,10 +33,11 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 commands:
-    _flushRoutingTableCacheUpdatesRequest:
+    _flushRoutingTableCacheUpdates:
         description: "An internal command to wait for the last routing table cache refresh for a particular namespace to be persisted to disk"
         strict: true
-        namespace: concatenate_with_db
+        namespace: type
+        type: namespacestring
         fields:
             syncFromConfig:
                 type: bool

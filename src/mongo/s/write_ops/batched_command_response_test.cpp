@@ -60,26 +60,22 @@ TEST(BatchedCommandResponse, Basic) {
                     << "errInfo"
                     << BSON("a" << 1)));
 
-    BSONObj origResponseObj = BSON("ok" << 0.0 << "errmsg"
-                                        << "this batch didn't work"
-                                        << "code"
-                                        << ErrorCodes::BadValue
-                                        << "codeName"
-                                        << "BadValue"
-                                        << BatchedCommandResponse::n(0)
-                                        << "opTime"
-                                        << mongo::Timestamp(1ULL)
-                                        << BatchedCommandResponse::writeErrors()
-                                        << writeErrorsArray
-                                        << BatchedCommandResponse::writeConcernError()
-                                        << writeConcernError);
+    BSONObj origResponseObj =
+        BSON(BatchedCommandResponse::n(0) << "opTime" << mongo::Timestamp(1ULL)
+                                          << BatchedCommandResponse::writeErrors()
+                                          << writeErrorsArray
+                                          << BatchedCommandResponse::writeConcernError()
+                                          << writeConcernError
+                                          << "ok"
+                                          << 1.0);
 
     string errMsg;
     BatchedCommandResponse response;
     bool ok = response.parseBSON(origResponseObj, &errMsg);
     ASSERT_TRUE(ok);
 
-    BSONObj genResponseObj = response.toBSON();
+    BSONObj genResponseObj = BSONObjBuilder(response.toBSON()).append("ok", 1.0).obj();
+
     ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj))
         << "\nparsed:   " << genResponseObj  //
         << "\noriginal: " << origResponseObj;

@@ -288,8 +288,6 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term) override;
 
-    virtual Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) override;
-
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
@@ -310,6 +308,8 @@ public:
     virtual Status stepUpIfEligible() override;
 
     virtual Status abortCatchupIfNeeded() override;
+
+    void signalDropPendingCollectionsRemovedFromStorage() final;
 
     // ================== Test support API ===================
 

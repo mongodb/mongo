@@ -131,6 +131,14 @@ public:
         repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
+     * Retrieves all databases in a cluster.
+     *
+     * Returns a !OK status if an error occurs.
+     */
+    virtual StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> getAllDBs(
+        OperationContext* opCtx, repl::ReadConcernLevel readConcern) = 0;
+
+    /**
      * Retrieves the metadata for a given collection, if it exists.
      *
      * @param nss fully qualified name of the collection (case sensitive)

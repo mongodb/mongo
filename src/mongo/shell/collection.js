@@ -1147,10 +1147,6 @@ DBCollection.prototype.toString = function() {
     return this.getFullName();
 };
 
-DBCollection.prototype.toString = function() {
-    return this.getFullName();
-};
-
 DBCollection.prototype.tojson = DBCollection.prototype.toString;
 
 DBCollection.prototype.shellPrint = DBCollection.prototype.toString;
@@ -1498,6 +1494,11 @@ DBCollection.prototype.watch = function(pipeline, options) {
     if (options.hasOwnProperty("resumeAfter")) {
         changeStreamStage.resumeAfter = options.resumeAfter;
         delete options.resumeAfter;
+    }
+
+    if (options.hasOwnProperty("startAtClusterTime")) {
+        changeStreamStage.startAtClusterTime = options.startAtClusterTime;
+        delete options.startAtClusterTime;
     }
 
     pipeline.unshift({$changeStream: changeStreamStage});

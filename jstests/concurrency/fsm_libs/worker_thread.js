@@ -25,6 +25,9 @@ var workerThread = (function() {
         var myDB;
         var configs = {};
         var connectionString = 'mongodb://' + args.host + '/?appname=tid:' + args.tid;
+        if (typeof args.replSetName !== 'undefined') {
+            connectionString += '&replicaSet=' + args.replSetName;
+        }
 
         globalAssertLevel = args.globalAssertLevel;
 
@@ -69,7 +72,21 @@ var workerThread = (function() {
                     delete args.sessionOptions.initialOperationTime;
                 }
 
-                const session = new Mongo(connectionString).startSession(args.sessionOptions);
+                const mongo = new Mongo(connectionString);
+
+                const session = mongo.startSession(args.sessionOptions);
+                const readPreference = session.getOptions().getReadPreference();
+                if (readPreference && readPreference.mode === 'secondary') {
+                    // Unset the explicit read preference so set_read_preference_secondary.js can do
+                    // the right thing based on the DB.
+                    session.getOptions().setReadPreference(undefined);
+
+                    // We load() set_read_preference_secondary.js in order to avoid running
+                    // commands against the "admin" and "config" databases via mongos with
+                    // readPreference={mode: "secondary"} when there's only a single node in
+                    // the CSRS.
+                    load('jstests/libs/override_methods/set_read_preference_secondary.js');
+                }
 
                 if (typeof initialClusterTime !== 'undefined') {
                     session.advanceClusterTime(initialClusterTime);

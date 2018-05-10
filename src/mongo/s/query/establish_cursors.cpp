@@ -47,13 +47,12 @@
 
 namespace mongo {
 
-std::vector<ClusterClientCursorParams::RemoteCursor> establishCursors(
-    OperationContext* opCtx,
-    executor::TaskExecutor* executor,
-    const NamespaceString& nss,
-    const ReadPreferenceSetting readPref,
-    const std::vector<std::pair<ShardId, BSONObj>>& remotes,
-    bool allowPartialResults) {
+std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
+                                           executor::TaskExecutor* executor,
+                                           const NamespaceString& nss,
+                                           const ReadPreferenceSetting readPref,
+                                           const std::vector<std::pair<ShardId, BSONObj>>& remotes,
+                                           bool allowPartialResults) {
     // Construct the requests
     std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& remote : remotes) {
@@ -68,20 +67,23 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishCursors(
                             readPref,
                             Shard::RetryPolicy::kIdempotent);
 
-    std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors;
+    std::vector<RemoteCursor> remoteCursors;
     try {
         // Get the responses
         while (!ars.done()) {
             try {
                 auto response = ars.next();
-
-                // uasserts must happen before attempting to access the optional shardHostAndPort.
-                auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(
+                // Note the shardHostAndPort may not be populated if there was an error, so be sure
+                // to do this after parsing the cursor response to ensure the response was ok.
+                // Additionally, be careful not to push into 'remoteCursors' until we are sure we
+                // have a valid cursor, since the error handling path will attempt to clean up
+                // anything in 'remoteCursors'
+                RemoteCursor cursor;
+                cursor.setCursorResponse(CursorResponse::parseFromBSONThrowing(
                     uassertStatusOK(std::move(response.swResponse)).data));
-
-                remoteCursors.emplace_back(std::move(response.shardId),
-                                           std::move(*response.shardHostAndPort),
-                                           std::move(cursorResponse));
+                cursor.setShardId(std::move(response.shardId));
+                cursor.setHostAndPort(*response.shardHostAndPort);
+                remoteCursors.push_back(std::move(cursor));
             } catch (const DBException& ex) {
                 // Retriable errors are swallowed if 'allowPartialResults' is true.
                 if (allowPartialResults &&
@@ -114,18 +116,21 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishCursors(
                         : response.swResponse.getStatus());
 
                 if (swCursorResponse.isOK()) {
-                    remoteCursors.emplace_back(std::move(response.shardId),
-                                               *response.shardHostAndPort,
-                                               std::move(swCursorResponse.getValue()));
+                    RemoteCursor cursor;
+                    cursor.setShardId(std::move(response.shardId));
+                    cursor.setHostAndPort(*response.shardHostAndPort);
+                    cursor.setCursorResponse(std::move(swCursorResponse.getValue()));
+                    remoteCursors.push_back(std::move(cursor));
                 }
             }
 
             // Schedule killCursors against all cursors that were established.
             for (const auto& remoteCursor : remoteCursors) {
                 BSONObj cmdObj =
-                    KillCursorsRequest(nss, {remoteCursor.cursorResponse.getCursorId()}).toBSON();
+                    KillCursorsRequest(nss, {remoteCursor.getCursorResponse().getCursorId()})
+                        .toBSON();
                 executor::RemoteCommandRequest request(
-                    remoteCursor.hostAndPort, nss.db().toString(), cmdObj, opCtx);
+                    remoteCursor.getHostAndPort(), nss.db().toString(), cmdObj, opCtx);
 
                 // We do not process the response to the killCursors request (we make a good-faith
                 // attempt at cleaning up the cursors, but ignore any returned errors).

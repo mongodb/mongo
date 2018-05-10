@@ -30,19 +30,14 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/query/tailable_mode_gen.h"
 
 namespace mongo {
-
-enum class TailableMode {
-    kNormal,
-    kTailable,
-    kTailableAndAwaitData,
-};
 
 /**
  * Returns a TailableMode from two booleans, returning ErrorCodes::FailedToParse if awaitData is
  * set without tailable.
  */
-StatusWith<TailableMode> tailableModeFromBools(bool isTailable, bool isAwaitData);
+StatusWith<TailableModeEnum> tailableModeFromBools(bool isTailable, bool isAwaitData);
 
 }  // namespace mongo

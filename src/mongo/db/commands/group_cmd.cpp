@@ -134,8 +134,7 @@ private:
         AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
-        auto statusWithPlanExecutor =
-            getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor = getExecutorGroup(opCtx, coll, groupRequest);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -157,18 +156,13 @@ private:
 
         GroupRequest groupRequest;
         Status parseRequestStatus = _parseRequest(dbname, cmdObj, &groupRequest);
-        if (!parseRequestStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, parseRequestStatus);
-        }
+        uassertStatusOK(parseRequestStatus);
 
         AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
-        auto statusWithPlanExecutor =
-            getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        auto statusWithPlanExecutor = getExecutorGroup(opCtx, coll, groupRequest);
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto planExecutor = std::move(statusWithPlanExecutor.getValue());
 
@@ -184,10 +178,8 @@ private:
         if (PlanExecutor::ADVANCED != state) {
             invariant(PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state);
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(retval).withContext(
-                    "Plan executor error during group command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(retval).withContext(
+                "Plan executor error during group command"));
         }
 
         invariant(planExecutor->isEOF());

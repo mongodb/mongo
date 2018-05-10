@@ -78,7 +78,7 @@ public:
             ASSERT_EQUALS(expectedNs.toString(), nss.toString());
 
             BSONObjBuilder responseBuilder;
-            CommandHelpers::appendCommandStatus(responseBuilder, response);
+            CommandHelpers::appendCommandStatusNoThrow(responseBuilder, response);
             return responseBuilder.obj();
         });
     }
@@ -98,8 +98,8 @@ public:
             BSONObjBuilder responseBuilder;
 
             if (!collectionOptionsReponse.isOK()) {
-                CommandHelpers::appendCommandStatus(responseBuilder,
-                                                    collectionOptionsReponse.getStatus());
+                CommandHelpers::appendCommandStatusNoThrow(responseBuilder,
+                                                           collectionOptionsReponse.getStatus());
             } else {
                 BSONObjBuilder listCollResponse(responseBuilder.subobjStart("cursor"));
                 BSONArrayBuilder collArrayBuilder(listCollResponse.subarrayStart("firstBatch"));

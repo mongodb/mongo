@@ -47,7 +47,10 @@ class ConsoleAppender : public Appender<Event> {
 public:
     typedef Encoder<Event> EventEncoder;
 
+    // TODO: Remove this ctor once raw pointer use is gone
     explicit ConsoleAppender(EventEncoder* encoder) : _encoder(encoder) {}
+    explicit ConsoleAppender(std::unique_ptr<EventEncoder> encoder)
+        : _encoder(std::move(encoder)) {}
     virtual Status append(const Event& event) {
         ConsoleType console;
         _encoder->encode(event, console.out()).flush();

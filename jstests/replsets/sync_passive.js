@@ -33,7 +33,7 @@ replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
 var master = replTest.getPrimary().getDB("test");
 var server0 = master;
-var server1 = replTest.liveNodes.slaves[0];
+var server1 = replTest._slaves[0];
 
 print("Initial sync");
 for (var i = 0; i < 100; i++) {
@@ -48,7 +48,8 @@ print("add some data");
 for (var i = 0; i < 1000; i++) {
     master.bar.insert({x: i});
 }
-replTest.awaitReplication();
+const liveSlaves = [replTest.nodes[2]];
+replTest.awaitReplication(null, null, liveSlaves);
 
 print("stop #0");
 replTest.stop(0);
@@ -57,7 +58,7 @@ print("restart #1");
 replTest.restart(1);
 
 print("check sync");
-replTest.awaitReplication();
+replTest.awaitReplication(null, null, liveSlaves);
 
 print("add data");
 reconnect(server1);
@@ -65,7 +66,7 @@ master = replTest.getPrimary().getDB("test");
 for (var i = 0; i < 1000; i++) {
     master.bar.insert({x: i});
 }
-replTest.awaitReplication();
+replTest.awaitReplication(null, null, liveSlaves);
 
 print("kill #1");
 replTest.stop(1);
@@ -75,7 +76,7 @@ replTest.restart(0);
 reconnect(server0);
 
 print("wait for sync");
-replTest.awaitReplication();
+replTest.awaitReplication(null, null, liveSlaves);
 
 print("bring #1 back up, make sure everything's okay");
 replTest.restart(1);

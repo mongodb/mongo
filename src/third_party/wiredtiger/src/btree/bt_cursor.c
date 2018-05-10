@@ -436,6 +436,20 @@ __cursor_row_modify(
 }
 
 /*
+ * __cursor_restart --
+ *	Common cursor restart handling.
+ */
+static void
+__cursor_restart(
+    WT_SESSION_IMPL *session, uint64_t *yield_count, uint64_t *sleep_usecs)
+{
+	__wt_state_yield_sleep(yield_count, sleep_usecs);
+
+	WT_STAT_CONN_INCR(session, cursor_restart);
+	WT_STAT_DATA_INCR(session, cursor_restart);
+}
+
+/*
  * __wt_btcur_reset --
  *	Invalidate the cursor position.
  */
@@ -655,30 +669,43 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		exact = 0;
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-	} else if ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND) {
-		WT_ERR(ret);
-		exact = 1;
 	} else {
 		/*
-		 * The cursor next call may have overwritten our caller's key,
-		 * restore it to its original value.
+		 * We didn't find an exact match: try after the search key,
+		 * then before.  We have to loop here because at low isolation
+		 * levels, new records could appear as we are stepping through
+		 * the tree.
 		 */
-		__cursor_state_restore(cursor, &state);
-
-		WT_ERR(__cursor_func_init(cbt, true));
-		WT_ERR(btree->type == BTREE_ROW ?
-		    __cursor_row_search(session, cbt, NULL, true) :
-		    __cursor_col_search(session, cbt, NULL));
-		WT_ERR(__wt_cursor_valid(cbt, &upd, &valid));
-		if (valid) {
-			exact = cbt->compare;
-			ret = __cursor_kv_return(session, cbt, upd);
-		} else if ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+		while ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND) {
 			WT_ERR(ret);
-			exact = -1;
+			if (btree->type == BTREE_ROW)
+				WT_ERR(__wt_compare(session, btree->collator,
+				    &cursor->key, &state.key, &exact));
+			else
+				exact = cbt->recno < state.recno ? -1 :
+				    cbt->recno == state.recno ? 0 : 1;
+			if (exact >= 0)
+				goto done;
+		}
+
+		/*
+		 * We walked to the end of the tree without finding a match.
+		 * Walk backwards instead.
+		 */
+		while ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND) {
+			WT_ERR(ret);
+			if (btree->type == BTREE_ROW)
+				WT_ERR(__wt_compare(session, btree->collator,
+				    &cursor->key, &state.key, &exact));
+			else
+				exact = cbt->recno < state.recno ? -1 :
+				    cbt->recno == state.recno ? 0 : 1;
+			if (exact <= 0)
+				goto done;
 		}
 	}
 
+done:
 err:	if (ret == 0 && exactp != NULL)
 		*exactp = exact;
 
@@ -706,11 +733,13 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint64_t yield_count, sleep_usecs;
 	bool append_key, valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	yield_count = sleep_usecs = 0;
 
 	WT_STAT_CONN_INCR(session, cursor_insert);
 	WT_STAT_DATA_INCR(session, cursor_insert);
@@ -827,8 +856,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_CONN_INCR(session, cursor_restart);
-		WT_STAT_DATA_INCR(session, cursor_restart);
+		__cursor_restart(session, &yield_count, &sleep_usecs);
 		goto retry;
 	}
 
@@ -891,10 +919,12 @@ __wt_btcur_insert_check(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint64_t yield_count, sleep_usecs;
 
 	cursor = &cbt->iface;
 	btree = cbt->btree;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	yield_count = sleep_usecs = 0;
 
 	/*
 	 * The pinned page goes away if we do a search, get a local copy of any
@@ -916,8 +946,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(__wt_illegal_value(session, NULL));
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_CONN_INCR(session, cursor_restart);
-		WT_STAT_DATA_INCR(session, cursor_restart);
+		__cursor_restart(session, &yield_count, &sleep_usecs);
 		goto retry;
 	}
 
@@ -942,11 +971,13 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint64_t yield_count, sleep_usecs;
 	bool iterating, valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	yield_count = sleep_usecs = 0;
 	iterating = F_ISSET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
 
 	WT_STAT_CONN_INCR(session, cursor_remove);
@@ -1079,8 +1110,7 @@ retry:	if (positioned == POSITIONED)
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_CONN_INCR(session, cursor_restart);
-		WT_STAT_DATA_INCR(session, cursor_restart);
+		__cursor_restart(session, &yield_count, &sleep_usecs);
 		goto retry;
 	}
 
@@ -1159,11 +1189,13 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint64_t yield_count, sleep_usecs;
 	bool valid;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	yield_count = sleep_usecs = 0;
 
 	/* It's no longer possible to bulk-load into the tree. */
 	__cursor_disable_bulk(session, btree);
@@ -1255,8 +1287,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_CONN_INCR(session, cursor_restart);
-		WT_STAT_DATA_INCR(session, cursor_restart);
+		__cursor_restart(session, &yield_count, &sleep_usecs);
 		goto retry;
 	}
 
@@ -1595,6 +1626,9 @@ __cursor_truncate(WT_SESSION_IMPL *session,
     int (*rmfunc)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, u_int))
 {
 	WT_DECL_RET;
+	uint64_t yield_count, sleep_usecs;
+
+	yield_count = sleep_usecs = 0;
 
 	/*
 	 * First, call the cursor search method to re-position the cursor: we
@@ -1631,8 +1665,7 @@ retry:	WT_ERR(__wt_btcur_search(start));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_CONN_INCR(session, cursor_restart);
-		WT_STAT_DATA_INCR(session, cursor_restart);
+		__cursor_restart(session, &yield_count, &sleep_usecs);
 		goto retry;
 	}
 
@@ -1650,7 +1683,10 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
     int (*rmfunc)(WT_SESSION_IMPL *, WT_CURSOR_BTREE *, u_int))
 {
 	WT_DECL_RET;
+	uint64_t yield_count, sleep_usecs;
 	const uint8_t *value;
+
+	yield_count = sleep_usecs = 0;
 
 	/*
 	 * Handle fixed-length column-store objects separately: for row-store
@@ -1689,8 +1725,7 @@ retry:	WT_ERR(__wt_btcur_search(start));
 	}
 
 err:	if (ret == WT_RESTART) {
-		WT_STAT_CONN_INCR(session, cursor_restart);
-		WT_STAT_DATA_INCR(session, cursor_restart);
+		__cursor_restart(session, &yield_count, &sleep_usecs);
 		goto retry;
 	}
 

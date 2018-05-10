@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import("env")
+Import("get_option")
 
 env = env.Clone()
 
@@ -12,9 +13,7 @@ env.Library(
         'cluster_get_shard_map_cmd.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/commands/killcursors_common',
-        '$BUILD_DIR/mongo/db/commands/current_op_common',
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/s/async_requests_sender',
     ]
 )
@@ -27,6 +26,7 @@ env.Library(
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_aggregate.cpp',
         'cluster_available_query_options_cmd.cpp',
+        'cluster_build_info.cpp',
         'cluster_coll_stats_cmd.cpp',
         'cluster_collection_mod_cmd.cpp',
         'cluster_compact_cmd.cpp',
@@ -79,6 +79,7 @@ env.Library(
         'cluster_reset_error_cmd.cpp',
         'cluster_restart_catalog_command.cpp',
         'cluster_set_feature_compatibility_version_cmd.cpp',
+        'cluster_set_free_monitoring.cpp' if get_option("enable-free-mon") == 'on' else [],
         'cluster_shard_collection_cmd.cpp',
         'cluster_shutdown_cmd.cpp',
         'cluster_split_cmd.cpp',
@@ -93,9 +94,15 @@ env.Library(
         'strategy.cpp',
         env.Idlc('cluster_multicast.idl')[0],
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authmongos',
-        '$BUILD_DIR/mongo/db/commands/killcursors_common',
+        '$BUILD_DIR/mongo/db/commands/core',
+        '$BUILD_DIR/mongo/db/commands/current_op_common',
+        '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
+        '$BUILD_DIR/mongo/db/commands/kill_common',
+        '$BUILD_DIR/mongo/db/commands/profile_common',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/commands/write_commands_common',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_server',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',
@@ -132,10 +139,23 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'shared_cluster_commands',
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/unittest/unittest',
     ]
+)
+
+env.CppUnitTest(
+    target="cluster_aggregate_test",
+    source=[
+        "cluster_aggregate_test.cpp",
+    ],
+    LIBDEPS=[
+        'cluster_commands',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
+    ],
 )

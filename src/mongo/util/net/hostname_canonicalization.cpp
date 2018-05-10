@@ -41,7 +41,7 @@
 #endif
 
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/sockaddr.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 

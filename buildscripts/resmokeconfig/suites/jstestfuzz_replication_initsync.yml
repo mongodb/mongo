@@ -15,7 +15,6 @@ executor:
         TestData:
           ignoreCommandsIncompatibleWithInitialSync: true
   hooks:
-  - class: CheckPrimary
   - class: BackgroundInitialSync
     n: 1
     shell_options:
@@ -32,6 +31,7 @@ executor:
         logComponentVerbosity:
           replication: 2
         numInitialSyncAttempts: 1
+        transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
     num_nodes: 2
     start_initial_sync_node: True

@@ -1,7 +1,12 @@
 // Test calculation of the 'millis' field in explain output.
 // This test makes assertions on how long a particular query will sleep. When the collection is
 // sharded each shard may sleep for less time than is expected.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//     assumes_unsharded_collection,
+//
+//     # Uses $where operator
+//     requires_scripting,
+// ]
 
 t = db.jstests_explain2;
 t.drop();

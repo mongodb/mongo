@@ -58,6 +58,7 @@ type ConnString struct {
 	SocketTimeout           time.Duration
 	Username                string
 	UseSSL                  bool
+	UseSSLSeen              bool
 	W                       string
 	WTimeout                time.Duration
 
@@ -100,6 +101,7 @@ func (p *parser) parse(original string) error {
 
 		// SSL should be turned on by default when retrieving hosts from SRV
 		p.UseSSL = true
+		p.UseSSLSeen = true
 
 		// remove the scheme
 		uri = uri[14:]
@@ -428,6 +430,7 @@ func (p *parser) addOption(pair string) error {
 			return fmt.Errorf("invalid value for %s: %s", key, value)
 		}
 		p.UseSSL = b
+		p.UseSSLSeen = true
 	case "w":
 		p.W = value
 	case "wtimeoutms":

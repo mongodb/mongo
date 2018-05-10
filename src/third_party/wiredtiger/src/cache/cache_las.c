@@ -42,17 +42,28 @@ __las_restore_isolation(
 }
 
 /*
- * __wt_las_nonempty --
+ * __las_entry_count --
+ *	Return when there are entries in the lookaside table.
+ */
+static uint64_t
+__las_entry_count(WT_CACHE *cache)
+{
+	uint64_t insert_cnt, remove_cnt;
+
+	insert_cnt = cache->las_insert_count;
+	WT_ORDERED_READ(remove_cnt, cache->las_remove_count);
+
+	return (insert_cnt > remove_cnt ? insert_cnt - remove_cnt : 0);
+}
+
+/*
+ * __wt_las_empty --
  *	Return when there are entries in the lookaside table.
  */
 bool
-__wt_las_nonempty(WT_SESSION_IMPL *session)
+__wt_las_empty(WT_SESSION_IMPL *session)
 {
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
-	return (cache->las_entry_count > 0);
+	return (__las_entry_count(S2C(session)->cache) == 0);
 }
 
 /*
@@ -81,8 +92,9 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 
 	/* Set the connection-wide statistics. */
 	cstats = conn->stats;
-	WT_STAT_SET(
-	    session, cstats, cache_lookaside_entries, cache->las_entry_count);
+
+	WT_STAT_SET(session, cstats,
+	    cache_lookaside_entries, __las_entry_count(cache));
 
 	/*
 	 * We have a cursor, and we need the underlying data handle; we can get
@@ -455,7 +467,7 @@ __wt_las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
  */
 static int
 __las_remove_block(WT_SESSION_IMPL *session,
-    WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid, uint64_t *decrp)
+    WT_CURSOR *cursor, uint64_t pageid, bool lock_wait, uint64_t *remove_cntp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -463,30 +475,32 @@ __las_remove_block(WT_SESSION_IMPL *session,
 	uint64_t las_counter, las_pageid;
 	uint32_t las_id;
 
-	*decrp = 0;
+	*remove_cntp = 0;
 
 	conn = S2C(session);
 
-	__wt_writelock(session, &conn->cache->las_sweepwalk_lock);
+	/* Prevent the sweep thread from removing the block. */
+	if (lock_wait)
+		__wt_writelock(session, &conn->cache->las_sweepwalk_lock);
+	else
+		WT_RET(__wt_try_writelock(
+		    session, &conn->cache->las_sweepwalk_lock));
 
 	/*
 	 * Search for the block's unique btree ID and page ID prefix and step
 	 * through all matching records, removing them.
 	 */
-	for (ret = __wt_las_cursor_position(cursor, btree_id, pageid);
+	for (ret = __wt_las_cursor_position(cursor, pageid);
 	    ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor,
 		    &las_pageid, &las_id, &las_counter, &las_key));
 
-		/*
-		 * Confirm the record matches; if not a match, we're done
-		 * searching for records for this page.
-		 */
-		if (las_pageid != pageid || las_id != btree_id)
+		/* Confirm that we have a matching record. */
+		if (las_pageid != pageid)
 			break;
 
 		WT_ERR(cursor->remove(cursor));
-		++*decrp;
+		++*remove_cntp;
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -580,7 +594,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	WT_SESSION_IMPL *las_session;
 	WT_TXN_ISOLATION saved_isolation;
 	WT_UPDATE *upd;
-	uint64_t decrement_cnt, insert_cnt, insert_estimate;
+	uint64_t insert_cnt;
 	uint64_t las_counter, las_pageid;
 	uint32_t btree_id, i, slot;
 	uint8_t *p;
@@ -590,12 +604,11 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	conn = S2C(session);
 	WT_CLEAR(las_timestamp);
 	WT_CLEAR(las_value);
-	decrement_cnt = insert_cnt = insert_estimate = 0;
+	insert_cnt = 0;
 	btree_id = btree->id;
 	local_txn = false;
 
-	las_pageid = multi->page_las.las_pageid =
-	    __wt_atomic_add64(&conn->cache->las_pageid, 1);
+	las_pageid = __wt_atomic_add64(&conn->cache->las_pageid, 1);
 
 	if (!btree->lookaside_entries)
 		btree->lookaside_entries = true;
@@ -606,12 +619,18 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	WT_ERR(__wt_txn_begin(las_session, NULL));
 	local_txn = true;
 
+#ifdef HAVE_DIAGNOSTIC
+	{
+	uint64_t remove_cnt;
 	/*
-	 * Make sure there are no leftover entries (e.g., from a handle
-	 * reopen).
+	 * There should never be any entries with the page ID we are about to
+	 * use.
 	 */
-	WT_ERR(__las_remove_block(
-	    session, cursor, btree_id, las_pageid, &decrement_cnt));
+	WT_ERR_BUSY_OK(__las_remove_block(
+	    session, cursor, las_pageid, false, &remove_cnt));
+	WT_ASSERT(session, remove_cnt == 0);
+	}
+#endif
 
 	/* Enter each update in the boundary's list into the lookaside store. */
 	for (las_counter = 0, i = 0,
@@ -707,18 +726,6 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 				    upd->type, &las_value);
 
 			/*
-			 * If remove is running concurrently, it's possible for
-			 * records to be removed before the insert transaction
-			 * commit (remove is configured read-uncommitted). Make
-			 * sure increments stay ahead of decrements.
-			 */
-			if (insert_estimate <= insert_cnt) {
-				insert_estimate += 100;
-				(void)__wt_atomic_add64(
-				    &conn->cache->las_entry_count, 100);
-			}
-
-			/*
 			 * Using update looks a little strange because the keys
 			 * are guaranteed to not exist, but since we're
 			 * appending, we want the cursor to stay positioned in
@@ -732,33 +739,21 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 err:	/* Resolve the transaction. */
 	if (local_txn) {
 		if (ret == 0)
-			ret = __wt_txn_commit(las_session, NULL);
+			WT_TRET(__wt_txn_commit(las_session, NULL));
 		else
 			WT_TRET(__wt_txn_rollback(las_session, NULL));
+
+		/* Adjust the entry count. */
+		if (ret == 0)
+			(void)__wt_atomic_add64(
+			    &conn->cache->las_insert_count, insert_cnt);
 	}
 
 	__las_restore_isolation(las_session, saved_isolation);
 
-	/*
-	 * If the transaction successfully committed and we inserted records,
-	 * adjust the final entry count. We may have also deleted records,
-	 * but we must have intended to insert records to be in this function
-	 * at all, checking the insert count is sufficient.
-	 */
-	if (insert_cnt > 0) {
-		if (ret == 0) {
-			(void)__wt_atomic_add64(
-			    &conn->cache->las_entry_count,
-			    insert_estimate - insert_cnt);
-			__wt_cache_decr_check_uint64(session,
-			    &conn->cache->las_entry_count,
-			    decrement_cnt, "lookaside entry count");
-
-			ret = __las_insert_block_verbose(session, multi);
-		} else
-			__wt_cache_decr_check_uint64(session,
-			    &conn->cache->las_entry_count,
-			    insert_estimate, "lookaside entry count");
+	if (ret == 0 && insert_cnt > 0) {
+		multi->page_las.las_pageid = las_pageid;
+		ret = __las_insert_block_verbose(session, multi);
 	}
 
 	return (ret);
@@ -772,7 +767,7 @@ err:	/* Resolve the transaction. */
  *	WT_CONNECTION::rollback_to_stable.
  */
 int
-__wt_las_cursor_position(WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid)
+__wt_las_cursor_position(WT_CURSOR *cursor, uint64_t pageid)
 {
 	WT_ITEM las_key;
 	uint64_t las_counter, las_pageid;
@@ -796,7 +791,7 @@ __wt_las_cursor_position(WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid)
 	for (;;) {
 		WT_CLEAR(las_key);
 		cursor->set_key(cursor,
-		    pageid, btree_id, (uint64_t)0, &las_key);
+		    pageid, (uint32_t)0, (uint64_t)0, &las_key);
 		WT_RET(cursor->search_near(cursor, &exact));
 		if (exact < 0) {
 			WT_RET(cursor->next(cursor));
@@ -813,8 +808,7 @@ __wt_las_cursor_position(WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid)
 			 */
 			WT_RET(cursor->get_key(cursor,
 			    &las_pageid, &las_id, &las_counter, &las_key));
-			if (las_pageid < pageid || (las_pageid == pageid &&
-			    las_id < btree_id))
+			if (las_pageid < pageid)
 				continue;
 		}
 
@@ -830,14 +824,14 @@ __wt_las_cursor_position(WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid)
  */
 int
 __wt_las_remove_block(
-    WT_SESSION_IMPL *session, uint32_t btree_id, uint64_t pageid)
+    WT_SESSION_IMPL *session, uint64_t pageid, bool lock_wait)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *las_session;
 	WT_TXN_ISOLATION saved_isolation;
-	uint64_t decrement_cnt;
+	uint64_t remove_cnt;
 	uint32_t session_flags;
 
 	conn = S2C(session);
@@ -856,15 +850,14 @@ __wt_las_remove_block(
 	WT_ERR(__wt_txn_begin(las_session, NULL));
 
 	ret = __las_remove_block(
-	    las_session, cursor, btree_id, pageid, &decrement_cnt);
+	    las_session, cursor, pageid, lock_wait, &remove_cnt);
 	if (ret == 0)
 		ret = __wt_txn_commit(las_session, NULL);
 	else
 		WT_TRET(__wt_txn_rollback(las_session, NULL));
 	if (ret == 0)
-		__wt_cache_decr_check_uint64(session,
-		    &conn->cache->las_entry_count,
-		    decrement_cnt, "lookaside entry count");
+		(void)__wt_atomic_add64(
+		    &conn->cache->las_remove_count, remove_cnt);
 
 err:	__las_restore_isolation(las_session, saved_isolation);
 	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
@@ -901,10 +894,11 @@ err:	__wt_spin_unlock(session, &cache->las_sweep_lock);
 static inline uint64_t
 __las_sweep_count(WT_CACHE *cache)
 {
+	uint64_t las_entry_count;
+
 	/*
-	 * The sweep server wakes up every 10 seconds (by default), it's a slow
-	 * moving thread. Try to review the entire lookaside table once every 5
-	 * minutes, or every 30 calls.
+	 * The sweep server is a slow moving thread. Try to review the entire
+	 * lookaside table once every 5 minutes.
 	 *
 	 * The reason is because the lookaside table exists because we're seeing
 	 * cache/eviction pressure (it allows us to trade performance and disk
@@ -918,8 +912,9 @@ __las_sweep_count(WT_CACHE *cache)
 	 * with lookaside entries are blocked during sweep, make sure we do
 	 * some work but don't block reads for too long.
 	 */
-	return ((uint64_t)WT_MAX(100, WT_MIN(10 * WT_THOUSAND,
-	    cache->las_entry_count / 30)));
+	las_entry_count = __las_entry_count(cache);
+	return ((uint64_t)WT_MAX(WT_LAS_SWEEP_ENTRIES,
+	    las_entry_count / (5 * WT_MINUTE / WT_LAS_SWEEP_SEC)));
 }
 
 /*
@@ -934,7 +929,6 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 	u_int i;
 
 	cache = S2C(session)->cache;
-	cache->las_sweep_cnt = __las_sweep_count(cache);
 
 	__wt_spin_lock(session, &cache->las_sweep_lock);
 
@@ -943,7 +937,7 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 	 * there's nothing to do.
 	 */
 	if (cache->las_dropped_next == 0) {
-		if (cache->las_entry_count == 0)
+		if (__wt_las_empty(session))
 			ret = WT_NOTFOUND;
 		goto err;
 	}
@@ -993,7 +987,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 #else
 	wt_timestamp_t *val_ts;
 #endif
-	uint64_t cnt, decrement_cnt, las_counter, las_pageid, txnid;
+	uint64_t cnt, remove_cnt, las_pageid, saved_pageid, visit_cnt;
+	uint64_t las_counter, las_txnid;
 	uint32_t las_id, session_flags;
 	uint8_t upd_type;
 	int notused;
@@ -1002,11 +997,12 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 	cursor = NULL;
 	sweep_key = &cache->las_sweep_key;
-	decrement_cnt = 0;
+	remove_cnt = 0;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 	local_txn = locked = false;
 
 	WT_RET(__wt_scr_alloc(session, 0, &saved_key));
+	saved_pageid = 0;
 
 	/*
 	 * Allocate a cursor and wrap all the updates in a transaction.
@@ -1018,6 +1014,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_txn_begin(session, NULL));
 	local_txn = true;
 
+	/*
+	 * Prevent other threads removing entries from underneath the sweep.
+	 */
 	__wt_writelock(session, &cache->las_sweepwalk_lock);
 	locked = true;
 
@@ -1046,19 +1045,25 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	if (ret != 0)
 		goto srch_notfound;
 
-	/*
-	 * Walk at least the number we calculated at the beginning of the
-	 * sweep, or more if there have been additional records inserted in the
-	 * meantime.  Don't just repeat the calculation here since sweep
-	 * removes entries and that would cause sweep to do less and less work
-	 * rather than driving the lookaside table to empty.
-	 */
 	cnt = __las_sweep_count(cache);
-	if (cnt < cache->las_sweep_cnt)
-		cnt = cache->las_sweep_cnt;
+	visit_cnt = 0;
 
 	/* Walk the file. */
 	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ERR(cursor->get_key(cursor,
+		    &las_pageid, &las_id, &las_counter, &las_key));
+
+		/*
+		 * If we have switched to a different page, clear the saved key.
+		 * Otherwise, sweep could incorrectly remove records after
+		 * seeing a birthmark for a key in one block if the same key is
+		 * at the beginning of the next block.  See WT-3982 for details.
+		 */
+		if (las_pageid != saved_pageid) {
+			saved_key->size = 0;
+			saved_pageid = las_pageid;
+		}
+
 		/*
 		 * Stop if the cache is stuck: we are ignoring the cache size
 		 * while scanning the lookaside table, so we're making things
@@ -1068,16 +1073,17 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			cnt = 0;
 
 		/*
-		 * If we have processed enough entries and we are between
-		 * blocks, give up.
+		 * We only want to break between key blocks. Stop if we've
+		 * processed enough entries either all we wanted or enough
+		 * and there is a reader waiting and we're on a key boundary.
 		 */
+		++visit_cnt;
+		if ((cnt == 0 ||
+		    (visit_cnt > WT_LAS_SWEEP_ENTRIES && cache->las_reader)) &&
+		    saved_key->size == 0)
+			break;
 		if (cnt > 0)
 			--cnt;
-		else if (saved_key->size == 0)
-			break;
-
-		WT_ERR(cursor->get_key(cursor,
-		    &las_pageid, &las_id, &las_counter, &las_key));
 
 		/*
 		 * If the entry belongs to a dropped tree, discard it.
@@ -1092,7 +1098,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		    __bit_test(cache->las_sweep_dropmap,
 		    las_id - cache->las_sweep_dropmin)) {
 			WT_ERR(cursor->remove(cursor));
-			++decrement_cnt;
+			++remove_cnt;
 			saved_key->size = 0;
 			continue;
 		}
@@ -1102,7 +1108,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * now no longer needed.
 		 */
 		WT_ERR(cursor->get_value(cursor,
-		    &txnid, &las_timestamp, &upd_type, &las_value));
+		    &las_txnid, &las_timestamp, &upd_type, &las_value));
 #ifdef HAVE_TIMESTAMPS
 		WT_ASSERT(session, las_timestamp.size == WT_TIMESTAMP_SIZE);
 		memcpy(&timestamp, las_timestamp.data, las_timestamp.size);
@@ -1116,7 +1122,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * If it is visible then perform additional checks to see
 		 * whether it has aged out of a live file.
 		 */
-		if (!__wt_txn_visible_all(session, txnid, val_ts)) {
+		if (!__wt_txn_visible_all(session, las_txnid, val_ts)) {
 			saved_key->size = 0;
 			continue;
 		}
@@ -1131,19 +1137,26 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 			if (cnt == 0)
 				break;
 
+			/* We can only start removing from a full value. */
+			if (upd_type == WT_UPDATE_MODIFY) {
+				saved_key->size = 0;
+				continue;
+			}
+
 			WT_ERR(__wt_buf_set(session, saved_key,
 			    las_key.data, las_key.size));
 
+			/*
+			 * If the first stable record contains data, we have to
+			 * keep it.
+			 */
 			if (upd_type != WT_UPDATE_BIRTHMARK)
 				continue;
 		}
 
 		WT_ERR(cursor->remove(cursor));
-		++decrement_cnt;
+		++remove_cnt;
 	}
-
-	__wt_writeunlock(session, &cache->las_sweepwalk_lock);
-	locked = false;
 
 	/*
 	 * If the loop terminates after completing a work unit, we will
@@ -1171,9 +1184,8 @@ err:		__wt_buf_free(session, sweep_key);
 		else
 			WT_TRET(__wt_txn_rollback(session, NULL));
 		if (ret == 0)
-			__wt_cache_decr_check_uint64(session,
-			    &S2C(session)->cache->las_entry_count,
-			    decrement_cnt, "lookaside entry count");
+			(void)__wt_atomic_add64(
+			    &cache->las_remove_count, remove_cnt);
 	}
 	if (locked)
 		__wt_writeunlock(session, &cache->las_sweepwalk_lock);

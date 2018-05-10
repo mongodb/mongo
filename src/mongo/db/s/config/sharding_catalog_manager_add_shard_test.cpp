@@ -134,13 +134,16 @@ protected:
     }
 
     void expectSetFeatureCompatibilityVersion(const HostAndPort& target,
-                                              StatusWith<BSONObj> response) {
+                                              StatusWith<BSONObj> response,
+                                              BSONObj writeConcern) {
         onCommandForAddShard([&, target, response](const RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, target);
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("setFeatureCompatibilityVersion"
-                                   << "4.0"));
+                                   << "4.0"
+                                   << "writeConcern"
+                                   << writeConcern));
 
             return response;
         });
@@ -384,6 +387,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     DatabaseType discoveredDB1("TestDB1", ShardId("StandaloneShard"), false);
     DatabaseType discoveredDB2("TestDB2", ShardId("StandaloneShard"), false);
 
+    operationContext()->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
+
     auto future = launchAsync([this, expectedShardName] {
         Client::initThreadIfNotAlready();
         auto shardName =
@@ -415,7 +420,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+    expectSetFeatureCompatibilityVersion(
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -493,7 +499,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+    expectSetFeatureCompatibilityVersion(
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -886,7 +893,8 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+    expectSetFeatureCompatibilityVersion(
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -950,7 +958,8 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+    expectSetFeatureCompatibilityVersion(
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);
@@ -1026,7 +1035,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(shardTarget, BSON("ok" << 1));
+    expectSetFeatureCompatibilityVersion(
+        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
     // Wait for the addShard to complete before checking the config database
     future.timed_get(kLongFutureTimeout);

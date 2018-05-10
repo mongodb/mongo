@@ -2,7 +2,6 @@
  * This test sets moveParanoia flag and then check that the directory is created with the moved data
  */
 
-// TODO: SERVER-33444 remove shardAsReplicaSet: false
 var st = new ShardingTest({
     shards: 2,
     mongos: 1,
@@ -10,7 +9,6 @@ var st = new ShardingTest({
         chunkSize: 1,
         enableAutoSplit: true,
         shardOptions: {moveParanoia: ""},
-        shardAsReplicaSet: false
     }
 });
 

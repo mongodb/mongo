@@ -6,7 +6,7 @@ var verifyOutput = function(out) {
     assert.eq(out.counts.output, 512, "output count is wrong");
 };
 
-// TODO: SERVER-33444 remove shardAsReplicaSet: false
+// TODO: SERVER-33599 remove shardAsReplicaSet: false
 var st = new ShardingTest({
     shards: 2,
     verbose: 1,

@@ -40,7 +40,7 @@ namespace mongo {
 void EphemeralForTestRecoveryUnit::commitUnitOfWork() {
     try {
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
-            (*it)->commit();
+            (*it)->commit(boost::none);
         }
         _changes.clear();
     } catch (...) {

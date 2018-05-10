@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
@@ -118,7 +119,7 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
         }
         // Convert the error status back into the format of a command result.
         BSONObjBuilder statusObjBob;
-        CommandHelpers::appendCommandStatus(statusObjBob, status);
+        CommandHelpers::appendCommandStatusNoThrow(statusObjBob, status);
 
         // Get the Shard object in order to get the ConnectionString.
         auto shard =
@@ -138,7 +139,7 @@ BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Ver
     // Propagate all generic arguments out of the inner command since the shards will only process
     // them at the top level.
     for (auto elem : filtered) {
-        if (CommandHelpers::isGenericArgument(elem.fieldNameStringData())) {
+        if (isGenericArgument(elem.fieldNameStringData())) {
             out.append(elem);
         }
     }
@@ -235,7 +236,7 @@ void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
         singleShardBob.append("shardName", shardResults[i].shardTargetId.toString());
         {
             const auto shard = uassertStatusOK(
-                grid.shardRegistry()->getShard(opCtx, shardResults[i].shardTargetId));
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardResults[i].shardTargetId));
             singleShardBob.append("connectionString", shard->getConnString().toString());
         }
         appendIfRoom(&singleShardBob, serverInfo, "serverInfo");

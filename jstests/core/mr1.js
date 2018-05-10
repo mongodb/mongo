@@ -1,4 +1,4 @@
-// @tags: [does_not_support_stepdowns, requires_getmore]
+// @tags: [does_not_support_stepdowns, requires_getmore, requires_fastcount]
 
 t = db.mr1;
 t.drop();
@@ -152,14 +152,16 @@ assert(!res.ok, "should be not ok");
 if (true) {
     correct = {};
 
+    var bulk = t.initializeUnorderedBulkOp();
     for (i = 0; i < 20000; i++) {
         k = "Z" + i % 10000;
         if (correct[k])
             correct[k]++;
         else
             correct[k] = 1;
-        t.save({x: i, tags: [k]});
+        bulk.insert({x: i, tags: [k]});
     }
+    assert.writeOK(bulk.execute());
 
     res = db.runCommand({mapreduce: "mr1", out: "mr1_foo", map: m, reduce: r});
     d(res);

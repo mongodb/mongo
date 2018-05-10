@@ -81,7 +81,7 @@ BSONObj BatchedCommandResponse::toBSON() const {
     BSONObjBuilder builder;
 
     invariant(_isStatusSet);
-    CommandHelpers::appendCommandStatus(builder, _status);
+    uassertStatusOK(_status);
 
     if (_isNModifiedSet)
         builder.appendNumber(nModified(), _nModified);

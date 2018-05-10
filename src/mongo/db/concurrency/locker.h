@@ -93,6 +93,16 @@ public:
     virtual stdx::thread::id getThreadId() const = 0;
 
     /**
+     * Updates any cached thread id values to represent the current thread.
+     */
+    virtual void updateThreadIdToCurrentThread() = 0;
+
+    /**
+     * Clears any cached thread id values.
+     */
+    virtual void unsetThreadId() = 0;
+
+    /**
      * Indicate that shared locks should participate in two-phase locking for this Locker instance.
      */
     virtual void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) = 0;
@@ -287,6 +297,12 @@ public:
     virtual void getLockerInfo(LockerInfo* lockerInfo) const = 0;
 
     /**
+     * Returns boost::none if this is an instance of LockerNoop, or a populated LockerInfo
+     * otherwise.
+     */
+    virtual boost::optional<LockerInfo> getLockerInfo() const = 0;
+
+    /**
      * LockSnapshot captures the state of all resources that are locked, what modes they're
      * locked in, and how many times they've been locked in that mode.
      */
@@ -384,6 +400,12 @@ public:
     bool shouldAcquireTicket() const {
         return _shouldAcquireTicket;
     }
+    /**
+     * This function is for unit testing only.
+     */
+    unsigned numResourcesToUnlockAtEndUnitOfWorkForTest() const {
+        return _numResourcesToUnlockAtEndUnitOfWork;
+    }
 
 
 protected:
@@ -396,6 +418,11 @@ protected:
      * never interruptible.
      */
     int _uninterruptibleLocksRequested = 0;
+    /**
+     * The number of LockRequests to unlock at the end of this WUOW. This is used for locks
+     * participating in two-phase locking.
+     */
+    unsigned _numResourcesToUnlockAtEndUnitOfWork = 0;
 
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;

@@ -28,7 +28,8 @@ namespace asio {
 namespace ssl {
 namespace detail {
 
-engine::engine(SSL_CTX* context) : ssl_(::SSL_new(context)) {
+engine::engine(SSL_CTX* context, const std::string& remoteHostName)
+    : ssl_(::SSL_new(context)), _remoteHostName(remoteHostName) {
     if (!ssl_) {
         asio::error_code ec(static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category());
         asio::detail::throw_error(ec, "engine");
@@ -194,6 +195,14 @@ int engine::do_accept(void*, std::size_t) {
 }
 
 int engine::do_connect(void*, std::size_t) {
+    if (!_remoteHostName.empty()) {
+        int ret = ::SSL_set_tlsext_host_name(ssl_, _remoteHostName.c_str());
+        if (ret != 1)
+            return ret;
+
+        _remoteHostName.clear();
+    }
+
     return ::SSL_connect(ssl_);
 }
 

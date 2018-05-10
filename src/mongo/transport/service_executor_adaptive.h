@@ -38,9 +38,8 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/tick_source.h"
-
-#include <asio.hpp>
 
 namespace mongo {
 namespace transport {
@@ -82,9 +81,9 @@ public:
         virtual int recursionLimit() const = 0;
     };
 
-    explicit ServiceExecutorAdaptive(ServiceContext* ctx, std::shared_ptr<asio::io_context> ioCtx);
+    explicit ServiceExecutorAdaptive(ServiceContext* ctx, ReactorHandle reactor);
     explicit ServiceExecutorAdaptive(ServiceContext* ctx,
-                                     std::shared_ptr<asio::io_context> ioCtx,
+                                     ReactorHandle reactor,
                                      std::unique_ptr<Options> config);
 
     ServiceExecutorAdaptive(ServiceExecutorAdaptive&&) = default;
@@ -177,7 +176,7 @@ private:
     using MetricsArray =
         std::array<Metrics, static_cast<size_t>(ServiceExecutorTaskName::kMaxTaskName)>;
 
-    enum class ThreadCreationReason { kStuckDetection, kStarvation, kReserveMinimum, kError, kMax };
+    enum class ThreadCreationReason { kStuckDetection, kStarvation, kReserveMinimum, kMax };
     enum class ThreadTimer { kRunning, kExecuting };
 
     struct ThreadState {
@@ -206,7 +205,7 @@ private:
     TickSource::Tick _getThreadTimerTotal(ThreadTimer which,
                                           const stdx::unique_lock<stdx::mutex>& lk) const;
 
-    std::shared_ptr<asio::io_context> _ioContext;
+    ReactorHandle _reactorHandle;
 
     std::unique_ptr<Options> _config;
 

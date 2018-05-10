@@ -4,6 +4,15 @@
 // Eventually, _movePrimary will use this command.
 
 (() => {
+
+    function sortByName(a, b) {
+        if (a.name < b.name)
+            return -1;
+        if (a.name > b.name)
+            return 1;
+        return 0;
+    }
+
     var st = new ShardingTest({shards: 2}), testDB = st.s.getDB('test');
 
     // Enable sharding on the test DB.
@@ -43,29 +52,29 @@
     var fromShard = st.getPrimaryShard('test');
     var toShard = st.getOther(fromShard);
 
+    var res = fromShard.getDB('test').runCommand({listCollections: 1});
+    assert.commandWorked(res);
+    var collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+
+    collections.sort(sortByName);
+    var coll2uuid = collections[1].info.uuid;
+
     // Have the other shard clone the DB from the primary.
     assert.commandWorked(toShard.adminCommand(
         {_cloneCatalogData: 'test', from: fromShard.host, writeConcern: {w: "majority"}}));
 
     // Ask the shard that just called _cloneCatalogData for the collections.
-    var res = toShard.getDB('test').runCommand({listCollections: 1});
+    res = toShard.getDB('test').runCommand({listCollections: 1});
     assert.commandWorked(res);
 
-    var collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
+    collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
 
-    function sortByName(a, b) {
-        if (a.name < b.name)
-            return -1;
-        if (a.name > b.name)
-            return 1;
-        return 0;
-    }
+    // There should be 2 collections: coll1, coll2
+    assert.eq(collections.length, 2);
+    collections.sort(sortByName);
 
-    // There should be 1 collections: coll1
-    assert.eq(collections.length, 1);
-
-    var c1;
-    [c1] = collections;
+    var c1, c2;
+    [c1, c2] = collections;
 
     function checkName(c, expectedName) {
         assert.eq(
@@ -78,9 +87,20 @@
             c.options, expectedOptions, 'Missing expected option(s) for collection ' + c.name);
     }
 
+    function checkUUID(c, expectedUUID) {
+        assert.hasFields(c, ['info'], 'Missing info field for collection ' + c.name);
+        assert.hasFields(c.info, ['uuid'], 'Missing uuid field for collection ' + c.name);
+        assert.eq(c.info.uuid, expectedUUID, 'Incorrect uuid for collection ' + c.name);
+    }
+
     // c1 should be coll1.
     checkName(c1, 'coll1');
     checkOptions(c1, Object.keys(coll1Options));
+
+    // c2 should be coll2.
+    checkName(c2, 'coll2');
+    checkOptions(c2, Object.keys(coll2Options));
+    checkUUID(c2, coll2uuid);
 
     function checkIndexes(collName, expectedIndexes) {
         var res = toShard.getDB('test').runCommand({listIndexes: collName});
@@ -104,8 +124,9 @@
     }
 
     checkIndexes('coll1', coll1Indexes);
+    checkIndexes('coll2', coll2Indexes);
 
-    // Verify that the data from the unsharded collections resides on the secondary shard, and was
+    // Verify that the data from the unsharded collections resides on the new primary shard, and was
     // copied as part of the clone.
     function checkCount(shard, collName, count) {
         var res = shard.getDB('test').runCommand({count: collName});
@@ -145,8 +166,6 @@
         toShard.adminCommand(
             {_cloneCatalogData: 'test', from: fromShard.host, writeConcern: {w: "majority"}}),
         ErrorCodes.NamespaceExists);
-
-    // TODO SERVER-32847: check that collection UUIDs are correctly copied over.
 
     st.stop();
 })();

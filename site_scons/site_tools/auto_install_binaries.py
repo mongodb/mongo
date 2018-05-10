@@ -13,7 +13,7 @@ def generate(env):
         '.so' : 'lib',
     }
 
-    def tag_install(env, target, source, **kwargs):
+    def auto_install(env, target, source, **kwargs):
         prefixDir = env.Dir('$INSTALL_DIR')
 
         actions = []
@@ -26,13 +26,26 @@ def generate(env):
         for s in map(env.Entry, env.Flatten(source)):
             setattr(s.attributes, "aib_install_actions", actions)
 
-        tags = kwargs.get('INSTALL_ALIAS', [])
-        if tags:
-            env.Alias(tags, actions)
+        # Get the tags. If no tags were set, or a non-falsish thing
+        # was set then interpret that as a request for normal
+        # tagging. Auto include the 'all' tag, and generate
+        # aliases. If the user explicitly set the INSTALL_ALIAS to
+        # something falsy, interpret that as meaning no tags at all,
+        # so that we have a way to exempt targets from auto
+        # installation.
+        tags = kwargs.get('INSTALL_ALIAS', None)
+        if tags is None or tags:
+            tags = set(tags or [])
+            tags.add('all')
+            if 'default' in tags:
+                tags.remove('default')
+                env.Alias('install', actions)
+                env.Default('install')
+            env.Alias(['install-' + tag for tag in tags], actions)
 
         return actions
 
-    env.AddMethod(tag_install, 'Install')
+    env.AddMethod(auto_install, 'AutoInstall')
 
     def auto_install_emitter(target, source, env):
         for t in target:
@@ -46,7 +59,7 @@ def generate(env):
             if auto_install_location:
                 tentry_install_tags = env.get('INSTALL_ALIAS', [])
                 setattr(tentry.attributes, 'INSTALL_ALIAS', tentry_install_tags)
-                install = env.Install(auto_install_location, tentry, INSTALL_ALIAS=tentry_install_tags)
+                install = env.AutoInstall(auto_install_location, tentry, INSTALL_ALIAS=tentry_install_tags)
         return (target, source)
 
     def add_emitter(builder):
@@ -64,8 +77,10 @@ def generate(env):
         install_sources = node.sources
         for install_source in install_sources:
             is_executor = install_source.get_executor()
+            if not is_executor:
+                continue
             is_targets = is_executor.get_all_targets()
-            for is_target in is_targets:
+            for is_target in (is_targets or []):
                 grandchildren = is_target.children()
                 for grandchild in grandchildren:
                     actions = getattr(grandchild.attributes, "aib_install_actions", None)

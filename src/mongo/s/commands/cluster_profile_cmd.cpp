@@ -29,42 +29,35 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/profile_common.h"
 
 namespace mongo {
 namespace {
 
-class ProfileCmd : public ErrmsgCommandDeprecated {
+class ProfileCmd : public ProfileCmdBase {
 public:
-    ProfileCmd() : ErrmsgCommandDeprecated("profile") {}
+    ProfileCmd() = default;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    // On mongoS, the 'profile' command is only used to change the global 'slowms' and 'sampleRate'
+    // parameters. Since it does not apply to any specific database but rather the mongoS as a
+    // whole, we require that it be run on the 'admin' database.
+    bool adminOnly() const final {
+        return true;
     }
 
-    virtual bool adminOnly() const {
-        return false;
-    }
+protected:
+    int _applyProfilingLevel(OperationContext* opCtx,
+                             const std::string& dbName,
+                             int profilingLevel) const final {
+        // Because mongoS does not allow profiling, but only uses the 'profile' command to change
+        // 'slowms' and 'sampleRate' for logging purposes, we do not apply the profiling level here.
+        // Instead, we validate that the user is not attempting to set a "real" profiling level.
+        uassert(ErrorCodes::BadValue,
+                "Profiling is not permitted on mongoS: the 'profile' field should be 0 to change "
+                "'slowms' and 'sampleRate' settings for logging, or -1 to view current values",
+                profilingLevel == -1 || profilingLevel == 0);
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::enableProfiler);
-        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-    }
-
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
-        errmsg = "profile currently not supported via mongos";
-        return false;
+        return 0;
     }
 
 } profileCmd;

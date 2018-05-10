@@ -45,10 +45,12 @@ using boost::intrusive_ptr;
 DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransformation(
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<TransformerInterface> parsedTransform,
-    std::string name)
+    std::string name,
+    bool isIndependentOfAnyCollection)
     : DocumentSource(pExpCtx),
       _parsedTransform(std::move(parsedTransform)),
-      _name(std::move(name)) {}
+      _name(std::move(name)),
+      _isIndependentOfAnyCollection(isIndependentOfAnyCollection) {}
 
 const char* DocumentSourceSingleDocumentTransformation::getSourceName() const {
     return _name.c_str();

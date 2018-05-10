@@ -100,6 +100,20 @@ public:
     static std::pair<Status, int> killCursorsWithMatchingSessions(
         OperationContext* opCtx, const SessionKiller::Matcher& matcher);
 
+    /**
+     * Kills all cursors with matching logical session and transaction number. Returns the number of
+     * cursors successfully killed.
+     */
+    static size_t killAllCursorsForTransaction(OperationContext* opCtx,
+                                               LogicalSessionId lsid,
+                                               TxnNumber txnNumber);
+
+    /**
+     * Returns true if the CursorManager has cursor references for the given session ID and
+     * transaction number.
+     */
+    static bool hasTransactionCursorReference(LogicalSessionId lsid, TxnNumber txnNumber);
+
     CursorManager(NamespaceString nss);
 
     /**
@@ -110,7 +124,8 @@ public:
 
     /**
      * Kills all managed query executors and ClientCursors. Callers must have exclusive access to
-     * the collection (i.e. must have the collection, databse, or global resource locked in MODE_X).
+     * the collection (i.e. must have the collection, database, or global resource locked in
+     * MODE_X).
      *
      * 'collectionGoingAway' indicates whether the Collection instance is being deleted.  This could
      * be because the db is being closed, or the collection/db is being dropped.
@@ -132,12 +147,9 @@ public:
     /**
      * Destroys cursors that have been inactive for too long.
      *
-     * Returns the number of cursors that were timed out. If any of the cursors were running in
-     * transactions, appends those transaction IDs to 'txnsToAbort'.
+     * Returns the number of cursors that were timed out.
      */
-    std::size_t timeoutCursors(OperationContext* opCtx,
-                               Date_t now,
-                               std::vector<std::pair<LogicalSessionId, TxnNumber>>* txnsToAbort);
+    std::size_t timeoutCursors(OperationContext* opCtx, Date_t now);
 
     /**
      * Register an executor so that it can be notified of deletions, invalidations, collection
@@ -177,8 +189,7 @@ public:
 
     /**
      * Returns an OK status if the cursor was successfully killed, meaning either:
-     * (1) The cursor was erased from the cursor registry. In this case, we also return the
-     * transaction ID of the transaction the cursor belonged to (if it exists).
+     * (1) The cursor was erased from the cursor registry
      * (2) The cursor's operation was interrupted, and the cursor will be cleaned up when the
      * operation next checks for interruption.
      * Case (2) will only occur if the cursor is pinned.
@@ -186,10 +197,14 @@ public:
      * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager. Returns
      * ErrorCodes::OperationFailed if attempting to erase a pinned cursor.
      *
-     * If 'shouldAudit' is true, will perform audit logging.
+     * If 'shouldAudit' is true, will perform audit logging. If 'lsid' or 'txnNumber' are provided
+     * we will confirm that the cursor is owned by the given session or transaction.
      */
-    StatusWith<boost::optional<std::pair<LogicalSessionId, TxnNumber>>> killCursor(
-        OperationContext* opCtx, CursorId id, bool shouldAudit);
+    Status killCursor(OperationContext* opCtx,
+                      CursorId id,
+                      bool shouldAudit,
+                      boost::optional<LogicalSessionId> lsid = boost::none,
+                      boost::optional<TxnNumber> txnNumber = boost::none);
 
     /**
      * Returns an OK status if we're authorized to erase the cursor. Otherwise, returns
@@ -261,12 +276,22 @@ private:
     struct PlanExecutorPartitioner {
         std::size_t operator()(const PlanExecutor* exec, std::size_t nPartitions);
     };
+
+    // Adds a CursorId to structure that allows for lookup by LogicalSessionId and TxnNumber.
+    void addTransactionCursorReference(LogicalSessionId lsid,
+                                       TxnNumber txnNumber,
+                                       NamespaceString nss,
+                                       CursorId cursorId);
+
+    // Removes a CursorId from the LogicalSessionId / TxnNumber lookup structure.
+    void removeTransactionCursorReference(const ClientCursor* cursor);
+
     CursorId allocateCursorId_inlock();
 
     ClientCursorPin _registerCursor(
         OperationContext* opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
 
-    void deregisterCursor(ClientCursor* cc);
+    void deregisterCursor(ClientCursor* cursor);
 
     void unpin(OperationContext* opCtx, ClientCursor* cursor);
 

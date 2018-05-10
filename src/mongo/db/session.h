@@ -39,10 +39,13 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
+
+extern AtomicInt32 transactionLifetimeLimitSeconds;
 
 class OperationContext;
 class UpdateRequest;
@@ -59,6 +62,12 @@ class Session {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
+    struct TransactionState {
+        static const OperationContext::Decoration<TransactionState> get;
+
+        bool requiresIXReadUpgrade = false;
+    };
+
     /**
      * Holds state for a snapshot read or multi-statement transaction in between network operations.
      */
@@ -77,6 +86,13 @@ public:
         TxnResources& operator=(TxnResources&&) = default;
 
         /**
+         * Returns a const pointer to the stashed lock state, or nullptr if no stashed locks exist.
+         */
+        const Locker* locker() const {
+            return _locker.get();
+        }
+
+        /**
          * Releases stashed transaction state onto 'opCtx'. Must only be called once.
          */
         void release(OperationContext* opCtx);
@@ -86,9 +102,13 @@ public:
         std::unique_ptr<Locker> _locker;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         repl::ReadConcernArgs _readConcernArgs;
+        WriteUnitOfWork::RecoveryUnitState _ruState;
     };
 
     using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
+    using CursorKillFunction =
+        std::function<size_t(OperationContext*, LogicalSessionId, TxnNumber)>;
+    using CursorExistsFunction = std::function<bool(LogicalSessionId, TxnNumber)>;
 
     static const BSONObj kDeadEndSentinel;
 
@@ -108,31 +128,43 @@ public:
     void refreshFromStorageIfNeeded(OperationContext* opCtx);
 
     /**
-     * Starts a new transaction on the session, must be called after refreshFromStorageIfNeeded has
-     * been called. If an attempt is made to start a transaction with number less than the latest
-     * transaction this session has seen, an exception will be thrown.
+     * Starts a new transaction on the session, or continues an already active transaction. In this
+     * context, a "transaction" is a sequence of operations associated with a transaction number.
+     * This sequence of operations could be a retryable write or multi-statement transaction. Both
+     * utilize this method.
      *
-     * Sets the autocommit parameter for this transaction. If it is boost::none, no autocommit
-     * parameter was passed into the request. If this is the first statement of a transaction,
-     * the autocommit parameter will default to true.
+     * The 'autocommit' argument represents the value of the field given in the original client
+     * request. If it is boost::none, no autocommit parameter was passed into the request. Every
+     * operation that is part of a multi statement transaction must specify 'autocommit=false'.
+     * 'startTransaction' represents the value of the field given in the original client request,
+     * and indicates whether this operation is the beginning of a multi-statement transaction.
      *
-     * Autocommit can only be specified on the first statement of a transaction. If otherwise,
-     * this function will throw.
-     *
-     * Throws if the session has been invalidated or if an attempt is made to start a transaction
-     * older than the active.
+     * Throws an exception if:
+     *      - An attempt is made to start a transaction with number less than the latest
+     *        transaction this session has seen.
+     *      - The session has been invalidated.
+     *      - The values of 'autocommit' and/or 'startTransaction' are inconsistent with the current
+     *        state of the transaction.
      *
      * In order to avoid the possibility of deadlock, this method must not be called while holding a
-     * lock.
+     * lock. This method must also be called after refreshFromStorageIfNeeded has been called.
      */
     void beginOrContinueTxn(OperationContext* opCtx,
                             TxnNumber txnNumber,
-                            boost::optional<bool> autocommit);
+                            boost::optional<bool> autocommit,
+                            boost::optional<bool> startTransaction,
+                            StringData dbName,
+                            StringData cmdName);
     /**
      * Similar to beginOrContinueTxn except it is used specifically for shard migrations and does
      * not check or modify the autocommit parameter.
      */
     void beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber);
+
+    /**
+     * Called for speculative transactions to fix the optime of the snapshot to read from.
+     */
+    void setSpeculativeTransactionOpTimeToLastApplied(OperationContext* opCtx);
 
     /**
      * Called after a write under the specified transaction completes while the node is a primary
@@ -220,18 +252,50 @@ public:
     /**
      * Transfers management of transaction resources from the Session to the OperationContext.
      */
-    void unstashTransactionResources(OperationContext* opCtx);
+    void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
 
     /**
-     * If there is transaction in progress with transaction number 'txnNumber' and _autocommit=true,
-     * aborts the transaction.
+     * Registers a function that will be used to kill client cursors on transaction commit or abort.
+     * TODO SERVER-34395: Move cursor kill function into Session instead of registering.
      */
-    void abortIfSnapshotRead(TxnNumber txnNumber);
+    static void registerCursorKillFunction(CursorKillFunction cursorKillFunc) {
+        _cursorKillFunction = cursorKillFunc;
+    }
+
+    // TODO SERVER-34113: Remove the "cursor exists" mechanism from both Session and CursorManager
+    // once snapshot reads outside of multi-statement transcactions are no longer supported.
+    static void registerCursorExistsFunction(CursorExistsFunction cursorExistsFunc) {
+        _cursorExistsFunction = cursorExistsFunc;
+    }
 
     /**
-     * Aborts the transaction, releasing stashed transaction resources.
+     * Commits the transaction, including committing the write unit of work and updating
+     * transaction state.
      */
-    void abortTransaction();
+    void commitTransaction(OperationContext* opCtx);
+
+    /**
+     * Aborts the transaction outside the transaction, releasing transaction resources.
+     */
+    void abortArbitraryTransaction(OperationContext* opCtx, bool shouldKillClientCursors);
+
+    /**
+     * Same as abortArbitraryTransaction, except only executes if _transactionExpireDate indicates
+     * that the transaction has expired.
+     */
+    void abortArbitraryTransactionIfExpired(OperationContext* opCtx);
+
+    /*
+     * Aborts the transaction inside the transaction, releasing transaction resources.
+     * We're inside the transaction when we have the Session checked out and 'opCtx' owns the
+     * transaction resources.
+     */
+    void abortActiveTransaction(OperationContext* opCtx);
+
+    /**
+     * Kills any open client cursors associated with the current transaction.
+     */
+    void killTransactionCursors(OperationContext* opCtx);
 
     bool getAutocommit() const {
         return _autocommit;
@@ -255,6 +319,16 @@ public:
             _txnState == MultiDocumentTransactionState::kInSnapshotRead;
     }
 
+    bool transactionIsCommitted() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState == MultiDocumentTransactionState::kCommitted;
+    }
+
+    bool transactionIsAborted() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState == MultiDocumentTransactionState::kAborted;
+    }
+
     /**
      * Adds a stored operation to the list of stored operations for the current multi-document
      * (non-autocommit) transaction.  It is illegal to add operations when no multi-document
@@ -267,23 +341,57 @@ public:
      * and marks the transaction as closed.  It is illegal to attempt to add operations to the
      * transaction after this is called.
      */
-    std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations();
+    std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations(OperationContext* opCtx);
 
     const std::vector<repl::ReplOperation>& transactionOperationsForTest() {
         return _transactionOperations;
     }
 
+    TxnNumber getActiveTxnNumberForTest() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _activeTxnNumber;
+    }
+
     /**
-     * Scan through the list of operations and add new oplog entries for updating
-     * config.transactions if needed.
+     * If this session is holding stashed locks in _txnResourceStash, reports the current state of
+     * the session using the provided builder. Locks the session object's mutex while running.
      */
-    static std::vector<repl::OplogEntry> addOpsForReplicatingTxnTable(
-        const std::vector<repl::OplogEntry>& ops);
+    void reportStashedState(BSONObjBuilder* builder) const;
+
+    /**
+     * Convenience method which creates and populates a BSONObj containing the stashed state.
+     * Returns an empty BSONObj if this session has no stashed resources.
+     */
+    BSONObj reportStashedState() const;
+
+    /**
+     * Returns a new oplog entry if the given entry has transaction state embedded within in.
+     * The new oplog entry will contain the operation needed to replicate the transaction
+     * table.
+     * Returns boost::none if the given oplog doesn't have any transaction state or does not
+     * support update to the transaction table.
+     */
+    static boost::optional<repl::OplogEntry> createMatchingTransactionTableUpdate(
+        const repl::OplogEntry& entry);
 
 private:
-    void _beginOrContinueTxn(WithLock, TxnNumber txnNumber, boost::optional<bool> autocommit);
+    // Holds function to be used to kill client cursors.
+    static CursorKillFunction _cursorKillFunction;
+    // Holds function which determines whether the CursorManager has client cursor references for a
+    // given transaction.
+    static CursorExistsFunction _cursorExistsFunction;
 
-    void _beginOrContinueTxnOnMigration(WithLock, TxnNumber txnNumber);
+    void _beginOrContinueTxn(WithLock,
+                             OperationContext* opCtx,
+                             TxnNumber txnNumber,
+                             boost::optional<bool> autocommit,
+                             boost::optional<bool> startTransaction,
+                             bool* canKillCursors);
+
+    void _beginOrContinueTxnOnMigration(WithLock,
+                                        OperationContext* opCtx,
+                                        TxnNumber txnNumber,
+                                        bool* canKillCursors);
 
     // Checks if there is a conflicting operation on the current Session
     void _checkValid(WithLock) const;
@@ -292,9 +400,12 @@ private:
     // we don't start a txn that is too old.
     void _checkTxnValid(WithLock, TxnNumber txnNumber) const;
 
-    void _setActiveTxn(WithLock, TxnNumber txnNumber);
+    void _setActiveTxn(WithLock,
+                       OperationContext* opCtx,
+                       TxnNumber txnNumber,
+                       bool* canKillCursors);
 
-    void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
+    void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber, bool checkAbort) const;
 
     boost::optional<repl::OpTime> _checkStatementExecuted(WithLock,
                                                           TxnNumber txnNumber,
@@ -310,12 +421,38 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
-    void _releaseStashedTransactionResources(WithLock);
+    void _abortArbitraryTransaction(WithLock, OperationContext* opCtx, bool* canKillCursors);
+
+    // Releases stashed transaction resources to abort the transaction.
+    // 'canKillCursors' is an output parameter, which when set to true indicates that transaction
+    // client cursors may be killed.
+    void _abortTransaction(WithLock, OperationContext* opCtx, bool* canKillCursors);
+
+    // Committing a transaction first changes its state to "Committing" and writes to the oplog,
+    // then it changes the state to "Committed".
+    //
+    // When a transaction is in "Committing" state, it's not allowed for other threads to change its
+    // state (i.e. abort the transaction), otherwise the on-disk state will diverge from the
+    // in-memory state.
+    // There are 3 cases where the transaction will be aborted.
+    // 1) abortTransaction command. Session check-out mechanism only allows one client to access a
+    // transaction.
+    // 2) killSession, stepdown, transaction timeout and any thread that aborts the transaction
+    // outside of session checkout. They can safely skip the committing transactions.
+    // 3) Migration. Should be able to skip committing transactions.
+    void _commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationContext* opCtx);
+
+    void _killTransactionCursors(OperationContext* opCtx,
+                                 LogicalSessionId lsid,
+                                 TxnNumber txnNumber);
 
     const LogicalSessionId _sessionId;
 
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
+
+    // Condition variable notified when we finish an attempt to commit the global WUOW.
+    stdx::condition_variable _commitcv;
 
     // Specifies whether the session information needs to be refreshed from storage
     bool _isValid{false};
@@ -354,6 +491,9 @@ private:
     // transaction.  Not used for retryable writes.
     std::vector<repl::ReplOperation> _transactionOperations;
 
+    // Total size in bytes of all operations within the _transactionOperations vector.
+    size_t _transactionOperationBytes = 0;
+
     // For the active txn, tracks which statement ids have been committed and at which oplog
     // opTime. Used for fast retryability check and retrieving the previous write's data without
     // having to scan through the oplog.
@@ -361,6 +501,17 @@ private:
 
     // Set in _beginOrContinueTxn and applies to the activeTxn on the session.
     bool _autocommit{true};
+
+    // Set when a snapshot read / transaction begins. Alleviates cache pressure by limiting how long
+    // a snapshot will remain open and available. Checked in combination with _txnState to determine
+    // whether the transaction should be aborted.
+    // This is unset until a transaction begins on the session, and then reset only when new
+    // transactions begin.
+    boost::optional<Date_t> _transactionExpireDate;
+
+    // The OpTime a speculative transaction is reading from and also the earliest opTime it
+    // should wait for write concern for on commit.
+    repl::OpTime _speculativeTransactionReadOpTime;
 };
 
 }  // namespace mongo

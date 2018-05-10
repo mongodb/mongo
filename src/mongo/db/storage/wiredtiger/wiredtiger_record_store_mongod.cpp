@@ -72,7 +72,7 @@ public:
      * Returns true iff there was an oplog to delete from.
      */
     bool _deleteExcessDocuments() {
-        if (!getGlobalServiceContext()->getGlobalStorageEngine()) {
+        if (!getGlobalServiceContext()->getStorageEngine()) {
             LOG(2) << "no global storage engine yet";
             return false;
         }

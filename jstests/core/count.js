@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.jstests_count;
 
 t.drop();

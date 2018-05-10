@@ -121,7 +121,8 @@ bool IndexFilterCommand::run(OperationContext* opCtx,
                              BSONObjBuilder& result) {
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
     Status status = runIndexFilterCommand(opCtx, nss.ns(), cmdObj, &result);
-    return CommandHelpers::appendCommandStatus(result, status);
+    uassertStatusOK(status);
+    return true;
 }
 
 
@@ -313,7 +314,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
                                          expCtx,
                                          extensionsCallback,
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
-        invariantOK(statusWithCQ.getStatus());
+        invariant(statusWithCQ.getStatus());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.

@@ -30,6 +30,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version_gen.h"
 
 namespace mongo {
 
@@ -65,5 +66,18 @@ Status onShardVersionMismatch(OperationContext* opCtx,
  */
 ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
                                                 const NamespaceString& nss);
+
+/**
+ * Should be called when any client request on this shard generates a StaleDbVersion exception.
+ *
+ * Invalidates the cached database version, schedules a refresh of the database info, waits for the
+ * refresh to complete, and updates the cached database version.
+ */
+void onDbVersionMismatch(OperationContext* opCtx,
+                         const StringData dbName,
+                         const DatabaseVersion& clientDbVersion,
+                         const boost::optional<DatabaseVersion>& serverDbVersion) noexcept;
+
+void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName);
 
 }  // namespace mongo

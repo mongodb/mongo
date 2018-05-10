@@ -60,14 +60,6 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
-    // Name for a shard's collections metadata collection, each document of which indicates the
-    // state of a specific collection.
-    static constexpr StringData kShardConfigCollectionsCollectionName =
-        "config.cache.collections"_sd;
-
-    // Name for causal consistency's key collection.
-    static constexpr StringData kSystemKeysCollectionName = "admin.system.keys"_sd;
-
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this
@@ -77,6 +69,17 @@ public:
 
     // Namespace for storing the transaction information for each session
     static const NamespaceString kSessionTransactionsTableNamespace;
+
+    // Name for a shard's collections metadata collection, each document of which indicates the
+    // state of a specific collection
+    static const NamespaceString kShardConfigCollectionsNamespace;
+
+    // Name for a shard's databases metadata collection, each document of which indicates the state
+    // of a specific database
+    static const NamespaceString kShardConfigDatabasesNamespace;
+
+    // Name for causal consistency's key collection.
+    static const NamespaceString kSystemKeysNamespace;
 
     // Namespace of the the oplog collection.
     static const NamespaceString kRsOplogNamespace;
@@ -171,7 +174,7 @@ public:
     };
 
     StringData db() const {
-        return _dotIndex == std::string::npos ? StringData() : StringData(_ns.c_str(), _dotIndex);
+        return _dotIndex == std::string::npos ? _ns : StringData(_ns.data(), _dotIndex);
     }
 
     StringData coll() const {
@@ -211,6 +214,9 @@ public:
     }
     bool isSystem() const {
         return coll().startsWith("system.");
+    }
+    bool isAdminDB() const {
+        return db() == kAdminDb;
     }
     bool isLocal() const {
         return db() == kLocalDb;

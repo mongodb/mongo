@@ -46,6 +46,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/index/index_access_methods",
         "$BUILD_DIR/mongo/db/query_exec",
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+    ],
 )
 
 env.CppUnitTest(

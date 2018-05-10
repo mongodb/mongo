@@ -193,11 +193,12 @@ wts_ops(int lastrun)
 			tinfo = tinfo_list[i];
 			total.commit += tinfo->commit;
 			total.deadlock += tinfo->deadlock;
-			total.prepare += tinfo->prepare;
 			total.insert += tinfo->insert;
+			total.prepare += tinfo->prepare;
 			total.remove += tinfo->remove;
 			total.rollback += tinfo->rollback;
 			total.search += tinfo->search;
+			total.truncate += tinfo->truncate;
 			total.update += tinfo->update;
 
 			switch (tinfo->state) {
@@ -496,21 +497,37 @@ begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 	u_int v;
 	const char *config;
 	char config_buf[64];
+	bool locked;
+
+	locked = false;
 
 	if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
-		v = mmrand(&tinfo->rnd, 2, 4);
+		v = mmrand(&tinfo->rnd, 1, 3);
 	switch (v) {
-	case ISOLATION_READ_UNCOMMITTED:
+	case 1:
+		v = ISOLATION_READ_UNCOMMITTED;
 		config = "isolation=read-uncommitted";
 		break;
-	case ISOLATION_READ_COMMITTED:
+	case 2:
+		v = ISOLATION_READ_COMMITTED;
 		config = "isolation=read-committed";
 		break;
-	case ISOLATION_SNAPSHOT:
+	case 3:
 	default:
 		v = ISOLATION_SNAPSHOT;
 		config = "isolation=snapshot";
+
 		if (g.c_txn_timestamps) {
+			/*
+			 * Avoid starting a new reader when a prepare is in
+			 * progress.
+			 */
+			if (g.c_prepare) {
+				testutil_check(
+				    pthread_rwlock_rdlock(&g.prepare_lock));
+				locked = true;
+			}
+
 			/*
 			 * Set the thread's read timestamp to the current value
 			 * before allocating a new read timestamp. This
@@ -530,6 +547,9 @@ begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
 	*iso_configp = v;
 
 	testutil_check(session->begin_transaction(session, config));
+
+	if (locked)
+		testutil_check(pthread_rwlock_unlock(&g.prepare_lock));
 
 	/*
 	 * It's OK for the oldest timestamp to move past a running query, clear
@@ -617,15 +637,12 @@ rollback_transaction(TINFO *tinfo, WT_SESSION *session)
 static int
 prepare_transaction(TINFO *tinfo, WT_SESSION *session)
 {
+	WT_DECL_RET;
 	uint64_t ts;
 	char config_buf[64];
 
-	/*
-	 * We cannot prepare a transaction if logging on the table is set.
-	 * Prepare also requires timestamps. Skip if not using timestamps,
-	 * if no timestamp has yet been set, or if using logging.
-	 */
-	if (!g.c_txn_timestamps || g.timestamp == 0 || g.c_logging)
+	/* Skip if no timestamp has yet been set. */
+	if (g.timestamp == 0)
 		return (0);
 
 	/*
@@ -635,10 +652,23 @@ prepare_transaction(TINFO *tinfo, WT_SESSION *session)
 	 */
 	++tinfo->prepare;
 
+	/*
+	 * Synchronize prepare call with begin transaction to prevent a new
+	 * reader creeping in.
+	 *
+	 * Prepare will return error if prepare timestamp is less than any
+	 * active read timestamp.
+	 */
+	testutil_check(pthread_rwlock_wrlock(&g.prepare_lock));
+
 	ts = set_commit_timestamp(tinfo);
 	testutil_check(__wt_snprintf(
 	    config_buf, sizeof(config_buf), "prepare_timestamp=%" PRIx64, ts));
-	return (session->prepare_transaction(session, config_buf));
+	ret = session->prepare_transaction(session, config_buf);
+
+	testutil_check(pthread_rwlock_unlock(&g.prepare_lock));
+
+	return (ret);
 }
 
 /*
@@ -690,6 +720,7 @@ ops(void *arg)
 	val_gen_init(tinfo->value);
 	tinfo->lastkey = &tinfo->_lastkey;
 	key_gen_init(tinfo->lastkey);
+	tinfo->tbuf = &tinfo->_tbuf;
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	cursor = NULL;
@@ -1071,10 +1102,10 @@ update_instead_of_chosen_op:
 		}
 
 		/*
-		 * Prepare the transaction 10% of the time.
-		 * Currently doesn't work with truncation, see WT-3922.
+		 * If prepare configured, prepare the transaction 10% of the
+		 * time.
 		 */
-		if (g.c_truncate == 0 && mmrand(&tinfo->rnd, 1, 10) == 1) {
+		if (g.c_prepare && mmrand(&tinfo->rnd, 1, 10) == 1) {
 			ret = prepare_transaction(tinfo, session);
 			testutil_assert(ret == 0 || ret == WT_PREPARE_CONFLICT);
 			if (ret == WT_PREPARE_CONFLICT)
@@ -1113,6 +1144,7 @@ deadlock:			++tinfo->deadlock;
 	key_gen_teardown(tinfo->key);
 	val_gen_teardown(tinfo->value);
 	key_gen_teardown(tinfo->lastkey);
+	free(tinfo->tbuf->mem);
 
 	tinfo->state = TINFO_COMPLETE;
 	return (WT_THREAD_RET_VALUE);
@@ -1291,11 +1323,11 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
 {
 	WT_DECL_RET;
 	WT_ITEM key, value;
-	uint64_t keyno;
+	uint64_t keyno, keyno_prev;
 	uint8_t bitfield;
 	int cmp;
 	const char *which;
-	bool incrementing;
+	bool incrementing, record_gaps;
 
 	keyno = 0;
 	which = next ? "WT_CURSOR.next" : "WT_CURSOR.prev";
@@ -1332,41 +1364,85 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
 		if (DATASOURCE("lsm"))
 			break;
 
+		/*
+		 * Compare the returned key with the previously returned key,
+		 * and assert the order is correct. If not deleting keys, and
+		 * the rows aren't in the column-store insert name space, also
+		 * assert we don't skip groups of records (that's a page-split
+		 * bug symptom).
+		 */
+		record_gaps = g.c_delete_pct != 0;
 		switch (g.type) {
 		case FIX:
 		case VAR:
-			testutil_assertfmt(
-			    !next || tinfo->keyno < keyno,
-			    "%s returned %" PRIu64 " then %" PRIu64,
-			    which, tinfo->keyno, keyno);
-			testutil_assertfmt(
-			    next || tinfo->keyno > keyno,
-			    "%s returned %" PRIu64 " then %" PRIu64,
-			    which, tinfo->keyno, keyno);
+			if (tinfo->keyno > g.c_rows || keyno > g.c_rows)
+				record_gaps = true;
+			if (!next) {
+				if (tinfo->keyno < keyno ||
+				    (!record_gaps && keyno != tinfo->keyno - 1))
+					goto order_error_col;
+			} else
+				if (tinfo->keyno > keyno ||
+				    (!record_gaps && keyno != tinfo->keyno + 1))
+					goto order_error_col;
+			if (0) {
+order_error_col:
+				testutil_die(0,
+				    "%s returned %" PRIu64 " then %" PRIu64,
+				    which, tinfo->keyno, keyno);
+			}
 
 			tinfo->keyno = keyno;
 			break;
 		case ROW:
-			cmp = memcmp(tinfo->key->data, key.data,
-			    WT_MIN(tinfo->key->size, key.size));
 			incrementing =
 			    (next && !g.c_reverse) || (!next && g.c_reverse);
-			testutil_assertfmt(
-			    !incrementing ||
-			    cmp < 0 ||
-			    (cmp == 0 && tinfo->key->size < key.size),
-			    "%s returned {%.*s} then {%.*s}",
-			    which,
-			    (int)tinfo->key->size, tinfo->key->data,
-			    (int)key.size, key.data);
-			testutil_assertfmt(
-			    incrementing ||
-			    cmp > 0 ||
-			    (cmp == 0 && tinfo->key->size > key.size),
-			    "%s returned {%.*s} then {%.*s}",
-			    which,
-			    (int)tinfo->key->size, tinfo->key->data,
-			    (int)key.size, key.data);
+			cmp = memcmp(tinfo->key->data, key.data,
+			    WT_MIN(tinfo->key->size, key.size));
+			if (incrementing) {
+				if (cmp > 0 ||
+				    (cmp == 0 && tinfo->key->size < key.size))
+					goto order_error_row;
+			} else
+				if (cmp < 0 ||
+				    (cmp == 0 && tinfo->key->size > key.size))
+					goto order_error_row;
+			if (!record_gaps) {
+				/*
+				 * Convert the keys to record numbers and then
+				 * compare less-than-or-equal. (Not less-than,
+				 * row-store inserts new rows in-between rows
+				 * by append a new suffix to the row's key.)
+				 */
+				testutil_check(__wt_buf_fmt(
+				    (WT_SESSION_IMPL *)cursor->session,
+				    tinfo->tbuf, "%.*s",
+				    (int)tinfo->key->size,
+				    (char *)tinfo->key->data));
+				keyno_prev =
+				    strtoul(tinfo->tbuf->data, NULL, 10);
+				testutil_check(__wt_buf_fmt(
+				    (WT_SESSION_IMPL *)cursor->session,
+				    tinfo->tbuf, "%.*s",
+				    (int)key.size, (char *)key.data));
+				keyno = strtoul(tinfo->tbuf->data, NULL, 10);
+				if (incrementing) {
+					if (keyno_prev != keyno &&
+					    keyno_prev + 1 != keyno)
+						goto order_error_row;
+				} else
+					if (keyno_prev != keyno &&
+					    keyno_prev - 1 != keyno)
+						goto order_error_row;
+			}
+			if (0) {
+order_error_row:
+				testutil_die(0,
+				    "%s returned {%.*s} then {%.*s}",
+				    which,
+				    (int)tinfo->key->size, tinfo->key->data,
+				    (int)key.size, key.data);
+			}
 
 			testutil_check(__wt_buf_set((WT_SESSION_IMPL *)
 			    cursor->session, tinfo->key, key.data, key.size));
@@ -1379,7 +1455,7 @@ nextprev(TINFO *tinfo, WT_CURSOR *cursor, bool next)
 		return (ret);
 	}
 
-	if (g.logging == LOG_OPS)
+	if (ret == 0 && g.logging == LOG_OPS)
 		switch (g.type) {
 		case FIX:
 			(void)g.wt_api->msg_printf(g.wt_api,

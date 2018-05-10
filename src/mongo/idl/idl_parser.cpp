@@ -33,7 +33,7 @@
 #include "mongo/idl/idl_parser.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -247,7 +247,7 @@ void IDLParserErrorContext::appendGenericCommandArguments(
 
         StringData name = element.fieldNameStringData();
         // Include a passthrough field as long the IDL class has not defined it.
-        if (CommandHelpers::isGenericArgument(name) &&
+        if (mongo::isGenericArgument(name) &&
             std::find(knownFields.begin(), knownFields.end(), name) == knownFields.end()) {
             builder->append(element);
         }

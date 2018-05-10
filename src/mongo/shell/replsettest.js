@@ -67,6 +67,10 @@
  * Member variables:
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
+
+/* Global default timeout variable */
+const kReplDefaultTimeoutMS = 10 * 60 * 1000;
+
 var ReplSetTest = function(opts) {
     'use strict';
 
@@ -91,17 +95,10 @@ var ReplSetTest = function(opts) {
 
     var _causalConsistency;
 
-    this.kDefaultTimeoutMS = 10 * 60 * 1000;
+    this.kDefaultTimeoutMS = kReplDefaultTimeoutMS;
     var oplogName = 'oplog.rs';
 
     // Publicly exposed variables
-
-    /**
-     * Populates a reference to all reachable nodes.
-     */
-    function _clearLiveNodes() {
-        self.liveNodes = {master: null, slaves: []};
-    }
 
     /**
      * Returns the config document reported from the specified connection.
@@ -111,40 +108,47 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Invokes the 'ismaster' command on each individual node and returns whether the node is the
-     * current RS master.
+     * Invokes the 'ismaster' command on each individual node and returns the current primary, or
+     * false if none is found. Populates the following cached values:
+     * '_master': the current primary
+     * '_slaves': all nodes other than 'master' (note this includes arbiters)
+     * '_liveNodes': all currently reachable nodes
      */
     function _callIsMaster() {
-        _clearLiveNodes();
+        self._liveNodes = [];
+        self._master = null;
+        self._slaves = [];
 
         var twoPrimaries = false;
         self.nodes.forEach(function(node) {
             try {
                 node.setSlaveOk();
                 var n = node.getDB('admin').runCommand({ismaster: 1});
+                self._liveNodes.push(node);
                 if (n.ismaster == true) {
-                    if (self.liveNodes.master) {
+                    if (self._master) {
                         twoPrimaries = true;
                     } else {
-                        self.liveNodes.master = node;
+                        self._master = node;
                     }
                 } else {
-                    self.liveNodes.slaves.push(node);
+                    self._slaves.push(node);
                 }
             } catch (err) {
                 print("ReplSetTest Could not call ismaster on node " + node + ": " + tojson(err));
+                self._slaves.push(node);
             }
         });
         if (twoPrimaries) {
             return false;
         }
 
-        return self.liveNodes.master || false;
+        return self._master || false;
     }
 
-    function asCluster(conn, fn) {
-        if (self.keyFile) {
-            return authutil.asCluster(conn, self.keyFile, fn);
+    function asCluster(conn, fn, keyFileParam = self.keyFile) {
+        if (keyFileParam) {
+            return authutil.asCluster(conn, keyFileParam, fn);
         } else {
             return fn();
         }
@@ -221,7 +225,7 @@ var ReplSetTest = function(opts) {
             try {
                 var conn = _callIsMaster();
                 if (!conn) {
-                    conn = self.liveNodes.slaves[0];
+                    conn = self._liveNodes[0];
                 }
 
                 // Try again to load connection
@@ -439,10 +443,7 @@ var ReplSetTest = function(opts) {
     this.getReplSetConfig = function() {
         var cfg = {};
         cfg._id = this.name;
-
-        if (this.protocolVersion !== undefined && this.protocolVersion !== null) {
-            cfg.protocolVersion = this.protocolVersion;
-        }
+        cfg.protocolVersion = 1;
 
         cfg.members = [];
 
@@ -467,10 +468,6 @@ var ReplSetTest = function(opts) {
             }
 
             cfg.members.push(member);
-        }
-
-        if (jsTestOptions().forceReplicationProtocolVersion !== undefined) {
-            cfg.protocolVersion = jsTestOptions().forceReplicationProtocolVersion;
         }
 
         if (_configSettings) {
@@ -516,21 +513,22 @@ var ReplSetTest = function(opts) {
     };
 
     /**
-     * Blocks until the secondary nodes have completed recovery and their roles are known.
+     * Blocks until the secondary nodes have completed recovery and their roles are known. Blocks on
+     * all secondary nodes or just 'slaves', if specified.
      */
-    this.awaitSecondaryNodes = function(timeout) {
+    this.awaitSecondaryNodes = function(timeout, slaves) {
         timeout = timeout || self.kDefaultTimeoutMS;
 
         assert.soonNoExcept(function() {
             // Reload who the current slaves are
             self.getPrimary(timeout);
 
-            var slaves = self.liveNodes.slaves;
-            var len = slaves.length;
+            var slavesToCheck = slaves || self._slaves;
+            var len = slavesToCheck.length;
             var ready = true;
 
             for (var i = 0; i < len; i++) {
-                var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
+                var isMaster = slavesToCheck[i].getDB("admin").runCommand({ismaster: 1});
                 var arbiter = (isMaster.arbiterOnly == undefined ? false : isMaster.arbiterOnly);
                 ready = ready && (isMaster.secondary || arbiter);
             }
@@ -656,7 +654,8 @@ var ReplSetTest = function(opts) {
             var primary = expectedPrimaryNodeId;
 
             for (var i = 0; i < nodes.length; i++) {
-                var replSetGetStatus = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+                var replSetGetStatus =
+                    assert.commandWorked(nodes[i].getDB("admin").runCommand({replSetGetStatus: 1}));
                 var nodesPrimary = -1;
                 for (var j = 0; j < replSetGetStatus.members.length; j++) {
                     if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {
@@ -762,7 +761,7 @@ var ReplSetTest = function(opts) {
     this.status = function(timeout) {
         var master = _callIsMaster();
         if (!master) {
-            master = this.liveNodes.slaves[0];
+            master = this._liveNodes[0];
         }
 
         return master.getDB("admin").runCommand({replSetGetStatus: 1});
@@ -833,12 +832,12 @@ var ReplSetTest = function(opts) {
     };
 
     this._setDefaultConfigOptions = function(config) {
-        if (jsTestOptions().forceReplicationProtocolVersion !== undefined &&
-            !config.hasOwnProperty("protocolVersion")) {
-            config.protocolVersion = jsTestOptions().forceReplicationProtocolVersion;
-        }
         // Update config for non journaling test variants
         this._updateConfigIfNotDurable(config);
+        // Add protocolVersion if missing
+        if (!config.hasOwnProperty('protocolVersion')) {
+            config['protocolVersion'] = 1;
+        }
     };
 
     /**
@@ -848,7 +847,8 @@ var ReplSetTest = function(opts) {
      * aren't authorized to run replSetGetStatus.
      * TODO(SERVER-14017): remove this in favor of using initiate() everywhere.
      */
-    this.initiateWithAnyNodeAsPrimary = function(cfg, initCmd) {
+    this.initiateWithAnyNodeAsPrimary = function(
+        cfg, initCmd, {doNotWaitForStableCheckpoint: doNotWaitForStableCheckpoint = false} = {}) {
         var master = this.nodes[0].getDB("admin");
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
@@ -933,7 +933,6 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             jsTest.authenticateNodes(this.nodes);
         }
-
         this.awaitSecondaryNodes();
 
         let shouldWaitForKeys = true;
@@ -945,8 +944,9 @@ var ReplSetTest = function(opts) {
                 let val = self.nodeOptions[key];
                 if (typeof(val) === "object" &&
                     (val.hasOwnProperty("shardsvr") ||
-                     // TODO: SERVER-31376
-                     val.hasOwnProperty("binVersion") && val.binVersion != "latest")) {
+                     val.hasOwnProperty("binVersion") &&
+                         // Should not wait for keys if version is less than 3.6
+                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
                     shouldWaitForKeys = false;
                     print("Set shouldWaitForKeys from node options: " + shouldWaitForKeys);
                 }
@@ -955,7 +955,9 @@ var ReplSetTest = function(opts) {
                 let val = self.startOptions;
                 if (typeof(val) === "object" &&
                     (val.hasOwnProperty("shardsvr") ||
-                     val.hasOwnProperty("binVersion") && val.binVersion != "latest")) {
+                     val.hasOwnProperty("binVersion") &&
+                         // Should not wait for keys if version is less than 3.6
+                         MongoRunner.compareBinVersions(val.binVersion, "3.6") == -1)) {
                     shouldWaitForKeys = false;
                     print("Set shouldWaitForKeys from start options: " + shouldWaitForKeys);
                 }
@@ -994,6 +996,9 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        if (!doNotWaitForStableCheckpoint) {
+            self.awaitLastStableCheckpointTimestamp();
+        }
     };
 
     /**
@@ -1033,38 +1038,8 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        if (this.protocolVersion === 0 || jsTestOptions().forceReplicationProtocolVersion === 0) {
-            // Ensure the specified node is primary.
-            for (let i = 0; i < this.nodes.length; i++) {
-                let primary = this.getPrimary();
-                if (primary === node) {
-                    break;
-                }
-                try {
-                    // Make sure the nodes do not step back up for 10 minutes.
-                    assert.commandWorked(
-                        primary.adminCommand({replSetStepDown: 10 * 60, force: true}));
-                } catch (ex) {
-                    print("Caught exception while stepping down node '" + tojson(node.host) +
-                          "': " + tojson(ex));
-                }
-                this.awaitReplication();
-                this.awaitNodesAgreeOnAppliedOpTime();
-                this.awaitNodesAgreeOnPrimary();
-            }
-
-            // Reset the rest of the nodes so they can run for election during the test.
-            for (let i = 0; i < this.nodes.length; i++) {
-                // Cannot call replSetFreeze on the primary.
-                if (this.nodes[i] === node) {
-                    continue;
-                }
-                assert.commandWorked(this.nodes[i].adminCommand({replSetFreeze: 0}));
-            }
-        } else {
-            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
-            this.awaitNodesAgreeOnPrimary();
-        }
+        assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+        this.awaitNodesAgreeOnPrimary();
         assert.eq(this.getPrimary(), node, node.host + " was not primary after stepUp");
     };
 
@@ -1124,7 +1099,7 @@ var ReplSetTest = function(opts) {
      * of the oplog on *all* secondaries.
      * Returns last oplog entry.
      */
-    this.awaitLastOpCommitted = function() {
+    this.awaitLastOpCommitted = function(timeout) {
         var rst = this;
         var master = rst.getPrimary();
         var masterOpTime = _getLastOpTime(master);
@@ -1132,32 +1107,155 @@ var ReplSetTest = function(opts) {
         print("Waiting for op with OpTime " + tojson(masterOpTime) +
               " to be committed on all secondaries");
 
-        assert.soonNoExcept(function() {
-            for (var i = 0; i < rst.nodes.length; i++) {
-                var node = rst.nodes[i];
+        assert.soonNoExcept(
+            function() {
+                for (var i = 0; i < rst.nodes.length; i++) {
+                    var node = rst.nodes[i];
 
-                // Continue if we're connected to an arbiter
-                var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
-                if (res.myState == ReplSetTest.State.ARBITER) {
+                    // Continue if we're connected to an arbiter
+                    var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+                    if (res.myState == ReplSetTest.State.ARBITER) {
+                        continue;
+                    }
+                    var rcmOpTime = _getReadConcernMajorityOpTime(node);
+                    if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
+                        return false;
+                    }
+                    if (rs.compareOpTimes(rcmOpTime, masterOpTime) < 0) {
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+            "Op with OpTime " + tojson(masterOpTime) + " failed to be committed on all secondaries",
+            timeout);
+
+        return masterOpTime;
+    };
+
+    /**
+     * This function waits for all nodes in this replica set to take a stable checkpoint. In order
+     * to be able to roll back a node must have a stable timestamp. In order to be able to restart
+     * and not go into resync right after initial sync, a node must have a stable checkpoint. By
+     * waiting for all nodes to report having a stable checkpoint, we ensure that both of these
+     * conditions are met and that our tests can run as expected. Beyond simply waiting, this
+     * function does writes to ensure that a stable checkpoint will be taken.
+     */
+    this.awaitLastStableCheckpointTimestamp = function() {
+        let rst = this;
+        let master = rst.getPrimary();
+        let id = tojson(rst.nodeList());
+
+        // Algorithm precondition: All nodes must be in primary/secondary state.
+        //
+        // 1) Perform a majority write. This will guarantee the primary updates its commit point
+        //    to the value of this write.
+        //
+        // 2) Perform a second write. This will guarantee that all nodes will update their commit
+        //    point to a time that is >= the previous write. That will trigger a stable checkpoint
+        //    on all nodes.
+        // TODO(SERVER-33248): Remove this block. We should not need to prod the replica set to
+        // advance the commit point if the commit point being lagged is sufficient to choose a
+        // sync source.
+        function advanceCommitPoint(master) {
+            // Shadow 'db' so that we can call 'advanceCommitPoint' directly on the primary node.
+            let db = master.getDB('admin');
+            const appendOplogNoteFn = function() {
+                assert.commandWorked(db.adminCommand({
+                    "appendOplogNote": 1,
+                    "data": {"awaitLastStableCheckpointTimestamp": 1},
+                    "writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}
+                }));
+                assert.commandWorked(db.adminCommand(
+                    {"appendOplogNote": 1, "data": {"awaitLastStableCheckpointTimestamp": 2}}));
+            };
+
+            // TODO(SERVER-14017): Remove this extra sub-shell in favor of a cleaner authentication
+            // solution.
+            const masterId = "n" + rst.getNodeId(master);
+            const masterOptions = rst.nodeOptions[masterId] || {};
+            if (masterOptions.clusterAuthMode === "x509") {
+                print("AwaitLastStableCheckpointTimestamp: authenticating on separate shell " +
+                      "with x509 for " + id);
+                const subShellArgs = [
+                    'mongo',
+                    '--ssl',
+                    '--sslCAFile=' + masterOptions.sslCAFile,
+                    '--sslPEMKeyFile=' + masterOptions.sslPEMKeyFile,
+                    '--sslAllowInvalidHostnames',
+                    '--authenticationDatabase=$external',
+                    '--authenticationMechanism=MONGODB-X509',
+                    master.host,
+                    '--eval',
+                    `(${appendOplogNoteFn.toString()})();`
+                ];
+
+                const retVal = _runMongoProgram(...subShellArgs);
+                assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+            } else {
+                if (masterOptions.clusterAuthMode) {
+                    print("AwaitLastStableCheckpointTimestamp: authenticating with " +
+                          masterOptions.clusterAuthMode + " for " + id);
+                }
+                asCluster(master, appendOplogNoteFn, masterOptions.keyFile);
+            }
+        }
+
+        print("AwaitLastStableCheckpointTimestamp: Beginning for " + id);
+
+        let replSetStatus = assert.commandWorked(master.adminCommand("replSetGetStatus"));
+        if (replSetStatus["configsvr"]) {
+            // Performing dummy replicated writes against a configsvr is hard, especially if auth
+            // is also enabled.
+            return;
+        }
+
+        rst.awaitNodesAgreeOnPrimary();
+        master = rst.getPrimary();
+
+        print("AwaitLastStableCheckpointTimestamp: ensuring the commit point advances for " + id);
+        advanceCommitPoint(master);
+
+        print("AwaitLastStableCheckpointTimestamp: Waiting for stable checkpoints for " + id);
+
+        assert.soonNoExcept(function() {
+            for (let node of rst.nodes) {
+                // The `lastStableCheckpointTimestamp` field contains the timestamp of a previous
+                // checkpoint taken at a stable timestamp. At startup recovery, this field
+                // contains the timestamp reflected in the data. After startup recovery, it may
+                // be lagged and there may be a stable checkpoint at a newer timestamp.
+                let res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+
+                // Continue if we're connected to an arbiter.
+                if (res.myState === ReplSetTest.State.ARBITER) {
                     continue;
                 }
-                var rcmOpTime = _getReadConcernMajorityOpTime(node);
-                if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
-                    return false;
+
+                // A missing `lastStableCheckpointTimestamp` field indicates that the storage
+                // engine does not support `recover to a stable timestamp`.
+                if (!res.hasOwnProperty("lastStableCheckpointTimestamp")) {
+                    continue;
                 }
-                if (rs.compareOpTimes(rcmOpTime, masterOpTime) < 0) {
+
+                // A null `lastStableCheckpointTimestamp` indicates that the storage engine supports
+                // "recover to a stable timestamp" but does not have a stable checkpoint yet.
+                if (res.lastStableCheckpointTimestamp.getTime() === 0) {
+                    print("AwaitLastStableCheckpointTimestamp: " + node.host +
+                          " does not have a stable checkpoint yet.");
                     return false;
                 }
             }
 
             return true;
-        }, "Op with OpTime " + tojson(masterOpTime) + " failed to be committed on all secondaries");
+        }, "Not all members have a stable checkpoint");
 
-        return masterOpTime;
+        print("AwaitLastStableCheckpointTimestamp: Successfully took stable checkpoints on " + id);
     };
 
-    // Wait until the optime of the specified type reaches the primary's last applied optime.
-    this.awaitReplication = function(timeout, secondaryOpTimeType) {
+    // Wait until the optime of the specified type reaches the primary's last applied optime. Blocks
+    // on all secondary nodes or just 'slaves', if specified.
+    this.awaitReplication = function(timeout, secondaryOpTimeType, slaves) {
         timeout = timeout || self.kDefaultTimeoutMS;
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
@@ -1201,8 +1299,10 @@ var ReplSetTest = function(opts) {
                 print("ReplSetTest awaitReplication: checking secondaries " +
                       "against latest primary optime " + tojson(masterLatestOpTime));
                 var secondaryCount = 0;
-                for (var i = 0; i < self.liveNodes.slaves.length; i++) {
-                    var slave = self.liveNodes.slaves[i];
+
+                var slavesToCheck = slaves || self._slaves;
+                for (var i = 0; i < slavesToCheck.length; i++) {
+                    var slave = slavesToCheck[i];
                     var slaveName = slave.toString().substr(14);  // strip "connection to "
 
                     var slaveConfigVersion =
@@ -1276,22 +1376,40 @@ var ReplSetTest = function(opts) {
                 awaitLastOpTimeWrittenFn();
 
                 print("ReplSetTest awaitReplication: resetting: optime for primary " +
-                      self.liveNodes.master + " is " + tojson(masterLatestOpTime));
+                      self._master + " is " + tojson(masterLatestOpTime));
 
                 return false;
             }
         }, "awaiting replication", timeout);
     };
 
-    this.getHashes = function(db) {
+    // Gets the dbhash for the current primary and for all secondaries (or the members of 'slaves',
+    // if specified).
+    this.getHashes = function(db, slaves) {
+        assert.neq(db, 'local', 'Cannot run getHashes() on the "local" database');
+
+        // getPrimary() repopulates 'self._slaves'.
         this.getPrimary();
         var res = {};
-        res.master = this.liveNodes.master.getDB(db).runCommand("dbhash");
+        slaves = slaves || this._slaves;
+
+        // If MapReduce is interrupted by a stepdown, it could still have 'tmp.mr' collections that
+        // it will not be able to delete. Excluding them from dbhash will prevent a mismatch.
+        // TODO SERVER-27147: no need to exclude 'tmp.mr' collections
+        var collections = this._master.getDB(db).getCollectionNames();
+        var colls_excluding_tmp_mr = collections.filter(coll => !coll.startsWith("tmp.mr."));
+        res.master =
+            this._master.getDB(db).runCommand({dbhash: 1, collections: colls_excluding_tmp_mr});
         res.slaves = [];
-        this.liveNodes.slaves.forEach(function(node) {
+        slaves.forEach(function(node) {
             var isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
             if (!isArbiter) {
-                var slaveRes = node.getDB(db).runCommand("dbhash");
+                collections = node.getDB(db).getCollectionNames();
+                colls_excluding_tmp_mr = collections.filter(coll => {
+                    return !coll.startsWith("tmp.mr.");
+                });
+                var slaveRes =
+                    node.getDB(db).runCommand({dbhash: 1, collections: colls_excluding_tmp_mr});
                 res.slaves.push(slaveRes);
             }
         });
@@ -1313,7 +1431,7 @@ var ReplSetTest = function(opts) {
     };
 
     // Call the provided checkerFunction, after the replica set has been write locked.
-    this.checkReplicaSet = function(checkerFunction, ...checkerFunctionArgs) {
+    this.checkReplicaSet = function(checkerFunction, slaves, ...checkerFunctionArgs) {
         assert.eq(typeof checkerFunction,
                   "function",
                   "Expected checkerFunction parameter to be a function");
@@ -1321,6 +1439,7 @@ var ReplSetTest = function(opts) {
         // Call getPrimary to populate rst with information about the nodes.
         var primary = this.getPrimary();
         assert(primary, 'calling getPrimary() failed');
+        slaves = slaves || self._slaves;
 
         // Since we cannot determine if there is a background index in progress (SERVER-26624), we
         // use the "collMod" command to wait for any index builds that may be in progress on the
@@ -1357,7 +1476,7 @@ var ReplSetTest = function(opts) {
         assert.commandWorked(primary.adminCommand({fsync: 1, lock: 1}),
                              'failed to lock the primary');
         try {
-            this.awaitReplication(60 * 1000 * 5);
+            this.awaitReplication(null, null, slaves);
             checkerFunction.apply(this, checkerFunctionArgs);
         } catch (e) {
             activeException = true;
@@ -1378,6 +1497,7 @@ var ReplSetTest = function(opts) {
         }
     };
 
+    // Check the replicated data hashes for all live nodes in the set.
     this.checkReplicatedDataHashes = function(
         msgPrefix = 'checkReplicatedDataHashes', excludedDBs = [], ignoreUUIDs = false) {
         // Return items that are in either Array `a` or `b` but not both. Note that this will
@@ -1515,21 +1635,21 @@ var ReplSetTest = function(opts) {
             }
         }
 
-        function checkDBHashesForReplSet(rst, dbBlacklist = [], msgPrefix, ignoreUUIDs) {
+        function checkDBHashesForReplSet(rst, dbBlacklist = [], slaves, msgPrefix, ignoreUUIDs) {
             // We don't expect the local database to match because some of its
             // collections are not replicated.
             dbBlacklist.push('local');
+            slaves = slaves || rst._slaves;
 
             var success = true;
             var hasDumpedOplog = false;
 
-            // Use liveNodes.master instead of getPrimary() to avoid the detection
-            // of a new primary.
-            // liveNodes must have been populated.
-            var primary = rst.liveNodes.master;
+            // Use '_master' instead of getPrimary() to avoid the detection of a new primary.
+            // '_master' must have been populated.
+            var primary = rst._master;
             var combinedDBs = new Set(primary.getDBNames());
 
-            rst.liveNodes.slaves.forEach(secondary => {
+            slaves.forEach(secondary => {
                 secondary.getDBNames().forEach(dbName => combinedDBs.add(dbName));
             });
 
@@ -1538,12 +1658,12 @@ var ReplSetTest = function(opts) {
                     continue;
                 }
 
-                var dbHashes = rst.getHashes(dbName);
-                var primaryDBHash = dbHashes.master;
-                var primaryCollections = Object.keys(primaryDBHash.collections);
-                assert.commandWorked(primaryDBHash);
-
                 try {
+                    var dbHashes = rst.getHashes(dbName, slaves);
+                    var primaryDBHash = dbHashes.master;
+                    var primaryCollections = Object.keys(primaryDBHash.collections);
+                    assert.commandWorked(primaryDBHash);
+
                     // Filter only collections that were retrieved by the dbhash. listCollections
                     // may include non-replicated collections like system.profile.
                     var primaryCollInfo =
@@ -1676,11 +1796,21 @@ var ReplSetTest = function(opts) {
             assert(success, 'dbhash mismatch between primary and secondary');
         }
 
-        this.checkReplicaSet(checkDBHashesForReplSet, this, excludedDBs, msgPrefix, ignoreUUIDs);
+        _callIsMaster();
+        var liveSlaves = self._slaves.filter(function(n) {
+            return self._liveNodes.indexOf(n) !== -1;
+        });
+        this.checkReplicaSet(checkDBHashesForReplSet,
+                             liveSlaves,
+                             this,
+                             excludedDBs,
+                             liveSlaves,
+                             msgPrefix,
+                             ignoreUUIDs);
     };
 
     this.checkOplogs = function(msgPrefix) {
-        this.checkReplicaSet(checkOplogs, this, msgPrefix);
+        this.checkReplicaSet(checkOplogs, null, this, msgPrefix);
     };
 
     /**
@@ -1783,6 +1913,46 @@ var ReplSetTest = function(opts) {
     }
 
     /**
+     * Checks that 'fastCount' matches an iterative count for all collections.
+     */
+    this.checkCollectionCounts = function(msgPrefix = 'checkCollectionCounts') {
+        let success = true;
+        const errPrefix = `${msgPrefix}, counts did not match for collection`;
+
+        function checkCollectionCount(coll) {
+            const itCount = coll.find().itcount();
+            const fastCount = coll.count();
+            if (itCount !== fastCount) {
+                print(`${errPrefix} ${coll.getFullName()} on ${coll.getMongo().host}.` +
+                      ` itcount: ${itCount}, fast count: ${fastCount}`);
+                print("Collection info: " +
+                      tojson(coll.getDB().getCollectionInfos({name: coll.getName()})));
+                print("Collection stats: " + tojson(coll.stats()));
+                success = false;
+            }
+        }
+
+        function checkCollectionCountsForDB(_db) {
+            const res = assert.commandWorked(
+                _db.runCommand({listCollections: 1, includePendingDrops: true}));
+            const collNames = new DBCommandCursor(_db, res).toArray();
+            collNames.forEach(c => checkCollectionCount(_db.getCollection(c.name)));
+        }
+
+        function checkCollectionCountsForNode(node) {
+            const dbNames = node.getDBNames();
+            dbNames.forEach(dbName => checkCollectionCountsForDB(node.getDB(dbName)));
+        }
+
+        function checkCollectionCountsForReplSet(rst) {
+            rst.nodes.forEach(node => checkCollectionCountsForNode(node));
+            assert(success, `Collection counts did not match. search for '${errPrefix}' in logs.`);
+        }
+
+        this.checkReplicaSet(checkCollectionCountsForReplSet, null, this);
+    };
+
+    /**
      * Starts up a server.  Options are saved by default for subsequent starts.
      *
      *
@@ -1838,7 +2008,9 @@ var ReplSetTest = function(opts) {
 
         // If restarting a node, use its existing options as the defaults.
         if ((options && options.restart) || restart) {
-            options = Object.merge(this.nodes[n].fullOptions, options);
+            const existingOpts =
+                _useBridge ? _unbridgedNodes[n].fullOptions : this.nodes[n].fullOptions;
+            options = Object.merge(existingOpts, options);
         } else {
             options = Object.merge(defaults, options);
         }
@@ -2031,12 +2203,10 @@ var ReplSetTest = function(opts) {
             // - the replica set is in an unrecoverable inconsistent state. E.g. the replica set
             //   is partitioned.
             //
-            if (_callIsMaster() &&
-                this.liveNodes.slaves.length > 0) {  // skip for single node replsets.
+            if (_callIsMaster() && this._liveNodes.length > 1) {  // skip for sets with 1 live node
                 // Auth only on live nodes because authutil.assertAuthenticate
                 // refuses to log in live connections if some secondaries are down.
-                asCluster([this.liveNodes.master, ...this.liveNodes.slaves],
-                          () => this.checkReplicatedDataHashes());
+                asCluster(this._liveNodes, () => this.checkReplicatedDataHashes());
             }
         }
 
@@ -2171,6 +2341,8 @@ var ReplSetTest = function(opts) {
         self.ports = existingNodes.map(node => node.split(':')[1]);
         self.nodes = existingNodes.map(node => new Mongo(node));
         self.waitForKeys = false;
+        self.host = existingNodes[0].split(':')[0];
+        self.name = conf._id;
     }
 
     if (typeof opts === 'string' || opts instanceof String) {
@@ -2184,6 +2356,12 @@ var ReplSetTest = function(opts) {
         _constructStartNewInstances(opts);
     }
 };
+
+/**
+ * Declare kDefaultTimeoutMS as a static property so we don't have to initialize
+ * a ReplSetTest object to use it.
+ */
+ReplSetTest.kDefaultTimeoutMS = kReplDefaultTimeoutMS;
 
 /**
  * Set of states that the replica set can be in. Used for the wait functions.

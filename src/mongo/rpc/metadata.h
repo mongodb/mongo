@@ -31,8 +31,8 @@
 #include <tuple>
 
 #include "mongo/base/status_with.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 class BSONObj;

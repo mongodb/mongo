@@ -57,19 +57,7 @@
 namespace mongo {
 MultiIndexBlock::Impl::~Impl() = default;
 
-namespace {
-stdx::function<MultiIndexBlock::factory_function_type> factory;
-}  // namespace
-
-void MultiIndexBlock::registerFactory(decltype(factory) newFactory) {
-    factory = std::move(newFactory);
-}
-
-auto MultiIndexBlock::makeImpl(OperationContext* const opCtx, Collection* const collection)
-    -> std::unique_ptr<Impl> {
-    return factory(opCtx, collection);
-}
-
+MONGO_DEFINE_SHIM(MultiIndexBlock::makeImpl);
 
 void MultiIndexBlock::TUHook::hook() noexcept {}
 }  // namespace mongo

@@ -71,6 +71,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 		break;
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
+		WT_ASSERT(session, alloc_entries != 0);
 		/*
 		 * Internal pages have an array of references to objects so they
 		 * can split.  Allocate the array of references and optionally,
@@ -102,11 +103,13 @@ err:			if ((pindex = WT_INTL_INDEX_GET_SAFE(page)) != NULL) {
 		}
 		break;
 	case WT_PAGE_COL_VAR:
-		page->pg_var = (WT_COL *)((uint8_t *)page + sizeof(WT_PAGE));
+		page->pg_var = alloc_entries == 0 ?
+		    NULL : (WT_COL *)((uint8_t *)page + sizeof(WT_PAGE));
 		page->entries = alloc_entries;
 		break;
 	case WT_PAGE_ROW_LEAF:
-		page->pg_row = (WT_ROW *)((uint8_t *)page + sizeof(WT_PAGE));
+		page->pg_row = alloc_entries == 0 ?
+		    NULL : (WT_ROW *)((uint8_t *)page + sizeof(WT_PAGE));
 		page->entries = alloc_entries;
 		break;
 	WT_ILLEGAL_VALUE(session);

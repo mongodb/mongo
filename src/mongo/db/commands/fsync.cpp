@@ -147,8 +147,8 @@ public:
             }
 
             // Take a global IS lock to ensure the storage engine is not shutdown
-            Lock::GlobalLock global(opCtx, MODE_IS, Date_t::max());
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+            Lock::GlobalLock global(opCtx, MODE_IS);
+            StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
             result.append("numFiles", storageEngine->flushAllFiles(opCtx, sync));
             return true;
         }
@@ -185,7 +185,7 @@ public:
             if (!status.isOK()) {
                 releaseLock();
                 warning() << "fsyncLock failed. Lock count reset to 0. Status: " << status;
-                return CommandHelpers::appendCommandStatus(result, status);
+                uassertStatusOK(status);
             }
         }
 
@@ -356,7 +356,7 @@ void FSyncLockThread::run() {
             return;
         }
         opCtx.lockState()->downgradeGlobalXtoSForMMAPV1();
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
 
         try {
             storageEngine->flushAllFiles(&opCtx, true);

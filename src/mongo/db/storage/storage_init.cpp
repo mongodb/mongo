@@ -54,7 +54,7 @@ public:
 
     virtual BSONObj generateSection(OperationContext* opCtx,
                                     const BSONElement& configElement) const {
-        auto engine = opCtx->getClient()->getServiceContext()->getGlobalStorageEngine();
+        auto engine = opCtx->getClient()->getServiceContext()->getStorageEngine();
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
                            << bool(engine->getSnapshotManager())
                            << "supportsSnapshotReadConcern"

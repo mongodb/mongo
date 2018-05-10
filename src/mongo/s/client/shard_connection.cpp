@@ -217,7 +217,7 @@ public:
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         std::vector<ShardId> all;
-        shardRegistry->getAllShardIds(&all);
+        shardRegistry->getAllShardIdsNoReload(&all);
 
         // Don't report exceptions here as errors in GetLastError
         LastError::Disabled ignoreForGLE(&LastError::get(cc()));

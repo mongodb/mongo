@@ -1,5 +1,4 @@
-"""
-A more reliable way to create and destroy processes.
+"""A more reliable way to create and destroy processes.
 
 Uses job objects when running on Windows to ensure that all created
 processes are terminated.
@@ -29,14 +28,13 @@ if os.name == "posix" and sys.version_info[0] == 2:
         import warnings
         warnings.warn(("Falling back to using the subprocess module because subprocess32 isn't"
                        " available. When using the subprocess module, a child process may trigger"
-                       " an invalid free(). See SERVER-22219 for more details."),
-                      RuntimeWarning)
-        import subprocess
+                       " an invalid free(). See SERVER-22219 for more details."), RuntimeWarning)
+        import subprocess  # type: ignore
 else:
     import subprocess
 
-from . import pipe
-from .. import utils
+from . import pipe  # pylint: disable=wrong-import-position
+from .. import utils  # pylint: disable=wrong-import-position
 
 # Attempt to avoid race conditions (e.g. hangs caused by a file descriptor being left open) when
 # starting subprocesses concurrently from multiple threads by guarding calls to subprocess.Popen()
@@ -74,8 +72,7 @@ if sys.platform == "win32":
                 win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
 
         # Update the limits of the job object.
-        win32job.SetInformationJobObject(job_object,
-                                         win32job.JobObjectExtendedLimitInformation,
+        win32job.SetInformationJobObject(job_object, win32job.JobObjectExtendedLimitInformation,
                                          job_info)
 
         return job_object
@@ -89,15 +86,12 @@ if sys.platform == "win32":
 
 
 class Process(object):
-    """
-    Wrapper around subprocess.Popen class.
-    """
+    """Wrapper around subprocess.Popen class."""
+
+    # pylint: disable=protected-access
 
     def __init__(self, logger, args, env=None, env_vars=None):
-        """
-        Initializes the process with the specified logger, arguments,
-        and environment.
-        """
+        """Initialize the process with the specified logger, arguments, and environment."""
 
         # Ensure that executable files that don't already have an
         # extension on Windows have a ".exe" extension.
@@ -117,10 +111,7 @@ class Process(object):
         self._stderr_pipe = None
 
     def start(self):
-        """
-        Starts the process and the logger pipes for its stdout and
-        stderr.
-        """
+        """Start the process and the logger pipes for its stdout and stderr."""
 
         creation_flags = 0
         if sys.platform == "win32" and _JOB_OBJECT is not None:
@@ -138,13 +129,9 @@ class Process(object):
         close_fds = (sys.platform != "win32")
 
         with _POPEN_LOCK:
-            self._process = subprocess.Popen(self.args,
-                                             bufsize=buffer_size,
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE,
-                                             close_fds=close_fds,
-                                             env=self.env,
-                                             creationflags=creation_flags)
+            self._process = subprocess.Popen(self.args, bufsize=buffer_size, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, close_fds=close_fds,
+                                             env=self.env, creationflags=creation_flags)
             self.pid = self._process.pid
 
         self._stdout_pipe = pipe.LoggerPipe(self.logger, logging.INFO, self._process.stdout)
@@ -164,25 +151,24 @@ class Process(object):
                 if return_code == win32con.STILL_ACTIVE:
                     raise
 
-    def stop(self, kill=False):
+    def stop(self, kill=False):  # pylint: disable=too-many-branches
         """Terminate the process."""
         if sys.platform == "win32":
 
             # Attempt to cleanly shutdown mongod.
-            if not kill and len(self.args) > 0 and self.args[0].find("mongod") != -1:
+            if not kill and self.args and self.args[0].find("mongod") != -1:
                 mongo_signal_handle = None
                 try:
                     mongo_signal_handle = win32event.OpenEvent(
-                        win32event.EVENT_MODIFY_STATE, False, "Global\\Mongo_" +
-                        str(self._process.pid))
+                        win32event.EVENT_MODIFY_STATE, False,
+                        "Global\\Mongo_" + str(self._process.pid))
 
                     if not mongo_signal_handle:
                         # The process has already died.
                         return
                     win32event.SetEvent(mongo_signal_handle)
                     # Wait 60 seconds for the program to exit.
-                    status = win32event.WaitForSingleObject(
-                        self._process._handle, 60 * 1000)
+                    status = win32event.WaitForSingleObject(self._process._handle, 60 * 1000)
                     if status == win32event.WAIT_OBJECT_0:
                         return
                 except win32process.error as err:
@@ -225,13 +211,11 @@ class Process(object):
                     raise
 
     def poll(self):
+        """Poll."""
         return self._process.poll()
 
     def wait(self):
-        """
-        Waits until the process has terminated and all output has been
-        consumed by the logger pipes.
-        """
+        """Wait until process has terminated and all output has been consumed by the logger pipes."""
 
         return_code = self._process.wait()
 
@@ -243,9 +227,7 @@ class Process(object):
         return return_code
 
     def as_command(self):
-        """
-        Returns an equivalent command line invocation of the process.
-        """
+        """Return an equivalent command line invocation of the process."""
 
         default_env = os.environ
         env_diff = self.env.copy()

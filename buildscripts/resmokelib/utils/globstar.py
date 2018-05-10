@@ -1,6 +1,4 @@
-"""
-Filename globbing utility.
-"""
+"""Filename globbing utility."""
 
 from __future__ import absolute_import
 
@@ -9,23 +7,19 @@ import os
 import os.path
 import re
 
-
 _GLOBSTAR = "**"
 _CONTAINS_GLOB_PATTERN = re.compile("[*?[]")
 
 
-def is_glob_pattern(s):
-    """
-    Returns true if 's' represents a glob pattern, and false otherwise.
-    """
+def is_glob_pattern(string):
+    """Return true if 'string' represents a glob pattern, and false otherwise."""
 
     # Copied from glob.has_magic().
-    return _CONTAINS_GLOB_PATTERN.search(s) is not None
+    return _CONTAINS_GLOB_PATTERN.search(string) is not None
 
 
 def glob(globbed_pathname):
-    """
-    Return a list of pathnames matching the 'globbed_pathname' pattern.
+    """Return a list of pathnames matching the 'globbed_pathname' pattern.
 
     In addition to containing simple shell-style wildcards a la fnmatch,
     the pattern may also contain globstars ("**"), which is recursively
@@ -36,8 +30,7 @@ def glob(globbed_pathname):
 
 
 def iglob(globbed_pathname):
-    """
-    Emit a list of pathnames matching the 'globbed_pathname' pattern.
+    """Emit a list of pathnames matching the 'globbed_pathname' pattern.
 
     In addition to containing simple shell-style wildcards a la fnmatch,
     the pattern may also contain globstars ("**"), which is recursively
@@ -80,9 +73,7 @@ def iglob(globbed_pathname):
 
 
 def _split_path(pathname):
-    """
-    Return 'pathname' as a list of path components.
-    """
+    """Return 'pathname' as a list of path components."""
 
     parts = []
 
@@ -101,45 +92,43 @@ def _split_path(pathname):
 
 
 def _canonicalize(parts):
-    """
-    Return a copy of 'parts' with consecutive "**"s coalesced.
+    """Return a copy of 'parts' with consecutive "**"s coalesced.
+
     Raise a ValueError for unsupported uses of "**".
     """
 
     res = []
 
     prev_was_globstar = False
-    for p in parts:
-        if p == _GLOBSTAR:
+    for part in parts:
+        if part == _GLOBSTAR:
             # Skip consecutive **'s
             if not prev_was_globstar:
                 prev_was_globstar = True
-                res.append(p)
-        elif _GLOBSTAR in p:  # a/b**/c or a/**b/c
+                res.append(part)
+        elif _GLOBSTAR in part:  # a/b**/c or a/**b/c
             raise ValueError("Can only specify glob patterns of the form a/**/b")
         else:
             prev_was_globstar = False
-            res.append(p)
+            res.append(part)
 
     return res
 
 
 def _find_globstar(parts):
-    """
-    Return the index of the first occurrence of "**" in 'parts'.
+    """Return the index of the first occurrence of "**" in 'parts'.
+
     Return -1 if "**" is not found in the list.
     """
 
-    for (i, p) in enumerate(parts):
-        if p == _GLOBSTAR:
-            return i
+    for (idx, part) in enumerate(parts):
+        if part == _GLOBSTAR:
+            return idx
     return -1
 
 
 def _list_dir(pathname):
-    """
-    Return a pair of the subdirectory names and filenames immediately
-    contained within the 'pathname' directory.
+    """Return a pair of subdirectory names and filenames contained within the 'pathname' directory.
 
     If 'pathname' does not exist, then None is returned.
     """
@@ -152,9 +141,9 @@ def _list_dir(pathname):
 
 
 def _expand(pathname):
-    """
-    Emit tuples of the form ("dir", dirname) and ("file", filename)
-    of all directories and files contained within the 'pathname' directory.
+    """Emit tuples of the form ("dir", dirname) and ("file", filename).
+
+    The result is for all directories and files contained within the 'pathname' directory.
     """
 
     res = _list_dir(pathname)
@@ -167,20 +156,20 @@ def _expand(pathname):
     if os.path.basename(pathname):
         yield ("dir", os.path.join(pathname, ""))
 
-    for f in files:
-        path = os.path.join(pathname, f)
+    for fname in files:
+        path = os.path.join(pathname, fname)
         yield ("file", path)
 
-    for d in dirs:
-        path = os.path.join(pathname, d)
-        for x in _expand(path):
-            yield x
+    for dname in dirs:
+        path = os.path.join(pathname, dname)
+        for xpath in _expand(path):
+            yield xpath
 
 
 def _expand_curdir(pathname):
-    """
-    Emit tuples of the form ("dir", dirname) and ("file", filename)
-    of all directories and files contained within the 'pathname' directory.
+    """Emit tuples of the form ("dir", dirname) and ("file", filename).
+
+    The result is for all directories and files contained within the 'pathname' directory.
 
     The returned pathnames omit a "./" prefix.
     """
@@ -194,9 +183,9 @@ def _expand_curdir(pathname):
     # Zero expansion
     yield ("dir", "")
 
-    for f in files:
-        yield ("file", f)
+    for fname in files:
+        yield ("file", fname)
 
-    for d in dirs:
-        for x in _expand(d):
-            yield x
+    for dname in dirs:
+        for xdir in _expand(dname):
+            yield xdir

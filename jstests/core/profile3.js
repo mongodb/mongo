@@ -1,4 +1,7 @@
-
+// @tags: [
+//     # profile command is not available on embedded
+//     incompatible_with_embedded,
+// ]
 // special db so that it can be run in parallel tests
 var stddb = db;
 var db = db.getSisterDB("profile3");

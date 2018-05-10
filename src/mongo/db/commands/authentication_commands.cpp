@@ -45,8 +45,10 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
@@ -54,24 +56,109 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
-
-using std::hex;
-using std::string;
-using std::stringstream;
+namespace {
 
 static bool _isX509AuthDisabled;
 static const char _nonceAuthenticationDisabledMessage[] =
     "Challenge-response authentication using getnonce and authenticate commands is disabled.";
 static const char _x509AuthenticationDisabledMessage[] = "x.509 authentication is disabled.";
 
-void CmdAuthenticate::disableAuthMechanism(std::string authMechanism) {
-    if (authMechanism == "MONGODB-X509") {
-        _isX509AuthDisabled = true;
+#ifdef MONGO_CONFIG_SSL
+Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj) {
+    if (!getSSLManager()) {
+        return Status(ErrorCodes::ProtocolError,
+                      "SSL support is required for the MONGODB-X509 mechanism.");
+    }
+    if (user.getDB() != "$external") {
+        return Status(ErrorCodes::ProtocolError,
+                      "X.509 authentication must always use the $external database.");
+    }
+
+    Client* client = Client::getCurrent();
+    AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
+    auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
+    uassert(ErrorCodes::AuthenticationFailed,
+            "No verified subject name available from client",
+            !clientName.empty());
+
+    if (!getSSLManager()->getSSLConfiguration().hasCA) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "Unable to verify x.509 certificate, as no CA has been provided.");
+    } else if (user.getUser() != clientName) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "There is no x.509 client certificate matching the user.");
+    } else {
+        // Handle internal cluster member auth, only applies to server-server connections
+        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
+            int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
+            if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
+                clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
+                return Status(ErrorCodes::AuthenticationFailed,
+                              "The provided certificate "
+                              "can only be used for cluster authentication, not client "
+                              "authentication. The current configuration does not allow "
+                              "x.509 cluster authentication, check the --clusterAuthMode flag");
+            }
+            authorizationSession->grantInternalAuthorization();
+        }
+        // Handle normal client authentication, only applies to client-server connections
+        else {
+            if (_isX509AuthDisabled) {
+                return Status(ErrorCodes::BadValue, _x509AuthenticationDisabledMessage);
+            }
+            Status status = authorizationSession->addAndAuthorizeUser(opCtx, user);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+        return Status::OK();
     }
 }
+#endif  // MONGO_CONFIG_SSL
+
+class CmdAuthenticate : public BasicCommand {
+public:
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
+    }
+    std::string help() const override {
+        return "internal";
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) const {}  // No auth required
+
+    CmdAuthenticate() : BasicCommand("authenticate") {}
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result);
+
+private:
+    /**
+     * Completes the authentication of "user" using "mechanism" and parameters from "cmdObj".
+     *
+     * Returns Status::OK() on success.  All other statuses indicate failed authentication.  The
+     * entire status returned here may always be used for logging.  However, if the code is
+     * AuthenticationFailed, the "reason" field of the return status may contain information
+     * that should not be revealed to the connected client.
+     *
+     * Other than AuthenticationFailed, common returns are BadValue, indicating unsupported
+     * mechanism, and ProtocolError, indicating an error in the use of the authentication
+     * protocol.
+     */
+    Status _authenticate(OperationContext* opCtx,
+                         const std::string& mechanism,
+                         const UserName& user,
+                         const BSONObj& cmdObj);
+} cmdAuthenticate;
 
 /**
  * Returns a random 64-bit nonce.
@@ -117,12 +204,12 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string&,
+             const std::string&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         auto n = getNextNonce();
-        stringstream ss;
-        ss << hex << n;
+        std::stringstream ss;
+        ss << std::hex << n;
         result.append("nonce", ss.str());
         return true;
     }
@@ -138,7 +225,7 @@ private:
 } cmdGetNonce;
 
 bool CmdAuthenticate::run(OperationContext* opCtx,
-                          const string& dbname,
+                          const std::string& dbname,
                           const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
     if (!serverGlobalParams.quiet.load()) {
@@ -147,17 +234,17 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     }
     std::string mechanism = cmdObj.getStringField("mechanism");
     if (mechanism.empty()) {
-        CommandHelpers::appendCommandStatus(result,
-                                            {ErrorCodes::BadValue, "Auth mechanism not specified"});
-        return false;
+        uasserted(ErrorCodes::BadValue, "Auth mechanism not specified");
     }
     UserName user;
     auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
-    if (mechanism == "MONGODB-X509" && !cmdObj.hasField("user")) {
+
+    if (mechanism == kX509AuthMechanism && !cmdObj.hasField("user")) {
         user = UserName(sslPeerInfo.subjectName, dbname);
     } else {
         user = UserName(cmdObj.getStringField("user"), dbname);
     }
+    uassert(ErrorCodes::AuthenticationFailed, "No user name provided", !user.getUser().empty());
 
     if (getTestCommandsEnabled() && user.getDB() == "admin" &&
         user.getUser() == internalSecurity.user->getName().getUser()) {
@@ -176,15 +263,14 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
                   << (client->hasRemote() ? (" from client " + client->getRemote().toString()) : "")
                   << " with mechanism " << mechanism << ": " << status;
         }
+        sleepmillis(saslGlobalParams.authFailedDelay.load());
         if (status.code() == ErrorCodes::AuthenticationFailed) {
             // Statuses with code AuthenticationFailed may contain messages we do not wish to
             // reveal to the user, so we return a status with the message "auth failed".
-            CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::AuthenticationFailed, "auth failed"));
+            uasserted(ErrorCodes::AuthenticationFailed, "auth failed");
         } else {
-            CommandHelpers::appendCommandStatus(result, status);
+            uassertStatusOK(status);
         }
-        sleepmillis(saslGlobalParams.authFailedDelay.load());
         return false;
     }
     result.append("dbname", user.getDB());
@@ -197,65 +283,12 @@ Status CmdAuthenticate::_authenticate(OperationContext* opCtx,
                                       const UserName& user,
                                       const BSONObj& cmdObj) {
 #ifdef MONGO_CONFIG_SSL
-    if (mechanism == "MONGODB-X509") {
+    if (mechanism == kX509AuthMechanism) {
         return _authenticateX509(opCtx, user, cmdObj);
     }
 #endif
     return Status(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
 }
-
-#ifdef MONGO_CONFIG_SSL
-Status CmdAuthenticate::_authenticateX509(OperationContext* opCtx,
-                                          const UserName& user,
-                                          const BSONObj& cmdObj) {
-    if (!getSSLManager()) {
-        return Status(ErrorCodes::ProtocolError,
-                      "SSL support is required for the MONGODB-X509 mechanism.");
-    }
-    if (user.getDB() != "$external") {
-        return Status(ErrorCodes::ProtocolError,
-                      "X.509 authentication must always use the $external database.");
-    }
-
-    Client* client = Client::getCurrent();
-    AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
-
-    if (!getSSLManager()->getSSLConfiguration().hasCA) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != clientName) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "There is no x.509 client certificate matching the user.");
-    } else {
-        // Handle internal cluster member auth, only applies to server-server connections
-        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
-            int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
-            if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
-                clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
-                return Status(ErrorCodes::AuthenticationFailed,
-                              "The provided certificate "
-                              "can only be used for cluster authentication, not client "
-                              "authentication. The current configuration does not allow "
-                              "x.509 cluster authentication, check the --clusterAuthMode flag");
-            }
-            authorizationSession->grantInternalAuthorization();
-        }
-        // Handle normal client authentication, only applies to client-server connections
-        else {
-            if (_isX509AuthDisabled) {
-                return Status(ErrorCodes::BadValue, _x509AuthenticationDisabledMessage);
-            }
-            Status status = authorizationSession->addAndAuthorizeUser(opCtx, user);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-        return Status::OK();
-    }
-}
-#endif
-CmdAuthenticate cmdAuthenticate;
 
 class CmdLogout : public BasicCommand {
 public:
@@ -273,7 +306,7 @@ public:
     }
     CmdLogout() : BasicCommand("logout") {}
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         AuthorizationSession* authSession = AuthorizationSession::get(Client::getCurrent());
@@ -289,4 +322,13 @@ public:
         return true;
     }
 } cmdLogout;
+
+}  // namespace
+
+void disableAuthMechanism(StringData authMechanism) {
+    if (authMechanism == kX509AuthMechanism) {
+        _isX509AuthDisabled = true;
+    }
 }
+
+}  // namespace mongo

@@ -73,13 +73,13 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     for (const auto& chunkEntry : chunkMgr->chunks()) {
         ChunkType chunk;
         chunk.setNS(chunkMgr->getns());
-        chunk.setMin(chunkEntry->getMin());
-        chunk.setMax(chunkEntry->getMax());
-        chunk.setJumbo(chunkEntry->isJumbo());
-        chunk.setShard(chunkEntry->getShardId());
-        chunk.setVersion(chunkEntry->getLastmod());
+        chunk.setMin(chunkEntry.getMin());
+        chunk.setMax(chunkEntry.getMax());
+        chunk.setJumbo(chunkEntry.isJumbo());
+        chunk.setShard(chunkEntry.getShardId());
+        chunk.setVersion(chunkEntry.getLastmod());
 
-        shardToChunksMap[chunkEntry->getShardId()].push_back(chunk);
+        shardToChunksMap[chunkEntry.getShardId()].push_back(chunk);
     }
 
     const auto swCollectionTags =
@@ -130,16 +130,16 @@ public:
      * Adds the specified split point to the chunk. The split points must always be within the
      * boundaries of the chunk and must come in increasing order.
      */
-    void addSplitPoint(shared_ptr<Chunk> chunk, const BSONObj& splitPoint) {
-        auto it = _chunkSplitPoints.find(chunk->getMin());
+    void addSplitPoint(const Chunk& chunk, const BSONObj& splitPoint) {
+        auto it = _chunkSplitPoints.find(chunk.getMin());
         if (it == _chunkSplitPoints.end()) {
-            _chunkSplitPoints.emplace(chunk->getMin(),
-                                      BalancerChunkSelectionPolicy::SplitInfo(chunk->getShardId(),
+            _chunkSplitPoints.emplace(chunk.getMin(),
+                                      BalancerChunkSelectionPolicy::SplitInfo(chunk.getShardId(),
                                                                               _nss,
                                                                               _collectionVersion,
-                                                                              chunk->getLastmod(),
-                                                                              chunk->getMin(),
-                                                                              chunk->getMax(),
+                                                                              chunk.getLastmod(),
+                                                                              chunk.getMin(),
+                                                                              chunk.getMax(),
                                                                               {splitPoint}));
         } else if (splitPoint.woCompare(it->second.splitKeys.back()) > 0) {
             it->second.splitKeys.push_back(splitPoint);
@@ -386,9 +386,9 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
         const auto& tagRange = tagRangeEntry.second;
 
         const auto chunkAtZoneMin = cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
-        invariant(chunkAtZoneMin->getMax().woCompare(tagRange.min) > 0);
+        invariant(chunkAtZoneMin.getMax().woCompare(tagRange.min) > 0);
 
-        if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
+        if (chunkAtZoneMin.getMin().woCompare(tagRange.min)) {
             splitCandidates.addSplitPoint(chunkAtZoneMin, tagRange.min);
         }
 
@@ -400,8 +400,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
 
         // We need to check that both the chunk's minKey does not match the zone's max and also that
         // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
-        if (chunkAtZoneMax->getMin().woCompare(tagRange.max) &&
-            chunkAtZoneMax->getMax().woCompare(tagRange.max)) {
+        if (chunkAtZoneMax.getMin().woCompare(tagRange.max) &&
+            chunkAtZoneMax.getMax().woCompare(tagRange.max)) {
             splitCandidates.addSplitPoint(chunkAtZoneMax, tagRange.max);
         }
     }
@@ -437,13 +437,13 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
 
         const auto chunkAtZoneMin = cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
 
-        if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
+        if (chunkAtZoneMin.getMin().woCompare(tagRange.min)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
                         << "Tag boundaries "
                         << tagRange.toString()
                         << " fall in the middle of an existing chunk "
-                        << ChunkRange(chunkAtZoneMin->getMin(), chunkAtZoneMin->getMax()).toString()
+                        << ChunkRange(chunkAtZoneMin.getMin(), chunkAtZoneMin.getMax()).toString()
                         << ". Balancing for collection "
                         << nss.ns()
                         << " will be postponed until the chunk is split appropriately."};
@@ -457,14 +457,14 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
 
         // We need to check that both the chunk's minKey does not match the zone's max and also that
         // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
-        if (chunkAtZoneMax->getMin().woCompare(tagRange.max) &&
-            chunkAtZoneMax->getMax().woCompare(tagRange.max)) {
+        if (chunkAtZoneMax.getMin().woCompare(tagRange.max) &&
+            chunkAtZoneMax.getMax().woCompare(tagRange.max)) {
             return {ErrorCodes::IllegalOperation,
                     str::stream()
                         << "Tag boundaries "
                         << tagRange.toString()
                         << " fall in the middle of an existing chunk "
-                        << ChunkRange(chunkAtZoneMax->getMin(), chunkAtZoneMax->getMax()).toString()
+                        << ChunkRange(chunkAtZoneMax.getMin(), chunkAtZoneMax.getMax()).toString()
                         << ". Balancing for collection "
                         << nss.ns()
                         << " will be postponed until the chunk is split appropriately."};

@@ -32,11 +32,11 @@
 #include "mongo/transport/transport_layer_asio.h"
 
 #include "mongo/db/server_options.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/op_msg.h"
 #include "mongo/util/net/sock.h"
 
 #include "asio.hpp"
@@ -214,7 +214,7 @@ public:
 
     void startSession(transport::SessionHandle session) override {
         log() << "Accepted connection from " << session->remote();
-        stdx::thread([ this, session = std::move(session) ] {
+        stdx::thread([ this, session = std::move(session) ]() mutable {
             log() << "waiting for message";
             session->setTimeout(Milliseconds{500});
             auto status = session->sourceMessage().getStatus();
@@ -226,6 +226,7 @@ public:
                 log() << "message received okay";
             }
 
+            session.reset();
             notifyComplete();
         }).detach();
     }
@@ -308,7 +309,7 @@ class TimeoutSwitchModesSEP : public TimeoutSEP {
 public:
     void startSession(transport::SessionHandle session) override {
         log() << "Accepted connection from " << session->remote();
-        stdx::thread worker([ this, session = std::move(session) ] {
+        stdx::thread worker([ this, session = std::move(session) ]() mutable {
             log() << "waiting for message";
             auto sourceMessage = [&] { return session->sourceMessage().getStatus(); };
 
@@ -333,6 +334,7 @@ public:
 
             notifyComplete();
             log() << "ending test";
+            session.reset();
         });
         worker.detach();
     }

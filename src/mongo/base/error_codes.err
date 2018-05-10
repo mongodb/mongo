@@ -241,12 +241,21 @@ error_code("DNSRecordTypeMismatch", 240)
 error_code("ConversionFailure", 241)
 error_code("CannotCreateCollection", 242)
 error_code("IncompatibleWithUpgradedServer", 243)
-error_code("TransactionAborted", 244)
+error_code("NOT_YET_AVAILABLE_TransactionAborted", 244)
 error_code("BrokenPromise", 245)
 error_code("SnapshotUnavailable", 246)
 error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
 error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion");
+error_code("StaleChunkHistory", 250);
+error_code("NoSuchTransaction", 251)
+error_code("ReentrancyNotAllowed", 252)
+error_code("FreeMonHttpInFlight", 253)
+error_code("FreeMonHttpTemporaryFailure", 254)
+error_code("FreeMonHttpPermanentFailure", 255)
+error_code("TransactionCommitted", 256)
+error_code("TransactionTooLarge", 257)
+error_code("UnknownFeatureCompatibilityVersion", 258);
 
 # Error codes 4000-8999 are reserved.
 
@@ -255,6 +264,7 @@ error_code("SocketException", 9001)
 error_code("OBSOLETE_RecvStaleConfig", 9996)
 error_code("NotMaster", 10107)
 error_code("CannotGrowDocumentInCappedNamespace", 10003)
+error_code("BSONObjectTooLarge", 10334)
 error_code("DuplicateKey", 11000)
 error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
@@ -288,7 +298,7 @@ error_class("NotMasterError", [
     "InterruptedDueToReplStateChange",
     "PrimarySteppedDown",
     ])
-error_class("StaleShardingError",
+error_class("StaleShardVersionError",
             ["StaleConfig", "StaleShardVersion", "StaleEpoch"])
 error_class("NeedRetargettingError",
             ["StaleConfig", "StaleShardVersion", "StaleEpoch", "CannotImplicitlyCreateCollection"])
@@ -304,4 +314,4 @@ error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
 
 error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])
 
-error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable"])
+error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory"])

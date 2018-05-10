@@ -56,7 +56,8 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
     // Use GlobalLock + lockMMAPV1Flush instead of DBLock to allow return when the lock is not
     // available. It may happen when the primary steps down and a shared global lock is
     // acquired.
-    Lock::GlobalLock lock(opCtx, MODE_IX, Date_t::now() + Milliseconds(1));
+    Lock::GlobalLock lock(
+        opCtx, MODE_IX, Date_t::now() + Milliseconds(1), Lock::InterruptBehavior::kThrow);
 
     if (!lock.isLocked()) {
         LOG(1) << "Global lock is not available skipping noopWrite";
@@ -118,17 +119,13 @@ public:
                      BSONObjBuilder& result) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (!replCoord->isReplEnabled()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::NoReplicationEnabled,
-                 "Must have replication set up to run \"appendOplogNote\""});
+            uasserted(ErrorCodes::NoReplicationEnabled,
+                      "Must have replication set up to run \"appendOplogNote\"");
         }
 
         BSONElement dataElement;
         auto dataStatus = bsonExtractTypedField(cmdObj, "data", Object, &dataElement);
-        if (!dataStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, dataStatus);
-        }
+        uassertStatusOK(dataStatus);
 
         Timestamp maxClusterTime;
         auto maxClusterTimeStatus =
@@ -136,24 +133,23 @@ public:
 
         if (!maxClusterTimeStatus.isOK()) {
             if (maxClusterTimeStatus == ErrorCodes::NoSuchKey) {  // no need to use maxClusterTime
-                return CommandHelpers::appendCommandStatus(
-                    result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
+                uassertStatusOK(_performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
+                return true;
             }
-            return CommandHelpers::appendCommandStatus(result, maxClusterTimeStatus);
+            uassertStatusOK(maxClusterTimeStatus);
         }
 
         auto lastAppliedOpTime = replCoord->getMyLastAppliedOpTime().getTimestamp();
         if (maxClusterTime > lastAppliedOpTime) {
-            return CommandHelpers::appendCommandStatus(
-                result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
+            uassertStatusOK(_performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
         } else {
             std::stringstream ss;
             ss << "Requested maxClusterTime " << LogicalTime(maxClusterTime).toString()
                << " is less or equal to the last primary OpTime: "
                << LogicalTime(lastAppliedOpTime).toString();
-            return CommandHelpers::appendCommandStatus(result,
-                                                       {ErrorCodes::StaleClusterTime, ss.str()});
+            uasserted(ErrorCodes::StaleClusterTime, ss.str());
         }
+        return true;
     }
 };
 

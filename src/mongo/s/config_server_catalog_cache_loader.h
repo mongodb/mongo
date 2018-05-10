@@ -46,12 +46,17 @@ public:
     void onStepUp() override;
     void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
+    void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
 
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
+
+    void getDatabase(
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
 
 private:
     // Thread pool to be used to perform metadata load

@@ -67,17 +67,8 @@ public:
      */
     using CallbackFn = stdx::function<void(const Status&)>;
 
-    /**
-     * Type of function for a writer thread during oplog application to apply a set of operations
-     * that have been assigned (hashed by SyncTail::fillWriterVectors()) to that writer thread.
-     * In production, this function would have the same outcome as calling SyncTail::syncApply()
-     * (oplog application mode will be embedded in the function implementation).
-     */
-    using ApplyOperationFn =
-        stdx::function<Status(OperationContext*, OperationPtrs*, WorkerMultikeyPathInfo*)>;
-
-    using MultiApplyFn = stdx::function<StatusWith<OpTime>(
-        OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn)>;
+    using MultiApplyFn =
+        stdx::function<StatusWith<OpTime>(OperationContext*, MultiApplier::Operations)>;
 
     /**
      * Creates MultiApplier in inactive state.
@@ -94,7 +85,6 @@ public:
      */
     MultiApplier(executor::TaskExecutor* executor,
                  const Operations& operations,
-                 const ApplyOperationFn& applyOperation,
                  const MultiApplyFn& multiApply,
                  const CallbackFn& onCompletion);
 
@@ -154,7 +144,6 @@ private:
     executor::TaskExecutor* _executor;
 
     Operations _operations;
-    ApplyOperationFn _applyOperation;
     MultiApplyFn _multiApply;
     CallbackFn _onCompletion;
 

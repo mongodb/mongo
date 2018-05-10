@@ -122,7 +122,7 @@ public:
         _entry->_removeFromCache(NULL, _ns);
     }
 
-    void commit() {}
+    void commit(boost::optional<Timestamp>) {}
 
 private:
     const std::string _ns;
@@ -145,7 +145,7 @@ public:
         _catalogEntry->_collections[_ns] = _cachedEntry;
     }
 
-    void commit() {
+    void commit(boost::optional<Timestamp>) {
         delete _cachedEntry;
     }
 
@@ -408,7 +408,7 @@ void MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
     // violation, but at this point we're not going to add more MMAPv1 specific interfaces.
     StringData dbName = systemCollectionNamespace.db();
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    Database* db = dbHolder().get(opCtx, dbName);
+    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
     Collection* systemCollection = db->getCollection(opCtx, systemCollectionNamespace);
     systemCollection->getCursorManager()->invalidateDocument(opCtx, record, INVALIDATION_DELETION);
 }

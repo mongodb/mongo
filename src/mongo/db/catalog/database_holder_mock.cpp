@@ -33,23 +33,15 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-namespace {
 
-DatabaseHolder& dbHolderImpl() {
+MONGO_REGISTER_SHIM(DatabaseHolder::getDatabaseHolder)()->DatabaseHolder& {
     static DatabaseHolder _dbHolder;
     return _dbHolder;
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeDbHolderimpl, ("InitializeDatabaseHolderFactory"))
-(InitializerContext* const) {
-    registerDbHolderImpl(dbHolderImpl);
-    return Status::OK();
+MONGO_REGISTER_SHIM(DatabaseHolder::makeImpl)
+(PrivateTo<DatabaseHolder>)->std::unique_ptr<DatabaseHolder::Impl> {
+    return stdx::make_unique<DatabaseHolderMock>();
 }
 
-MONGO_INITIALIZER(InitializeDatabaseHolderFactory)(InitializerContext* const) {
-    DatabaseHolder::registerFactory([] { return stdx::make_unique<DatabaseHolderMock>(); });
-    return Status::OK();
-}
-
-}  // namespace
 }  // namespace mongo

@@ -92,7 +92,7 @@ std::string _getOutTypeString(mr::Config::OutputType outType) {
         case mr::Config::INMEMORY:
             return "INMEMORY";
     }
-    invariant(0);
+    MONGO_UNREACHABLE;
 }
 
 /**

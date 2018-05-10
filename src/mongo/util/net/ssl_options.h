@@ -27,8 +27,7 @@
 
 #pragma once
 
-#include "mongo/util/net/ssl_manager.h"
-
+#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -62,7 +61,9 @@ struct SSLParams {
     struct CertificateSelector {
         std::string subject;
         std::vector<uint8_t> thumbprint;
-        std::vector<uint8_t> serial;
+        bool empty() const {
+            return subject.empty() && thumbprint.empty();
+        }
     };
 #ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
     CertificateSelector sslCertificateSelector;         // --sslCertificateSelector

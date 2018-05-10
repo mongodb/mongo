@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 Import("env")
+Import("get_option")
 
 env = env.Clone()
 
@@ -119,6 +120,8 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/commands/mongod",
+        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
         "$BUILD_DIR/mongo/db/logical_clock",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
@@ -137,13 +140,20 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/db/sessions_collection_standalone",
         "$BUILD_DIR/mongo/db/storage/mmap_v1/paths",
         "$BUILD_DIR/mongo/db/storage/kv/kv_engine_core",
+        "$BUILD_DIR/mongo/transport/transport_layer_manager",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/progress_meter",
         "$BUILD_DIR/mongo/util/version_impl",
+        "$BUILD_DIR/mongo/shell_core",
         "mocklib",
         "testframework",
     ],
+    INSTALL_ALIAS=[
+        'tests'
+    ],
 )
 
-env.Alias("dbtest", env.Install('#/', dbtest))
+hygienic = get_option('install-mode') == 'hygienic'
+if not hygienic:
+    env.Alias("dbtest", env.Install('#/', dbtest))

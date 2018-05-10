@@ -132,7 +132,20 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	tried_eviction = false;
 	time_start = time_stop = 0;
 
+	/* Only visit pages in cache and don't bump page read generations. */
 	flags = WT_READ_CACHE | WT_READ_NO_GEN;
+
+	/*
+	 * Skip all deleted pages.  For a page to be marked deleted, it must
+	 * have been evicted from cache and marked clean.  Checkpoint should
+	 * never instantiate deleted pages: if a truncate is not visible to the
+	 * checkpoint, the on-disk version is correct.  If the truncate is
+	 * visible, we skip over the child page when writing its parent.  We
+	 * check whether a truncate is visible in the checkpoint as part of
+	 * reconciling internal pages (specifically in __rec_child_modify).
+	 */
+	LF_SET(WT_READ_DELETED_SKIP);
+
 	internal_bytes = leaf_bytes = 0;
 	internal_pages = leaf_pages = 0;
 	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;

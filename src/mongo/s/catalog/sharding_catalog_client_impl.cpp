@@ -276,6 +276,40 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
     return result;
 }
 
+StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> ShardingCatalogClientImpl::getAllDBs(
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
+    std::vector<DatabaseType> databases;
+    auto findStatus = _exhaustiveFindOnConfig(opCtx,
+                                              kConfigReadSelector,
+                                              readConcern,
+                                              DatabaseType::ConfigNS,
+                                              BSONObj(),     // no query filter
+                                              BSONObj(),     // no sort
+                                              boost::none);  // no limit
+    if (!findStatus.isOK()) {
+        return findStatus.getStatus();
+    }
+
+    for (const BSONObj& doc : findStatus.getValue().value) {
+        auto dbRes = DatabaseType::fromBSON(doc);
+        if (!dbRes.isOK()) {
+            return dbRes.getStatus().withContext(stream() << "Failed to parse database document "
+                                                          << doc);
+        }
+
+        Status validateStatus = dbRes.getValue().validate();
+        if (!validateStatus.isOK()) {
+            return validateStatus.withContext(stream() << "Failed to validate database document "
+                                                       << doc);
+        }
+
+        databases.push_back(dbRes.getValue());
+    }
+
+    return repl::OpTimeWith<std::vector<DatabaseType>>{std::move(databases),
+                                                       findStatus.getValue().opTime};
+}
+
 StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchDatabaseMetadata(
     OperationContext* opCtx,
     const std::string& dbName,
@@ -623,12 +657,12 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         if (initialCmdHadWriteConcern) {
             Status status = writeConcern.parse(writeConcernElement.Obj());
             if (!status.isOK()) {
-                return CommandHelpers::appendCommandStatus(*result, status);
+                return CommandHelpers::appendCommandStatusNoThrow(*result, status);
             }
 
             if (!(writeConcern.wNumNodes == 1 ||
                   writeConcern.wMode == WriteConcernOptions::kMajority)) {
-                return CommandHelpers::appendCommandStatus(
+                return CommandHelpers::appendCommandStatusNoThrow(
                     *result,
                     {ErrorCodes::InvalidOptions,
                      str::stream() << "Invalid replication write concern. User management write "
@@ -667,13 +701,15 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
             Shard::RetryPolicy::kNotIdempotent);
 
     if (!response.isOK()) {
-        return CommandHelpers::appendCommandStatus(*result, response.getStatus());
+        return CommandHelpers::appendCommandStatusNoThrow(*result, response.getStatus());
     }
     if (!response.getValue().commandStatus.isOK()) {
-        return CommandHelpers::appendCommandStatus(*result, response.getValue().commandStatus);
+        return CommandHelpers::appendCommandStatusNoThrow(*result,
+                                                          response.getValue().commandStatus);
     }
     if (!response.getValue().writeConcernStatus.isOK()) {
-        return CommandHelpers::appendCommandStatus(*result, response.getValue().writeConcernStatus);
+        return CommandHelpers::appendCommandStatusNoThrow(*result,
+                                                          response.getValue().writeConcernStatus);
     }
 
     CommandHelpers::filterCommandReplyForPassthrough(response.getValue().response, result);
@@ -697,7 +733,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
         return resultStatus.getValue().commandStatus.isOK();
     }
 
-    return CommandHelpers::appendCommandStatus(*result, resultStatus.getStatus());
+    return CommandHelpers::appendCommandStatusNoThrow(*result, resultStatus.getStatus());  // XXX
 }
 
 Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCtx,
@@ -754,27 +790,31 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
         BSONObjBuilder query;
         lastChunkVersion.addToBSON(query, ChunkType::lastmod());
         query.append(ChunkType::ns(), nss.ns());
-        auto swChunks = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
-        const auto& newestChunk = swChunks.getValue();
+        auto chunkWithStatus = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
 
-        if (!swChunks.isOK()) {
-            errMsg = str::stream() << "getChunks function failed, unable to validate chunk "
-                                   << "operation metadata: " << swChunks.getStatus().toString()
-                                   << ". applyChunkOpsDeprecated failed to get confirmation "
-                                   << "of commit. Unable to save chunk ops. Command: " << cmd
-                                   << ". Result: " << response.getValue().response;
-        } else if (!newestChunk.empty()) {
-            invariant(newestChunk.size() == 1);
-            return Status::OK();
-        } else {
+        if (!chunkWithStatus.isOK()) {
+            errMsg = str::stream()
+                << "getChunks function failed, unable to validate chunk "
+                << "operation metadata: " << chunkWithStatus.getStatus().toString()
+                << ". applyChunkOpsDeprecated failed to get confirmation "
+                << "of commit. Unable to save chunk ops. Command: " << cmd
+                << ". Result: " << response.getValue().response;
+            return status.withContext(errMsg);
+        };
+
+        const auto& newestChunk = chunkWithStatus.getValue();
+
+        if (newestChunk.empty()) {
             errMsg = str::stream() << "chunk operation commit failed: version "
                                    << lastChunkVersion.toString()
                                    << " doesn't exist in namespace: " << nss.ns()
                                    << ". Unable to save chunk ops. Command: " << cmd
                                    << ". Result: " << response.getValue().response;
-        }
+            return status.withContext(errMsg);
+        };
 
-        return status.withContext(errMsg);
+        invariant(newestChunk.size() == 1);
+        return Status::OK();
     }
 
     return Status::OK();

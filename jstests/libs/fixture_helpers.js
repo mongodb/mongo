@@ -51,13 +51,28 @@ var FixtureHelpers = (function() {
     }
 
     /**
+     * Looks for an entry in the config database for the given collection, to check whether it's
+     * sharded.
+     */
+    function isSharded(coll) {
+        const db = coll.getDB();
+        return db.getSiblingDB("config").collections.find({_id: coll.getFullName()}).count() > 0;
+    }
+
+    /**
+     * Returns the resolved view definition for 'collName' if it is a view, 'undefined' otherwise.
+     */
+    function getViewDefinition(db, collName) {
+        return db.getCollectionInfos({type: "view", name: collName}).shift();
+    }
+
+    /**
      * Returns the number of shards that 'coll' has any chunks on. Returns 1 if the collection is
      * not sharded. Note that if the balancer is enabled then the number of shards with chunks for
      * this collection can change at any moment.
      */
     function numberOfShardsForCollection(coll) {
-        if (!isMongos(coll.getDB()) ||
-            db.getSiblingDB("config").collections.find({_id: coll.getFullName()}).count() === 0) {
+        if (!isMongos(coll.getDB()) || !isSharded(coll)) {
             // If we're not talking to a mongos, or the collection is not sharded, there is one
             // shard.
             return 1;
@@ -107,6 +122,8 @@ var FixtureHelpers = (function() {
 
     return {
         isMongos: isMongos,
+        isSharded: isSharded,
+        getViewDefinition: getViewDefinition,
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,

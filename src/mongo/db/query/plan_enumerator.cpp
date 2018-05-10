@@ -341,7 +341,7 @@ PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
 
     if (_nodeToId.end() == it) {
         error() << "Trying to look up memo entry for node, none found.";
-        invariant(0);
+        MONGO_UNREACHABLE;
     }
 
     return it->second;

@@ -1,5 +1,4 @@
-"""
-Extension to the Queue.Queue class.
+"""Extension to the Queue.Queue class.
 
 Added support for the join() method to take a timeout. This is necessary
 in order for KeyboardInterrupt exceptions to get propagated.
@@ -9,23 +8,18 @@ See https://bugs.python.org/issue1167930 for more details.
 
 from __future__ import absolute_import
 
-import Queue
+import Queue as _Queue
 import time
 
-
 # Exception that is raised when get_nowait() is called on an empty Queue.
-Empty = Queue.Empty
+Empty = _Queue.Empty
 
 
-class Queue(Queue.Queue):
-    """
-    A multi-producer, multi-consumer queue.
-    """
+class Queue(_Queue.Queue):
+    """A multi-producer, multi-consumer queue."""
 
-    def join(self, timeout=None):
-        """
-        Wait until all items in the queue have been retrieved and processed,
-        or until 'timeout' seconds have passed.
+    def join(self, timeout=None):  # pylint: disable=arguments-differ
+        """Wait until all items in the queue have been processed or 'timeout' seconds have passed.
 
         The count of unfinished tasks is incremented whenever an item is added
         to the queue. The count is decremented whenever task_done() is called

@@ -174,7 +174,19 @@
         clusterOptions.replication.enabled = true;
         clusterOptions.replication.numNodes = topology.nodes.length;
     } else if (topology.type === Topology.kShardedCluster) {
-        throw new Error("resmoke_runner.js doesn't currently support sharded clusters");
+        clusterOptions.replication.enabled = TestData.usingReplicaSetShards || false;
+        clusterOptions.sharded.enabled = true;
+        clusterOptions.sharded.enableAutoSplit =
+            TestData.hasOwnProperty('runningWithAutoSplit') ? TestData.runningWithAutoSplit : true;
+        clusterOptions.sharded.enableBalancer =
+            TestData.hasOwnProperty('runningWithBalancer') ? TestData.runningWithBalancer : true;
+        clusterOptions.sharded.numMongos = topology.mongos.nodes.length;
+        clusterOptions.sharded.numShards = Object.keys(topology.shards).length;
+        clusterOptions.sharded.stepdownOptions = {};
+        clusterOptions.sharded.stepdownOptions.configStepdown =
+            TestData.runningWithConfigStepdowns || false;
+        clusterOptions.sharded.stepdownOptions.shardStepdown =
+            TestData.runningWithShardStepdowns || false;
     } else if (topology.type !== Topology.kStandalone) {
         throw new Error('Unrecognized topology format: ' + tojson(topology));
     }
@@ -184,5 +196,20 @@
         workloads = [workloads];
     }
 
-    runWorkloads(workloads, {cluster: clusterOptions});
+    let sessionOptions = {};
+    if (TestData.runningWithCausalConsistency) {
+        sessionOptions = Object.assign(
+            sessionOptions, {causalConsistency: true, readPreference: {mode: 'secondary'}});
+    }
+    if (TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns) {
+        sessionOptions = Object.assign(sessionOptions, {retryWrites: true});
+    }
+
+    const executionOptions = {dbNamePrefix: TestData.dbNamePrefix || ""};
+
+    if (Object.keys(sessionOptions).length > 0) {
+        executionOptions.sessionOptions = sessionOptions;
+    }
+
+    runWorkloads(workloads, {cluster: clusterOptions, execution: executionOptions});
 })();

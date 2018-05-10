@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""Bypass compile and fetch binaries."""
 
 from __future__ import absolute_import
 from __future__ import print_function
@@ -7,15 +8,16 @@ import argparse
 import json
 import os
 import re
-import shutil
 import sys
 import tarfile
 
 import urllib
+# pylint: disable=ungrouped-imports
 try:
     from urlparse import urlparse
 except ImportError:
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse  # type: ignore
+# pylint: enable=ungrouped-imports
 
 import requests
 import yaml
@@ -24,6 +26,7 @@ _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
 
 
 def executable_name(pathname):
+    """Return the executable name."""
     # Ensure that executable files on Windows have a ".exe" extension.
     if _IS_WINDOWS and os.path.splitext(pathname)[1] != ".exe":
         return "{}.exe".format(pathname)
@@ -31,6 +34,7 @@ def executable_name(pathname):
 
 
 def archive_name(archive):
+    """Return the archive name."""
     # Ensure the right archive extension is used for Windows.
     if _IS_WINDOWS:
         return "{}.zip".format(archive)
@@ -38,6 +42,7 @@ def archive_name(archive):
 
 
 def requests_get_json(url):
+    """Return the JSON response."""
     response = requests.get(url)
     response.raise_for_status()
 
@@ -49,9 +54,9 @@ def requests_get_json(url):
 
 
 def read_evg_config():
-    """
-    Attempts to parse the Evergreen configuration from its home location.
-    Returns None if the configuration file wasn't found.
+    """Attempt to parse the Evergreen configuration from its home location.
+
+    Return None if the configuration file wasn't found.
     """
     evg_file = os.path.expanduser("~/.evergreen.yml")
     if os.path.isfile(evg_file):
@@ -62,18 +67,14 @@ def read_evg_config():
 
 
 def write_out_bypass_compile_expansions(patch_file, **expansions):
-    """
-    Write out the macro expansions to given file.
-    """
+    """Write out the macro expansions to given file."""
     with open(patch_file, "w") as out_file:
         print("Saving compile bypass expansions to {0}: ({1})".format(patch_file, expansions))
         yaml.safe_dump(expansions, out_file, default_flow_style=False)
 
 
 def write_out_artifacts(json_file, artifacts):
-    """
-    Write out the JSON file with URLs of artifacts to given file.
-    """
+    """Write out the JSON file with URLs of artifacts to given file."""
     with open(json_file, "w") as out_file:
         print("Generating artifacts.json from pre-existing artifacts {0}".format(
             json.dumps(artifacts, indent=4)))
@@ -81,21 +82,22 @@ def write_out_artifacts(json_file, artifacts):
 
 
 def generate_bypass_expansions(project, build_variant, revision, build_id):
+    """Perform the generate bypass expansions."""
     expansions = {}
     # With compile bypass we need to update the URL to point to the correct name of the base commit
     # binaries.
     expansions["mongo_binaries"] = (archive_name("{}/{}/{}/binaries/mongo-{}".format(
-            project, build_variant, revision, build_id)))
+        project, build_variant, revision, build_id)))
 
     # With compile bypass we need to update the URL to point to the correct name of the base commit
     # debug symbols.
     expansions["mongo_debugsymbols"] = (archive_name("{}/{}/{}/debugsymbols/debugsymbols-{}".format(
-            project, build_variant, revision, build_id)))
+        project, build_variant, revision, build_id)))
 
     # With compile bypass we need to update the URL to point to the correct name of the base commit
     # mongo shell.
     expansions["mongo_shell"] = (archive_name("{}/{}/{}/binaries/mongo-shell-{}".format(
-            project, build_variant, revision, build_id)))
+        project, build_variant, revision, build_id)))
 
     # Enable bypass compile
     expansions["bypass_compile"] = True
@@ -103,8 +105,7 @@ def generate_bypass_expansions(project, build_variant, revision, build_id):
 
 
 def should_bypass_compile():
-    """
-    Based on the modified patch files determine whether the compile stage should be bypassed.
+    """Determine whether the compile stage should be bypassed based on the modified patch files.
 
     We use lists of files and directories to more precisely control which modified patch files will
     lead to compile bypass.
@@ -133,7 +134,7 @@ def should_bypass_compile():
         "buildscripts/make_archive.py",
         "buildscripts/moduleconfig.py",
         "buildscripts/msitrim.py",
-        "buildscripts/packager-enterprise.py",
+        "buildscripts/packager_enterprise.py",
         "buildscripts/packager.py",
         "buildscripts/scons.py",
         "buildscripts/utils.py",
@@ -155,9 +156,8 @@ def should_bypass_compile():
             if os.path.isdir(filename):
                 continue
 
-            if (filename in requires_compile_files
-                    or any(filename.startswith(directory)
-                           for directory in requires_compile_directories)):
+            if (filename in requires_compile_files or any(
+                    filename.startswith(directory) for directory in requires_compile_directories)):
                 print("Compile bypass disabled after detecting {} as being modified because"
                       " it is a file known to affect compilation.".format(filename))
                 return False
@@ -172,36 +172,31 @@ def should_bypass_compile():
 
 
 def parse_args():
+    """Parse the program arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--project",
-                        required=True,
+    parser.add_argument("--project", required=True,
                         help="The Evergreen project. e.g mongodb-mongo-master")
 
-    parser.add_argument("--buildVariant",
-                        required=True,
+    parser.add_argument("--buildVariant", required=True,
                         help="The build variant. e.g enterprise-rhel-62-64-bit")
 
-    parser.add_argument("--revision",
-                        required=True,
-                        help="The base commit hash.")
+    parser.add_argument("--revision", required=True, help="The base commit hash.")
 
-    parser.add_argument("--patchFile",
-                        required=True,
+    parser.add_argument("--patchFile", required=True,
                         help="A list of all files modified in patch build.")
 
-    parser.add_argument("--outFile",
-                        required=True,
+    parser.add_argument("--outFile", required=True,
                         help="The YAML file to write out the macro expansions.")
 
-    parser.add_argument("--jsonArtifact",
-                        required=True,
+    parser.add_argument("--jsonArtifact", required=True,
                         help="The JSON file to write out the metadata of files to attach to task.")
 
     return parser.parse_args()
 
 
-def main():
-    """
+def main():  # pylint: disable=too-many-locals,too-many-statements
+    """Execute Main entry.
+
     From the /rest/v1/projects/{project}/revisions/{revision} endpoint find an existing build id
     to generate the compile task id to use for retrieving artifacts when bypassing compile.
 
@@ -224,7 +219,7 @@ def main():
         api_server = "{url.scheme}://{url.netloc}".format(
             url=urlparse(evg_config.get("api_server_host")))
         revision_url = "{}/rest/v1/projects/{}/revisions/{}".format(api_server, args.project,
-            args.revision)
+                                                                    args.revision)
         revisions = requests_get_json(revision_url)
 
         match = None
@@ -233,6 +228,7 @@ def main():
         # Evergreen only contain "_". Replace the hyphens before searching for the build.
         prefix = prefix.replace("-", "_")
         build_id_pattern = re.compile(prefix)
+        build_id = None
         for build_id in revisions["builds"]:
             # Find a suitable build_id
             match = build_id_pattern.search(build_id)
@@ -240,7 +236,7 @@ def main():
                 break
         else:
             print("Could not find build id for revision {} on project {}."
-                " Default compile bypass to false.".format(args.revision, args.project))
+                  " Default compile bypass to false.".format(args.revision, args.project))
             return
 
         # Generate the compile task id.
@@ -270,16 +266,21 @@ def main():
                     return
 
                 # Need to extract certain files from the pre-existing artifacts.tgz.
-                extract_files = [executable_name("dbtest"), executable_name("mongobridge"),
-                                 "build/integration_tests.txt"]
+                extract_files = [
+                    executable_name("dbtest"),
+                    executable_name("mongobridge"),
+                    executable_name("mongoe"),
+                    "build/integration_tests.txt",
+                ]
                 with tarfile.open(filename, "r:gz") as tar:
                     # The repo/ directory contains files needed by the package task. May
                     # need to add other files that would otherwise be generated by SCons
                     # if we did not bypass compile.
-                    subdir = [tarinfo for tarinfo in tar.getmembers()
-                              if tarinfo.name.startswith("build/integration_tests/")
-                              or tarinfo.name.startswith("repo/")
-                              or tarinfo.name in extract_files]
+                    subdir = [
+                        tarinfo for tarinfo in tar.getmembers()
+                        if tarinfo.name.startswith("build/integration_tests/")
+                        or tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
+                    ]
                     print("Extracting the following files from {0}...\n{1}".format(
                         filename, "\n".join(tarinfo.name for tarinfo in subdir)))
                     tar.extractall(members=subdir)
@@ -318,8 +319,9 @@ def main():
 
         # Need to apply these expansions for bypassing SCons.
         expansions = generate_bypass_expansions(args.project, args.buildVariant, args.revision,
-            build_id)
+                                                build_id)
         write_out_bypass_compile_expansions(args.outFile, **expansions)
+
 
 if __name__ == "__main__":
     main()

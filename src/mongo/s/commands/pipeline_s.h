@@ -122,9 +122,8 @@ public:
             MONGO_UNREACHABLE;
         }
 
-        std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
-                                                        const NamespaceString&,
-                                                        UUID) const final {
+        std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(OperationContext*,
+                                                                         UUID) const final {
             MONGO_UNREACHABLE;
         }
 
@@ -139,6 +138,13 @@ public:
         BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                           Client* client,
                                           CurrentOpTruncateMode truncateOps) const final;
+
+        void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                              CurrentOpUserMode userMode,
+                                              std::vector<BSONObj>* ops) const final {
+            // This implementation is a no-op, since mongoS does not maintain a SessionCatalog or
+            // hold stashed locks for idle sessions.
+        }
     };
 
 private:

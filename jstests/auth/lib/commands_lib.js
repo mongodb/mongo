@@ -193,6 +193,7 @@ var authCommandsLib = {
           testname: "abortTxn",
           command: {abortTransaction: 1},
           skipSharded: true,
+          skipUnlessReplicaSet: true,
           testcases: [
               {
                 runOnDb: firstDbName,
@@ -1600,7 +1601,7 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "aggregate_changeStream",
+          testname: "aggregate_changeStream_one_collection",
           command: {aggregate: "foo", pipeline: [{$changeStream: {}}], cursor: {}},
           setup: function(db) {
               db.createCollection("foo");
@@ -1636,6 +1637,49 @@ var authCommandsLib = {
                 expectFail: true,  // because no replication enabled
               }
           ]
+        },
+        {
+          testname: "aggregate_changeStream_whole_db",
+          command: {aggregate: 1, pipeline: [{$changeStream: {}}], cursor: {}},
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {
+                    read: 1,
+                    readAnyDatabase: 1,
+                    readWrite: 1,
+                    readWriteAnyDatabase: 1,
+                    dbOwner: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges: [{
+                    resource: {db: firstDbName, collection: ""},
+                    actions: ["changeStream", "find"]
+                }],
+                expectFail: true,  // because no replication enabled
+              },
+              {
+                runOnDb: secondDbName,
+                roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+                privileges: [{
+                    resource: {db: secondDbName, collection: ""},
+                    actions: ["changeStream", "find"]
+                }],
+                expectFail: true,  // because no replication enabled
+              }
+          ]
+        },
+        {
+          testname: "aggregate_changeStream_whole_cluster",
+          command:
+              {aggregate: 1, pipeline: [{$changeStream: {allChangesForCluster: true}}], cursor: {}},
+          testcases: [{
+              runOnDb: adminDbName,
+              roles: {readAnyDatabase: 1, readWriteAnyDatabase: 1, root: 1, __system: 1},
+              privileges: [{resource: {db: "", collection: ""}, actions: ["changeStream", "find"]}],
+              expectFail: true,  // because no replication enabled
+          }]
         },
         {
           testname: "appendOplogNote",
@@ -3899,6 +3943,22 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "getDatabaseVersion",
+          command: {getDatabaseVersion: "test"},
+          skipSharded: true,  // only available on mongod
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges:
+                    [{resource: {db: "test", collection: ""}, actions: ["getDatabaseVersion"]}],
+                expectFail: true  // only allowed on shard servers
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "getDiagnosticData",
           command: {getDiagnosticData: 1},
           testcases: [
@@ -3918,6 +3978,16 @@ var authCommandsLib = {
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
           ]
+        },
+        {
+          testname: "getFreeMonitoringStatus",
+          skipSharded: true,
+          command: {getFreeMonitoringStatus: 1},
+          testcases: [{
+              runOnDb: adminDbName,
+              roles: {clusterMonitor: 1, clusterAdmin: 1, root: 1, __system: 1},
+              privileges: [{resource: {cluster: true}, actions: ["checkFreeMonitoringStatus"]}]
+          }]
         },
         {
           testname: "getLastError",
@@ -3994,7 +4064,8 @@ var authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 roles: roles_monitoring,
-                privileges: [{resource: {cluster: true}, actions: ["getShardMap"]}]
+                privileges: [{resource: {cluster: true}, actions: ["getShardMap"]}],
+                expectFail: true
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
@@ -4846,6 +4917,49 @@ var authCommandsLib = {
                 privileges: [
                     {resource: {db: secondDbName, collection: ""}, actions: ["enableProfiler"]}
                 ]
+              }
+          ]
+        },
+        {
+          testname: "profile_mongos",
+          command: {profile: 0, slowms: 10, sampleRate: 0.5},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_dbAdminAny,
+                privileges:
+                    [{resource: {db: adminDbName, collection: ""}, actions: ["enableProfiler"]}]
+              },
+              {
+                runOnDb: firstDbName,
+                roles: {},
+              }
+          ]
+        },
+        {
+          testname: "profileGetLevel_mongos",
+          command: {profile: -1},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {
+                    backup: 1,
+                    dbAdminAnyDatabase: 1,
+                    clusterMonitor: 1,
+                    clusterAdmin: 1,
+                    root: 1,
+                    __system: 1
+                },
+                privileges: [{
+                    resource: {db: adminDbName, collection: "system.profile"},
+                    actions: ["find"]
+                }]
+              },
+              {
+                runOnDb: firstDbName,
+                roles: {},
               }
           ]
         },

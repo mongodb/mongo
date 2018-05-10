@@ -13,6 +13,7 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/count.js');              // for $config
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropCollections
+load("jstests/libs/fixture_helpers.js");                         // For isMongos.
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.data.prefix = 'count_fsm_q_l_s';
@@ -29,9 +30,12 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.states.count = function count(db, collName) {
-        assertWhenOwnColl.eq(this.getCount(db),
-                             // having done 'skip(this.countPerNum - 1).limit(10)'
-                             10);
+        if (!isMongos(db)) {
+            // SERVER-33753: count() without a predicate can be wrong on sharded clusters.
+            assertWhenOwnColl.eq(this.getCount(db),
+                                 // having done 'skip(this.countPerNum - 1).limit(10)'
+                                 10);
+        }
 
         var num = Random.randInt(this.modulus);
         assertWhenOwnColl.eq(this.getCount(db, {i: num}),

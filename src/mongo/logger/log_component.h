@@ -57,6 +57,7 @@ public:
         kReplicationRollback,
         kSharding,
         kStorage,
+        kStorageRecovery,
         kJournal,
         kWrite,
         kFTDC,

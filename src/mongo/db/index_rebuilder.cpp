@@ -146,7 +146,7 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
 
     std::vector<std::string> dbNames;
 
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     storageEngine->listDatabases(&dbNames);
 
     try {

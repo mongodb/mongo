@@ -177,7 +177,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         auto collMetadata =
-            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata();
+            CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata(opCtx);
         if (collMetadata) {
             plannerParams->shardKey = collMetadata->getKeyPattern();
         } else {
@@ -207,6 +207,39 @@ void fillOutPlannerParams(OperationContext* opCtx,
     } else {
         plannerParams->options |= QueryPlannerParams::KEEP_MUTATIONS;
     }
+
+    if (shouldWaitForOplogVisibility(
+            opCtx, collection, canonicalQuery->getQueryRequest().isTailable())) {
+        plannerParams->options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
+    }
+}
+
+bool shouldWaitForOplogVisibility(OperationContext* opCtx,
+                                  const Collection* collection,
+                                  bool tailable) {
+
+    // Only non-tailable cursors on the oplog are affected. Only forward cursors, not reverse
+    // cursors, are affected, but this is checked when the cursor is opened.
+    if (!collection->ns().isOplog() || tailable) {
+        return false;
+    }
+
+    // Only primaries should require readers to wait for oplog visibility. In any other replication
+    // state, readers read at the most visible oplog timestamp. The reason why readers on primaries
+    // need to wait is because multiple optimes can be allocated for operations before their entries
+    // are written to the storage engine. "Holes" will appear when an operation with a later optime
+    // commits before an operation with an earlier optime, and readers should wait so that all data
+    // is consistent.
+    //
+    // Secondaries can't wait for oplog visibility without the PBWM lock because it can introduce a
+    // hang while a batch application is in progress. The wait is done while holding a global lock,
+    // and the oplog visibility timestamp is updated at the end of every batch on a secondary,
+    // signalling the wait to complete. If a replication worker had a global lock and temporarily
+    // released it, a reader could acquire the lock to read the oplog. If the secondary reader were
+    // to wait for the oplog visibility timestamp to be updated, it would wait for a replication
+    // batch that would never complete because it couldn't reacquire its own lock, the global lock
+    // held by the waiting reader.
+    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, "admin");
 }
 
 namespace {
@@ -278,7 +311,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
             root = make_unique<ShardFilterStage>(
                 opCtx,
-                CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata(),
+                CollectionShardingState::get(opCtx, canonicalQuery->nss())->getMetadata(opCtx),
                 ws,
                 root.release());
         }
@@ -617,6 +650,8 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
     params.tailable = cq->getQueryRequest().isTailable();
     params.shouldTrackLatestOplogTimestamp =
         plannerOptions & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    params.shouldWaitForOplogVisibility =
+        shouldWaitForOplogVisibility(opCtx, collection, params.tailable);
 
     // If the query is just a lower bound on "ts", we know that every document in the collection
     // after the first matching one must also match. To avoid wasting time running the match
@@ -1018,15 +1053,17 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
 //
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorGroup(
-    OperationContext* opCtx,
-    Collection* collection,
-    const GroupRequest& request,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    OperationContext* opCtx, Collection* collection, const GroupRequest& request) {
     if (!getGlobalScriptEngine()) {
         return Status(ErrorCodes::BadValue, "server-side JavaScript execution is disabled");
     }
 
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
+    const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto yieldPolicy =
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
 
     if (!collection) {
         // Treat collections that do not exist as empty collections.  Note that the explain
@@ -1269,11 +1306,7 @@ BSONObj getDistinctProjection(const std::string& field) {
 }  // namespace
 
 StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
-    OperationContext* opCtx,
-    Collection* collection,
-    const CountRequest& request,
-    bool explain,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    OperationContext* opCtx, Collection* collection, const CountRequest& request, bool explain) {
     unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
 
     auto qr = stdx::make_unique<QueryRequest>(request.getNs());
@@ -1290,13 +1323,19 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
         collection ? static_cast<const ExtensionsCallback&>(
                          ExtensionsCallbackReal(opCtx, &collection->ns()))
                    : static_cast<const ExtensionsCallback&>(ExtensionsCallbackNoop()),
-        MatchExpressionParser::kAllowAllSpecialFeatures &
-            ~MatchExpressionParser::AllowedFeatures::kIsolated);
+        MatchExpressionParser::kAllowAllSpecialFeatures);
 
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto yieldPolicy =
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
+
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain
         // reporting machinery always assumes that the root stage for a count operation is
@@ -1326,7 +1365,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
             opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
     }
 
-    const size_t plannerOptions = QueryPlannerParams::IS_COUNT;
+    size_t plannerOptions = QueryPlannerParams::IS_COUNT;
+    if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, request.getNs().ns())) {
+        plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
+    }
+
     StatusWith<PrepareExecutionResult> executionResult =
         prepareExecution(opCtx, collection, ws.get(), std::move(cq), plannerOptions);
     if (!executionResult.isOK()) {
@@ -1478,8 +1521,13 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     OperationContext* opCtx,
     Collection* collection,
     const std::string& ns,
-    ParsedDistinct* parsedDistinct,
-    PlanExecutor::YieldPolicy yieldPolicy) {
+    ParsedDistinct* parsedDistinct) {
+    const auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto yieldPolicy =
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
+
     if (!collection) {
         // Treat collections that do not exist as empty collections.
         return PlanExecutor::make(opCtx,
@@ -1548,8 +1596,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

@@ -45,6 +45,7 @@ public:
     OplogInterfaceLocal(OperationContext* opCtx, const std::string& collectionName);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;
+    HostAndPort hostAndPort() const override;
 
 private:
     OperationContext* _opCtx;

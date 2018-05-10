@@ -98,7 +98,7 @@ void BSONObj::_assertInvalid() const {
         ss << " First element: " << e.toString();
     } catch (...) {
     }
-    massert(10334, ss.str(), 0);
+    massert(ErrorCodes::BSONObjectTooLarge, ss.str(), 0);
 }
 
 BSONObj BSONObj::copy() const {

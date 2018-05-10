@@ -101,8 +101,8 @@ public:
             }
         }
 
-        return CommandHelpers::appendCommandStatus(result,
-                                                   killSessionsCmdHelper(opCtx, result, patterns));
+        uassertStatusOK(killSessionsCmdHelper(opCtx, result, patterns));
+        return true;
     }
 } killAllSessionsCommand;
 

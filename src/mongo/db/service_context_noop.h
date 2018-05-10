@@ -33,20 +33,6 @@
 namespace mongo {
 
 class ServiceContextNoop : public ServiceContext {
-public:
-    StorageEngine* getGlobalStorageEngine() override;
-
-    void initializeGlobalStorageEngine() override;
-
-    void shutdownGlobalStorageEngineCleanly() override;
-
-    void registerStorageEngine(const std::string& name,
-                               const StorageEngine::Factory* factory) override;
-
-    bool isRegisteredStorageEngine(const std::string& name) override;
-
-    StorageFactoriesIterator* makeStorageFactoriesIterator() override;
-
 private:
     std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) override;
 };

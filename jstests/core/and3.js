@@ -1,4 +1,8 @@
 // Check key match with sub matchers - part of SERVER-3192
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
 
 t = db.jstests_and3;
 t.drop();

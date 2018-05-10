@@ -36,7 +36,9 @@ operations on any cursors open in that WT_SESSION handle (whether opened
 before or after the WT_SESSION::begin_transaction call), are part of the
 transaction and their effects committed by calling
 WT_SESSION::commit_transaction, or discarded by calling
-WT_SESSION::rollback_transaction.
+WT_SESSION::rollback_transaction. Applications that use
+@ref transaction_timestamps can utilize the WT_SESSION::prepare_transaction API
+as a basis for implementing a two phase commit protocol.
 
 If WT_SESSION::commit_transaction returns an error for any reason, the
 transaction was rolled back, not committed.
@@ -151,6 +153,8 @@ Named snapshots are not durable: they do not survive WT_CONNECTION::close.
 
 @section transaction_timestamps Application-specified Transaction Timestamps
 
+@subsection timestamp_overview Timestamp overview
+
 Some applications have their own notion of time, including an expected commit
 order for transactions that may be inconsistent with the order assigned by
 WiredTiger.  We assume that applications can represent their notion of a
@@ -161,22 +165,56 @@ generate transaction timestamps, if that is sufficient for the application.
 The application's timestamp size is specified as a number of bytes at build
 time, with <code>configure --with-timestamp-size=X</code>.  The default
 timestamp size is 8 bytes (i.e., 64 bits).  Setting a size of zero disables
-transaction timestamp functionality.
+transaction timestamp functionality. Timestamps are communicated to WiredTiger
+using a hexadecimal encoding, so the encoded value can be twice as long as the
+raw timestamp value.
 
-Applications can assign explicit commit timestamps to transactions, then read
-"as of" a timestamp.  Timestamps are communicated to WiredTiger using a
-hexadecimal encoding, so the encoded value can be twice as long as the raw
-timestamp value.
+Applications assign explicit commit timestamps to transactions, then read
+"as of" a timestamp. The timestamp mechanism operates in parallel with
+WiredTiger's internal transaction ID management. It is recommended that once
+timestamps are in use for a particular table, all subsequent updates also use
+timestamps.
 
-WiredTiger also provides the ability to set a different commit timestamp for
-different set of updates in a single transaction. This can be done by calling
-WT_SESSION::timestamp_transaction repeatedly to set a new commit timestamp
-between a set of updates for the current transaction. This gives the ability to
-commit several updates with different read "as of" timestamp in a single
-transaction.
+@subsection timestamp_transactions Using transactions with timestamps
+
+Applications that use timestamps will generally provide a timestamp at
+WT_SESSION::transaction_commit that will be assigned to all updates that are
+part of the transaction. WiredTiger also provides the ability to set a different
+commit timestamp for different sets of updates in a single transaction. This can
+be done by calling WT_SESSION::timestamp_transaction repeatedly to set a new
+commit timestamp between a set of updates for the current transaction. This
+gives the ability to commit updates with different read "as of" timestamps in a
+single transaction.
 
 Setting a read timestamp in WT_SESSION::begin_transaction forces a transaction
 to run at snapshot isolation and ignore any commits with a newer timestamp.
+
+Commit timestamps cannot be set in the past of any read timestamp that has
+been used.  This is enforced by assertions in diagnostic builds, if
+applications violate this rule, data consistency can be violated.
+
+The commits to a particular data item must be performed in timestamp order.
+If applications violate this rule, data consistency can be violated.
+
+The WT_SESSION::prepare_transaction API is designed to be used in conjunction
+with timestamps and assigns a prepare timestamp to the transaction, which will
+be used for visibility checks until the transaction is committed or aborted.
+Once a transaction has been prepared the only other operations that can be
+completed are WT_SESSION::commit_transaction or
+WT_SESSION::rollback_transaction. The WT_SESSION::prepare_transaction API only
+guarantees that transactional conflicts will not cause the transaction to
+rollback - it does not guarantee that the transactions updates are durable. If
+a read operation encounters an update from a prepared transaction a
+WT_PREPARE_CONFLICT error will be returned indicating that it is not possible
+to choose a version of data to return until a prepared transaction is resolved,
+it is reasonable to retry such operations.
+
+@subsection timestamp_connection Managing global timestamp state
+
+Applications that use timestamps need to manage some global state in order
+to allow WiredTiger to clean up old updates, and not make new updates durable
+until it is safe to do so. That state is managed using the
+WT_CONNECTION::set_timestamp API.
 
 Setting an oldest timestamp in WT_CONNECTION::set_timestamp indicates that
 future read timestamps will be at least as recent as the oldest timestamp, so
@@ -196,14 +234,7 @@ does not automatically reset the maximum commit timestamp it is tracking. The
 application should explicitly do so by setting a commit timestamp in
 WT_CONNECTION::set_timestamp.
 
-Commit timestamps cannot be set in the past of any read timestamp that has
-been used.  This is enforced by assertions in diagnostic builds, if
-applications violate this rule, data consistency can be violated.
-
-The commits to a particular data item must be performed in timestamp order.
-If applications violate this rule, data consistency can be violated.
-
-@subsection Timestamp support in the extension API
+@subsection timestamp_extensions Timestamp support in the extension API
 
 The extension API, used by modules that extend WiredTiger via
 WT_CONNECTION::get_extension_api, is not timestamp-aware.  In particular,

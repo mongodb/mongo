@@ -70,7 +70,7 @@ protected:
         client.createCollection(kNss.ns());
 
         const KeyPattern keyPattern(kShardKeyPattern);
-        auto cm = ChunkManager::makeNew(
+        auto rt = RoutingTableHistory::makeNew(
             kNss,
             UUID::gen(),
             keyPattern,
@@ -81,6 +81,7 @@ protected:
                        ChunkRange{keyPattern.globalMin(), keyPattern.globalMax()},
                        ChunkVersion(1, 0, epoch()),
                        ShardId("otherShard"))});
+        std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
         auto const css = CollectionShardingState::get(operationContext(), kNss);

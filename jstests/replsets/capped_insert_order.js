@@ -9,7 +9,7 @@
     replTest.initiate();
 
     var master = replTest.getPrimary();
-    var slave = replTest.liveNodes.slaves[0];
+    var slave = replTest._slaves[0];
 
     var dbName = "db";
     var masterDb = master.getDB(dbName);

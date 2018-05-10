@@ -3,7 +3,7 @@
 Random.setRandomSeed();
 
 db.capped7.drop();
-db._dbCommand({create: "capped7", capped: true, size: 1000, $nExtents: 11, autoIndexId: false});
+db._dbCommand({create: "capped7", capped: true, size: 1000, $nExtents: 11});
 tzz = db.capped7;
 
 var ten = new Array(11).toString().replace(/,/g, "-");

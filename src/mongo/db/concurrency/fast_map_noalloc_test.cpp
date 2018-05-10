@@ -46,7 +46,7 @@ struct TestStruct {
     std::string value;
 };
 
-typedef class FastMapNoAlloc<ResourceId, TestStruct, 6> TestFastMapNoAlloc;
+typedef class FastMapNoAlloc<ResourceId, TestStruct> TestFastMapNoAlloc;
 
 
 TEST(FastMapNoAlloc, Empty) {
@@ -68,33 +68,20 @@ TEST(FastMapNoAlloc, NotEmpty) {
     ASSERT(!it.finished());
     ASSERT(!!it);
 
-    ASSERT(it->id == 101);
-    ASSERT(it->value == "Item101");
+    ASSERT(it->id == 102);
+    ASSERT(it->value == "Item102");
 
     it.next();
     ASSERT(!it.finished());
     ASSERT(!!it);
 
-    ASSERT(it->id == 102);
-    ASSERT(it->value == "Item102");
+    ASSERT(it->id == 101);
+    ASSERT(it->value == "Item101");
 
     // We are at the last element
     it.next();
     ASSERT(it.finished());
     ASSERT(!it);
-}
-
-TEST(FastMapNoAlloc, ExceedCapacity) {
-    TestFastMapNoAlloc map;
-
-    for (int i = 0; i < 6; i++) {
-        map.insert(ResourceId(RESOURCE_COLLECTION, i))
-            ->initNew(i, "Item" + boost::lexical_cast<std::string>(i));
-    }
-
-    ASSERT_THROWS_CODE(map.insert(ResourceId(RESOURCE_COLLECTION, 6)),
-                       AssertionException,
-                       ErrorCodes::TooManyLocks);
 }
 
 TEST(FastMapNoAlloc, FindNonExisting) {

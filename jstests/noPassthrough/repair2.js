@@ -22,11 +22,23 @@
         }
 
         for (let j = 0; j < 5000; ++j) {
-            bulk.find({_id: j, $isolated: 1}).remove();
+            bulk.find({_id: j}).remove();
         }
 
-        assert.writeOK(bulk.execute());
-        assert.eq(0, t.count());
+        // The bulk operation is expected to succeed, or fail due to interrupt depending on the
+        // storage engine.
+        try {
+            bulk.execute();
+            assert.eq(0, t.count());
+        } catch (ex) {
+            ex.toResult().getWriteErrors().forEach(function(error) {
+                assert.eq(error.code, ErrorCodes.QueryPlanKilled, tojson(error));
+                assert.eq(error.errmsg, "database closed for repair", tojson(error));
+            });
+            // The failure may have been a remove, so continuing to the next iteration in the loop
+            // would result in a duplicate key on insert.
+            break;
+        }
     }
 
     awaitShell();

@@ -30,6 +30,7 @@
 
 #include <mongoc.h>
 #include <set>
+#include <yaml-cpp/yaml.h>
 
 #include "mongo/client/embedded/functions_for_test.h"
 #include "mongo/client/embedded/libmongodbcapi.h"
@@ -45,6 +46,8 @@
 
 namespace moe = mongo::optionenvironment;
 
+libmongodbcapi_lib* global_lib_handle;
+
 namespace {
 
 std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
@@ -53,17 +56,22 @@ class MongodbEmbeddedTransportLayerTest : public mongo::unittest::Test {
 protected:
     void setUp() {
         if (!globalTempDir) {
-            globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
+            globalTempDir = std::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
-        int argc = 5;
-        const char* argv[] = {"mongo_embedded_transport_layer_test",
-                              "--storageEngine",
-                              "mobile",
-                              "--dbpath",
-                              globalTempDir->path().c_str()};
-        db_handle = libmongodbcapi_db_new(argc, argv, nullptr);
 
-        mongoc_init();
+        YAML::Emitter yaml;
+        yaml << YAML::BeginMap;
+
+        yaml << YAML::Key << "storage";
+        yaml << YAML::Value << YAML::BeginMap;
+        yaml << YAML::Key << "dbPath";
+        yaml << YAML::Value << globalTempDir->path();
+        yaml << YAML::EndMap;  // storage
+
+        yaml << YAML::EndMap;
+
+        db_handle = libmongodbcapi_instance_create(global_lib_handle, yaml.c_str(), nullptr);
+
         cd_client = embedded_mongoc_client_new(db_handle);
         mongoc_client_set_error_api(cd_client, 2);
         cd_db = mongoc_client_get_database(cd_client, "test");
@@ -71,7 +79,7 @@ protected:
     }
 
     void tearDown() {
-        mongoc_collection_drop(cd_collection, NULL);
+        mongoc_collection_drop(cd_collection, nullptr);
         if (cd_collection) {
             mongoc_collection_destroy(cd_collection);
         }
@@ -83,11 +91,11 @@ protected:
         if (cd_client) {
             mongoc_client_destroy(cd_client);
         }
-        mongoc_cleanup();
-        libmongodbcapi_db_destroy(db_handle);
+
+        libmongodbcapi_instance_destroy(db_handle, nullptr);
     }
 
-    libmongodbcapi_db* getDBHandle() {
+    libmongodbcapi_instance* getDBHandle() {
         return db_handle;
     }
 
@@ -103,7 +111,7 @@ protected:
 
 
 private:
-    libmongodbcapi_db* db_handle;
+    libmongodbcapi_instance* db_handle;
     mongoc_database_t* cd_db;
     mongoc_client_t* cd_client;
     mongoc_collection_t* cd_collection;
@@ -157,6 +165,15 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndDelete) {
     ASSERT(0 == mongoc_collection_count(collection, MONGOC_QUERY_NONE, nullptr, 0, 0, NULL, &err));
     bson_destroy(doc);
 }
+
+struct StatusDestroy {
+    void operator()(libmongodbcapi_status* const ptr) {
+        if (!ptr) {
+            libmongodbcapi_status_destroy(ptr);
+        }
+    }
+};
+using StatusPtr = std::unique_ptr<libmongodbcapi_status, StatusDestroy>;
 }  // namespace
 
 // Define main function as an entry to these tests.
@@ -186,7 +203,25 @@ int main(int argc, char** argv, char** envp) {
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::serverGlobalParams.noUnixSocket = true;
     ::mongo::unittest::setupTestLogger();
+
+    StatusPtr status(libmongodbcapi_status_create());
+    mongoc_init();
+
+    global_lib_handle = libmongodbcapi_lib_init(nullptr, status.get());
+    if (global_lib_handle == nullptr) {
+        std::cerr << "Error: " << libmongodbcapi_status_get_explanation(status.get());
+        return EXIT_FAILURE;
+    }
+
     auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
+
+    if (libmongodbcapi_lib_fini(global_lib_handle, status.get()) != LIBMONGODB_CAPI_SUCCESS) {
+        std::cerr << "Error: " << libmongodbcapi_status_get_explanation(status.get());
+        return EXIT_FAILURE;
+    }
+
+    mongoc_cleanup();
+
     globalTempDir.reset();
     mongo::quickExit(result);
 }

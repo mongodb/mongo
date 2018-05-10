@@ -65,6 +65,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -132,7 +133,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
 StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShard(
     OperationContext* opCtx,
     RemoteCommandTargeter* targeter,
-    const std::string& dbName,
+    StringData dbName,
     const BSONObj& cmdObj) {
     auto swHost = targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!swHost.isOK()) {
@@ -141,7 +142,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     auto host = std::move(swHost.getValue());
 
     executor::RemoteCommandRequest request(
-        host, dbName, cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
+        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
 
     executor::RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
@@ -299,8 +300,8 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
     const ConnectionString& connectionString) {
-    auto swCommandResponse =
-        _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("isMaster" << 1));
+    auto swCommandResponse = _runCommandForAddShard(
+        opCtx, targeter.get(), NamespaceString::kAdminDb, BSON("isMaster" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
         return swCommandResponse.getStatus().withReason(
             str::stream() << "Cannot add " << connectionString.toString()
@@ -472,14 +473,14 @@ Status ShardingCatalogManager::_dropSessionsCollection(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
     BSONObjBuilder builder;
-    builder.append("drop", SessionsCollection::kSessionsCollection.toString());
+    builder.append("drop", SessionsCollection::kSessionsNamespaceString.coll());
     {
         BSONObjBuilder wcBuilder(builder.subobjStart("writeConcern"));
         wcBuilder.append("w", "majority");
     }
 
     auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), SessionsCollection::kSessionsDb.toString(), builder.done());
+        opCtx, targeter.get(), SessionsCollection::kSessionsNamespaceString.db(), builder.done());
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -495,8 +496,11 @@ Status ShardingCatalogManager::_dropSessionsCollection(
 StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFromShard(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
-    auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), "admin", BSON("listDatabases" << 1 << "nameOnly" << true));
+    auto swCommandResponse =
+        _runCommandForAddShard(opCtx,
+                               targeter.get(),
+                               NamespaceString::kAdminDb,
+                               BSON("listDatabases" << 1 << "nameOnly" << true));
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -642,7 +646,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // the shard.
     LOG(2) << "going to insert shardIdentity document into shard: " << shardType;
     auto commandRequest = createShardIdentityUpsertForAddShard(opCtx, shardType.getName());
-    auto swCommandResponse = _runCommandForAddShard(opCtx, targeter.get(), "admin", commandRequest);
+    auto swCommandResponse =
+        _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, commandRequest);
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -659,24 +664,24 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // possible an earlier setFCV failed partway, so we handle all possible fcv states. Note, if
     // the state is upgrading (downgrading), a user cannot switch to downgrading (upgrading) without
     // first finishing the upgrade (downgrade).
-    //
-    // Note, we don't explicitly send writeConcern majority to the added shard, because a 3.4 mongod
-    // will reject it (setFCV did not support writeConcern until 3.6), and a 3.6 mongod will still
-    // default to majority writeConcern.
-    // TODO SERVER-32045: propagate the user's writeConcern.
     BSONObj setFCVCmd;
     switch (serverGlobalParams.featureCompatibility.getVersion()) {
         case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
         case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
             setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                             << FeatureCompatibilityVersionParser::kVersion40);
+                             << FeatureCompatibilityVersionParser::kVersion40
+                             << WriteConcernOptions::kWriteConcernField
+                             << opCtx->getWriteConcern().toBSON());
             break;
         default:
             setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
-                             << FeatureCompatibilityVersionParser::kVersion36);
+                             << FeatureCompatibilityVersionParser::kVersion36
+                             << WriteConcernOptions::kWriteConcernField
+                             << opCtx->getWriteConcern().toBSON());
             break;
     }
-    auto versionResponse = _runCommandForAddShard(opCtx, targeter.get(), "admin", setFCVCmd);
+    auto versionResponse =
+        _runCommandForAddShard(opCtx, targeter.get(), NamespaceString::kAdminDb, setFCVCmd);
     if (!versionResponse.isOK()) {
         return versionResponse.getStatus();
     }
@@ -700,6 +705,15 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
         DatabaseType dbt(dbName, shardType.getName(), false);
+
+        // If we're in FCV 4.0, we should add a version to each database.
+        if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+            dbt.setVersion(databaseVersion::makeNew());
+        }
+
         Status status = Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbt);
         if (!status.isOK()) {
             log() << "adding shard " << shardConnectionString.toString()
@@ -887,14 +901,9 @@ StatusWith<ShardId> ShardingCatalogManager::_selectShardForNewDatabase(
     OperationContext* opCtx, ShardRegistry* shardRegistry) {
     std::vector<ShardId> allShardIds;
 
-    shardRegistry->getAllShardIds(&allShardIds);
+    shardRegistry->getAllShardIds(opCtx, &allShardIds);
     if (allShardIds.empty()) {
-        shardRegistry->reload(opCtx);
-        shardRegistry->getAllShardIds(&allShardIds);
-
-        if (allShardIds.empty()) {
-            return Status(ErrorCodes::ShardNotFound, "No shards found");
-        }
+        return Status(ErrorCodes::ShardNotFound, "No shards found");
     }
 
     ShardId candidateShardId = allShardIds[0];

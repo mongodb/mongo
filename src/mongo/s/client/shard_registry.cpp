@@ -163,10 +163,24 @@ shared_ptr<Shard> ShardRegistry::lookupRSName(const string& name) const {
     return _data.findByRSName(name);
 }
 
-void ShardRegistry::getAllShardIds(vector<ShardId>* all) const {
+void ShardRegistry::getAllShardIdsNoReload(vector<ShardId>* all) const {
     std::set<ShardId> seen;
     _data.getAllShardIds(seen);
     all->assign(seen.begin(), seen.end());
+}
+
+void ShardRegistry::getAllShardIds(OperationContext* opCtx, vector<ShardId>* all) {
+    getAllShardIdsNoReload(all);
+    if (all->empty()) {
+        bool didReload = reload(opCtx);
+        getAllShardIdsNoReload(all);
+        // If we didn't do the reload ourselves, we should retry to ensure
+        // that the reload is actually initiated while we're executing this
+        if (!didReload && all->empty()) {
+            reload(opCtx);
+            getAllShardIdsNoReload(all);
+        }
+    }
 }
 
 int ShardRegistry::getNumShards() const {
@@ -339,9 +353,10 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
     // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
     Client::initThread("replSetChange");
     auto opCtx = cc().makeOperationContext();
+    auto const grid = Grid::get(opCtx.get());
 
     try {
-        std::shared_ptr<Shard> s = Grid::get(opCtx.get())->shardRegistry()->lookupRSName(setName);
+        std::shared_ptr<Shard> s = grid->shardRegistry()->lookupRSName(setName);
         if (!s) {
             LOG(1) << "shard not found for set: " << newConnectionString
                    << " when attempting to inform config servers of updated set membership";
@@ -353,15 +368,13 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
             return;
         }
 
-        auto status =
-            Grid::get(opCtx.get())
-                ->catalogClient()
-                ->updateConfigDocument(opCtx.get(),
-                                       ShardType::ConfigNS,
-                                       BSON(ShardType::name(s->getId().toString())),
-                                       BSON("$set" << BSON(ShardType::host(newConnectionString))),
-                                       false,
-                                       ShardingCatalogClient::kMajorityWriteConcern);
+        auto status = grid->catalogClient()->updateConfigDocument(
+            opCtx.get(),
+            ShardType::ConfigNS,
+            BSON(ShardType::name(s->getId().toString())),
+            BSON("$set" << BSON(ShardType::host(newConnectionString))),
+            false,
+            ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             error() << "RSChangeWatcher: could not update config db for set: " << setName
                     << " to: " << newConnectionString << causedBy(status.getStatus());
@@ -376,9 +389,20 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
 ////////////// ShardRegistryData //////////////////
 
 ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory) {
-    auto shardsAndOpTime = uassertStatusOKWithContext(
-        grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern),
-        "could not get updated shard list from config server");
+    auto const catalogClient = Grid::get(opCtx)->catalogClient();
+
+    auto readConcern = repl::ReadConcernLevel::kMajorityReadConcern;
+
+    // ShardRemote requires a majority read. We can only allow a non-majority read if we are a
+    // config server.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !repl::ReadConcernArgs::get(opCtx).isEmpty()) {
+        readConcern = repl::ReadConcernArgs::get(opCtx).getLevel();
+    }
+
+    auto shardsAndOpTime =
+        uassertStatusOKWithContext(catalogClient->getAllShards(opCtx, readConcern),
+                                   "could not get updated shard list from config server");
 
     auto shards = std::move(shardsAndOpTime.value);
     auto reloadOpTime = std::move(shardsAndOpTime.opTime);

@@ -117,9 +117,10 @@ private:
 
     /**
      * Throws a AssertionException if the namespace found in 'inputDoc' doesn't match the one on the
-     * ExpressionContext.
+     * ExpressionContext. If the namespace on the ExpressionContext is 'collectionless', then this
+     * function verifies that the only the database names match.
      */
-    NamespaceString assertNamespaceMatches(const Document& inputDoc) const;
+    NamespaceString assertValidNamespace(const Document& inputDoc) const;
 };
 
 }  // namespace mongo

@@ -76,7 +76,7 @@ bool _areOpsCrudOnly(const BSONObj& doTxnCmd) {
         BSONElement& fieldOp = fields[1];
 
         const char* opType = fieldOp.valuestrsafe();
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
 
         // All atomic ops have an opType of length 1.
         if (opType[0] == '\0' || opType[1] != '\0')
@@ -188,7 +188,7 @@ Status _doTxn(OperationContext* opCtx,
             // lock or any database locks. We release all locks temporarily while the fail
             // point is enabled to allow other threads to make progress.
             boost::optional<Lock::TempRelease> release;
-            auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+            auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             if (storageEngine->isMmapV1() && !opCtx->lockState()->isW()) {
                 release.emplace(opCtx->lockState());
             }
@@ -289,7 +289,7 @@ Status doTxn(OperationContext* opCtx,
 
 
     // Acquire global lock in IX mode so that the replication state check will remain valid.
-    Lock::GlobalLock globalLock(opCtx, MODE_IX, Date_t::max());
+    Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool userInitiatedWritesAndNotPrimary =
@@ -312,14 +312,10 @@ Status doTxn(OperationContext* opCtx,
 
         numApplied = 0;
         uassertStatusOK(_doTxn(opCtx, dbName, doTxnCmd, &intermediateResult, &numApplied));
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        invariant(opObserver);
-        opObserver->onTransactionCommit(opCtx);
+        session->commitTransaction(opCtx);
         result->appendElements(intermediateResult.obj());
-
-        // Commit the global WUOW if the command succeeds.
-        opCtx->getWriteUnitOfWork()->commit();
     } catch (const DBException& ex) {
+        session->abortActiveTransaction(opCtx);
         BSONArrayBuilder ab;
         ++numApplied;
         for (int j = 0; j < numApplied; j++)

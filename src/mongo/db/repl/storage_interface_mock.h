@@ -268,8 +268,14 @@ public:
     }
 
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
-        OperationContext* opCtx, const NamespaceString& nss) override {
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) override {
         return 0;
+    }
+
+    Status setCollectionCount(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              long long newCount) override {
+        return Status{ErrorCodes::IllegalOperation, "setCollectionCount not implemented."};
     }
 
     StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
@@ -285,7 +291,7 @@ public:
 
     Timestamp getInitialDataTimestamp() const;
 
-    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override {
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override {
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
     }
 
@@ -309,6 +315,11 @@ public:
                               const Timestamp& ts,
                               bool orderedCommit) override {
         return;
+    }
+
+    boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+        ServiceContext* serviceCtx) const override {
+        return boost::none;
     }
 
     // Testing functions.

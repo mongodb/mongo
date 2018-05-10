@@ -1,7 +1,4 @@
-"""
-Defines a mapping of shortened names for logger configuration files to
-their full path.
-"""
+"""Defines a mapping of shortened names for logger configuration files to their full path."""
 
 from __future__ import absolute_import
 
@@ -10,11 +7,9 @@ import os.path
 
 
 def _get_named_loggers():
-    """
-    Explores this directory for any YAML configuration files.
+    """Explore this directory for any YAML configuration files.
 
-    Returns a mapping of basenames without the file extension to their
-    full path.
+    Returns a mapping of basenames without the file extension to their full path.
     """
 
     dirname = os.path.dirname(__file__)
@@ -32,5 +27,6 @@ def _get_named_loggers():
         raise IOError("Directory '%s' does not exist" % (dirname))
 
     return named_loggers
+
 
 NAMED_LOGGERS = _get_named_loggers()

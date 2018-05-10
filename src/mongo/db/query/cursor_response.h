@@ -69,10 +69,15 @@ public:
     void append(const BSONObj& obj) {
         invariant(_active);
         _batch.append(obj);
+        _numDocs++;
     }
 
     void setLatestOplogTimestamp(Timestamp ts) {
         _latestOplogTimestamp = ts;
+    }
+
+    long long numDocs() const {
+        return _numDocs;
     }
 
     /**
@@ -94,6 +99,7 @@ private:
     BSONObjBuilder* const _commandResponse;
     BSONObjBuilder _cursorObject;
     BSONArrayBuilder _batch;
+    long long _numDocs = 0;
     Timestamp _latestOplogTimestamp;
 };
 
@@ -126,13 +132,36 @@ void appendGetMoreResponseObject(long long cursorId,
                                  BSONObjBuilder* builder);
 
 class CursorResponse {
+// In order to work around a bug in the compiler on the s390x platform, the IDL needs to invoke the
+// copy constructor on that platform.
+// TODO SERVER-32467 Remove this ifndef once the compiler has been fixed and the workaround has been
+// removed.
+#ifndef __s390x__
     MONGO_DISALLOW_COPYING(CursorResponse);
+#endif
 
 public:
     enum class ResponseType {
         InitialResponse,
         SubsequentResponse,
     };
+
+    /**
+     * Constructs a CursorResponse from the command BSON response.
+     */
+    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);
+
+    /**
+     * A throwing version of 'parseFromBSON'.
+     */
+    static CursorResponse parseFromBSONThrowing(const BSONObj& cmdResponse) {
+        return uassertStatusOK(parseFromBSON(cmdResponse));
+    }
+
+    /**
+     * Constructs an empty cursor response.
+     */
+    CursorResponse() = default;
 
     /**
      * Constructs from values for each of the fields.
@@ -146,6 +175,15 @@ public:
 
     CursorResponse(CursorResponse&& other) = default;
     CursorResponse& operator=(CursorResponse&& other) = default;
+
+// In order to work around a bug in the compiler on the s390x platform, the IDL needs to invoke the
+// copy constructor on that platform.
+// TODO SERVER-32467 Remove this ifndef once the compiler has been fixed and the workaround has been
+// removed.
+#ifdef __s390x__
+    CursorResponse(const CursorResponse& other) = default;
+    CursorResponse& operator=(const CursorResponse& other) = default;
+#endif
 
     //
     // Accessors.
@@ -180,15 +218,13 @@ public:
     }
 
     /**
-     * Constructs a CursorResponse from the command BSON response.
-     */
-    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse);
-
-    /**
      * Converts this response to its raw BSON representation.
      */
     BSONObj toBSON(ResponseType responseType) const;
     void addToBSON(ResponseType responseType, BSONObjBuilder* builder) const;
+    BSONObj toBSONAsInitialResponse() const {
+        return toBSON(ResponseType::InitialResponse);
+    }
 
 private:
     NamespaceString _nss;

@@ -8,7 +8,7 @@ var nodes = rt.startSet();
 rt.initiate();
 var m = rt.getPrimary();
 rt.awaitSecondaryNodes();
-var slaves = rt.liveNodes.slaves;
+var slaves = rt._slaves;
 s = slaves[0];
 s.setSlaveOk();
 admin = m.getDB("admin");

@@ -9,7 +9,8 @@
     function checkReplicatedDataHashesThread(hosts, testData) {
         try {
             TestData = testData;
-            new ReplSetTest(hosts[0]).checkReplicatedDataHashes();
+            const excludedDBs = jsTest.options().excludedDBsFromDBHash;
+            new ReplSetTest(hosts[0]).checkReplicatedDataHashes(undefined, excludedDBs);
             return {ok: 1};
         } catch (e) {
             return {ok: 0, hosts: hosts, error: e.toString(), stack: e.stack};
@@ -39,7 +40,8 @@
                 return;
             }
 
-            new ReplSetTest(topology.nodes[0]).checkReplicatedDataHashes();
+            const excludedDBs = jsTest.options().excludedDBsFromDBHash;
+            new ReplSetTest(topology.nodes[0]).checkReplicatedDataHashes(undefined, excludedDBs);
             return;
         }
 

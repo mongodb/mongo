@@ -8,7 +8,8 @@ import subprocess
 import sys
 
 
-def getAllSourceFiles(arr=None, prefix="."):
+def get_all_source_files(arr=None, prefix="."):
+    """Return source files."""
     if arr is None:
         arr = []
 
@@ -17,19 +18,17 @@ def getAllSourceFiles(arr=None, prefix="."):
         arr.append(prefix)
         return arr
 
-    for x in os.listdir(prefix):
-        if (x.startswith(".")
-            or x.startswith("pcre-")
-            or x.startswith("32bit")
-            or x.startswith("mongodb-")
-            or x.startswith("debian")
-            or x.startswith("mongo-cxx-driver")
-            or x.startswith("sqlite")
-            or "gotools" in x
-            or x.find("mozjs") != -1):
+    for fx in os.listdir(prefix):
+        # pylint: disable=too-many-boolean-expressions
+        if (fx.startswith(".") or fx.startswith("pcre-") or fx.startswith("32bit")
+                or fx.startswith("mongodb-") or fx.startswith("debian")
+                or fx.startswith("mongo-cxx-driver") or fx.startswith("sqlite") or "gotools" in fx
+                or fx.find("mozjs") != -1):
             continue
+        # pylint: enable=too-many-boolean-expressions
 
-        def isFollowableDir(prefix, full):
+        def is_followable_dir(prefix, full):
+            """Return True if 'full' is a followable directory."""
             if not os.path.isdir(full):
                 return False
             if not os.path.islink(full):
@@ -39,9 +38,9 @@ def getAllSourceFiles(arr=None, prefix="."):
                 return True
             return False
 
-        full = prefix + "/" + x
-        if isFollowableDir(prefix, full):
-            getAllSourceFiles(arr, full)
+        full = prefix + "/" + fx
+        if is_followable_dir(prefix, full):
+            get_all_source_files(arr, full)
         else:
             if full.endswith(".cpp") or full.endswith(".h") or full.endswith(".c"):
                 full = full.replace("//", "/")
@@ -50,7 +49,8 @@ def getAllSourceFiles(arr=None, prefix="."):
     return arr
 
 
-def getGitBranch():
+def get_git_branch():
+    """Return the git branch version."""
     if not os.path.exists(".git") or not os.path.isdir(".git"):
         return None
 
@@ -58,27 +58,29 @@ def getGitBranch():
     if not version.startswith("ref: "):
         return version
     version = version.split("/")
-    version = version[len(version)-1]
+    version = version[len(version) - 1]
     return version
 
 
-def getGitBranchString(prefix="", postfix=""):
-    t = re.compile("[/\\\]").split(os.getcwd())
-    if len(t) > 2 and t[len(t)-1] == "mongo":
-        par = t[len(t)-2]
-        m = re.compile(".*_([vV]\d+\.\d+)$").match(par)
-        if m is not None:
-            return prefix + m.group(1).lower() + postfix
+def get_git_branch_string(prefix="", postfix=""):
+    """Return the git branch name."""
+    tt = re.compile(r"[/\\]").split(os.getcwd())
+    if len(tt) > 2 and tt[len(tt) - 1] == "mongo":
+        par = tt[len(tt) - 2]
+        mt = re.compile(r".*_([vV]\d+\.\d+)$").match(par)
+        if mt is not None:
+            return prefix + mt.group(1).lower() + postfix
         if par.find("Nightly") > 0:
             return ""
 
-    b = getGitBranch()
-    if b is None or b == "master":
+    branch = get_git_branch()
+    if branch is None or branch == "master":
         return ""
-    return prefix + b + postfix
+    return prefix + branch + postfix
 
 
-def getGitVersion():
+def get_git_version():
+    """Return the git version."""
     if not os.path.exists(".git") or not os.path.isdir(".git"):
         return "nogitversion"
 
@@ -86,34 +88,32 @@ def getGitVersion():
     if not version.startswith("ref: "):
         return version
     version = version[5:]
-    f = ".git/" + version
-    if not os.path.exists(f):
+    git_ver = ".git/" + version
+    if not os.path.exists(git_ver):
         return version
-    return open(f, "r").read().strip()
+    return open(git_ver, "r").read().strip()
 
 
-def getGitDescribe():
+def get_git_describe():
+    """Return 'git describe'."""
     with open(os.devnull, "r+") as devnull:
-        proc = subprocess.Popen(
-            "git describe",
-            stdout=subprocess.PIPE,
-            stderr=devnull,
-            stdin=devnull,
-            shell=True)
+        proc = subprocess.Popen("git describe", stdout=subprocess.PIPE, stderr=devnull,
+                                stdin=devnull, shell=True)
         return proc.communicate()[0].strip()
 
 
 def execsys(args):
-    import subprocess
+    """Execute a subprocess of 'args'."""
     if isinstance(args, str):
-        r = re.compile("\s+")
-        args = r.split(args)
-    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    r = p.communicate()
-    return r
+        rc = re.compile(r"\s+")
+        args = rc.split(args)
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    res = proc.communicate()
+    return res
 
 
 def which(executable):
+    """Return full path of 'executable'."""
     if sys.platform == "win32":
         paths = os.environ.get("Path", "").split(";")
     else:
@@ -131,6 +131,7 @@ def which(executable):
 
 
 def find_python(min_version=(2, 5)):
+    """Return path of python."""
     try:
         if sys.version_info >= min_version:
             return sys.executable
@@ -139,32 +140,33 @@ def find_python(min_version=(2, 5)):
         pass
 
     version = re.compile(r"[Pp]ython ([\d\.]+)", re.MULTILINE)
-    binaries = (
-        "python27", "python2.7", "python26", "python2.6", "python25", "python2.5", "python")
+    binaries = ("python27", "python2.7", "python26", "python2.6", "python25", "python2.5", "python")
     for binary in binaries:
         try:
-            out, err = subprocess.Popen(
-                [binary, "-V"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            out, err = subprocess.Popen([binary, "-V"], stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE).communicate()
             for stream in (out, err):
                 match = version.search(stream)
                 if match:
                     versiontuple = tuple(map(int, match.group(1).split(".")))
                     if versiontuple >= min_version:
                         return which(binary)
-        except:
+        except Exception:  # pylint: disable=broad-except
             pass
 
-    raise Exception(
-        "could not find suitable Python (version >= %s)" % ".".join(str(v) for v in min_version))
+    raise Exception("could not find suitable Python (version >= %s)" % ".".join(
+        str(v) for v in min_version))
 
 
-# unicode is a pain. some strings cannot be unicode()'d
-# but we want to just preserve the bytes in a human-readable
-# fashion. this codec error handler will substitute the
-# repr() of the offending bytes into the decoded string
-# at the position they occurred
 def replace_with_repr(unicode_error):
+    """Codec error handler replacement."""
+    # Unicode is a pain, some strings cannot be unicode()'d
+    # but we want to just preserve the bytes in a human-readable
+    # fashion. This codec error handler will substitute the
+    # repr() of the offending bytes into the decoded string
+    # at the position they occurred
     offender = unicode_error.object[unicode_error.start:unicode_error.end]
     return (unicode(repr(offender).strip("'").strip('"')), unicode_error.end)
+
 
 codecs.register_error("repr", replace_with_repr)

@@ -1,11 +1,11 @@
-"""GDB commands for MongoDB
-"""
+"""GDB commands for MongoDB."""
 from __future__ import print_function
 
-import gdb
 import os
 import re
 import sys
+
+import gdb
 
 
 def get_process_name():
@@ -16,7 +16,7 @@ def get_process_name():
 
 
 def get_thread_id():
-    """Returns the thread_id of the current GDB thread"""
+    """Return the thread_id of the current GDB thread."""
     # GDB thread example:
     #  RHEL
     #   [Current thread is 1 (Thread 0x7f072426cca0 (LWP 12867))]
@@ -36,43 +36,70 @@ def get_thread_id():
     raise ValueError("Failed to find thread id in {}".format(thread_info))
 
 
+def get_current_thread_name():
+    """Return the name of the current GDB thread."""
+    fallback_name = '"%s"' % (gdb.selected_thread().name or '')
+    try:
+        # This goes through the pretty printer for StringData which adds "" around the name.
+        name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
+        if name == '""':
+            return fallback_name
+        return name
+    except gdb.error:
+        return fallback_name
+
+
 ###################################################################################################
 #
 # Commands
 #
 ###################################################################################################
-# Dictionary of commands so we can write a help function that describes the MongoDB commands.
-mongo_commands = {}
 
 
-def register_mongo_command(obj, name, command_class):
-    """Register a command with no completer as a mongo command"""
-    global mongo_commands
-    gdb.Command.__init__(obj, name, command_class)
+class RegisterMongoCommand(object):
+    """Class to register mongo commands with GDB."""
 
-    mongo_commands[name] = obj.__doc__
+    _MONGO_COMMANDS = {}  # type: ignore
+
+    @classmethod
+    def register(cls, obj, name, command_class):
+        """Register a command with no completer as a mongo command."""
+        gdb.Command.__init__(obj, name, command_class)
+        cls._MONGO_COMMANDS[name] = obj.__doc__
+
+    @classmethod
+    def print_commands(cls):
+        """Print the registered mongo commands."""
+        print("Command - Description")
+        for key in cls._MONGO_COMMANDS:
+            print("%s - %s" % (key, cls._MONGO_COMMANDS[key]))
 
 
 class DumpGlobalServiceContext(gdb.Command):
-    """Dump the Global Service Context"""
+    """Dump the Global Service Context."""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-service-context", gdb.COMMAND_DATA)
+        """Initialize DumpGlobalServiceContext."""
+        RegisterMongoCommand.register(self, "mongodb-service-context", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):
+    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+        """Invoke GDB command to print the Global Service Context."""
         gdb.execute("print *('mongo::(anonymous namespace)::globalServiceContext')")
+
 
 # Register command
 DumpGlobalServiceContext()
 
 
 class MongoDBDumpLocks(gdb.Command):
-    """Dump locks in mongod process"""
+    """Dump locks in mongod process."""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
+        """Initialize MongoDBDumpLocks."""
+        RegisterMongoCommand.register(self, "mongodb-dump-locks", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):
+    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+        """Invoke MongoDBDumpLocks."""
         print("Running Hang Analyzer Supplement - MongoDBDumpLocks")
 
         main_binary_name = get_process_name()
@@ -81,8 +108,9 @@ class MongoDBDumpLocks(gdb.Command):
         else:
             print("Not invoking mongod lock dump for: %s" % (main_binary_name))
 
-    def dump_mongod_locks(self):
-        """GDB in-process python supplement"""
+    @staticmethod
+    def dump_mongod_locks():
+        """GDB in-process python supplement."""
 
         try:
             # Call into mongod, and dump the state of lock manager
@@ -92,17 +120,20 @@ class MongoDBDumpLocks(gdb.Command):
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 
+
 # Register command
 MongoDBDumpLocks()
 
 
 class BtIfActive(gdb.Command):
-    """Print stack trace or a short message if the current thread is idle"""
+    """Print stack trace or a short message if the current thread is idle."""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
+        """Initialize BtIfActive."""
+        RegisterMongoCommand.register(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):
+    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+        """Invoke GDB to print stack trace."""
         try:
             idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
         except gdb.error:
@@ -113,19 +144,22 @@ class BtIfActive(gdb.Command):
         else:
             gdb.execute("bt")
 
+
 # Register command
 BtIfActive()
 
 
 class MongoDBUniqueStack(gdb.Command):
-    """Print unique stack traces of all threads in current process"""
+    """Print unique stack traces of all threads in current process."""
 
     _HEADER_FORMAT = "Thread {gdb_thread_num}: {name} (Thread {pthread} (LWP {lwpid})):"
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-uniqstack", gdb.COMMAND_DATA)
+        """Initialize MongoDBUniqueStack."""
+        RegisterMongoCommand.register(self, "mongodb-uniqstack", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
+        """Invoke GDB to dump stacks."""
         stacks = {}
         if not arg:
             arg = 'bt'  # default to 'bt'
@@ -142,23 +176,14 @@ class MongoDBUniqueStack(gdb.Command):
             if current_thread and current_thread.is_valid():
                 current_thread.switch()
 
-    def _get_current_thread_name(self):
-        fallback_name = '"%s"' % (gdb.selected_thread().name or '')
-        try:
-            # This goes through the pretty printer for StringData which adds "" around the name.
-            name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
-            if name == '""':
-                return fallback_name
-            return name
-        except gdb.error:
-            return fallback_name
-
-    def _process_thread_stack(self, arg, stacks, thread):
+    @staticmethod
+    def _process_thread_stack(arg, stacks, thread):
+        """Process the thread stack."""
         thread_info = {}  # thread dict to hold per thread data
         thread_info['pthread'] = get_thread_id()
         thread_info['gdb_thread_num'] = thread.num
         thread_info['lwpid'] = thread.ptid[1]
-        thread_info['name'] = self._get_current_thread_name()
+        thread_info['name'] = get_current_thread_name()
 
         if sys.platform.startswith("linux"):
             header_format = "Thread {gdb_thread_num}: {name} (Thread 0x{pthread:x} (LWP {lwpid}))"
@@ -183,9 +208,9 @@ class MongoDBUniqueStack(gdb.Command):
             except gdb.error as err:
                 print("{} {}".format(thread_info['header'], err))
                 break
-        addrs = tuple(addrs)  # tuples are hashable, lists aren't.
+        addrs_tuple = tuple(addrs)  # tuples are hashable, lists aren't.
 
-        unique = stacks.setdefault(addrs, {'threads': []})
+        unique = stacks.setdefault(addrs_tuple, {'threads': []})
         unique['threads'].append(thread_info)
         if 'output' not in unique:
             try:
@@ -193,8 +218,12 @@ class MongoDBUniqueStack(gdb.Command):
             except gdb.error as err:
                 print("{} {}".format(thread_info['header'], err))
 
-    def _dump_unique_stacks(self, stacks):
+    @staticmethod
+    def _dump_unique_stacks(stacks):
+        """Dump the unique stacks."""
+
         def first_tid(stack):
+            """Return the first tid."""
             return stack['threads'][0]['gdb_thread_num']
 
         for stack in sorted(stacks.values(), key=first_tid, reverse=True):
@@ -204,17 +233,20 @@ class MongoDBUniqueStack(gdb.Command):
             print(stack['output'])
             print()  # leave extra blank line after each thread stack
 
+
 # Register command
 MongoDBUniqueStack()
 
 
 class MongoDBJavaScriptStack(gdb.Command):
-    """Print the JavaScript stack from a MongoDB process"""
+    """Print the JavaScript stack from a MongoDB process."""
 
     def __init__(self):
-        register_mongo_command(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
+        """Initialize MongoDBJavaScriptStack."""
+        RegisterMongoCommand.register(self, "mongodb-javascript-stack", gdb.COMMAND_STATUS)
 
-    def invoke(self, arg, _from_tty):
+    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
+        """Invoke GDB to dump JS stacks."""
         print("Running Print JavaScript Stack Supplement")
 
         main_binary_name = get_process_name()
@@ -223,8 +255,9 @@ class MongoDBJavaScriptStack(gdb.Command):
         else:
             print("No JavaScript stack print done for: %s" % (main_binary_name))
 
-    def javascript_stack(self):
-        """GDB in-process python supplement"""
+    @staticmethod
+    def javascript_stack():
+        """GDB in-process python supplement."""
 
         for thread in gdb.selected_inferior().threads():
             try:
@@ -253,15 +286,16 @@ MongoDBJavaScriptStack()
 
 
 class MongoDBHelp(gdb.Command):
-    """Dump list of mongodb commands"""
+    """Dump list of mongodb commands."""
 
     def __init__(self):
+        """Initialize MongoDBHelp."""
         gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_SUPPORT)
 
-    def invoke(self, arg, _from_tty):
-        print("Command - Description")
-        for key in mongo_commands:
-            print("%s - %s" % (key, mongo_commands[key]))
+    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+        """Register the mongo print commands."""
+        RegisterMongoCommand.print_commands()
+
 
 # Register command
 MongoDBHelp()

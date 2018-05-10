@@ -32,7 +32,6 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 
@@ -56,15 +55,17 @@ public:
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
                                       Milliseconds timeout) override;
-    void asyncConnect(HostAndPort peer,
-                      ConnectSSLMode sslMode,
-                      Milliseconds timeout,
-                      std::function<void(StatusWith<SessionHandle>)> callback) override;
+    Future<SessionHandle> asyncConnect(HostAndPort peer,
+                                       ConnectSSLMode sslMode,
+                                       const ReactorHandle& reactor) override;
 
     Status setup() override;
     Status start() override;
     void shutdown() override;
     bool inShutdown() const;
+
+
+    virtual ReactorHandle getReactor(WhichReactor which) override;
 
     // Set to a factory function to use your own session type.
     std::function<SessionHandle(TransportLayer*)> createSessionHook;

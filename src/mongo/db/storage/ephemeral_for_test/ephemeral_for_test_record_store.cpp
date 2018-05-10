@@ -51,7 +51,7 @@ class EphemeralForTestRecordStore::InsertChange : public RecoveryUnit::Change {
 public:
     InsertChange(OperationContext* opCtx, Data* data, RecordId loc)
         : _opCtx(opCtx), _data(data), _loc(loc) {}
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
@@ -77,7 +77,7 @@ public:
                  const EphemeralForTestRecord& rec)
         : _opCtx(opCtx), _data(data), _loc(loc), _rec(rec) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
@@ -107,7 +107,7 @@ public:
         swap(_records, _data->records);
     }
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         using std::swap;
 

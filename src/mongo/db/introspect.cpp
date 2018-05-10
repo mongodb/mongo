@@ -116,6 +116,11 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
 
     try {
+        // Even if the operation we are profiling was interrupted, we still want to output the
+        // profiler entry.  This lock guard will prevent lock acquisitions from throwing exceptions
+        // before we finish writing the entry.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
         bool acquireDbXLock = false;
         while (true) {
             std::unique_ptr<AutoGetDb> autoGetDb;

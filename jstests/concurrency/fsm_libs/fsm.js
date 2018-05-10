@@ -21,14 +21,23 @@ var fsm = (function() {
         // See fsm_libs/cluster.js for the format of args.cluster.
         var connCache;
         if (args.passConnectionCache) {
+            // In order to ensure that all operations performed by a worker thread happen on the
+            // same session, we override the "_defaultSession" property of the connections in the
+            // cache to be the same as the session underlying 'args.db'.
+            const makeNewConnWithExistingSession = function(connStr) {
+                const conn = new Mongo(connStr);
+                conn._defaultSession = new _DelegatingDriverSession(conn, args.db.getSession());
+                return conn;
+            };
+
             connCache = {mongos: [], config: [], shards: {}};
-            connCache.mongos = args.cluster.mongos.map(connStr => new Mongo(connStr));
-            connCache.config = args.cluster.config.map(connStr => new Mongo(connStr));
+            connCache.mongos = args.cluster.mongos.map(makeNewConnWithExistingSession);
+            connCache.config = args.cluster.config.map(makeNewConnWithExistingSession);
 
             var shardNames = Object.keys(args.cluster.shards);
 
             shardNames.forEach(name => (connCache.shards[name] = args.cluster.shards[name].map(
-                                            connStr => new Mongo(connStr))));
+                                            makeNewConnWithExistingSession)));
         }
 
         for (var i = 0; i < args.iterations; ++i) {

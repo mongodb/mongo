@@ -1,5 +1,9 @@
 /**
  * Tests that we can create background (and foreground) indexes that are multikey.
+ * @tags: [
+ *  # Uses index building in background
+ *  requires_background_index,
+ * ]
  */
 
 (function() {

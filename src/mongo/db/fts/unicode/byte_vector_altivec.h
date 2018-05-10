@@ -34,6 +34,7 @@
 
 #include <cstdint>
 
+#include "mongo/config.h"
 #include "mongo/platform/bits.h"
 
 namespace mongo {
@@ -98,7 +99,7 @@ public:
         // big endian by comparison.
         const Native bits = {120, 112, 104, 96, 88, 80, 72, 64, 56, 48, 40, 32, 24, 16, 8, 0};
 
-        return vec_extract(vec_vbpermq(_data, bits), 0);
+        return vec_extract(vec_vbpermq(_data, bits), MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX);
     }
 
     /**

@@ -64,6 +64,12 @@ BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
 BSONObj appendAtClusterTime(BSONObj cmdObj, LogicalTime atClusterTime);
 
 /**
+ * Returns a copy of the given readConcern object with atClusterTime appended. The given object must
+ * not already have an atClusterTime field.
+ */
+BSONObj appendAtClusterTimeToReadConcern(BSONObj readConcernObj, LogicalTime atClusterTime);
+
+/**
  * Utility for dispatching unversioned commands to all shards in a cluster.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns
@@ -93,6 +99,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
+    StringData dbName,
     const NamespaceString& nss,
     const CachedCollectionRoutingInfo& routingInfo,
     const BSONObj& cmdObj,
@@ -115,6 +122,20 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
 std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy);
+
+/**
+ * Utility for dispatching commands against the primary of a database and attach the appropriate
+ * database version.
+ *
+ * Does not retry on StaleDbVersion.
+ */
+AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
+    OperationContext* opCtx,
+    StringData dbName,
+    const CachedDatabaseInfo& dbInfo,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy);
@@ -159,7 +180,10 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
 /**
  * Utility function to return an empty result set from a command.
  */
-bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
+bool appendEmptyResultSet(OperationContext* opCtx,
+                          BSONObjBuilder& result,
+                          Status status,
+                          const std::string& ns);
 
 /**
  * If the specified database exists already, loads it in the cache (if not already there) and
@@ -168,9 +192,33 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName);
 
 /**
- *  Computes the cluster snapshot time for provided shards. Returns uninitialized LogicalTime if
- *  the set is empty or every shard's lastCommittedOpTime is not initialized.
+ * Returns the shards that would be targeted for the given query according to the given routing
+ * info.
  */
-LogicalTime computeAtClusterTime(OperationContext* opCtx, std::set<ShardId> shardIds);
+std::set<ShardId> getTargetedShardsForQuery(OperationContext* opCtx,
+                                            const CachedCollectionRoutingInfo& routingInfo,
+                                            const BSONObj& query,
+                                            const BSONObj& collation);
 
+/**
+ * Returns the latest known lastCommittedOpTime for the targeted shard.
+ *
+ * A null logical time is returned if the readConcern on the OperationContext is not snapshot.
+ */
+boost::optional<LogicalTime> computeAtClusterTimeForOneShard(OperationContext* opCtx,
+                                                             const ShardId& shardId);
+
+/**
+ * Returns the atClusterTime to use for the given query. This will be the latest known
+ * lastCommittedOpTime for the targeted shards if the same set of shards would be targeted at that
+ * time, otherwise the latest in-memory cluster time.
+ *
+ * A null logical time is returned if the readConcern on the OperationContext is not snapshot.
+ */
+boost::optional<LogicalTime> computeAtClusterTime(OperationContext* opCtx,
+                                                  bool mustRunOnAll,
+                                                  const std::set<ShardId>& shardIds,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj query,
+                                                  const BSONObj collation);
 }  // namespace mongo

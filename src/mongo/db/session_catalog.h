@@ -53,24 +53,11 @@ class SessionCatalog {
     friend class ScopedCheckedOutSession;
 
 public:
-    explicit SessionCatalog(ServiceContext* serviceContext);
+    SessionCatalog() = default;
     ~SessionCatalog();
 
     /**
-     * Instantiates a transaction table on the specified service context. Must be called only once
-     * and is not thread-safe.
-     */
-    static void create(ServiceContext* service);
-
-    /**
-     * Resets the transaction table on the specified service context to an uninitialized state.
-     * Meant only for testing.
-     */
-    static void reset_forTest(ServiceContext* service);
-
-    /**
      * Retrieves the session transaction table associated with the service or operation context.
-     * Must only be called after 'create' has been called.
      */
     static SessionCatalog* get(OperationContext* opCtx);
     static SessionCatalog* get(ServiceContext* service);
@@ -80,6 +67,12 @@ public:
      * exist or has no UUID. Acquires a lock on the collection. Required for rollback via refetch.
      */
     static boost::optional<UUID> getTransactionTableUUID(OperationContext* opCtx);
+
+    /**
+     * Resets the transaction table to an uninitialized state.
+     * Meant only for testing.
+     */
+    void reset_forTest();
 
     /**
      * Invoked when the node enters the primary state. Ensures that the transactions collection is
@@ -111,18 +104,6 @@ public:
      * which run on a session.
      */
     ScopedSession getOrCreateSession(OperationContext* opCtx, const LogicalSessionId& lsid);
-
-    /**
-     * Returns a reference to the specified cached session if it exists, regardless of whether it is
-     * checked-out or not. The returned session is not returned checked-out and is allowed to be
-     * checked-out concurrently.
-     *
-     * The intended usage for this method is to allow cursor destruction that may abort the
-     * transaction to run in parallel with operations for the same session without blocking it.
-     * Because of this, it may not be used from operations which run on a session.
-     */
-    boost::optional<ScopedSession> getSession(OperationContext* opCtx,
-                                              const LogicalSessionId& lsid);
 
     /**
      * Callback to be invoked when it is suspected that the on-disk session contents might not be in
@@ -176,20 +157,9 @@ private:
         WithLock, OperationContext* opCtx, const LogicalSessionId& lsid);
 
     /**
-     * May release and re-acquire it zero or more times before returning. The returned
-     * 'SessionRuntimeInfo' is guaranteed to be linked on the catalog's _txnTable as long as the
-     * lock is held. If the requested 'SessionRuntimeInfo' does not exist, returns nullptr.
-     */
-    std::shared_ptr<SessionRuntimeInfo> _getSessionRuntimeInfo(WithLock,
-                                                               OperationContext* opCtx,
-                                                               const LogicalSessionId& lsid);
-
-    /**
      * Makes a session, previously checked out through 'checkoutSession', available again.
      */
     void _releaseSession(const LogicalSessionId& lsid);
-
-    ServiceContext* const _serviceContext;
 
     stdx::mutex _mutex;
     SessionRuntimeInfoMap _txnTable;
@@ -272,9 +242,6 @@ private:
  * Scoped object, which checks out the session specified in the passed operation context and stores
  * it for later access by the command. The session is installed at construction time and is removed
  * at destruction.
- *
- * Nested OperationContextSessions only check out the session once at the top level, but the checked
- * out session is accessible via get() in inner scopes. This could happen due to DBDirectClient.
  */
 class OperationContextSession {
     MONGO_DISALLOW_COPYING(OperationContextSession);
@@ -282,15 +249,17 @@ class OperationContextSession {
 public:
     OperationContextSession(OperationContext* opCtx,
                             bool checkOutSession,
-                            boost::optional<bool> autocommit);
+                            boost::optional<bool> autocommit,
+                            boost::optional<bool> startTransaction,
+                            StringData dbName,
+                            StringData cmdName);
 
     ~OperationContextSession();
 
     /**
-     * Returns the session checked out in the constructor. If "topLevelOnly" is true, it returns
-     * the session when it's at the top nesting level, and nullptr otherwise.
+     * Returns the session checked out in the constructor.
      */
-    static Session* get(OperationContext* opCtx, bool topLevelOnly = false);
+    static Session* get(OperationContext* opCtx);
 
 private:
     OperationContext* const _opCtx;

@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/update_zone_key_range_request_type.h"
@@ -97,6 +98,10 @@ public:
             uasserted(ErrorCodes::IllegalOperation,
                       "_configsvrAssignKeyRangeToZone can only be run on config servers");
         }
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto parsedRequest =
             uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromConfigCommand(cmdObj));

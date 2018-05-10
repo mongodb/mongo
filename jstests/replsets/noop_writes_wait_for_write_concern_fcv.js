@@ -24,7 +24,8 @@
         assert.eq(primary, replTest.nodes[0]);
 
         // Set the FCV to the given target version, to ensure calling setFCV below is a no-op.
-        assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: targetVersion}));
+        assert.commandWorkedIgnoringWriteConcernErrors(
+            primary.adminCommand({setFeatureCompatibilityVersion: targetVersion}));
 
         // Stop one node to force commands with "majority" write concern to time out. First increase
         // the election timeout to prevent the primary from stepping down before the test is over.
@@ -57,7 +58,7 @@
             // Verify the command receives a write concern error. If we don't wait for write concern
             // on noop writes then we won't get a write concern error.
             assertWriteConcernError(res);
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteConcernErrors(res);
         } catch (e) {
             printjson(res);
             throw e;

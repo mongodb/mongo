@@ -13,7 +13,6 @@
     assert.eq(2, names.length);
     assert.commandWorked(s.s0.adminCommand({addshard: names[0]}));
     assert.commandWorked(s.s0.adminCommand({addshard: names[1], maxSize: MaxSizeMB}));
-
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', names[0]);
 

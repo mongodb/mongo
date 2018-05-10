@@ -87,7 +87,7 @@ struct SockAddr {
      */
     explicit SockAddr(StringData target, int port, sa_family_t familyHint);
 
-    explicit SockAddr(struct sockaddr_storage& other, socklen_t size);
+    explicit SockAddr(const sockaddr_storage& other, socklen_t size);
 
     /**
      * Resolve an ip or hostname to a vector of SockAddr objects.

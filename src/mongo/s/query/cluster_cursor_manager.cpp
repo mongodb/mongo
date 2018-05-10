@@ -147,6 +147,11 @@ BSONObj ClusterCursorManager::PinnedCursor::getOriginatingCommand() const {
     return _cursor->getOriginatingCommand();
 }
 
+std::size_t ClusterCursorManager::PinnedCursor::getNumRemotes() const {
+    invariant(_cursor);
+    return _cursor->getNumRemotes();
+}
+
 CursorId ClusterCursorManager::PinnedCursor::getCursorId() const {
     return _cursorId;
 }
@@ -176,6 +181,16 @@ void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
 
     // Return the cursor as exhausted so that it's deleted immediately.
     returnCursor(CursorState::Exhausted);
+}
+
+boost::optional<LogicalSessionId> ClusterCursorManager::PinnedCursor::getLsid() const {
+    invariant(_cursor);
+    return _cursor->getLsid();
+}
+
+boost::optional<TxnNumber> ClusterCursorManager::PinnedCursor::getTxnNumber() const {
+    invariant(_cursor);
+    return _cursor->getTxnNumber();
 }
 
 ClusterCursorManager::ClusterCursorManager(ClockSource* clockSource)
@@ -406,7 +421,7 @@ void ClusterCursorManager::detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk
                                                const NamespaceString& nss,
                                                CursorId cursorId) {
     auto detachedCursor = _detachCursor(lk, nss, cursorId);
-    invariantOK(detachedCursor.getStatus());
+    invariant(detachedCursor.getStatus());
 
     // Deletion of the cursor can happen out of the lock.
     lk.unlock();

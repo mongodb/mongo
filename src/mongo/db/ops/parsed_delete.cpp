@@ -109,18 +109,7 @@ const DeleteRequest* ParsedDelete::getRequest() const {
 }
 
 PlanExecutor::YieldPolicy ParsedDelete::yieldPolicy() const {
-    if (_request->isGod()) {
-        return PlanExecutor::NO_YIELD;
-    }
-    if (_request->getYieldPolicy() == PlanExecutor::YIELD_AUTO && isIsolated()) {
-        return PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;  // Don't yield locks.
-    }
-    return _request->getYieldPolicy();
-}
-
-bool ParsedDelete::isIsolated() const {
-    return _canonicalQuery.get() ? _canonicalQuery->isIsolated()
-                                 : QueryRequest::isQueryIsolated(_request->getQuery());
+    return _request->isGod() ? PlanExecutor::NO_YIELD : _request->getYieldPolicy();
 }
 
 bool ParsedDelete::hasParsedQuery() const {

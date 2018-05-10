@@ -23,7 +23,7 @@
         replTest.startSet();
         replTest.initiate();
         var master = replTest.getPrimary();
-        var secondary = replTest.liveNodes.slaves[0];
+        var secondary = replTest._slaves[0];
         var masterDB = master.getDB(replsetDBName);
         masterDB.dropDatabase();
 

@@ -47,7 +47,7 @@ RollbackSourceImpl::RollbackSourceImpl(GetConnectionFn getConnection,
     : _getConnection(getConnection),
       _source(source),
       _collectionName(collectionName),
-      _oplog(getConnection, collectionName) {}
+      _oplog(source, getConnection, collectionName) {}
 
 const OplogInterface& RollbackSourceImpl::getOplog() const {
     return _oplog;

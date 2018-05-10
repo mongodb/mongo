@@ -51,9 +51,20 @@ PlanStage::StageState QueuedDataStage::doWork(WorkingSetID* out) {
     StageState state = _results.front();
     _results.pop();
 
-    if (PlanStage::ADVANCED == state) {
-        *out = _members.front();
-        _members.pop();
+    switch (state) {
+        case PlanStage::ADVANCED:
+            *out = _members.front();
+            _members.pop();
+            break;
+        case PlanStage::DEAD:
+        case PlanStage::FAILURE:
+            // On DEAD or FAILURE, this stage is reponsible for allocating the WorkingSetMember with
+            // the error details.
+            *out = WorkingSetCommon::allocateStatusMember(
+                _ws, Status(ErrorCodes::InternalError, "Queued data stage failure"));
+            break;
+        default:
+            break;
     }
 
     return state;

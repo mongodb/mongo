@@ -48,23 +48,41 @@ void killSessionsLocalKillCursors(OperationContext* opCtx, const SessionKiller::
     auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
     uassertStatusOK(res.first);
 }
+}  // namespace
 
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher) {
+                                       const SessionKiller::Matcher& matcher,
+                                       bool shouldKillClientCursors) {
     SessionCatalog::get(opCtx)->scanSessions(
-        opCtx, matcher, [](OperationContext* opCtx, Session* session) {
-            session->abortTransaction();
+        opCtx, matcher, [shouldKillClientCursors](OperationContext* opCtx, Session* session) {
+            session->abortArbitraryTransaction(opCtx, shouldKillClientCursors);
         });
 }
-}  // namespace
+
+void killSessionsLocalKillTransactionCursors(OperationContext* opCtx,
+                                             const SessionKiller::Matcher& matcher) {
+    SessionCatalog::get(opCtx)->scanSessions(
+        opCtx, matcher, [](OperationContext* opCtx, Session* session) {
+            session->killTransactionCursors(opCtx);
+        });
+}
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,
                                         SessionKiller::UniformRandomBitGenerator* urbg) {
-    killSessionsLocalKillCursors(opCtx, matcher);
-    uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
     killSessionsLocalKillTransactions(opCtx, matcher);
+    uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
+    killSessionsLocalKillCursors(opCtx, matcher);
     return {std::vector<HostAndPort>{}};
+}
+
+void killAllExpiredTransactions(OperationContext* opCtx) {
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    SessionCatalog::get(opCtx)->scanSessions(
+        opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
+            session->abortArbitraryTransactionIfExpired(opCtx);
+        });
 }
 
 }  // namespace mongo

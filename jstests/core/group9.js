@@ -1,6 +1,11 @@
-// Cannot implicitly shard accessed collections because of unsupported group operator on sharded
-// collection.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//     # Cannot implicitly shard accessed collections because of unsupported group operator on
+//     # sharded collection.
+//     assumes_unsharded_collection,
+//
+//     # group requires javascript
+//     requires_scripting
+// ]
 
 (function() {
     'use strict';

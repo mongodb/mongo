@@ -31,12 +31,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/tailable_mode.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
 class BSONObj;
 class ClusterCursorManager;
+class RemoteCursor;
 template <typename T>
 class StatusWith;
 struct HostAndPort;
@@ -74,6 +75,24 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager,
-                                        TailableMode tailableMode = TailableMode::kNormal);
+                                        TailableModeEnum tailableMode = TailableModeEnum::kNormal);
 
+/**
+ * Convenience function which extracts all necessary information from the passed RemoteCursor, and
+ * stores a ClusterClientCursor based on it.
+ */
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const NamespaceString& requestedNss,
+                                        const RemoteCursor& remoteCursor,
+                                        TailableModeEnum tailableMode);
+
+/**
+ * Convenience function which extracts all necessary information from the passed CommandResponse,
+ * and stores a ClusterClientCursor based on it.
+ */
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const NamespaceString& requestedNss,
+                                        const ShardId& shardId,
+                                        const Shard::CommandResponse& commandResponse,
+                                        TailableModeEnum tailableMode);
 }  // namespace mongo

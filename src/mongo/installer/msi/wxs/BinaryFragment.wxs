@@ -67,10 +67,6 @@
         <File Id="f_mongoimport" Name="mongoimport.exe" Source="$(var.ToolBinarySource)\mongoimport.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
-      <Component Id="c_mongoperf" Guid="B046CCD2-39DC-4CB4-8A58-A7790148C41E">
-        <File Id="f_mongoperf" Name="mongoperf.exe" Source="$(var.BinarySource)\mongoperf.exe"
-              DiskId ="1" KeyPath="yes"/>
-      </Component>
       <Component Id="c_mongorestore" Guid="72A16D11-242E-4368-93C9-5F6162C548FC">
         <File Id="f_mongorestore" Name="mongorestore.exe" Source="$(var.ToolBinarySource)\mongorestore.exe"
               DiskId ="1" KeyPath="yes"/>

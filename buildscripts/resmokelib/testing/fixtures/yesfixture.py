@@ -1,6 +1,4 @@
-"""
-Fixture for generating lots of log messages.
-"""
+"""Fixture for generating lots of log messages."""
 
 from __future__ import absolute_import
 
@@ -10,18 +8,18 @@ from . import interface
 from ...core import programs
 
 
-class YesFixture(interface.Fixture):
-    """
-    Fixture which spawns potentially several 'yes' executables to generate lots of log messages.
-    """
+class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
+    """Fixture which spawns several 'yes' executables to generate lots of log messages."""
 
     def __init__(self, logger, job_num, num_instances=1, message_length=100):
+        """Initialize YesFixture."""
         interface.Fixture.__init__(self, logger, job_num)
 
         self.__processes = [None] * num_instances
         self.__message = "y" * message_length
 
     def setup(self):
+        """Start the yes processes."""
         for (i, process) in enumerate(self.__processes):
             process = self._make_process(i)
 
@@ -65,4 +63,5 @@ class YesFixture(interface.Fixture):
         return success
 
     def is_running(self):
+        """Return true if the yes processes are running."""
         return all(process is not None and process.poll() is None for process in self.__processes)

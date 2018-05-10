@@ -6,6 +6,9 @@
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
+//
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 
 var t = db.jstests_count_plan_summary;

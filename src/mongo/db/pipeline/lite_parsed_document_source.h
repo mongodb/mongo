@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/unordered_set.h"
@@ -125,6 +126,12 @@ public:
     virtual bool allowedToPassthroughFromMongos() const {
         return true;
     }
+
+    /**
+     * Verifies that this stage is allowed to run with the specified read concern. Throws a
+     * UserException if not compatible.
+     */
+    virtual void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {}
 };
 
 class LiteParsedDocumentSourceDefault final : public LiteParsedDocumentSource {

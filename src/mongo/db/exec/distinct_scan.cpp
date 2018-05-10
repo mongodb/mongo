@@ -125,7 +125,7 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
             *out = id;
             return PlanStage::ADVANCED;
     }
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool DistinctScan::isEOF() {

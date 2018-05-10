@@ -38,6 +38,7 @@
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/assert_util.h"
@@ -49,6 +50,32 @@
 namespace mongo {
 
 using std::string;
+
+namespace {
+StatusWith<std::string> getMetadataRaw(WT_SESSION* session, StringData uri) {
+    WT_CURSOR* cursor;
+    invariantWTOK(session->open_cursor(session, "metadata:create", nullptr, "", &cursor));
+    invariant(cursor);
+    ON_BLOCK_EXIT([cursor] { invariantWTOK(cursor->close(cursor)); });
+
+    std::string strUri = uri.toString();
+    cursor->set_key(cursor, strUri.c_str());
+    int ret = cursor->search(cursor);
+    if (ret == WT_NOTFOUND) {
+        return StatusWith<std::string>(ErrorCodes::NoSuchKey,
+                                       str::stream() << "Unable to find metadata for " << uri);
+    } else if (ret != 0) {
+        return StatusWith<std::string>(wtRCToStatus(ret));
+    }
+    const char* metadata = NULL;
+    ret = cursor->get_value(cursor, &metadata);
+    if (ret != 0) {
+        return StatusWith<std::string>(wtRCToStatus(ret));
+    }
+    invariant(metadata);
+    return StatusWith<std::string>(metadata);
+}
+}  // namespace
 
 Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == 0)
@@ -84,7 +111,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     invariant(colon != string::npos);
     colgroupUri += tableUri.substr(colon);
     StatusWith<std::string> colgroupResult = getMetadata(opCtx, colgroupUri);
-    invariantOK(colgroupResult.getStatus());
+    invariant(colgroupResult.getStatus());
     WiredTigerConfigParser parser(colgroupResult.getValue());
 
     WT_CONFIG_ITEM typeItem;
@@ -100,9 +127,14 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
 
 StatusWith<std::string> WiredTigerUtil::getMetadata(OperationContext* opCtx, StringData uri) {
     invariant(opCtx);
-    WiredTigerCursor curwrap("metadata:create", WiredTigerSession::kMetadataTableId, false, opCtx);
-    WT_CURSOR* cursor = curwrap.get();
+
+    auto session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
+    WT_CURSOR* cursor =
+        session->getCursor("metadata:create", WiredTigerSession::kMetadataTableId, false);
     invariant(cursor);
+    auto releaser =
+        MakeGuard([&] { session->releaseCursor(WiredTigerSession::kMetadataTableId, cursor); });
+
     std::string strUri = uri.toString();
     cursor->set_key(cursor, strUri.c_str());
     int ret = cursor->search(cursor);
@@ -195,7 +227,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(Operat
     if (result.getStatus().code() == ErrorCodes::NoSuchKey) {
         return result.getStatus();
     }
-    invariantOK(result.getStatus());
+    invariant(result.getStatus());
 
     WiredTigerConfigParser topParser(result.getValue());
     WT_CONFIG_ITEM metadata;
@@ -448,9 +480,9 @@ bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
         return false;
     }
 
-    if (ns.coll() == "replset.checkpointTimestamp" || ns.coll() == "replset.minvalid") {
-        // Of local collections, these two are derived from the state of the data and therefore
-        // are not logged.
+    if (ns.coll() == "replset.minvalid") {
+        // Of local collections, this is derived from the state of the data and therefore
+        // not logged.
         return false;
     }
 
@@ -459,32 +491,37 @@ bool WiredTigerUtil::useTableLogging(NamespaceString ns, bool replEnabled) {
 }
 
 Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::string& uri, bool on) {
-    WiredTigerRecoveryUnit* recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);
-    return setTableLogging(recoveryUnit->getSession()->getSession(), uri, on);
+    // Try to close as much as possible to avoid EBUSY errors.
+    WiredTigerRecoveryUnit::get(opCtx)->getSession()->closeAllCursors(uri);
+    WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
+    sessionCache->closeAllCursors(uri);
+
+    // Use a dedicated session for alter operations to avoid transaction issues.
+    WiredTigerSession session(sessionCache->conn());
+    return setTableLogging(session.getSession(), uri, on);
 }
 
 Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& uri, bool on) {
-    const bool keepOldBehavior = true;
-    if (keepOldBehavior) {
-        return Status::OK();
-    }
-
-    LOG(3) << "Changing logging values. Uri: " << uri << " Enabled? " << on;
-    int ret;
+    std::string setting;
     if (on) {
-        ret = session->alter(session, uri.c_str(), "log=(enabled=true)");
+        setting = "log=(enabled=true)";
     } else {
-        ret = session->alter(session, uri.c_str(), "log=(enabled=false)");
+        setting = "log=(enabled=false)";
     }
 
+    int ret = session->alter(session, uri.c_str(), setting.c_str());
     if (ret) {
-        return Status(ErrorCodes::WriteConflict,
-                      str::stream() << "Failed to update log setting. Uri: " << uri << " Enable? "
-                                    << on
-                                    << " Ret: "
-                                    << ret
-                                    << " Msg: "
-                                    << session->strerror(session, ret));
+        // `setTableLogging` can be called even when the table is in the desired state. WT can
+        // return EBUSY if it cannot access the table to be altered before it knows whether
+        // there's anything to change.  Assert that if alter call returned an error, the table is
+        // in the expected state.
+        std::string existingMetadata = getMetadataRaw(session, uri).getValue();
+        if (existingMetadata.find(setting) == std::string::npos) {
+            severe() << "Failed to update log setting. Uri: " << uri << " Enable? " << on
+                     << " Ret: " << ret << " MD: " << redact(existingMetadata)
+                     << " Msg: " << session->strerror(session, ret);
+            fassertFailed(50756);
+        }
     }
 
     return Status::OK();

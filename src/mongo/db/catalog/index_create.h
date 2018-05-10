@@ -114,12 +114,11 @@ private:
         return *this->_pimpl;
     }
 
-    static std::unique_ptr<Impl> makeImpl(OperationContext* opCtx, Collection* collection);
-
 public:
-    using factory_function_type = decltype(makeImpl);
-
-    static void registerFactory(stdx::function<factory_function_type> factory);
+    static MONGO_DECLARE_SHIM((OperationContext * opCtx,
+                               Collection* collection,
+                               PrivateTo<MultiIndexBlock>)
+                                  ->std::unique_ptr<Impl>) makeImpl;
 
     inline ~MultiIndexBlock() = default;
 
@@ -127,7 +126,7 @@ public:
      * Neither pointer is owned.
      */
     inline explicit MultiIndexBlock(OperationContext* const opCtx, Collection* const collection)
-        : _pimpl(makeImpl(opCtx, collection)) {}
+        : _pimpl(makeImpl(opCtx, collection, PrivateCall<MultiIndexBlock>{})) {}
 
     /**
      * By default we ignore the 'background' flag in specs when building an index. If this is

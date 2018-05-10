@@ -6,7 +6,9 @@
  * scenario, none of the members will have any data, and upon restart will each look for a member to
  * initial sync from, so no primary will be elected. This test induces such a scenario, so cannot be
  * run on ephemeral storage engines.
- * @tags: [requires_persistence]
+
+ * This only tests rollback via refetch behavior and thus only runs on mmapv1.
+ * @tags: [requires_persistence, requires_mmapv1]
  */
 
 // Sets up a replica set and grabs things for later.
@@ -61,12 +63,24 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // Restarts B, which should attempt rollback but then fassert.
 clearRawMongoProgramOutput();
-// Don't wait for a connection to the node after startup, since it might roll back and crash
-// immediately.
-replTest.start(BID, {waitForConnect: false}, true /*restart*/);
+try {
+    b_conn = replTest.start(BID, {waitForConnect: true}, true /*restart*/);
+} catch (e) {
+    // We swallow the exception from ReplSetTest#start() because it means that the server
+    // fassert()'d before the mongo shell could connect to it.
+}
+// Wait for node B to fassert
 assert.soon(function() {
-    return rawMongoProgramOutput().match("Cannot roll back a collMod command");
-}, "B failed to fassert");
+    try {
+        b_conn.getDB("local").runCommand({ping: 1});
+    } catch (e) {
+        return true;
+    }
+    return false;
+}, "Node did not fassert", 60 * 1000);
 
 replTest.stop(BID, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+
+assert(rawMongoProgramOutput().match("Cannot roll back a collMod command"), "B failed to fassert");
+
 replTest.stopSet();

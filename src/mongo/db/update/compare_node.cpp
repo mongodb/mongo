@@ -53,13 +53,13 @@ ModifierNode::ModifyResult CompareNode::updateExistingElement(
     if ((compareVal == 0) || ((_mode == CompareMode::kMax) ? (compareVal > 0) : (compareVal < 0))) {
         return ModifyResult::kNoOp;
     } else {
-        invariantOK(element->setValueBSONElement(_val));
+        invariant(element->setValueBSONElement(_val));
         return ModifyResult::kNormalUpdate;
     }
 }
 
 void CompareNode::setValueForNewElement(mutablebson::Element* element) const {
-    invariantOK(element->setValueBSONElement(_val));
+    invariant(element->setValueBSONElement(_val));
 }
 
 }  // namespace mongo

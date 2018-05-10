@@ -50,24 +50,29 @@
 
 namespace mongo {
 namespace {
+std::unique_ptr<DatabaseHolder> dbHolderStorage;
 
-DatabaseHolder& dbHolderImpl() {
-    static DatabaseHolder _dbHolder;
-    return _dbHolder;
-}
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(InitializeDbHolderimpl, ("InitializeDatabaseHolderFactory"))
-(InitializerContext* const) {
-    registerDbHolderImpl(dbHolderImpl);
-    return Status::OK();
-}
-
-MONGO_INITIALIZER(InitializeDatabaseHolderFactory)(InitializerContext* const) {
-    DatabaseHolder::registerFactory([] { return stdx::make_unique<DatabaseHolderImpl>(); });
-    return Status::OK();
-}
-
+GlobalInitializerRegisterer dbHolderImplInitializer("InitializeDbHolderimpl",
+                                                    [](InitializerContext* const) {
+                                                        dbHolderStorage =
+                                                            std::make_unique<DatabaseHolder>();
+                                                        return Status::OK();
+                                                    },
+                                                    [](DeinitializerContext* const) {
+                                                        dbHolderStorage = nullptr;
+                                                        return Status::OK();
+                                                    });
 }  // namespace
+
+MONGO_REGISTER_SHIM(DatabaseHolder::getDatabaseHolder)
+()->DatabaseHolder& {
+    return *dbHolderStorage;
+}
+
+MONGO_REGISTER_SHIM(DatabaseHolder::makeImpl)
+(PrivateTo<DatabaseHolder>)->std::unique_ptr<DatabaseHolder::Impl> {
+    return std::make_unique<DatabaseHolderImpl>();
+}
 
 using std::set;
 using std::size_t;
@@ -162,7 +167,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     // requirement for X-lock on the database when we enter. So there is no way we can insert two
     // different databases for the same name.
     lk.unlock();
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(opCtx, dbname);
 
     if (!entry->exists()) {
@@ -216,7 +221,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns, const std
     _dbs.erase(it);
 
     getGlobalServiceContext()
-        ->getGlobalStorageEngine()
+        ->getStorageEngine()
         ->closeDatabase(opCtx, dbName.toString())
         .transitional_ignore();
 }
@@ -247,7 +252,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx, const std::string& re
         _dbs.erase(name);
 
         getGlobalServiceContext()
-            ->getGlobalStorageEngine()
+            ->getStorageEngine()
             ->closeDatabase(opCtx, name)
             .transitional_ignore();
     }

@@ -4,6 +4,11 @@
 //
 // SERVER-1752
 
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
+
 t = db.jstests_countc;
 t.drop();
 

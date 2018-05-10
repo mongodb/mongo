@@ -400,6 +400,9 @@ var _bulk_api_module = (function() {
         // Define properties
         defineReadOnlyProperty(this, "code", commandError.code);
         defineReadOnlyProperty(this, "errmsg", commandError.errmsg);
+        if (commandError.hasOwnProperty("errorLabels")) {
+            defineReadOnlyProperty(this, "errorLabels", commandError.errorLabels);
+        }
 
         this.name = 'WriteCommandError';
         this.message = this.errmsg;
@@ -877,7 +880,8 @@ var _bulk_api_module = (function() {
 
                 const session = collection.getDB().getSession();
                 if (serverSupportsRetryableWrites && session.getOptions().shouldRetryWrites() &&
-                    session._serverSession.canRetryWrites(cmd)) {
+                    session._serverSession.canRetryWrites(cmd) &&
+                    !session._serverSession.isInActiveTransaction()) {
                     cmd = session._serverSession.assignTransactionNumber(cmd);
                 }
             }

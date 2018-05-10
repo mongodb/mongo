@@ -39,7 +39,6 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
@@ -72,6 +71,8 @@ SubplanStage::SubplanStage(OperationContext* opCtx,
       _query(cq) {
     invariant(_collection);
     invariant(_query->root()->matchType() == MatchExpression::OR);
+    invariant(_query->root()->numChildren(),
+              "Cannot use a SUBPLAN stage for an $or with no children");
 }
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
@@ -100,8 +101,8 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
-    // We can only subplan rooted $or queries.
-    return MatchExpression::OR == expr->matchType();
+    // We can only subplan rooted $or queries, and only if they have at least one clause.
+    return MatchExpression::OR == expr->matchType() && expr->numChildren() > 0;
 }
 
 Status SubplanStage::planSubqueries() {

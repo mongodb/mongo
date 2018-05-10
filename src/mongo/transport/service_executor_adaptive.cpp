@@ -92,7 +92,6 @@ constexpr auto kExecutorName = "adaptive"_sd;
 constexpr auto kStuckDetection = "stuckThreadsDetected"_sd;
 constexpr auto kStarvation = "starvation"_sd;
 constexpr auto kReserveMinimum = "belowReserveMinimum"_sd;
-constexpr auto kBecauseOfError = "replacingCrashedThreads"_sd;
 constexpr auto kThreadReasons = "threadCreationCauses"_sd;
 
 int64_t ticksToMicros(TickSource::Tick ticks, TickSource* tickSource) {
@@ -153,14 +152,14 @@ struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
 thread_local ServiceExecutorAdaptive::ThreadState* ServiceExecutorAdaptive::_localThreadState =
     nullptr;
 
-ServiceExecutorAdaptive::ServiceExecutorAdaptive(ServiceContext* ctx,
-                                                 std::shared_ptr<asio::io_context> ioCtx)
-    : ServiceExecutorAdaptive(ctx, std::move(ioCtx), stdx::make_unique<ServerParameterOptions>()) {}
+ServiceExecutorAdaptive::ServiceExecutorAdaptive(ServiceContext* ctx, ReactorHandle reactor)
+    : ServiceExecutorAdaptive(
+          ctx, std::move(reactor), stdx::make_unique<ServerParameterOptions>()) {}
 
 ServiceExecutorAdaptive::ServiceExecutorAdaptive(ServiceContext* ctx,
-                                                 std::shared_ptr<asio::io_context> ioCtx,
+                                                 ReactorHandle reactor,
                                                  std::unique_ptr<Options> config)
-    : _ioContext(std::move(ioCtx)),
+    : _reactorHandle(reactor),
       _config(std::move(config)),
       _tickSource(ctx->getTickSource()),
       _lastScheduleTimer(_tickSource) {}
@@ -190,7 +189,7 @@ Status ServiceExecutorAdaptive::shutdown(Milliseconds timeout) {
     _controllerThread.join();
 
     stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
-    _ioContext->stop();
+    _reactorHandle->stop();
     bool result =
         _deathCondition.wait_for(lk, timeout.toSystemDuration(), [&] { return _threads.empty(); });
 
@@ -254,9 +253,9 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
     // can be called immediately and recursively.
     if ((flags & kMayRecurse) &&
         (_localThreadState->recursionDepth + 1 < _config->recursionLimit())) {
-        _ioContext->dispatch(std::move(wrappedTask));
+        _reactorHandle->schedule(Reactor::kDispatch, std::move(wrappedTask));
     } else {
-        _ioContext->post(std::move(wrappedTask));
+        _reactorHandle->schedule(Reactor::kPost, std::move(wrappedTask));
     }
 
     _lastScheduleTimer.reset();
@@ -588,31 +587,11 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
         // Reset ticksSpentExecuting timer
         state->executingCurRun = 0;
 
-        try {
-            asio::io_context::work work(*_ioContext);
-            // If we're still "pending" only try to run one task, that way the controller will
-            // know that it's okay to start adding threads to avoid starvation again.
-            state->running.markRunning();
-            _ioContext->run_for(runTime.toSystemDuration());
+        // If we're still "pending" only try to run one task, that way the controller will
+        // know that it's okay to start adding threads to avoid starvation again.
+        state->running.markRunning();
+        _reactorHandle->runFor(runTime);
 
-            // _ioContext->run_one() will return when all the scheduled handlers are completed, and
-            // you must call restart() to call run_one() again or else it will return immediately.
-            // In the case where the server has just started and there has been no work yet, this
-            // means this loop will spin until the first client connect. This call to restart avoids
-            // that.
-            if (_ioContext->stopped())
-                _ioContext->restart();
-            // If an exception escaped from ASIO, then break from this thread and start a new one.
-        } catch (std::exception& e) {
-            log() << "Exception escaped worker thread: " << e.what()
-                  << " Starting new worker thread.";
-            _startWorkerThread(ThreadCreationReason::kError);
-            break;
-        } catch (...) {
-            log() << "Unknown exception escaped worker thread. Starting new worker thread.";
-            _startWorkerThread(ThreadCreationReason::kError);
-            break;
-        }
         auto spentRunning = state->running.markStopped();
 
         // If we spent less than our idle threshold actually running tasks then exit the thread.
@@ -678,8 +657,6 @@ StringData ServiceExecutorAdaptive::_threadStartedByToString(
             return kStarvation;
         case ThreadCreationReason::kReserveMinimum:
             return kReserveMinimum;
-        case ThreadCreationReason::kError:
-            return kBecauseOfError;
         default:
             MONGO_UNREACHABLE;
     }

@@ -164,13 +164,12 @@ public:
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     OptionalCollectionUUID uuid,
-                                    bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
                                     bool stayTemp) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
             const auto time = observer->onRenameCollection(
-                opCtx, fromCollection, toCollection, uuid, dropTarget, dropTargetUUID, stayTemp);
+                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
             invariant(time.isNull());
         }
 
@@ -194,11 +193,20 @@ public:
     }
 
     void onTransactionCommit(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onTransactionCommit(opCtx);
     }
 
+    void onTransactionPrepare(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
+        for (auto& observer : _observers) {
+            observer->onTransactionPrepare(opCtx);
+        }
+    }
+
     void onTransactionAbort(OperationContext* opCtx) override {
+        ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onTransactionAbort(opCtx);
     }

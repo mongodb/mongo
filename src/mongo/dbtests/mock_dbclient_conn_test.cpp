@@ -35,7 +35,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/timer.h"
 

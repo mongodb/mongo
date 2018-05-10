@@ -532,7 +532,7 @@ string ZoneRange::toString() const {
 }
 
 MigrateInfo::MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk) {
-    invariantOK(a_chunk.validate());
+    invariant(a_chunk.validate());
     invariant(a_to.isValid());
 
     to = a_to;

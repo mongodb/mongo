@@ -273,7 +273,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
         }
         return;
     }
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 
 bool QuorumChecker::hasReceivedSufficientResponses() const {

@@ -99,7 +99,7 @@ Config::OutputOptions Config::parseOutputOptions(const std::string& dbname, cons
     return outputOptions;
 }
 
-void addPrivilegesRequiredForMapReduce(const Command* commandTemplate,
+void addPrivilegesRequiredForMapReduce(const BasicCommand* commandTemplate,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {

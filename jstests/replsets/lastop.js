@@ -101,8 +101,9 @@
     var twelfthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
     assert.commandFailed(m1.getCollection("test.foo").createIndex({m3: 1}));
     noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
-
-    assert.eq(noOp, twelfthOp);
+    // Index builds, whether a success of failure, change the metadata state twice. For primaries,
+    // this will advance the optime twice.
+    assert.gt(noOp.ts, twelfthOp.ts);
 
     // No-op insert
     assert.writeOK(m1.getCollection("test.foo").insert({_id: 5, x: 5}));

@@ -345,8 +345,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	WT_TXN_ISOLATION saved_isolation;
 	bool flush_set, release_dhandle;
 
-	flush_set = release_dhandle = false;
-	WT_NOT_READ(flush_set);
+	WT_NOT_READ(flush_set, false);
+	release_dhandle = false;
 
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
@@ -360,8 +360,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		if (ret == 0)
 			chunk->evicted = 1;
 		else if (ret == EBUSY) {
-			ret = 0;
-			WT_NOT_READ(ret);
+			WT_NOT_READ(ret, 0);
 		} else
 			WT_RET_MSG(session, ret, "discard handle");
 	}

@@ -781,6 +781,7 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     if (this._txnNumber) {
         getMoreCmd.txnNumber = NumberLong(this._txnNumber);
+        getMoreCmd.autocommit = false;
     }
 
     // Deliver the getMore command, and check for errors in the response.

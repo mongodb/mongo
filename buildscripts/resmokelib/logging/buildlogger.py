@@ -1,6 +1,4 @@
-"""
-Defines handlers for communicating with a buildlogger server.
-"""
+"""Define handlers for communicating with a buildlogger server."""
 
 from __future__ import absolute_import
 
@@ -11,7 +9,6 @@ import requests
 
 from . import handlers
 from .. import config as _config
-
 
 CREATE_BUILD_ENDPOINT = "/build"
 APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"
@@ -28,19 +25,17 @@ BUILDLOGGER_FALLBACK = None
 
 
 def _log_on_error(func):
-    """
-    A decorator that causes any exceptions to be logged by the
-    "buildlogger" Logger instance.
+    """Provide decorator that causes exceptions to be logged by the "buildlogger" Logger instance.
 
-    Returns the wrapped function's return value, or None if an error
-    was encountered.
+    Return the wrapped function's return value, or None if an error was encountered.
     """
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """Provide wrapper function."""
         try:
             return func(*args, **kwargs)
-        except:
+        except:  # pylint: disable=bare-except
             BUILDLOGGER_FALLBACK.exception("Encountered an error.")
         return None
 
@@ -51,9 +46,8 @@ class _LogsSplitter(object):
     """Class with static methods used to split list of log lines into smaller batches."""
 
     @staticmethod
-    def split_logs(log_lines, max_size):
-        """
-        Splits the log lines into batches of size less than or equal to max_size.
+    def split_logs(log_lines, max_size):  # noqa: D406,D407,D411,D413
+        """Split the log lines into batches of size less than or equal to max_size.
 
         Args:
             log_lines: A list of log lines.
@@ -66,8 +60,8 @@ class _LogsSplitter(object):
             return [log_lines]
 
         def line_size(line):
-            """
-            Computes the encoded JSON size of a log line as part of an array.
+            """Compute the encoded JSON size of a log line as part of an array.
+
             2 is added to each string size to account for the array representation of the logs,
             as each line is preceded by a '[' or a space and followed by a ',' or a ']'.
             """
@@ -89,20 +83,11 @@ class _LogsSplitter(object):
 
 
 class _BaseBuildloggerHandler(handlers.BufferedHandler):
-    """
-    Base class of the buildlogger handler for the global logs and the
-    handler for the test logs.
-    """
+    """Base class of the buildlogger handler for global logs and handler for test logs."""
 
-    def __init__(self,
-                 build_config,
-                 endpoint,
-                 capacity=_SEND_AFTER_LINES,
+    def __init__(self, build_config, endpoint, capacity=_SEND_AFTER_LINES,
                  interval_secs=_SEND_AFTER_SECS):
-        """
-        Initializes the buildlogger handler with the build id and
-        credentials.
-        """
+        """Initialize the buildlogger handler with the build id and credentials."""
 
         handlers.BufferedHandler.__init__(self, capacity, interval_secs)
 
@@ -115,9 +100,9 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         self.max_size = None
 
     def process_record(self, record):
-        """
-        Returns a tuple of the time the log record was created, and the
-        message because the buildlogger expects the log messages
+        """Return a tuple of the time the log record was created, and the message.
+
+        This is necessary because the buildlogger expects the log messages to be
         formatted in JSON as:
 
             [ [ <log-time-1>, <log-message-1> ],
@@ -128,14 +113,11 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         return (record.created, msg)
 
     def post(self, *args, **kwargs):
-        """
-        Convenience method for subclasses to use when making POST requests.
-        """
+        """Provide convenience method for subclasses to use when making POST requests."""
         return self.http_handler.post(*args, **kwargs)
 
-    def _append_logs(self, log_lines):
-        """
-        Sends a POST request to the handlers endpoint with the logs that have been captured.
+    def _append_logs(self, log_lines):  # noqa: D406,D407,D413
+        """Send a POST request to the handlers endpoint with the logs that have been captured.
 
         Returns:
             The number of log lines that have been successfully sent.
@@ -149,10 +131,8 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                 break
         return lines_sent
 
-    def __append_logs_chunk(self, log_lines_chunk):
-        """
-        Sends a log lines chunk, handles 413 Request Entity Too Large errors and retries
-        if necessary.
+    def __append_logs_chunk(self, log_lines_chunk):  # noqa: D406,D407,D413
+        """Send log lines chunk, handle 413 Request Entity Too Large errors & retry, if necessary.
 
         Returns:
             The number of log lines that have been successfully sent.
@@ -177,14 +157,12 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                     return self._append_logs(log_lines_chunk)
             BUILDLOGGER_FALLBACK.exception("Encountered an error.")
             return 0
-        except:
+        except:  # pylint: disable=bare-except
             BUILDLOGGER_FALLBACK.exception("Encountered an error.")
             return 0
 
     def _flush_buffer_with_lock(self, buf, close_called):
-        """
-        Ensures all logging output has been flushed to the buildlogger
-        server.
+        """Ensure all logging output has been flushed to the buildlogger server.
 
         If _append_logs() returns false, then the log messages are added
         to a separate buffer and retried the next time flush() is
@@ -209,13 +187,12 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
 
 
 class BuildloggerTestHandler(_BaseBuildloggerHandler):
-    """
-    Buildlogger handler for the test logs.
-    """
+    """Buildlogger handler for the test logs."""
 
-    def __init__(self, build_config, build_id, test_id,
-                 capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS):
-        """Initializes the buildlogger handler with the credentials, build id, and test id."""
+    def __init__(  # pylint: disable=too-many-arguments
+            self, build_config, build_id, test_id, capacity=_SEND_AFTER_LINES,
+            interval_secs=_SEND_AFTER_SECS):
+        """Initialize the buildlogger handler with the credentials, build id, and test id."""
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {
             "build_id": build_id,
             "test_id": test_id,
@@ -224,19 +201,14 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
 
     @_log_on_error
     def _finish_test(self, failed=False):
-        """
-        Sends a POST request to the APPEND_TEST_LOGS_ENDPOINT with the
-        test status.
-        """
+        """Send a POST request to the APPEND_TEST_LOGS_ENDPOINT with the test status."""
         self.post(self.endpoint, headers={
             "X-Sendlogs-Test-Done": "true",
             "X-Sendlogs-Test-Failed": "true" if failed else "false",
         })
 
     def close(self):
-        """
-        Closes the buildlogger handler.
-        """
+        """Close the buildlogger handler."""
 
         _BaseBuildloggerHandler.close(self)
 
@@ -245,13 +217,11 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
 
 
 class BuildloggerGlobalHandler(_BaseBuildloggerHandler):
-    """
-    Buildlogger handler for the global logs.
-    """
+    """Buildlogger handler for the global logs."""
 
-    def __init__(self, build_config, build_id,
-                 capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS):
-        """Initializes the buildlogger handler with the credentials and build id."""
+    def __init__(self, build_config, build_id, capacity=_SEND_AFTER_LINES,
+                 interval_secs=_SEND_AFTER_SECS):
+        """Initialize the buildlogger handler with the credentials and build id."""
         endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
         _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
 
@@ -265,6 +235,7 @@ class BuildloggerServer(object):
 
     @_log_on_error
     def __init__(self):
+        """Initialize BuildloggerServer."""
         tmp_globals = {}
         self.config = {}
         execfile(_BUILDLOGGER_CONFIG, tmp_globals, self.config)
@@ -281,18 +252,14 @@ class BuildloggerServer(object):
 
     @_log_on_error
     def new_build_id(self, suffix):
-        """
-        Returns a new build id for sending global logs to.
-        """
+        """Return a new build id for sending global logs to."""
         username = self.config["username"]
         password = self.config["password"]
         builder = "%s_%s" % (self.config["builder"], suffix)
         build_num = int(self.config["build_num"])
 
-        handler = handlers.HTTPHandler(
-            url_root=_config.BUILDLOGGER_URL,
-            username=username,
-            password=password)
+        handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL, username=username,
+                                       password=password)
 
         response = handler.post(CREATE_BUILD_ENDPOINT, data={
             "builder": builder,
@@ -304,38 +271,40 @@ class BuildloggerServer(object):
 
     @_log_on_error
     def new_test_id(self, build_id, test_filename, test_command):
-        """
-        Returns a new test id for sending test logs to.
-        """
-        handler = handlers.HTTPHandler(
-            url_root=_config.BUILDLOGGER_URL,
-            username=self.config["username"],
-            password=self.config["password"])
+        """Return a new test id for sending test logs to."""
+        handler = handlers.HTTPHandler(url_root=_config.BUILDLOGGER_URL,
+                                       username=self.config["username"],
+                                       password=self.config["password"])
 
         endpoint = CREATE_TEST_ENDPOINT % {"build_id": build_id}
-        response = handler.post(endpoint, data={
-            "test_filename": test_filename,
-            "command": test_command,
-            "phase": self.config.get("build_phase", "unknown"),
-            "task_id": _config.EVERGREEN_TASK_ID,
-        })
+        response = handler.post(
+            endpoint, data={
+                "test_filename": test_filename,
+                "command": test_command,
+                "phase": self.config.get("build_phase", "unknown"),
+                "task_id": _config.EVERGREEN_TASK_ID,
+            })
 
         return response["id"]
 
     def get_global_handler(self, build_id, handler_info):
+        """Return the global handler."""
         return BuildloggerGlobalHandler(self.config, build_id, **handler_info)
 
     def get_test_handler(self, build_id, test_id, handler_info):
+        """Return the test handler."""
         return BuildloggerTestHandler(self.config, build_id, test_id, **handler_info)
 
     @staticmethod
     def get_build_log_url(build_id):
+        """Return the build log URL."""
         base_url = _config.BUILDLOGGER_URL.rstrip("/")
         endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
         return "%s/%s" % (base_url, endpoint.strip("/"))
 
     @staticmethod
     def get_test_log_url(build_id, test_id):
+        """Return the test log URL."""
         base_url = _config.BUILDLOGGER_URL.rstrip("/")
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {"build_id": build_id, "test_id": test_id}
         return "%s/%s" % (base_url, endpoint.strip("/"))

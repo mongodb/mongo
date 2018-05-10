@@ -2161,7 +2161,7 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
     const auto opCtx = makeOperationContext();
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
 
@@ -2217,7 +2217,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
 
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX);
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
 
@@ -3059,6 +3059,8 @@ void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status) {
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                       << "node1:12345"
@@ -3157,6 +3159,8 @@ void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* sta
                              << "mySet"
                              << "version"
                              << 3
+                             << "protocolVersion"
+                             << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                       << "node1:12345")

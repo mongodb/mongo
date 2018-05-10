@@ -32,6 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 
 namespace mongo {
 

@@ -64,6 +64,7 @@ class LogDomain {
 public:
     typedef E Event;
     typedef Appender<Event> EventAppender;
+    typedef std::unique_ptr<EventAppender> AppenderAutoPtr;
 
     /**
      * Opaque handle returned by attachAppender(), which can be subsequently passed to
@@ -72,17 +73,24 @@ public:
     class AppenderHandle {
         friend class LogDomain;
 
+        static const size_t invalid_handle = (size_t)-1;
+
     public:
-        AppenderHandle() {}
+        AppenderHandle() : _index(invalid_handle) {}
+
+        explicit operator bool() const noexcept {
+            return _index != invalid_handle;
+        }
+
+        void reset() {
+            _index = invalid_handle;
+        }
 
     private:
         explicit AppenderHandle(size_t index) : _index(index) {}
 
         size_t _index;
     };
-
-    // TODO(schwerin): Replace with unique_ptr in C++11.
-    typedef std::unique_ptr<EventAppender> AppenderAutoPtr;
 
     LogDomain();
     ~LogDomain();
@@ -119,14 +127,19 @@ public:
      * Attaches "appender" to this domain, taking ownership of it.  Returns a handle that may be
      * used later to detach this appender.
      */
-    AppenderHandle attachAppender(AppenderAutoPtr appender);
+    AppenderHandle attachAppender(std::unique_ptr<EventAppender> appender);
+
+    template <typename Ptr>
+    AppenderHandle attachAppender(Ptr appender) {
+        return attachAppender(std::unique_ptr<EventAppender>(std::move(appender)));
+    }
 
     /**
      * Detaches the appender referenced by "handle" from this domain, releasing ownership of it.
      * Returns an unique_ptr to the handler to the caller, who is now responsible for its
      * deletion. Caller should consider "handle" is invalid after this call.
      */
-    AppenderAutoPtr detachAppender(AppenderHandle handle);
+    std::unique_ptr<EventAppender> detachAppender(AppenderHandle handle);
 
     /**
      * Destroy all attached appenders, invalidating all handles.
@@ -134,9 +147,7 @@ public:
     void clearAppenders();
 
 private:
-    typedef std::vector<EventAppender*> AppenderVector;
-
-    AppenderVector _appenders;
+    std::vector<std::unique_ptr<EventAppender>> _appenders;
     bool _abortOnFailure;
 };
 

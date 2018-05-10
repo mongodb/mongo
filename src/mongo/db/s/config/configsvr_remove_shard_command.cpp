@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -92,6 +93,10 @@ public:
                 "_configsvrRemoveShard can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << cmdObj.firstElement().fieldName()
                               << "' must be of type string",
@@ -109,8 +114,7 @@ public:
             std::string msg(str::stream() << "Could not drop shard '" << target
                                           << "' because it does not exist");
             log() << msg;
-            return CommandHelpers::appendCommandStatus(result,
-                                                       Status(ErrorCodes::ShardNotFound, msg));
+            uasserted(ErrorCodes::ShardNotFound, msg);
         }
         const auto& shard = shardStatus.getValue();
 
@@ -155,10 +159,8 @@ public:
                     BSONObj(),
                     boost::none,  // return all
                     nullptr,
-                    repl::ReadConcernLevel::kMajorityReadConcern);
-                if (!swChunks.isOK()) {
-                    return CommandHelpers::appendCommandStatus(result, swChunks.getStatus());
-                }
+                    repl::ReadConcernArgs::get(opCtx).getLevel());
+                uassertStatusOK(swChunks.getStatus());
 
                 const auto& chunks = swChunks.getValue();
                 result.append("msg", "draining ongoing");

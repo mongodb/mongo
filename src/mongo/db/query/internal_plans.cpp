@@ -39,6 +39,7 @@
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -87,7 +88,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -116,7 +117,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -146,7 +147,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -165,7 +166,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
 
     auto executor =
         PlanExecutor::make(opCtx, std::move(ws), std::move(root), collection, yieldPolicy);
-    invariantOK(executor.getStatus());
+    invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
 
@@ -179,6 +180,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(OperationContext* op
     CollectionScanParams params;
     params.collection = collection;
     params.start = startLoc;
+    params.shouldWaitForOplogVisibility = shouldWaitForOplogVisibility(opCtx, collection, false);
 
     if (FORWARD == direction) {
         params.direction = CollectionScanParams::FORWARD;

@@ -84,8 +84,7 @@ public:
     /**
      * Returns the spec for the id index to create by default for this collection.
      */
-    BSONObj getDefaultIdIndexSpec(ServerGlobalParams::FeatureCompatibility::Version
-                                      featureCompatibilityVersion) const override;
+    BSONObj getDefaultIdIndexSpec() const override;
 
     IndexDescriptor* findIdIndex(OperationContext* opCtx) const override;
 

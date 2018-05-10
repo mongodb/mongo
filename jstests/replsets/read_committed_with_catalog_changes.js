@@ -255,7 +255,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
 
     // Get connections.
     var primary = replTest.getPrimary();
-    var secondary = replTest.liveNodes.slaves[0];
+    var secondary = replTest._slaves[0];
 
     // This is the DB that all of the tests will use.
     var mainDB = primary.getDB('mainDB');

@@ -49,7 +49,8 @@
     assert.writeOK(mongosColl.insert({_id: -1}));
     assert.writeOK(mongosColl.insert({_id: 1}));
 
-    let changeStream = mongosColl.aggregate([{$changeStream: {}}, {$project: {_id: 0}}]);
+    let changeStream =
+        mongosColl.aggregate([{$changeStream: {}}, {$project: {_id: 0, clusterTime: 0}}]);
 
     // Test that a change stream can see inserts on shard 0.
     assert.writeOK(mongosColl.insert({_id: 1000}));
@@ -163,7 +164,8 @@
                     mongosColl.getDB(), mongosColl.getName()));
 
     ChangeStreamTest.assertChangeStreamThrowsCode({
-        collection: mongosColl,
+        db: mongosDB,
+        collName: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         expectedCode: 40615
     });

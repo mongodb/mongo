@@ -64,6 +64,7 @@ const auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
 class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {
 public:
     void setUp() override {
+        Test::setUp();  // Will establish a feature compatibility version.
         auto service = getExpCtx()->opCtx->getServiceContext();
         repl::ReplSettings settings;
 
@@ -520,9 +521,8 @@ public:
     Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                         Pipeline* pipeline) final {
         while (_removeLeadingQueryStages && !pipeline->getSources().empty()) {
-            if (pipeline->popFrontWithCriteria("$match") ||
-                pipeline->popFrontWithCriteria("$sort") ||
-                pipeline->popFrontWithCriteria("$project")) {
+            if (pipeline->popFrontWithName("$match") || pipeline->popFrontWithName("$sort") ||
+                pipeline->popFrontWithName("$project")) {
                 continue;
             }
             break;

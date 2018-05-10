@@ -1,4 +1,7 @@
 // Check that count returns 0 in some exception cases.
+//
+// @tags: [requires_fastcount]
+
 (function() {
     'use strict';
 

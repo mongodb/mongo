@@ -48,7 +48,7 @@ def get_py_linter(linter_filter):
 
     linter_candidates = [linter for linter in _LINTERS if linter.cmd_name in linter_list]
 
-    if len(linter_candidates) == 0:
+    if not linter_candidates:
         raise ValueError("No linters found for filter '%s'" % (linter_filter))
 
     return linter_candidates
@@ -56,16 +56,13 @@ def get_py_linter(linter_filter):
 
 def is_interesting_file(file_name):
     # type: (str) -> bool
-    """"Return true if this file should be checked."""
-    return file_name.endswith(".py") and (file_name.startswith("buildscripts/idl") or
-                                          file_name.startswith("buildscripts/linter") or
-                                          file_name.startswith("buildscripts/pylinters.py"))
-
-
-def _get_build_dir():
-    # type: () -> str
-    """Get the location of the scons' build directory in case we need to download clang-format."""
-    return os.path.join(git.get_base_dir(), "build")
+    """Return true if this file should be checked."""
+    file_blacklist = ["buildscripts/cpplint.py"]
+    directory_blacklist = ["src/third_party"]
+    if file_name in file_blacklist or file_name.startswith(tuple(directory_blacklist)):
+        return False
+    directory_list = ["buildscripts", "pytests"]
+    return file_name.endswith(".py") and file_name.startswith(tuple(directory_list))
 
 
 def _lint_files(linters, config_dict, file_names):
@@ -123,7 +120,7 @@ def _fix_files(linters, config_dict, file_names):
     # Get a list of linters which return a valid command for get_fix_cmd()
     fix_list = [fixer for fixer in linter_list if fixer.get_fix_cmd_args("ignore")]
 
-    if len(fix_list) == 0:
+    if not fix_list:
         raise ValueError("Cannot find any linters '%s' that support fixing." % (linters))
 
     lint_runner = runner.LintRunner()
@@ -152,7 +149,7 @@ def fix_func(linters, config_dict, file_names):
 
 def main():
     # type: () -> None
-    """Main entry point."""
+    """Execute Main entry point."""
 
     parser = argparse.ArgumentParser(description='PyLinter frontend.')
 
@@ -161,14 +158,12 @@ def main():
     dest_prefix = "linter_"
     for linter1 in linters:
         msg = 'Path to linter %s' % (linter1.cmd_name)
-        parser.add_argument(
-            '--' + linter1.cmd_name, type=str, help=msg, dest=dest_prefix + linter1.cmd_name)
+        parser.add_argument('--' + linter1.cmd_name, type=str, help=msg,
+                            dest=dest_prefix + linter1.cmd_name)
 
-    parser.add_argument(
-        '--linters',
-        type=str,
-        help="Comma separated list of filters to use, defaults to 'all'",
-        default="all")
+    parser.add_argument('--linters', type=str,
+                        help="Comma separated list of filters to use, defaults to 'all'",
+                        default="all")
 
     parser.add_argument('-v', "--verbose", action='store_true', help="Enable verbose logging")
 

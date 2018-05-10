@@ -201,6 +201,10 @@ var BackupRestoreTest = function(options) {
 
         jsTestLog("Backup restore " + tojson(options));
 
+        // skipValidationOnNamespaceNotFound must be set to true for correct operation of this test.
+        assert(typeof TestData.skipValidationOnNamespaceNotFound === 'undefined' ||
+               TestData.skipValidationOnNamespaceNotFound);
+
         // Test options
         // Test name
         var testName = jsTest.name();
@@ -227,8 +231,11 @@ var BackupRestoreTest = function(options) {
         // Start numNodes node replSet
         var rst = new ReplSetTest({
             nodes: numNodes,
-            nodeOptions: {dbpath: dbpathFormat},
-            oplogSize: 1024,
+            nodeOptions: {
+                dbpath: dbpathFormat,
+                setParameter: {logComponentVerbosity: tojsononeline({storage: {recovery: 2}})}
+            },
+            oplogSize: 1024
         });
         var nodes = rst.startSet();
 
@@ -238,6 +245,8 @@ var BackupRestoreTest = function(options) {
         rst.awaitNodesAgreeOnPrimary();
         var primary = rst.getPrimary();
         var secondary = rst.getSecondary();
+
+        jsTestLog("Secondary to copy data from: " + secondary);
 
         // Launch CRUD client
         var crudDb = "crud";
@@ -304,15 +313,9 @@ var BackupRestoreTest = function(options) {
                 _runCmd(rsyncCmd);
                 sleep(10000);
             }
-            // Set an option to skip 'ns not found' error during collection validation
-            // when shutting down mongod.
-            TestData.skipValidationOnNamespaceNotFound = true;
 
             // Stop the mongod process
             rst.stop(secondary.nodeId);
-
-            // Unset to allow future collection validation on stopMongod.
-            TestData.skipValidationOnNamespaceNotFound = false;
 
             // One final rsync
             _runCmd(rsyncCmd);
@@ -323,15 +326,8 @@ var BackupRestoreTest = function(options) {
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
             rst.start(secondary.nodeId, {}, true);
         } else if (options.backup == 'stopStart') {
-            // Set an option to skip 'ns not found' error during collection validation
-            // when shutting down mongod.
-            TestData.skipValidationOnNamespaceNotFound = true;
-
             // Stop the mongod process
             rst.stop(secondary.nodeId);
-
-            // Unset to allow future collection validation on stopMongod.
-            TestData.skipValidationOnNamespaceNotFound = false;
 
             copyDbpath(dbpathSecondary, hiddenDbpath);
             removeFile(hiddenDbpath + '/mongod.lock');

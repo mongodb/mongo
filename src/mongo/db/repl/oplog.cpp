@@ -139,7 +139,8 @@ void checkOplogInsert(Status result) {
 void _getNextOpTimes(OperationContext* opCtx,
                      Collection* oplog,
                      std::size_t count,
-                     OplogSlot* slotsOut) {
+                     OplogSlot* slotsOut,
+                     bool persist = true) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     long long term = OpTime::kUninitializedTerm;
 
@@ -158,7 +159,10 @@ void _getNextOpTimes(OperationContext* opCtx,
     lastSetTimestamp = ts;
     newTimestampNotifier.notify_all();
     const bool orderedCommit = false;
-    fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+
+    if (persist) {
+        fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+    }
 
     for (std::size_t i = 0; i < count; i++) {
         slotsOut[i].opTime = {Timestamp(ts.asULL() + i), term};
@@ -220,9 +224,10 @@ void setOplogCollectionName(ServiceContext* service) {
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
-                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
+                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
+                            OplogApplication::Mode mode) {
     // Check if collection exists.
-    Database* db = dbHolder().get(opCtx, indexNss.ns());
+    Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, indexNss.ns());
     auto indexCollection = db ? db->getCollection(opCtx, indexNss) : nullptr;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
@@ -234,21 +239,31 @@ void createIndexForApplyOps(OperationContext* opCtx,
     bool relaxIndexConstraints =
         ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss);
     if (indexSpec["background"].trueValue()) {
-        Lock::TempRelease release(opCtx->lockState());
-        if (opCtx->lockState()->isLocked()) {
-            // If TempRelease fails, background index build will deadlock.
+        if (mode == OplogApplication::Mode::kRecovering) {
             LOG(3) << "apply op: building background index " << indexSpec
-                   << " in the foreground because temp release failed";
+                   << " in the foreground because the node is in recovery";
             IndexBuilder builder(indexSpec, relaxIndexConstraints);
             Status status = builder.buildInForeground(opCtx, db);
             uassertStatusOK(status);
         } else {
-            IndexBuilder* builder = new IndexBuilder(indexSpec, relaxIndexConstraints);
-            // This spawns a new thread and returns immediately.
-            builder->go();
-            // Wait for thread to start and register itself
-            IndexBuilder::waitForBgIndexStarting();
+            Lock::TempRelease release(opCtx->lockState());
+            if (opCtx->lockState()->isLocked()) {
+                // If TempRelease fails, background index build will deadlock.
+                LOG(3) << "apply op: building background index " << indexSpec
+                       << " in the foreground because temp release failed";
+                IndexBuilder builder(indexSpec, relaxIndexConstraints);
+                Status status = builder.buildInForeground(opCtx, db);
+                uassertStatusOK(status);
+            } else {
+                IndexBuilder* builder = new IndexBuilder(
+                    indexSpec, relaxIndexConstraints, opCtx->recoveryUnit()->getCommitTimestamp());
+                // This spawns a new thread and returns immediately.
+                builder->go();
+                // Wait for thread to start and register itself
+                IndexBuilder::waitForBgIndexStarting();
+            }
         }
+
         opCtx->recoveryUnit()->abandonSnapshot();
     } else {
         IndexBuilder builder(indexSpec, relaxIndexConstraints);
@@ -376,12 +391,41 @@ void _logOpsInner(OperationContext* opCtx,
     checkOplogInsert(oplogCollection->insertDocumentsForOplog(opCtx, writers, timestamps, nDocs));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
-    opCtx->recoveryUnit()->onCommit([opCtx, replCoord, finalOpTime] {
-        // Optimes on the primary should always represent consistent database states.
-        replCoord->setMyLastAppliedOpTimeForward(
-            finalOpTime, ReplicationCoordinator::DataConsistency::Consistent);
-        ReplClientInfo::forClient(opCtx->getClient()).setLastOp(finalOpTime);
-    });
+    opCtx->recoveryUnit()->onCommit(
+        [opCtx, replCoord, finalOpTime](boost::optional<Timestamp> commitTime) {
+            if (commitTime) {
+                // The `finalOpTime` may be less than the `commitTime` if multiple oplog entries
+                // are logging within one WriteUnitOfWork.
+                invariant(finalOpTime.getTimestamp() <= *commitTime,
+                          str::stream() << "Final OpTime: " << finalOpTime.toString()
+                                        << ". Commit Time: "
+                                        << commitTime->toString());
+            }
+
+            auto lastAppliedTimestamp = finalOpTime.getTimestamp();
+            const auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+            if (storageEngine->supportsDocLocking()) {
+                // If the storage engine supports document level locking, then it is possible for
+                // oplog writes to commit out of order. In that case, we only want to set our last
+                // applied optime to the all committed timestamp to ensure that all operations
+                // earlier than the last applied optime have been storage-committed. We are
+                // guaranteed that whatever operation occurred at the all committed timestamp
+                // occurred during the same term as 'finalOpTime'. When a primary enters a new term,
+                // it first commits a 'new primary' oplog entry in the new term before accepting any
+                // new writes. This will ensure that the all committed timestamp is in the new term
+                // before any client writes are committed.
+                lastAppliedTimestamp = storageEngine->getAllCommittedTimestamp(opCtx);
+            }
+
+            // Optimes on the primary should always represent consistent database states.
+            replCoord->setMyLastAppliedOpTimeForward(
+                OpTime(lastAppliedTimestamp, finalOpTime.getTerm()),
+                ReplicationCoordinator::DataConsistency::Consistent);
+
+            // We set the last op on the client to 'finalOpTime', because that contains the
+            // timestamp of the operation that the client actually performed.
+            ReplClientInfo::forClient(opCtx->getClient()).setLastOp(finalOpTime);
+        });
 }
 
 OpTime logOp(OperationContext* opCtx,
@@ -533,7 +577,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 #else
     long long lowerBound = 0;
     double bytes = 0;
-    if (opCtx->getClient()->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+    if (opCtx->getClient()->getServiceContext()->getStorageEngine()->isEphemeral()) {
         // in memory: 50MB minimum size
         lowerBound = 50LL * 1024 * 1024;
         bytes = pi.getMemSizeMB() * 1024 * 1024;
@@ -608,7 +652,7 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
     });
 
     /* sync here so we don't get any surprising lag later when we try to sync */
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     storageEngine->flushAllFiles(opCtx, true);
 
     log() << "******" << endl;
@@ -627,6 +671,14 @@ OplogSlot getNextOpTime(OperationContext* opCtx) {
     invariant(_localOplogCollection);
     OplogSlot os;
     _getNextOpTimes(opCtx, _localOplogCollection, 1, &os);
+    return os;
+}
+
+OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
+    invariant(_localOplogCollection);
+    OplogSlot os;
+    bool persist = false;  // Don't update the storage engine with the allocated OpTime.
+    _getNextOpTimes(opCtx, _localOplogCollection, 1, &os, persist);
     return os;
 }
 
@@ -762,7 +814,7 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           BSONObj nsObj = BSON("ns" << nss.ns());
           indexSpec = indexSpec.addField(nsObj.firstElement());
 
-          createIndexForApplyOps(opCtx, indexSpec, nss, {});
+          createIndexForApplyOps(opCtx, indexSpec, nss, {}, mode);
           return Status::OK();
       },
       {ErrorCodes::IndexAlreadyExists, ErrorCodes::NamespaceNotFound}}},
@@ -1034,7 +1086,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         uassert(ErrorCodes::InvalidNamespace,
                 "'ns' must be of type String",
                 fieldNs.type() == BSONType::String);
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
         requestNss = NamespaceString(ns);
         if (nsIsFull(ns)) {
             if (supportsDocLocking()) {
@@ -1101,7 +1153,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     //    the individual operations will not contain a `ts` field. The caller is responsible for
     //    setting the timestamp before committing. Assigning a competing timestamp in this
     //    codepath would break that atomicity. Sharding is a consumer of this use-case.
-    const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork] {
+    const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork, mode] {
         const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
@@ -1120,8 +1172,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     break;
                 }
                 case ReplicationCoordinator::modeNone: {
-                    // We do not assign timestamps on standalones.
-                    return false;
+                    // Only assign timestamps on standalones during replication recovery when
+                    // started with 'recoverFromOplogAsStandalone'.
+                    return mode == OplogApplication::Mode::kRecovering;
                 }
             }
         }
@@ -1137,7 +1190,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             NamespaceString indexNss;
             std::tie(indexSpec, indexNss) =
                 repl::prepForApplyOpsIndexInsert(fieldO, op, requestNss);
-            createIndexForApplyOps(opCtx, indexSpec, indexNss, incrementOpsAppliedStats);
+            createIndexForApplyOps(opCtx, indexSpec, indexNss, incrementOpsAppliedStats, mode);
             return Status::OK();
         }
         uassert(ErrorCodes::NamespaceNotFound,
@@ -1286,7 +1339,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 UpdateLifecycleImpl updateLifecycle(requestNss);
                 request.setLifecycle(&updateLifecycle);
 
-                const StringData ns = fieldNs.valueStringData();
+                const StringData ns = fieldNs.valuestrsafe();
                 writeConflictRetry(opCtx, "applyOps_upsert", ns, [&] {
                     WriteUnitOfWork wuow(opCtx);
                     // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is true),
@@ -1336,7 +1389,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             timestamp = fieldTs.timestamp();
         }
 
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
         auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
             if (timestamp != Timestamp::min()) {
@@ -1411,7 +1464,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             timestamp = fieldTs.timestamp();
         }
 
-        const StringData ns = fieldNs.valueStringData();
+        const StringData ns = fieldNs.valuestrsafe();
         writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
             if (timestamp != Timestamp::min()) {
@@ -1472,7 +1525,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
     }
     {
-        Database* db = dbHolder().get(opCtx, nss.ns());
+        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
         if (db && !db->getCollection(opCtx, nss) && db->getViewCatalog()->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
@@ -1510,7 +1563,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    const bool assignCommandTimestamp = [opCtx] {
+    const bool assignCommandTimestamp = [opCtx, mode] {
         const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
         if (opCtx->writesAreReplicated()) {
             // We do not assign timestamps on replicated writes since they will get their oplog
@@ -1527,8 +1580,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     return true;
                 }
                 case ReplicationCoordinator::modeNone: {
-                    // We do not assign timestamps on standalones.
-                    return false;
+                    // Only assign timestamps on standalones during replication recovery when
+                    // started with 'recoverFromOplogAsStandalone'.
+                    return mode == OplogApplication::Mode::kRecovering;
                 }
             }
             MONGO_UNREACHABLE;
@@ -1576,7 +1630,11 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 Command* cmd = CommandHelpers::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
-                BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nss.db().toString(), o));
+
+                // TODO: This parse could be expensive and not worth it.
+                BackgroundOperation::awaitNoBgOpInProgForNs(
+                    cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns().toString());
+
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->checkForInterrupt();
                 break;

@@ -43,6 +43,10 @@
 
 namespace mongo {
 
+// Including builder.h here would cause a cycle.
+template <typename Allocator>
+class StringBuilderImpl;
+
 template <typename T>
 class StatusWith;
 
@@ -129,7 +133,6 @@ public:
         return _status.isOK();
     }
 
-
     /**
      * This method is a transitional tool, to facilitate transition to compile-time enforced status
      * checking.
@@ -156,7 +159,18 @@ StatusWith<T> makeStatusWith(Args&&... args) {
 }
 
 template <typename T>
-std::ostream& operator<<(std::ostream& stream, const StatusWith<T>& sw) {
+auto operator<<(std::ostream& stream, const StatusWith<T>& sw)
+    -> decltype(stream << sw.getValue())  // SFINAE on T streamability.
+{
+    if (sw.isOK())
+        return stream << sw.getValue();
+    return stream << sw.getStatus();
+}
+
+template <typename Allocator, typename T>
+auto operator<<(StringBuilderImpl<Allocator>& stream, const StatusWith<T>& sw)
+    -> decltype(stream << sw.getValue())  // SFINAE on T streamability.
+{
     if (sw.isOK())
         return stream << sw.getValue();
     return stream << sw.getStatus();

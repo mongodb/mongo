@@ -68,6 +68,8 @@ const std::map<OpType, std::string> kOpTypeNames{{OpType::NONE, "none"},
 // executed with no query options. This is only meaningful if a command is run via OP_QUERY against
 // '$cmd'.
 const int kNoOptions = 0;
+const int kStartTransactionOption = 1 << 0;
+const int kMultiStatementTransactionOption = 1 << 1;
 
 const BSONObj readConcernSnapshot = BSON("level"
                                          << "snapshot");
@@ -164,6 +166,14 @@ bool runCommandWithSession(DBClientBase* conn,
         cmdObjWithLsidBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *txnNumber);
     }
 
+    if (options & kMultiStatementTransactionOption) {
+        cmdObjWithLsidBuilder.append("autocommit", false);
+    }
+
+    if (options & kStartTransactionOption) {
+        cmdObjWithLsidBuilder.append("startTransaction", true);
+    }
+
     return conn->runCommand(dbname, cmdObjWithLsidBuilder.done(), *result);
 }
 
@@ -174,6 +184,24 @@ bool runCommandWithSession(DBClientBase* conn,
                            const boost::optional<LogicalSessionIdToClient>& lsid,
                            BSONObj* result) {
     return runCommandWithSession(conn, dbname, cmdObj, options, lsid, boost::none, result);
+}
+
+void abortTransaction(DBClientBase* conn,
+                      const boost::optional<LogicalSessionIdToClient>& lsid,
+                      boost::optional<TxnNumber> txnNumber) {
+    BSONObj abortTransactionCmd = BSON("abortTransaction" << 1);
+    BSONObj abortCommandResult;
+    const bool successful = runCommandWithSession(conn,
+                                                  "admin",
+                                                  abortTransactionCmd,
+                                                  kMultiStatementTransactionOption,
+                                                  lsid,
+                                                  txnNumber,
+                                                  &abortCommandResult);
+    // Transaction could be aborted already
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "abort command failed; reply was: " << abortCommandResult,
+            successful || abortCommandResult["codeName"].valueStringData() == "NoSuchTransaction");
 }
 
 /**
@@ -195,11 +223,18 @@ int runQueryWithReadCommands(DBClientBase* conn,
     const auto dbName = qr->nss().db().toString();
 
     BSONObj findCommandResult;
-    uassert(
-        ErrorCodes::CommandFailed,
-        str::stream() << "find command failed; reply was: " << findCommandResult,
-        runCommandWithSession(
-            conn, dbName, qr->asFindCommand(), kNoOptions, lsid, txnNumber, &findCommandResult));
+    uassert(ErrorCodes::CommandFailed,
+            str::stream() << "find command failed; reply was: " << findCommandResult,
+            runCommandWithSession(
+                conn,
+                dbName,
+                qr->asFindCommand(),
+                // read command with txnNumber implies performing reads in a
+                // multi-statement transaction
+                txnNumber ? kStartTransactionOption | kMultiStatementTransactionOption : kNoOptions,
+                lsid,
+                txnNumber,
+                &findCommandResult));
 
     CursorResponse cursorResponse =
         uassertStatusOK(CursorResponse::parseFromBSON(findCommandResult));
@@ -214,19 +249,24 @@ int runQueryWithReadCommands(DBClientBase* conn,
     }
 
     while (cursorResponse.getCursorId() != 0) {
-        GetMoreRequest getMoreRequest(qr->nss(),
-                                      cursorResponse.getCursorId(),
-                                      qr->getBatchSize(),
-                                      boost::none,   // maxTimeMS
-                                      boost::none,   // term
-                                      boost::none);  // lastKnownCommittedOpTime
+        GetMoreRequest getMoreRequest(
+            qr->nss(),
+            cursorResponse.getCursorId(),
+            qr->getBatchSize()
+                ? boost::optional<std::int64_t>(static_cast<std::int64_t>(*qr->getBatchSize()))
+                : boost::none,
+            boost::none,   // maxTimeMS
+            boost::none,   // term
+            boost::none);  // lastKnownCommittedOpTime
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,
                 str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,
                 runCommandWithSession(conn,
                                       dbName,
                                       getMoreRequest.toBSON(),
-                                      kNoOptions,
+                                      // read command with txnNumber implies performing reads in a
+                                      // multi-statement transaction
+                                      txnNumber ? kMultiStatementTransactionOption : kNoOptions,
                                       lsid,
                                       txnNumber,
                                       &getMoreCommandResult));
@@ -762,6 +802,15 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     }
 
     TxnNumber txnNumber = 0;
+    bool inProgressMultiStatementTxn = false;
+
+    ON_BLOCK_EXIT([&] {
+        // Executing the transaction with a new txnNumber would end the previous transaction
+        // automatically, but we have to end the last transaction manually with an abort command.
+        if (inProgressMultiStatementTxn) {
+            abortTransaction(conn, lsid, txnNumber);
+        }
+    });
 
     std::unique_ptr<Scope> scope{getGlobalScriptEngine()->newScopeForCurrentThread()};
     verify(scope.get());
@@ -818,13 +867,14 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (_config->useSnapshotReads) {
                                 qr->setReadConcern(readConcernSnapshot);
                             }
-                            invariantOK(qr->validate());
+                            invariant(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             boost::optional<TxnNumber> txnNumberForOp;
                             if (_config->useSnapshotReads) {
                                 ++txnNumber;
                                 txnNumberForOp = txnNumber;
+                                inProgressMultiStatementTxn = true;
                             }
                             runQueryWithReadCommands(
                                 conn, lsid, txnNumberForOp, std::move(qr), &result);
@@ -943,13 +993,14 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (_config->useSnapshotReads) {
                                 qr->setReadConcern(readConcernSnapshot);
                             }
-                            invariantOK(qr->validate());
+                            invariant(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.queryCounter);
                             boost::optional<TxnNumber> txnNumberForOp;
                             if (_config->useSnapshotReads) {
                                 ++txnNumber;
                                 txnNumberForOp = txnNumber;
+                                inProgressMultiStatementTxn = true;
                             }
                             count = runQueryWithReadCommands(
                                 conn, lsid, txnNumberForOp, std::move(qr), nullptr);

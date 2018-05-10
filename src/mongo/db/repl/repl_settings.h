@@ -58,6 +58,11 @@ public:
     std::string getReplSetString() const;
 
     /**
+     * Static getter for the 'recoverFromOplogAsStandalone' server parameter.
+     */
+    static bool shouldRecoverFromOplogAsStandalone();
+
+    /**
      * Note: _prefetchIndexMode is initialized to UNINITIALIZED by default.
      * To check whether _prefetchIndexMode has been set to a valid value, call
      * isPrefetchIndexModeSet().

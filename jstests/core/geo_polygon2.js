@@ -1,6 +1,7 @@
 //
 // More tests for N-dimensional polygon querying
 //
+// @tags: [requires_fastcount]
 
 // Create a polygon of some shape (no holes)
 // using turtle graphics.  Basically, will look like a very contorted octopus (quad-pus?) shape.

@@ -38,12 +38,12 @@
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/legacy_request_builder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {

@@ -179,40 +179,6 @@ public:
                                                         << "roles"
                                                         << BSONArray()),
                                                    BSONObj()));
-
-
-        ASSERT_OK(authManagerExternalState->insert(
-            opCtx.get(),
-            NamespaceString("admin.system.users"),
-            BSON("_id"
-                 << "test.collision"
-                 << "user"
-                 << "collision"
-                 << "db"
-                 << "test"
-                 << "credentials"
-                 << BSON("SCRAM-SHA-256"
-                         << scram::Secrets<SHA256Block>::generateCredentials("collision", 15000))
-                 << "roles"
-                 << BSONArray()),
-            BSONObj()));
-
-        // A user whose name does not equal "test.collision"'s, but ends in a Zero Width Joiner.
-        ASSERT_OK(authManagerExternalState->insert(
-            opCtx.get(),
-            NamespaceString("admin.system.users"),
-            BSON("_id"
-                 << "test.collision‍"  // This string ends in a ZWJ
-                 << "user"
-                 << "collision‍"  // This string ends in a ZWJ
-                 << "db"
-                 << "test"
-                 << "credentials"
-                 << BSON("SCRAM-SHA-256"
-                         << scram::Secrets<SHA256Block>::generateCredentials("collision", 15000))
-                 << "roles"
-                 << BSONArray()),
-            BSONObj()));
     }
 
     ServiceContextNoop serviceContext;
@@ -263,30 +229,12 @@ TEST_F(MechanismRegistryTest, invalidUserCantAdvertiseMechs) {
 
     BSONObjBuilder builder;
 
-    ASSERT_THROWS(
-        registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                                BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                                << "test.noSuchUser"),
-                                                &builder),
-        AssertionException);
-}
-
-TEST_F(MechanismRegistryTest, collisionsPreventAdvertisement) {
-    registry.registerFactory<FooMechanismFactory<true>>(
-        SASLServerMechanismRegistry::kNoValidateGlobalMechanisms);
-
-    BSONObjBuilder builder;
-
     registry.advertiseMechanismNamesForUser(opCtx.get(),
                                             BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                            << "test.collision"),
+                                                            << "test.noSuchUser"),
                                             &builder);
-    ASSERT_THROWS(
-        registry.advertiseMechanismNamesForUser(opCtx.get(),
-                                                BSON("isMaster" << 1 << "saslSupportedMechs"
-                                                                << "test.collision‍"),
-                                                &builder),
-        AssertionException);
+
+    ASSERT_BSONOBJ_EQ(BSONObj(), builder.obj());
 }
 
 TEST_F(MechanismRegistryTest, strongMechCanAdvertise) {

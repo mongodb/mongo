@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
 
@@ -105,7 +106,6 @@ public:
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     OptionalCollectionUUID uuid,
-                                    bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
                                     bool stayTemp) override {
         return repl::OpTime();
@@ -121,9 +121,48 @@ public:
 
     void onTransactionCommit(OperationContext* opCtx) override {}
 
+    void onTransactionPrepare(OperationContext* opCtx) override {}
+
     void onTransactionAbort(OperationContext* opCtx) override {}
 
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) {}
 };
+
+
+// Replication oplog OpObserver hooks. Informs the sharding system of changes that may be
+// relevant to ongoing operations.
+//
+// The global lock is expected to be held in mode IX by the caller of any of these functions.
+
+/**
+ * Details of documents being removed from a sharded collection.
+ */
+struct ShardObserverDeleteState {
+    static ShardObserverDeleteState make(OperationContext* opCtx,
+                                         CollectionShardingState* css,
+                                         const BSONObj& docToDelete);
+    // Contains the fields of the document that are in the collection's shard key, and "_id".
+    BSONObj documentKey;
+
+    // True if the document being deleted belongs to a chunk which, while still in the shard,
+    // is being migrated out. (Not to be confused with "fromMigrate", which tags operations
+    // that are steps in performing the migration.)
+    bool isMigrating;
+};
+
+void shardObserveInsertOp(OperationContext* opCtx,
+                          CollectionShardingState* css,
+                          const BSONObj& insertedDoc,
+                          const repl::OpTime& opTime);
+void shardObserveUpdateOp(OperationContext* opCtx,
+                          CollectionShardingState* css,
+                          const BSONObj& updatedDoc,
+                          const repl::OpTime& opTime,
+                          const repl::OpTime& prePostImageOpTime);
+void shardObserveDeleteOp(OperationContext* opCtx,
+                          CollectionShardingState* css,
+                          const ShardObserverDeleteState& deleteState,
+                          const repl::OpTime& opTime,
+                          const repl::OpTime& preImageOpTime);
 
 }  // namespace mongo

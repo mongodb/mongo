@@ -48,6 +48,7 @@
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/killcursors_request.h"
@@ -70,8 +71,8 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password_digest.h"
@@ -969,7 +970,7 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
         return Status(ErrorCodes::HostUnreachable,
                       str::stream() << "couldn't connect to server " << _serverAddress.toString()
                                     << ", connection attempt failed: "
-                                    << sws.getStatus().toString());
+                                    << sws.getStatus());
     }
 
     _session = std::move(sws.getValue());

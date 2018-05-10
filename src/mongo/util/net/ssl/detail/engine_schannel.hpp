@@ -65,7 +65,7 @@ public:
     };
 
     // Construct a new engine for the specified context.
-    ASIO_DECL explicit engine(SCHANNEL_CRED* context);
+    ASIO_DECL explicit engine(SCHANNEL_CRED* context, const std::string& remoteHostName);
 
     // Destructor.
     ASIO_DECL ~engine();
@@ -101,10 +101,6 @@ public:
     // error code object, suitable for passing to a completion handler.
     ASIO_DECL const asio::error_code& map_error_code(asio::error_code& ec) const;
 
-    // MONGODB additions:
-    // Set the Server name for TLS SNI purposes.
-    ASIO_DECL void set_server_name(const std::wstring name);
-
 private:
     // Disallow copying and assignment.
     engine(const engine&);
@@ -121,7 +117,7 @@ private:
     SCHANNEL_CRED* _pCred;
 
     // TLS SNI server name
-    std::wstring _serverName;
+    std::wstring _remoteHostName;
 
     // Engine State machine
     //

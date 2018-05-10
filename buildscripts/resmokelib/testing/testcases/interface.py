@@ -1,6 +1,6 @@
-"""
-Subclass of unittest.TestCase with helpers for spawning a separate
-process to perform the actual test case.
+"""Subclass of unittest.TestCase with helpers for spawning a separate process.
+
+This is used to perform the actual test case.
 """
 
 from __future__ import absolute_import
@@ -12,34 +12,25 @@ import unittest
 from ... import logging
 from ...utils import registry
 
-
-_TEST_CASES = {}
+_TEST_CASES = {}  # type: ignore
 
 
 def make_test_case(test_kind, *args, **kwargs):
-    """
-    Factory function for creating TestCase instances.
-    """
-
+    """Provide factory function for creating TestCase instances."""
     if test_kind not in _TEST_CASES:
         raise ValueError("Unknown test kind '%s'" % test_kind)
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
 class TestCase(unittest.TestCase):
-    """
-    A test case to execute.
-    """
+    """A test case to execute."""
 
-    __metaclass__ = registry.make_registry_metaclass(_TEST_CASES)
+    __metaclass__ = registry.make_registry_metaclass(_TEST_CASES)  # type: ignore
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     def __init__(self, logger, test_kind, test_name):
-        """
-        Initializes the TestCase with the name of the test.
-        """
-
+        """Initialize the TestCase with the name of the test."""
         unittest.TestCase.__init__(self, methodName="run_test")
 
         if not isinstance(logger, logging.Logger):
@@ -55,7 +46,7 @@ class TestCase(unittest.TestCase):
         # logger is an instance of TestQueueLogger. When the TestCase is created by a hook
         # implementation it is an instance of BaseLogger.
         self.logger = logger
-        # Used to store the logger when overridden by a test logger in Report.startTest().
+        # Used to store the logger when overridden by a test logger in Report.start_test().
         self._original_logger = None
 
         self.test_kind = test_kind
@@ -67,32 +58,27 @@ class TestCase(unittest.TestCase):
         self.is_configured = False
 
     def long_name(self):
-        """
-        Returns the path to the test, relative to the current working directory.
-        """
+        """Return the path to the test, relative to the current working directory."""
         return os.path.relpath(self.test_name)
 
     def basename(self):
-        """
-        Returns the basename of the test.
-        """
+        """Return the basename of the test."""
         return os.path.basename(self.test_name)
 
     def short_name(self):
-        """
-        Returns the basename of the test without the file extension.
-        """
+        """Return the basename of the test without the file extension."""
         return os.path.splitext(self.basename())[0]
 
     def id(self):
+        """Return the id of the test."""
         return self.test_name
 
-    def shortDescription(self):
+    def short_description(self):
+        """Return the short_description of the test."""
         return "%s %s" % (self.test_kind, self.test_name)
 
     def override_logger(self, new_logger):
-        """
-        Overrides this instance's logger with a new logger.
+        """Override this instance's logger with a new logger.
 
         This method is used by the repport to set the test logger.
         """
@@ -101,15 +87,13 @@ class TestCase(unittest.TestCase):
         self.logger = new_logger
 
     def reset_logger(self):
-        """Resets this instance's logger to its original value."""
+        """Reset this instance's logger to its original value."""
         assert self._original_logger, "Logger was not overridden"
         self.logger = self._original_logger
         self._original_logger = None
 
     def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
-        """
-        Stores 'fixture' as an attribute for later use during execution.
-        """
+        """Store 'fixture' as an attribute for later use during execution."""
         if self.is_configured:
             raise RuntimeError("configure can only be called once")
 
@@ -117,15 +101,11 @@ class TestCase(unittest.TestCase):
         self.fixture = fixture
 
     def run_test(self):
-        """
-        Runs the specified test.
-        """
+        """Run the specified test."""
         raise NotImplementedError("run_test must be implemented by TestCase subclasses")
 
     def as_command(self):
-        """
-        Returns the command invocation used to run the test.
-        """
+        """Return the command invocation used to run the test."""
         raise NotImplementedError("as_command must be implemented by TestCase subclasses")
 
 
@@ -133,40 +113,34 @@ class ProcessTestCase(TestCase):  # pylint: disable=abstract-method
     """Base class for TestCases that executes an external process."""
 
     def run_test(self):
+        """Run the test."""
         try:
             shell = self._make_process()
             self._execute(shell)
         except self.failureException:
             raise
         except:
-            self.logger.exception("Encountered an error running %s %s",
-                                  self.test_kind, self.basename())
+            self.logger.exception("Encountered an error running %s %s", self.test_kind,
+                                  self.basename())
             raise
 
     def as_command(self):
-        """
-        Returns the command invocation used to run the test.
-        """
+        """Return the command invocation used to run the test."""
         return self._make_process().as_command()
 
     def _execute(self, process):
-        """
-        Runs the specified process.
-        """
-        self.logger.info("Starting %s...\n%s", self.shortDescription(), process.as_command())
+        """Run the specified process."""
+        self.logger.info("Starting %s...\n%s", self.short_description(), process.as_command())
 
         process.start()
-        self.logger.info("%s started with pid %s.", self.shortDescription(), process.pid)
+        self.logger.info("%s started with pid %s.", self.short_description(), process.pid)
 
         self.return_code = process.wait()
         if self.return_code != 0:
-            raise self.failureException("%s failed" % (self.shortDescription()))
+            raise self.failureException("%s failed" % (self.short_description()))
 
-        self.logger.info("%s finished.", self.shortDescription())
+        self.logger.info("%s finished.", self.short_description())
 
     def _make_process(self):
-        """
-        Returns a new Process instance that could be used to run the
-        test or log the command.
-        """
+        """Return a new Process instance that could be used to run the test or log the command."""
         raise NotImplementedError("_make_process must be implemented by TestCase subclasses")

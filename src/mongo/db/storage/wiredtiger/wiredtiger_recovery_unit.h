@@ -63,10 +63,13 @@ public:
     ~WiredTigerRecoveryUnit();
 
     void beginUnitOfWork(OperationContext* opCtx) override;
+    void prepareUnitOfWork() override;
     void commitUnitOfWork() override;
     void abortUnitOfWork() override;
 
     bool waitUntilDurable() override;
+
+    bool waitUntilUnjournaledWritesDurable() override;
 
     void registerChange(Change* change) override;
 
@@ -86,6 +89,8 @@ public:
     void clearCommitTimestamp() override;
 
     Timestamp getCommitTimestamp() override;
+
+    void setPrepareTimestamp(Timestamp timestamp) override;
 
     Status setPointInTimeReadTimestamp(Timestamp timestamp) override;
 
@@ -156,6 +161,8 @@ private:
     // new optime, and thus always call oplogDiskLocRegister() on the record store.
     bool _orderedCommit = true;
     Timestamp _commitTimestamp;
+    Timestamp _prepareTimestamp;
+    boost::optional<Timestamp> _lastTimestampSet;
     uint64_t _mySnapshotId;
     Timestamp _majorityCommittedSnapshot;
     Timestamp _readAtTimestamp;

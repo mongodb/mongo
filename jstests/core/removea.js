@@ -1,33 +1,32 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_non_retryable_writes, requires_fastcount]
 
-// Test removal of a substantial proportion of inserted documents.  SERVER-3803
-// A complete test will only be performed against a DEBUG build.
+// Test removal of a substantial proportion of inserted documents.
+(function() {
+    "use strict";
 
-t = db.jstests_removea;
+    const t = db.jstests_removea;
 
-Random.setRandomSeed();
+    Random.setRandomSeed();
 
-for (v = 0; v < 2; ++v) {  // Try each index version.
-    t.drop();
-    t.ensureIndex({a: 1}, {v: v});
-    S = 100;
-    B = 100;
-    for (var x = 0; x < S; x++) {
-        var batch = [];
-        for (var y = 0; y < B; y++) {
-            var i = y + (B * x);
-            batch.push({a: i});
+    for (let v = 0; v < 2; ++v) {  // Try each index version.
+        t.drop();
+        t.ensureIndex({a: 1}, {v: v});
+        const S = 100;
+        const B = 100;
+        for (let x = 0; x < S; x++) {
+            let batch = [];
+            for (let y = 0; y < B; y++) {
+                let i = y + (B * x);
+                batch.push({a: i});
+            }
+            assert.writeOK(t.insert(batch));
         }
-        t.insert(batch);
-    }
-    assert.eq(t.count(), S * B);
+        assert.eq(t.count(), S * B);
 
-    toDrop = [];
-    for (i = 0; i < S * B; ++i) {
-        toDrop.push(Random.randInt(10000));  // Dups in the query will be ignored.
+        let toDrop = [];
+        for (let i = 0; i < S * B; ++i) {
+            toDrop.push(Random.randInt(10000));  // Dups in the query will be ignored.
+        }
+        assert.writeOK(t.remove({a: {$in: toDrop}}));
     }
-    // Remove many of the documents; $atomic prevents use of a ClientCursor, which would invoke a
-    // different bucket deallocation procedure than the one to be tested (see SERVER-4575).
-    var res = t.remove({a: {$in: toDrop}, $atomic: true});
-    assert.writeOK(res);
-}
+})();

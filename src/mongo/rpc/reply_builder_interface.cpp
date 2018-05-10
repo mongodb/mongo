@@ -34,8 +34,6 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/util/net/message.h"
-
 
 namespace mongo {
 namespace rpc {
@@ -46,7 +44,7 @@ const char kCodeField[] = "code";
 const char kCodeNameField[] = "codeName";
 const char kErrorField[] = "errmsg";
 
-// similar to appendCommandStatus (duplicating logic here to avoid cyclic library
+// similar to appendCommandStatusNoThrow (duplicating logic here to avoid cyclic library
 // dependency)
 BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
     auto okField = reply.getField(kOKField);

@@ -36,6 +36,7 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
@@ -43,7 +44,6 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/cluster_write.h"
-#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 
@@ -56,9 +56,14 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 }  // namespace
 
 Status SessionsCollectionSharded::_checkCacheForSessionsCollection(OperationContext* opCtx) {
+    // If the sharding state is not yet initialized, fail.
+    if (!Grid::get(opCtx)->isShardingInitialized()) {
+        return {ErrorCodes::ShardingStateNotInitialized, "sharding state is not yet initialized"};
+    }
+
     // If the collection doesn't exist, fail. Only the config servers generate it.
     auto res = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-        opCtx, NamespaceString(SessionsCollection::kSessionsFullNS.toString()));
+        opCtx, SessionsCollection::kSessionsNamespaceString);
     if (!res.isOK()) {
         return res.getStatus();
     }
@@ -78,7 +83,8 @@ Status SessionsCollectionSharded::setupSessionsCollection(OperationContext* opCt
 Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
                                                   const LogicalSessionRecordSet& sessions) {
     auto send = [&](BSONObj toSend) {
-        auto opMsg = OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsDb, toSend);
+        auto opMsg =
+            OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsNamespaceString.db(), toSend);
         auto request = BatchedCommandRequest::parseUpdate(opMsg);
 
         BatchedCommandResponse response;
@@ -94,7 +100,8 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
 Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
                                                 const LogicalSessionIdSet& sessions) {
     auto send = [&](BSONObj toSend) {
-        auto opMsg = OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsDb, toSend);
+        auto opMsg =
+            OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsNamespaceString.db(), toSend);
         auto request = BatchedCommandRequest::parseDelete(opMsg);
 
         BatchedCommandResponse response;
@@ -111,9 +118,8 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
 
     auto send = [&](BSONObj toSend) -> StatusWith<BSONObj> {
-        const NamespaceString nss(SessionsCollection::kSessionsFullNS);
-
-        auto qr = QueryRequest::makeFromFindCommand(nss, toSend, false);
+        auto qr = QueryRequest::makeFromFindCommand(
+            SessionsCollection::kSessionsNamespaceString, toSend, false);
         if (!qr.isOK()) {
             return qr.getStatus();
         }
@@ -144,7 +150,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
         for (const auto& obj : batch) {
             firstBatch.append(obj);
         }
-        firstBatch.done(cursorId, nss.ns());
+        firstBatch.done(cursorId, SessionsCollection::kSessionsNamespaceString.ns());
 
         return result.obj();
     };

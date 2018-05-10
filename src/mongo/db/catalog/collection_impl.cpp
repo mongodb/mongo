@@ -76,34 +76,30 @@
 
 namespace mongo {
 
+MONGO_REGISTER_SHIM(Collection::makeImpl)
+(Collection* const _this,
+ OperationContext* const opCtx,
+ const StringData fullNS,
+ OptionalCollectionUUID uuid,
+ CollectionCatalogEntry* const details,
+ RecordStore* const recordStore,
+ DatabaseCatalogEntry* const dbce,
+ PrivateTo<Collection>)
+    ->std::unique_ptr<Collection::Impl> {
+    return std::make_unique<CollectionImpl>(_this, opCtx, fullNS, uuid, details, recordStore, dbce);
+}
+
+MONGO_REGISTER_SHIM(Collection::parseValidationLevel)
+(const StringData data)->StatusWith<Collection::ValidationLevel> {
+    return CollectionImpl::parseValidationLevel(data);
+}
+
+MONGO_REGISTER_SHIM(Collection::parseValidationAction)
+(const StringData data)->StatusWith<Collection::ValidationAction> {
+    return CollectionImpl::parseValidationAction(data);
+}
+
 namespace {
-MONGO_INITIALIZER(InitializeCollectionFactory)(InitializerContext* const) {
-    Collection::registerFactory(
-        [](Collection* const _this,
-           OperationContext* const opCtx,
-           const StringData fullNS,
-           OptionalCollectionUUID uuid,
-           CollectionCatalogEntry* const details,
-           RecordStore* const recordStore,
-           DatabaseCatalogEntry* const dbce) -> std::unique_ptr<Collection::Impl> {
-            return stdx::make_unique<CollectionImpl>(
-                _this, opCtx, fullNS, uuid, details, recordStore, dbce);
-        });
-    return Status::OK();
-}
-
-MONGO_INITIALIZER(InitializeParseValidationLevelImpl)(InitializerContext* const) {
-    Collection::registerParseValidationLevelImpl(
-        [](const StringData data) { return CollectionImpl::parseValidationLevel(data); });
-    return Status::OK();
-}
-
-MONGO_INITIALIZER(InitializeParseValidationActionImpl)(InitializerContext* const) {
-    Collection::registerParseValidationActionImpl(
-        [](const StringData data) { return CollectionImpl::parseValidationAction(data); });
-    return Status::OK();
-}
-
 // Used below to fail during inserts.
 MONGO_FP_DECLARE(failCollectionInserts);
 
@@ -129,7 +125,7 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
               << collationSpec;
         fassertFailedNoTrace(40144);
     }
-    invariantOK(collator.getStatus());
+    invariant(collator.getStatus());
 
     return std::move(collator.getValue());
 }
@@ -197,6 +193,15 @@ CollectionImpl::~CollectionImpl() {
         LOG(2) << "destructed collection " << ns() << " with UUID " << uuid()->toString();
     }
     _magic = 0;
+}
+
+void CollectionImpl::refreshUUID(OperationContext* opCtx) {
+    auto options = getCatalogEntry()->getCollectionOptions(opCtx);
+    // refreshUUID may be called from outside a WriteUnitOfWork. In such cases, there is no
+    // change to any on disk data, so no rollback handler is needed.
+    if (opCtx->lockState()->inAWriteUnitOfWork())
+        opCtx->recoveryUnit()->onRollback([ this, oldUUID = _uuid ] { this->_uuid = oldUUID; });
+    _uuid = options.uuid;
 }
 
 bool CollectionImpl::requiresIdIndex() const {
@@ -323,7 +328,8 @@ Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
     return status;
 }
@@ -375,7 +381,8 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->onInserts(
         opCtx, ns(), uuid(), begin, end, fromMigrate);
 
-    opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
     return Status::OK();
 }
@@ -444,7 +451,8 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     getGlobalServiceContext()->getOpObserver()->onInserts(
         opCtx, ns(), uuid(), inserts.begin(), inserts.end(), false);
 
-    opCtx->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { notifyCappedWaitersIfNeeded(); });
 
     return loc.getStatus();
 }

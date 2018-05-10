@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# To add new directories, after running this tool, manually delete the
+# .git directory in the vended directory before running "git add".  Then
+# you can run this tool again to reclone it.
+
 set -eu
 set -x
 set -o errexit

@@ -1,0 +1,7 @@
+# See https://github.com/google/yapf
+[style]
+based_on_style = pep8
+column_limit = 100
+indent_dictionary_value = True
+split_before_named_assigns = False
+each_dict_entry_on_separate_line = False

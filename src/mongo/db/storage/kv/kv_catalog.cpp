@@ -139,7 +139,7 @@ public:
     AddIdentChange(KVCatalog* catalog, StringData ident)
         : _catalog(catalog), _ident(ident.toString()) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
         _catalog->_idents.erase(_ident);
@@ -154,7 +154,7 @@ public:
     RemoveIdentChange(KVCatalog* catalog, StringData ident, const Entry& entry)
         : _catalog(catalog), _ident(ident.toString()), _entry(entry) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         stdx::lock_guard<stdx::mutex> lk(_catalog->_identsLock);
         _catalog->_idents[_ident] = _entry;

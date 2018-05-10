@@ -21,6 +21,7 @@
         "mapreduce",
         "parallelCollectionScan",
     ]);
+    const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 
     // This list of cursor-generating commands is incomplete. For example, "listCollections",
     // "listIndexes", "parallelCollectionScan", and "repairCursor" are all missing from this list.
@@ -118,6 +119,10 @@
         } else if ((commandName === "mapReduce" || commandName === "mapreduce") &&
                    !OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
             // A map-reduce operation with non-inline output must be sent to the primary.
+            shouldForceReadPreference = false;
+        } else if (conn.isMongos() && kDatabasesOnConfigServers.has(dbName)) {
+            // Avoid overriding the read preference for config server since there may only be one
+            // of them.
             shouldForceReadPreference = false;
         }
 

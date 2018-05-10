@@ -136,7 +136,7 @@ void DocumentSourceSort::serializeToArray(
                                         << "mergePresorted"
                                         << (_mergingPresorted ? Value(true) : Value())
                                         << "limit"
-                                        << (limitSrc ? Value(limitSrc->getLimit()) : Value())))));
+                                        << (_limitSrc ? Value(_limitSrc->getLimit()) : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
         MutableDocument inner(sortKeyPattern(SortKeySerialization::kForPipelineSerialization));
         if (_mergingPresorted) {
@@ -144,8 +144,8 @@ void DocumentSourceSort::serializeToArray(
         }
         array.push_back(Value(DOC(kStageName << inner.freeze())));
 
-        if (limitSrc) {
-            limitSrc->serializeToArray(array);
+        if (_limitSrc) {
+            _limitSrc->serializeToArray(array);
         }
     }
 }
@@ -155,7 +155,7 @@ void DocumentSourceSort::doDispose() {
 }
 
 long long DocumentSourceSort::getLimit() const {
-    return limitSrc ? limitSrc->getLimit() : -1;
+    return _limitSrc ? _limitSrc->getLimit() : -1;
 }
 
 Document DocumentSourceSort::sortKeyPattern(SortKeySerialization serializationMode) const {
@@ -319,8 +319,8 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
     verify(_sortPattern.size());
 
     SortOptions opts;
-    if (limitSrc)
-        opts.limit = limitSrc->getLimit();
+    if (_limitSrc)
+        opts.limit = _limitSrc->getLimit();
 
     opts.maxMemoryUsageBytes = _maxMemoryUsageBytes;
     if (pExpCtx->allowDiskUse && !pExpCtx->inMongos) {
@@ -529,7 +529,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSort::getMergeSources() {
         other->sortKeyPattern(SortKeySerialization::kForPipelineSerialization).toBson(),
         pExpCtx->getCollator()};
     other->_paths = _paths;
-    other->limitSrc = limitSrc;
+    other->_limitSrc = _limitSrc;
     other->_maxMemoryUsageBytes = _maxMemoryUsageBytes;
     other->_mergingPresorted = true;
     other->_rawSort = _rawSort;

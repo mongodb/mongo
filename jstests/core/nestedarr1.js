@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, requires_fastcount]
 
 /**
  * Inserts documents with an indexed nested array field, progressively increasing the nesting

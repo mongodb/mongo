@@ -39,11 +39,21 @@ void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+void ReadOnlyCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,
     stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
     return _configServerLoader.getChunksSince(nss, version, callbackFn);
+}
+
+void ReadOnlyCatalogCacheLoader::getDatabase(
+    StringData dbName,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    return _configServerLoader.getDatabase(dbName, callbackFn);
 }
 
 }  // namespace mongo

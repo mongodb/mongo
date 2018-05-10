@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.query1;
 t.drop();

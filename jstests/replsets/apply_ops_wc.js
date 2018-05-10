@@ -44,7 +44,7 @@
 
     function assertApplyOpsCommandWorked(res) {
         assert.eq(3, res.applied);
-        assert.commandWorked(res);
+        assert.commandWorkedIgnoringWriteConcernErrors(res);
         assert.eq([true, true, true], res.results);
     }
 

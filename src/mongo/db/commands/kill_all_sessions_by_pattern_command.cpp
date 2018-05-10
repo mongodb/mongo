@@ -101,10 +101,8 @@ public:
 
                 for (const auto& pattern : ksc.getKillAllSessionsByPattern()) {
                     if (pattern.getUsers() || pattern.getRoles()) {
-                        return CommandHelpers::appendCommandStatus(
-                            result,
-                            Status(ErrorCodes::Unauthorized,
-                                   "Not authorized to impersonate in killAllSessionsByPattern"));
+                        uasserted(ErrorCodes::Unauthorized,
+                                  "Not authorized to impersonate in killAllSessionsByPattern");
                     }
                 }
             }
@@ -113,8 +111,8 @@ public:
         KillAllSessionsByPatternSet patterns{ksc.getKillAllSessionsByPattern().begin(),
                                              ksc.getKillAllSessionsByPattern().end()};
 
-        return CommandHelpers::appendCommandStatus(result,
-                                                   killSessionsCmdHelper(opCtx, result, patterns));
+        uassertStatusOK(killSessionsCmdHelper(opCtx, result, patterns));
+        return true;
     }
 } killAllSessionsByPatternCommand;
 

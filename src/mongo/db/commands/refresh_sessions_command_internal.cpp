@@ -78,9 +78,7 @@ public:
         auto cmd = RefreshSessionsCmdFromClusterMember::parse(ctx, cmdObj);
         auto res =
             LogicalSessionCache::get(opCtx->getServiceContext())->refreshSessions(opCtx, cmd);
-        if (!res.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, res);
-        }
+        uassertStatusOK(res);
 
         return true;
     }

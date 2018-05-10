@@ -182,6 +182,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
 
     // clusterMonitor role actions that target the cluster resource
     clusterMonitorRoleClusterActions
+        << ActionType::checkFreeMonitoringStatus
         << ActionType::connPoolStats
         << ActionType::getCmdLineOpts
         << ActionType::getLog
@@ -205,6 +206,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     clusterMonitorRoleDatabaseActions 
         << ActionType::collStats  // dbAdmin gets this also
         << ActionType::dbStats  // dbAdmin gets this also
+        << ActionType::getDatabaseVersion
         << ActionType::getShardVersion
         << ActionType::indexStats;
 
@@ -249,7 +251,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::listShards  // clusterMonitor gets this also
         << ActionType::flushRouterConfig  // hostManager gets this also
         << ActionType::cleanupOrphaned
-        << ActionType::setFeatureCompatibilityVersion;
+        << ActionType::setFeatureCompatibilityVersion
+        << ActionType::setFreeMonitoring;
 
     clusterManagerRoleDatabaseActions
         << ActionType::splitChunk
@@ -363,6 +366,8 @@ void addUserAdminAnyDbPrivileges(PrivilegeVector* privileges) {
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
         Privilege(ResourcePattern::forClusterResource(), ActionType::invalidateUserCache));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::viewUser));
 
 
     ActionSet readRoleAndIndexActions;

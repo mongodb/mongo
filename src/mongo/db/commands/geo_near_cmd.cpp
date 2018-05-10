@@ -176,7 +176,7 @@ public:
             Status collationEltStatus =
                 bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElt);
             if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
-                return CommandHelpers::appendCommandStatus(result, collationEltStatus);
+                uassertStatusOK(collationEltStatus);
             }
             if (collationEltStatus.isOK()) {
                 collation = collationElt.Obj();
@@ -220,8 +220,7 @@ public:
                                          std::move(qr),
                                          expCtx,
                                          extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures &
-                                             ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
         if (!statusWithCQ.isOK()) {
             errmsg = "Can't parse filter / create query";
             return false;
@@ -230,10 +229,14 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
-        auto exec = uassertStatusOK(
-            getExecutor(opCtx, collection, std::move(cq), PlanExecutor::YIELD_AUTO, 0));
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        const PlanExecutor::YieldPolicy yieldPolicy =
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+            ? PlanExecutor::INTERRUPT_ONLY
+            : PlanExecutor::YIELD_AUTO;
+        auto exec = uassertStatusOK(getExecutor(opCtx, collection, std::move(cq), yieldPolicy, 0));
 
         auto curOp = CurOp::get(opCtx);
         {
@@ -301,10 +304,8 @@ public:
             log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
                   << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(currObj).withContext(
-                    "Executor error during geoNear command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(currObj).withContext(
+                "Executor error during geoNear command"));
         }
 
         PlanSummaryStats summary;

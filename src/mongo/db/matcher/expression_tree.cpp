@@ -129,6 +129,16 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             children.erase(std::remove(children.begin(), children.end(), nullptr), children.end());
         }
 
+        // Check if the above optimizations eliminated all children. An OR with no children is
+        // always false.
+        // TODO SERVER-34759 It is correct to replace this empty AND with an $alwaysTrue, but we
+        // need to make enhancements to the planner to make it understand an $alwaysTrue and an
+        // empty AND as the same thing. The planner can create inferior plans for $alwaysTrue which
+        // it would not produce for an AND with no children.
+        if (children.empty() && matchType == MatchExpression::OR) {
+            return stdx::make_unique<AlwaysFalseMatchExpression>();
+        }
+
         if (children.size() == 1) {
             if ((matchType == AND || matchType == OR || matchType == INTERNAL_SCHEMA_XOR)) {
                 // Simplify AND/OR/XOR with exactly one operand to an expression consisting of just
@@ -159,7 +169,6 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 }
             }
         }
-
 
         return expression;
     };
@@ -256,6 +265,9 @@ void OrMatchExpression::debugString(StringBuilder& debug, int level) const {
 
 void OrMatchExpression::serialize(BSONObjBuilder* out) const {
     if (!numChildren()) {
+        // It is possible for an OrMatchExpression to have no children, resulting in the serialized
+        // expression {$or: []}, which is not a valid query object. An empty $or is logically
+        // equivalent to {$alwaysFalse: 1}.
         out->append(AlwaysFalseMatchExpression::kName, 1);
         return;
     }

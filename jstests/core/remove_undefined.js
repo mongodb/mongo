@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_non_retryable_writes, requires_fastcount]
 
 (function() {
     "use strict";

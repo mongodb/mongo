@@ -13,7 +13,7 @@ class YapfLinter(base.LinterBase):
     def __init__(self):
         # type: () -> None
         """Create a yapf linter."""
-        super(YapfLinter, self).__init__("yapf", "yapf 0.16.0")
+        super(YapfLinter, self).__init__("yapf", "yapf 0.21.0")
 
     def get_lint_version_cmd_args(self):
         # type: () -> List[str]

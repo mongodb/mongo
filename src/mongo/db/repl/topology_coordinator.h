@@ -355,6 +355,10 @@ public:
         unsigned selfUptime;
         const OpTime& readConcernMajorityOpTime;
         const BSONObj& initialSyncStatus;
+
+        // boost::none if the storage engine does not support recovering to a
+        // timestamp. Timestamp::min() if a stable checkpoint is yet to be taken.
+        const boost::optional<Timestamp> lastStableCheckpointTimestamp;
     };
 
     // produce a reply to a status request
@@ -747,7 +751,8 @@ public:
     // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
     // TODO(spencer): Remove this once we can easily call for an election in unit tests to
     // set the current primary.
-    void _setCurrentPrimaryForTest(int primaryIndex);
+    void setCurrentPrimary_forTest(int primaryIndex,
+                                   const Timestamp& electionTime = Timestamp(0, 0));
 
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;

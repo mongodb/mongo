@@ -33,16 +33,22 @@
 #include "mongo/s/async_requests_sender.h"
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/baton.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_EXPORT_SERVER_PARAMETER(AsyncRequestsSenderUseBaton, bool, true);
+
 namespace {
 
 // Maximum number of retries for network and replication notMaster errors (per host).
@@ -58,6 +64,7 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          Shard::RetryPolicy retryPolicy)
     : _opCtx(opCtx),
       _executor(executor),
+      _baton(opCtx),
       _db(dbName.toString()),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy) {
@@ -69,16 +76,9 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
     _metadataObj = readPreference.toContainingBSON();
 
     // Schedule the requests immediately.
-
-    // We must create the notification before scheduling any requests, because the notification is
-    // signaled both on an error in scheduling the request and a request's callback.
-    _notification.emplace();
-
-    // We lock so that no callbacks signal the notification until after we are done scheduling
-    // requests, to prevent signaling the notification twice, which is illegal.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _scheduleRequests(lk);
+    _scheduleRequests();
 }
+
 AsyncRequestsSender::~AsyncRequestsSender() {
     _cancelPendingRequests();
 
@@ -98,7 +98,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
         // Otherwise, wait for some response to be received.
         if (_interruptStatus.isOK()) {
             try {
-                _notification->get(_opCtx);
+                _makeProgress(_opCtx);
             } catch (const AssertionException& ex) {
                 // If the operation is interrupted, we cancel outstanding requests and switch to
                 // waiting for the (canceled) callbacks to finish without checking for interrupts.
@@ -107,25 +107,22 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() {
                 continue;
             }
         } else {
-            _notification->get();
+            _makeProgress(nullptr);
         }
     }
     return *readyResponse;
 }
 
 void AsyncRequestsSender::stopRetrying() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
 }
 
 bool AsyncRequestsSender::done() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return std::all_of(
         _remotes.begin(), _remotes.end(), [](const RemoteData& remote) { return remote.done; });
 }
 
 void AsyncRequestsSender::_cancelPendingRequests() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stopRetrying = true;
 
     // Cancel all outstanding requests so they return immediately.
@@ -137,12 +134,13 @@ void AsyncRequestsSender::_cancelPendingRequests() {
 }
 
 boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    _notification.emplace();
-
     if (!_stopRetrying) {
-        _scheduleRequests(lk);
+        _scheduleRequests();
+    }
+
+    // If we have baton requests, we want to process those before proceeding
+    if (_batonRequests) {
+        return boost::none;
     }
 
     // Check if any remote is ready.
@@ -171,7 +169,7 @@ boost::optional<AsyncRequestsSender::Response> AsyncRequestsSender::_ready() {
     return boost::none;
 }
 
-void AsyncRequestsSender::_scheduleRequests(WithLock lk) {
+void AsyncRequestsSender::_scheduleRequests() {
     invariant(!_stopRetrying);
     // Schedule remote work on hosts for which we have not sent a request or need to retry.
     for (size_t i = 0; i < _remotes.size(); ++i) {
@@ -212,27 +210,30 @@ void AsyncRequestsSender::_scheduleRequests(WithLock lk) {
 
         // If the remote does not have a response or pending request, schedule remote work for it.
         if (!remote.swResponse && !remote.cbHandle.isValid()) {
-            auto scheduleStatus = _scheduleRequest(lk, i);
+            auto scheduleStatus = _scheduleRequest(i);
             if (!scheduleStatus.isOK()) {
                 remote.swResponse = std::move(scheduleStatus);
-                // Signal the notification indicating the remote had an error (we need to do this
-                // because no request was scheduled, so no callback for this remote will run and
-                // signal the notification).
-                if (!*_notification) {
-                    _notification->set();
+
+                if (_baton) {
+                    _batonRequests++;
+                    _baton->schedule([this] { _batonRequests--; });
                 }
+
+                // Push a noop response to the queue to indicate that a remote is ready for
+                // re-processing due to failure.
+                _responseQueue.push(boost::none);
             }
         }
     }
 }
 
-Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
+Status AsyncRequestsSender::_scheduleRequest(size_t remoteIndex) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
     invariant(!remote.swResponse);
 
-    Status resolveStatus = remote.resolveShardIdToHostAndPort(_readPreference);
+    Status resolveStatus = remote.resolveShardIdToHostAndPort(this, _readPreference);
     if (!resolveStatus.isOK()) {
         return resolveStatus;
     }
@@ -241,9 +242,16 @@ Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
         *remote.shardHostAndPort, _db, remote.cmdObj, _metadataObj, _opCtx);
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
-        request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            _handleResponse(cbData, remoteIndex);
-        });
+        request,
+        [remoteIndex, this](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+            if (_baton) {
+                _batonRequests++;
+                _baton->schedule([this] { _batonRequests--; });
+            }
+
+            _responseQueue.push(Job{cbData, remoteIndex});
+        },
+        _baton);
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
     }
@@ -252,11 +260,29 @@ Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
     return Status::OK();
 }
 
-void AsyncRequestsSender::_handleResponse(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, size_t remoteIndex) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
+// Passing opCtx means you'd like to opt into opCtx interruption.  During cleanup we actually don't.
+void AsyncRequestsSender::_makeProgress(OperationContext* opCtx) {
+    invariant(!opCtx || opCtx == _opCtx);
 
-    auto& remote = _remotes[remoteIndex];
+    boost::optional<Job> job;
+
+    if (_baton) {
+        // If we're using a baton, we peek the queue, and block on the baton if it's empty
+        if (boost::optional<boost::optional<Job>> tryJob = _responseQueue.tryPop()) {
+            job = std::move(*tryJob);
+        } else {
+            _baton->run(opCtx, boost::none);
+        }
+    } else {
+        // Otherwise we block on the queue
+        job = opCtx ? _responseQueue.pop(opCtx) : _responseQueue.pop();
+    }
+
+    if (!job) {
+        return;
+    }
+
+    auto& remote = _remotes[job->remoteIndex];
     invariant(!remote.swResponse);
 
     // Clear the callback handle. This indicates that we are no longer waiting on a response from
@@ -264,15 +290,10 @@ void AsyncRequestsSender::_handleResponse(
     remote.cbHandle = executor::TaskExecutor::CallbackHandle();
 
     // Store the response or error.
-    if (cbData.response.status.isOK()) {
-        remote.swResponse = std::move(cbData.response);
+    if (job->cbData.response.status.isOK()) {
+        remote.swResponse = std::move(job->cbData.response);
     } else {
-        remote.swResponse = std::move(cbData.response.status);
-    }
-
-    // Signal the notification indicating that a remote received a response.
-    if (!*_notification) {
-        _notification->set();
+        remote.swResponse = std::move(job->cbData.response.status);
     }
 }
 
@@ -295,14 +316,57 @@ AsyncRequestsSender::RemoteData::RemoteData(ShardId shardId, BSONObj cmdObj)
     : shardId(std::move(shardId)), cmdObj(std::move(cmdObj)) {}
 
 Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
-    const ReadPreferenceSetting& readPref) {
+    AsyncRequestsSender* ars, const ReadPreferenceSetting& readPref) {
     const auto shard = getShard();
     if (!shard) {
         return Status(ErrorCodes::ShardNotFound,
                       str::stream() << "Could not find shard " << shardId);
     }
 
-    auto findHostStatus = shard->getTargeter()->findHostWithMaxWait(readPref, Seconds{20});
+    auto clock = ars->_opCtx->getServiceContext()->getFastClockSource();
+
+    auto deadline = clock->now() + Seconds(20);
+
+    auto targeter = shard->getTargeter();
+
+    auto findHostStatus = [&] {
+        // If we don't have a baton, just go ahead and block in targeting
+        if (!ars->_baton) {
+            return targeter->findHostWithMaxWait(readPref, Seconds{20});
+        }
+
+        // If we do have a baton, and we can target quickly, just do that
+        {
+            auto findHostStatus = targeter->findHostNoWait(readPref);
+            if (findHostStatus.isOK()) {
+                return findHostStatus;
+            }
+        }
+
+        // If it's going to take a while to target, we spin up a background thread to do our
+        // targeting, while running the baton on the calling thread.  This allows us to make forward
+        // progress on previous requests.
+        Promise<HostAndPort> promise;
+        auto future = promise.getFuture();
+
+        ars->_batonRequests++;
+        stdx::thread bgChecker([&] {
+            promise.setWith(
+                [&] { return targeter->findHostWithMaxWait(readPref, deadline - clock->now()); });
+
+            ars->_baton->schedule([ars] { ars->_batonRequests--; });
+        });
+        const auto guard = MakeGuard([&] { bgChecker.join(); });
+
+        while (!future.isReady()) {
+            if (!ars->_baton->run(nullptr, deadline)) {
+                break;
+            }
+        }
+
+        return future.getNoThrow();
+    }();
+
     if (!findHostStatus.isOK()) {
         return findHostStatus.getStatus();
     }
@@ -315,6 +379,19 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
 std::shared_ptr<Shard> AsyncRequestsSender::RemoteData::getShard() {
     // TODO: Pass down an OperationContext* to use here.
     return grid.shardRegistry()->getShardNoReload(shardId);
+}
+
+AsyncRequestsSender::BatonDetacher::BatonDetacher(OperationContext* opCtx)
+    : _baton(AsyncRequestsSenderUseBaton.load()
+                 ? (opCtx->getServiceContext()->getTransportLayer()
+                        ? opCtx->getServiceContext()->getTransportLayer()->makeBaton(opCtx)
+                        : nullptr)
+                 : nullptr) {}
+
+AsyncRequestsSender::BatonDetacher::~BatonDetacher() {
+    if (_baton) {
+        _baton->detach();
+    }
 }
 
 }  // namespace mongo

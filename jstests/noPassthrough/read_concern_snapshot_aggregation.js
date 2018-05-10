@@ -33,6 +33,8 @@
         let cmdAsSnapshotRead = Object.extend({}, cmd);
         cmdAsSnapshotRead.txnNumber = NumberLong(++txnNumber);
         cmdAsSnapshotRead.readConcern = {level: "snapshot"};
+        cmdAsSnapshotRead.autocommit = false;
+        cmdAsSnapshotRead.startTransaction = true;
         assert.commandFailedWithCode(sessionDB.runCommand(cmdAsSnapshotRead), code);
 
         // As a sanity check, also make sure that the command succeeds when run without a txn number
@@ -45,23 +47,6 @@
 
     // Test that $collStats is disallowed with snapshot reads.
     testSnapshotAggFailsWithCode(kCollName, [{$collStats: {}}], kIllegalStageForSnapshotReadCode);
-
-    // Test that $geoNear is disallowed with snapshot reads.
-    assert.commandWorked(sessionDB.runCommand({
-        createIndexes: kCollName,
-        indexes: [{key: {a: "2dsphere"}, name: "a_2dsphere"}],
-        writeConcern: {w: "majority"}
-    }));
-    testSnapshotAggFailsWithCode(kCollName,
-                                 [{
-                                    $geoNear: {
-                                        near: {type: "Point", coordinates: [0, 0]},
-                                        distanceField: "distanceField",
-                                        spherical: true,
-                                        key: "a"
-                                    }
-                                 }],
-                                 kIllegalStageForSnapshotReadCode);
 
     // Test that $indexStats is disallowed with snapshot reads.
     testSnapshotAggFailsWithCode(kCollName, [{$indexStats: {}}], kIllegalStageForSnapshotReadCode);
@@ -76,16 +61,15 @@
     testSnapshotAggFailsWithCode(kCollName, [{$out: "out"}], ErrorCodes.InvalidOptions);
 
     // Test that $listSessions is disallowed with snapshot reads. This stage must be run against
-    // 'system.sessions' in the config database.
+    // 'system.sessions' in the config database, which cannot be queried in a transaction.
     sessionDB = session.getDatabase(kConfigDB);
-    testSnapshotAggFailsWithCode(
-        "system.sessions", [{$listSessions: {}}], kIllegalStageForSnapshotReadCode);
+    testSnapshotAggFailsWithCode("system.sessions", [{$listSessions: {}}], 50844);
 
     // Test that $currentOp is disallowed with snapshot reads. We have to reassign 'sessionDB' to
     // refer to the admin database, because $currentOp pipelines are required to run against
-    // 'admin'.
+    // 'admin'. Queries against 'admin' are not permitted in a transaction.
     sessionDB = session.getDatabase(kAdminDB);
-    testSnapshotAggFailsWithCode(1, [{$currentOp: {}}], ErrorCodes.InvalidOptions);
+    testSnapshotAggFailsWithCode(1, [{$currentOp: {}}], 50844);
     sessionDB = session.getDatabase(kDBName);
 
     // Helper for testing that aggregation stages which involve a local and foreign collection
@@ -106,15 +90,15 @@
         let cmdRes = sessionDB.runCommand({
             aggregate: localColl.getName(),
             pipeline: pipeline,
-            // TODO SERVER-33698: Remove this workaround once cursor establishment commands with
-            // batchSize:0 correctly open a snapshot for the read transaction.
-            cursor: {batchSize: 1},
+            cursor: {batchSize: 0},
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(++txnNumber)
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false
         });
         assert.commandWorked(cmdRes);
         assert.neq(0, cmdRes.cursor.id);
-        assert.eq(1, cmdRes.cursor.firstBatch.length);
+        assert.eq(0, cmdRes.cursor.firstBatch.length);
 
         assert.commandWorked(localColl.insert(localDocsPost, kWCMajority));
         assert.commandWorked(foreignColl.insert(foreignDocsPost, kWCMajority));
@@ -122,6 +106,8 @@
             new DBCommandCursor(sessionDB, cmdRes, undefined, undefined, NumberLong(txnNumber))
                 .toArray();
         assert.eq(results, expectedResults);
+        assert.commandWorked(sessionDB.adminCommand(
+            {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
     }
 
     // Test that snapshot isolation works with $lookup using localField/foreignField syntax.
@@ -179,8 +165,59 @@
             [{_id: 0, as: []}, {_id: 1, as: [{_id: 1, linkTo: 2}]}, {_id: 2, as: []}]
     });
 
+    // Test that snapshot isolation works for $geoNear. Special care is taken to test snapshot
+    // isolation across getMore for $geoNear as it is an initial document source.
+    const coll = sessionDB.getCollection(kCollName);
+    coll.drop();
+    assert.commandWorked(sessionDB.runCommand({
+        createIndexes: kCollName,
+        indexes: [{key: {geo: "2dsphere"}, name: "geo_2dsphere"}],
+        writeConcern: {w: "majority"}
+    }));
+
+    let bulk = coll.initializeUnorderedBulkOp();
+    const numInitialGeoInsert = 4;
+    for (let i = 0; i < numInitialGeoInsert; ++i) {
+        bulk.insert({_id: i, geo: {type: "Point", coordinates: [0, 0]}});
+    }
+    assert.commandWorked(bulk.execute({w: "majority"}));
+
+    let cmdRes = assert.commandWorked(sessionDB.runCommand({
+        aggregate: kCollName,
+        pipeline: [{
+            $geoNear: {
+                spherical: true,
+                near: {type: "Point", coordinates: [0, 0]},
+                distanceField: "distance"
+            }
+        }],
+        txnNumber: NumberLong(++txnNumber),
+        readConcern: {level: "snapshot"},
+        autocommit: false,
+        startTransaction: true,
+        cursor: {batchSize: 0}
+    }));
+    assert(cmdRes.hasOwnProperty("cursor"));
+    const cursorId = cmdRes.cursor.id;
+    assert.neq(cursorId, 0);
+
+    assert.commandWorked(
+        coll.insert({_id: numInitialGeoInsert, geo: {type: "Point", coordinates: [0, 0]}},
+                    {writeConcern: {w: "majority"}}));
+
+    cmdRes = assert.commandWorked(sessionDB.runCommand({
+        getMore: NumberLong(cursorId),
+        collection: kCollName,
+        autocommit: false,
+        txnNumber: NumberLong(txnNumber)
+    }));
+    assert.commandWorked(sessionDB.adminCommand(
+        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
+    assert(cmdRes.hasOwnProperty("cursor"));
+    assert(cmdRes.cursor.hasOwnProperty("nextBatch"));
+    assert.eq(cmdRes.cursor.nextBatch.length, numInitialGeoInsert);
+
     // Test that snapshot reads are legal for $facet.
-    let coll = sessionDB.getCollection(kCollName);
     coll.drop();
     assert.commandWorked(coll.insert(
         [
@@ -190,7 +227,7 @@
         ],
         kWCMajority));
 
-    let cmdRes = sessionDB.runCommand({
+    cmdRes = sessionDB.runCommand({
         aggregate: kCollName,
         pipeline: [
             {
@@ -205,8 +242,12 @@
         ],
         cursor: {},
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(++txnNumber)
+        txnNumber: NumberLong(++txnNumber),
+        startTransaction: true,
+        autocommit: false
     });
+    assert.commandWorked(sessionDB.adminCommand(
+        {commitTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false}));
     assert.commandWorked(cmdRes);
     assert.eq(0, cmdRes.cursor.id);
     assert.eq(cmdRes.cursor.firstBatch, [

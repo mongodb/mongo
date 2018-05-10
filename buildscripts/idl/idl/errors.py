@@ -73,7 +73,6 @@ ERROR_ID_ENUM_BAD_TYPE = "ID0036"
 ERROR_ID_ENUM_BAD_INT_VAUE = "ID0037"
 ERROR_ID_ENUM_NON_UNIQUE_VALUES = "ID0038"
 ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
-ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM = "ID0040"
 ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
 ERROR_ID_FIELD_NO_COMMAND = "ID0042"
 ERROR_ID_NO_ARRAY_OF_CHAIN = "ID0043"
@@ -108,7 +107,7 @@ class ParserError(common.SourceLocation):
 
     def __init__(self, error_id, msg, file_name, line, column):
         # type: (unicode, unicode, unicode, int, int) -> None
-        """"Construct a parser error with source location information."""
+        """Construct a parser error with source location information."""
         # pylint: disable=too-many-arguments
         self.error_id = error_id
         self.msg = msg
@@ -116,8 +115,7 @@ class ParserError(common.SourceLocation):
 
     def __str__(self):
         # type: () -> str
-        """
-        Return a formatted error.
+        """Return a formatted error.
 
         Example error message:
         test.idl: (17, 4): ID0008: Unknown IDL node 'cpp_namespac' for YAML entity 'global'.
@@ -128,11 +126,11 @@ class ParserError(common.SourceLocation):
 
 
 class ParserErrorCollection(object):
-    """A collection of parser errors with source context information."""
+    """Collection of parser errors with source context information."""
 
     def __init__(self):
         # type: () -> None
-        """Default constructor."""
+        """Initialize ParserErrorCollection."""
         self._errors = []  # type: List[ParserError]
 
     def add(self, location, error_id, msg):
@@ -210,9 +208,10 @@ class ParserContext(object):
     def add_unknown_root_node_error(self, node):
         # type: (yaml.nodes.Node) -> None
         """Add an error about an unknown YAML root node."""
-        self._add_node_error(node, ERROR_ID_UNKNOWN_ROOT, (
-            "Unrecognized IDL specification root level node '%s', only " +
-            " (global, import, types, commands, and structs) are accepted") % (node.value))
+        self._add_node_error(node, ERROR_ID_UNKNOWN_ROOT,
+                             ("Unrecognized IDL specification root level node '%s', only " +
+                              " (global, import, types, commands, and structs) are accepted") %
+                             (node.value))
 
     def add_unknown_node_error(self, node, name):
         # type: (yaml.nodes.Node, unicode) -> None
@@ -287,9 +286,9 @@ class ParserContext(object):
             return False
 
         if not (node.value == "true" or node.value == "false"):
-            self._add_node_error(node, ERROR_ID_IS_NODE_VALID_BOOL,
-                                 "Illegal bool value for '%s', expected either 'true' or 'false'." %
-                                 node_name)
+            self._add_node_error(
+                node, ERROR_ID_IS_NODE_VALID_BOOL,
+                "Illegal bool value for '%s', expected either 'true' or 'false'." % node_name)
             return False
 
         return True
@@ -309,9 +308,8 @@ class ParserContext(object):
         assert self.is_scalar_sequence_or_scalar_node(node, "unknown")
         if node.id == "scalar":
             return [node.value]
-        else:
-            # Unzip the list of ScalarNode
-            return [v.value for v in node.value]
+        # Unzip the list of ScalarNode
+        return [v.value for v in node.value]
 
     def add_duplicate_error(self, node, node_name):
         # type: (yaml.nodes.Node, unicode) -> None
@@ -331,16 +329,16 @@ class ParserContext(object):
         """Add an error about a YAML node missing a required child."""
         # pylint: disable=invalid-name
         self._add_node_error(node, ERROR_ID_MISSING_REQUIRED_FIELD,
-                             "IDL node '%s' is missing required scalar '%s'" %
-                             (node_parent, node_name))
+                             "IDL node '%s' is missing required scalar '%s'" % (node_parent,
+                                                                                node_name))
 
     def add_missing_ast_required_field_error(self, location, ast_type, ast_parent, ast_name):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
         """Add an error about a AST node missing a required child."""
         # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_MISSING_AST_REQUIRED_FIELD,
-                        "%s '%s' is missing required scalar '%s'" %
-                        (ast_type, ast_parent, ast_name))
+                        "%s '%s' is missing required scalar '%s'" % (ast_type, ast_parent,
+                                                                     ast_name))
 
     def add_array_not_valid_error(self, location, ast_type, name):
         # type: (common.SourceLocation, unicode, unicode) -> None
@@ -352,8 +350,8 @@ class ParserContext(object):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
         """Add an error about a bad bson type."""
         self._add_error(location, ERROR_ID_BAD_BSON_TYPE,
-                        "BSON Type '%s' is not recognized for %s '%s'." %
-                        (bson_type_name, ast_type, ast_parent))
+                        "BSON Type '%s' is not recognized for %s '%s'." % (bson_type_name, ast_type,
+                                                                           ast_parent))
 
     def add_bad_bson_scalar_type_error(self, location, ast_type, ast_parent, bson_type_name):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
@@ -390,9 +388,10 @@ class ParserContext(object):
         # type: (common.SourceLocation, unicode, unicode) -> None
         """Add an error about field must be empty for ignored fields."""
         # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED, (
-            "Field '%s' cannot contain a value for property '%s' when a field is marked as ignored")
-                        % (name, field_name))
+        self._add_error(
+            location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED,
+            ("Field '%s' cannot contain a value for property '%s' when a field is marked as ignored"
+             ) % (name, field_name))
 
     def add_struct_field_must_be_empty_error(self, location, name, field_name):
         # type: (common.SourceLocation, unicode, unicode) -> None
@@ -407,27 +406,31 @@ class ParserContext(object):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
         # pylint: disable=invalid-name
         """Add an error about field must be empty for fields of type struct."""
-        self._add_error(location, ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED, (
-            "Custom serialization for a scalar is only supported for 'string'. The %s '%s' cannot" +
-            " use bson type '%s', use a bson_serialization_type of 'any' instead.") %
-                        (ast_type, ast_parent, bson_type_name))
+        self._add_error(
+            location, ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED,
+            ("Custom serialization for a scalar is only supported for 'string'. The %s '%s' cannot"
+             + " use bson type '%s', use a bson_serialization_type of 'any' instead.") %
+            (ast_type, ast_parent, bson_type_name))
 
     def add_bad_any_type_use_error(self, location, bson_type, ast_type, ast_parent):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
         # pylint: disable=invalid-name
         """Add an error about any being used in a list of bson types."""
-        self._add_error(location, ERROR_ID_BAD_ANY_TYPE_USE, (
-            "The BSON Type '%s' is not allowed in a list of bson serialization types for" +
-            "%s '%s'. It must be only a single bson type.") % (bson_type, ast_type, ast_parent))
+        self._add_error(
+            location, ERROR_ID_BAD_ANY_TYPE_USE,
+            ("The BSON Type '%s' is not allowed in a list of bson serialization types for" +
+             "%s '%s'. It must be only a single bson type.") % (bson_type, ast_type, ast_parent))
 
     def add_bad_cpp_numeric_type_use_error(self, location, ast_type, ast_parent, cpp_type):
         # type: (common.SourceLocation, unicode, unicode, unicode) -> None
         # pylint: disable=invalid-name
         """Add an error about any being used in a list of bson types."""
-        self._add_error(location, ERROR_ID_BAD_NUMERIC_CPP_TYPE, (
-            "The C++ numeric type '%s' is not allowed for %s '%s'. Only 'std::int32_t'," +
-            " 'std::uint32_t', 'std::uint64_t', and 'std::int64_t' are supported.") %
-                        (cpp_type, ast_type, ast_parent))
+        self._add_error(
+            location, ERROR_ID_BAD_NUMERIC_CPP_TYPE,
+            ("The C++ numeric type '%s' is not allowed for %s '%s'. Only 'std::int32_t'," +
+             " 'std::uint32_t', 'std::uint64_t', and 'std::int64_t' are supported.") % (cpp_type,
+                                                                                        ast_type,
+                                                                                        ast_parent))
 
     def add_bad_array_type_name_error(self, location, field_name, type_name):
         # type: (common.SourceLocation, unicode, unicode) -> None
@@ -551,14 +554,6 @@ class ParserContext(object):
                         ("Enum '%s' has non-continuous integer variables, enums must have a " +
                          "continuous range of integer variables.") % (enum_name))
 
-    def add_enum_field_must_be_empty_error(self, location, name, field_name):
-        # type: (common.SourceLocation, unicode, unicode) -> None
-        """Add an error about field must be empty for fields of type enum."""
-        # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM, (
-            "Field '%s' cannot contain a value for property '%s' when a field's type is a enum") %
-                        (name, field_name))
-
     def add_bad_command_namespace_error(self, location, command_name, command_namespace,
                                         valid_commands):
         # type: (common.SourceLocation, unicode, unicode, List[unicode]) -> None
@@ -571,9 +566,10 @@ class ParserContext(object):
     def add_bad_command_as_field_error(self, location, command_name):
         # type: (common.SourceLocation, unicode) -> None
         """Add an error about using a command for a field."""
-        self._add_error(location, ERROR_ID_FIELD_NO_COMMAND,
-                        ("Command '%s' cannot be used as a field type'. Commands must be top-level"
-                         + " types due to their serialization rules.") % (command_name))
+        self._add_error(
+            location, ERROR_ID_FIELD_NO_COMMAND,
+            ("Command '%s' cannot be used as a field type'. Commands must be top-level" +
+             " types due to their serialization rules.") % (command_name))
 
     def add_bad_array_of_chain(self, location, field_name):
         # type: (common.SourceLocation, unicode) -> None
@@ -585,9 +581,10 @@ class ParserContext(object):
         # type: (common.SourceLocation, unicode) -> None
         """Add an error about a field being optional and having a default value."""
         # pylint: disable=invalid-name
-        self._add_error(location, ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL, (
-            "Field '%s' can only be marked as optional or have a default value," + " not both.") %
-                        (field_name))
+        self._add_error(
+            location, ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL,
+            ("Field '%s' can only be marked as optional or have a default value," + " not both.") %
+            (field_name))
 
     def add_bad_struct_field_as_doc_sequence_error(self, location, struct_name, field_name):
         # type: (common.SourceLocation, unicode, unicode) -> None
@@ -637,8 +634,8 @@ class ParserContext(object):
 
         except ValueError as value_error:
             self._add_node_error(node, ERROR_ID_IS_NODE_VALID_INT,
-                                 "Illegal integer value for '%s', message '%s'." %
-                                 (node_name, value_error))
+                                 "Illegal integer value for '%s', message '%s'." % (node_name,
+                                                                                    value_error))
             return False
 
         return True

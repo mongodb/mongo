@@ -545,6 +545,7 @@ protected:
             mongo::BSONObjBuilder newConfigBuilder;
             newConfigBuilder.append("_id", oldConfig.getReplSetName());
             newConfigBuilder.append("version", oldConfig.getConfigVersion());
+            newConfigBuilder.append("protocolVersion", 1);
 
             mongo::BSONArrayBuilder membersBuilder(newConfigBuilder.subarrayStart("members"));
             {

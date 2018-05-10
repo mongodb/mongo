@@ -55,7 +55,7 @@ public:
     AddIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce, StringData ident)
         : _opCtx(opCtx), _cce(cce), _ident(ident.toString()) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         // Intentionally ignoring failure.
         _cce->_engine->dropIdent(_opCtx, _ident).transitional_ignore();
@@ -72,7 +72,7 @@ public:
         : _opCtx(opCtx), _cce(cce), _ident(ident.toString()) {}
 
     virtual void rollback() {}
-    virtual void commit() {
+    virtual void commit(boost::optional<Timestamp>) {
         // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
         // index, we should never see it again anyway.
         _cce->_engine->dropIdent(_opCtx, _ident).transitional_ignore();
@@ -248,9 +248,10 @@ void KVCollectionCatalogEntry::addUUID(OperationContext* opCtx,
     }
 }
 
-bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid) {
+bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
+                                                     OptionalCollectionUUID uuid) {
     MetaData md = _getMetaData(opCtx);
-    return md.options.uuid && md.options.uuid.get() == uuid;
+    return md.options.uuid && md.options.uuid == uuid;
 }
 
 void KVCollectionCatalogEntry::updateFlags(OperationContext* opCtx, int newValue) {

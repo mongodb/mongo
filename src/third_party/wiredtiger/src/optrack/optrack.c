@@ -46,11 +46,11 @@ err:		WT_PANIC_MSG(session, ret, "%s", __func__);
 }
 
 /*
- * __wt_optrack_open_file --
+ * __optrack_open_file --
  *	Open the per-session operation-tracking file.
  */
-int
-__wt_optrack_open_file(WT_SESSION_IMPL *session)
+static int
+__optrack_open_file(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(buf);
@@ -61,7 +61,8 @@ __wt_optrack_open_file(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 
 	if (!F_ISSET(conn, WT_CONN_OPTRACK))
-		return (WT_ERROR);
+		WT_RET_MSG(session, WT_ERROR,
+		    "%s: WT_CONN_OPTRACK not set", __func__);
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_filename_construct(session, conn->optrack_path,
@@ -103,9 +104,8 @@ err:		WT_TRET(__wt_close(session, &session->optrack_fh));
 void
 __wt_optrack_flush_buffer(WT_SESSION_IMPL *s)
 {
-	if (s->optrack_fh == NULL)
-		if (__wt_optrack_open_file(s))
-			return;
+	if (s->optrack_fh == NULL && __optrack_open_file(s) != 0)
+		return;
 
 	/*
 	 * We're not using the standard write path deliberately, that's quite

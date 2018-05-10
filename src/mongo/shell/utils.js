@@ -63,11 +63,17 @@ function retryOnNetworkError(func, numRetries, sleepMs) {
     }
 }
 
-// Checks if a javascript exception is a network error.
+// Checks if a Javascript exception is a network error.
 function isNetworkError(error) {
-    return error.message.indexOf("network error") >= 0 ||
-        error.message.indexOf("error doing query") >= 0 ||
-        error.message.indexOf("socket exception") >= 0;
+    let networkErrs = [
+        "network error",
+        "error doing query",
+        "socket exception",
+        "SocketException",
+        "HostNotFound"
+    ];
+    // See if any of the known network error strings appear in the given message.
+    return networkErrs.some(err => error.message.includes(err));
 }
 
 // Please consider using bsonWoCompare instead of this as much as possible.
@@ -249,15 +255,18 @@ jsTestOptions = function() {
             noJournal: TestData.noJournal,
             noJournalPrealloc: TestData.noJournalPrealloc,
             auth: TestData.auth,
+            // Note: keyFile is also used as a flag to indicate cluster auth is turned on, set it
+            // to a truthy value if you'd like to do cluster auth, even if it's not keyFile auth.
+            // Use clusterAuthMode to specify the actual auth mode you want to use.
             keyFile: TestData.keyFile,
             authUser: TestData.authUser || "__system",
             authPassword: TestData.keyFileData,
             authenticationDatabase: TestData.authenticationDatabase || "admin",
             authMechanism: TestData.authMechanism,
+            clusterAuthMode: TestData.clusterAuthMode || "keyFile",
             adminUser: TestData.adminUser || "admin",
             adminPassword: TestData.adminPassword || "password",
             useLegacyConfigServers: TestData.useLegacyConfigServers || false,
-            forceReplicationProtocolVersion: TestData.forceReplicationProtocolVersion,
             enableMajorityReadConcern: TestData.enableMajorityReadConcern,
             writeConcernMajorityShouldJournal: TestData.writeConcernMajorityShouldJournal,
             enableEncryption: TestData.enableEncryption,
@@ -285,6 +294,8 @@ jsTestOptions = function() {
                 TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             skipCheckingCatalogCacheConsistencyWithShardingCatalog:
                 TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
+            skipAwaitingReplicationOnShardsBeforeCheckingUUIDs:
+                TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,

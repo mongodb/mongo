@@ -404,6 +404,8 @@ void MigrationDestinationManager::cloneDocumentsFromDonor(
         opCtx->checkForInterrupt();
 
         auto res = fetchBatchFn(opCtx);
+
+        opCtx->checkForInterrupt();
         batches.push(res.getOwned(), opCtx);
         auto arr = res["objects"].Obj();
         if (arr.isEmpty()) {
@@ -675,13 +677,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             // options.
             WriteUnitOfWork wuow(opCtx);
             const bool createDefaultIndexes = true;
-            Status status = userCreateNS(opCtx,
-                                         db,
-                                         _nss.ns(),
-                                         donorOptions,
-                                         CollectionOptions::parseForStorage,
-                                         createDefaultIndexes,
-                                         donorIdIndexSpec);
+            Status status = Database::userCreateNS(opCtx,
+                                                   db,
+                                                   _nss.ns(),
+                                                   donorOptions,
+                                                   CollectionOptions::parseForStorage,
+                                                   createDefaultIndexes,
+                                                   donorIdIndexSpec);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << _nss << "] "
                           << " with options " << donorOptions << ": " << redact(status);
@@ -1024,7 +1026,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             if (Helpers::findById(opCtx, ctx.db(), nss.ns(), id, fullObj)) {
                 if (!isInRange(fullObj, min, max, shardKeyPattern)) {
                     if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
-                        invariant(0);
+                        MONGO_UNREACHABLE;
                     }
                     continue;
                 }
@@ -1057,7 +1059,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             // do not apply insert/update if doc does not belong to the chunk being migrated
             if (!isInRange(updatedDoc, min, max, shardKeyPattern)) {
                 if (MONGO_FAIL_POINT(failMigrationReceivedOutOfRangeOperation)) {
-                    invariant(0);
+                    MONGO_UNREACHABLE;
                 }
                 continue;
             }
@@ -1112,7 +1114,7 @@ CollectionShardingState::CleanupNotification MigrationDestinationManager::_noteP
 
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
-    auto metadata = css->getMetadata();
+    auto metadata = css->getMetadata(opCtx);
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.
@@ -1146,7 +1148,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
-    auto metadata = css->getMetadata();
+    auto metadata = css->getMetadata(opCtx);
 
     // This can currently happen because drops aren't synchronized with in-migrations. The idea for
     // checking this here is that in the future we shouldn't have this problem.

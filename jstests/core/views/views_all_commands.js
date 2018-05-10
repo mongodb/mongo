@@ -1,5 +1,10 @@
-// @tags: [does_not_support_stepdowns, requires_getmore, requires_non_retryable_commands,
-// requires_non_retryable_writes]
+// @tags: [
+//   does_not_support_stepdowns,
+//   requires_getmore,
+//   requires_non_retryable_commands,
+//   requires_non_retryable_writes,
+//   requires_fastcount,
+// ]
 
 /*
  * Declaratively-defined tests for views for all database commands. This file contains a map of test
@@ -82,6 +87,7 @@
         _configsvrRemoveShardFromZone: {skip: isAnInternalCommand},
         _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+        _flushDatabaseCacheUpdates: {skip: isUnrelated},
         _flushRoutingTableCacheUpdates: {skip: isUnrelated},
         _getNextSessionMods: {skip: isAnInternalCommand},
         _getUserCacheGeneration: {skip: isAnInternalCommand},
@@ -221,6 +227,7 @@
             }
         },
         dropUser: {skip: isUnrelated},
+        echo: {skip: isUnrelated},
         emptycapped: {
             command: {emptycapped: "view"},
             expectFailure: true,
@@ -239,6 +246,7 @@
         flushRouterConfig: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
+        getDatabaseVersion: {skip: isUnrelated},
         geoNear: {
             command:
                 {geoNear: "view", near: {type: "Point", coordinates: [-50, 37]}, spherical: true},
@@ -254,6 +262,7 @@
         },
         getCmdLineOpts: {skip: isUnrelated},
         getDiagnosticData: {skip: isUnrelated},
+        getFreeMonitoringStatus: {skip: isUnrelated},
         getLastError: {skip: isUnrelated},
         getLog: {skip: isUnrelated},
         getMore: {
@@ -399,6 +408,7 @@
         planCacheListQueryShapes:
             {command: {planCacheListQueryShapes: "view"}, expectFailure: true},
         planCacheSetFilter: {command: {planCacheSetFilter: "view"}, expectFailure: true},
+        prepareTransaction: {skip: isUnrelated},
         profile: {skip: isUnrelated},
         refreshLogicalSessionCacheNow: {skip: isAnInternalCommand},
         reapLogicalSessionCacheNow: {skip: isAnInternalCommand},
@@ -465,6 +475,7 @@
         serverStatus: {command: {serverStatus: 1}, skip: isUnrelated},
         setCommittedSnapshot: {skip: isAnInternalCommand},
         setFeatureCompatibilityVersion: {skip: isUnrelated},
+        setFreeMonitoring: {skip: isUnrelated},
         setParameter: {skip: isUnrelated},
         setShardVersion: {skip: isUnrelated},
         shardCollection: {

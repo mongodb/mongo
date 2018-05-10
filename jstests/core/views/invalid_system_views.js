@@ -1,9 +1,16 @@
-// @tags: [requires_non_retryable_commands, requires_non_retryable_writes]
-
 /**
  * Tests that invalid view definitions in system.views do not impact valid commands on existing
  * collections.
+ *
+ * @tags: [
+ *  requires_non_retryable_commands,
+ *  requires_non_retryable_writes,
+ *
+ *  # applyOps uses the oplog that require replication support
+ *  requires_replication,
+ * ]
  */
+
 (function() {
     "use strict";
     const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;

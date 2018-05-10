@@ -1,5 +1,3 @@
-load('jstests/libs/write_concern_util.js');
-
 /**
  * This file tests that commands that do writes accept a write concern. This file does not test
  * mongos commands or user management commands, both of which are tested separately. This test
@@ -138,8 +136,7 @@ load('jstests/libs/write_concern_util.js');
         dropTestCollection();
         cmd.setupFunc();
         var res = coll.runCommand(cmd.req);
-        assert.commandWorked(res);
-        assertWriteConcernError(res);
+        assert.commandFailedWithCode(res, ErrorCodes.UnknownReplWriteConcern);
         cmd.confirmFunc();
     }
 

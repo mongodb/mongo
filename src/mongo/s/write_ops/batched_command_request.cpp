@@ -59,20 +59,6 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
     return batchRequest;
 }
 
-// This macro just invokes a given method on one of the three types of ops with parameters
-#define INVOKE(M, ...)                                    \
-    {                                                     \
-        switch (_batchType) {                             \
-            case BatchedCommandRequest::BatchType_Insert: \
-                return _insertReq->M(__VA_ARGS__);        \
-            case BatchedCommandRequest::BatchType_Update: \
-                return _updateReq->M(__VA_ARGS__);        \
-            case BatchedCommandRequest::BatchType_Delete: \
-                return _deleteReq->M(__VA_ARGS__);        \
-        }                                                 \
-        MONGO_UNREACHABLE;                                \
-    }
-
 }  // namespace
 
 BatchedCommandRequest BatchedCommandRequest::parseInsert(const OpMsgRequest& request) {
@@ -88,7 +74,7 @@ BatchedCommandRequest BatchedCommandRequest::parseDelete(const OpMsgRequest& req
 }
 
 const NamespaceString& BatchedCommandRequest::getNS() const {
-    INVOKE(getNamespace);
+    return _visit([](auto&& op) -> decltype(auto) { return op.getNamespace(); });
 }
 
 NamespaceString BatchedCommandRequest::getTargetingNS() const {
@@ -111,15 +97,18 @@ bool BatchedCommandRequest::isInsertIndexRequest() const {
 }
 
 std::size_t BatchedCommandRequest::sizeWriteOps() const {
-    switch (_batchType) {
-        case BatchedCommandRequest::BatchType_Insert:
-            return getInsertRequest().getDocuments().size();
-        case BatchedCommandRequest::BatchType_Update:
-            return getUpdateRequest().getUpdates().size();
-        case BatchedCommandRequest::BatchType_Delete:
-            return getDeleteRequest().getDeletes().size();
-    }
-    MONGO_UNREACHABLE;
+    struct Visitor {
+        auto operator()(const write_ops::Insert& op) const {
+            return op.getDocuments().size();
+        }
+        auto operator()(const write_ops::Update& op) const {
+            return op.getUpdates().size();
+        }
+        auto operator()(const write_ops::Delete& op) const {
+            return op.getDeletes().size();
+        }
+    };
+    return _visit(Visitor{});
 }
 
 bool BatchedCommandRequest::isVerboseWC() const {
@@ -137,28 +126,15 @@ bool BatchedCommandRequest::isVerboseWC() const {
 }
 
 const write_ops::WriteCommandBase& BatchedCommandRequest::getWriteCommandBase() const {
-    INVOKE(getWriteCommandBase);
+    return _visit([](auto&& op) -> decltype(auto) { return op.getWriteCommandBase(); });
 }
 
 void BatchedCommandRequest::setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase) {
-    INVOKE(setWriteCommandBase, std::move(writeCommandBase));
+    return _visit([&](auto&& op) { op.setWriteCommandBase(std::move(writeCommandBase)); });
 }
 
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
-    switch (_batchType) {
-        case BatchedCommandRequest::BatchType_Insert:
-            getInsertRequest().serialize({}, builder);
-            break;
-        case BatchedCommandRequest::BatchType_Update:
-            getUpdateRequest().serialize({}, builder);
-            break;
-        case BatchedCommandRequest::BatchType_Delete:
-            getDeleteRequest().serialize({}, builder);
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-
+    _visit([&](auto&& op) { op.serialize({}, builder); });
     if (_shardVersion) {
         _shardVersion->appendForCommands(builder);
     }

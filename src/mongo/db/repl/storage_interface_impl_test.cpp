@@ -2559,6 +2559,24 @@ TEST_F(StorageInterfaceImplTest, GetCollectionCountReturnsCollectionCount) {
 }
 
 TEST_F(StorageInterfaceImplTest,
+       SetCollectionCountReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    NamespaceString nss("nosuchdb.coll");
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.setCollectionCount(opCtx, nss, 3));
+}
+
+TEST_F(StorageInterfaceImplTest,
+       SetCollectionCountReturnsNamespaceNotFoundWhenCollectionDoesNotExist) {
+    auto opCtx = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.setCollectionCount(opCtx, wrongColl, 3));
+}
+
+TEST_F(StorageInterfaceImplTest,
        GetCollectionSizeReturnsNamespaceNotFoundWhenDatabaseDoesNotExist) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

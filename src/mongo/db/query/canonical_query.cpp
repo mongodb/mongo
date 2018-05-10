@@ -221,13 +221,6 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _collator = std::move(collator);
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
-    _isIsolated = QueryRequest::isQueryIsolated(_qr->getFilter());
-    if (_isIsolated) {
-        RARELY {
-            warning() << "The $isolated/$atomic option is deprecated. See "
-                         "http://dochub.mongodb.org/core/isolated-deprecation";
-        }
-    }
 
     // Normalize, sort and validate tree.
     _root = MatchExpression::optimize(std::move(root));
@@ -285,11 +278,7 @@ bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
                 // But it can be BinData.
                 return false;
             }
-        } else if (elt.fieldName()[0] == '$' && (str::equals("$isolated", elt.fieldName()) ||
-                                                 str::equals("$atomic", elt.fieldName()))) {
-            // ok, passthrough
         } else {
-            // If the field is not _id, it must be $isolated/$atomic.
             return false;
         }
     }

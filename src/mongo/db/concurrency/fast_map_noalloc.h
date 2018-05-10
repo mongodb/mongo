@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <deque>
+
 #include "mongo/base/static_assert.h"
 #include "mongo/util/assert_util.h"
 
@@ -36,32 +38,52 @@ namespace mongo {
 /**
  * NOTE: This structure should not be used for anything other than the Lock Manager.
  *
- * This is a simple implementation of an unordered associative array with minimal
- * functionality, used by the lock manager. It keeps a small number of memory entries to store
- * values, in order to avoid memory allocations, which dominate the cost of the lock manager
- * calls by a wide margin.
+ * This is a simple implementation of an unordered associative array with minimal functionality,
+ * used by the lock manager. It keeps a small number of memory entries to store values, in order to
+ * avoid memory allocations, which dominate the cost of the lock manager calls by a wide margin.
  *
  * This class is not thread-safe.
+ *
+ * Note: this custom data structure is necessary because we need: fast memory access; to maintain
+ * all data pointer/reference validity when entries are added/removed; and to avoid costly and
+ * repetitive entry mallocs and frees.
  */
-template <class KeyType, class ValueType, int PreallocCount>
+template <class KeyType, class ValueType>
 class FastMapNoAlloc {
-public:
+private:
+    /**
+     * Map entry through which we avoid releasing memory: we mark it as inUse or not.
+     * Maps keys to values.
+     */
+    struct PreallocEntry {
+        bool inUse = false;
+
+        KeyType key;
+        ValueType value;
+    };
+
+    typedef typename std::deque<PreallocEntry> Container;
+
+    typedef typename Container::size_type size_type;
+
+    typedef typename Container::iterator map_iterator;
+
+    typedef typename Container::const_iterator const_map_iterator;
+
+
     /**
      * Forward-only iterator. Does not synchronize with the underlying collection in any way.
      * In other words, do not modify the collection while there is an open iterator on it.
      */
-    template <class MapType, class IteratorValueType>
+    template <class MapType, class IteratorValueType, class IteratorType>
     class IteratorImpl {
     public:
-        IteratorImpl(const IteratorImpl& other) : _map(other._map), _idx(other._idx) {}
-
-
         //
         // Operators
         //
 
-        bool operator!() const {
-            return finished();
+        operator bool() const {
+            return !finished();
         }
 
         IteratorValueType& operator*() const {
@@ -82,7 +104,7 @@ public:
          * can be used to determine whether a previous call to find has found something.
          */
         bool finished() const {
-            return (MONGO_unlikely(_idx == PreallocCount));
+            return (_it == _map._fastAccess.end());
         }
 
         /**
@@ -92,7 +114,7 @@ public:
         IteratorValueType* objAddr() const {
             invariant(!finished());
 
-            return &_map._fastAccess[_idx].value;
+            return &(_it->value);
         }
 
         /**
@@ -102,7 +124,7 @@ public:
         const KeyType& key() const {
             invariant(!finished());
 
-            return _map._fastAccess[_idx].key;
+            return _it->key;
         }
 
         /**
@@ -111,9 +133,8 @@ public:
          */
         void next() {
             invariant(!finished());
-
-            while (++_idx < PreallocCount) {
-                if (_map._fastAccess[_idx].inUse) {
+            while (++_it != _map._fastAccess.end()) {
+                if (_it->inUse) {
                     return;
                 }
             }
@@ -125,9 +146,9 @@ public:
          */
         void remove() {
             invariant(!finished());
-            invariant(_map._fastAccess[_idx].inUse);
+            invariant(_it->inUse);
 
-            _map._fastAccess[_idx].inUse = false;
+            _it->inUse = false;
             _map._fastAccessUsedSize--;
 
             next();
@@ -135,26 +156,31 @@ public:
 
 
     private:
-        friend class FastMapNoAlloc<KeyType, ValueType, PreallocCount>;
+        friend class FastMapNoAlloc<KeyType, ValueType>;
 
         // Used for iteration of the complete map
-        IteratorImpl(MapType& map) : _map(map), _idx(-1) {
-            next();
+        IteratorImpl(MapType& map) : _map(map), _it(map._fastAccess.begin()) {
+            while (_it != _map._fastAccess.end()) {
+                if (_it->inUse) {
+                    return;
+                }
+                ++_it;
+            }
         }
 
         // Used for iterator starting at a position
-        IteratorImpl(MapType& map, int idx) : _map(map), _idx(idx) {
-            invariant(_idx >= 0);
+        IteratorImpl(MapType& map, IteratorType it) : _map(map), _it(std::move(it)) {
+            invariant(_it != _map._fastAccess.end());
         }
 
         // Used for iteration starting at a particular key
-        IteratorImpl(MapType& map, const KeyType& key) : _map(map), _idx(0) {
-            while (_idx < PreallocCount) {
-                if (_map._fastAccess[_idx].inUse && (_map._fastAccess[_idx].key == key)) {
+        IteratorImpl(MapType& map, const KeyType& key) : _map(map), _it(_map._fastAccess.begin()) {
+            while (_it != _map._fastAccess.end()) {
+                if (_it->inUse && _it->key == key) {
                     return;
                 }
 
-                ++_idx;
+                ++_it;
             }
         }
 
@@ -162,41 +188,42 @@ public:
         // The map being iterated on
         MapType& _map;
 
-        // Index to the current entry being iterated
-        int _idx;
+        // Iterator on the map
+        IteratorType _it;
     };
 
+public:
+    typedef IteratorImpl<FastMapNoAlloc<KeyType, ValueType>, ValueType, map_iterator> Iterator;
 
-    typedef IteratorImpl<FastMapNoAlloc<KeyType, ValueType, PreallocCount>, ValueType> Iterator;
-
-    typedef IteratorImpl<const FastMapNoAlloc<KeyType, ValueType, PreallocCount>, const ValueType>
+    typedef IteratorImpl<const FastMapNoAlloc<KeyType, ValueType>,
+                         const ValueType,
+                         const_map_iterator>
         ConstIterator;
 
-
-    FastMapNoAlloc() : _fastAccess(), _fastAccessUsedSize(0) {}
+    FastMapNoAlloc() : _fastAccessUsedSize(0) {}
 
     /**
      * Inserts the specified entry in the map and returns a reference to the memory for the
      * entry just inserted.
      */
     Iterator insert(const KeyType& key) {
-        uassert(ErrorCodes::TooManyLocks,
-                "Operation requires too many locks",
-                _fastAccessUsedSize < PreallocCount);
+        if (_fastAccessUsedSize == _fastAccess.size()) {
+            // Place the new entry in the front so the below map iteration is faster.
+            _fastAccess.emplace_front();
+        }
 
-        // Find the first unused slot. This could probably be even further optimized by adding
-        // a field pointing to the first unused location.
-        int idx = 0;
-        for (; _fastAccess[idx].inUse; idx++)
-            ;
+        map_iterator it = _fastAccess.begin();
+        while (it != _fastAccess.end() && it->inUse) {
+            ++it;
+        }
 
-        invariant(idx < PreallocCount);
+        invariant(it != _fastAccess.end() && !(it->inUse));
 
-        _fastAccess[idx].inUse = true;
-        _fastAccess[idx].key = key;
-        _fastAccessUsedSize++;
+        it->inUse = true;
+        it->key = key;
+        ++_fastAccessUsedSize;
 
-        return Iterator(*this, idx);
+        return Iterator(*this, it);
     }
 
     /**
@@ -214,7 +241,7 @@ public:
      * Returns an iterator pointing to the first position, which has entry with the specified
      * key. Before dereferencing the returned iterator, it should be checked for validity using
      * the finished() method or the ! operator. If no element was found, finished() will return
-     * false.
+     * true.
      *
      * While it is allowed to call next() on the returned iterator, this is not very useful,
      * because the container is not ordered.
@@ -227,7 +254,7 @@ public:
         return ConstIterator(*this, key);
     }
 
-    int size() const {
+    size_t size() const {
         return _fastAccessUsedSize;
     }
     bool empty() const {
@@ -235,30 +262,12 @@ public:
     }
 
 private:
-    // Empty and very large maps do not make sense since there will be no performance gain, so
-    // disallow them.
-    MONGO_STATIC_ASSERT(PreallocCount > 0);
-    MONGO_STATIC_ASSERT(PreallocCount < 32);
+    // We chose a deque data structure because it maintains the validity of existing
+    // pointers/references to its contents when it allocates more memory. Deque also gives us O(1)
+    // emplace_front() in insert().
+    std::deque<PreallocEntry> _fastAccess;
 
-    // Iterator accesses the map directly
-    friend class IteratorImpl<FastMapNoAlloc<KeyType, ValueType, PreallocCount>, ValueType>;
-
-    friend class IteratorImpl<const FastMapNoAlloc<KeyType, ValueType, PreallocCount>,
-                              const ValueType>;
-
-
-    struct PreallocEntry {
-        PreallocEntry() : inUse(false) {}
-
-        bool inUse;
-
-        KeyType key;
-        ValueType value;
-    };
-
-    // Pre-allocated memory for entries
-    PreallocEntry _fastAccess[PreallocCount];
-    int _fastAccessUsedSize;
+    size_type _fastAccessUsedSize;
 };
 
 }  // namespace mongo

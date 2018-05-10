@@ -40,10 +40,10 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {

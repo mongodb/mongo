@@ -467,25 +467,23 @@ static int
 __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	uint64_t maxleafpage, required;
 	const char *cfg[] = { WT_CONFIG_BASE(
 	    session, WT_SESSION_create), lsm_tree->file_config, NULL };
 
+	conn = S2C(session);
+
 	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
 	maxleafpage = (uint64_t)cval.val;
 
-	/*
-	 * Three chunks, plus one page for each participant in up to three
-	 * concurrent merges.
-	 */
-	required = 3 * lsm_tree->chunk_size +
-	    3 * (lsm_tree->merge_max * maxleafpage);
-	if (S2C(session)->cache_size < required)
+	required = WT_LSM_TREE_MINIMUM_SIZE(
+	    lsm_tree->chunk_size, lsm_tree->merge_max, maxleafpage);
+	if (conn->cache_size < required)
 		WT_RET_MSG(session, EINVAL,
 		    "LSM cache size %" PRIu64 " (%" PRIu64 "MB) too small, "
 		    "must be at least %" PRIu64 " (%" PRIu64 "MB)",
-		    S2C(session)->cache_size,
-		    S2C(session)->cache_size / WT_MEGABYTE,
+		    conn->cache_size, conn->cache_size / WT_MEGABYTE,
 		    required, (required + (WT_MEGABYTE - 1))/ WT_MEGABYTE);
 	return (0);
 }
@@ -911,8 +909,7 @@ __wt_lsm_tree_drop(
 	int tret;
 	bool locked;
 
-	locked = false;
-	WT_NOT_READ(locked);
+	WT_NOT_READ(locked, false);
 
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, name, true, &lsm_tree));
@@ -971,8 +968,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	bool locked;
 
 	old = NULL;
-	locked = false;
-	WT_NOT_READ(locked);
+	WT_NOT_READ(locked, false);
 
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, olduri, true, &lsm_tree));
@@ -1043,8 +1039,7 @@ __wt_lsm_tree_truncate(
 	WT_UNUSED(cfg);
 
 	chunk = NULL;
-	locked = false;
-	WT_NOT_READ(locked);
+	WT_NOT_READ(locked, false);
 
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, name, true, &lsm_tree));
@@ -1382,8 +1377,8 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	u_int i;
 	bool exclusive, locked, need_release;
 
-	locked = need_release = false;
-	WT_NOT_READ(locked);
+	WT_NOT_READ(locked, false);
+	WT_NOT_READ(need_release, false);
 	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE);
 
 	WT_RET(__wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));

@@ -176,9 +176,18 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
-    virtual StatusWith<Timestamp> recoverToStableTimestamp() override;
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
     virtual boost::optional<Timestamp> getRecoveryTimestamp() const override;
+
+    /**
+     * Returns a timestamp value that is at or before the last checkpoint. Everything before this
+     * value is guaranteed to be persisted on disk and replication recovery will not need to
+     * replay documents with an earlier time.
+     */
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp() const override;
+
+    virtual Timestamp getAllCommittedTimestamp(OperationContext* opCtx) const override;
 
     bool supportsReadConcernSnapshot() const final;
 
@@ -281,6 +290,7 @@ private:
 
     bool _durable;
     bool _ephemeral;
+    const bool _inRepairMode;
     bool _readOnly;
     std::unique_ptr<WiredTigerJournalFlusher> _journalFlusher;  // Depends on _sizeStorer
     std::unique_ptr<WiredTigerCheckpointThread> _checkpointThread;
@@ -295,5 +305,6 @@ private:
     mutable Date_t _previousCheckedDropsQueued;
 
     std::unique_ptr<WiredTigerSession> _backupSession;
+    Timestamp _recoveryTimestamp;
 };
 }

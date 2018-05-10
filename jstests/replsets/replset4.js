@@ -9,7 +9,7 @@ doTest = function(signal) {
     var master = replTest.getPrimary();
 
     // Kill both slaves, simulating a network partition
-    var slaves = replTest.liveNodes.slaves;
+    var slaves = replTest._slaves;
     for (var i = 0; i < slaves.length; i++) {
         var slave_id = replTest.getNodeId(slaves[i]);
         replTest.stop(slave_id);

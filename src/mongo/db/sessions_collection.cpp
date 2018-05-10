@@ -56,6 +56,14 @@ namespace {
 // comfortably be able to stay under, even with 10k user names.
 constexpr size_t kMaxBatchSize = 1000;
 
+// Used to refresh or remove items from the session collection with write
+// concern majority
+const BSONObj kMajorityWriteConcern = WriteConcernOptions(WriteConcernOptions::kMajority,
+                                                          WriteConcernOptions::SyncMode::UNSET,
+                                                          Seconds(15))
+                                          .toBSON();
+
+
 BSONObj lsidQuery(const LogicalSessionId& lsid) {
     return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
 }
@@ -149,13 +157,8 @@ Status runBulkCmd(StringData label,
 
 }  // namespace
 
-
-constexpr StringData SessionsCollection::kSessionsDb;
-constexpr StringData SessionsCollection::kSessionsCollection;
-constexpr StringData SessionsCollection::kSessionsFullNS;
 const NamespaceString SessionsCollection::kSessionsNamespaceString =
-    NamespaceString{SessionsCollection::kSessionsFullNS};
-
+    NamespaceString(NamespaceString::kConfigDb, "system.sessions");
 
 SessionsCollection::~SessionsCollection() = default;
 
@@ -214,6 +217,7 @@ Status SessionsCollection::doRefresh(const NamespaceString& ns,
         batch->append("update", ns.coll());
         batch->append("ordered", false);
         batch->append("allowImplicitCollectionCreation", false);
+        batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern);
     };
 
     auto add = [](BSONArrayBuilder* entries, const LogicalSessionRecord& record) {
@@ -248,6 +252,7 @@ Status SessionsCollection::doRemove(const NamespaceString& ns,
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("delete", ns.coll());
         batch->append("ordered", false);
+        batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern);
     };
 
     auto add = [](BSONArrayBuilder* builder, const LogicalSessionId& lsid) {
@@ -328,7 +333,7 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
     indexes.push_back(std::move(index));
 
     CreateIndexesCmd createIndexes;
-    createIndexes.setCreateIndexes(kSessionsCollection.toString());
+    createIndexes.setCreateIndexes(kSessionsNamespaceString.coll());
     createIndexes.setIndexes(std::move(indexes));
 
     return createIndexes.toBSON();

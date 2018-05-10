@@ -135,6 +135,8 @@ TEST_F(FreshnessCheckerTest, TwoNodes) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -179,6 +181,8 @@ TEST_F(FreshnessCheckerTest, ShuttingDown) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -204,6 +208,8 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -257,6 +263,8 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTime) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -306,6 +314,8 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponse) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -358,6 +368,8 @@ TEST_F(FreshnessCheckerTest, ElectVetoed) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -422,6 +434,8 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -481,6 +495,8 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTimeManyNodes
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -555,6 +571,8 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponseManyNodes) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -617,6 +635,8 @@ TEST_F(FreshnessCheckerTest, ElectVetoedManyNodes) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -678,6 +698,8 @@ TEST_F(FreshnessCheckerTest, ElectVetoedAndTiedFreshnessManyNodes) {
     ReplSetConfig config = assertMakeRSConfig(BSON("_id"
                                                    << "rs0"
                                                    << "version"
+                                                   << 1
+                                                   << "protocolVersion"
                                                    << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
@@ -757,6 +779,8 @@ TEST_F(FreshnessCheckerTest, ElectManyNodesNotAllRespond) {
                                                    << "rs0"
                                                    << "version"
                                                    << 1
+                                                   << "protocolVersion"
+                                                   << 1
                                                    << "members"
                                                    << BSON_ARRAY(BSON("_id" << 1 << "host"
                                                                             << "h0")
@@ -822,6 +846,8 @@ public:
             .initialize(BSON("_id"
                              << "rs0"
                              << "version"
+                             << 1
+                             << "protocolVersion"
                              << 1
                              << "members"
                              << BSON_ARRAY(BSON("_id" << 0 << "host"

@@ -25,6 +25,7 @@ def build_cpp_integration_test(env, target, source, **kwargs):
     libdeps.append( '$BUILD_DIR/mongo/unittest/integration_test_main' )
 
     kwargs['LIBDEPS'] = libdeps
+    kwargs['INSTALL_ALIAS'] = ['tests']
 
     result = env.Program(target, source, **kwargs)
     env.RegisterIntegrationTest(result[0])

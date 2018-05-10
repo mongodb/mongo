@@ -81,28 +81,22 @@ public:
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* opCtx);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* opCtx);
+    virtual void killAllTransactionCursors(OperationContext* opCtx);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(const OpTime& newCommitPoint);
+    virtual void updateLocalSnapshot(const OpTime& optime);
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
+    boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                          MultiApplier::Operations ops,
-                                          MultiApplier::ApplyOperationFn applyOperation) override;
-    virtual Status multiInitialSyncApply(OperationContext* opCtx,
-                                         MultiApplier::OperationPtrs* ops,
-                                         const HostAndPort& source,
-                                         AtomicUInt32* fetchCount,
-                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
+    OplogApplier::BatchLimits getInitialSyncBatchLimits() const final;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

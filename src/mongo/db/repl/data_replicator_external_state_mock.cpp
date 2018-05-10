@@ -39,14 +39,10 @@ namespace repl {
 DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
     : multiApplyFn([](OperationContext*,
                       const MultiApplier::Operations& ops,
-                      MultiApplier::ApplyOperationFn) { return ops.back().getOpTime(); }) {}
+                      OplogApplier::Observer*) { return ops.back().getOpTime(); }) {}
 
 executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const {
     return taskExecutor;
-}
-
-ThreadPool* DataReplicatorExternalStateMock::getDbWorkThreadPool() const {
-    return dbWorkThreadPool;
 }
 
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
@@ -85,25 +81,33 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOpl
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
+StatusWith<OplogApplier::Operations> DataReplicatorExternalStateMock::getNextApplierBatch(
+    OperationContext* opCtx, OplogBuffer* oplogBuffer, const OplogApplier::BatchLimits&) {
+    OplogApplier::Operations ops;
+    OplogBuffer::Value op;
+    // For testing only. Return a single batch containing all of the operations in the oplog buffer.
+    while (oplogBuffer->tryPop(opCtx, &op)) {
+        OplogEntry entry(op);
+        // The "InitialSyncerPassesThroughGetNextApplierBatchInLockError" test case expects
+        // ErrorCodes::BadValue on an unexpected oplog entry version.
+        if (entry.getVersion() != OplogEntry::kOplogVersion) {
+            return {ErrorCodes::BadValue, ""};
+        }
+        ops.push_back(entry);
+    }
+    return std::move(ops);
+}
+
 StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
     return replSetConfigResult;
 }
 
-StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
-    OperationContext* opCtx,
-    MultiApplier::Operations ops,
-    MultiApplier::ApplyOperationFn applyOperation) {
-    return multiApplyFn(opCtx, std::move(ops), applyOperation);
-}
-
-Status DataReplicatorExternalStateMock::_multiInitialSyncApply(
-    OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
-    const HostAndPort& source,
-    AtomicUInt32* fetchCount,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-
-    return multiInitialSyncApplyFn(opCtx, ops, source, fetchCount, workerMultikeyPathInfo);
+StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(OperationContext* opCtx,
+                                                                MultiApplier::Operations ops,
+                                                                OplogApplier::Observer* observer,
+                                                                const HostAndPort& source,
+                                                                ThreadPool* writerPool) {
+    return multiApplyFn(opCtx, std::move(ops), observer);
 }
 
 }  // namespace repl

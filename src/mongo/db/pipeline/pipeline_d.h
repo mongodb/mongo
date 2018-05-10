@@ -98,9 +98,8 @@ public:
         Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                             Pipeline* pipeline) final;
         std::string getShardName(OperationContext* opCtx) const final;
-        std::vector<FieldPath> collectDocumentKeyFields(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        UUID uuid) const final;
+        std::pair<std::vector<FieldPath>, bool> collectDocumentKeyFields(OperationContext* opCtx,
+                                                                         UUID uuid) const final;
         boost::optional<Document> lookupSingleDocument(
             const boost::intrusive_ptr<ExpressionContext>& expCtx,
             const NamespaceString& nss,
@@ -114,6 +113,10 @@ public:
         BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                           Client* client,
                                           CurrentOpTruncateMode truncateOps) const final;
+
+        void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                              CurrentOpUserMode userMode,
+                                              std::vector<BSONObj>* ops) const final;
 
     private:
         /**

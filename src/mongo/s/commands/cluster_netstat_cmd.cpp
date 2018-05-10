@@ -40,37 +40,36 @@ class NetStatCmd : public BasicCommand {
 public:
     NetStatCmd() : BasicCommand("netstat") {}
 
+    std::string help() const override {
+        return "Shows status/reachability of servers in the cluster";
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    std::string help() const override {
-        return " shows status/reachability of servers in the cluster";
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::netstat);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result.append("configserver",
-                      grid.shardRegistry()->getConfigServerConnectionString().toString());
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+        result.append("configserver", shardRegistry->getConfigServerConnectionString().toString());
         result.append("isdbgrid", 1);
         return true;
     }

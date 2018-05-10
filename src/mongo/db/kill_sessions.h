@@ -94,6 +94,12 @@ KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
                                                       const KillAllSessionsUser& user);
 
 /**
+ * Constructs a KillAllSessionsByPatternSet, each element of which matches the UID of a user that is
+ * currently authenticated on the given connection.
+ */
+KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationContext* opCtx);
+
+/**
  * Constructs a kill sessions pattern for a particular logical session
  */
 KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,

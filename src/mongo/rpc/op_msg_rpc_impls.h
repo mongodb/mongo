@@ -28,9 +28,9 @@
 
 #pragma once
 
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/util/net/op_msg.h"
 
 namespace mongo {
 namespace rpc {

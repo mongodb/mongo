@@ -241,8 +241,6 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);
 
-    virtual Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) override;
-
     virtual void dropAllSnapshots() override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
@@ -285,6 +283,8 @@ public:
     }
 
     virtual Status abortCatchupIfNeeded() override;
+
+    void signalDropPendingCollectionsRemovedFromStorage() final;
 
 private:
     AtomicUInt64 _snapshotNameGenerator;

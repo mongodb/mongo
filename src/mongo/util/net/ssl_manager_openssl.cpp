@@ -55,7 +55,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/private/ssl_expiration.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -76,14 +75,6 @@
 namespace mongo {
 
 namespace {
-
-std::string removeFQDNRoot(std::string name) {
-    if (name.back() == '.') {
-        name.pop_back();
-    }
-    return name;
-};
-
 
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
@@ -375,7 +366,7 @@ private:
      * Given an error code from an SSL-type IO function, logs an
      * appropriate message and throws a NetworkException.
      */
-    MONGO_COMPILER_NORETURN void _handleSSLError(int code, int ret);
+    MONGO_COMPILER_NORETURN void _handleSSLError(SSLConnectionOpenSSL* conn, int ret);
 
     /*
      * Init the SSL context using parameters provided in params. This SSL context will
@@ -627,7 +618,7 @@ int SSLManagerOpenSSL::SSL_read(SSLConnectionInterface* connInterface, void* buf
     } while (!_doneWithSSLOp(conn, status));
 
     if (status <= 0)
-        _handleSSLError(SSL_get_error(conn->ssl, status), status);
+        _handleSSLError(conn, status);
     return status;
 }
 
@@ -639,7 +630,7 @@ int SSLManagerOpenSSL::SSL_write(SSLConnectionInterface* connInterface, const vo
     } while (!_doneWithSSLOp(conn, status));
 
     if (status <= 0)
-        _handleSSLError(SSL_get_error(conn->ssl, status), status);
+        _handleSSLError(conn, status);
     return status;
 }
 
@@ -651,7 +642,7 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     } while (!_doneWithSSLOp(conn, status));
 
     if (status < 0)
-        _handleSSLError(SSL_get_error(conn->ssl, status), status);
+        _handleSSLError(conn, status);
     return status;
 }
 
@@ -1190,14 +1181,14 @@ SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
     int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
     if (ret != 1)
-        _handleSSLError(SSL_get_error(sslConn.get()->ssl, ret), ret);
+        _handleSSLError(sslConn.get(), ret);
 
     do {
         ret = ::SSL_connect(sslConn->ssl);
     } while (!_doneWithSSLOp(sslConn.get(), ret));
 
     if (ret != 1)
-        _handleSSLError(SSL_get_error(sslConn.get()->ssl, ret), ret);
+        _handleSSLError(sslConn.get(), ret);
 
     return sslConn.release();
 }
@@ -1214,7 +1205,7 @@ SSLConnectionInterface* SSLManagerOpenSSL::accept(Socket* socket,
     } while (!_doneWithSSLOp(sslConn.get(), ret));
 
     if (ret != 1)
-        _handleSSLError(SSL_get_error(sslConn.get()->ssl, ret), ret);
+        _handleSSLError(sslConn.get(), ret);
 
     return sslConn.release();
 }
@@ -1244,6 +1235,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeer
         if (_allowInvalidCertificates) {
             warning() << "SSL peer certificate validation failed: "
                       << X509_verify_cert_error_string(result);
+            return {boost::none};
         } else {
             str::stream msg;
             msg << "SSL peer certificate validation failed: "
@@ -1379,7 +1371,8 @@ std::string SSLManagerInterface::getSSLErrorMessage(int code) {
     return msg;
 }
 
-void SSLManagerOpenSSL::_handleSSLError(int code, int ret) {
+void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
+    int code = SSL_get_error(conn->ssl, ret);
     int err = ERR_get_error();
 
     switch (code) {
@@ -1416,25 +1409,7 @@ void SSLManagerOpenSSL::_handleSSLError(int code, int ret) {
             error() << "unrecognized SSL error";
             break;
     }
+    _flushNetworkBIO(conn);
     throwSocketError(SocketErrorKind::CONNECT_ERROR, "");
 }
 }  // namespace mongo
-
-// TODO SERVER-11601 Use NFC Unicode canonicalization
-bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
-    nameToMatch = removeFQDNRoot(std::move(nameToMatch));
-    certHostName = removeFQDNRoot(std::move(certHostName));
-
-    if (certHostName.size() < 2) {
-        return false;
-    }
-
-    // match wildcard DNS names
-    if (certHostName[0] == '*' && certHostName[1] == '.') {
-        // allow name.example.com if the cert is *.example.com, '*' does not match '.'
-        const char* subName = strchr(nameToMatch.c_str(), '.');
-        return subName && !strcasecmp(certHostName.c_str() + 1, subName);
-    } else {
-        return !strcasecmp(nameToMatch.c_str(), certHostName.c_str());
-    }
-}

@@ -34,7 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/util/password_digest.h"
 
 using mongo::executor::RemoteCommandRequest;

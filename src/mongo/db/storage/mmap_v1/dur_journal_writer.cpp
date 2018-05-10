@@ -259,22 +259,22 @@ void JournalWriter::_journalWriterThread() {
         }
     } catch (const DBException& e) {
         severe() << "dbexception in journalWriterThread causing immediate shutdown: " << redact(e);
-        invariant(false);
+        MONGO_UNREACHABLE;
     } catch (const std::ios_base::failure& e) {
         severe() << "ios_base exception in journalWriterThread causing immediate shutdown: "
                  << e.what();
-        invariant(false);
+        MONGO_UNREACHABLE;
     } catch (const std::bad_alloc& e) {
         severe() << "bad_alloc exception in journalWriterThread causing immediate shutdown: "
                  << e.what();
-        invariant(false);
+        MONGO_UNREACHABLE;
     } catch (const std::exception& e) {
         severe() << "exception in journalWriterThread causing immediate shutdown: "
                  << redact(e.what());
-        invariant(false);
+        MONGO_UNREACHABLE;
     } catch (...) {
         severe() << "unhandled exception in journalWriterThread causing immediate shutdown";
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     log() << "Journal writer thread stopped";

@@ -72,7 +72,7 @@ load("jstests/replsets/rslib.js");
     var master = rs.getPrimary();
     rs.awaitSecondaryNodes();
     var mId = rs.getNodeId(master);
-    var slave = rs.liveNodes.slaves[0];
+    var slave = rs._slaves[0];
     assert.eq(1, master.getDB("admin").auth("foo", "bar"));
     assert.writeOK(master.getDB("test").foo.insert(
         {x: 1}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));

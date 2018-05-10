@@ -1,15 +1,20 @@
-// Test DBCollection.watch() shell helper and its options.
-
+// Test change streams related shell helpers and options passed to them. Note that, while we only
+// call the DBCollection.watch helper in this file, it will be redirected to the DB.watch or
+// Mongo.watch equivalents in the whole_db and whole_cluster passthroughs.
 (function() {
     "use strict";
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     const coll = assertDropAndRecreateCollection(db, "change_stream_shell_helper");
 
     function checkNextChange(cursor, expected) {
         assert.soon(() => cursor.hasNext());
-        assert.docEq(cursor.next(), expected);
+        const nextObj = cursor.next();
+        delete nextObj._id;
+        delete nextObj.clusterTime;
+        assert.docEq(nextObj, expected);
     }
 
     function testCommandIsCalled(testFunc, checkFunc) {
@@ -38,12 +43,18 @@
     }
 
     jsTestLog("Testing watch() without options");
-    let cursor = coll.watch();
-    assert(!cursor.hasNext());
+    let changeStreamCursor = coll.watch();
+
+    assert(!changeStreamCursor.hasNext());
+
+    // Write the first document into the collection. We will save the resume token from this change.
     assert.writeOK(coll.insert({_id: 0, x: 1}));
-    assert.soon(() => cursor.hasNext());
-    let change = cursor.next();
-    assert(!cursor.hasNext());
+    let resumeToken;
+
+    // Test that each of the change stream cursors picks up the change.
+    assert.soon(() => changeStreamCursor.hasNext());
+    let change = changeStreamCursor.next();
+    assert(!changeStreamCursor.hasNext());
     let expected = {
         documentKey: {_id: 0},
         fullDocument: {_id: 0, x: 1},
@@ -52,22 +63,35 @@
     };
     assert("_id" in change, "Got unexpected change: " + tojson(change));
     // Remember the _id of the first op to resume the stream.
-    const resumeToken = change._id;
+    resumeToken = change._id;
+    // Remove the fields we cannot predict, then test that the change is as expected.
     delete change._id;
+    delete change.clusterTime;
     assert.docEq(change, expected);
 
     jsTestLog("Testing watch() with pipeline");
-    cursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
-    assert.writeOK(coll.insert({_id: 1, x: 1}));
-    checkNextChange(cursor, {docId: 1});
+    changeStreamCursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}]);
+
+    // Store the cluster time of the insert as the timestamp to start from.
+    const resumeTime =
+        assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: 1, x: 1}]}))
+            .$clusterTime.clusterTime;
+
+    checkNextChange(changeStreamCursor, {docId: 1});
 
     jsTestLog("Testing watch() with pipeline and resumeAfter");
-    cursor =
+    changeStreamCursor =
         coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
-    checkNextChange(cursor, {docId: 1});
+    checkNextChange(changeStreamCursor, {docId: 1});
+
+    jsTestLog("Testing watch() with pipeline and startAtClusterTime");
+    changeStreamCursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],
+                                    {startAtClusterTime: {ts: resumeTime}});
+    checkNextChange(changeStreamCursor, {docId: 1});
 
     jsTestLog("Testing watch() with updateLookup");
-    cursor = coll.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
+    changeStreamCursor = coll.watch([{$project: {_id: 0}}], {fullDocument: "updateLookup"});
+
     assert.writeOK(coll.update({_id: 0}, {$set: {x: 10}}));
     expected = {
         documentKey: {_id: 0},
@@ -76,13 +100,12 @@
         operationType: "update",
         updateDescription: {removedFields: [], updatedFields: {x: 10}},
     };
-    checkNextChange(cursor, expected);
+    checkNextChange(changeStreamCursor, expected);
 
     jsTestLog("Testing watch() with batchSize");
     // Only test mongod because mongos uses batch size 0 for aggregate commands internally to
-    // establish cursors quickly.
-    // GetMore on mongos doesn't respect batch size either due to SERVER-31992.
-    const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    // establish cursors quickly. GetMore on mongos doesn't respect batch size due to SERVER-31992.
+    const isMongos = FixtureHelpers.isMongos(db);
     if (!isMongos) {
         // Increase a field by 5 times and verify the batch size is respected.
         for (let i = 0; i < 5; i++) {
@@ -90,47 +113,43 @@
         }
 
         // Only watch the "update" changes of the specific doc since the beginning.
-        cursor = coll.watch(
+        changeStreamCursor = coll.watch(
             [{$match: {documentKey: {_id: 1}, operationType: "update"}}, {$project: {_id: 0}}],
             {resumeAfter: resumeToken, batchSize: 2});
 
         // Check the first batch.
-        assert.eq(cursor.objsLeftInBatch(), 2);
+        assert.eq(changeStreamCursor.objsLeftInBatch(), 2);
         // Consume the first batch.
-        assert(cursor.hasNext());
-        cursor.next();
-        assert(cursor.hasNext());
-        cursor.next();
-        assert.eq(cursor.objsLeftInBatch(), 0);
+        assert(changeStreamCursor.hasNext());
+        changeStreamCursor.next();
+        assert(changeStreamCursor.hasNext());
+        changeStreamCursor.next();
+        // Confirm that the batch is empty.
+        assert.eq(changeStreamCursor.objsLeftInBatch(), 0);
 
         // Check the batch returned by getMore.
-        assert(cursor.hasNext());
-        assert.eq(cursor.objsLeftInBatch(), 2);
-        cursor.next();
-        assert(cursor.hasNext());
-        cursor.next();
-        assert.eq(cursor.objsLeftInBatch(), 0);
+        assert(changeStreamCursor.hasNext());
+        assert.eq(changeStreamCursor.objsLeftInBatch(), 2);
+        changeStreamCursor.next();
+        assert(changeStreamCursor.hasNext());
+        changeStreamCursor.next();
+        assert.eq(changeStreamCursor.objsLeftInBatch(), 0);
         // There are more changes coming, just not in the batch.
-        assert(cursor.hasNext());
+        assert(changeStreamCursor.hasNext());
     }
 
     jsTestLog("Testing watch() with maxAwaitTimeMS");
-    cursor = coll.watch([], {maxAwaitTimeMS: 500});
-    testCommandIsCalled(
-        function() {
-            assert(!cursor.hasNext());
-        },
-        function(cmdObj) {
-            assert.eq("getMore",
-                      Object.keys(cmdObj)[0],
-                      "expected getMore command, but was: " + tojson(cmdObj));
-            assert(cmdObj.hasOwnProperty("maxTimeMS"),
-                   "unexpected getMore command: " + tojson(cmdObj));
-            assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
-        });
+    changeStreamCursor = coll.watch([], {maxAwaitTimeMS: 500});
+    testCommandIsCalled(() => assert(!changeStreamCursor.hasNext()), (cmdObj) => {
+        assert.eq("getMore",
+                  Object.keys(cmdObj)[0],
+                  "expected getMore command, but was: " + tojson(cmdObj));
+        assert(cmdObj.hasOwnProperty("maxTimeMS"), "unexpected getMore command: " + tojson(cmdObj));
+        assert.eq(500, cmdObj.maxTimeMS, "unexpected getMore command: " + tojson(cmdObj));
+    });
 
     jsTestLog("Testing the cursor gets closed when the collection gets dropped");
-    cursor = coll.watch([{$project: {_id: 0}}]);
+    changeStreamCursor = coll.watch([{$project: {_id: 0, clusterTime: 0}}]);
     assert.writeOK(coll.insert({_id: 2, x: 1}));
     expected = {
         documentKey: {_id: 2},
@@ -138,17 +157,19 @@
         ns: {db: "test", coll: coll.getName()},
         operationType: "insert",
     };
-    checkNextChange(cursor, expected);
-    assert(!cursor.hasNext());
-    assert(!cursor.isClosed());
-    assert(!cursor.isExhausted());
+    checkNextChange(changeStreamCursor, expected);
+    assert(!changeStreamCursor.hasNext());
+    assert(!changeStreamCursor.isClosed());
+    assert(!changeStreamCursor.isExhausted());
+
+    // Dropping the collection should invalidate any open change streams.
     assertDropCollection(db, coll.getName());
-    assert.soon(() => cursor.hasNext());
-    assert(cursor.isClosed());
-    assert(!cursor.isExhausted());
+    assert.soon(() => changeStreamCursor.hasNext());
+    assert(changeStreamCursor.isClosed());
+    assert(!changeStreamCursor.isExhausted());
     expected = {operationType: "invalidate"};
-    checkNextChange(cursor, expected);
-    assert(!cursor.hasNext());
-    assert(cursor.isClosed());
-    assert(cursor.isExhausted());
+    checkNextChange(changeStreamCursor, expected);
+    assert(!changeStreamCursor.hasNext());
+    assert(changeStreamCursor.isClosed());
+    assert(changeStreamCursor.isExhausted());
 }());

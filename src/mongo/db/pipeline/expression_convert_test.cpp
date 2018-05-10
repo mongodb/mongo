@@ -209,44 +209,6 @@ TEST_F(ExpressionConvertTest, NonStringNonNumericalTypeFails) {
                              });
 }
 
-TEST_F(ExpressionConvertTest, IllegalTargetTypeFails) {
-    auto expCtx = getExpCtx();
-
-    std::vector<std::string> illegalTargetTypes{"minKey",
-                                                "object",
-                                                "array",
-                                                "binData",
-                                                "undefined",
-                                                "null",
-                                                "regex",
-                                                "dbPointer",
-                                                "javascript",
-                                                "symbol",
-                                                "javascriptWithScope",
-                                                "timestamp",
-                                                "maxKey"};
-
-    // Attempt a conversion with each illegal type.
-    for (auto&& typeName : illegalTargetTypes) {
-        auto spec = BSON("$convert" << BSON("input"
-                                            << "$path1"
-                                            << "to"
-                                            << Value(typeName)
-                                            << "onError"
-                                            << 0));
-
-        auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-
-        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document()),
-                                 AssertionException,
-                                 [](const AssertionException& exception) {
-                                     ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
-                                     ASSERT_STRING_CONTAINS(exception.reason(),
-                                                            "$convert with unsupported 'to' type");
-                                 });
-    }
-}
-
 TEST_F(ExpressionConvertTest, InvalidNumericTargetTypeFails) {
     auto expCtx = getExpCtx();
 
@@ -293,10 +255,12 @@ TEST_F(ExpressionConvertTest, NegativeNumericTargetTypeFails) {
         });
 }
 
-TEST_F(ExpressionConvertTest, UnsupportedConversionFails) {
+TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvided) {
     auto expCtx = getExpCtx();
 
     std::vector<std::pair<Value, std::string>> unsupportedConversions{
+        // Except for the ones listed below, $convert supports all conversions between the supported
+        // types: double, string, int, long, decimal, objectId, bool, int, and date.
         {Value(OID()), "double"},
         {Value(OID()), "int"},
         {Value(OID()), "long"},
@@ -305,9 +269,27 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionFails) {
         {Value(Date_t{}), "int"},
         {Value(int{1}), "date"},
         {Value(true), "date"},
+
+        // All conversions that involve any other type will fail, unless the target type is bool,
+        // in which case the conversion results in a true value. Below is one conversion for each
+        // of the unsupported types.
+        {Value(1.0), "minKey"},
+        {Value(1.0), "missing"},
+        {Value(1.0), "object"},
+        {Value(1.0), "array"},
+        {Value(1.0), "binData"},
+        {Value(1.0), "undefined"},
+        {Value(1.0), "null"},
+        {Value(1.0), "regex"},
+        {Value(1.0), "dbPointer"},
+        {Value(1.0), "javascript"},
+        {Value(1.0), "symbol"},
+        {Value(1.0), "javascriptWithScope"},
+        {Value(1.0), "timestamp"},
+        {Value(1.0), "maxKey"},
     };
 
-    // Attempt every possible unsupported conversion.
+    // Attempt all of the unsupported conversions listed above.
     for (auto conversion : unsupportedConversions) {
         auto inputValue = conversion.first;
         auto targetTypeName = conversion.second;
@@ -317,17 +299,36 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionFails) {
                                             << "to"
                                             << Value(targetTypeName)));
 
-        Document intInput{{"path1", inputValue}};
+        Document input{{"path1", inputValue}};
 
         auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(intInput),
+        ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(input),
                                  AssertionException,
                                  [](const AssertionException& exception) {
                                      ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
                                      ASSERT_STRING_CONTAINS(exception.reason(),
                                                             "Unsupported conversion");
                                  });
+    }
+
+    // Attempt them again, this time with an "onError" value.
+    for (auto conversion : unsupportedConversions) {
+        auto inputValue = conversion.first;
+        auto targetTypeName = conversion.second;
+
+        auto spec = BSON("$convert" << BSON("input"
+                                            << "$path1"
+                                            << "to"
+                                            << Value(targetTypeName)
+                                            << "onError"
+                                            << "X"));
+
+        Document input{{"path1", inputValue}};
+
+        auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+        ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(input), "X"_sd, BSONType::String);
     }
 }
 

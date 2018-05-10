@@ -68,10 +68,10 @@ public:
         if (id.missing()) {
             ResumeTokenData tokenData;
             tokenData.clusterTime = ts;
-            return ResumeToken(tokenData).toDocument();
+            return ResumeToken(tokenData).toDocument(ResumeToken::SerializationFormat::kHexString);
         }
-        return ResumeToken(ResumeTokenData(ts, Value(Document{{"_id", id}}), testUuid()))
-            .toDocument();
+        return ResumeToken(ResumeTokenData(ts, 0, 0, Value(Document{{"_id", id}}), testUuid()))
+            .toDocument(ResumeToken::SerializationFormat::kHexString);
     }
 };
 
@@ -119,7 +119,11 @@ public:
         UUID collectionUUID,
         const Document& documentKey,
         boost::optional<BSONObj> readConcern) {
-        auto swPipeline = makePipeline({BSON("$match" << documentKey)}, expCtx);
+        // The namespace 'nss' may be different than the namespace on the ExpressionContext in the
+        // case of a change stream on a whole database so we need to make a copy of the
+        // ExpressionContext with the new namespace.
+        auto foreignExpCtx = expCtx->copyWith(nss, collectionUUID, boost::none);
+        auto swPipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
         if (swPipeline == ErrorCodes::NamespaceNotFound) {
             return boost::none;
         }
@@ -146,7 +150,7 @@ private:
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyOnUpdate) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "documentKey" field.
@@ -168,7 +172,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationType) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
@@ -190,7 +194,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
@@ -212,7 +216,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
@@ -234,7 +238,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatchPipeline) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with a document without a "ns" field.
@@ -253,10 +257,65 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
 }
 
+TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDatabaseMismatchOnCollectionlessNss) {
+    auto expCtx = getExpCtx();
+
+    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("test");
+
+    // Set up the lookup change post image stage.
+    auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
+
+    // Mock its input with a document without a "ns" field.
+    auto mockLocalSource = DocumentSourceMock::create(
+        Document{{"_id", makeResumeToken(0)},
+                 {"documentKey", Document{{"_id", 0}}},
+                 {"operationType", "update"_sd},
+                 {"ns", Document{{"db", "DIFFERENT"_sd}, {"coll", "irrelevant"_sd}}}});
+
+    lookupChangeStage->setSource(mockLocalSource.get());
+
+    // Mock out the foreign collection.
+    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
+
+    ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
+}
+
+TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPassIfDatabaseMatchesOnCollectionlessNss) {
+    auto expCtx = getExpCtx();
+
+    expCtx->ns = NamespaceString::makeCollectionlessAggregateNSS("test");
+
+    // Set up the lookup change post image stage.
+    auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
+
+    // Mock out the foreign collection.
+    deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}}};
+    expCtx->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(mockForeignContents);
+
+    auto mockLocalSource = DocumentSourceMock::create(
+        Document{{"_id", makeResumeToken(0)},
+                 {"documentKey", Document{{"_id", 0}}},
+                 {"operationType", "update"_sd},
+                 {"ns", Document{{"db", expCtx->ns.db()}, {"coll", "irrelevant"_sd}}}});
+
+    lookupChangeStage->setSource(mockLocalSource.get());
+
+    auto next = lookupChangeStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.releaseDocument(),
+        (Document{{"_id", makeResumeToken(0)},
+                  {"documentKey", Document{{"_id", 0}}},
+                  {"operationType", "update"_sd},
+                  {"ns", Document{{"db", expCtx->ns.db()}, {"coll", "irrelevant"_sd}}},
+                  {"fullDocument", Document{{"_id", 0}}}}));
+}
+
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUnique) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input with an update document.
@@ -281,7 +340,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
 TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
 
-    // Set up the $lookup stage.
+    // Set up the lookup change post image stage.
     auto lookupChangeStage = DocumentSourceLookupChangePostImage::create(expCtx);
 
     // Mock its input, pausing every other result.

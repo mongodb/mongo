@@ -303,13 +303,13 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::targetInsert(OperationContext* o
     if (!shardKey.isEmpty()) {
         return _targetShardKey(shardKey, CollationSpec::kSimpleSpec, doc.objsize());
     } else {
-        if (!_routingInfo->primary()) {
+        if (!_routingInfo->db().primary()) {
             return Status(ErrorCodes::NamespaceNotFound,
                           str::stream() << "could not target insert in collection " << getNS().ns()
                                         << "; no metadata found");
         }
 
-        return ShardEndpoint(_routingInfo->primary()->getId(), ChunkVersion::UNSHARDED());
+        return ShardEndpoint(_routingInfo->db().primary()->getId(), ChunkVersion::UNSHARDED());
     }
 
     return Status::OK();
@@ -527,7 +527,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetDoc(
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
     OperationContext* opCtx, const BSONObj& query, const BSONObj& collation) const {
-    if (!_routingInfo->primary() && !_routingInfo->cm()) {
+    if (!_routingInfo->db().primary() && !_routingInfo->cm()) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "could not target query in " << getNS().ns()
                               << "; no metadata found"};
@@ -541,7 +541,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
             return ex.toStatus();
         }
     } else {
-        shardIds.insert(_routingInfo->primary()->getId());
+        shardIds.insert(_routingInfo->db().primary()->getId());
     }
 
     std::vector<ShardEndpoint> endpoints;
@@ -562,14 +562,14 @@ ShardEndpoint ChunkManagerTargeter::_targetShardKey(const BSONObj& shardKey,
     // Track autosplit stats for sharded collections
     // Note: this is only best effort accounting and is not accurate.
     if (estDataSize > 0) {
-        _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
+        _stats->chunkSizeDelta[chunk.getMin()] += estDataSize;
     }
 
-    return {chunk->getShardId(), _routingInfo->cm()->getVersion(chunk->getShardId())};
+    return {chunk.getShardId(), _routingInfo->cm()->getVersion(chunk.getShardId())};
 }
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() const {
-    if (!_routingInfo->primary() && !_routingInfo->cm()) {
+    if (!_routingInfo->db().primary() && !_routingInfo->cm()) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "could not target full range of " << getNS().ns()
                               << "; metadata not found"};
@@ -579,7 +579,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() 
     if (_routingInfo->cm()) {
         _routingInfo->cm()->getAllShardIds(&shardIds);
     } else {
-        shardIds.insert(_routingInfo->primary()->getId());
+        shardIds.insert(_routingInfo->db().primary()->getId());
     }
 
     std::vector<ShardEndpoint> endpoints;
@@ -594,14 +594,14 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetCollection() 
 
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetAllShards(
     OperationContext* opCtx) const {
-    if (!_routingInfo->primary() && !_routingInfo->cm()) {
+    if (!_routingInfo->db().primary() && !_routingInfo->cm()) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "could not target every shard with versions for " << getNS().ns()
                               << "; metadata not found"};
     }
 
     std::vector<ShardId> shardIds;
-    Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+    Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&shardIds);
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
@@ -671,7 +671,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
     //
 
     auto lastManager = _routingInfo->cm();
-    auto lastPrimary = _routingInfo->primary();
+    auto lastPrimary = _routingInfo->db().primary();
 
     auto initStatus = init(opCtx);
     if (!initStatus.isOK()) {
@@ -694,7 +694,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
         // metadata since we last got it from the cache.
 
         bool alreadyRefreshed = wasMetadataRefreshed(
-            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->primary());
+            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->db().primary());
 
         // If didn't already refresh the targeting information, refresh it
         if (!alreadyRefreshed) {
@@ -703,7 +703,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
         }
 
         *wasChanged = isMetadataDifferent(
-            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->primary());
+            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->db().primary());
         return Status::OK();
     } else if (!_remoteShardVersions.empty()) {
         // If we got stale shard versions from remote shards, we may need to refresh
@@ -720,7 +720,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
         }
 
         *wasChanged = isMetadataDifferent(
-            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->primary());
+            lastManager, lastPrimary, _routingInfo->cm(), _routingInfo->db().primary());
         return Status::OK();
     }
 
@@ -728,7 +728,7 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasC
 }
 
 Status ChunkManagerTargeter::_refreshNow(OperationContext* opCtx) {
-    Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*_routingInfo));
+    Grid::get(opCtx)->catalogCache()->onStaleShardVersion(std::move(*_routingInfo));
 
     return init(opCtx);
 }

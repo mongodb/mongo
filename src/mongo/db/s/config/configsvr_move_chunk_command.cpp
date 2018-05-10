@@ -36,6 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/s/request_types/balance_chunk_request_type.h"
 #include "mongo/util/log.h"
@@ -82,6 +83,11 @@ public:
              const std::string& unusedDbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
         auto request = uassertStatusOK(BalanceChunkRequest::parseFromConfigCommand(cmdObj));
 
         if (request.hasToShardId()) {

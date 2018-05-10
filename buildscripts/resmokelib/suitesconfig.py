@@ -14,9 +14,7 @@ from .. import resmokeconfig
 
 
 def get_named_suites():
-    """
-    Returns the list of suites available to execute.
-    """
+    """Return the list of suites available to execute."""
 
     # Skip "with_*server" and "no_server" because they do not define any test files to run.
     executor_only = {"with_server", "with_external_server", "no_server"}
@@ -26,8 +24,7 @@ def get_named_suites():
 
 
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
-    """
-    Returns a dict keyed by test name containing all of the suites that will run that test.
+    """Return a dict keyed by test name containing all of the suites that will run that test.
 
     If 'test_kind' is specified then only the mappings for that kind are returned.
     Since this iterates through every available suite, it should only be run once.
@@ -59,7 +56,7 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
 
 
 def get_suites(suite_files, test_files):
-    """Retrieves the Suite instances based on suite configuration files and override parameters.
+    """Retrieve the Suite instances based on suite configuration files and override parameters.
 
     Args:
         suite_files: A list of file paths pointing to suite YAML configuration files. For the suites
@@ -71,9 +68,9 @@ def get_suites(suite_files, test_files):
     if test_files:
         # Do not change the execution order of the tests passed as args, unless a tag option is
         # specified. If an option is specified, then sort the tests for consistent execution order.
-        _config.ORDER_TESTS_BY_NAME = any(tag_filter is not None for
-                                          tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS,
-                                                         _config.INCLUDE_WITH_ANY_TAGS))
+        _config.ORDER_TESTS_BY_NAME = any(
+            tag_filter is not None
+            for tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS, _config.INCLUDE_WITH_ANY_TAGS))
         # Build configuration for list of files to run.
         suite_roots = _make_suite_roots(test_files)
 
@@ -93,10 +90,7 @@ def _make_suite_roots(files):
 
 
 def _get_suite_config(pathname):
-    """
-    Attempts to read a YAML configuration from 'pathname' that describes
-    what tests to run and how to run them.
-    """
+    """Attempt to read YAML configuration from 'pathname' for the suite."""
     return _get_yaml_config("suite", pathname)
 
 
@@ -109,6 +103,6 @@ def _get_yaml_config(kind, pathname):
         pathname = resmokeconfig.NAMED_SUITES[pathname]  # Expand 'pathname' to full path.
 
     if not utils.is_yaml_file(pathname) or not os.path.isfile(pathname):
-        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'"
-                                        % (kind, pathname))
+        raise optparse.OptionValueError("Expected a %s YAML config, but got '%s'" % (kind,
+                                                                                     pathname))
     return utils.load_yaml_file(pathname)

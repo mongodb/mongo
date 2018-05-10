@@ -7,14 +7,13 @@
 (function() {
     "use strict";
 
-    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    // TODO: SERVER-33830 remove shardAsReplicaSet: false
     var st = new ShardingTest({
         name: 'migrateBig_balancer',
         shards: 2,
         other: {enableBalancer: true, shardAsReplicaSet: false}
     });
     var mongos = st.s;
-
     var admin = mongos.getDB("admin");
     var db = mongos.getDB("test");
     var coll = db.getCollection("stuff");
@@ -37,8 +36,8 @@
     for (var i = 0; i < 40; i++) {
         bulk.insert({data: dataObj});
     }
-    assert.writeOK(bulk.execute());
 
+    assert.writeOK(bulk.execute());
     assert.eq(40, coll.count(), "prep1");
 
     assert.commandWorked(admin.runCommand({shardcollection: "" + coll, key: {_id: 1}}));

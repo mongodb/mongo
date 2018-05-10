@@ -6,6 +6,7 @@
 //   # the replica set, whereas the latter must be routed to the primary.
 //   assumes_read_preference_unchanged,
 //   requires_non_retryable_commands,
+//   requires_fastcount,
 // ]
 (function() {
     var coll = db.capped6;
@@ -40,8 +41,8 @@
      */
     function prepareCollection(shouldReverse) {
         coll.drop();
-        db._dbCommand(
-            {create: "capped6", capped: true, size: 1000, $nExtents: 11, autoIndexId: false});
+        assert.commandWorked(
+            db.createCollection("capped6", {capped: true, size: 1000, $nExtents: 11}));
         var valueArray = new Array(maxDocuments);
         var c = "";
         for (i = 0; i < maxDocuments; ++i, c += "-") {

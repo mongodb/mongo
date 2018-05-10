@@ -34,6 +34,7 @@
 #include "asio/error.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 #include "mongo/util/net/ssl/error.hpp"
+#include "mongo/util/text.h"
 
 #include "asio/detail/push_options.hpp"
 
@@ -42,17 +43,19 @@ namespace ssl {
 namespace detail {
 
 
-engine::engine(SCHANNEL_CRED* context)
+engine::engine(SCHANNEL_CRED* context, const std::string& remoteHostName)
     : _pCred(context),
-      _hcxt{0, 0},
-      _hcred{0, 0},
+      _remoteHostName(mongo::toNativeString(remoteHostName.c_str())),
       _inBuffer(kDefaultBufferSize),
       _outBuffer(kDefaultBufferSize),
       _extraBuffer(kDefaultBufferSize),
       _handshakeManager(
-          &_hcxt, &_hcred, _serverName, &_inBuffer, &_outBuffer, &_extraBuffer, _pCred),
+          &_hcxt, &_hcred, _remoteHostName, &_inBuffer, &_outBuffer, &_extraBuffer, _pCred),
       _readManager(&_hcxt, &_hcred, &_inBuffer, &_extraBuffer),
-      _writeManager(&_hcxt, &_outBuffer) {}
+      _writeManager(&_hcxt, &_outBuffer) {
+    SecInvalidateHandle(&_hcxt);
+    SecInvalidateHandle(&_hcred);
+}
 
 engine::~engine() {
     DeleteSecurityContext(&_hcxt);
@@ -167,10 +170,6 @@ asio::const_buffer engine::put_input(const asio::const_buffer& data) {
     }
 
     return asio::buffer(data + data.size());
-}
-
-void engine::set_server_name(const std::wstring name) {
-    _serverName = name;
 }
 
 const asio::error_code& engine::map_error_code(asio::error_code& ec) const {

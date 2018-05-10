@@ -33,10 +33,9 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_source_feedback.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
@@ -93,28 +92,22 @@ public:
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual void closeConnections();
     virtual void killAllUserOperations(OperationContext* opCtx);
+    virtual void killAllTransactionCursors(OperationContext* opCtx);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(const OpTime& newCommitPoint) final;
+    void updateLocalSnapshot(const OpTime& optime) final;
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
+    boost::optional<OpTime> getEarliestDropPendingOpTime() const final;
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
-    virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                                          MultiApplier::Operations ops,
-                                          MultiApplier::ApplyOperationFn applyOperation) override;
-    virtual Status multiInitialSyncApply(OperationContext* opCtx,
-                                         MultiApplier::OperationPtrs* ops,
-                                         const HostAndPort& source,
-                                         AtomicUInt32* fetchCount,
-                                         WorkerMultikeyPathInfo* workerMultikeyPathInfo) override;
-    virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
-        OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
+    OplogApplier::BatchLimits getInitialSyncBatchLimits() const final;
 
     // Methods from JournalListener.
     virtual JournalListener::Token getToken();
@@ -189,8 +182,10 @@ private:
     // Thread running SyncSourceFeedback::run().
     std::unique_ptr<stdx::thread> _syncSourceFeedbackThread;
 
-    // Thread running runSyncThread().
-    std::unique_ptr<RSDataSync> _applierThread;
+    // Thread running oplog application.
+    std::unique_ptr<executor::TaskExecutor> _oplogApplierTaskExecutor;
+    std::unique_ptr<OplogApplier> _oplogApplier;
+    Future<void> _oplogApplierShutdownFuture;
 
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
     stdx::mutex _nextThreadIdMutex;

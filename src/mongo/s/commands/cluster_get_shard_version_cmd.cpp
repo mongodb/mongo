@@ -111,7 +111,7 @@ public:
             const auto cm = cachedCollInfo.cm();
 
             for (const auto& chunk : cm->chunks()) {
-                log() << redact(chunk->toString());
+                log() << redact(chunk.toString());
             }
 
             cm->getVersion().addToBSON(result, "version");

@@ -41,6 +41,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexUpdateTests {
@@ -649,7 +650,7 @@ public:
         const std::string storageEngineName = "wiredTiger";
 
         // Run 'wiredTiger' tests if the storage engine is supported.
-        if (getGlobalServiceContext()->isRegisteredStorageEngine(storageEngineName)) {
+        if (isRegisteredStorageEngine(getGlobalServiceContext(), storageEngineName)) {
             // Every field under "storageEngine" has to be an object.
             ASSERT_NOT_OK(createIndex("unittest", _createSpec(BSON(storageEngineName << 1))));
 

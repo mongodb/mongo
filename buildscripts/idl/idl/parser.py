@@ -22,9 +22,9 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import io
+from typing import Any, Callable, Dict, List, Set, Tuple, Union
 import yaml
 from yaml import nodes
-from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
 from . import common
 from . import cpp_types
@@ -65,7 +65,7 @@ def _generic_parser(
         syntax_node_name,  # type: unicode
         syntax_node,  # type: Any
         mapping_rules  # type: Dict[unicode, _RuleDesc]
-):
+):  # type: (...) -> None
     # pylint: disable=too-many-branches
     field_name_set = set()  # type: Set[str]
 
@@ -97,8 +97,8 @@ def _generic_parser(
                     syntax_node.__dict__[first_name] = ctxt.get_list(second_node)
             elif rule_desc.node_type == "mapping":
                 if ctxt.is_mapping_node(second_node, first_name):
-                    syntax_node.__dict__[first_name] = rule_desc.mapping_parser_func(ctxt,
-                                                                                     second_node)
+                    syntax_node.__dict__[first_name] = rule_desc.mapping_parser_func(
+                        ctxt, second_node)
             else:
                 raise errors.IDLError("Unknown node_type '%s' for parser rule" %
                                       (rule_desc.node_type))
@@ -129,7 +129,7 @@ def _parse_mapping(
         node,  # type: Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]
         syntax_node_name,  # type: unicode
         func  # type: Callable[[errors.ParserContext,syntax.IDLSpec,unicode,Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]], None]
-):
+):  # type: (...) -> None
     """Parse a top-level mapping section in the IDL file."""
     if not ctxt.is_mapping_node(node, syntax_node_name):
         return
@@ -177,15 +177,16 @@ def _parse_type(ctxt, spec, name, node):
     idltype = syntax.Type(ctxt.file_name, node.start_mark.line, node.start_mark.column)
     idltype.name = name
 
-    _generic_parser(ctxt, node, "type", idltype, {
-        "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "cpp_type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "bson_serialization_type": _RuleDesc('scalar_or_sequence', _RuleDesc.REQUIRED),
-        "bindata_subtype": _RuleDesc('scalar'),
-        "serializer": _RuleDesc('scalar'),
-        "deserializer": _RuleDesc('scalar'),
-        "default": _RuleDesc('scalar'),
-    })
+    _generic_parser(
+        ctxt, node, "type", idltype, {
+            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "cpp_type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "bson_serialization_type": _RuleDesc('scalar_or_sequence', _RuleDesc.REQUIRED),
+            "bindata_subtype": _RuleDesc('scalar'),
+            "serializer": _RuleDesc('scalar'),
+            "deserializer": _RuleDesc('scalar'),
+            "default": _RuleDesc('scalar'),
+        })
 
     spec.symbols.add_type(ctxt, idltype)
 
@@ -196,16 +197,17 @@ def _parse_field(ctxt, name, node):
     field = syntax.Field(ctxt.file_name, node.start_mark.line, node.start_mark.column)
     field.name = name
 
-    _generic_parser(ctxt, node, "field", field, {
-        "description": _RuleDesc('scalar'),
-        "cpp_name": _RuleDesc('scalar'),
-        "type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "ignore": _RuleDesc("bool_scalar"),
-        "optional": _RuleDesc("bool_scalar"),
-        "default": _RuleDesc('scalar'),
-        "supports_doc_sequence": _RuleDesc("bool_scalar"),
-        "comparison_order": _RuleDesc("int_scalar"),
-    })
+    _generic_parser(
+        ctxt, node, "field", field, {
+            "description": _RuleDesc('scalar'),
+            "cpp_name": _RuleDesc('scalar'),
+            "type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "ignore": _RuleDesc("bool_scalar"),
+            "optional": _RuleDesc("bool_scalar"),
+            "default": _RuleDesc('scalar'),
+            "supports_doc_sequence": _RuleDesc("bool_scalar"),
+            "comparison_order": _RuleDesc("int_scalar"),
+        })
 
     return field
 
@@ -336,16 +338,17 @@ def _parse_struct(ctxt, spec, name, node):
     struct = syntax.Struct(ctxt.file_name, node.start_mark.line, node.start_mark.column)
     struct.name = name
 
-    _generic_parser(ctxt, node, "struct", struct, {
-        "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
-        "chained_types": _RuleDesc('mapping', mapping_parser_func=_parse_chained_types),
-        "chained_structs": _RuleDesc('mapping', mapping_parser_func=_parse_chained_structs),
-        "strict": _RuleDesc("bool_scalar"),
-        "inline_chained_structs": _RuleDesc("bool_scalar"),
-        "immutable": _RuleDesc('bool_scalar'),
-        "generate_comparison_operators": _RuleDesc("bool_scalar"),
-    })
+    _generic_parser(
+        ctxt, node, "struct", struct, {
+            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
+            "chained_types": _RuleDesc('mapping', mapping_parser_func=_parse_chained_types),
+            "chained_structs": _RuleDesc('mapping', mapping_parser_func=_parse_chained_structs),
+            "strict": _RuleDesc("bool_scalar"),
+            "inline_chained_structs": _RuleDesc("bool_scalar"),
+            "immutable": _RuleDesc('bool_scalar'),
+            "generate_comparison_operators": _RuleDesc("bool_scalar"),
+        })
 
     # TODO: SHOULD WE ALLOW STRUCTS ONLY WITH CHAINED STUFF and no fields???
     if struct.fields is None and struct.chained_types is None and struct.chained_structs is None:
@@ -392,11 +395,12 @@ def _parse_enum(ctxt, spec, name, node):
     idl_enum = syntax.Enum(ctxt.file_name, node.start_mark.line, node.start_mark.column)
     idl_enum.name = name
 
-    _generic_parser(ctxt, node, "enum", idl_enum, {
-        "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "values": _RuleDesc('mapping', mapping_parser_func=_parse_enum_values),
-    })
+    _generic_parser(
+        ctxt, node, "enum", idl_enum, {
+            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "type": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "values": _RuleDesc('mapping', mapping_parser_func=_parse_enum_values),
+        })
 
     if idl_enum.values is None:
         ctxt.add_empty_enum_error(node, idl_enum.name)
@@ -413,19 +417,20 @@ def _parse_command(ctxt, spec, name, node):
     command = syntax.Command(ctxt.file_name, node.start_mark.line, node.start_mark.column)
     command.name = name
 
-    _generic_parser(ctxt, node, "command", command, {
-        "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "chained_types": _RuleDesc('mapping', mapping_parser_func=_parse_chained_types),
-        "chained_structs": _RuleDesc('mapping', mapping_parser_func=_parse_chained_structs),
-        "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
-        "namespace": _RuleDesc('scalar', _RuleDesc.REQUIRED),
-        "cpp_name": _RuleDesc('scalar'),
-        "type": _RuleDesc('scalar'),
-        "strict": _RuleDesc("bool_scalar"),
-        "inline_chained_structs": _RuleDesc("bool_scalar"),
-        "immutable": _RuleDesc('bool_scalar'),
-        "generate_comparison_operators": _RuleDesc("bool_scalar"),
-    })
+    _generic_parser(
+        ctxt, node, "command", command, {
+            "description": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "chained_types": _RuleDesc('mapping', mapping_parser_func=_parse_chained_types),
+            "chained_structs": _RuleDesc('mapping', mapping_parser_func=_parse_chained_structs),
+            "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
+            "namespace": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "cpp_name": _RuleDesc('scalar'),
+            "type": _RuleDesc('scalar'),
+            "strict": _RuleDesc("bool_scalar"),
+            "inline_chained_structs": _RuleDesc("bool_scalar"),
+            "immutable": _RuleDesc('bool_scalar'),
+            "generate_comparison_operators": _RuleDesc("bool_scalar"),
+        })
 
     # TODO: support the first argument as UUID depending on outcome of Catalog Versioning changes.
     valid_commands = [
@@ -537,10 +542,10 @@ def _parse(stream, error_file_name):
 
     if ctxt.errors.has_errors():
         return syntax.IDLParsedSpec(None, ctxt.errors)
-    else:
-        _propagate_globals(spec)
 
-        return syntax.IDLParsedSpec(spec, None)
+    _propagate_globals(spec)
+
+    return syntax.IDLParsedSpec(spec, None)
 
 
 class ImportResolverBase(object):
@@ -620,7 +625,7 @@ def parse(stream, input_file_name, resolver):
             return parsed_doc
 
         # We need to generate includes for imported IDL files which have structs
-        if base_file_name == input_file_name and len(parsed_doc.spec.symbols.structs):
+        if base_file_name == input_file_name and parsed_doc.spec.symbols.structs:
             needs_include.append(imported_file_name)
 
         # Add other imported files to the list of files to parse

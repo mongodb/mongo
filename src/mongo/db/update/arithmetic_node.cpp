@@ -113,7 +113,7 @@ ModifierNode::ModifyResult ArithmeticNode::updateExistingElement(
                                 << (idElem.ok() ? idElem.toString() : "no id")
                                 << "}");
     } else {
-        invariantOK(element->setValueSafeNum(valueToSet));
+        invariant(element->setValueSafeNum(valueToSet));
         return ModifyResult::kNormalUpdate;
     }
 }

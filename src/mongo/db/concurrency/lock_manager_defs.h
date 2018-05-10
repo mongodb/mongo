@@ -128,7 +128,7 @@ enum LockResult {
     LOCK_DEADLOCK,
 
     /**
-     * This is used as an initialiser value. Should never be returned.
+     * This is used as an initializer value. Should never be returned.
      */
     LOCK_INVALID
 };
@@ -418,6 +418,9 @@ struct LockRequest {
     // Written by LockManager on any thread
     // Read by LockManager on any thread
     // Protected by LockHead bucket's mutex
+    // Read by Locker on Locker thread
+    // It is safe for the Locker to read this without taking the bucket mutex provided that the
+    // LockRequest status is not WAITING or CONVERTING.
     LockMode mode;
 
     // This value is different from MODE_NONE only if a conversion is requested for a lock and that
@@ -427,6 +430,18 @@ struct LockRequest {
     // Read by LockManager on any thread
     // Protected by LockHead bucket's mutex
     LockMode convertMode;
+
+    // This unsigned represents the number of pending unlocks for this LockRequest. It is greater
+    // than 0 when the LockRequest is participating in two-phase lock and unlock() is called on it.
+    // It can be greater than 1 if this lock is participating in two-phase-lock and has been
+    // converted to a different mode that also participates in two-phase-lock. unlock() may be
+    // called multiple times on the same resourceId within the same WriteUnitOfWork in this case, so
+    // the number of unlocks() to execute at the end of this WUOW is tracked with this unsigned.
+    //
+    // Written by Locker on Locker thread
+    // Read by Locker on Locker thread
+    // No synchronization
+    unsigned unlockPending = 0;
 };
 
 /**

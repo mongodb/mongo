@@ -1141,22 +1141,9 @@ Status OptionsParser::run(const OptionSection& options,
             return ret;
         }
 
-        YAML::Node YAMLConfig;
-        ret = parseYAMLConfigFile(config_file, &YAMLConfig);
+        ret = parseConfigFile(options, config_file, &configEnvironment);
         if (!ret.isOK()) {
             return ret;
-        }
-
-        if (isYAMLConfig(YAMLConfig)) {
-            ret = addYAMLNodesToEnvironment(YAMLConfig, options, "", &configEnvironment);
-            if (!ret.isOK()) {
-                return ret;
-            }
-        } else {
-            ret = parseINIConfigFile(options, config_file, &configEnvironment);
-            if (!ret.isOK()) {
-                return ret;
-            }
         }
     }
 
@@ -1209,6 +1196,57 @@ Status OptionsParser::run(const OptionSection& options,
     }
 
     return Status::OK();
+}
+
+Status OptionsParser::runConfigFile(
+    const OptionSection& options,
+    const std::string& config,
+    const std::map<std::string, std::string>& env,  // Unused, interface consistent with run()
+    Environment* configEnvironment) {
+    // Add the default values to our resulting environment
+    Status ret = addDefaultValues(options, configEnvironment);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    // Add values from the provided config file
+    ret = parseConfigFile(options, config, configEnvironment);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    // Add the constraints from our options to the result environment
+    ret = addConstraints(options, configEnvironment);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    return ret;
+}
+
+Status OptionsParser::parseConfigFile(const OptionSection& options,
+                                      const std::string& config_file,
+                                      Environment* configEnvironment) {
+    YAML::Node YAMLConfig;
+    Status ret = parseYAMLConfigFile(config_file, &YAMLConfig);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    // Check if YAML parsing was successful, if not try to read as INI
+    if (isYAMLConfig(YAMLConfig)) {
+        ret = addYAMLNodesToEnvironment(YAMLConfig, options, "", configEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+    } else {
+        ret = parseINIConfigFile(options, config_file, configEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+    }
+
+    return ret;
 }
 
 }  // namespace optionenvironment

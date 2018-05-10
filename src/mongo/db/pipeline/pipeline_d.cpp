@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/kill_sessions.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -72,6 +74,7 @@
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/stats/top.h"
@@ -84,7 +87,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -154,7 +156,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
         if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {
             auto shardFilterStage = stdx::make_unique<ShardFilterStage>(
                 opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(),
+                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
                 ws.get(),
                 stage.release());
             return PlanExecutor::make(opCtx,
@@ -384,7 +386,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
         plannerOpts |= QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
     }
 
-    if (expCtx->needsMerge && expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
+    if (expCtx->needsMerge && expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData) {
         plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
     }
 
@@ -589,7 +591,7 @@ bool PipelineD::MongoDInterface::isSharded(OperationContext* opCtx, const Namesp
     // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
     // state.
     auto css = CollectionShardingState::get(opCtx, nss);
-    return bool(css->getMetadata());
+    return bool(css->getMetadata(opCtx));
 }
 
 BSONObj PipelineD::MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -726,7 +728,7 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     auto css = CollectionShardingState::get(expCtx->opCtx, expCtx->ns);
     uassert(4567,
             str::stream() << "from collection (" << expCtx->ns.ns() << ") cannot be sharded",
-            !bool(css->getMetadata()));
+            !bool(css->getMetadata(expCtx->opCtx)));
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
@@ -741,25 +743,43 @@ std::string PipelineD::MongoDInterface::getShardName(OperationContext* opCtx) co
     return std::string();
 }
 
-std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
-    OperationContext* opCtx, const NamespaceString& nss, UUID uuid) const {
-    if (!ShardingState::get(opCtx)->enabled()) {
-        return {"_id"};  // Nothing is sharded.
+std::pair<std::vector<FieldPath>, bool> PipelineD::MongoDInterface::collectDocumentKeyFields(
+    OperationContext* opCtx, UUID uuid) const {
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        return {{"_id"}, false};  // Nothing is sharded.
     }
 
-    auto scm = [this, opCtx, &nss]() -> ScopedCollectionMetadata {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+    // An empty namespace indicates that the collection has been dropped. Treat it as unsharded and
+    // mark the fields as final.
+    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
+    if (nss.isEmpty()) {
+        return {{"_id"}, true};
+    }
+
+    // Before taking a collection lock to retrieve the shard key fields, consult the catalog cache
+    // to determine whether the collection is sharded in the first place.
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+
+    const bool collectionIsSharded = catalogCache && [&]() {
+        auto routingInfo = catalogCache->getCollectionRoutingInfo(opCtx, nss);
+        return routingInfo.isOK() && routingInfo.getValue().cm();
     }();
 
-    if (!scm) {
-        return {"_id"};  // Collection is not sharded.
+    // Collection exists and is not sharded, mark as not final.
+    if (!collectionIsSharded) {
+        return {{"_id"}, false};
     }
 
-    uassert(ErrorCodes::InvalidUUID,
-            str::stream() << "Collection " << nss.ns()
-                          << " UUID differs from UUID on change stream operations",
-            scm->uuidMatches(uuid));
+    auto scm = [opCtx, &nss]() -> ScopedCollectionMetadata {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
+    }();
+
+    // Collection is not sharded or UUID mismatch implies collection has been dropped and recreated
+    // as sharded.
+    if (!scm || !scm->uuidMatches(uuid)) {
+        return {{"_id"}, false};
+    }
 
     // Unpack the shard key.
     std::vector<FieldPath> result;
@@ -771,7 +791,8 @@ std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
     if (!gotId) {  // If not part of the shard key, "_id" comes last.
         result.emplace_back("_id");
     }
-    return result;
+    // Collection is now sharded so the document key fields will never change, mark as final.
+    return {result, true};
 }
 
 std::vector<GenericCursor> PipelineD::MongoDInterface::getCursors(
@@ -823,12 +844,38 @@ BSONObj PipelineD::MongoDInterface::_reportCurrentOpForClient(
 
     // Append lock stats before returning.
     if (auto clientOpCtx = client->getOperationContext()) {
-        Locker::LockerInfo lockerInfo;
-        clientOpCtx->lockState()->getLockerInfo(&lockerInfo);
-        fillLockerInfo(lockerInfo, builder);
+        if (auto lockerInfo = clientOpCtx->lockState()->getLockerInfo()) {
+            fillLockerInfo(*lockerInfo, builder);
+        }
     }
 
     return builder.obj();
+}
+
+void PipelineD::MongoDInterface::_reportCurrentOpsForIdleSessions(OperationContext* opCtx,
+                                                                  CurrentOpUserMode userMode,
+                                                                  std::vector<BSONObj>* ops) const {
+    auto sessionCatalog = SessionCatalog::get(opCtx);
+
+    const bool authEnabled =
+        AuthorizationSession::get(opCtx->getClient())->getAuthorizationManager().isAuthEnabled();
+
+    // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers to
+    // create a pattern that will match against all authenticated usernames for the current client.
+    // If the user is listing ops for all users, we create an empty pattern; constructing an
+    // instance of SessionKiller::Matcher with this empty pattern will return all sessions.
+    auto sessionFilter = (authEnabled && userMode == CurrentOpUserMode::kExcludeOthers
+                              ? makeSessionFilterForAuthenticatedUsers(opCtx)
+                              : KillAllSessionsByPatternSet{{}});
+
+    sessionCatalog->scanSessions(opCtx,
+                                 {std::move(sessionFilter)},
+                                 [&](OperationContext* opCtx, Session* session) {
+                                     auto op = session->reportStashedState();
+                                     if (!op.isEmpty()) {
+                                         ops->emplace_back(op);
+                                     }
+                                 });
 }
 
 std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(

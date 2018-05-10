@@ -32,7 +32,10 @@ function optimesAreEqual(replTest) {
     return true;
 }
 
-var replTest = new ReplSetTest({name: "replStatus", nodes: 3, oplogSize: 1, waitForKeys: true});
+// This test has a part that rolls over the oplog. Doing so requires a fresh stable
+// checkpoint. Set the syncdelay to a small value to increase checkpoint frequency.
+var replTest = new ReplSetTest(
+    {name: "replStatus", nodes: 3, oplogSize: 1, waitForKeys: true, nodeOptions: {syncdelay: 1}});
 
 replTest.startSet();
 replTest.initiate();
@@ -63,9 +66,12 @@ assert.soon(function() {
     return optimesAreEqual(replTest);
 });
 
-// Test that earliestOptime was updated
-info = master.getDB('admin').serverStatus({oplog: true}).oplog;
-assert.gt(timestampCompare(info.latestOptime, initialInfo.latestOptime), 0);
-assert.gt(timestampCompare(info.earliestOptime, initialInfo.earliestOptime), 0);
+// This block requires a fresh stable checkpoint.
+assert.soon(function() {
+    // Test that earliestOptime was updated
+    info = master.getDB('admin').serverStatus({oplog: true}).oplog;
+    return timestampCompare(info.latestOptime, initialInfo.latestOptime) > 0 &&
+        timestampCompare(info.earliestOptime, initialInfo.earliestOptime) > 0;
+});
 
 replTest.stopSet();

@@ -4,6 +4,8 @@
  *   - A bad argument to the hint() method should raise an error.
  *   - The hint() method should support both the name of the index, and the object spec of the
  *     index.
+ *
+ * @tags: [requires_fastcount]
  */
 (function() {
     "use strict";

@@ -46,14 +46,21 @@ namespace catalog {
 void closeCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
 
+    // Closing UUID Catalog: only lookupNSSByUUID will fall back to using pre-closing state to
+    // allow authorization for currently unknown UUIDs. This is needed because authorization needs
+    // to work before acquiring locks, and might otherwise spuriously regard a UUID as unknown
+    // while reloading the catalog.
+    UUIDCatalog::get(opCtx).onCloseCatalog();
+    LOG(1) << "closeCatalog: closing UUID catalog";
+
     // Close all databases.
     log() << "closeCatalog: closing all databases";
     constexpr auto reason = "closing databases for closeCatalog";
-    dbHolder().closeAll(opCtx, reason);
+    DatabaseHolder::getDatabaseHolder().closeAll(opCtx, reason);
 
     // Close the storage engine's catalog.
     log() << "closeCatalog: closing storage engine catalog";
-    opCtx->getServiceContext()->getGlobalStorageEngine()->closeCatalog(opCtx);
+    opCtx->getServiceContext()->getStorageEngine()->closeCatalog(opCtx);
 }
 
 void openCatalog(OperationContext* opCtx) {
@@ -61,7 +68,7 @@ void openCatalog(OperationContext* opCtx) {
 
     // Load the catalog in the storage engine.
     log() << "openCatalog: loading storage engine catalog";
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     storageEngine->loadCatalog(opCtx);
 
     log() << "openCatalog: reconciling catalog and idents";
@@ -138,7 +145,7 @@ void openCatalog(OperationContext* opCtx) {
     storageEngine->listDatabases(&databasesToOpen);
     for (auto&& dbName : databasesToOpen) {
         LOG(1) << "openCatalog: dbholder reopening database " << dbName;
-        auto db = dbHolder().openDb(opCtx, dbName);
+        auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
 
         std::list<std::string> collections;
@@ -166,6 +173,10 @@ void openCatalog(OperationContext* opCtx) {
             }
         }
     }
+    // Opening UUID Catalog: The UUID catalog is now in sync with the storage engine catalog. Clear
+    // the pre-closing state.
+    UUIDCatalog::get(opCtx).onOpenCatalog();
+    LOG(1) << "openCatalog: finished reloading UUID catalog";
 }
 }  // namespace catalog
 }  // namespace mongo

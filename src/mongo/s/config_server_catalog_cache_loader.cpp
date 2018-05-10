@@ -25,7 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -33,8 +33,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -161,6 +164,11 @@ void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* op
     MONGO_UNREACHABLE;
 }
 
+void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
+                                                          StringData dbName) {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,
@@ -184,6 +192,29 @@ std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSin
     }));
 
     return notify;
+}
+
+void ConfigServerCatalogCacheLoader::getDatabase(
+    StringData dbName,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    uassertStatusOK(_threadPool.schedule([ name = dbName.toString(), callbackFn ]() noexcept {
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        auto swDbt = [&]() -> StatusWith<DatabaseType> {
+            try {
+                return uassertStatusOK(
+                           Grid::get(opCtx.get())
+                               ->catalogClient()
+                               ->getDatabase(
+                                   opCtx.get(), name, repl::ReadConcernLevel::kMajorityReadConcern))
+                    .value;
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
+        }();
+
+        callbackFn(opCtx.get(), std::move(swDbt));
+    }));
 }
 
 }  // namespace mongo

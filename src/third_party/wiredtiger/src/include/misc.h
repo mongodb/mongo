@@ -11,7 +11,10 @@
  * and unused function return values.
  */
 #define	WT_UNUSED(var)		(void)(var)
-#define	WT_NOT_READ(var)	(void)(var)
+#define	WT_NOT_READ(v, val) do {					\
+	(v) = (val);							\
+	(void)(v);							\
+} while (0);
 #define	WT_IGNORE_RET(call) do {					\
 	int __ignored_ret;						\
 	__ignored_ret = (call);						\
@@ -24,6 +27,8 @@
 #define	WT_THOUSAND	(1000)
 #define	WT_MILLION	(1000000)
 #define	WT_BILLION	(1000000000)
+
+#define	WT_MINUTE	(60)
 
 #define	WT_KILOBYTE	(1024)
 #define	WT_MEGABYTE	(1048576)
@@ -289,15 +294,16 @@ typedef void wt_timestamp_t;
 	__wt_scr_alloc_func(session, size, scratchp, __func__, __LINE__)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags, __func__, __LINE__)
-#define	__wt_page_swap(session, held, want, flags)			\
-	__wt_page_swap_func(session, held, want, flags, __func__, __LINE__)
+#define	__wt_page_swap(session, held, want, prev_race, flags)		\
+	__wt_page_swap_func(						\
+	    session, held, want, prev_race, flags, __func__, __LINE__)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
 #define	__wt_page_in(session, ref, flags)				\
 	__wt_page_in_func(session, ref, flags)
-#define	__wt_page_swap(session, held, want, flags)			\
-	__wt_page_swap_func(session, held, want, flags)
+#define	__wt_page_swap(session, held, want, prev_race, flags)		\
+	__wt_page_swap_func(session, held, want, prev_race, flags)
 #endif
 
 /* Called on unexpected code path: locate the failure. */

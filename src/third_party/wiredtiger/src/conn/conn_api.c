@@ -1055,9 +1055,10 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	if (cval.val != 0)
 		F_SET(conn, WT_CONN_LEAK_MEMORY);
 	WT_TRET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
-	if (cval.val != 0 && conn->txn_global.has_stable_timestamp) {
+	if (cval.val != 0) {
 		ckpt_cfg = "use_timestamp=true";
-		F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
+		if (conn->txn_global.has_stable_timestamp)
+			F_SET(conn, WT_CONN_CLOSING_TIMESTAMP);
 	}
 
 err:	/*
@@ -1100,8 +1101,8 @@ err:	/*
 	 */
 	F_SET(conn, WT_CONN_EVICTION_NO_LOOKASIDE);
 
-	/* Shut down transactions (wait for in-flight operations to complete. */
-	WT_TRET(__wt_txn_global_shutdown(session));
+	/* Wait for in-flight operations to complete. */
+	WT_TRET(__wt_txn_activity_drain(session));
 
 	/*
 	 * Perform a system-wide checkpoint so that all tables are consistent
@@ -1133,6 +1134,9 @@ err:	/*
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 	}
+
+	/* Shut down the global transaction state. */
+	__wt_txn_global_shutdown(session);
 
 	if (ret != 0) {
 		__wt_err(session, ret,
@@ -1987,16 +1991,29 @@ err:	__wt_scr_free(session, &buf);
 
 /*
  * __wt_timing_stress_config --
- *	Set timing stress for test delay configuration.
+ *	Set timing stress configuration. There are a places we optionally make
+ * threads sleep in order to stress the system and increase the likelihood of
+ * failure. For example, there are several places where page splits are delayed
+ * to make cursor iteration races more likely.
  */
 int
 __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	/*
+	 * Each split race delay is controlled using a different flag to allow
+	 * more effective race condition detection, since enabling all delays
+	 * at once can lead to an overall slowdown to the point where race
+	 * conditions aren't encountered.
+	 */
 	static const WT_NAME_FLAG stress_types[] = {
 		{ "checkpoint_slow",	WT_TIMING_STRESS_CHECKPOINT_SLOW },
-		{ "internal_page_split_race",
-		    WT_TIMING_STRESS_INTERNAL_PAGE_SPLIT_RACE },
-		{ "page_split_race",	WT_TIMING_STRESS_PAGE_SPLIT_RACE },
+		{ "split_race_1",	WT_TIMING_STRESS_SPLIT_RACE_1 },
+		{ "split_race_2",	WT_TIMING_STRESS_SPLIT_RACE_2 },
+		{ "split_race_3",	WT_TIMING_STRESS_SPLIT_RACE_3 },
+		{ "split_race_4",	WT_TIMING_STRESS_SPLIT_RACE_4 },
+		{ "split_race_5",	WT_TIMING_STRESS_SPLIT_RACE_5 },
+		{ "split_race_6",	WT_TIMING_STRESS_SPLIT_RACE_6 },
+		{ "split_race_7",	WT_TIMING_STRESS_SPLIT_RACE_7 },
 		{ NULL, 0 }
 	};
 	WT_CONFIG_ITEM cval, sval;
@@ -2007,8 +2024,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	WT_RET(__wt_config_gets(
-	    session, cfg, "timing_stress_for_test", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "timing_stress_for_test", &cval));
 
 	flags = 0;
 	for (ft = stress_types; ft->name != NULL; ft++) {

@@ -393,7 +393,8 @@ void State::dropTempCollections() {
 
         writeConflictRetry(_opCtx, "M/R dropTempCollections", _config.incLong.ns(), [this] {
             Lock::DBLock lk(_opCtx, _config.incLong.db(), MODE_X);
-            if (Database* db = dbHolder().get(_opCtx, _config.incLong.ns())) {
+            if (Database* db =
+                    DatabaseHolder::getDatabaseHolder().get(_opCtx, _config.incLong.ns())) {
                 WriteUnitOfWork wunit(_opCtx);
                 uassertStatusOK(db->dropCollection(_opCtx, _config.incLong.ns()));
                 wunit.commit();
@@ -428,7 +429,8 @@ void State::prepTempCollection() {
             options.temp = true;
             options.uuid.emplace(UUID::gen());
 
-            incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
+            incColl = incCtx.db()->createCollection(
+                _opCtx, _config.incLong.ns(), options, false /* force no _id index */);
             invariant(incColl);
 
             auto rawIndexSpec =
@@ -460,7 +462,6 @@ void State::prepTempCollection() {
         Collection* const finalColl = finalCtx.getCollection();
         if (finalColl) {
             finalOptions = finalColl->getCatalogEntry()->getCollectionOptions(_opCtx);
-
             if (_config.finalOutputCollUUID) {
                 // The final output collection's UUID is passed from mongos if the final output
                 // collection is sharded. If a UUID was sent, ensure it matches what's on this
@@ -516,7 +517,14 @@ void State::prepTempCollection() {
         // preserved.
         options.uuid.emplace(_config.finalOutputCollUUID ? *_config.finalOutputCollUUID
                                                          : UUID::gen());
-        tempColl = tempCtx.db()->createCollection(_opCtx, _config.tempNamespace.ns(), options);
+
+        // Override createCollection's prohibition on creating new replicated collections without an
+        // _id index.
+        bool buildIdIndex = (options.autoIndexId == CollectionOptions::YES ||
+                             options.autoIndexId == CollectionOptions::DEFAULT);
+
+        tempColl = tempCtx.db()->createCollection(
+            _opCtx, _config.tempNamespace.ns(), options, buildIdIndex);
 
         for (vector<BSONObj>::iterator it = indexesToInsert.begin(); it != indexesToInsert.end();
              ++it) {
@@ -646,7 +654,7 @@ unsigned long long _collectionCount(OperationContext* opCtx,
     // If the global write lock is held, we must avoid using AutoGetCollectionForReadCommand as it
     // may lead to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
     if (callerHoldsGlobalLock) {
-        Database* db = dbHolder().get(opCtx, nss.ns());
+        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, nss.ns());
         if (db) {
             coll = db->getCollection(opCtx, nss);
         }
@@ -1133,8 +1141,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
                                      std::move(qr),
                                      expCtx,
                                      extensionsCallback,
-                                     MatchExpressionParser::kAllowAllSpecialFeatures &
-                                         ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     verify(statusWithCQ.isOK());
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
@@ -1407,9 +1414,7 @@ public:
         auto client = opCtx->getClient();
 
         if (client->isInDirectClient()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation, "Cannot run mapReduce command from eval()"));
+            uasserted(ErrorCodes::IllegalOperation, "Cannot run mapReduce command from eval()");
         }
 
         auto curOp = CurOp::get(opCtx);
@@ -1425,7 +1430,7 @@ public:
             // Get metadata before we check our version, to make sure it doesn't increment in the
             // meantime
             AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-            return CollectionShardingState::get(opCtx, config.nss)->getMetadata();
+            return CollectionShardingState::get(opCtx, config.nss)->getMetadata(opCtx);
         }();
 
         bool shouldHaveData = false;
@@ -1435,10 +1440,8 @@ public:
         try {
             State state(opCtx, config);
             if (!state.sourceExists()) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::NamespaceNotFound,
-                           str::stream() << "namespace does not exist: " << config.nss.ns()));
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "namespace does not exist: " << config.nss.ns());
             }
 
             state.init();
@@ -1495,13 +1498,12 @@ public:
                 const ExtensionsCallbackReal extensionsCallback(opCtx, &config.nss);
 
                 const boost::intrusive_ptr<ExpressionContext> expCtx;
-                auto statusWithCQ = CanonicalQuery::canonicalize(
-                    opCtx,
-                    std::move(qr),
-                    expCtx,
-                    extensionsCallback,
-                    MatchExpressionParser::kAllowAllSpecialFeatures &
-                        ~MatchExpressionParser::AllowedFeatures::kIsolated);
+                auto statusWithCQ =
+                    CanonicalQuery::canonicalize(opCtx,
+                                                 std::move(qr),
+                                                 expCtx,
+                                                 extensionsCallback,
+                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
                 if (!statusWithCQ.isOK()) {
                     uasserted(17238, "Can't canonicalize query " + config.filter.toString());
                     return 0;
@@ -1574,9 +1576,7 @@ public:
                         scopedAutoDb.reset(new AutoGetDb(opCtx, config.nss.db(), MODE_S));
 
                         auto restoreStatus = exec->restoreState();
-                        if (!restoreStatus.isOK()) {
-                            return CommandHelpers::appendCommandStatus(result, restoreStatus);
-                        }
+                        uassertStatusOK(restoreStatus);
 
                         reduceTime += t.micros();
 
@@ -1590,11 +1590,9 @@ public:
                 }
 
                 if (PlanExecutor::DEAD == execState || PlanExecutor::FAILURE == execState) {
-                    return CommandHelpers::appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::OperationFailed,
-                               str::stream() << "Executor error during mapReduce command: "
-                                             << WorkingSetCommon::toStatusString(o)));
+                    uasserted(ErrorCodes::OperationFailed,
+                              str::stream() << "Executor error during mapReduce command: "
+                                            << WorkingSetCommon::toStatusString(o));
                 }
 
                 // Record the indexes used by the PlanExecutor.
@@ -1724,11 +1722,9 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::CommandNotSupported,
-                       str::stream() << "Can not execute mapReduce with output database " << dbname
-                                     << " which lives on config servers"));
+            uasserted(ErrorCodes::CommandNotSupported,
+                      str::stream() << "Can not execute mapReduce with output database " << dbname
+                                    << " which lives on config servers");
         }
 
         // Don't let any lock acquisitions get interrupted.
@@ -1798,15 +1794,12 @@ public:
 
         state.prepTempCollection();
 
-        std::vector<std::shared_ptr<Chunk>> chunks;
+        std::vector<Chunk> chunks;
 
         if (config.outputOptions.outType != Config::OutputType::INMEMORY) {
             auto outRoutingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
                 opCtx, config.outputOptions.finalNamespace);
-            if (!outRoutingInfoStatus.isOK()) {
-                return CommandHelpers::appendCommandStatus(result,
-                                                           outRoutingInfoStatus.getStatus());
-            }
+            uassertStatusOK(outRoutingInfoStatus.getStatus());
 
             if (auto cm = outRoutingInfoStatus.getValue().cm()) {
                 // Fetch result from other shards 1 chunk at a time. It would be better to do just
@@ -1814,7 +1807,7 @@ public:
                 const string shardName = ShardingState::get(opCtx)->getShardName();
 
                 for (const auto& chunk : cm->chunks()) {
-                    if (chunk->getShardId() == shardName) {
+                    if (chunk.getShardId() == shardName) {
                         chunks.push_back(chunk);
                     }
                 }
@@ -1828,12 +1821,11 @@ public:
         BSONList values;
 
         while (true) {
-            shared_ptr<Chunk> chunk;
             if (chunks.size() > 0) {
-                chunk = chunks[index];
+                const auto& chunk = chunks[index];
                 BSONObjBuilder b;
-                b.appendAs(chunk->getMin().firstElement(), "$gte");
-                b.appendAs(chunk->getMax().firstElement(), "$lt");
+                b.appendAs(chunk.getMin().firstElement(), "$gte");
+                b.appendAs(chunk.getMax().firstElement(), "$lt");
                 query = BSON("_id" << b.obj());
                 //                        chunkSizes.append(min);
             }
@@ -1876,8 +1868,9 @@ public:
                     values.push_back(t);
             }
 
-            if (chunk) {
-                chunkSizes.append(chunk->getMin());
+            if (chunks.size() > 0) {
+                const auto& chunk = chunks[index];
+                chunkSizes.append(chunk.getMin());
                 chunkSizes.append(chunkSize);
             }
 

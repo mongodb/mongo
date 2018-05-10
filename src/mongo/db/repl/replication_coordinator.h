@@ -761,21 +761,6 @@ public:
     virtual Status updateTerm(OperationContext* opCtx, long long term) = 0;
 
     /**
-     * Returns the minimum visible snapshot for this operation.
-     *
-     * This name is guaranteed to compare > all names reserved before and < all names reserved
-     * after.
-     *
-     * This method will not take any locks or attempt to access storage using the passed-in
-     * OperationContext. It will only be used to return reserved SnapshotNames by each operation so
-     * callers can correctly wait for the reserved snapshot to be visible.
-     *
-     * A null OperationContext can be used in cases where the snapshot to wait for should not be
-     * adjusted.
-     */
-    virtual Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) = 0;
-
-    /**
      * Blocks until either the current committed snapshot is at least as high as 'untilSnapshot',
      * or we are interrupted for any reason, including shutdown or maxTimeMs expiration.
      * 'opCtx' is used to checkForInterrupt and enforce maxTimeMS.
@@ -827,6 +812,11 @@ public:
      * Abort catchup if the node is in catchup mode.
      */
     virtual Status abortCatchupIfNeeded() = 0;
+
+    /**
+     * Signals that drop pending collections have been removed from storage.
+     */
+    virtual void signalDropPendingCollectionsRemovedFromStorage() = 0;
 
     /**
      * Returns true if logOp() should not append an entry to the oplog for the namespace for this

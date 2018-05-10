@@ -176,6 +176,11 @@ ReplOperation OplogEntry::makeDeleteOperation(const NamespaceString& nss,
     return op;
 }
 
+size_t OplogEntry::getReplOperationSize(const ReplOperation& op) {
+    return sizeof(op) + op.getNamespace().size() + op.getObject().objsize() +
+        (op.getObject2() ? op.getObject2()->objsize() : 0);
+}
+
 StatusWith<OplogEntry> OplogEntry::parse(const BSONObj& object) {
     try {
         return OplogEntry(object);

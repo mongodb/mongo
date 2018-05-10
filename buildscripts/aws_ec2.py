@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """AWS EC2 instance launcher and controller."""
 
 from __future__ import print_function
@@ -21,18 +20,12 @@ class AwsEc2(object):
     """Class to support controlling AWS EC2 istances."""
 
     InstanceStatus = collections.namedtuple("InstanceStatus", [
-        "instance_id",
-        "image_id",
-        "instance_type",
-        "state",
-        "private_ip_address",
-        "public_ip_address",
-        "private_dns_name",
-        "public_dns_name",
-        "tags"
-        ])
+        "instance_id", "image_id", "instance_type", "state", "private_ip_address",
+        "public_ip_address", "private_dns_name", "public_dns_name", "tags"
+    ])
 
     def __init__(self):
+        """Initialize AwsEc2."""
         try:
             self.connection = boto3.resource("ec2")
         except botocore.exceptions.BotoCoreError:
@@ -44,10 +37,11 @@ class AwsEc2(object):
     @staticmethod
     def wait_for_state(instance, state, wait_time_secs=0, show_progress=False):
         """Wait up to 'wait_time_secs' for instance to be in 'state'.
-           Return 0 if 'state' reached, 1 otherwise."""
+
+        Return 0 if 'state' reached, 1 otherwise.
+        """
         if show_progress:
-            print("Waiting for instance {} to reach '{}' state".format(instance, state),
-                  end="",
+            print("Waiting for instance {} to reach '{}' state".format(instance, state), end="",
                   file=sys.stdout)
         reached_state = False
         end_time = time.time() + wait_time_secs
@@ -81,10 +75,9 @@ class AwsEc2(object):
         return 0 if reached_state else 1
 
     def control_instance(self, mode, image_id, wait_time_secs=0, show_progress=False):
-        """Controls an AMI instance. Returns 0 & status information, if successful."""
+        """Control an AMI instance. Returns 0 & status information, if successful."""
         if mode not in _MODES:
-            raise ValueError(
-                "Invalid mode '{}' specified, choose from {}.".format(mode, _MODES))
+            raise ValueError("Invalid mode '{}' specified, choose from {}.".format(mode, _MODES))
 
         sys.stdout.flush()
         instance = self.connection.Instance(image_id)
@@ -112,30 +105,24 @@ class AwsEc2(object):
 
         ret = 0
         if wait_time_secs > 0:
-            ret = self.wait_for_state(
-                instance=instance,
-                state=state,
-                wait_time_secs=wait_time_secs,
-                show_progress=show_progress)
+            ret = self.wait_for_state(instance=instance, state=state, wait_time_secs=wait_time_secs,
+                                      show_progress=show_progress)
         try:
             # Always provide status after executing command.
             status = self.InstanceStatus(
-                getattr(instance, "instance_id", None),
-                getattr(instance, "image_id", None),
-                getattr(instance, "instance_type", None),
-                getattr(instance, "state", None),
+                getattr(instance, "instance_id", None), getattr(instance, "image_id", None),
+                getattr(instance, "instance_type", None), getattr(instance, "state", None),
                 getattr(instance, "private_ip_address", None),
                 getattr(instance, "public_ip_address", None),
                 getattr(instance, "private_dns_name", None),
-                getattr(instance, "public_dns_name", None),
-                getattr(instance, "tags", None))
+                getattr(instance, "public_dns_name", None), getattr(instance, "tags", None))
         except botocore.exceptions.ClientError as err:
             return 1, err.message
 
         return ret, status
 
     def tag_instance(self, image_id, tags):
-        """Tags an AMI instance. """
+        """Tag an AMI instance."""
         if tags:
             # It's possible that ClientError code InvalidInstanceID.NotFound could be returned,
             # even if the 'image_id' exists. We will retry up to 5 times, with increasing wait,
@@ -151,21 +138,14 @@ class AwsEc2(object):
                 time.sleep(i + 1)
             instance.create_tags(Tags=tags)
 
-    def launch_instance(self,
-                        ami,
-                        instance_type,
-                        block_devices=None,
-                        key_name=None,
-                        security_group_ids=None,
-                        security_groups=None,
-                        subnet_id=None,
-                        tags=None,
-                        wait_time_secs=0,
-                        show_progress=False,
-                        **kwargs):
-        """Launches and tags an AMI instance.
+    def launch_instance(  # pylint: disable=too-many-arguments,too-many-locals
+            self, ami, instance_type, block_devices=None, key_name=None, security_group_ids=None,
+            security_groups=None, subnet_id=None, tags=None, wait_time_secs=0, show_progress=False,
+            **kwargs):
+        """Launch and tag an AMI instance.
 
-           Returns the tuple (0, status_information), if successful."""
+        Return the tuple (0, status_information), if successful.
+        """
 
         bdms = []
         if block_devices is None:
@@ -187,127 +167,92 @@ class AwsEc2(object):
             kwargs["KeyName"] = key_name
 
         try:
-            instances = self.connection.create_instances(
-                ImageId=ami,
-                InstanceType=instance_type,
-                MaxCount=1,
-                MinCount=1,
-                **kwargs)
+            instances = self.connection.create_instances(ImageId=ami, InstanceType=instance_type,
+                                                         MaxCount=1, MinCount=1, **kwargs)
         except (botocore.exceptions.ClientError, botocore.exceptions.ParamValidationError) as err:
             return 1, err.message
 
         instance = instances[0]
         if wait_time_secs > 0:
-            self.wait_for_state(
-                instance=instance,
-                state="running",
-                wait_time_secs=wait_time_secs,
-                show_progress=show_progress)
+            self.wait_for_state(instance=instance, state="running", wait_time_secs=wait_time_secs,
+                                show_progress=show_progress)
 
         self.tag_instance(instance.instance_id, tags)
 
         return self.control_instance("status", instance.instance_id)
 
 
-def main():
-    """Main program."""
+def main():  # pylint: disable=too-many-locals,too-many-statements
+    """Execute Main program."""
 
     required_create_options = ["ami", "key_name"]
 
     parser = optparse.OptionParser(description=__doc__)
     control_options = optparse.OptionGroup(parser, "Control options")
     create_options = optparse.OptionGroup(parser, "Create options")
+    status_options = optparse.OptionGroup(parser, "Status options")
 
-    parser.add_option("--mode",
-                      dest="mode",
-                      choices=_MODES,
-                      default="status",
-                      help="Operations to perform on an EC2 instance, choose one of"
-                           " '{}', defaults to '%default'.".format(", ".join(_MODES)))
+    parser.add_option("--mode", dest="mode", choices=_MODES, default="status",
+                      help=("Operations to perform on an EC2 instance, choose one of"
+                            " '{}', defaults to '%default'.".format(", ".join(_MODES))))
 
-    control_options.add_option("--imageId",
-                               dest="image_id",
-                               default=None,
+    control_options.add_option("--imageId", dest="image_id", default=None,
                                help="EC2 image_id to perform operation on [REQUIRED for control].")
 
-    control_options.add_option("--waitTimeSecs",
-                               dest="wait_time_secs",
-                               type=int,
-                               default=5 * 60,
-                               help="Time to wait for EC2 instance to reach it's new state,"
-                                    " defaults to '%default'.")
+    control_options.add_option("--waitTimeSecs", dest="wait_time_secs", type=int, default=5 * 60,
+                               help=("Time to wait for EC2 instance to reach it's new state,"
+                                     " defaults to '%default'."))
 
-    create_options.add_option("--ami",
-                              dest="ami",
-                              default=None,
+    create_options.add_option("--ami", dest="ami", default=None,
                               help="EC2 AMI to launch [REQUIRED for create].")
 
-    create_options.add_option("--blockDevice",
-                              dest="block_devices",
-                              metavar="DEVICE-NAME DEVICE-SIZE-GB",
-                              action="append",
-                              default=[],
+    create_options.add_option("--blockDevice", dest="block_devices",
+                              metavar="DEVICE-NAME DEVICE-SIZE-GB", action="append", default=[],
                               nargs=2,
-                              help="EBS device name and volume size in GiB."
-                                   " More than one device can be attached, by specifying"
-                                   " this option more than once."
-                                   " The device will be deleted on termination of the instance.")
+                              help=("EBS device name and volume size in GiB."
+                                    " More than one device can be attached, by specifying"
+                                    " this option more than once."
+                                    " The device will be deleted on termination of the instance."))
 
-    create_options.add_option("--instanceType",
-                              dest="instance_type",
-                              default="t1.micro",
+    create_options.add_option("--instanceType", dest="instance_type", default="t1.micro",
                               help="EC2 instance type to launch, defaults to '%default'.")
 
-    create_options.add_option("--keyName",
-                              dest="key_name",
-                              default=None,
+    create_options.add_option("--keyName", dest="key_name", default=None,
                               help="EC2 key name [REQUIRED for create].")
 
-    create_options.add_option("--securityGroupIds",
-                              dest="security_group_ids",
-                              action="append",
+    create_options.add_option("--securityGroupIds", dest="security_group_ids", action="append",
                               default=[],
-                              help="EC2 security group ids. More than one security group id can be"
-                                   " added, by specifying this option more than once.")
+                              help=("EC2 security group ids. More than one security group id can be"
+                                    " added, by specifying this option more than once."))
 
-    create_options.add_option("--securityGroup",
-                              dest="security_groups",
-                              action="append",
+    create_options.add_option("--securityGroup", dest="security_groups", action="append",
                               default=[],
-                              help="EC2 security group. More than one security group can be added,"
-                                   " by specifying this option more than once.")
+                              help=("EC2 security group. More than one security group can be added,"
+                                    " by specifying this option more than once."))
 
-    create_options.add_option("--subnetId",
-                              dest="subnet_id",
-                              default=None,
+    create_options.add_option("--subnetId", dest="subnet_id", default=None,
                               help="EC2 subnet id to use in VPC.")
 
-    create_options.add_option("--tagExpireHours",
-                              dest="tag_expire_hours",
-                              type=int,
-                              default=2,
+    create_options.add_option("--tagExpireHours", dest="tag_expire_hours", type=int, default=2,
                               help="EC2 tag expire time in hours, defaults to '%default'.")
 
-    create_options.add_option("--tagName",
-                              dest="tag_name",
-                              default="",
+    create_options.add_option("--tagName", dest="tag_name", default="",
                               help="EC2 tag and instance name.")
 
-    create_options.add_option("--tagOwner",
-                              dest="tag_owner",
-                              default="",
-                              help="EC2 tag owner.")
+    create_options.add_option("--tagOwner", dest="tag_owner", default="", help="EC2 tag owner.")
 
-    create_options.add_option("--extraArgs",
-                              dest="extra_args",
-                              metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                              default=None,
-                              help="EC2 create instance keyword args. The argument is specified as"
-                                   " bracketed YAML - i.e. JSON with support for single quoted"
-                                   " and unquoted keys. Example, '{DryRun: True}'")
+    create_options.add_option(
+        "--extraArgs", dest="extra_args", metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
+        default=None, help=("EC2 create instance keyword args. The argument is specified as"
+                            " bracketed YAML - i.e. JSON with support for single quoted"
+                            " and unquoted keys. Example, '{DryRun: True}'"))
+
+    status_options.add_option("--yamlFile", dest="yaml_file", default=None,
+                              help="Save the status into the specified YAML file.")
 
     parser.add_option_group(control_options)
     parser.add_option_group(create_options)
+    parser.add_option_group(status_options)
 
     (options, _) = parser.parse_args()
 
@@ -331,44 +276,42 @@ def main():
         # The 'expire-on' key is a UTC time.
         expire_dt = datetime.datetime.utcnow() + datetime.timedelta(hours=options.tag_expire_hours)
         tags = [{"Key": "expire-on", "Value": expire_dt.strftime("%Y-%m-%d %H:%M:%S")},
-                {"Key": "Name", "Value": options.tag_name},
-                {"Key": "owner", "Value": options.tag_owner}]
+                {"Key": "Name",
+                 "Value": options.tag_name}, {"Key": "owner", "Value": options.tag_owner}]
 
         my_kwargs = {}
         if options.extra_args is not None:
             my_kwargs = yaml.safe_load(options.extra_args)
 
         (ret_code, instance_status) = aws_ec2.launch_instance(
-            ami=options.ami,
-            instance_type=options.instance_type,
-            block_devices=block_devices,
-            key_name=options.key_name,
-            security_group_ids=options.security_group_ids,
-            security_groups=options.security_groups,
-            subnet_id=options.subnet_id,
-            tags=tags,
-            wait_time_secs=options.wait_time_secs,
-            show_progress=True,
-            **my_kwargs)
+            ami=options.ami, instance_type=options.instance_type, block_devices=block_devices,
+            key_name=options.key_name, security_group_ids=options.security_group_ids,
+            security_groups=options.security_groups, subnet_id=options.subnet_id, tags=tags,
+            wait_time_secs=options.wait_time_secs, show_progress=True, **my_kwargs)
     else:
         if not getattr(options, "image_id", None):
             parser.print_help()
             parser.error("Missing required control option")
 
         (ret_code, instance_status) = aws_ec2.control_instance(
-            mode=options.mode,
-            image_id=options.image_id,
-            wait_time_secs=options.wait_time_secs,
+            mode=options.mode, image_id=options.image_id, wait_time_secs=options.wait_time_secs,
             show_progress=True)
 
-    print("Return code: {}, Instance status:".format(ret_code))
     if ret_code:
-        print(instance_status)
-    else:
-        for field in instance_status._fields:
-            print("\t{}: {}".format(field, getattr(instance_status, field)))
+        print("Return code: {}, {}".format(ret_code, instance_status))
+        sys.exit(ret_code)
 
-    sys.exit(ret_code)
+    status_dict = {}
+    for field in getattr(instance_status, "_fields", []):
+        status_dict[field] = getattr(instance_status, field)
+
+    if options.yaml_file:
+        print("Saving status to {}".format(options.yaml_file))
+        with open(options.yaml_file, "w") as ystream:
+            yaml.safe_dump(status_dict, ystream)
+
+    print(yaml.safe_dump(status_dict))
+
 
 if __name__ == "__main__":
     main()

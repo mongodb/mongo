@@ -370,7 +370,7 @@ Status StorageInterfaceImpl::insertDocuments(OperationContext* opCtx,
 }
 
 Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
-    dropAllDatabasesExceptLocal(opCtx);
+    Database::dropAllDatabasesExceptLocal(opCtx);
     return Status::OK();
 }
 
@@ -986,17 +986,37 @@ StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollection
 }
 
 StatusWith<StorageInterface::CollectionCount> StorageInterfaceImpl::getCollectionCount(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
+    AutoGetCollectionForRead autoColl(opCtx, nsOrUUID);
 
     auto collectionResult =
-        getCollection(autoColl, nss, "Unable to get number of documents in collection.");
+        getCollection(autoColl, nsOrUUID, "Unable to get number of documents in collection.");
     if (!collectionResult.isOK()) {
         return collectionResult.getStatus();
     }
     auto collection = collectionResult.getValue();
 
     return collection->numRecords(opCtx);
+}
+
+Status StorageInterfaceImpl::setCollectionCount(OperationContext* opCtx,
+                                                const NamespaceStringOrUUID& nsOrUUID,
+                                                long long newCount) {
+    AutoGetCollection autoColl(opCtx, nsOrUUID, LockMode::MODE_X);
+
+    auto collectionResult =
+        getCollection(autoColl, nsOrUUID, "Unable to set number of documents in collection.");
+    if (!collectionResult.isOK()) {
+        return collectionResult.getStatus();
+    }
+    auto collection = collectionResult.getValue();
+
+    auto rs = collection->getRecordStore();
+    // We cannot fix the data size correctly, so we just get the current cached value and keep it
+    // the same.
+    long long dataSize = rs->dataSize(opCtx);
+    rs->updateStatsAfterRepair(opCtx, newCount, dataSize);
+    return Status::OK();
 }
 
 StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
@@ -1013,25 +1033,25 @@ StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
 }
 
 void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
-    serviceCtx->getGlobalStorageEngine()->setStableTimestamp(snapshotName);
+    serviceCtx->getStorageEngine()->setStableTimestamp(snapshotName);
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
                                                    Timestamp snapshotName) {
-    serviceCtx->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
+    serviceCtx->getStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 
-StatusWith<Timestamp> StorageInterfaceImpl::recoverToStableTimestamp(ServiceContext* serviceCtx) {
-    return serviceCtx->getGlobalStorageEngine()->recoverToStableTimestamp();
+StatusWith<Timestamp> StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx) {
+    return opCtx->getServiceContext()->getStorageEngine()->recoverToStableTimestamp(opCtx);
 }
 
 bool StorageInterfaceImpl::supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const {
-    return serviceCtx->getGlobalStorageEngine()->supportsRecoverToStableTimestamp();
+    return serviceCtx->getStorageEngine()->supportsRecoverToStableTimestamp();
 }
 
 boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(
     ServiceContext* serviceCtx) const {
-    return serviceCtx->getGlobalStorageEngine()->getRecoveryTimestamp();
+    return serviceCtx->getStorageEngine()->getRecoveryTimestamp();
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
@@ -1104,5 +1124,20 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
         28557,
         oplog.getCollection()->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
 }
+
+boost::optional<Timestamp> StorageInterfaceImpl::getLastStableCheckpointTimestamp(
+    ServiceContext* serviceCtx) const {
+    if (!supportsRecoverToStableTimestamp(serviceCtx)) {
+        return boost::none;
+    }
+
+    const auto ret = serviceCtx->getStorageEngine()->getLastStableCheckpointTimestamp();
+    if (ret == boost::none) {
+        return Timestamp::min();
+    }
+
+    return ret;
+}
+
 }  // namespace repl
 }  // namespace mongo

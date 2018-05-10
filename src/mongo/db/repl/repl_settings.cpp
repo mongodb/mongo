@@ -31,11 +31,21 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_parameters.h"
 
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
+namespace {
+
+// Tells the server to perform replication recovery as a standalone.
+constexpr bool recoverFromOplogAsStandaloneDefault = false;
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(recoverFromOplogAsStandalone,
+                                      bool,
+                                      recoverFromOplogAsStandaloneDefault);
+
+}  // namespace
 
 std::string ReplSettings::ourSetName() const {
     size_t sl = _replSetString.find('/');
@@ -58,6 +68,10 @@ long long ReplSettings::getOplogSizeBytes() const {
 
 std::string ReplSettings::getReplSetString() const {
     return _replSetString;
+}
+
+bool ReplSettings::shouldRecoverFromOplogAsStandalone() {
+    return recoverFromOplogAsStandalone;
 }
 
 ReplSettings::IndexPrefetchConfig ReplSettings::getPrefetchIndexMode() const {

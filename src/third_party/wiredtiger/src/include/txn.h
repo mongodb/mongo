@@ -103,6 +103,7 @@ struct __wt_txn_global {
 
 	WT_DECL_TIMESTAMP(commit_timestamp)
 	WT_DECL_TIMESTAMP(last_ckpt_timestamp)
+	WT_DECL_TIMESTAMP(meta_ckpt_timestamp)
 	WT_DECL_TIMESTAMP(oldest_timestamp)
 	WT_DECL_TIMESTAMP(pinned_timestamp)
 	WT_DECL_TIMESTAMP(recovery_timestamp)

@@ -47,6 +47,7 @@ MockReplicaSet::MockReplicaSet(const string& setName, size_t nodes) : _setName(s
     BSONObjBuilder configBuilder;
     configBuilder.append("_id", setName);
     configBuilder.append("version", 1);
+    configBuilder.append("protocolVersion", 1);
 
     BSONArrayBuilder membersBuilder(configBuilder.subarrayStart("members"));
     for (size_t n = 0; n < nodes; n++) {

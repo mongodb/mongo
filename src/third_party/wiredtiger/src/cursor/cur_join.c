@@ -1117,9 +1117,11 @@ __curjoin_next(WT_CURSOR *cursor)
 		 * generic error.
 		 */
 		iter->entry->stats.main_access++;
-		if ((ret = c->search(c)) == WT_NOTFOUND)
-			ret = WT_ERROR;
-		WT_ERR(ret);
+		if ((ret = c->search(c)) != 0) {
+			if (ret == WT_NOTFOUND)
+				ret = WT_ERROR;
+			WT_ERR_MSG(session, ret, "join cursor failed search");
+		}
 
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else if (ret == WT_NOTFOUND &&

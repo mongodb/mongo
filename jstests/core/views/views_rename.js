@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [requires_non_retryable_commands, requires_fastcount]
 
 (function() {
     // SERVER-30406 Test that renaming system.views correctly invalidates the view catalog

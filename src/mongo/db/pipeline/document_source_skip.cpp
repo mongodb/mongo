@@ -84,11 +84,13 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     invariant(*itr == this);
 
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-
     if (nextSkip) {
-        _nToSkip += nextSkip->getSkip();
-        container->erase(std::next(itr));
-        return itr;
+        // '_nToSkip' can potentially overflow causing it to become negative and skip nothing.
+        if (std::numeric_limits<long long>::max() - _nToSkip - nextSkip->getSkip() >= 0) {
+            _nToSkip += nextSkip->getSkip();
+            container->erase(std::next(itr));
+            return itr;
+        }
     }
     return std::next(itr);
 }

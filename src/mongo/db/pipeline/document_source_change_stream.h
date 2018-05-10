@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_sources_gen.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/resume_token.h"
 
 namespace mongo {
 
@@ -64,47 +65,36 @@ public:
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-            // TODO SERVER-29138: we need to communicate that this stage will need to look up
-            // documents from different collections.
             return stdx::unordered_set<NamespaceString>();
         }
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
         PrivilegeVector requiredPrivileges(bool isMongos) const final {
-            return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
+            if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
+                // Watching a whole cluster.
+                return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
+            } else if (_nss.isCollectionlessAggregateNS()) {
+                // Watching a whole database.
+                return {Privilege(ResourcePattern::forDatabaseName(_nss.db()), actions)};
+            } else {
+                // Watching a single collection. Note if this is in the admin database it will fail
+                // at parse time.
+                return {Privilege(ResourcePattern::forExactNamespace(_nss), actions)};
+            }
+        }
+
+        void assertSupportsReadConcern(const repl::ReadConcernArgs& readConcern) const {
+            // Only "majority" is allowed for change streams.
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Read concern " << readConcern.toString()
+                                  << " is not supported for change streams. "
+                                     "Only read concern level \"majority\" is supported.",
+                    !readConcern.hasLevel() ||
+                        readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern);
         }
 
     private:
         const NamespaceString _nss;
-    };
-
-    class Transformation : public DocumentSourceSingleDocumentTransformation::TransformerInterface {
-    public:
-        Transformation(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       BSONObj changeStreamSpec)
-            : _expCtx(expCtx), _changeStreamSpec(changeStreamSpec.getOwned()) {}
-        ~Transformation() = default;
-        Document applyTransformation(const Document& input) final;
-        TransformerType getType() const final {
-            return TransformerType::kChangeStreamTransformation;
-        };
-        void optimize() final{};
-        Document serializeStageOptions(
-            boost::optional<ExplainOptions::Verbosity> explain) const final;
-        DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final;
-        DocumentSource::GetModPathsReturn getModifiedPaths() const final;
-
-    private:
-        boost::intrusive_ptr<ExpressionContext> _expCtx;
-        BSONObj _changeStreamSpec;
-
-        // Fields of the document key, in order, including the shard key if the collection is
-        // sharded, and anyway "_id". Empty until the first oplog entry with a uuid is encountered.
-        // Needed for transforming 'insert' oplog entries.
-        std::vector<FieldPath> _documentKeyFields;
-
-        // Set to true if the collection is found to be sharded while retrieving _documentKeyFields.
-        bool _documentKeyFieldsSharded = false;
     };
 
     // The name of the field where the document key (_id and shard key, if present) will be found
@@ -122,6 +112,10 @@ public:
     // transformation.
     static constexpr StringData kNamespaceField = "ns"_sd;
 
+    // Name of the field which stores information about updates. Only applies when OperationType
+    // is "update".
+    static constexpr StringData kUpdateDescriptionField = "updateDescription"_sd;
+
     // The name of the subfield of '_id' where the UUID of the namespace will be located after the
     // transformation.
     static constexpr StringData kUuidField = "uuid"_sd;
@@ -130,18 +124,16 @@ public:
     // transformation.
     static constexpr StringData kOperationTypeField = "operationType"_sd;
 
-    // The name of this stage.
-    static constexpr StringData kStageName = "$changeStream"_sd;
-
     // The name of the field where the clusterTime of the change will be located after the
     // transformation. The cluster time will be located inside the change identifier, so the full
     // path to the cluster time will be kIdField + "." + kClusterTimeField.
     static constexpr StringData kClusterTimeField = "clusterTime"_sd;
 
-    // The name of the field where the timestamp of the change will be located after the
-    // transformation. The timestamp will be located inside the cluster time, so the full path
-    // to the timestamp will be kIdField + "." + kClusterTimeField + "." + kTimestampField.
-    static constexpr StringData kTimestampField = "ts"_sd;
+    // The name of this stage.
+    static constexpr StringData kStageName = "$changeStream"_sd;
+
+    static constexpr StringData kTxnNumberField = "txnNumber"_sd;
+    static constexpr StringData kLsidField = "lsid"_sd;
 
     // The different types of operations we can use for the operation type.
     static constexpr StringData kUpdateOpType = "update"_sd;
@@ -152,13 +144,23 @@ public:
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 
+    enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
+
+
+    /**
+     * Helpers for Determining which regex to match a change stream against.
+     */
+    static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
+    static std::string getNsRegexForChangeStream(const NamespaceString& nss);
+
+
     /**
      * Produce the BSON object representing the filter for the $match stage to filter oplog entries
      * to only those relevant for this $changeStream stage.
      */
     static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     Timestamp startFrom,
-                                    bool isResume);
+                                    bool startFromInclusive);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
@@ -168,7 +170,9 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSource> createTransformationStage(
-        BSONObj changeStreamSpec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONObj changeStreamSpec,
+        ServerGlobalParams::FeatureCompatibility::Version fcv);
 
     /**
      * Given a BSON object containing an aggregation command with a $changeStream stage, and a
@@ -179,7 +183,24 @@ public:
     static BSONObj replaceResumeTokenInCommand(const BSONObj originalCmdObj,
                                                const BSONObj resumeToken);
 
+    /**
+     * Helper used by various change stream stages. Used for asserting that a certain Value of a
+     * field has a certain type. Will uassert() if the field does not have the expected type.
+     */
+    static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
+
 private:
+    static constexpr StringData kRegexAllCollections = R"(\.(?!(\$|system\.)))"_sd;
+    static constexpr StringData kRegexAllDBs = "(?!(admin|config|local)).+"_sd;
+    static constexpr StringData kRegexCmdColl = R"(\.\$cmd$)"_sd;
+
+    // Helper function which throws if the $changeStream fails any of a series of semantic checks.
+    // For instance, whether it is permitted to run given the current FCV, whether the namespace is
+    // valid for the options specified in the spec, etc.
+    static void assertIsLegalSpecification(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const DocumentSourceChangeStreamSpec& spec,
+                                           ServerGlobalParams::FeatureCompatibility::Version fcv);
+
     // It is illegal to construct a DocumentSourceChangeStream directly, use createFromBson()
     // instead.
     DocumentSourceChangeStream() = default;

@@ -34,6 +34,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/bson_extract_optime.h"
@@ -58,7 +59,7 @@ GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
 GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
                                CursorId id,
-                               boost::optional<long long> sizeOfBatch,
+                               boost::optional<std::int64_t> sizeOfBatch,
                                boost::optional<Milliseconds> awaitDataTimeout,
                                boost::optional<long long> term,
                                boost::optional<repl::OpTime> lastKnownCommittedOpTime)
@@ -107,7 +108,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
     boost::optional<NamespaceString> nss;
 
     // Optional fields.
-    boost::optional<long long> batchSize;
+    boost::optional<std::int64_t> batchSize;
     boost::optional<Milliseconds> awaitDataTimeout;
     boost::optional<long long> term;
     boost::optional<repl::OpTime> lastKnownCommittedOpTime;
@@ -158,7 +159,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 return status;
             }
             lastKnownCommittedOpTime = ot;
-        } else if (!CommandHelpers::isGenericArgument(fieldName)) {
+        } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
                                   << "Unrecognized field '"

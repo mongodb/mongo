@@ -90,7 +90,7 @@ void readRequestMetadata(OperationContext* opCtx, const BSONObj& metadataObj) {
         uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
 
     auto logicalClock = LogicalClock::get(opCtx);
-    if (logicalClock) {
+    if (logicalClock && logicalClock->isEnabled()) {
         auto logicalTimeMetadata =
             uassertStatusOK(rpc::LogicalTimeMetadata::readFromMetadata(logicalTimeElem));
 

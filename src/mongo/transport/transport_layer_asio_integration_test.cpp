@@ -30,9 +30,17 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 #include "asio.hpp"
@@ -75,6 +83,56 @@ TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
 #else
     ASSERT_EQ(ec, asio::error::eof);
 #endif
+}
+
+// This test forces reads and writes to occur one byte at a time, verifying SERVER-34506 (the
+// isJustForContinuation optimization works).
+//
+// Because of the file size limit, it's only an effective check on debug builds (where the future
+// implementation checks the length of the future chain).
+TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
+    const auto assertOK = [](executor::RemoteCommandResponse reply) {
+        ASSERT_OK(reply.status);
+        ASSERT(reply.data["ok"]) << reply.data;
+    };
+
+    auto connectionString = unittest::getFixtureConnectionString();
+    auto server = connectionString.getServers().front();
+
+    auto sc = getGlobalServiceContext();
+    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kEgress);
+
+    stdx::thread thread([&] { reactor->run(); });
+    const auto threadGuard = MakeGuard([&] {
+        reactor->stop();
+        thread.join();
+    });
+
+    AsyncDBClient::Handle handle =
+        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor).get();
+
+    handle->initWireVersion(__FILE__, nullptr).get();
+
+    FailPointEnableBlock fp("transportLayerASIOshortOpportunisticReadWrite");
+
+    const executor::RemoteCommandRequest ecr{
+        server, "admin", BSON("echo" << std::string(1 << 10, 'x')), BSONObj(), nullptr};
+
+    assertOK(handle->runCommandRequest(ecr).get());
+
+    auto client = sc->makeClient(__FILE__);
+    auto opCtx = client->makeOperationContext();
+
+    if (auto baton = sc->getTransportLayer()->makeBaton(opCtx.get())) {
+        auto future = handle->runCommandRequest(ecr, baton);
+        const auto batonGuard = MakeGuard([&] { baton->detach(); });
+
+        while (!future.isReady()) {
+            baton->run(nullptr, boost::none);
+        }
+
+        assertOK(future.get());
+    }
 }
 
 }  // namespace

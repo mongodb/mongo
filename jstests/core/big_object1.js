@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount, requires_collstats]
 
 t = db.big_object1;
 t.drop();

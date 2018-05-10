@@ -266,6 +266,14 @@ connect = function(url, user, pass) {
         chatty("WARNING: shell and server versions do not match");
     }
 
+    // Optionally display free monitoring message.
+    const freemonStatus = db.adminCommand({getFreeMonitoringStatus: 1});
+    if (freemonStatus.ok) {
+        if (freemonStatus.userReminder) {
+            chatty(freemonStatus.userReminder);
+        }
+    }
+
     return db;
 };
 
@@ -465,4 +473,31 @@ Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10
         this.adminCommand({"ping": 1});
     }
     throw new Error("failed waiting for non default clusterTime");
+};
+
+Mongo.prototype.watch = function(pipeline, options) {
+    pipeline = pipeline || [];
+    options = options || {};
+    assert(pipeline instanceof Array, "'pipeline' argument must be an array");
+    assert(options instanceof Object, "'options' argument must be an object");
+
+    let changeStreamStage = {
+        allChangesForCluster: true,
+        fullDocument: options.fullDocument || "default"
+    };
+    delete options.allChangesForCluster;
+    delete options.fullDocument;
+
+    if (options.hasOwnProperty("resumeAfter")) {
+        changeStreamStage.resumeAfter = options.resumeAfter;
+        delete options.resumeAfter;
+    }
+
+    if (options.hasOwnProperty("startAtClusterTime")) {
+        changeStreamStage.startAtClusterTime = options.startAtClusterTime;
+        delete options.startAtClusterTime;
+    }
+
+    pipeline.unshift({$changeStream: changeStreamStage});
+    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: pipeline}, options);
 };

@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/*.js
+  - jstests/core/txns/**/*.js
   exclude_files:
   # These tests are not expected to pass with replica-sets:
   - jstests/core/dbadmin.js
@@ -16,6 +17,7 @@ selector:
 
 executor:
   archive:
+    tests: true
     hooks:
       - PeriodicKillSecondaries
   config:
@@ -23,13 +25,19 @@ executor:
       eval: "testingReplication = true;"
       readMode: commands
   hooks:
-  - class: CheckPrimary
   - class: PeriodicKillSecondaries
   fixture:
     class: ReplicaSetFixture
     mongod_options:
+      syncdelay: 5
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        logComponentVerbosity:
+          replication:
+            heartbeats: 2
+            rollback: 2
+          storage:
+            recovery: 2
     num_nodes: 2
     voting_secondaries: false

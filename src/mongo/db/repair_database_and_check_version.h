@@ -31,6 +31,7 @@
 #include "mongo/base/status_with.h"
 
 namespace mongo {
+class Database;
 class OperationContext;
 
 /**
@@ -38,4 +39,11 @@ class OperationContext;
 * represents whether there are non-local databases.
 */
 StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx);
+
+/**
+ * If we are in a replset, every replicated collection must have an _id index.  As we scan each
+ * database, we also gather a list of drop-pending collection namespaces for the
+ * DropPendingCollectionReaper to clean up eventually.
+ */
+void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Database* db);
 }

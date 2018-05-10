@@ -55,6 +55,9 @@ public:
         const std::string& dbName,
         repl::ReadConcernLevel readConcernLevel) override;
 
+    StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> getAllDBs(
+        OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;
+
     StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,

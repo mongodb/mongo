@@ -36,8 +36,8 @@
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/object_check.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {

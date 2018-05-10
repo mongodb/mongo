@@ -42,6 +42,9 @@ const OperationContext::Decoration<OperationShardingState> shardingMetadataDecor
 // Max time to wait for the migration critical section to complete
 const Milliseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
 
+// Max time to wait for the movePrimary critical section to complete
+const Milliseconds kMaxWaitForMovePrimaryCriticalSection = Minutes(5);
+
 // The name of the field in which the client attaches its database version.
 constexpr auto kDbVersionField = "databaseVersion"_sd;
 }  // namespace
@@ -67,10 +70,8 @@ bool OperationShardingState::allowImplicitCollectionCreation() const {
 
 void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss,
                                                              const BSONObj& cmdObj) {
-    invariant(!hasShardVersion());
-    invariant(!_dbVersion);
-
-    _nss = std::move(nss);
+    invariant(_shardVersions.empty());
+    invariant(_databaseVersions.empty());
 
     const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
     if (!shardVersionElem.eoo()) {
@@ -86,11 +87,10 @@ void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss
                 str::stream() << "could not parse shardVersion from field " << versionArr,
                 canParse);
 
-        _hasShardVersion = true;
         if (nss.isSystemDotIndexes()) {
-            _shardVersion = ChunkVersion::IGNORED();
+            _shardVersions[nss.ns()] = ChunkVersion::IGNORED();
         } else {
-            _shardVersion = std::move(shardVersion);
+            _shardVersions[nss.ns()] = std::move(shardVersion);
         }
     }
 
@@ -100,42 +100,48 @@ void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss
                 str::stream() << "expected databaseVersion element to be an object, got "
                               << dbVersionElem,
                 dbVersionElem.type() == BSONType::Object);
-        _dbVersion = DatabaseVersion::parse(IDLParserErrorContext("setClientRoutingVersions"),
-                                            dbVersionElem.Obj());
+        // Unforunately this is a bit ugly; it's because a command comes with a shardVersion or
+        // databaseVersion, and the assumption is that those versions are applied to whatever is
+        // returned by the Command's parseNs(), which can either be a full namespace or just a db.
+        _databaseVersions[nss.db().empty() ? nss.ns() : nss.db()] = DatabaseVersion::parse(
+            IDLParserErrorContext("initializeClientRoutingVersions"), dbVersionElem.Obj());
     }
 }
 
 bool OperationShardingState::hasShardVersion() const {
-    return _hasShardVersion;
+    return _globalUnshardedShardVersion || !_shardVersions.empty();
 }
 
 ChunkVersion OperationShardingState::getShardVersion(const NamespaceString& nss) const {
-    if (_nss != nss) {
+    if (_globalUnshardedShardVersion) {
         return ChunkVersion::UNSHARDED();
     }
 
-    return _shardVersion;
+    const auto it = _shardVersions.find(nss.ns());
+    if (it != _shardVersions.end()) {
+        return it->second;
+    }
+    // If the client did not send a shardVersion for the requested namespace, assume the client
+    // expected the namespace to be unsharded.
+    return ChunkVersion::UNSHARDED();
 }
 
 bool OperationShardingState::hasDbVersion() const {
-    return !!_dbVersion;
+    return !_databaseVersions.empty();
 }
 
-boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(const StringData db) const {
-    if (_nss.db() != db) {
+boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(
+    const StringData dbName) const {
+    const auto it = _databaseVersions.find(dbName);
+    if (it == _databaseVersions.end()) {
         return boost::none;
     }
-    return _dbVersion;
+    return it->second;
 }
 
-void OperationShardingState::setShardVersion(NamespaceString nss, ChunkVersion newVersion) {
-    // This currently supports only setting the shard version for one namespace.
-    invariant(!_hasShardVersion || _nss == nss);
-    invariant(!nss.isSystemDotIndexes() || ChunkVersion::isIgnoredVersion(newVersion));
-
-    _nss = std::move(nss);
-    _shardVersion = std::move(newVersion);
-    _hasShardVersion = true;
+void OperationShardingState::setGlobalUnshardedShardVersion() {
+    invariant(_shardVersions.empty());
+    _globalUnshardedShardVersion = true;
 }
 
 bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationContext* opCtx) {
@@ -159,6 +165,29 @@ void OperationShardingState::setMigrationCriticalSectionSignal(
     std::shared_ptr<Notification<void>> critSecSignal) {
     invariant(critSecSignal);
     _migrationCriticalSectionSignal = std::move(critSecSignal);
+}
+
+bool OperationShardingState::waitForMovePrimaryCriticalSectionSignal(OperationContext* opCtx) {
+    // Must not block while holding a lock
+    invariant(!opCtx->lockState()->isLocked());
+
+    if (_movePrimaryCriticalSectionSignal) {
+        _movePrimaryCriticalSectionSignal->waitFor(
+            opCtx,
+            opCtx->hasDeadline() ? std::min(opCtx->getRemainingMaxTimeMillis(),
+                                            kMaxWaitForMovePrimaryCriticalSection)
+                                 : kMaxWaitForMovePrimaryCriticalSection);
+        _movePrimaryCriticalSectionSignal = nullptr;
+        return true;
+    }
+
+    return false;
+}
+
+void OperationShardingState::setMovePrimaryCriticalSectionSignal(
+    std::shared_ptr<Notification<void>> critSecSignal) {
+    invariant(critSecSignal);
+    _movePrimaryCriticalSectionSignal = std::move(critSecSignal);
 }
 
 }  // namespace mongo

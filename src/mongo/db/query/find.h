@@ -34,7 +34,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/util/net/message.h"
+#include "mongo/rpc/message.h"
 
 namespace mongo {
 

@@ -1,6 +1,12 @@
-// Cannot implicitly shard accessed collections because group is not supported on sharded
-// collections.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//     # Cannot implicitly shard accessed collections because group is not supported on sharded
+//     # collections.
+//     assumes_unsharded_collection,
+//     requires_fastcount,
+//
+//     # reduce uses javascript
+//     requires_scripting,
+// ]
 
 t = db.geo_group;
 t.drop();

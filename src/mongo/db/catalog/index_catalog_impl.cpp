@@ -54,6 +54,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
@@ -61,50 +62,45 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/represent_as.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER(InitializeIndexCatalogFactory)(InitializerContext* const) {
-    IndexCatalog::registerFactory([](
-        IndexCatalog* const this_, Collection* const collection, const int maxNumIndexesAllowed) {
-        return stdx::make_unique<IndexCatalogImpl>(this_, collection, maxNumIndexesAllowed);
-    });
-    return Status::OK();
+MONGO_REGISTER_SHIM(IndexCatalog::makeImpl)
+(IndexCatalog* const this_,
+ Collection* const collection,
+ const int maxNumIndexesAllowed,
+ PrivateTo<IndexCatalog>)
+    ->std::unique_ptr<IndexCatalog::Impl> {
+    return std::make_unique<IndexCatalogImpl>(this_, collection, maxNumIndexesAllowed);
 }
 
-MONGO_INITIALIZER(InitializeIndexCatalogIndexIteratorFactory)(InitializerContext* const) {
-    IndexCatalog::IndexIterator::registerFactory([](OperationContext* const opCtx,
-                                                    const IndexCatalog* const cat,
-                                                    const bool includeUnfinishedIndexes) {
-        return stdx::make_unique<IndexCatalogImpl::IndexIteratorImpl>(
-            opCtx, cat, includeUnfinishedIndexes);
-    });
-    return Status::OK();
+MONGO_REGISTER_SHIM(IndexCatalog::IndexIterator::makeImpl)
+(OperationContext* const opCtx,
+ const IndexCatalog* const cat,
+ const bool includeUnfinishedIndexes,
+ PrivateTo<IndexCatalog::IndexIterator>)
+    ->std::unique_ptr<IndexCatalog::IndexIterator::Impl> {
+    return std::make_unique<IndexCatalogImpl::IndexIteratorImpl>(
+        opCtx, cat, includeUnfinishedIndexes);
+}
+MONGO_REGISTER_SHIM(IndexCatalog::fixIndexKey)(const BSONObj& key)->BSONObj {
+    return IndexCatalogImpl::fixIndexKey(key);
 }
 
-MONGO_INITIALIZER(InitializeFixIndexKeyImpl)(InitializerContext* const) {
-    IndexCatalog::registerFixIndexKeyImpl(&IndexCatalogImpl::fixIndexKey);
-    return Status::OK();
+MONGO_REGISTER_SHIM(IndexCatalog::prepareInsertDeleteOptions)
+(OperationContext* opCtx, const IndexDescriptor* desc, InsertDeleteOptions* options)->void {
+    return IndexCatalogImpl::prepareInsertDeleteOptions(opCtx, desc, options);
 }
 
-MONGO_INITIALIZER(InitializePrepareInsertDeleteOptionsImpl)(InitializerContext* const) {
-    IndexCatalog::registerPrepareInsertDeleteOptionsImpl(
-        &IndexCatalogImpl::prepareInsertDeleteOptions);
-    return Status::OK();
-}
-
-}  // namespace
-
-using std::unique_ptr;
 using std::endl;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
@@ -336,7 +332,12 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(OperationContext* opC
 StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationContext* opCtx,
                                                                    BSONObj spec) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));
-    invariant(_collection->numRecords(opCtx) == 0);
+    invariant(_collection->numRecords(opCtx) == 0,
+              str::stream() << "Collection must be empty. Collection: " << _collection->ns().ns()
+                            << " UUID: "
+                            << _collection->uuid()
+                            << " Count: "
+                            << _collection->numRecords(opCtx));
 
     _checkMagic();
     Status status = checkUnfinished();
@@ -404,25 +405,36 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
     _indexName = descriptor->indexName();
     _indexNamespace = descriptor->indexNamespace();
 
-    /// ----------   setup on disk structures ----------------
-
+    bool isBackgroundIndex = _spec["background"].trueValue();
     bool isBackgroundSecondaryBuild = false;
     if (auto replCoord = repl::ReplicationCoordinator::get(_opCtx)) {
         isBackgroundSecondaryBuild =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
-            replCoord->getMemberState().secondary() && _spec["background"].trueValue();
+            replCoord->getMemberState().secondary() && isBackgroundIndex;
     }
 
+    // Setup on-disk structures.
     Status status = _collection->getCatalogEntry()->prepareForIndexBuild(
         _opCtx, descriptor.get(), isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 
     auto* const descriptorPtr = descriptor.get();
-    /// ----------   setup in memory structures  ----------------
     const bool initFromDisk = false;
     _entry = IndexCatalogImpl::_setupInMemoryStructures(
         _catalog, _opCtx, std::move(descriptor), initFromDisk);
+
+    if (isBackgroundIndex) {
+        _opCtx->recoveryUnit()->onCommit(
+            [ opCtx = _opCtx, entry = _entry, collection = _collection ](
+                boost::optional<Timestamp> commitTime) {
+                // This will prevent the unfinished index from being visible on index iterators.
+                if (commitTime) {
+                    entry->setMinimumVisibleSnapshot(commitTime.get());
+                    collection->setMinimumVisibleSnapshot(commitTime.get());
+                }
+            });
+    }
 
     // Register this index with the CollectionInfoCache to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
@@ -456,6 +468,7 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
     invariant(_opCtx->lockState()->inAWriteUnitOfWork());
 
     Collection* collection = _catalog->_getCollection();
+
     fassert(17207, collection->ok());
     NamespaceString ns(_indexNamespace);
     invariant(_opCtx->lockState()->isDbLockedForMode(ns.db(), MODE_X));
@@ -470,19 +483,24 @@ void IndexCatalogImpl::IndexBuildBlock::success() {
     OperationContext* opCtx = _opCtx;
     LOG(2) << "marking index " << _indexName << " as ready in snapshot id "
            << opCtx->recoveryUnit()->getSnapshotId();
-    _opCtx->recoveryUnit()->onCommit([opCtx, entry, collection] {
-        // Note: this runs after the WUOW commits but before we release our X lock on the
-        // collection. This means that any snapshot created after this must include the full index,
-        // and no one can try to read this index before we set the visibility.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto snapshotName = replCoord->getMinimumVisibleSnapshot(opCtx);
-        entry->setMinimumVisibleSnapshot(snapshotName);
-
-        // TODO remove this once SERVER-20439 is implemented. It is a stopgap solution for
-        // SERVER-20260 to make sure that reads with majority readConcern level can see indexes that
-        // are created with w:majority by making the readers block.
-        collection->setMinimumVisibleSnapshot(snapshotName);
-    });
+    _opCtx->recoveryUnit()->onCommit(
+        [opCtx, entry, collection](boost::optional<Timestamp> commitTime) {
+            // Note: this runs after the WUOW commits but before we release our X lock on the
+            // collection. This means that any snapshot created after this must include the full
+            // index, and no one can try to read this index before we set the visibility.
+            if (!commitTime) {
+                // The end of background index builds on secondaries does not get a commit
+                // timestamp. We use the cluster time since it's guaranteed to be greater than the
+                // time of the index build. It is possible the cluster time could be in the future,
+                // and we will need to do another write to reach the minimum visible snapshot.
+                commitTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
+            }
+            entry->setMinimumVisibleSnapshot(commitTime.get());
+            // We must also set the minimum visible snapshot on the collection like during init().
+            // This prevents reads in the past from reading inconsistent metadata. We should be
+            // able to remove this when the catalog is versioned.
+            collection->setMinimumVisibleSnapshot(commitTime.get());
+        });
 
     entry->setIsReady(true);
 }
@@ -518,7 +536,7 @@ Status _checkValidFilterExpressions(MatchExpression* expression, int level = 0) 
                                         << expression->toString());
     }
 }
-}
+}  // namespace
 
 Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec) const {
     const NamespaceString& nss = _collection->ns();
@@ -555,7 +573,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
 
     // SERVER-16893 Forbid use of v0 indexes with non-mmapv1 engines
     if (indexVersion == IndexVersion::kV0 &&
-        !opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+        !opCtx->getServiceContext()->getStorageEngine()->isMmapV1()) {
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream() << "use of v0 indexes is only allowed with the "
                                     << "mmapv1 storage engine");
@@ -686,15 +704,12 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
             new ExpressionContext(opCtx, collator.get()));
 
         // Parsing the partial filter expression is not expected to fail here since the
-        // expression would have been successfully parsed upstream during index creation. However,
-        // filters that were allowed in partial filter expressions prior to 3.6 may be present in
-        // the index catalog and must also successfully parse (e.g., partial index filters with the
-        // $isolated/$atomic option).
+        // expression would have been successfully parsed upstream during index creation.
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterElement.Obj(),
                                          std::move(expCtx),
                                          ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kIsolated);
+                                         MatchExpressionParser::kBanAllSpecialFeatures);
         if (!statusWithMatcher.isOK()) {
             return statusWithMatcher.getStatus();
         }
@@ -750,8 +765,8 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
                       "Empty \"storageEngine\" options are invalid. "
                       "Please remove the field or include valid options.");
     }
-    Status storageEngineStatus =
-        validateStorageOptions(storageEngineOptions, [](const auto& x, const auto& y) {
+    Status storageEngineStatus = validateStorageOptions(
+        opCtx->getServiceContext(), storageEngineOptions, [](const auto& x, const auto& y) {
             return x->validateIndexStorageOptions(y);
         });
     if (!storageEngineStatus.isOK()) {
@@ -860,11 +875,10 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     return Status::OK();
 }
 
-BSONObj IndexCatalogImpl::getDefaultIdIndexSpec(
-    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) const {
+BSONObj IndexCatalogImpl::getDefaultIdIndexSpec() const {
     dassert(_idObj["_id"].type() == NumberInt);
 
-    const auto indexVersion = IndexDescriptor::getDefaultIndexVersion(featureCompatibilityVersion);
+    const auto indexVersion = IndexDescriptor::getDefaultIndexVersion();
 
     BSONObjBuilder b;
     b.append("v", static_cast<int>(indexVersion));
@@ -976,11 +990,16 @@ public:
                       IndexCatalogEntry* entry)
         : _opCtx(opCtx), _collection(collection), _entries(entries), _entry(entry) {}
 
-    void commit() final {
+    void commit(boost::optional<Timestamp> commitTime) final {
         // Ban reading from this collection on committed reads on snapshots before now.
-        auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-        auto snapshotName = replCoord->getMinimumVisibleSnapshot(_opCtx);
-        _collection->setMinimumVisibleSnapshot(snapshotName);
+        if (!commitTime) {
+            // This is called when we refresh the index catalog entry, which does not always have
+            // a commit timestamp. We use the cluster time since it's guaranteed to be greater than
+            // the time of the index removal. It is possible the cluster time could be in the
+            // future, and we will need to do another write to reach the minimum visible snapshot.
+            commitTime = LogicalClock::getClusterTimeForReplicaSet(_opCtx).asTimestamp();
+        }
+        _collection->setMinimumVisibleSnapshot(commitTime.get());
 
         delete _entry;
     }

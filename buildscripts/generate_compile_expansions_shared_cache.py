@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """
-This script generates the compile expansions file used by Evergreen as part of the push/release
-process.
+Generate the compile expansions file used by Evergreen as part of the push/release process.
 
 Invoke by specifying an output file.
 $ python generate_compile_expansions.py --out compile_expansions.yml
 """
+
+from __future__ import print_function
 
 import argparse
 import json
@@ -14,7 +15,7 @@ import re
 import sys
 import yaml
 
-version_json = "version.json"
+VERSION_JSON = "version.json"
 
 
 def generate_expansions():
@@ -25,7 +26,7 @@ def generate_expansions():
     """
     args = parse_args()
     expansions = {}
-    expansions.update(generate_version_expansions(args))
+    expansions.update(generate_version_expansions())
     expansions.update(generate_scons_cache_expansions())
 
     with open(args.out, "w") as out:
@@ -34,18 +35,19 @@ def generate_expansions():
 
 
 def parse_args():
+    """Parse program arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
     return parser.parse_args()
 
 
-def generate_version_expansions(args):
+def generate_version_expansions():
     """Generate expansions from a version.json file if given, or $MONGO_VERSION."""
     expansions = {}
 
-    if os.path.exists(version_json):
-        with open(version_json, "r") as f:
-            data = f.read()
+    if os.path.exists(VERSION_JSON):
+        with open(VERSION_JSON, "r") as fh:
+            data = fh.read()
             version_data = json.loads(data)
         version_line = version_data['version']
         version_parts = match_verstr(version_line)
@@ -84,8 +86,8 @@ def generate_scons_cache_expansions():
         system_id_path = "/etc/mongodb-build-system-id"
 
     if os.path.isfile(system_id_path):
-        with open(system_id_path, "r") as f:
-            system_uuid = f.readline().strip()
+        with open(system_id_path, "r") as fh:
+            system_uuid = fh.readline().strip()
 
     # Set the scons shared cache setting
 
@@ -96,10 +98,12 @@ def generate_scons_cache_expansions():
 
         # Patches are read only
         if os.getenv("IS_PATCH"):
-            expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}' --cache-readonly".format(
-                scons_cache_mode, default_cache_path)
+            expansions[
+                "scons_cache_args"] = "--cache={0} --cache-dir='{1}' --cache-readonly".format(
+                    scons_cache_mode, default_cache_path)
         else:
-            expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(scons_cache_mode, default_cache_path)
+            expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(
+                scons_cache_mode, default_cache_path)
 
     # Local shared cache - host-based
     elif os.getenv("SCONS_CACHE_SCOPE") == "local":
@@ -111,7 +115,8 @@ def generate_scons_cache_expansions():
 
         default_cache_path = os.path.join(default_cache_path_base, system_uuid)
         expansions["scons_cache_path"] = default_cache_path
-        expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(scons_cache_mode, default_cache_path)
+        expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(
+            scons_cache_mode, default_cache_path)
     # No cache
     else:
         # Anything else is 'none'
@@ -121,8 +126,7 @@ def generate_scons_cache_expansions():
 
 
 def match_verstr(verstr):
-    """
-    This function matches a version string and captures the "extra" part.
+    """Match a version string and capture the "extra" part.
 
     If the version is a release like "2.3.4" or "2.3.4-rc0", this will return
     None. If the version is a pre-release like "2.3.4-325-githash" or

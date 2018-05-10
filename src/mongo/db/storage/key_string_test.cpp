@@ -50,6 +50,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -60,6 +61,15 @@ using namespace mongo;
 
 BSONObj toBson(const KeyString& ks, Ordering ord) {
     return KeyString::toBson(ks.getBuffer(), ks.getSize(), ord, ks.getTypeBits());
+}
+
+BSONObj toBsonAndCheckKeySize(const KeyString& ks, Ordering ord) {
+    auto keyStringSize = ks.getSize();
+
+    // Validate size of the key in KeyString.
+    ASSERT_EQUALS(keyStringSize,
+                  KeyString::getKeySize(ks.getBuffer(), keyStringSize, ord, ks.getTypeBits()));
+    return KeyString::toBson(ks.getBuffer(), keyStringSize, ord, ks.getTypeBits());
 }
 
 Ordering ALL_ASCENDING = Ordering::make(BSONObj());
@@ -97,13 +107,13 @@ TEST_F(KeyStringTest, Simple1) {
                      KeyString(version, b, ALL_ASCENDING, RecordId()));
 }
 
-#define ROUNDTRIP_ORDER(version, x, order)             \
-    do {                                               \
-        const BSONObj _orig = x;                       \
-        const KeyString _ks(version, _orig, order);    \
-        const BSONObj _converted = toBson(_ks, order); \
-        ASSERT_BSONOBJ_EQ(_converted, _orig);          \
-        ASSERT(_converted.binaryEqual(_orig));         \
+#define ROUNDTRIP_ORDER(version, x, order)                            \
+    do {                                                              \
+        const BSONObj _orig = x;                                      \
+        const KeyString _ks(version, _orig, order);                   \
+        const BSONObj _converted = toBsonAndCheckKeySize(_ks, order); \
+        ASSERT_BSONOBJ_EQ(_converted, _orig);                         \
+        ASSERT(_converted.binaryEqual(_orig));                        \
     } while (0)
 
 #define ROUNDTRIP(version, x)                        \
@@ -1178,6 +1188,106 @@ TEST_F(KeyStringTest, KeyWithTooManyTypeBitsCausesUassert) {
     ASSERT_THROWS_CODE(key.resetToKey(obj, ONE_ASCENDING), DBException, ErrorCodes::KeyTooLong);
 }
 
+TEST_F(KeyStringTest, ToBsonSafeShouldNotTerminate) {
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+
+    const char invalidString[] = {
+        60,  // CType::kStringLike
+        55,  // Non-null terminated
+    };
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(invalidString, sizeof(invalidString), ALL_ASCENDING, typeBits),
+        AssertionException,
+        50816);
+
+    const char invalidNumber[] = {
+        43,  // CType::kNumericPositive1ByteInt
+        1,   // Encoded integer part, least significant bit indicates there's a fractional part.
+        0,   // Since the integer part is 1 byte, the next 7 bytes are expected to be the fractional
+             // part and are needed to prevent the BufReader from overflowing.
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    };
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(invalidNumber, sizeof(invalidNumber), ALL_ASCENDING, typeBits),
+        AssertionException,
+        50810);
+}
+
+TEST_F(KeyStringTest, InvalidDecimalExponent) {
+    const Decimal128 dec("1125899906842624.1");
+    const KeyString ks(KeyString::Version::V1, BSON("" << dec), ALL_ASCENDING);
+
+    // Overwrite the 1st byte to 0, corrupting the exponent. This is meant to reproduce
+    // SERVER-34767.
+    char* ksBuffer = (char*)ks.getBuffer();
+    ksBuffer[1] = 0;
+
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(ksBuffer, ks.getSize(), ALL_ASCENDING, ks.getTypeBits()),
+        AssertionException,
+        50814);
+}
+
+TEST_F(KeyStringTest, InvalidDecimalZero) {
+    const KeyString ks(KeyString::Version::V1, BSON("" << Decimal128("-0")), ALL_ASCENDING);
+
+    char* ksBuffer = (char*)ks.getBuffer();
+    ksBuffer[2] = 100;
+
+    uint8_t* typeBits = (uint8_t*)ks.getTypeBits().getBuffer();
+    typeBits[1] = 147;
+
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe(ksBuffer, ks.getSize(), ALL_ASCENDING, ks.getTypeBits()),
+        AssertionException,
+        50846);
+}
+
+TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
+    std::mt19937 gen(newSeed());
+    std::uniform_int_distribution<> randomByte(std::numeric_limits<unsigned char>::min(),
+                                               std::numeric_limits<unsigned char>::max());
+
+    const auto interestingElements = getInterestingElements(KeyString::Version::V1);
+    for (auto elem : interestingElements) {
+        const KeyString ks(KeyString::Version::V1, elem, ALL_ASCENDING);
+
+        char* ksBuffer = (char*)ks.getBuffer();
+        char* typeBits = (char*)ks.getTypeBits().getBuffer();
+
+        // Select a random byte to change, except for the first byte as it will likely become an
+        // invalid CType and not test anything interesting.
+        auto offset = randomByte(gen);
+        auto newValue = randomByte(gen);
+        ksBuffer[offset % ks.getSize() + 1] = newValue;
+
+        // Ditto for the type bits buffer.
+        offset = randomByte(gen);
+        newValue = randomByte(gen);
+        typeBits[offset % ks.getTypeBits().getSize() + 1] = newValue;
+
+        try {
+            KeyString::toBsonSafe(ksBuffer, ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
+        } catch (const AssertionException&) {
+            // The expectation is that the randomized buffer is likely an invalid KeyString,
+            // however attempting to decode it should fail gracefully.
+        }
+
+        // Retest with descending.
+        try {
+            KeyString::toBsonSafe(ksBuffer, ks.getSize(), ONE_DESCENDING, ks.getTypeBits());
+        } catch (const AssertionException&) {
+            // The expectation is that the randomized buffer is likely an invalid KeyString,
+            // however attempting to decode it should fail gracefully.
+        }
+    }
+}
+
 namespace {
 const uint64_t kMinPerfMicros = 20 * 1000;
 const uint64_t kMinPerfSamples = 50 * 1000;
@@ -1329,4 +1439,13 @@ TEST_F(KeyStringTest, DecimalFromUniformDoublePerf) {
         }
     }
     perfTest(version, numbers);
+}
+
+DEATH_TEST(KeyStringTest, ToBsonPromotesAssertionsToTerminate, "terminate() called") {
+    const char invalidString[] = {
+        60,  // CType::kStringLike
+        55,  // Non-null terminated
+    };
+    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    KeyString::toBson(invalidString, sizeof(invalidString), ALL_ASCENDING, typeBits);
 }

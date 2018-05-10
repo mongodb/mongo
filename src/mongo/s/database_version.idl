@@ -24,7 +24,10 @@ imports:
 structs:
     DatabaseVersion:
         description: "A (UUID, int) pair that uniquely identifies an incarnation of a database in a cluster and reflects changes to the database's primary shard"
-        generate_comparison_operators: true
+        # The generated comparison operators will do a field-wise lexicographic comparison, which
+        # doesn't work because it's nonsensical to lexicographically compare UUIDs.
+        generate_comparison_operators: false
+        strict: true
         fields:
             uuid:
                 type: uuid

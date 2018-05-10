@@ -1,6 +1,4 @@
-"""
-unittest.TestCase for tests with a static JavaScript runner file.
-"""
+"""The unittest.TestCase for tests with a static JavaScript runner file."""
 
 from __future__ import absolute_import
 
@@ -16,14 +14,10 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self,
-                 logger,
-                 test_kind,
-                 test_name,
-                 test_runner_file,
-                 shell_executable=None,
-                 shell_options=None):
-        """Initializes the JSRunnerFileTestCase with the 'test_name' file."""
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, test_kind, test_name, test_runner_file, shell_executable=None,
+            shell_options=None):
+        """Initialize the JSRunnerFileTestCase with the 'test_name' file."""
 
         interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)
 
@@ -34,6 +28,7 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         self.test_runner_file = test_runner_file
 
     def configure(self, fixture, *args, **kwargs):
+        """Configure the js runner."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         global_vars = self.shell_options.get("global_vars", {}).copy()
@@ -45,7 +40,8 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
         self.shell_options["global_vars"] = global_vars
 
     def _populate_test_data(self, test_data):
-        """
+        """Provide base method.
+
         This method is intended to be overridden by subclasses in order to define the configuration
         necessary for the static JavaScript runner file.
         """
@@ -53,8 +49,6 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger,
-            executable=self.shell_executable,
+            self.logger, executable=self.shell_executable,
             connection_string=self.fixture.get_driver_connection_url(),
-            filename=self.test_runner_file,
-            **self.shell_options)
+            filename=self.test_runner_file, **self.shell_options)

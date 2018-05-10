@@ -1,3 +1,7 @@
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
 
 t = db.getCollection("where1");
 t.drop();

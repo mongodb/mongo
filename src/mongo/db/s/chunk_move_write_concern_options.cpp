@@ -69,7 +69,7 @@ StatusWith<WriteConcernOptions> ChunkMoveWriteConcernOptions::getEffectiveWriteC
     OperationContext* opCtx, const MigrationSecondaryThrottleOptions& options) {
     auto secondaryThrottle = options.getSecondaryThrottle();
     if (secondaryThrottle == MigrationSecondaryThrottleOptions::kDefault) {
-        if (opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
+        if (opCtx->getServiceContext()->getStorageEngine()->supportsDocLocking()) {
             secondaryThrottle = MigrationSecondaryThrottleOptions::kOff;
         } else {
             secondaryThrottle = MigrationSecondaryThrottleOptions::kOn;

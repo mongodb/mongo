@@ -70,56 +70,14 @@ namespace mongo {
 // Emit the vtable in this TU
 Collection::Impl::~Impl() = default;
 
-namespace {
-stdx::function<Collection::factory_function_type> factory;
-}  // namespace
+MONGO_DEFINE_SHIM(Collection::makeImpl);
 
-void Collection::registerFactory(decltype(factory) newFactory) {
-    factory = std::move(newFactory);
-}
+MONGO_DEFINE_SHIM(Collection::parseValidationLevel);
 
-auto Collection::makeImpl(Collection* _this,
-                          OperationContext* const opCtx,
-                          const StringData fullNS,
-                          OptionalCollectionUUID uuid,
-                          CollectionCatalogEntry* const details,
-                          RecordStore* const recordStore,
-                          DatabaseCatalogEntry* const dbce) -> std::unique_ptr<Impl> {
-    return factory(_this, opCtx, fullNS, uuid, details, recordStore, dbce);
-}
+MONGO_DEFINE_SHIM(Collection::parseValidationAction);
 
 void Collection::TUHook::hook() noexcept {}
 
-
-namespace {
-stdx::function<decltype(Collection::parseValidationLevel)> parseValidationLevelImpl;
-}  // namespace
-
-void Collection::registerParseValidationLevelImpl(
-    stdx::function<decltype(parseValidationLevel)> impl) {
-    parseValidationLevelImpl = std::move(impl);
-}
-
-auto Collection::parseValidationLevel(const StringData data) -> StatusWith<ValidationLevel> {
-    return parseValidationLevelImpl(data);
-}
-
-namespace {
-stdx::function<decltype(Collection::parseValidationAction)> parseValidationActionImpl;
-}  // namespace
-
-void Collection::registerParseValidationActionImpl(
-    stdx::function<decltype(parseValidationAction)> impl) {
-    parseValidationActionImpl = std::move(impl);
-}
-
-auto Collection::parseValidationAction(const StringData data) -> StatusWith<ValidationAction> {
-    return parseValidationActionImpl(data);
-}
-}  // namespace mongo
-
-
-namespace mongo {
 std::string CompactOptions::toString() const {
     std::stringstream ss;
     ss << "paddingMode: ";

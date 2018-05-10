@@ -108,6 +108,14 @@ public:
         return _cursorsOut;
     }
 
+    bool isDropQueuedIdentsAtSessionEndAllowed() const {
+        return _dropQueuedIdentsAtSessionEnd;
+    }
+
+    void dropQueuedIdentsAtSessionEndAllowed(bool dropQueuedIdentsAtSessionEnd) {
+        _dropQueuedIdentsAtSessionEnd = dropQueuedIdentsAtSessionEnd;
+    }
+
     static uint64_t genTableId();
 
     /**
@@ -138,6 +146,7 @@ private:
     CursorCache _cursors;            // owned
     uint64_t _cursorGen;
     int _cursorsOut;
+    bool _dropQueuedIdentsAtSessionEnd = true;
 };
 
 /**
@@ -157,6 +166,11 @@ public:
     public:
         void operator()(WiredTigerSession* session) const;
     };
+
+    /**
+     * Indicates that WiredTiger should be configured to cache cursors.
+     */
+    static bool isEngineCachingCursors();
 
     /**
      * Returns a smart pointer to a previously released session for reuse, or creates a new session.
@@ -196,6 +210,26 @@ public:
      * Uses a temporary session. Safe to call without any locks, even during shutdown.
      */
     void waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint);
+
+    /**
+     * Waits until a prepared unit of work has ended (either been commited or aborted). This
+     * should be used when encountering WT_PREPARE_CONFLICT errors. The caller is required to retry
+     * the conflicting WiredTiger API operation. A return from this function does not guarantee that
+     * the conflicting transaction has ended, only that one prepared unit of work in the process has
+     * signaled that it has ended.
+     * Accepts an OperationContext that will throw an AssertionException when interrupted.
+     *
+     * This method is provided in WiredTigerSessionCache and not RecoveryUnit because all recovery
+     * units share the same session cache, and we want a recovery unit on one thread to signal all
+     * recovery units waiting for prepare conflicts across all other threads.
+     */
+    void waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx);
+
+    /**
+     * Notifies waiters that the caller's perpared unit of work has ended (either committed or
+     * aborted).
+     */
+    void notifyPreparedUnitOfWorkHasCommittedOrAborted();
 
     WT_CONNECTION* conn() const {
         return _conn;
@@ -242,6 +276,11 @@ private:
     // Counter and critical section mutex for waitUntilDurable
     AtomicUInt32 _lastSyncTime;
     stdx::mutex _lastSyncMutex;
+
+    // Mutex and cond var for waiting on prepare commit or abort.
+    stdx::mutex _prepareCommittedOrAbortedMutex;
+    stdx::condition_variable _prepareCommittedOrAbortedCond;
+    std::uint64_t _lastCommitOrAbortCounter;
 
     // Protects _journalListener.
     stdx::mutex _journalListenerMutex;

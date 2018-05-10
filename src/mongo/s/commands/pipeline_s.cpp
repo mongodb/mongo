@@ -66,7 +66,7 @@ std::pair<ShardId, ChunkVersion> getSingleTargetedShardForQuery(
         return {*shardIds.begin(), chunkMgr->getVersion(*shardIds.begin())};
     }
 
-    return {routingInfo.primaryId(), ChunkVersion::UNSHARDED()};
+    return {routingInfo.db().primaryId(), ChunkVersion::UNSHARDED()};
 }
 
 /**
@@ -114,7 +114,7 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
         cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
     }
 
-    auto shardResult = std::vector<ClusterClientCursorParams::RemoteCursor>();
+    auto shardResult = std::vector<RemoteCursor>();
     auto findCmd = cmdBuilder.obj();
     size_t numAttempts = 0;
     while (++numAttempts <= kMaxNumStaleVersionRetries) {
@@ -154,9 +154,9 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
             // If it's an unsharded collection which has been deleted and re-created, we may get a
             // NamespaceNotFound error when looking up by UUID.
             return boost::none;
-        } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>&) {
+        } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>&) {
             // If we hit a stale shardVersion exception, invalidate the routing table cache.
-            catalogCache->onStaleConfigError(std::move(routingInfo));
+            catalogCache->onStaleShardVersion(std::move(routingInfo));
             continue;  // Try again if allowed.
         }
         break;  // Success!
@@ -164,13 +164,13 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
 
     invariant(shardResult.size() == 1u);
 
-    auto& cursor = shardResult.front().cursorResponse;
+    auto& cursor = shardResult.front().getCursorResponse();
     auto& batch = cursor.getBatch();
 
     // We should have at most 1 result, and the cursor should be exhausted.
     uassert(ErrorCodes::InternalError,
             str::stream() << "Shard cursor was unexpectedly open after lookup: "
-                          << shardResult.front().hostAndPort
+                          << shardResult.front().getHostAndPort()
                           << ", id: "
                           << cursor.getCursorId(),
             cursor.getCursorId() == 0);

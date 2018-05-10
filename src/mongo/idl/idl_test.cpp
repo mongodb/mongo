@@ -31,8 +31,8 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/unittest_gen.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/net/op_msg.h"
 
 using namespace mongo::idl::test;
 using namespace mongo::idl::import;
@@ -990,7 +990,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                             );
     auto testStruct = Complex_array_fields::parse(ctxt, testDoc);
 
-    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int64_t>&>();
+    assert_same_types<decltype(testStruct.getField1()), const std::vector<std::int32_t>&>();
     assert_same_types<decltype(testStruct.getField2()),
                       const std::vector<mongo::NamespaceString>&>();
     assert_same_types<decltype(testStruct.getField3()), const std::vector<mongo::AnyBasicType>&>();
@@ -1001,7 +1001,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
                       const std::vector<mongo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
-                      const boost::optional<std::vector<std::int64_t>>&>();
+                      const boost::optional<std::vector<std::int32_t>>&>();
     assert_same_types<decltype(testStruct.getField2o()),
                       const boost::optional<std::vector<mongo::NamespaceString>>&>();
     assert_same_types<decltype(testStruct.getField3o()),
@@ -1013,7 +1013,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField6o()),
                       const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
 
-    std::vector<std::int64_t> field1{1, 2, 3};
+    std::vector<std::int32_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
     std::vector<NamespaceString> field2{{"a", "b"}, {"c", "d"}};
     ASSERT_TRUE(field2 == testStruct.getField2());
@@ -1526,18 +1526,27 @@ TEST(IDLEnum, TestEnum) {
     auto testStruct = StructWithEnum::parse(ctxt, testDoc);
     ASSERT_TRUE(testStruct.getField1() == IntEnum::c2);
     ASSERT_TRUE(testStruct.getField2() == StringEnumEnum::s0);
+    ASSERT_TRUE(testStruct.getFieldDefault() == StringEnumEnum::s1);
 
     assert_same_types<decltype(testStruct.getField1()), IntEnum>();
     assert_same_types<decltype(testStruct.getField1o()), const boost::optional<IntEnum>>();
     assert_same_types<decltype(testStruct.getField2()), StringEnumEnum>();
     assert_same_types<decltype(testStruct.getField2o()), const boost::optional<StringEnumEnum>>();
+    assert_same_types<decltype(testStruct.getFieldDefault()), StringEnumEnum>();
+
+    auto testSerializedDoc = BSON("field1" << 2 << "field2"
+                                           << "zero"
+                                           << "fieldDefault"
+                                           << "one");
+
+
     // Positive: Test we can roundtrip from the just parsed document
     {
         BSONObjBuilder builder;
         testStruct.serialize(&builder);
         auto loopbackDoc = builder.obj();
 
-        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+        ASSERT_BSONOBJ_EQ(testSerializedDoc, loopbackDoc);
     }
 
     // Positive: Test we can serialize from nothing the same document
@@ -1549,7 +1558,7 @@ TEST(IDLEnum, TestEnum) {
         one_new.serialize(&builder);
 
         auto serializedDoc = builder.obj();
-        ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+        ASSERT_BSONOBJ_EQ(testSerializedDoc, serializedDoc);
     }
 }
 

@@ -89,11 +89,13 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrDropDatabase can only be run on config servers"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrDropDatabase can only be run on config servers");
         }
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         const std::string dbname = parseNs("", cmdObj);
 
@@ -117,7 +119,7 @@ public:
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
         auto dbInfo =
-            catalogClient->getDatabase(opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern);
+            catalogClient->getDatabase(opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
 
         // If the namespace isn't found, treat the drop as a success. In case the drop just happened
         // and has not fully propagated, set the client's last optime to the system's last optime to
@@ -142,7 +144,7 @@ public:
 
         // Drop the database's collections.
         for (const auto& nss : catalogClient->getAllShardedCollectionsForDb(
-                 opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern)) {
+                 opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel())) {
             auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nss.ns(), "dropCollection", DistLockManager::kDefaultLockTimeout));
             uassertStatusOK(catalogManager->dropCollection(opCtx, nss));
@@ -154,7 +156,7 @@ public:
         // Drop the database from each of the remaining shards.
         {
             std::vector<ShardId> allShardIds;
-            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&allShardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload(&allShardIds);
 
             for (const ShardId& shardId : allShardIds) {
                 _dropDatabaseFromShard(opCtx, shardId, dbname);

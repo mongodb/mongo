@@ -64,8 +64,8 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
 
     // Get connections.
     var oldPrimary = replTest.getPrimary();
-    var newPrimary = replTest.liveNodes.slaves[0];
-    var pureSecondary = replTest.liveNodes.slaves[1];
+    var newPrimary = replTest._slaves[0];
+    var pureSecondary = replTest._slaves[1];
     var arbiters = [replTest.nodes[3], replTest.nodes[4]];
 
     // This is the collection that all of the tests will use.

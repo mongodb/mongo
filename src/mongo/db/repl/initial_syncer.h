@@ -35,6 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/callback_completion_guard.h"
@@ -46,9 +47,11 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -88,8 +91,10 @@ struct InitialSyncerOptions {
     /** Function to sets this node into a specific follower mode. */
     using SetFollowerModeFn = stdx::function<bool(const MemberState&)>;
 
-    /** Function to get this node's slaveDelay. */
-    using GetSlaveDelayFn = stdx::function<Seconds()>;
+    /**
+     * Struct to hold oplog application batch limits.
+     */
+    using BatchLimits = SyncTail::BatchLimits;
 
     // Error and retry values
     Milliseconds syncSourceRetryWait{1000};
@@ -104,8 +109,7 @@ struct InitialSyncerOptions {
     Milliseconds getApplierBatchCallbackRetryWait{1000};
 
     // Batching settings.
-    std::uint32_t replBatchLimitBytes = 512 * 1024 * 1024;
-    std::uint32_t replBatchLimitOperations = 5000;
+    BatchLimits batchLimits;
 
     // Replication settings
     NamespaceString localOplogNS = NamespaceString("local.oplog.rs");
@@ -114,7 +118,6 @@ struct InitialSyncerOptions {
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
     ResetOptimesFn resetOptimes;
-    GetSlaveDelayFn getSlaveDelay;
 
     SyncSourceSelector* syncSourceSelector = nullptr;
 
@@ -178,6 +181,7 @@ public:
 
     InitialSyncer(InitialSyncerOptions opts,
                   std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
+                  ThreadPool* writerPool,
                   StorageInterface* storage,
                   ReplicationProcess* replicationProcess,
                   const OnCompletionFn& onCompletion);
@@ -482,6 +486,7 @@ private:
                              Fetcher::Documents::const_iterator end,
                              const OplogFetcher::DocumentsInfo& info);
 
+    void _appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob) const;
     BSONObj _getInitialSyncProgress_inlock() const;
 
     StatusWith<MultiApplier::Operations> _getNextApplierBatch_inlock();
@@ -575,6 +580,7 @@ private:
     const InitialSyncerOptions _opts;                                           // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)
+    ThreadPool* _writerPool;                                                    // (R)
     StorageInterface* _storage;                                                 // (R)
     ReplicationProcess* _replicationProcess;                                    // (S)
 

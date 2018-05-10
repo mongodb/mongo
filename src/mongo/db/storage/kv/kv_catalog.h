@@ -97,6 +97,10 @@ public:
         return _featureTracker.get();
     }
 
+    RecordStore* getRecordStore() {
+        return _rs;
+    }
+
 private:
     class AddIdentChange;
     class RemoveIdentChange;

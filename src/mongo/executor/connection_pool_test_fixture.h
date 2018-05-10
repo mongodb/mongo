@@ -147,7 +147,7 @@ class PoolImpl final : public ConnectionPool::DependentTypeFactoryInterface {
     friend class ConnectionImpl;
 
 public:
-    std::unique_ptr<ConnectionPool::ConnectionInterface> makeConnection(
+    std::shared_ptr<ConnectionPool::ConnectionInterface> makeConnection(
         const HostAndPort& hostAndPort, size_t generation) override;
 
     std::unique_ptr<ConnectionPool::TimerInterface> makeTimer() override;

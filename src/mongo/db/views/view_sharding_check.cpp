@@ -73,7 +73,7 @@ bool ViewShardingCheck::collectionIsSharded(OperationContext* opCtx, const Names
     // and must be for a sharding check.
     dassert(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
     AutoGetCollection autoGetCol(opCtx, nss, MODE_IS);
-    return CollectionShardingState::get(opCtx, nss)->collectionIsSharded();
+    return CollectionShardingState::get(opCtx, nss)->collectionIsSharded(opCtx);
 }
 
 }  // namespace mongo

@@ -34,10 +34,10 @@
 
 #include <string>
 
-#include "mongo/base/init.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -48,7 +48,9 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer.h"
@@ -61,13 +63,11 @@
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
-#include "mongo/db/repl/oplog_buffer_collection.h"
-#include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -96,11 +96,12 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
-#include "mongo/util/net/listen.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
@@ -118,17 +119,7 @@ const char meCollectionName[] = "local.me";
 const auto meDatabaseName = localDbName;
 const char tsFieldName[] = "ts";
 
-const char kCollectionOplogBufferName[] = "collection";
-const char kBlockingQueueOplogBufferName[] = "inMemoryBlockingQueue";
-
-// Set this to specify whether to use a collection to buffer the oplog on the destination server
-// during initial sync to prevent rolling over the oplog.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
-                                      std::string,
-                                      kCollectionOplogBufferName);
-
-// Set this to specify size of read ahead buffer in the OplogBufferCollection.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBufferPeekCacheSize, int, 10000);
+MONGO_FP_DECLARE(dropPendingCollectionReaperHang);
 
 // Set this to specify maximum number of times the oplog fetcher will consecutively restart the
 // oplog tailing query on non-cancellation errors.
@@ -157,25 +148,28 @@ Status ExportedOplogFetcherMaxFetcherRestartsServerParameter::validate(
     return Status::OK();
 }
 
-MONGO_INITIALIZER(initialSyncOplogBuffer)(InitializerContext*) {
-    if ((initialSyncOplogBuffer != kCollectionOplogBufferName) &&
-        (initialSyncOplogBuffer != kBlockingQueueOplogBufferName)) {
-        return Status(ErrorCodes::BadValue,
-                      "unsupported initial sync oplog buffer option: " + initialSyncOplogBuffer);
-    }
-    return Status::OK();
-}
-
 /**
  * Returns new thread pool for thread pool task executor.
  */
-std::unique_ptr<ThreadPool> makeThreadPool() {
+auto makeThreadPool(const std::string& poolName) {
     ThreadPool::Options threadPoolOptions;
-    threadPoolOptions.poolName = "replication";
+    threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
     };
     return stdx::make_unique<ThreadPool>(threadPoolOptions);
+}
+
+/**
+ * Returns a new thread pool task executor.
+ */
+auto makeTaskExecutor(ServiceContext* service, const std::string& poolName) {
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+    return stdx::make_unique<executor::ThreadPoolTaskExecutor>(
+        makeThreadPool(poolName),
+        executor::makeNetworkInterface("RS", nullptr, std::move(hookList)));
 }
 
 /**
@@ -240,9 +234,17 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _bgSync->startup(opCtx);
 
     log() << "Starting replication applier thread";
-    invariant(!_applierThread);
-    _applierThread.reset(new RSDataSync{_bgSync.get(), _oplogBuffer.get(), replCoord});
-    _applierThread->startup();
+    invariant(!_oplogApplier);
+    _oplogApplier = stdx::make_unique<OplogApplier>(_oplogApplierTaskExecutor.get(),
+                                                    _oplogBuffer.get(),
+                                                    _bgSync.get(),
+                                                    replCoord,
+                                                    _replicationProcess->getConsistencyMarkers(),
+                                                    _storageInterface,
+                                                    OplogApplier::Options(),
+                                                    _writerPool.get());
+    _oplogApplierShutdownFuture = _oplogApplier->startup();
+
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
     // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
@@ -268,7 +270,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldSSF = std::move(_syncSourceFeedbackThread);
     auto oldOplogBuffer = std::move(_oplogBuffer);
     auto oldBgSync = std::move(_bgSync);
-    auto oldApplier = std::move(_applierThread);
+    auto oldApplier = std::move(_oplogApplier);
     lock->unlock();
 
     // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
@@ -304,7 +306,7 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     }
 
     if (oldApplier) {
-        oldApplier->join();
+        _oplogApplierShutdownFuture.get();
     }
 
     if (oldOplogBuffer) {
@@ -324,13 +326,12 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     }
 
     log() << "Starting replication storage threads";
-    _service->getGlobalStorageEngine()->setJournalListener(this);
+    _service->getStorageEngine()->setJournalListener(this);
 
-    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(_service));
-    _taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        makeThreadPool(),
-        executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
+    _oplogApplierTaskExecutor = makeTaskExecutor(_service, "rsSync");
+    _oplogApplierTaskExecutor->startup();
+
+    _taskExecutor = makeTaskExecutor(_service, "replication");
     _taskExecutor->startup();
 
     _writerPool = SyncTail::makeWriterPool();
@@ -354,6 +355,9 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
 
     log() << "Stopping replication storage threads";
     _taskExecutor->shutdown();
+    _oplogApplierTaskExecutor->shutdown();
+
+    _oplogApplierTaskExecutor->join();
     _taskExecutor->join();
     lk.unlock();
 
@@ -383,7 +387,7 @@ ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const
 Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationContext* opCtx) {
     try {
         Lock::GlobalWrite globalWrite(opCtx);
-        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
 
         if (!engine->isMmapV1()) {
             return Status::OK();
@@ -393,7 +397,7 @@ Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationCont
         Status status = repairDatabase(opCtx, engine, localDbName, false, false);
 
         // Open database before returning
-        dbHolder().openDb(opCtx, localDbName);
+        DatabaseHolder::getDatabaseHolder().openDb(opCtx, localDbName);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -641,6 +645,18 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
 void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* opCtx) {
     ServiceContext* environment = opCtx->getServiceContext();
     environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToReplStateChange);
+
+    // Destroy all stashed transaction resources, in order to release locks.
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    bool killCursors = false;
+    killSessionsLocalKillTransactions(opCtx, matcherAllSessions, killCursors);
+}
+
+void ReplicationCoordinatorExternalStateImpl::killAllTransactionCursors(OperationContext* opCtx) {
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    killSessionsLocalKillTransactionCursors(opCtx, matcherAllSessions);
 }
 
 void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
@@ -740,6 +756,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);
+
+    notifyFreeMonitoringOnTransitionToPrimary();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
@@ -765,7 +783,7 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
 
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = _service->getGlobalStorageEngine();
+    StorageEngine* storageEngine = _service->getStorageEngine();
     storageEngine->listDatabases(&dbNames);
 
     for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
@@ -774,31 +792,38 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         if (*it == "local")
             continue;
         LOG(2) << "Removing temporary collections from " << *it;
-        Database* db = dbHolder().get(opCtx, *it);
+        Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, *it);
         // Since we must be holding the global lock during this function, if listDatabases
         // returned this dbname, we should be able to get a reference to it - it can't have
         // been dropped.
-        invariant(db);
+        invariant(db, str::stream() << "Unable to get reference to database " << *it);
         db->clearTmpCollections(opCtx);
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
-    if (auto manager = _service->getGlobalStorageEngine()->getSnapshotManager())
+    if (auto manager = _service->getStorageEngine()->getSnapshotManager())
         manager->dropAllSnapshots();
 }
 
 void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
     const OpTime& newCommitPoint) {
-    auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
+    auto manager = _service->getStorageEngine()->getSnapshotManager();
     if (manager) {
         manager->setCommittedSnapshot(newCommitPoint.getTimestamp());
     }
     notifyOplogMetadataWaiters(newCommitPoint);
 }
 
+void ReplicationCoordinatorExternalStateImpl::updateLocalSnapshot(const OpTime& optime) {
+    auto manager = _service->getStorageEngine()->getSnapshotManager();
+    if (manager) {
+        manager->setLocalSnapshot(optime.getTimestamp());
+    }
+}
+
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {
-    return _service->getGlobalStorageEngine()->getSnapshotManager() != nullptr;
+    return _service->getStorageEngine()->getSnapshotManager() != nullptr;
 }
 
 void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
@@ -813,11 +838,25 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
             scheduleWork(
                 _taskExecutor.get(),
                 [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
+                    if (MONGO_FAIL_POINT(dropPendingCollectionReaperHang)) {
+                        log() << "fail point dropPendingCollectionReaperHang enabled. "
+                                 "Blocking until fail point is disabled. "
+                                 "committedOpTime: "
+                              << committedOpTime;
+                        MONGO_FAIL_POINT_PAUSE_WHILE_SET(dropPendingCollectionReaperHang);
+                    }
                     auto opCtx = cc().makeOperationContext();
                     reaper->dropCollectionsOlderThan(opCtx.get(), committedOpTime);
+                    auto replCoord = ReplicationCoordinator::get(opCtx.get());
+                    replCoord->signalDropPendingCollectionsRemovedFromStorage();
                 });
         }
     }
+}
+
+boost::optional<OpTime> ReplicationCoordinatorExternalStateImpl::getEarliestDropPendingOpTime()
+    const {
+    return _dropPendingCollectionReaper->getEarliestDropOpTime();
 }
 
 double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFraction() const {
@@ -826,7 +865,7 @@ double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFra
 
 bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageEngine(
     OperationContext* opCtx) const {
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
     return storageEngine->getSnapshotManager();
@@ -834,56 +873,22 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
 
 bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedByStorageEngine(
     OperationContext* opCtx) const {
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     // This should never be called if the storage engine has not been initialized.
     invariant(storageEngine);
     return storageEngine->supportsReadConcernSnapshot();
 }
 
-StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
-    OperationContext* opCtx,
-    MultiApplier::Operations ops,
-    MultiApplier::ApplyOperationFn applyOperation) {
-    auto applyOperationsForWriter = [&](OperationContext* opCtx,
-                                        MultiApplier::OperationPtrs* ops,
-                                        SyncTail* st,
-                                        WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
-        return applyOperation(opCtx, ops, workerMultikeyPathInfo);
-    };
-    SyncTail syncTail(nullptr, applyOperationsForWriter, _writerPool.get());
-    return syncTail.multiApply(opCtx, std::move(ops));
-}
-
-Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
-    const HostAndPort& source,
-    AtomicUInt32* fetchCount,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
-    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
-    // with invalid BackgroundSync, MultiSyncApplyFunc and writerPool arguments because we will not
-    // be accessing any SyncTail functionality that require these constructor parameters.
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-    syncTail.setHostname(source.toString());
-    return repl::multiInitialSyncApply(opCtx, ops, &syncTail, fetchCount, workerMultikeyPathInfo);
-}
-
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
-    OperationContext* opCtx) const {
-    if (initialSyncOplogBuffer == kCollectionOplogBufferName) {
-        invariant(initialSyncOplogBufferPeekCacheSize >= 0);
-        OplogBufferCollection::Options options;
-        options.peekCacheSize = std::size_t(initialSyncOplogBufferPeekCacheSize);
-        return stdx::make_unique<OplogBufferProxy>(
-            stdx::make_unique<OplogBufferCollection>(StorageInterface::get(opCtx), options));
-    } else {
-        return stdx::make_unique<OplogBufferBlockingQueue>();
-    }
-}
-
 std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
     return oplogFetcherMaxFetcherRestarts.load();
+}
+
+OplogApplier::BatchLimits ReplicationCoordinatorExternalStateImpl::getInitialSyncBatchLimits()
+    const {
+    OplogApplier::BatchLimits batchLimits;
+    batchLimits.bytes = SyncTail::replBatchLimitBytes;
+    batchLimits.ops = std::size_t(SyncTail::replBatchLimitOperations.load());
+    return batchLimits;
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {

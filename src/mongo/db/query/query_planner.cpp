@@ -132,6 +132,10 @@ string optionString(size_t options) {
                 break;
             case QueryPlannerParams::TRACK_LATEST_OPLOG_TS:
                 ss << "TRACK_LATEST_OPLOG_TS ";
+                break;
+            case QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE:
+                ss << "OPLOG_SCAN_WAIT_FOR_VISIBLE ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;

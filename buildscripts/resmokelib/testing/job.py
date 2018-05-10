@@ -1,7 +1,4 @@
-"""
-Enables supports for running tests simultaneously by processing them
-from a multi-consumer queue.
-"""
+"""Enable running tests simultaneously by processing them from a multi-consumer queue."""
 
 from __future__ import absolute_import
 
@@ -9,18 +6,16 @@ import sys
 
 from .. import config
 from .. import errors
+from ..testing.hooks import stepdown
 from ..utils import queue as _queue
 
 
 class Job(object):
-    """
-    Runs tests from a queue.
-    """
+    """Run tests from a queue."""
 
-    def __init__(self, logger, fixture, hooks, report, archival, suite_options):
-        """
-        Initializes the job with the specified fixture and hooks.
-        """
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, fixture, hooks, report, archival, suite_options):
+        """Initialize the job with the specified fixture and hooks."""
 
         self.logger = logger
         self.fixture = fixture
@@ -29,10 +24,15 @@ class Job(object):
         self.archival = archival
         self.suite_options = suite_options
 
+        # Don't check fixture.is_running() when using the ContinuousStepdown hook, which kills
+        # and restarts the primary. Even if the fixture is still running as expected, there is a
+        # race where fixture.is_running() could fail if called after the primary was killed but
+        # before it was restarted.
+        self._check_if_fixture_running = not any(
+            isinstance(hook, stepdown.ContinuousStepdown) for hook in self.hooks)
+
     def __call__(self, queue, interrupt_flag, teardown_flag=None):
-        """
-        Continuously executes tests from 'queue' and records their
-        details in 'report'.
+        """Continuously execute tests from 'queue' and records their details in 'report'.
 
         If 'teardown_flag' is not None, then 'self.fixture.teardown()'
         will be called before this method returns. If an error occurs
@@ -47,7 +47,7 @@ class Job(object):
             # Stop running tests immediately.
             self.logger.error("Received a StopExecution exception: %s.", err)
             should_stop = True
-        except:
+        except:  # pylint: disable=bare-except
             # Unknown error, stop execution.
             self.logger.exception("Encountered an error during test execution.")
             should_stop = True
@@ -64,15 +64,12 @@ class Job(object):
             except errors.ServerFailure as err:
                 self.logger.warn("Teardown of %s was not successful: %s", self.fixture, err)
                 teardown_flag.set()
-            except:
+            except:  # pylint: disable=bare-except
                 self.logger.exception("Encountered an error while tearing down %s.", self.fixture)
                 teardown_flag.set()
 
     def _run(self, queue, interrupt_flag):
-        """
-        Calls the before/after suite hooks and continuously executes
-        tests from 'queue'.
-        """
+        """Call the before/after suite hooks and continuously execute tests from 'queue'."""
 
         for hook in self.hooks:
             hook.before_suite(self.report)
@@ -91,9 +88,7 @@ class Job(object):
             hook.after_suite(self.report)
 
     def _execute_test(self, test):
-        """
-        Calls the before/after test hooks and executes 'test'.
-        """
+        """Call the before/after test hooks and execute 'test'."""
 
         test.configure(self.fixture, config.NUM_CLIENTS_PER_FIXTURE)
         self._run_hooks_before_tests(test)
@@ -101,26 +96,26 @@ class Job(object):
         test(self.report)
         try:
             if self.suite_options.fail_fast and not self.report.wasSuccessful():
-                self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
-                raise errors.StopExecution("%s failed" % (test.shortDescription()))
+                self.logger.info("%s failed, so stopping..." % (test.short_description()))
+                raise errors.StopExecution("%s failed" % (test.short_description()))
 
-            if not self.fixture.is_running():
+            if self._check_if_fixture_running and not self.fixture.is_running():
                 self.logger.error(
                     "%s marked as a failure because the fixture crashed during the test.",
-                    test.shortDescription())
+                    test.short_description())
                 self.report.setFailure(test, return_code=2)
                 # Always fail fast if the fixture fails.
-                raise errors.StopExecution("%s not running after %s" %
-                                           (self.fixture, test.shortDescription()))
+                raise errors.StopExecution("%s not running after %s" % (self.fixture,
+                                                                        test.short_description()))
         finally:
-            success = self.report._find_test_info(test).status == "pass"
+            success = self.report.find_test_info(test).status == "pass"
             if self.archival:
                 self.archival.archive(self.logger, test, success)
 
         self._run_hooks_after_tests(test)
 
     def _run_hook(self, hook, hook_function, test):
-        """ Helper to run hook and archival. """
+        """Provide helper to run hook and archival."""
         try:
             success = False
             hook_function(test, self.report)
@@ -130,8 +125,7 @@ class Job(object):
                 self.archival.archive(self.logger, test, success, hook=hook)
 
     def _run_hooks_before_tests(self, test):
-        """
-        Runs the before_test method on each of the hooks.
+        """Run the before_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
         failure, and reraises any other exceptions.
@@ -145,13 +139,13 @@ class Job(object):
 
         except errors.ServerFailure:
             self.logger.exception("%s marked as a failure by a hook's before_test.",
-                                  test.shortDescription())
+                                  test.short_description())
             self._fail_test(test, sys.exc_info(), return_code=2)
             raise errors.StopExecution("A hook's before_test failed")
 
         except errors.TestFailure:
             self.logger.exception("%s marked as a failure by a hook's before_test.",
-                                  test.shortDescription())
+                                  test.short_description())
             self._fail_test(test, sys.exc_info(), return_code=1)
             if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's before_test failed")
@@ -164,8 +158,7 @@ class Job(object):
             raise
 
     def _run_hooks_after_tests(self, test):
-        """
-        Runs the after_test method on each of the hooks.
+        """Run the after_test method on each of the hooks.
 
         Swallows any TestFailure exceptions if set to continue on
         failure, and reraises any other exceptions.
@@ -179,13 +172,13 @@ class Job(object):
 
         except errors.ServerFailure:
             self.logger.exception("%s marked as a failure by a hook's after_test.",
-                                  test.shortDescription())
+                                  test.short_description())
             self.report.setFailure(test, return_code=2)
             raise errors.StopExecution("A hook's after_test failed")
 
         except errors.TestFailure:
             self.logger.exception("%s marked as a failure by a hook's after_test.",
-                                  test.shortDescription())
+                                  test.short_description())
             self.report.setFailure(test, return_code=1)
             if self.suite_options.fail_fast:
                 raise errors.StopExecution("A hook's after_test failed")
@@ -195,9 +188,7 @@ class Job(object):
             raise
 
     def _fail_test(self, test, exc_info, return_code=1):
-        """
-        Helper to record a test as a failure with the provided return
-        code.
+        """Provide helper to record a test as a failure with the provided return code.
 
         This method should not be used if 'test' has already been
         started, instead use TestReport.setFailure().
@@ -210,10 +201,9 @@ class Job(object):
 
     @staticmethod
     def _drain_queue(queue):
-        """
-        Removes all elements from 'queue' without actually doing
-        anything to them. Necessary to unblock the main thread that is
-        waiting for 'queue' to be empty.
+        """Remove all elements from 'queue' without actually doing anything to them.
+
+        Necessary to unblock the main thread that is waiting for 'queue' to be empty.
         """
 
         try:

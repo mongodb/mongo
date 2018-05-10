@@ -85,6 +85,6 @@ IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* opCtx,
         return new TwoDAccessMethod(index, sdi);
 
     log() << "Can't find index for keyPattern " << desc->keyPattern();
-    invariant(false);
+    MONGO_UNREACHABLE;
 }
 }  // namespace mongo

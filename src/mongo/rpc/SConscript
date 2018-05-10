@@ -24,13 +24,18 @@ env.Library(
         'protocol',
     ],
     source=[
+        'message.cpp',
+        'op_msg.cpp',
         'protocol.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/wire_version',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
 
@@ -180,6 +185,7 @@ env.CppUnitTest(
         'get_status_from_command_result_test.cpp',
         'legacy_request_test.cpp',
         'object_check_test.cpp',
+        'op_msg_test.cpp',
         'protocol_test.cpp',
         'reply_builder_test.cpp',
     ],
@@ -237,4 +243,16 @@ env.CppUnitTest(
     LIBDEPS=[
         'client_metadata',
     ]
+)
+
+env.CppIntegrationTest(
+    target='op_msg_integration_test',
+    source=[
+        'op_msg_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'protocol',
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/util/version_impl',
+    ],
 )

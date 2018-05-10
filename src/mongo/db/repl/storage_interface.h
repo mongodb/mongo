@@ -323,8 +323,16 @@ public:
     /**
      * Returns the number of documents in the collection.
      */
-    virtual StatusWith<CollectionCount> getCollectionCount(OperationContext* opCtx,
-                                                           const NamespaceString& nss) = 0;
+    virtual StatusWith<CollectionCount> getCollectionCount(
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) = 0;
+
+    /**
+     * Sets the number of documents in the collection. This function does NOT also update the
+     * data size of the collection.
+     */
+    virtual Status setCollectionCount(OperationContext* opCtx,
+                                      const NamespaceStringOrUUID& nsOrUUID,
+                                      long long newCount) = 0;
 
     /**
      * Returns the UUID of the collection specified by nss, if such a UUID exists.
@@ -352,7 +360,7 @@ public:
      *
      * The 'stable' timestamp is set by calling StorageInterface::setStableTimestamp.
      */
-    virtual StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) = 0;
+    virtual StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) = 0;
 
     /**
      * Returns whether the storage engine supports "recover to stable timestamp".
@@ -381,6 +389,14 @@ public:
     virtual void oplogDiskLocRegister(OperationContext* opCtx,
                                       const Timestamp& ts,
                                       bool orderedCommit) = 0;
+
+    /**
+     * Returns a timestamp that is guaranteed to be persisted on disk in a checkpoint. Returns
+     * `Timestamp::min()` if no stable checkpoint has been taken. Returns boost::none if
+     * `supportsRecoverToStableTimestamp` returns false.
+     */
+    virtual boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+        ServiceContext* serviceCtx) const = 0;
 };
 
 }  // namespace repl

@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.insert1;
 t.drop();
 

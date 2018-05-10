@@ -1,3 +1,7 @@
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
 
 t = db.jstests_js5;
 t.drop();

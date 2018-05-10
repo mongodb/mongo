@@ -10,10 +10,14 @@
 #if !defined(_MSC_VER) && !defined(_lint)
 #include <x86intrin.h>
 #endif
+#endif
+
+#if defined(HAVE_ARM_NEON_INTRIN_H)
+#include <arm_neon.h>
+#endif
 						/* 16B alignment */
 #define	WT_ALIGNED_16(p)	(((uintptr_t)(p) & 0x0f) == 0)
 #define	WT_VECTOR_SIZE		16		/* chunk size */
-#endif
 
 /*
  * __wt_lex_compare --
@@ -68,6 +72,24 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
 			}
+		len += remain;
+	}
+#elif defined(HAVE_ARM_NEON_INTRIN_H)
+	/* Use vector instructions if we'll execute at least 1 of them. */
+	if (len >= WT_VECTOR_SIZE) {
+		size_t remain;
+		uint8x16_t res_eq, u, t;
+		remain = len % WT_VECTOR_SIZE;
+		len -= remain;
+		for (; len > 0;
+		    len -= WT_VECTOR_SIZE,
+		    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE) {
+			u = vld1q_u8(userp);
+			t = vld1q_u8(treep);
+			res_eq = vceqq_u8(u, t);
+			if (vminvq_u8(res_eq) != 255)
+				break;
+		}
 		len += remain;
 	}
 #endif
@@ -156,6 +178,26 @@ __wt_lex_compare_skip(
 				if (_mm_movemask_epi8(res_eq) != 65535)
 					break;
 			}
+		len += remain;
+	}
+#elif defined(HAVE_ARM_NEON_INTRIN_H)
+	/* Use vector instructions if we'll execute  at least 1 of them. */
+	if (len >= WT_VECTOR_SIZE) {
+		size_t remain;
+		uint8x16_t res_eq, u, t;
+		remain = len % WT_VECTOR_SIZE;
+		len -= remain;
+		if (WT_ALIGNED_16(userp) && WT_ALIGNED_16(treep))
+		for (; len > 0;
+		    len -= WT_VECTOR_SIZE,
+		    userp += WT_VECTOR_SIZE, treep += WT_VECTOR_SIZE,
+			*matchp += WT_VECTOR_SIZE) {
+			u = vld1q_u8(userp);
+			t = vld1q_u8(treep);
+			res_eq = vceqq_u8(u, t);
+			if (vminvq_u8(res_eq) != 255)
+				break;
+		}
 		len += remain;
 	}
 #endif

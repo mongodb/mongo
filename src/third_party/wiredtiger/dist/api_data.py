@@ -2,7 +2,18 @@
 
 class Method:
     def __init__(self, config):
-        self.config = config
+        # Deal with duplicates: with complex configurations (like
+        # WT_SESSION::create), it's simpler to deal with duplicates once than
+        # manually as configurations are defined
+        self.config = []
+        lastname = None
+        for c in sorted(config):
+            if '.' in c.name:
+                raise "Bad config key '%s'" % c.name
+            if c.name == lastname:
+                continue
+            lastname = c.name
+            self.config.append(c)
 
 class Config:
     def __init__(self, name, default, desc, subconfig=None, **flags):
@@ -15,10 +26,13 @@ class Config:
     def __cmp__(self, other):
         return cmp(self.name, other.name)
 
-# Metadata shared by all schema objects
-common_meta = [
+common_runtime_config = [
     Config('app_metadata', '', r'''
         application-owned metadata for this object'''),
+]
+
+# Metadata shared by all schema objects
+common_meta = common_runtime_config + [
     Config('collator', 'none', r'''
         configure custom collation for keys.  Permitted values are \c "none"
         or a custom collator name created with WT_CONNECTION::add_collator'''),
@@ -130,7 +144,7 @@ lsm_config = [
     ]),
 ]
 
-file_runtime_config = [
+file_runtime_config = common_runtime_config + [
     Config('access_pattern_hint', 'none', r'''
         It is recommended that workloads that consist primarily of
         updates and/or point queries specify \c random.  Workloads that
@@ -337,8 +351,6 @@ file_meta = file_config + [
         the file checkpoint entries'''),
     Config('checkpoint_lsn', '', r'''
         LSN of the last checkpoint'''),
-    Config('checkpoint_timestamp', '', r'''
-        stable timestamp of the last checkpoint'''),
     Config('id', '', r'''
         the file's ID number'''),
     Config('version', '(major=0,minor=0)', r'''
@@ -575,14 +587,13 @@ connection_runtime_config = [
         type='list',
         choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
     Config('timing_stress_for_test', '', r'''
-        enable code that interrupts the usual timing of operations with a
-        goal of uncovering race conditions and unexpected blocking.
-        This option is intended for use with internal stress
-        testing of WiredTiger. Options are given as a list, such as
-        <code>"timing_stress_for_test=[checkpoint_slow,
-            internal_page_split_race, page_split_race]"</code>''',
-        type='list', undoc=True, choices=[
-            'checkpoint_slow', 'internal_page_split_race', 'page_split_race']),
+        enable code that interrupts the usual timing of operations with a goal
+        of uncovering race conditions and unexpected blocking. This option is
+        intended for use with internal stress testing of WiredTiger.''',
+        type='list', undoc=True,
+        choices=[
+        'checkpoint_slow', 'split_race_1', 'split_race_2', 'split_race_3',
+        'split_race_4', 'split_race_5', 'split_race_6', 'split_race_7']),
     Config('verbose', '', r'''
         enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -927,7 +938,15 @@ methods = {
 
 'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
 
-'WT_SESSION.alter' : Method(file_runtime_config),
+'WT_SESSION.alter' : Method(file_runtime_config + [
+    Config('exclusive_refreshed', 'true', r'''
+        refresh the in memory state and flush the metadata change to disk,
+        disabling this flag is dangerous - it will only re-write the
+        metadata without refreshing the in-memory information or creating
+        a checkpoint. The update will also only be applied to table URI
+        entries in the metadata, not their sub-entries.''',
+        type='boolean', undoc=True),
+]),
 
 'WT_SESSION.close' : Method([]),
 

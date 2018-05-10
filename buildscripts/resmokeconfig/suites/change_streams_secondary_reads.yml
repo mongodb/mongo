@@ -32,6 +32,8 @@ selector:
   # "Cowardly refusing to run test with overridden read preference when it reads from a
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
+  # Transactions not supported on sharded cluster.
+  - uses_transactions
 
 executor:
   archive:
@@ -80,8 +82,3 @@ executor:
     num_rs_nodes_per_shard: 2
     shard_options:
       voting_secondaries: true
-    configsvr_options:
-      num_nodes: 3
-      voting_secondaries: true
-    enable_sharding:
-    - test

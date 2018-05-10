@@ -77,5 +77,10 @@ std::unique_ptr<OplogInterface::Iterator> OplogInterfaceMock::makeIterator() con
         new OplogIteratorMock(_operations.begin(), _operations.end()));
 }
 
+HostAndPort OplogInterfaceMock::hostAndPort() const {
+    // Returns a default-constructed HostAndPort, which has an empty hostname and an invalid port.
+    return {};
+}
+
 }  // namespace repl
 }  // namespace mongo

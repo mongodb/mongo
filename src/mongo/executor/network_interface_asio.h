@@ -48,6 +48,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/stdx/condition_variable.h"
@@ -57,7 +58,6 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/message_compressor_manager.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -130,9 +130,13 @@ public:
     Date_t now() override;
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                         RemoteCommandRequest& request,
-                        const RemoteCommandCompletionFn& onFinish) override;
-    void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle) override;
-    Status setAlarm(Date_t when, const stdx::function<void()>& action) override;
+                        const RemoteCommandCompletionFn& onFinish,
+                        const transport::BatonHandle& baton = nullptr) override;
+    void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                       const transport::BatonHandle& baton = nullptr) override;
+    Status setAlarm(Date_t when,
+                    const stdx::function<void()>& action,
+                    const transport::BatonHandle& baton = nullptr) override;
 
     bool onNetworkThread() override;
 

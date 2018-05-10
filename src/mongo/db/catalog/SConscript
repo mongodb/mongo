@@ -20,6 +20,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/command_generic_argument',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/server_parameters',
     ],
@@ -129,6 +130,7 @@ env.Library(
         "database.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -228,6 +230,16 @@ env.Library(
 )
 
 env.Library(
+    target='index_create_impl_servers',
+    source=[
+        'index_create_impl_servers.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'catalog_impl',
+    ],
+)
+
+env.Library(
     target='catalog_impl',
     source=[
         "catalog_control.cpp",
@@ -277,6 +289,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap_v1_options',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
     ],
 )
 

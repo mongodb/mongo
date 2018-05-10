@@ -9,7 +9,7 @@
 (function() {
     'use strict';
 
-    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    // TODO: SERVER-33601 remove shardAsReplicaSet: false
     var s = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
 
     var db = s.getDB("test");

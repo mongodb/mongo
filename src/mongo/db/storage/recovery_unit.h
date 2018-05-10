@@ -73,11 +73,42 @@ public:
     virtual void abortUnitOfWork() = 0;
 
     /**
-     * Waits until all commits that happened before this call are durable. Returns true, unless the
-     * storage engine cannot guarantee durability, which should never happen when isDurable()
-     * returned true. This cannot be called from inside a unit of work, and should fail if it is.
+     * Must be called after beginUnitOfWork and before calling either abortUnitOfWork or
+     * commitUnitOfWork. Transitions the current transaction (unit of work) to the
+     * "prepared" state. Must be overridden by storage engines that support prepared
+     * transactions.
+     *
+     * Must be preceded by a call to setPrepareTimestamp().
+     *
+     * It is not valid to call commitUnitOfWork() afterward without calling setCommitTimestamp()
+     * with a value greater than or equal to the prepare timestamp.
+     * This cannot be called after setTimestamp or setCommitTimestamp.
+     */
+    virtual void prepareUnitOfWork() {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support prepared transactions");
+    }
+
+    /**
+     * Waits until all commits that happened before this call are durable in the journal. Returns
+     * true, unless the storage engine cannot guarantee durability, which should never happen when
+     * isDurable() returned true. This cannot be called from inside a unit of work, and should
+     * fail if it is.
      */
     virtual bool waitUntilDurable() = 0;
+
+    /**
+     * Unlike `waitUntilDurable`, this method takes a stable checkpoint, making durable any writes
+     * on unjournaled tables that are behind the current stable timestamp. If the storage engine
+     * is starting from an "unstable" checkpoint, this method call will turn into an unstable
+     * checkpoint.
+     *
+     * This must not be called by a system taking user writes until after a stable timestamp is
+     * passed to the storage engine.
+     */
+    virtual bool waitUntilUnjournaledWritesDurable() {
+        return waitUntilDurable();
+    }
 
     /**
      * When this is called, if there is an open transaction, it is closed. On return no
@@ -127,6 +158,21 @@ public:
      */
     repl::ReadConcernLevel getReadConcernLevel() const {
         return _readConcernLevel;
+    }
+
+    /**
+     * Tells the recovery unit to read at the last applied timestamp, tracked by the SnapshotManger.
+     * For local and available read concerns, this should be used to read from a consistent state on
+     * a secondary while replicated batches are being applied.
+     *
+     * For snapshot read concerns, should be used for "speculative" snapshots which provide a
+     * view of the data which may become majority committed in the future.
+     */
+    void setShouldReadAtLastAppliedTimestamp(bool value) {
+        invariant(!value || _readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern ||
+                  _readConcernLevel == repl::ReadConcernLevel::kAvailableReadConcern ||
+                  _readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
+        _shouldReadAtLastAppliedTimestamp = value;
     }
 
     /**
@@ -180,6 +226,17 @@ public:
     }
 
     /**
+     * Sets a prepare timestamp for the current transaction. A subsequent call to
+     * prepareUnitOfWork() is expected and required.
+     * This cannot be called after setTimestamp or setCommitTimestamp.
+     * This must be called inside a WUOW and may only be called once.
+     */
+    virtual void setPrepareTimestamp(Timestamp timestamp) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "This storage engine does not support prepared transactions");
+    }
+
+    /**
      * Sets which timestamp to use for read transactions.
      */
     virtual Status setPointInTimeReadTimestamp(Timestamp timestamp) {
@@ -197,13 +254,17 @@ public:
      * that rollback() and commit() may be called after resources with a shorter lifetime than
      * the WriteUnitOfWork have been freed. Each registered change will be committed or rolled
      * back once.
+     *
+     * commit() handlers are passed the timestamp at which the transaction is committed. If the
+     * transaction is not committed at a particular timestamp, or if the storage engine does not
+     * support timestamps, then boost::none will be supplied for this parameter.
      */
     class Change {
     public:
         virtual ~Change() {}
 
         virtual void rollback() = 0;
-        virtual void commit() = 0;
+        virtual void commit(boost::optional<Timestamp> commitTime) = 0;
     };
 
     /**
@@ -230,7 +291,7 @@ public:
             void rollback() final {
                 _callback();
             }
-            void commit() final {}
+            void commit(boost::optional<Timestamp>) final {}
 
         private:
             Callback _callback;
@@ -250,8 +311,8 @@ public:
         public:
             OnCommitChange(Callback&& callback) : _callback(std::move(callback)) {}
             void rollback() final {}
-            void commit() final {
-                _callback();
+            void commit(boost::optional<Timestamp> commitTime) final {
+                _callback(commitTime);
             }
 
         private:
@@ -311,6 +372,7 @@ protected:
     RecoveryUnit() {}
     repl::ReplicationCoordinator::Mode _replicationMode = repl::ReplicationCoordinator::modeNone;
     repl::ReadConcernLevel _readConcernLevel = repl::ReadConcernLevel::kLocalReadConcern;
+    bool _shouldReadAtLastAppliedTimestamp = false;
 };
 
 }  // namespace mongo

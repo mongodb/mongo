@@ -22,9 +22,30 @@
         jsTest.log("".concat("pid=[", pid, "]"));
 
         if (expectOk) {
-            const ec = stopMongoProgramByPid(pid);
-            const expect = _isWindows() ? 1 : -15;  // SIGTERM is 15
-            assert.eq(ec, expect, "Expected mongod terminate");
+            let port;
+
+            // We use assert.soonNoExcept() here because `cat(logpath)` may fail due to the mongod
+            // not yet having created the log file yet.
+            assert.soonNoExcept(() => {
+                const found = cat(logpath).match(/waiting for connections on port (\d+)/);
+                if (found !== null) {
+                    print("Found message from mongod with port it is listening on: " + found[0]);
+                    port = found[1];
+                    return true;
+                }
+            });
+
+            const connStr = `127.0.0.1:${port}`;
+            print("Attempting to connect to " + connStr);
+
+            let conn;
+            assert.soonNoExcept(() => {
+                conn = new Mongo(connStr);
+                return true;
+            });
+            assert.commandWorked(conn.adminCommand({ping: 1}));
+
+            stopMongoProgramByPid(pid);
         } else {
             const ec = waitProgram(pid);
             assert.eq(ec, MongoRunner.EXIT_NET_ERROR);

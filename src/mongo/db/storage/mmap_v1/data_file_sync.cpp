@@ -81,7 +81,7 @@ void DataFileSync::run() {
 
         auto opCtx = cc().makeOperationContext();
         Date_t start = jsTime();
-        StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
 
         dur::notifyPreDataFileFlush();
         int numFiles = storageEngine->flushAllFiles(opCtx.get(), true);

@@ -115,6 +115,11 @@ structs:
       autocommit:
         type: bool
         optional: true
+      startTransaction:
+        description: "Used to indicate that a command is the start of a multi-statement
+                      transaction."
+        type: bool
+        optional: true
 
   SessionsCollectionFetchResultIndividualResult:
     description: "Individual result"

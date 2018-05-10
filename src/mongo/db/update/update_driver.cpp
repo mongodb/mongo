@@ -285,7 +285,7 @@ Status UpdateDriver::update(StringData matchedField,
         //
         // We also don't need to specify the semantics for a full document replacement (and there
         // would be no place to put a "$v" field in the update document).
-        invariantOK(logBuilder.setUpdateSemantics(UpdateSemantics::kUpdateNode));
+        invariant(logBuilder.setUpdateSemantics(UpdateSemantics::kUpdateNode));
     }
 
     if (_logOp && logOpRec)

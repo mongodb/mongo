@@ -745,20 +745,36 @@ __wt_config_gets_def(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, int def, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM_STATIC_INIT(false_value);
+	const char **end;
 
 	*value = false_value;
 	value->val = def;
 
-	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
+	if (cfg == NULL)
 		return (0);
 
-	if (cfg[2] == NULL) {
+	/*
+	 * Checking the "length" of the pointer array is a little odd, but it's
+	 * deliberate. The reason is because we pass variable length arrays of
+	 * pointers as the configuration argument, some of which have only one
+	 * element and the NULL termination. Static analyzers (like Coverity)
+	 * complain if we read from an offset past the end of the array, even
+	 * if we check there's no NULL slots before the offset.
+	 */
+	for (end = cfg; *end != NULL; ++end)
+		;
+	switch ((int)(end - cfg)) {
+	case 0:				/* cfg[0] == NULL */
+	case 1:				/* cfg[1] == NULL */
+		return (0);
+	case 2:				/* cfg[2] == NULL */
 		WT_RET_NOTFOUND_OK(
 		    __wt_config_getones(session, cfg[1], key, value));
 		return (0);
+	default:
+		return (__wt_config_gets(session, cfg, key, value));
 	}
-
-	return (__wt_config_gets(session, cfg, key, value));
+	/* NOTREACHED */
 }
 
 /*

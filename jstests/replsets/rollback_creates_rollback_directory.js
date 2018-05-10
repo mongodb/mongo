@@ -8,114 +8,116 @@
 // inital sync from, so no primary will be elected. This test induces such a scenario, so cannot be
 // run on ephemeral storage engines.
 // @tags: [requires_persistence]
-var testName = "rollback_creates_rollback_directory";
-var replTest = new ReplSetTest({name: testName, nodes: 3});
-var nodes = replTest.nodeList();
 
-var conns = replTest.startSet();
-var r = replTest.initiate({
-    "_id": testName,
-    "members": [
-        {"_id": 0, "host": nodes[0], priority: 3},
-        {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true}
-    ]
-});
+function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
+    jsTestLog("Testing createRollbackDataFiles = " + shouldCreateRollbackFiles);
+    var testName = "rollback_creates_rollback_directory";
+    var replTest = new ReplSetTest({name: testName, nodes: 3});
+    var nodes = replTest.nodeList();
 
-// Make sure we have a master
-replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-var master = replTest.getPrimary();
-var a_conn = conns[0];
-var b_conn = conns[1];
-a_conn.setSlaveOk();
-b_conn.setSlaveOk();
-var A = a_conn.getDB("test");
-var B = b_conn.getDB("test");
-var AID = replTest.getNodeId(a_conn);
-var BID = replTest.getNodeId(b_conn);
-var Apath = MongoRunner.dataDir + "/" + testName + "-0/";
-var Bpath = MongoRunner.dataDir + "/" + testName + "-1/";
-assert(master == conns[0], "conns[0] assumed to be master");
-assert(a_conn.host == master.host);
+    var conns =
+        replTest.startSet({setParameter: {createRollbackDataFiles: shouldCreateRollbackFiles}});
+    var r = replTest.initiate({
+        "_id": testName,
+        "members": [
+            {"_id": 0, "host": nodes[0], priority: 3},
+            {"_id": 1, "host": nodes[1]},
+            {"_id": 2, "host": nodes[2], arbiterOnly: true}
+        ],
+    });
 
-// Make sure we have an arbiter
-assert.soon(function() {
-    res = conns[2].getDB("admin").runCommand({replSetGetStatus: 1});
-    return res.myState == 7;
-}, "Arbiter failed to initialize.");
+    // Make sure we have a master
+    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
+    var master = replTest.getPrimary();
+    var a_conn = conns[0];
+    var b_conn = conns[1];
+    a_conn.setSlaveOk();
+    b_conn.setSlaveOk();
+    var A = a_conn.getDB("test");
+    var B = b_conn.getDB("test");
+    var AID = replTest.getNodeId(a_conn);
+    var BID = replTest.getNodeId(b_conn);
+    var Apath = MongoRunner.dataDir + "/" + testName + "-0/";
+    var Bpath = MongoRunner.dataDir + "/" + testName + "-1/";
+    assert(master == conns[0], "conns[0] assumed to be master");
+    assert(a_conn.host == master.host);
 
-var options = {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}, upsert: true};
-assert.writeOK(A.foo.update({key: 'value1'}, {$set: {req: 'req'}}, options));
-replTest.stop(AID);
+    // Make sure we have an arbiter
+    assert.soon(function() {
+        res = conns[2].getDB("admin").runCommand({replSetGetStatus: 1});
+        return res.myState == 7;
+    }, "Arbiter failed to initialize.");
 
-master = replTest.getPrimary();
-assert(b_conn.host == master.host);
-options = {
-    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
-    upsert: true
-};
-assert.writeOK(B.foo.update({key: 'value1'}, {$set: {res: 'res'}}, options));
-replTest.stop(BID);
-replTest.restart(AID);
-master = replTest.getPrimary();
-assert(a_conn.host == master.host);
-options = {
-    writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS},
-    upsert: true
-};
-assert.writeOK(A.foo.update({key: 'value2'}, {$set: {req: 'req'}}, options));
-replTest.restart(BID);  // should rollback
-reconnect(B);
+    var options = {writeConcern: {w: 2, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
+    assert.writeOK(A.foo.update({key: 'value1'}, {$set: {req: 'req'}}, options));
+    replTest.stop(AID);
 
-print("BEFORE------------------");
-printjson(A.foo.find().toArray());
+    master = replTest.getPrimary();
+    assert(b_conn.host == master.host);
+    options = {writeConcern: {w: 1, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
+    assert.writeOK(B.foo.update({key: 'value1'}, {$set: {res: 'res'}}, options));
+    replTest.stop(BID);
+    replTest.restart(AID);
+    master = replTest.getPrimary();
+    assert(a_conn.host == master.host);
+    options = {writeConcern: {w: 1, wtimeout: replTest.kDefaultTimeoutMS}, upsert: true};
+    assert.writeOK(A.foo.update({key: 'value2'}, {$set: {req: 'req'}}, options));
+    replTest.restart(BID);  // should rollback
+    reconnect(B);
 
-replTest.awaitReplication();
-replTest.awaitSecondaryNodes();
+    print("BEFORE------------------");
+    printjson(A.foo.find().toArray());
 
-print("AFTER------------------");
-printjson(A.foo.find().toArray());
+    replTest.awaitReplication();
+    replTest.awaitSecondaryNodes();
 
-assert.eq(2, A.foo.find().itcount());
-assert.eq('req', A.foo.findOne({key: 'value1'}).req);
-assert.eq(null, A.foo.findOne({key: 'value1'}).res);
-reconnect(B);
-assert.eq(2, B.foo.find().itcount());
-assert.eq('req', B.foo.findOne({key: 'value1'}).req);
-assert.eq(null, B.foo.findOne({key: 'value1'}).res);
+    print("AFTER------------------");
+    printjson(A.foo.find().toArray());
 
-// check here for rollback files
-var rollbackDir = Bpath + "rollback/";
-assert(pathExists(rollbackDir), "rollback directory was not created!");
+    assert.eq(2, A.foo.find().itcount());
+    assert.eq('req', A.foo.findOne({key: 'value1'}).req);
+    assert.eq(null, A.foo.findOne({key: 'value1'}).res);
+    reconnect(B);
+    assert.eq(2, B.foo.find().itcount());
+    assert.eq('req', B.foo.findOne({key: 'value1'}).req);
+    assert.eq(null, B.foo.findOne({key: 'value1'}).res);
 
-// Verify data consistency between nodes.
-replTest.checkReplicatedDataHashes();
-replTest.checkOplogs();
+    // check here for rollback files
+    var rollbackDir = Bpath + "rollback/";
+    assert.eq(pathExists(rollbackDir), shouldCreateRollbackFiles);
 
-print(testName + ".js SUCCESS");
-replTest.stopSet(15);
+    // Verify data consistency between nodes.
+    replTest.checkReplicatedDataHashes();
+    replTest.checkOplogs();
 
-function wait(f) {
-    var n = 0;
-    while (!f()) {
-        if (n % 4 == 0)
-            print(testName + ".js waiting");
-        if (++n == 4) {
-            print("" + f);
+    print(testName + ".js SUCCESS");
+    replTest.stopSet(15);
+
+    function wait(f) {
+        var n = 0;
+        while (!f()) {
+            if (n % 4 == 0)
+                print(testName + ".js waiting");
+            if (++n == 4) {
+                print("" + f);
+            }
+            assert(n < 200, 'tried 200 times, giving up');
+            sleep(1000);
         }
-        assert(n < 200, 'tried 200 times, giving up');
-        sleep(1000);
+    }
+
+    function reconnect(a) {
+        wait(function() {
+            try {
+                a.bar.stats();
+                return true;
+            } catch (e) {
+                print(e);
+                return false;
+            }
+        });
     }
 }
 
-function reconnect(a) {
-    wait(function() {
-        try {
-            a.bar.stats();
-            return true;
-        } catch (e) {
-            print(e);
-            return false;
-        }
-    });
-}
+runRollbackDirectoryTest(false);
+runRollbackDirectoryTest(true);

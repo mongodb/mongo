@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
@@ -209,10 +210,8 @@ public:
                     << PlanExecutor::statestr(state)
                     << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error during StageDebug command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                "Executor error during StageDebug command"));
         }
 
         return true;

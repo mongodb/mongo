@@ -9,9 +9,11 @@ import copy
 import datetime
 import unittest
 
-from buildscripts import test_failures
+from buildscripts import lifecycle_test_failures as test_failures
 from buildscripts import update_test_lifecycle
 from buildscripts.ciconfig import tags as ci_tags
+
+# pylint: disable=invalid-name,missing-docstring,protected-access,too-many-lines
 
 
 class TestValidateConfig(unittest.TestCase):
@@ -20,13 +22,12 @@ class TestValidateConfig(unittest.TestCase):
     """
 
     CONFIG = update_test_lifecycle.Config(
-        test_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        task_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        variant_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        distro_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        reliable_min_runs=2,
-        reliable_time_period=datetime.timedelta(days=1),
-        unreliable_min_runs=2,
+        test_fail_rates=update_test_lifecycle.Rates(
+            acceptable=0, unacceptable=1), task_fail_rates=update_test_lifecycle.Rates(
+                acceptable=0, unacceptable=1), variant_fail_rates=update_test_lifecycle.Rates(
+                    acceptable=0, unacceptable=1), distro_fail_rates=update_test_lifecycle.Rates(
+                        acceptable=0, unacceptable=1), reliable_min_runs=2,
+        reliable_time_period=datetime.timedelta(days=1), unreliable_min_runs=2,
         unreliable_time_period=datetime.timedelta(days=1))
 
     def test_acceptable_test_fail_rate(self):
@@ -180,8 +181,8 @@ class TestValidateConfig(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             config = self.CONFIG._replace(
-                variant_fail_rates=self.CONFIG.variant_fail_rates._replace(acceptable=0.9,
-                                                                           unacceptable=0.1))
+                variant_fail_rates=self.CONFIG.variant_fail_rates._replace(
+                    acceptable=0.9, unacceptable=0.1))
             update_test_lifecycle.validate_config(config)
 
     def test_acceptable_distro_fail_rate(self):
@@ -232,8 +233,8 @@ class TestValidateConfig(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             config = self.CONFIG._replace(
-                distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9,
-                                                                         unacceptable=0.1))
+                distro_fail_rates=self.CONFIG.distro_fail_rates._replace(
+                    acceptable=0.9, unacceptable=0.1))
             update_test_lifecycle.validate_config(config)
 
     def test_reliable_min_runs(self):
@@ -322,29 +323,24 @@ class TestValidateConfig(unittest.TestCase):
             update_test_lifecycle.validate_config(config)
 
 
-class TestUpdateTags(unittest.TestCase):
+class TestUpdateTags(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """
     Tests for the update_tags() function.
     """
 
     CONFIG = update_test_lifecycle.Config(
-        test_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        task_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        variant_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        distro_fail_rates=update_test_lifecycle.Rates(acceptable=0, unacceptable=1),
-        reliable_min_runs=2,
-        reliable_time_period=datetime.timedelta(days=1),
-        unreliable_min_runs=2,
+        test_fail_rates=update_test_lifecycle.Rates(
+            acceptable=0, unacceptable=1), task_fail_rates=update_test_lifecycle.Rates(
+                acceptable=0, unacceptable=1), variant_fail_rates=update_test_lifecycle.Rates(
+                    acceptable=0, unacceptable=1), distro_fail_rates=update_test_lifecycle.Rates(
+                        acceptable=0, unacceptable=1), reliable_min_runs=2,
+        reliable_time_period=datetime.timedelta(days=1), unreliable_min_runs=2,
         unreliable_time_period=datetime.timedelta(days=1))
 
-    ENTRY = test_failures.ReportEntry(test="jstests/core/all.js",
-                                      task="jsCore_WT",
-                                      variant="linux-64",
-                                      distro="rhel62",
-                                      start_date=datetime.date(2017, 6, 3),
-                                      end_date=datetime.date(2017, 6, 3),
-                                      num_pass=0,
-                                      num_fail=0)
+    ENTRY = test_failures.ReportEntry(test="jstests/core/all.js", task="jsCore_WT",
+                                      variant="linux-64", distro="rhel62", start_date=datetime.date(
+                                          2017, 6, 3), end_date=datetime.date(2017, 6, 3),
+                                      num_pass=0, num_fail=0)
 
     def assert_has_only_js_tests(self, lifecycle):
         """
@@ -395,9 +391,10 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             test_fail_rates=self.CONFIG.test_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable"]),
-        ]))
+        self.transition_from_reliable_to_unreliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js", ["unreliable"]),
+                                                    ]))
 
     def test_transition_task_from_reliable_to_unreliable(self):
         """
@@ -408,9 +405,11 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             task_fail_rates=self.CONFIG.task_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable|jsCore_WT"]),
-        ]))
+        self.transition_from_reliable_to_unreliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js",
+                                                         ["unreliable|jsCore_WT"]),
+                                                    ]))
 
     def test_transition_variant_from_reliable_to_unreliable(self):
         """
@@ -421,9 +420,11 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64"]),
-        ]))
+        self.transition_from_reliable_to_unreliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js",
+                                                         ["unreliable|jsCore_WT|linux-64"]),
+                                                    ]))
 
     def test_transition_distro_from_reliable_to_unreliable(self):
         """
@@ -434,9 +435,11 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64|rhel62"]),
-        ]))
+        self.transition_from_reliable_to_unreliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js",
+                                                         ["unreliable|jsCore_WT|linux-64|rhel62"]),
+                                                    ]))
 
     def test_transition_from_reliable_to_unreliable(self):
         """
@@ -449,14 +452,15 @@ class TestUpdateTags(unittest.TestCase):
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(unacceptable=0.1),
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(unacceptable=0.1))
 
-        self.transition_from_reliable_to_unreliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", [
-                "unreliable",
-                "unreliable|jsCore_WT",
-                "unreliable|jsCore_WT|linux-64",
-                "unreliable|jsCore_WT|linux-64|rhel62",
-            ]),
-        ]))
+        self.transition_from_reliable_to_unreliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js", [
+                                                            "unreliable",
+                                                            "unreliable|jsCore_WT",
+                                                            "unreliable|jsCore_WT|linux-64",
+                                                            "unreliable|jsCore_WT|linux-64|rhel62",
+                                                        ]),
+                                                    ]))
 
     def transition_from_unreliable_to_reliable(self, config, initial_tags):
         """
@@ -516,23 +520,19 @@ class TestUpdateTags(unittest.TestCase):
         # The test did not run on the reliable period on linux-64.
         report = test_failures.Report([
             # Failing.
-            self.ENTRY._replace(num_pass=0,
-                                num_fail=2),
+            self.ENTRY._replace(num_pass=0, num_fail=2),
             # Passing on a different variant.
-            self.ENTRY._replace(start_date=reliable_period_date,
-                                end_date=reliable_period_date,
-                                num_pass=3,
-                                num_fail=0,
-                                variant="linux-alt",
-                                distro="debian7"),
+            self.ENTRY._replace(start_date=reliable_period_date, end_date=reliable_period_date,
+                                num_pass=3, num_fail=0, variant="linux-alt", distro="debian7"),
         ])
 
         update_test_lifecycle.validate_config(config)
         update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
         # The tags for variant and distro have been removed.
-        self.assertEqual(updated_tags, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable", "unreliable|jsCore_WT"])]))
+        self.assertEqual(updated_tags,
+                         collections.OrderedDict([("jstests/core/all.js",
+                                                   ["unreliable", "unreliable|jsCore_WT"])]))
 
     def test_non_running_at_all_is_reliable(self):
         """
@@ -574,9 +574,10 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             test_fail_rates=self.CONFIG.test_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable"]),
-        ]))
+        self.transition_from_unreliable_to_reliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js", ["unreliable"]),
+                                                    ]))
 
     def test_transition_task_from_unreliable_to_reliable(self):
         """
@@ -587,9 +588,11 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             task_fail_rates=self.CONFIG.task_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable|jsCore_WT"]),
-        ]))
+        self.transition_from_unreliable_to_reliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js",
+                                                         ["unreliable|jsCore_WT"]),
+                                                    ]))
 
     def test_transition_variant_from_unreliable_to_reliable(self):
         """
@@ -600,9 +603,11 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64"]),
-        ]))
+        self.transition_from_unreliable_to_reliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js",
+                                                         ["unreliable|jsCore_WT|linux-64"]),
+                                                    ]))
 
     def test_transition_distro_from_unreliable_to_reliable(self):
         """
@@ -613,9 +618,11 @@ class TestUpdateTags(unittest.TestCase):
         config = self.CONFIG._replace(
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", ["unreliable|jsCore_WT|linux-64|rhel62"]),
-        ]))
+        self.transition_from_unreliable_to_reliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js",
+                                                         ["unreliable|jsCore_WT|linux-64|rhel62"]),
+                                                    ]))
 
     def test_transition_from_unreliable_to_reliable(self):
         """
@@ -629,14 +636,15 @@ class TestUpdateTags(unittest.TestCase):
             variant_fail_rates=self.CONFIG.variant_fail_rates._replace(acceptable=0.9),
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9))
 
-        self.transition_from_unreliable_to_reliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", [
-                "unreliable",
-                "unreliable|jsCore_WT",
-                "unreliable|jsCore_WT|linux-64",
-                "unreliable|jsCore_WT|linux-64|rhel62",
-            ]),
-        ]))
+        self.transition_from_unreliable_to_reliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js", [
+                                                            "unreliable",
+                                                            "unreliable|jsCore_WT",
+                                                            "unreliable|jsCore_WT|linux-64",
+                                                            "unreliable|jsCore_WT|linux-64|rhel62",
+                                                        ]),
+                                                    ]))
 
     def test_remain_reliable(self):
         """
@@ -720,14 +728,15 @@ class TestUpdateTags(unittest.TestCase):
             distro_fail_rates=self.CONFIG.distro_fail_rates._replace(acceptable=0.9),
             reliable_min_runs=100)
 
-        self.transition_from_unreliable_to_reliable(config, collections.OrderedDict([
-            ("jstests/core/all.js", [
-                "unreliable",
-                "unreliable|jsCore_WT",
-                "unreliable|jsCore_WT|linux-64",
-                "unreliable|jsCore_WT|linux-64|rhel62",
-            ]),
-        ]))
+        self.transition_from_unreliable_to_reliable(config,
+                                                    collections.OrderedDict([
+                                                        ("jstests/core/all.js", [
+                                                            "unreliable",
+                                                            "unreliable|jsCore_WT",
+                                                            "unreliable|jsCore_WT|linux-64",
+                                                            "unreliable|jsCore_WT|linux-64|rhel62",
+                                                        ]),
+                                                    ]))
 
     def test_obeys_reliable_time_period(self):
         """
@@ -748,14 +757,14 @@ class TestUpdateTags(unittest.TestCase):
 
         tests = ["jstests/core/all.js"]
         report = test_failures.Report([
-            self.ENTRY._replace(start_date=(self.ENTRY.start_date - datetime.timedelta(days=1)),
-                                end_date=(self.ENTRY.end_date - datetime.timedelta(days=1)),
-                                num_pass=1,
-                                num_fail=0),
-            self.ENTRY._replace(start_date=(self.ENTRY.start_date - datetime.timedelta(days=2)),
-                                end_date=(self.ENTRY.end_date - datetime.timedelta(days=2)),
-                                num_pass=1,
-                                num_fail=0),
+            self.ENTRY._replace(
+                start_date=(self.ENTRY.start_date - datetime.timedelta(days=1)),
+                end_date=(self.ENTRY.end_date - datetime.timedelta(days=1)), num_pass=1,
+                num_fail=0),
+            self.ENTRY._replace(
+                start_date=(self.ENTRY.start_date - datetime.timedelta(days=2)),
+                end_date=(self.ENTRY.end_date - datetime.timedelta(days=2)), num_pass=1,
+                num_fail=0),
             self.ENTRY._replace(num_pass=0, num_fail=1),
             self.ENTRY._replace(num_pass=0, num_fail=1),
             self.ENTRY._replace(num_pass=0, num_fail=1, task="jsCore"),
@@ -766,14 +775,15 @@ class TestUpdateTags(unittest.TestCase):
         update_test_lifecycle.validate_config(config)
         update_test_lifecycle.update_tags(summary_lifecycle, config, report, tests)
         updated_tags = self.assert_has_only_js_tests(lifecycle)
-        self.assertEqual(updated_tags, collections.OrderedDict([
-            ("jstests/core/all.js", [
-                "unreliable",
-                "unreliable|jsCore_WT",
-                "unreliable|jsCore_WT|linux-64",
-                "unreliable|jsCore_WT|linux-64|rhel62",
-            ]),
-        ]))
+        self.assertEqual(updated_tags,
+                         collections.OrderedDict([
+                             ("jstests/core/all.js", [
+                                 "unreliable",
+                                 "unreliable|jsCore_WT",
+                                 "unreliable|jsCore_WT|linux-64",
+                                 "unreliable|jsCore_WT|linux-64|rhel62",
+                             ]),
+                         ]))
 
     def test_obeys_unreliable_min_runs(self):
         """
@@ -835,14 +845,14 @@ class TestUpdateTags(unittest.TestCase):
 
         tests = ["jstests/core/all.js"]
         report = test_failures.Report([
-            self.ENTRY._replace(start_date=(self.ENTRY.start_date - datetime.timedelta(days=1)),
-                                end_date=(self.ENTRY.end_date - datetime.timedelta(days=1)),
-                                num_pass=0,
-                                num_fail=1),
-            self.ENTRY._replace(start_date=(self.ENTRY.start_date - datetime.timedelta(days=2)),
-                                end_date=(self.ENTRY.end_date - datetime.timedelta(days=2)),
-                                num_pass=0,
-                                num_fail=1),
+            self.ENTRY._replace(
+                start_date=(self.ENTRY.start_date - datetime.timedelta(days=1)),
+                end_date=(self.ENTRY.end_date - datetime.timedelta(days=1)), num_pass=0,
+                num_fail=1),
+            self.ENTRY._replace(
+                start_date=(self.ENTRY.start_date - datetime.timedelta(days=2)),
+                end_date=(self.ENTRY.end_date - datetime.timedelta(days=2)), num_pass=0,
+                num_fail=1),
             self.ENTRY._replace(num_pass=1, num_fail=0),
             self.ENTRY._replace(num_pass=1, num_fail=0),
             self.ENTRY._replace(num_pass=1, num_fail=0, task="jsCore"),
@@ -858,13 +868,11 @@ class TestUpdateTags(unittest.TestCase):
 
 class TestCombinationHelpers(unittest.TestCase):
     def test_from_entry(self):
-        entry = test_failures._ReportEntry(
-            "testA", "taskA", "variantA", "distroA",
-            datetime.date.today(),
-            datetime.date.today(), 0, 0)
+        entry = test_failures._ReportEntry("testA", "taskA", "variantA", "distroA",
+                                           datetime.date.today(), datetime.date.today(), 0, 0)
         combination = update_test_lifecycle._test_combination_from_entry(
             entry, test_failures.Report.TEST)
-        self.assertEqual(combination, ("testA",))
+        self.assertEqual(combination, ("testA", ))
 
         combination = update_test_lifecycle._test_combination_from_entry(
             entry, test_failures.Report.TEST_TASK)
@@ -881,12 +889,10 @@ class TestCombinationHelpers(unittest.TestCase):
     def test_make_from_tag(self):
         test = "testA"
 
-        combination = update_test_lifecycle._test_combination_from_tag(
-            test, "unreliable")
-        self.assertEqual(combination, ("testA",))
+        combination = update_test_lifecycle._test_combination_from_tag(test, "unreliable")
+        self.assertEqual(combination, ("testA", ))
 
-        combination = update_test_lifecycle._test_combination_from_tag(
-            test, "unreliable|taskA")
+        combination = update_test_lifecycle._test_combination_from_tag(test, "unreliable|taskA")
         self.assertEqual(combination, ("testA", "taskA"))
 
         combination = update_test_lifecycle._test_combination_from_tag(
@@ -901,57 +907,57 @@ class TestCombinationHelpers(unittest.TestCase):
 class TestCleanUpTags(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.evg = MockEvergreenConfig(["task1", "task2", "task3"],
-                                      {"variant1": {"tasks": ["task1", "task2"],
-                                                    "distros": ["distro1"]},
-                                       "variant2": {"tasks": ["task3"],
-                                                    "distros": ["distro2"]}})
+        cls.evg = MockEvergreenConfig(
+            ["task1", "task2", "task3"], {
+                "variant1": {"tasks": ["task1", "task2"], "distros": ["distro1"]},
+                "variant2": {"tasks": ["task3"], "distros": ["distro2"]}
+            })
 
     def test_is_unreliable_tag_relevant(self):
         self.assertTrue(update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable"))
 
     def test_is_unknown_task_relevant(self):
-        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task_unknown"))
+        self.assertFalse(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task_unknown"))
 
     def test_is_known_task_relevant(self):
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task1"))
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task2"))
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task3"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task1"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task2"))
+        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task3"))
 
     def test_is_unknown_variant_relevant(self):
-        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task1|variant3"
-        ))
+        self.assertFalse(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task1|variant3"))
 
     def test_is_unknown_task_variant_relevant(self):
-        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task3|variant1"))
-        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task1|variant2"))
+        self.assertFalse(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task3|variant1"))
+        self.assertFalse(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task1|variant2"))
 
     def test_is_known_task_variant_relevant(self):
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task1|variant1"))
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task2|variant1"))
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task3|variant2"))
+        self.assertTrue(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task1|variant1"))
+        self.assertTrue(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task2|variant1"))
+        self.assertTrue(
+            update_test_lifecycle._is_tag_still_relevant(self.evg, "unreliable|task3|variant2"))
 
     def test_is_unknown_task_variant_distro_relevant(self):
-        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task1|variant1|distro2"))
-        self.assertFalse(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task3|variant2|distro1"))
+        self.assertFalse(
+            update_test_lifecycle._is_tag_still_relevant(self.evg,
+                                                         "unreliable|task1|variant1|distro2"))
+        self.assertFalse(
+            update_test_lifecycle._is_tag_still_relevant(self.evg,
+                                                         "unreliable|task3|variant2|distro1"))
 
     def test_is_known_task_variant_distro_relevant(self):
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task1|variant1|distro1"))
-        self.assertTrue(update_test_lifecycle._is_tag_still_relevant(
-            self.evg, "unreliable|task3|variant2|distro2"))
+        self.assertTrue(
+            update_test_lifecycle._is_tag_still_relevant(self.evg,
+                                                         "unreliable|task1|variant1|distro1"))
+        self.assertTrue(
+            update_test_lifecycle._is_tag_still_relevant(self.evg,
+                                                         "unreliable|task3|variant2|distro2"))
 
 
 class MockEvergreenConfig(object):
@@ -973,8 +979,11 @@ class MockVariant(object):
 
 class TestJiraIssueCreator(unittest.TestCase):
     def test_description(self):
-        data = {"js_test": {"testfile1": {"tag1": 0.1, "tag2": 0.2},
-                            "testfile2": {"tag1": 0.1, "tag3": 0.3}}}
+        data = {
+            "js_test": {
+                "testfile1": {"tag1": 0.1, "tag2": 0.2}, "testfile2": {"tag1": 0.1, "tag3": 0.3}
+            }
+        }
         desc = update_test_lifecycle.JiraIssueCreator._make_updated_tags_description(data)
         expected = ("- *js_test*\n"
                     "-- {{testfile1}}\n"
@@ -992,8 +1001,7 @@ class TestJiraIssueCreator(unittest.TestCase):
         self.assertEqual(expected, desc)
 
     def test_clean_up_description(self):
-        data = {"js_test": {"testfile1": ["tag1", "tag2"],
-                            "testfile2": []}}
+        data = {"js_test": {"testfile1": ["tag1", "tag2"], "testfile2": []}}
         desc = update_test_lifecycle.JiraIssueCreator._make_tags_cleaned_up_description(data)
         expected = ("- *js_test*\n"
                     "-- {{testfile1}}\n"
@@ -1017,8 +1025,9 @@ class TestJiraIssueCreator(unittest.TestCase):
         self.assertTrue(desc == update_test_lifecycle.JiraIssueCreator._truncate_description(desc))
 
         desc += "a"
-        self.assertTrue(len(update_test_lifecycle.JiraIssueCreator._truncate_description(desc)) <=
-                        update_test_lifecycle.JiraIssueCreator._MAX_DESCRIPTION_SIZE)
+        self.assertTrue(
+            len(update_test_lifecycle.JiraIssueCreator._truncate_description(desc)) <=
+            update_test_lifecycle.JiraIssueCreator._MAX_DESCRIPTION_SIZE)
 
 
 class TestTagsConfigWithChangelog(unittest.TestCase):

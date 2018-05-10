@@ -63,6 +63,12 @@ public:
         return Pipeline::aggSupportsWriteConcern(cmd);
     }
 
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const final {
+        return true;
+    }
+
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
@@ -74,8 +80,8 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        return CommandHelpers::appendCommandStatus(
-            result, _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
+        uassertStatusOK(_runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
+        return true;
     }
 
     Status explain(OperationContext* opCtx,

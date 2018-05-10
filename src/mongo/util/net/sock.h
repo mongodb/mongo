@@ -68,11 +68,6 @@ struct SSLPeerInfo;
 extern const int portSendFlags;
 extern const int portRecvFlags;
 
-void setSocketKeepAliveParams(int sock,
-                              unsigned int maxKeepIdleSecs = 300,
-                              unsigned int maxKeepIntvlSecs = 300);
-void disableNagle(int sock);
-
 #if !defined(_WIN32)
 
 inline void closesocket(int s) {
@@ -82,29 +77,6 @@ const int INVALID_SOCKET = -1;
 typedef int SOCKET;
 
 #endif  // _WIN32
-
-std::string makeUnixSockPath(int port);
-
-// If an ip address is passed in, just return that.  If a hostname is passed
-// in, look up its ip and return that.  Returns "" on failure.
-std::string hostbyname(const char* hostname);
-
-void enableIPv6(bool state = true);
-bool IPv6Enabled();
-void setSockTimeouts(int sock, double secs);
-
-/** this is not cache and does a syscall */
-std::string getHostName();
-
-/** this is cached, so if changes during the process lifetime
- * will be stale */
-std::string getHostNameCached();
-
-/** Returns getHostNameCached():<port>. */
-std::string getHostNameCachedAndPort();
-
-/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
-std::string prettyHostName();
 
 /**
  * thin wrapped around file descriptor and system calls
@@ -269,6 +241,5 @@ private:
     /** true until the first packet has been received or an outgoing connect has been made */
     bool _awaitingHandshake;
 };
-
 
 }  // namespace mongo

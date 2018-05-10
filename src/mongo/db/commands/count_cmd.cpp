@@ -150,13 +150,10 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
-        auto statusWithPlanExecutor = getExecutorCount(opCtx,
-                                                       collection,
-                                                       request.getValue(),
-                                                       true,  // explain
-                                                       PlanExecutor::YIELD_AUTO);
+        auto statusWithPlanExecutor =
+            getExecutorCount(opCtx, collection, request.getValue(), true /*explain*/);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -181,18 +178,19 @@ public:
 
         const bool isExplain = false;
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
-        if (!request.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, request.getStatus());
-        }
+        uassertStatusOK(request.getStatus());
+
+        // Check whether we are allowed to read from this node after acquiring our locks.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassertStatusOK(replCoord->checkCanServeReadsFor(
+            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
 
             auto viewAggregation = request.getValue().asAggregationCommand();
-            if (!viewAggregation.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
-            }
+            uassertStatusOK(viewAggregation.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
@@ -205,16 +203,11 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
-        auto statusWithPlanExecutor = getExecutorCount(opCtx,
-                                                       collection,
-                                                       request.getValue(),
-                                                       false,  // !explain
-                                                       PlanExecutor::YIELD_AUTO);
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        auto statusWithPlanExecutor =
+            getExecutorCount(opCtx, collection, request.getValue(), false /*explain*/);
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -226,9 +219,7 @@ public:
         }
 
         Status execPlanStatus = exec->executePlan();
-        if (!execPlanStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, execPlanStatus);
-        }
+        uassertStatusOK(execPlanStatus);
 
         PlanSummaryStats summaryStats;
         Explain::getSummaryStats(*exec, &summaryStats);

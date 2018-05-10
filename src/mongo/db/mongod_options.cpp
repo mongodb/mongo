@@ -126,20 +126,6 @@ Status addMongodOptions(moe::OptionSection* options) {
 
     // Diagnostic Options
 
-    general_options
-        .addOptionChaining("operationProfiling.slowOpThresholdMs",
-                           "slowms",
-                           moe::Int,
-                           "value of slow for profile and console log")
-        .setDefault(moe::Value(100));
-
-    general_options
-        .addOptionChaining("operationProfiling.slowOpSampleRate",
-                           "slowOpSampleRate",
-                           moe::Double,
-                           "fraction of slow ops to include in the profile and console log")
-        .setDefault(moe::Value(1.0));
-
     general_options.addOptionChaining("profile", "profile", moe::Int, "0=off 1=slow, 2=all")
         .setSources(moe::SourceAllLegacy);
 
@@ -406,6 +392,12 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "enables majority readConcern")
         .setDefault(moe::Value(true));
 
+    replication_options.addOptionChaining(
+        "master", "master", moe::Switch, "Master/slave replication no longer supported");
+
+    replication_options.addOptionChaining(
+        "slave", "slave", moe::Switch, "Master/slave replication no longer supported");
+
     // Sharding Options
 
     sharding_options
@@ -557,6 +549,11 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
         setPlainConsoleLogger();
         sysRuntimeInfo();
+        return false;
+    }
+
+    if (params.count("master") || params.count("slave")) {
+        severe() << "Master/slave replication is no longer supported";
         return false;
     }
 
@@ -910,14 +907,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("operationProfiling.slowOpThresholdMs")) {
-        serverGlobalParams.slowMS = params["operationProfiling.slowOpThresholdMs"].as<int>();
-    }
-
-    if (params.count("operationProfiling.slowOpSampleRate")) {
-        serverGlobalParams.sampleRate = params["operationProfiling.slowOpSampleRate"].as<double>();
-    }
-
     if (params.count("storage.syncPeriodSecs")) {
         storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
         if (storageGlobalParams.syncdelay < 0 ||
@@ -1073,6 +1062,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         replSettings.setOplogSizeBytes(x * 1024 * 1024);
         invariant(replSettings.getOplogSizeBytes() > 0);
     }
+
     if (params.count("cacheSize")) {
         long x = params["cacheSize"].as<long>();
         if (x <= 0) {

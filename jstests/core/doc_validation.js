@@ -1,7 +1,11 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands,
-// requires_non_retryable_writes]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   requires_non_retryable_commands,
+//   requires_non_retryable_writes,
+//   requires_fastcount,
+// ]
 
 // Test basic inserts and updates with document validation.
 (function() {

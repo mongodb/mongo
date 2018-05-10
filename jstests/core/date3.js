@@ -1,4 +1,6 @@
 // Check dates before Unix epoch - SERVER-405
+//
+// @tags: [requires_fastcount]
 
 t = db.date3;
 t.drop();

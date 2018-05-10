@@ -103,7 +103,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         if (needToMakeCursor) {
             const bool forward = _params.direction == CollectionScanParams::FORWARD;
 
-            if (forward && !_params.tailable && _params.collection->ns().isOplog()) {
+            if (forward && _params.shouldWaitForOplogVisibility) {
                 // Forward, non-tailable scans from the oplog need to wait until all oplog entries
                 // before the read begins to be visible. This isn't needed for reverse scans because
                 // we only hide oplog entries from forward scans, and it isn't necessary for tailing
@@ -112,8 +112,10 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // might not include writes that finished before the read started. This also must be
                 // done before we create the cursor as that is when we establish the endpoint for
                 // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
-                // storage engine snapshot while waiting. Otherwise, we will end up reading from
-                // the snapshot where the oplog entries are not yet visible even after the wait.
+                // storage engine snapshot while waiting. Otherwise, we will end up reading from the
+                // snapshot where the oplog entries are not yet visible even after the wait.
+                invariant(!_params.tailable && _params.collection->ns().isOplog());
+
                 getOpCtx()->recoveryUnit()->abandonSnapshot();
                 _params.collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
                     getOpCtx());

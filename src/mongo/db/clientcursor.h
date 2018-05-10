@@ -39,7 +39,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 

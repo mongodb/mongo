@@ -33,6 +33,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/field_parser.h"
@@ -176,15 +177,13 @@ public:
             Status status = bsonExtractOpTimeField(cmdObj, "wOpTime", &lastOpTime);
             if (!status.isOK()) {
                 result.append("badGLE", cmdObj);
-                return CommandHelpers::appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatusNoThrow(result, status);
             }
         } else {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::TypeMismatch,
-                       str::stream() << "Expected \"wOpTime\" field in getLastError to "
-                                        "have type Date, Timestamp, or OpTime but found type "
-                                     << typeName(opTimeElement.type())));
+            uasserted(ErrorCodes::TypeMismatch,
+                      str::stream() << "Expected \"wOpTime\" field in getLastError to "
+                                       "have type Date, Timestamp, or OpTime but found type "
+                                    << typeName(opTimeElement.type()));
         }
 
 
@@ -194,7 +193,7 @@ public:
             FieldParser::extract(cmdObj, wElectionIdField, &electionId, &errmsg);
         if (!extracted) {
             result.append("badGLE", cmdObj);
-            CommandHelpers::appendCommandStatus(result, false, errmsg);
+            CommandHelpers::appendSimpleCommandStatus(result, false, errmsg);
             return false;
         }
 
@@ -213,7 +212,7 @@ public:
         BSONObj writeConcernDoc = ([&] {
             BSONObjBuilder bob;
             for (auto&& elem : cmdObj) {
-                if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData()))
+                if (!isGenericArgument(elem.fieldNameStringData()))
                     bob.append(elem);
             }
             return bob.obj();
@@ -241,7 +240,7 @@ public:
 
         if (!status.isOK()) {
             result.append("badGLE", writeConcernDoc);
-            return CommandHelpers::appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
 
         // Don't wait for replication if there was an error reported - this matches 2.4 behavior
@@ -297,7 +296,7 @@ public:
             return true;
         }
 
-        return CommandHelpers::appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatusNoThrow(result, status);
     }
 
 } cmdGetLastError;

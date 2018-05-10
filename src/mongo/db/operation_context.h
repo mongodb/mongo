@@ -54,7 +54,6 @@ class CurOp;
 class ProgressMeter;
 class ServiceContext;
 class StringData;
-class WriteUnitOfWork;
 
 namespace repl {
 class UnreplicatedWritesBlock;
@@ -75,15 +74,6 @@ class OperationContext : public Decorable<OperationContext> {
     MONGO_DISALLOW_COPYING(OperationContext);
 
 public:
-    /**
-     * The RecoveryUnitState is used by WriteUnitOfWork to ensure valid state transitions.
-     */
-    enum RecoveryUnitState {
-        kNotInUnitOfWork,   // not in a unit of work, no writes allowed
-        kActiveUnitOfWork,  // in a unit of work that still may either commit or abort
-        kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
-    };
-
     OperationContext(Client* client, unsigned int opId);
 
     virtual ~OperationContext() = default;
@@ -115,7 +105,8 @@ public:
      * returned separately even though the state logically belongs to the RecoveryUnit,
      * as it is managed by the OperationContext.
      */
-    RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit, RecoveryUnitState state);
+    WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
+                                                       WriteUnitOfWork::RecoveryUnitState state);
 
     /**
      * Interface for locking.  Caller DOES NOT own pointer.
@@ -286,6 +277,20 @@ public:
     }
 
     /**
+     * Sets a transport Baton on the operation.  This will trigger the Baton on markKilled.
+     */
+    void setBaton(const transport::BatonHandle& baton) {
+        _baton = baton;
+    }
+
+    /**
+     * Retrieves the baton associated with the operation.
+     */
+    const transport::BatonHandle& getBaton() const {
+        return _baton;
+    }
+
+    /**
      * Associates a transaction number with this operation context. May only be called once for the
      * lifetime of the operation and the operation must have a logical session id assigned.
      */
@@ -406,14 +411,6 @@ public:
     }
 
     /**
-     * Reset the deadline for this operation.
-     */
-    void clearDeadline() {
-        _deadline = Date_t::max();
-        _maxTime = computeMaxTimeFromDeadline(_deadline);
-    }
-
-    /**
      * Returns the number of milliseconds remaining for this operation's time limit or
      * Milliseconds::max() if the operation has no time limit.
      */
@@ -427,20 +424,6 @@ public:
      * value Microseconds::max() if the operation has no time limit.
      */
     Microseconds getRemainingMaxTimeMicros() const;
-
-    /**
-     * Indicate that the current network operation will leave an open client cursor on completion.
-     */
-    void setStashedCursor() {
-        _hasStashedCursor = true;
-    }
-
-    /**
-     * Returns whether the current network operation will leave an open client cursor on completion.
-     */
-    bool hasStashedCursor() {
-        return _hasStashedCursor;
-    }
 
 private:
     /**
@@ -484,7 +467,8 @@ private:
     std::unique_ptr<Locker> _locker;
 
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
-    RecoveryUnitState _ruState = kNotInUnitOfWork;
+    WriteUnitOfWork::RecoveryUnitState _ruState =
+        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 
     // Operations run within a transaction will hold a WriteUnitOfWork for the duration in order
     // to maintain two-phase locking.
@@ -495,6 +479,9 @@ private:
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
+    // A transport Baton associated with the operation. The presence of this object implies that a
+    // client thread is doing it's own async networking by blocking on it's own thread.
+    transport::BatonHandle _baton;
 
     // If non-null, _waitMutex and _waitCV are the (mutex, condition variable) pair that the
     // operation is currently waiting on inside a call to waitForConditionOrInterrupt...().
@@ -525,10 +512,6 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
-
-    // When true, the cursor used by this operation will be stashed for use by a subsequent network
-    // operation.
-    bool _hasStashedCursor = false;
 };
 
 namespace repl {

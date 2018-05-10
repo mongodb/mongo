@@ -38,6 +38,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -65,6 +66,7 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
     setDiffieHellmanParameterPEMFile(ServerParameterSet::getGlobal(),
                                      "opensslDiffieHellmanParameters",
                                      &sslGlobalParams.sslPEMTempDHParam);
+
 }  // namespace
 
 SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
@@ -460,6 +462,83 @@ StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExten
 
     return roles;
 }
+
+std::string removeFQDNRoot(std::string name) {
+    if (name.back() == '.') {
+        name.pop_back();
+    }
+    return name;
+};
+
+namespace {
+
+// Characters that need to be escaped in RFC 2253
+const std::array<char, 7> rfc2253EscapeChars = {',', '+', '"', '\\', '<', '>', ';'};
+
+}  // namespace
+
+// See section "2.4 Converting an AttributeValue from ASN.1 to a String" in RFC 2243
+std::string escapeRfc2253(StringData str) {
+    std::string ret;
+
+    if (str.size() > 0) {
+        size_t pos = 0;
+
+        // a space or "#" character occurring at the beginning of the string
+        if (str[0] == ' ') {
+            ret = "\\ ";
+            pos = 1;
+        } else if (str[0] == '#') {
+            ret = "\\#";
+            pos = 1;
+        }
+
+        while (pos < str.size()) {
+            if (static_cast<signed char>(str[pos]) < 0) {
+                ret += '\\';
+                ret += integerToHex(str[pos]);
+            } else {
+                if (std::find(rfc2253EscapeChars.cbegin(), rfc2253EscapeChars.cend(), str[pos]) !=
+                    rfc2253EscapeChars.cend()) {
+                    ret += '\\';
+                }
+
+                ret += str[pos];
+            }
+            ++pos;
+        }
+
+        // a space character occurring at the end of the string
+        if (ret.size() > 2 && ret[ret.size() - 1] == ' ') {
+            ret[ret.size() - 1] = '\\';
+            ret += ' ';
+        }
+    }
+
+    return ret;
+}
+
 #endif
 
 }  // namespace mongo
+
+#ifdef MONGO_CONFIG_SSL
+// TODO SERVER-11601 Use NFC Unicode canonicalization
+bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
+    nameToMatch = removeFQDNRoot(std::move(nameToMatch));
+    certHostName = removeFQDNRoot(std::move(certHostName));
+
+    if (certHostName.size() < 2) {
+        return false;
+    }
+
+    // match wildcard DNS names
+    if (certHostName[0] == '*' && certHostName[1] == '.') {
+        // allow name.example.com if the cert is *.example.com, '*' does not match '.'
+        const char* subName = strchr(nameToMatch.c_str(), '.');
+        return subName && !strcasecmp(certHostName.c_str() + 1, subName);
+    } else {
+        return !strcasecmp(nameToMatch.c_str(), certHostName.c_str());
+    }
+}
+#endif

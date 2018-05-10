@@ -90,5 +90,4 @@
         filter: {a: {$nearSphere: {$geometry: {type: "Point", coordinates: [0, 0]}}}}
     }));
 
-    assert.commandFailed(db.adminCommand({listDatabases: 1, filter: {$isolated: 1}}));
 }());

@@ -236,7 +236,7 @@ add_option('spider-monkey-dbg',
 )
 
 add_option('opt',
-    choices=['on', 'off'],
+    choices=['on', 'size', 'off'],
     const='on',
     help='Enable compile-time optimization',
     nargs='?',
@@ -273,6 +273,13 @@ add_option('gdbserver',
 add_option('gcov',
     help='compile with flags for gcov',
     nargs=0,
+)
+
+add_option('enable-free-mon',
+    choices=["auto", "on", "off"],
+    default="auto",
+    help='Disable support for Free Monitoring to avoid HTTP client library dependencies',
+    type='choice',
 )
 
 add_option('use-sasl-client',
@@ -351,6 +358,15 @@ add_option('use-system-icu',
 add_option('use-system-intel_decimal128',
     help='use system version of intel decimal128',
     nargs=0,
+)
+
+add_option('use-system-mongo-c',
+    choices=['on', 'off', 'auto'],
+    const='on',
+    default="auto",
+    help="use system version of the mongo-c-driver (auto will use it if it's found)",
+    nargs='?',
+    type='choice',
 )
 
 add_option('use-system-all',
@@ -501,6 +517,11 @@ add_option('msvc-debugging-format',
     type='choice',
 )
 
+add_option('jlink',
+        help="Limit link concurrency to given value",
+        nargs=1,
+        type=int)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
@@ -509,7 +530,7 @@ try:
         print("version.json does not contain a version string")
         Exit(1)
     if 'githash' not in version_data:
-        version_data['githash'] = utils.getGitVersion()
+        version_data['githash'] = utils.get_git_version()
 
 except IOError as e:
     # If the file error wasn't because the file is missing, error out
@@ -518,8 +539,8 @@ except IOError as e:
         Exit(1)
 
     version_data = {
-        'version': utils.getGitDescribe()[1:],
-        'githash': utils.getGitVersion(),
+        'version': utils.get_git_describe()[1:],
+        'githash': utils.get_git_version(),
     }
 
 except ValueError as e:
@@ -884,8 +905,11 @@ dbg_opt_mapping = {
     ( "off", None  ) : ( False, True ),
     ( "off", "on"  ) : ( False, True ),
     ( "off", "off" ) : ( False, False ),
+    ( "on",  "size"  ) : ( True,  True ),
+    ( "off", "size"  ) : ( False, True ),
 }
 debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
+optBuildForSize = True if optBuild and get_option('opt') == "size" else False
 
 if releaseBuild and (debugBuild or not optBuild):
     print("Error: A --release build may not have debugging, and must have optimization")
@@ -1610,11 +1634,14 @@ elif env.TargetOSIs('windows'):
     env.Append(CCFLAGS=[winRuntimeLibMap[(dynamicCRT, debugBuild)]])
 
     if optBuild:
+        # /O1:  optimize for size
         # /O2:  optimize for speed (as opposed to size)
         # /Oy-: disable frame pointer optimization (overrides /O2, only affects 32-bit)
         # /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function
         # calls
-        env.Append( CCFLAGS=["/O2", "/Oy-"] )
+
+        optStr = "/O2" if not optBuildForSize else "/O1"
+        env.Append( CCFLAGS=[optStr, "/Oy-"] )
         env.Append( LINKFLAGS=["/INCREMENTAL:NO"])
     else:
         env.Append( CCFLAGS=["/Od"] )
@@ -1723,8 +1750,10 @@ if env.TargetOSIs('posix'):
         env.Append( CCFLAGS=["-fprofile-arcs", "-ftest-coverage"] )
         env.Append( LINKFLAGS=["-fprofile-arcs", "-ftest-coverage"] )
 
-    if optBuild:
+    if optBuild and not optBuildForSize:
         env.Append( CCFLAGS=["-O2"] )
+    elif optBuild and optBuildForSize: 
+        env.Append( CCFLAGS=["-Os"] )
     else:
         env.Append( CCFLAGS=["-O0"] )
 
@@ -1801,10 +1830,12 @@ env['MONGO_MODULES'] = [m.name for m in mongo_modules]
 
 # --- check system ---
 ssl_provider = None
- 
+free_monitoring = get_option("enable-free-mon")
+
 def doConfigure(myenv):
     global wiredtiger
     global ssl_provider
+    global free_monitoring
 
     # Check that the compilers work.
     #
@@ -2467,14 +2498,36 @@ def doConfigure(myenv):
             "undefined" : myenv.File("#etc/ubsan.blacklist"),
         }
 
-        blackfiles = set([v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list])
-        blacklist_options=["-fsanitize-blacklist=%s" % blackfile
-                           for blackfile in blackfiles
-                           if os.stat(blackfile.path).st_size != 0]
+        # Select those unique black files that are associated with the
+        # currently enabled sanitizers, but filter out those that are
+        # zero length.
+        blackfiles = {v for (k, v) in blackfiles_map.iteritems() if k in sanitizer_list}
+        blackfiles = [f for f in blackfiles if os.stat(f.path).st_size != 0]
 
-        for blacklist_option in blacklist_options:
-            if AddToCCFLAGSIfSupported(myenv, blacklist_option):
-                myenv.Append(LINKFLAGS=[blacklist_option])
+        # Filter out any blacklist options that the toolchain doesn't support.
+        supportedBlackfiles = []
+        blackfilesTestEnv = myenv.Clone()
+        for blackfile in blackfiles:
+            if AddToCCFLAGSIfSupported(blackfilesTestEnv, "-fsanitize-blacklist=%s" % blackfile):
+                supportedBlackfiles.append(blackfile)
+        blackfilesTestEnv = None
+        blackfiles = sorted(supportedBlackfiles)
+
+        # If we ended up with any blackfiles after the above filters,
+        # then expand them into compiler flag arguments, and use a
+        # generator to return at command line expansion time so that
+        # we can change the signature if the file contents change.
+        if blackfiles:
+            blacklist_options=["-fsanitize-blacklist=%s" % blackfile for blackfile in blackfiles]
+            def SanitizerBlacklistGenerator(source, target, env, for_signature):
+                if for_signature:
+                    return [f.get_csig() for f in blackfiles]
+                return blacklist_options
+            myenv.AppendUnique(
+                SANITIZER_BLACKLIST_GENERATOR=SanitizerBlacklistGenerator,
+                CCFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
+                LINKFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
+            )
 
         llvm_symbolizer = get_option('llvm-symbolizer')
         if os.path.isabs(llvm_symbolizer):
@@ -2746,27 +2799,14 @@ def doConfigure(myenv):
     def checkOpenSSL(conf):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
+        sslLinkDependencies = ["crypto", "dl"]
+        if conf.env.TargetOSIs('freebsd'):
+            sslLinkDependencies = ["crypto"]
+
         if conf.env.TargetOSIs('windows'):
             sslLibName = "ssleay32"
             cryptoLibName = "libeay32"
-
-            # Add the SSL binaries to the zip file distribution
-            def addOpenSslLibraryToDistArchive(file_name):
-                openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
-                full_file_name = os.path.join(openssl_bin_path, file_name)
-                if os.path.exists(full_file_name):
-                    env.Append(ARCHIVE_ADDITIONS=[full_file_name])
-                    env.Append(ARCHIVE_ADDITION_DIR_MAP={
-                            openssl_bin_path: "bin"
-                            })
-                    return True
-                else:
-                    return False
-
-            files = ['ssleay32.dll', 'libeay32.dll']
-            for extra_file in files:
-                if not addOpenSslLibraryToDistArchive(extra_file):
-                    print("WARNING: Cannot find SSL library '%s'" % extra_file)
+            sslLinkDependencies = ["libeay32"]
 
         # Used to import system certificate keychains
         if conf.env.TargetOSIs('darwin'):
@@ -2806,15 +2846,6 @@ def doConfigure(myenv):
                         pass
 
         if not conf.CheckLibWithHeader(
-                sslLibName,
-                ["openssl/ssl.h"],
-                "C",
-                "SSL_version(NULL);",
-                autoadd=True):
-            maybeIssueDarwinSSLAdvice(conf.env)
-            conf.env.ConfError("Couldn't find OpenSSL ssl.h header and library")
-
-        if not conf.CheckLibWithHeader(
                 cryptoLibName,
                 ["openssl/crypto.h"],
                 "C",
@@ -2822,6 +2853,23 @@ def doConfigure(myenv):
                 autoadd=True):
             maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("Couldn't find OpenSSL crypto.h header and library")
+
+        def CheckLibSSL(context):
+            res = SCons.Conftest.CheckLib(context,
+                     libs=[sslLibName],
+                     extra_libs=sslLinkDependencies,
+                     header='#include "openssl/ssl.h"',
+                     language="C",
+                     call="SSL_version(NULL);",
+                     autoadd=True)
+            context.did_show_result = 1
+            return not res
+
+        conf.AddTest("CheckLibSSL", CheckLibSSL)
+
+        if not conf.CheckLibSSL():
+           maybeIssueDarwinSSLAdvice(conf.env)
+           conf.env.ConfError("Couldn't find OpenSSL ssl.h header and library")
 
         def CheckLinkSSL(context):
             test_body = """
@@ -2888,11 +2936,10 @@ def doConfigure(myenv):
 
     ssl_provider = get_option("ssl-provider")
     if ssl_provider == 'auto':
-        # TODO: When native platforms are implemented, make them the default
-        # if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
-        #     ssl_provider = 'native'
-        # else:
-        ssl_provider = 'openssl'
+        if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
+            ssl_provider = 'native'
+        else:
+            ssl_provider = 'openssl'
 
     if ssl_provider == 'native':
         if conf.env.TargetOSIs('windows'):
@@ -2901,11 +2948,13 @@ def doConfigure(myenv):
             conf.env.Append( MONGO_CRYPTO=["windows"] )
 
         elif conf.env.TargetOSIs('darwin', 'macOS'):
+            ssl_provider = 'apple'
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_APPLE")
             conf.env.Append( MONGO_CRYPTO=["apple"] )
-            if has_option("ssl"):
-                # TODO: Replace SSL implementation as well.
-                # For now, let openssl fill that role.
-                checkOpenSSL(conf)
+            conf.env.AppendUnique(FRAMEWORKS=[
+                'CoreFoundation',
+                'Security',
+            ])
 
     if ssl_provider == 'openssl':
         if has_option("ssl"):
@@ -2922,8 +2971,47 @@ def doConfigure(myenv):
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
+        print("Using SSL Provider: {0}".format(ssl_provider))
     else:
         ssl_provider = "none"
+
+    # The Windows build needs the openssl binaries if it targets openssl or includes the tools
+    # since the tools link against openssl
+    if conf.env.TargetOSIs('windows') and (ssl_provider == "openssl" or has_option("use-new-tools")):
+        # Add the SSL binaries to the zip file distribution
+        def addOpenSslLibraryToDistArchive(file_name):
+            openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
+            full_file_name = os.path.join(openssl_bin_path, file_name)
+            if os.path.exists(full_file_name):
+                env.Append(ARCHIVE_ADDITIONS=[full_file_name])
+                env.Append(ARCHIVE_ADDITION_DIR_MAP={
+                        openssl_bin_path: "bin"
+                        })
+                return True
+            else:
+                return False
+
+        files = ['ssleay32.dll', 'libeay32.dll']
+        for extra_file in files:
+            if not addOpenSslLibraryToDistArchive(extra_file):
+                print("WARNING: Cannot find SSL library '%s'" % extra_file)
+
+
+
+    if free_monitoring == "auto":
+        if "enterprise" not in env['MONGO_MODULES']:
+            free_monitoring = "on"
+        else:
+            free_monitoring = "off"
+
+    if not env.TargetOSIs("windows") \
+        and free_monitoring == "on" \
+        and not conf.CheckLibWithHeader(
+        "curl",
+        ["curl/curl.h"], "C",
+        "curl_global_init(0);",
+        autoadd=False):
+        env.ConfError("Could not find <curl/curl.h> and curl lib")
 
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
@@ -3136,15 +3224,76 @@ def doConfigure(myenv):
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
             break
  
-    conf.env['MONGO_HAVE_LIBMONGOC'] = conf.CheckLibWithHeader(
-            ["mongoc-1.0"],
-            ["mongoc.h"],
-            "C",
-            "mongoc_get_major_version();",
-            autoadd=False )
+    mongoc_mode = get_option('use-system-mongo-c')
+    if mongoc_mode != 'off':
+        conf.env['MONGO_HAVE_LIBMONGOC'] = conf.CheckLibWithHeader(
+                ["mongoc-1.0"],
+                ["mongoc.h"],
+                "C",
+                "mongoc_get_major_version();",
+                autoadd=False )
+        if not conf.env['MONGO_HAVE_LIBMONGOC'] and mongoc_mode == 'on':
+            myenv.ConfError("Failed to find the required C driver headers")
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
+
+    if env['TARGET_ARCH'] == "ppc64le":
+        # This checks for an altivec optimization we use in full text search.
+        # Different versions of gcc appear to put output bytes in different
+        # parts of the output vector produced by vec_vbpermq.  This configure
+        # check looks to see which format the compiler produces.
+        #
+        # NOTE: This breaks cross compiles, as it relies on checking runtime functionality for the
+        # environment we're in.  A flag to choose the index, or the possibility that we don't have
+        # multiple versions to support (after a compiler upgrade) could solve the problem if we
+        # eventually need them.
+        def CheckAltivecVbpermqOutput(context, index):
+            test_body = """
+                #include <altivec.h>
+                #include <cstring>
+                #include <cstdint>
+                #include <cstdlib>
+
+                int main() {{
+                    using Native = __vector signed char;
+                    const size_t size = sizeof(Native);
+                    const Native bits = {{ 120, 112, 104, 96, 88, 80, 72, 64, 56, 48, 40, 32, 24, 16, 8, 0 }};
+
+                    uint8_t inputBuf[size];
+                    std::memset(inputBuf, 0xFF, sizeof(inputBuf));
+
+                    for (size_t offset = 0; offset <= size; offset++) {{
+                        Native vec = vec_vsx_ld(0, reinterpret_cast<const Native*>(inputBuf));
+
+                        uint64_t mask = vec_extract(vec_vbpermq(vec, bits), {0});
+
+                        size_t initialZeros = (mask == 0 ? size : __builtin_ctzll(mask));
+                        if (initialZeros != offset) {{
+			    return 1;
+                        }}
+
+                        if (offset < size) {{
+                            inputBuf[offset] = 0;  // Add an initial 0 for the next loop.
+                        }}
+                    }}
+
+		    return 0;
+                }}
+            """.format(index)
+
+            context.Message('Checking for vec_vbperm output in index {0}... '.format(index))
+            ret = context.TryRun(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret[0])
+            return ret[0]
+
+        conf.AddTest('CheckAltivecVbpermqOutput', CheckAltivecVbpermqOutput)
+
+        outputIndex = next((idx for idx in [0,1] if conf.CheckAltivecVbpermqOutput(idx)), None)
+        if outputIndex is not None:
+	    conf.env.SetConfigHeaderDefine("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex)
+        else:
+            myenv.ConfError("Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported")
 
     return conf.Finish()
 
@@ -3159,7 +3308,11 @@ if get_option('install-mode') == 'hygienic':
                 env.Literal('\\$$ORIGIN/../lib')
             ],
             LINKFLAGS=[
-                '-Wl,-z,origin',
+                # Most systems *require* -z,origin to make origin work, but android
+                # blows up at runtime if it finds DF_ORIGIN_1 in DT_FLAGS_1.
+                # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/linker/linker.h#68
+                # https://android.googlesource.com/platform/bionic/+/cbc80ba9d839675a0c4891e2ab33f39ba51b04b2/libc/include/elf.h#215
+                '-Wl,-z,origin' if not env.TargetOSIs('android') else [],
                 '-Wl,--enable-new-dtags',
             ],
             SHLINKFLAGS=[
@@ -3169,11 +3322,11 @@ if get_option('install-mode') == 'hygienic':
         )
     elif env['PLATFORM'] == 'darwin':
         env.AppendUnique(
-            LINKFLAGS=[
+            PROGLINKFLAGS=[
                 '-Wl,-rpath,@loader_path/../lib'
             ],
             SHLINKFLAGS=[
-                "-Wl,-install_name,@loader_path/../lib/${TARGET.file}",
+                "-Wl,-install_name,@rpath/${TARGET.file}",
             ],
         )
 
@@ -3203,8 +3356,8 @@ if incremental_link.exists(env):
 
 def checkErrorCodes():
     import buildscripts.errorcodes as x
-    if x.checkErrorCodes() == False:
-        env.FatalError("next id to use: {0}", x.getNextCode())
+    if x.check_error_codes() == False:
+        env.FatalError("next id to use: {0}", x.get_next_code())
 
 checkErrorCodes()
 
@@ -3310,6 +3463,7 @@ Export("mmapv1")
 Export("mobile_se")
 Export("endian")
 Export("ssl_provider")
+Export("free_monitoring")
 
 def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
@@ -3339,6 +3493,42 @@ env.Alias("distsrc-tgz", env.GZip(
 )
 env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
 env.Alias("distsrc", "distsrc-tgz")
+
+# Do this as close to last as possible before reading SConscripts, so
+# that any tools that may have injected other things via emitters are included
+# among the side effect adornments.
+#
+# TODO: Move this to a tool.
+if has_option('jlink'):
+    jlink = get_option('jlink')
+    if jlink < 1:
+        env.FatalError("The argument to jlink must be a positive integer")
+
+    target_builders = ['Program', 'SharedLibrary', 'LoadableModule']
+
+    # A bound map of stream (as in stream of work) name to side-effect
+    # file. Since SCons will not allow tasks with a shared side-effect
+    # to execute concurrently, this gives us a way to limit link jobs
+    # independently of overall SCons concurrency.
+    jlink_stream_map = dict()
+
+    def jlink_emitter(target, source, env):
+        name = str(target[0])
+        se_name = "#jlink-stream" + str(hash(name) % jlink)
+        se_node = jlink_stream_map.get(se_name, None)
+        if not se_node:
+            se_node = env.Entry(se_name)
+            # This may not be necessary, but why chance it
+            env.NoCache(se_node)
+            jlink_stream_map[se_name] = se_node
+        env.SideEffect(se_node, target)
+        return (target, source)
+
+    for target_builder in target_builders:
+        builder = env['BUILDERS'][target_builder]
+        base_emitter = builder.emitter
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, jlink_emitter])
+        builder.emitter = new_emitter
 
 env.SConscript(
     dirs=[

@@ -41,6 +41,7 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
     stat_cursor_cache = 0
     stat_cursor_reopen = 0
 
+    # Returns a list: [cursor_cached, cursor_reopened]
     def caching_stats(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache = stat_cursor[stat.conn.cursor_cache][2]
@@ -48,6 +49,8 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return [cache, reopen]
 
+    # Returns a list: [cursor_sweep, cursor_sweep_buckets,
+    #                  cursor_sweep_examined, cursor_sweep_closed]
     def sweep_stats(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         sweep = stat_cursor[stat.conn.cursor_sweep][2]
@@ -509,7 +512,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
         swept = end_sweep_stats[3] - begin_sweep_stats[3]
 
         # Although this is subject to tuning parameters, we know that
-        # in an active sesssion, we'll sweep through minimum of 1% of
+        # in an active session, we'll sweep through minimum of 1% of
         # the cached cursors per second.  We've set this test to run
         # 5 rounds. In 2 of the 5 rounds (sandwiched between the others),
         # some of the uris are allowed to close. So during the 'closing rounds'
@@ -527,3 +530,25 @@ class test_cursor13_sweep(test_cursor13_big_base):
         # by approximately the number of swept cursors, but it's less
         # predictable.
         self.assertGreater(end_stats[1] - begin_stats[1], 0)
+
+class test_cursor13_dup(test_cursor13_base):
+    def test_dup(self):
+        self.cursor_stats_init()
+        uri = 'table:test_cursor13_dup'
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri)
+        cursor['A'] = 'B'
+        cursor.close()
+
+        # Get a cursor and position it.
+        # An unpositioned cursor cannot be duplicated.
+        c1 = self.session.open_cursor(uri, None)
+        c1.next()
+
+        for notused in range(0, 100):
+            self.session.breakpoint()
+            c2 = self.session.open_cursor(None, c1, None)
+            c2.close()
+        stats = self.caching_stats()
+        self.assertGreaterEqual(stats[0], 100)  # cursor_cached > 100
+        self.assertGreaterEqual(stats[1], 100)  # cursor_reopened > 100

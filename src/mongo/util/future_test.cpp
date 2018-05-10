@@ -34,6 +34,10 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 namespace mongo {
 namespace {
 
@@ -73,7 +77,10 @@ Future<Result> async(Func&& func) {
     auto fut = promise.getFuture();
 
     stdx::thread([ promise = std::move(promise), func = std::forward<Func>(func) ]() mutable {
+#if !__has_feature(thread_sanitizer)
+        // TSAN works better without this sleep, but it is useful for testing correctness.
         sleepmillis(100);  // Try to wait until after the Future has been handled.
+#endif
         try {
             completePromise(&promise, func);
         } catch (const DBException& ex) {
@@ -236,6 +243,46 @@ TEST(Future, Fail_getAsync) {
         });
         ASSERT_EQ(std::move(outsideFut).getNoThrow(), failStatus);
     });
+}
+
+TEST(Future, Success_isReady) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            const auto id = stdx::this_thread::get_id();
+                            while (!fut.isReady()) {
+                            }
+                            std::move(fut).getAsync([&](StatusWith<int> status) {
+                                ASSERT_EQ(stdx::this_thread::get_id(), id);
+                                ASSERT_EQ(status, 1);
+                            });
+
+                        });
+}
+
+TEST(Future, Fail_isReady) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        const auto id = stdx::this_thread::get_id();
+        while (!fut.isReady()) {
+        }
+        std::move(fut).getAsync([&](StatusWith<int> status) {
+            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_NOT_OK(status);
+        });
+
+    });
+}
+
+TEST(Future, isReady_TSAN_OK) {
+    bool done = false;
+    auto fut = async([&] {
+        done = true;
+        return 1;
+    });
+    while (!fut.isReady()) {
+    }
+    // ASSERT(done);  // Data Race! Uncomment to make sure TSAN is working.
+    (void)fut.get();
+    ASSERT(done);
 }
 
 TEST(Future, Success_thenSimple) {
@@ -687,6 +734,43 @@ TEST(Future_Void, Fail_getAsync) {
         });
         ASSERT_EQ(std::move(outsideFut).getNoThrow(), failStatus);
     });
+}
+
+TEST(Future_Void, Success_isReady) {
+    FUTURE_SUCCESS_TEST([] {},
+                        [](Future<void>&& fut) {
+                            const auto id = stdx::this_thread::get_id();
+                            while (!fut.isReady()) {
+                            }
+                            std::move(fut).getAsync([&](Status status) {
+                                ASSERT_EQ(stdx::this_thread::get_id(), id);
+                                ASSERT_OK(status);
+                            });
+
+                        });
+}
+
+TEST(Future_Void, Fail_isReady) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        const auto id = stdx::this_thread::get_id();
+        while (!fut.isReady()) {
+        }
+        std::move(fut).getAsync([&](Status status) {
+            ASSERT_EQ(stdx::this_thread::get_id(), id);
+            ASSERT_NOT_OK(status);
+        });
+
+    });
+}
+
+TEST(Future_Void, isReady_TSAN_OK) {
+    bool done = false;
+    auto fut = async([&] { done = true; });
+    while (!fut.isReady()) {
+    }
+    // ASSERT(done);  // Data Race! Uncomment to make sure TSAN is working.
+    fut.get();
+    ASSERT(done);
 }
 
 TEST(Future_Void, Success_thenSimple) {

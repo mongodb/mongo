@@ -7,6 +7,10 @@ selector:
   # This test exercises an internal detail of mongos<->mongod communication and is not expected
   # to work against a mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
+  # TODO: SERVER-32088 should fix resuming a change stream when not all shards have data.
+  - jstests/change_streams/change_stream_shell_helper.js
+  - jstests/change_streams/lookup_post_image.js
+  - jstests/change_streams/include_cluster_time.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the
@@ -21,6 +25,8 @@ selector:
   # "Cowardly refusing to run test with overridden write concern when it uses a command that can
   #  only perform w=1 writes: ..."
   - requires_eval_command
+  # Transactions not supported on sharded clusters.
+  - uses_transactions
 
 executor:
   archive:
@@ -55,8 +61,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        periodicNoopIntervalSecs: 1
+        writePeriodicNoops: true
     num_rs_nodes_per_shard: 1
-    # This test suite doesn't actually shard any collections, but enabling sharding will prevent
-    # read commands against non-existent databases from unconditionally returning a CursorId of 0.
-    enable_sharding:
-    - test

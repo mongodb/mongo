@@ -165,12 +165,6 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     ServerMechanismBase::_principalName = input[0].substr(2);
     decodeSCRAMUsername(ServerMechanismBase::_principalName);
 
-    auto swUser = saslPrep(ServerMechanismBase::ServerMechanismBase::_principalName);
-    if (!swUser.isOK()) {
-        return swUser.getStatus();
-    }
-    ServerMechanismBase::ServerMechanismBase::_principalName = std::move(swUser.getValue());
-
     if (!authzId.empty() && ServerMechanismBase::_principalName != authzId) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "SCRAM user name " << ServerMechanismBase::_principalName
@@ -190,7 +184,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     // for the internal user.
     UserName user(ServerMechanismBase::ServerMechanismBase::_principalName,
                   ServerMechanismBase::getAuthenticationDatabase());
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
+    if (Policy::getName() == "SCRAM-SHA-1"_sd &&
+        !sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
         user != internalSecurity.user->getName()) {
         return Status(ErrorCodes::BadValue, "SCRAM-SHA-1 authentication is disabled");
     }
@@ -343,6 +338,9 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_sec
 
     return std::make_tuple(false, sb.str());
 }
+
+template class SaslSCRAMServerMechanism<SCRAMSHA1Policy>;
+template class SaslSCRAMServerMechanism<SCRAMSHA256Policy>;
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SASLSCRAMServerMechanism,
                                      ("CreateSASLServerMechanismRegistry"))

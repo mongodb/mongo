@@ -1,6 +1,6 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// expected.  Also, the primary node cannot change because we use the local database in this test.
+// @tags: [assumes_no_implicit_collection_creation_after_drop, does_not_support_stepdowns]
 
 // Test creation of the _id index with various options:
 // - _id indexes must have key pattern {_id: 1}.
@@ -14,7 +14,9 @@
 
     load("jstests/libs/get_index_helpers.js");
 
-    var coll = db.index_id_options;
+    // Must use local db for testing because autoIndexId:false collections are not allowed in
+    // replicated databases.
+    var coll = db.getSiblingDB("local").index_id_options;
 
     // _id indexes must have key pattern {_id: 1}.
     coll.drop();

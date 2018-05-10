@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
@@ -50,7 +51,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_source_impl.h"
 #include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/server_parameters.h"
@@ -625,8 +625,9 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         return connection->get();
     };
 
-    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     if (!forceRollbackViaRefetch.load() && storageEngine->supportsRecoverToStableTimestamp()) {
+        log() << "Rollback using 'recoverToStableTimestamp' method.";
         _runRollbackViaRecoverToCheckpoint(
             opCtx, source, &localOplog, storageInterface, getConnection);
     } else {
@@ -646,7 +647,8 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     StorageInterface* storageInterface,
     OplogInterfaceRemote::GetConnectionFn getConnection) {
 
-    OplogInterfaceRemote remoteOplog(getConnection, NamespaceString::kRsOplogNamespace.ns());
+    OplogInterfaceRemote remoteOplog(
+        source, getConnection, NamespaceString::kRsOplogNamespace.ns());
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -697,11 +699,14 @@ void BackgroundSync::stop(bool resetLastFetchedOptime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     _state = ProducerState::Stopped;
+    log() << "Stopping replication producer";
+
     _syncSourceHost = HostAndPort();
     if (resetLastFetchedOptime) {
         invariant(_oplogBuffer->isEmpty());
         _lastOpTimeFetched = OpTime();
         _lastFetchedHash = 0;
+        log() << "Resetting last fetched optimes in bgsync";
     }
 
     if (_syncSourceResolver) {
@@ -732,6 +737,9 @@ void BackgroundSync::start(OperationContext* opCtx) {
         // When a node steps down during drain mode, the last fetched optime would be newer than
         // the last applied.
         if (_lastOpTimeFetched <= lastAppliedOpTimeWithHash.opTime) {
+            LOG(1) << "Setting bgsync _lastOpTimeFetched=" << lastAppliedOpTimeWithHash.opTime
+                   << " and _lastFetchedHash=" << lastAppliedOpTimeWithHash.value
+                   << ". Previous _lastOpTimeFetched: " << _lastOpTimeFetched;
             _lastOpTimeFetched = lastAppliedOpTimeWithHash.opTime;
             _lastFetchedHash = lastAppliedOpTimeWithHash.value;
         }
@@ -776,8 +784,11 @@ OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* 
                  << "\" field. Oplog entry: " << redact(oplogEntry) << ": " << redact(status);
         fassertFailed(18902);
     }
+
     OplogEntry parsedEntry(oplogEntry);
-    return OpTimeWithHash(hash, parsedEntry.getOpTime());
+    auto lastOptime = OpTimeWithHash(hash, parsedEntry.getOpTime());
+    LOG(1) << "Successfully read last entry of oplog while starting bgsync: " << redact(oplogEntry);
+    return lastOptime;
 }
 
 bool BackgroundSync::shouldStopFetching() const {

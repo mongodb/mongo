@@ -60,17 +60,11 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 
+#include "mongo/db/op_observer.h"
+
 namespace mongo {
 
 namespace {
-MONGO_INITIALIZER(InitializeMultiIndexBlockFactory)(InitializerContext* const) {
-    MultiIndexBlock::registerFactory(
-        [](OperationContext* const opCtx, Collection* const collection) {
-            return stdx::make_unique<MultiIndexBlockImpl>(opCtx, collection);
-        });
-    return Status::OK();
-}
-
 
 /**
  * Returns true if writes to the catalog entry for the input namespace require being
@@ -87,8 +81,13 @@ bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) 
         return false;
     }
 
-    // Nodes in `startup` may not have yet initialized the `LogicalClock`.
-    if (replCoord->getMemberState().startup()) {
+    // Nodes in `startup` may not have yet initialized the `LogicalClock`. Primaries do not need
+    // ghost writes. Nodes in the `applyOps` (`startup2`) phase of initial sync must not timestamp
+    // index builds before the `initialDataTimestamp`. Nodes doing replication recovery (also
+    // `startup2`) must timestamp index builds. All replication recovery index builds are
+    // foregrounded and have a "commit timestamp" set.
+    const auto memberState = replCoord->getMemberState();
+    if (memberState.primary() || memberState.startup() || memberState.startup2()) {
         return false;
     }
 
@@ -104,6 +103,7 @@ using std::endl;
 MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuildUnlocked);
+MONGO_FP_DECLARE(slowBackgroundIndexBuild);
 
 AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
 
@@ -136,7 +136,7 @@ class MultiIndexBlockImpl::SetNeedToCleanupOnRollback : public RecoveryUnit::Cha
 public:
     explicit SetNeedToCleanupOnRollback(MultiIndexBlockImpl* indexer) : _indexer(indexer) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         _indexer->_needToCleanup = true;
     }
@@ -154,7 +154,7 @@ class MultiIndexBlockImpl::CleanupIndexesVectorOnRollback : public RecoveryUnit:
 public:
     explicit CleanupIndexesVectorOnRollback(MultiIndexBlockImpl* indexer) : _indexer(indexer) {}
 
-    virtual void commit() {}
+    virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         _indexer->_indexes.clear();
     }
@@ -172,24 +172,32 @@ MultiIndexBlockImpl::MultiIndexBlockImpl(OperationContext* opCtx, Collection* co
       _needToCleanup(true) {}
 
 MultiIndexBlockImpl::~MultiIndexBlockImpl() {
+    if (!_needToCleanup && !_indexes.empty()) {
+        _collection->infoCache()->clearQueryCache();
+    }
+
     if (!_needToCleanup || _indexes.empty())
         return;
-
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
 
     while (true) {
         try {
             WriteUnitOfWork wunit(_opCtx);
-            // This cleans up all index builds.
-            // Because that may need to write, it is done inside
-            // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
+            // This cleans up all index builds. Because that may need to write, it is done inside of
+            // a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail();
             }
-            if (requiresCommitTimestamp) {
-                fassert(50703,
-                        _opCtx->recoveryUnit()->setTimestamp(
-                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+
+            auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+            if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+                // Primaries must timestamp the failure of an index build (via an op message).
+                // Secondaries may not fail index builds.
+                // Make lock acquisition uninterruptible because writing an op message takes a lock.
+                UninterruptibleLockGuard(_opCtx->lockState());
+                _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+                    _opCtx,
+                    BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
+                                                            << _collection->ns().ns())));
             }
             wunit.commit();
             return;
@@ -226,8 +234,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const BSONObj& spec) 
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSONObj>& indexSpecs) {
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
-
     WriteUnitOfWork wunit(_opCtx);
 
     invariant(_indexes.empty());
@@ -254,7 +260,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         }
 
         // Any foreground indexes make all indexes be built in the foreground.
-        _buildInBackground = (_buildInBackground && info["background"].trueValue());
+        _buildInBackground = (_buildInBackground && initBackgroundIndexFromSpec(info));
     }
 
     std::vector<BSONObj> indexInfoObjs;
@@ -317,10 +323,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     if (_buildInBackground)
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
-    if (requiresCommitTimestamp) {
-        fassert(50702,
-                _opCtx->recoveryUnit()->setTimestamp(
-                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+    auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
+    if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+        // Only primaries must timestamp this write. Secondaries run this from within a
+        // `TimestampBlock`
+        _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
+            _opCtx, BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
     }
 
     wunit.commit();
@@ -383,9 +391,9 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             if (_allowInterruption)
                 _opCtx->checkForInterrupt();
 
-            if (!(retries || (PlanExecutor::ADVANCED == state))) {
-                // The only reason we are still in the loop is hangAfterStartingIndexBuild.
-                log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
+            if (!(retries || PlanExecutor::ADVANCED == state) ||
+                MONGO_FAIL_POINT(slowBackgroundIndexBuild)) {
+                log() << "Hanging index build due to failpoint";
                 invariant(_allowInterruption);
                 sleepmillis(1000);
                 continue;
@@ -444,10 +452,9 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
         }
     }
 
-    uassert(28550,
-            "Unable to complete index build due to collection scan failure: " +
-                WorkingSetCommon::toStatusString(objToIndex.value()),
-            state == PlanExecutor::IS_EOF);
+    if (state != PlanExecutor::IS_EOF) {
+        return WorkingSetCommon::getMemberObjectStatus(objToIndex.value());
+    }
 
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
         // Unlock before hanging so replication recognizes we've completed.
@@ -527,8 +534,6 @@ void MultiIndexBlockImpl::abortWithoutCleanup() {
 }
 
 void MultiIndexBlockImpl::commit() {
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
-
     // Do not interfere with writing multikey information when committing index builds.
     auto restartTracker =
         MakeGuard([this] { MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo(); });
@@ -558,7 +563,9 @@ void MultiIndexBlockImpl::commit() {
         }
     }
 
-    if (requiresCommitTimestamp) {
+    if (requiresGhostCommitTimestamp(_opCtx, _collection->ns())) {
+        // Only secondaries must explicitly timestamp index completion. Primaries perform this
+        // write along with an oplog entry.
         fassert(50701,
                 _opCtx->recoveryUnit()->setTimestamp(
                     LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));

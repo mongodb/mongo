@@ -148,8 +148,12 @@ REGISTER_DOCUMENT_SOURCE(replaceRoot,
 intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
 
+    const bool isIndependentOfAnyCollection = false;
     return new DocumentSourceSingleDocumentTransformation(
-        pExpCtx, ReplaceRootTransformation::create(pExpCtx, elem), "$replaceRoot");
+        pExpCtx,
+        ReplaceRootTransformation::create(pExpCtx, elem),
+        "$replaceRoot",
+        isIndependentOfAnyCollection);
 }
 
 }  // namespace mongo

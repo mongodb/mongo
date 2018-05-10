@@ -65,16 +65,18 @@
     var smallOplogSizeMB = 1;
     var bigOplogSizeMB = 1000;
 
-    // Node 0 is given a small oplog so we can overflow it. Node 1's large oplog allows it to store
-    // all entries comfortably without overflowing, so that Node 2 can eventually use it as a sync
-    // source after it goes too stale.
+    // Node 0 is given a small oplog so we can overflow it. Node 1's large oplog allows it to
+    // store all entries comfortably without overflowing, so that Node 2 can eventually use it as
+    // a sync source after it goes too stale. Because this test overflows the oplog, a small
+    // syncdelay is chosen to frequently take checkpoints, allowing oplog truncation to proceed.
     var replTest = new ReplSetTest({
         name: testName,
         nodes: [
             {oplogSize: smallOplogSizeMB},
             {oplogSize: bigOplogSizeMB},
             {oplogSize: smallOplogSizeMB}
-        ]
+        ],
+        nodeOptions: {syncdelay: 1},
     });
 
     var nodes = replTest.startSet();

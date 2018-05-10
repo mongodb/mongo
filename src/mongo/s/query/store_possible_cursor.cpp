@@ -33,12 +33,49 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
+
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const NamespaceString& requestedNss,
+                                        const RemoteCursor& remoteCursor,
+                                        TailableModeEnum tailableMode) {
+    auto executorPool = Grid::get(opCtx)->getExecutorPool();
+    return storePossibleCursor(
+        opCtx,
+        remoteCursor.getShardId().toString(),
+        remoteCursor.getHostAndPort(),
+        remoteCursor.getCursorResponse().toBSON(CursorResponse::ResponseType::InitialResponse),
+        requestedNss,
+        executorPool->getArbitraryExecutor(),
+        Grid::get(opCtx)->getCursorManager(),
+        tailableMode);
+}
+
+StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
+                                        const NamespaceString& requestedNss,
+                                        const ShardId& shardId,
+                                        const Shard::CommandResponse& commandResponse,
+                                        TailableModeEnum tailableMode) {
+    invariant(commandResponse.hostAndPort);
+    auto executorPool = Grid::get(opCtx)->getExecutorPool();
+    return storePossibleCursor(opCtx,
+                               shardId,
+                               *commandResponse.hostAndPort,
+                               commandResponse.response,
+                               requestedNss,
+                               executorPool->getArbitraryExecutor(),
+                               Grid::get(opCtx)->getCursorManager(),
+                               tailableMode);
+}
 
 StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const ShardId& shardId,
@@ -47,7 +84,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager,
-                                        TailableMode tailableMode) {
+                                        TailableModeEnum tailableMode) {
     if (!cmdResult["ok"].trueValue() || !cmdResult.hasField("cursor")) {
         return cmdResult;
     }
@@ -57,17 +94,30 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return incomingCursorResponse.getStatus();
     }
 
+    CurOp::get(opCtx)->debug().nreturned = incomingCursorResponse.getValue().getBatch().size();
+
+    // If nShards has already been set, then we are storing the forwarding $mergeCursors cursor from
+    // a split aggregation pipeline, and the shards half of that pipeline may have targeted multiple
+    // shards. In that case, leave the current value as-is.
+    CurOp::get(opCtx)->debug().nShards = std::max(CurOp::get(opCtx)->debug().nShards, 1);
+
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
+        CurOp::get(opCtx)->debug().cursorExhausted = true;
         return cmdResult;
     }
 
     ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS());
-    params.remotes.emplace_back(shardId,
-                                server,
-                                CursorResponse(incomingCursorResponse.getValue().getNSS(),
-                                               incomingCursorResponse.getValue().getCursorId(),
-                                               {}));
+    params.remotes.emplace_back();
+    auto& remoteCursor = params.remotes.back();
+    remoteCursor.setShardId(shardId.toString());
+    remoteCursor.setHostAndPort(server);
+    remoteCursor.setCursorResponse(CursorResponse(incomingCursorResponse.getValue().getNSS(),
+                                                  incomingCursorResponse.getValue().getCursorId(),
+                                                  {}));
+    params.originatingCommandObj = CurOp::get(opCtx)->opDescription().getOwned();
     params.tailableMode = tailableMode;
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
 
     auto ccc = ClusterClientCursorImpl::make(opCtx, executor, std::move(params));
 
@@ -85,6 +135,8 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     if (!clusterCursorId.isOK()) {
         return clusterCursorId.getStatus();
     }
+
+    CurOp::get(opCtx)->debug().cursorid = clusterCursorId.getValue();
 
     CursorResponse outgoingCursorResponse(
         requestedNss, clusterCursorId.getValue(), incomingCursorResponse.getValue().getBatch());

@@ -61,6 +61,8 @@ public:
                                          << "rs0"
                                          << "version"
                                          << 2
+                                         << "protocolVersion"
+                                         << 1
                                          << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "host0")
@@ -191,6 +193,8 @@ public:
                                          << "rs0"
                                          << "version"
                                          << 2
+                                         << "protocolVersion"
+                                         << 1
                                          << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "host0")
@@ -232,6 +236,8 @@ public:
                                          << "rs0"
                                          << "version"
                                          << 2
+                                         << "protocolVersion"
+                                         << 1
                                          << "members"
                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                   << "host0")

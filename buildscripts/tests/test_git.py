@@ -7,9 +7,10 @@ import unittest
 
 import buildscripts.git as _git
 
+# pylint: disable=missing-docstring,protected-access
+
 
 class TestRepository(unittest.TestCase):
-
     def setUp(self):
         self.subprocess = MockSubprocess()
         _git.subprocess = self.subprocess
@@ -47,7 +48,7 @@ class TestRepository(unittest.TestCase):
 
     def _check_gito_command(self, method, command, params):
         # Initialize subprocess mock.
-        self.subprocess.call_output_args = None
+        self.subprocess.call_output_args = None  # pylint: disable=attribute-defined-outside-init
         self.subprocess.call_output = str(method)
         self.subprocess.call_returncode = 0
         # Call method.
@@ -81,7 +82,7 @@ class MockSubprocess(object):
         self.call_returncode = 0
         self.call_output = ""
 
-    def Popen(self, args, **kwargs):
+    def Popen(self, args, **kwargs):  # pylint: disable=invalid-name,unused-argument
         self.call_args = args
         return MockProcess(self.call_returncode, self.call_output)
 

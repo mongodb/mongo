@@ -45,6 +45,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"

@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
@@ -65,7 +66,7 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
     // Ensure that the command does not contain any unrecognized parameters
     for (const auto& cmdElem : cmdObj) {
         const auto fieldName = cmdElem.fieldNameStringData();
-        if (fieldName == commandName || CommandHelpers::isGenericArgument(fieldName)) {
+        if (fieldName == commandName || isGenericArgument(fieldName)) {
             continue;
         }
 

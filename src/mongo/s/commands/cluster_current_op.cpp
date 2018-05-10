@@ -85,7 +85,7 @@ private:
             return status;
         }
 
-        CommandHelpers::appendCommandStatus(responseBuilder, Status::OK());
+        CommandHelpers::appendSimpleCommandStatus(responseBuilder, true);
 
         return CursorResponse::parseFromBSON(responseBuilder.obj());
     }

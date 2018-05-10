@@ -41,6 +41,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -64,7 +65,7 @@ public:
                "splitKeys : [ {a:150} , ... ]}";
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -87,7 +88,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -95,19 +96,11 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        //
-        // Check whether parameters passed to splitChunk are sound
-        //
         const NamespaceString nss = NamespaceString(parseNs(dbname, cmdObj));
-        if (!nss.isValid()) {
-            errmsg = str::stream() << "invalid namespace '" << nss.toString()
-                                   << "' specified for command";
-            return false;
-        }
 
+        // Check whether parameters passed to splitChunk are sound
         BSONObj keyPatternObj;
         {
             BSONElement keyPatternElem;
@@ -125,8 +118,7 @@ public:
 
         string shardName;
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);
-        if (!parseShardNameStatus.isOK())
-            return CommandHelpers::appendCommandStatus(result, parseShardNameStatus);
+        uassertStatusOK(parseShardNameStatus);
 
         log() << "received splitChunk request: " << redact(cmdObj);
 

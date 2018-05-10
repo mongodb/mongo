@@ -46,7 +46,7 @@
             tojson({sharded: sharded, indexType: indexType}));
     }
 
-    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    // TODO: SERVER-33954 Remove shardAsReplicaSet: false
     var st = new ShardingTest({shards: 3, mongos: 1, other: {shardAsReplicaSet: false}});
     assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
     st.ensurePrimaryShard('test', st.shard1.shardName);

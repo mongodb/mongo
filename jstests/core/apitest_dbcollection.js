@@ -1,5 +1,14 @@
 /**
- *   Tests for the db collection
+ * Tests for the db collection
+ *
+ * @tags: [
+ *  requires_fastcount,
+ *  requires_collstats,
+ *
+ *  # indexDetails result is not correct with mobile storage engine.
+ *  # TODO SERVER-34579
+ *  incompatible_with_embedded_todo_investigate,
+ * ]
  */
 
 /*

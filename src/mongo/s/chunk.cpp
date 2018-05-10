@@ -33,11 +33,9 @@
 #include "mongo/s/chunk.h"
 
 #include "mongo/platform/random.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
 namespace {
 
 // Test whether we should split once data * kSplitCheckInterval > chunkSize (approximately)
@@ -57,34 +55,61 @@ int64_t mkDataWritten() {
 
 }  // namespace
 
-Chunk::Chunk(const ChunkType& from)
+ChunkInfo::ChunkInfo(const ChunkType& from)
     : _range(from.getMin(), from.getMax()),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
       _history(from.getHistory()),
       _jumbo(from.getJumbo()),
       _dataWritten(mkDataWritten()) {
-    invariantOK(from.validate());
+    invariant(from.validate());
+    if (!_history.empty()) {
+        invariant(_shardId == _history.front().getShard());
+    }
 }
 
-bool Chunk::containsKey(const BSONObj& shardKey) const {
+const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) const {
+    // This chunk was refreshed from FCV 3.6 config server so it doesn't have history
+    if (_history.empty()) {
+        // TODO: SERVER-34619 - add uassert
+        return _shardId;
+    }
+
+    // If the tiemstamp is not provided than we return the latest shardid
+    if (!ts) {
+        invariant(_shardId == _history.front().getShard());
+        return _history.front().getShard();
+    }
+
+    for (const auto& h : _history) {
+        if (h.getValidAfter() <= ts) {
+            return h.getShard();
+        }
+    }
+
+    uasserted(ErrorCodes::StaleChunkHistory,
+              str::stream() << "Cant find shardId the chunk belonged to at cluster time "
+                            << ts.get().toString());
+}
+
+bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
 }
 
-uint64_t Chunk::getBytesWritten() const {
+uint64_t ChunkInfo::getBytesWritten() const {
     return _dataWritten;
 }
 
-uint64_t Chunk::addBytesWritten(uint64_t bytesWrittenIncrement) {
+uint64_t ChunkInfo::addBytesWritten(uint64_t bytesWrittenIncrement) {
     _dataWritten += bytesWrittenIncrement;
     return _dataWritten;
 }
 
-void Chunk::clearBytesWritten() {
+void ChunkInfo::clearBytesWritten() {
     _dataWritten = 0;
 }
 
-bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
+bool ChunkInfo::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf) const {
     // If this chunk is at either end of the range, trigger auto-split at 10% less data written in
     // order to trigger the top-chunk optimization.
     const uint64_t splitThreshold = (minIsInf || maxIsInf)
@@ -92,15 +117,15 @@ bool Chunk::shouldSplit(uint64_t desiredChunkSize, bool minIsInf, bool maxIsInf)
         : desiredChunkSize;
 
     // Check if there are enough estimated bytes written to warrant a split
-    return _dataWritten >= splitThreshold / kSplitTestFactor;
+    return _dataWritten >= splitThreshold / Chunk::kSplitTestFactor;
 }
 
-std::string Chunk::toString() const {
+std::string ChunkInfo::toString() const {
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
                          << ": " << _lastmod.toString() << ", " << _range.toString();
 }
 
-void Chunk::markAsJumbo() {
+void ChunkInfo::markAsJumbo() {
     _jumbo = true;
 }
 

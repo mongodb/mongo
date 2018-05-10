@@ -1,3 +1,8 @@
+// @tags: [
+//     # repairDatabase command is not available on embedded
+//     incompatible_with_embedded,
+// ]
+
 mydb = db.getSisterDB("repair_server12955");
 assert.commandWorked(mydb.dropDatabase());
 

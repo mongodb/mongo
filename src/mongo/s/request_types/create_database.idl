@@ -32,11 +32,10 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-structs:
-    ConfigsvrCreateDatabase:
+commands:
+    _configsvrCreateDatabase:
+        cpp_name : ConfigsvrCreateDatabase
         description: "The internal createDatabase command on the config server"
         strict: false
-        fields:
-            _configsvrCreateDatabase:
-                type: string
-                description: "The namespace of the database to be created."
+        namespace: type
+        type: string

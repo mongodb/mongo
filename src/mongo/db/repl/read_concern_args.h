@@ -88,6 +88,12 @@ public:
     Status initialize(const BSONElement& readConcernElem);
 
     /**
+     * Upconverts the readConcern level to 'snapshot', or returns a non-ok status if this
+     * readConcern cannot be upconverted.
+     */
+    Status upconvertReadConcernLevelToSnapshot();
+
+    /**
      * Appends level and afterOpTime.
      */
     void appendInfo(BSONObjBuilder* builder) const;
@@ -101,6 +107,11 @@ public:
      *  Returns default kLocalReadConcern if _level is not set.
      */
     ReadConcernLevel getLevel() const;
+
+    /**
+     *  Returns readConcernLevel before upconverting, or same as getLevel() if not upconverted.
+     */
+    ReadConcernLevel getOriginalLevel() const;
 
     /**
      * Checks whether _level is explicitly set.
@@ -133,6 +144,11 @@ private:
      */
     boost::optional<LogicalTime> _atClusterTime;
     boost::optional<ReadConcernLevel> _level;
+
+    /**
+     * If the read concern was upconverted, the original read concern level.
+     */
+    boost::optional<ReadConcernLevel> _originalLevel;
 };
 
 }  // namespace repl

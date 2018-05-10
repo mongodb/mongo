@@ -33,9 +33,11 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
@@ -71,10 +73,12 @@ constexpr StringData DocumentSourceChangeStream::kFullDocumentField;
 constexpr StringData DocumentSourceChangeStream::kIdField;
 constexpr StringData DocumentSourceChangeStream::kNamespaceField;
 constexpr StringData DocumentSourceChangeStream::kUuidField;
+constexpr StringData DocumentSourceChangeStream::kUpdateDescriptionField;
 constexpr StringData DocumentSourceChangeStream::kOperationTypeField;
 constexpr StringData DocumentSourceChangeStream::kStageName;
-constexpr StringData DocumentSourceChangeStream::kTimestampField;
 constexpr StringData DocumentSourceChangeStream::kClusterTimeField;
+constexpr StringData DocumentSourceChangeStream::kTxnNumberField;
+constexpr StringData DocumentSourceChangeStream::kLsidField;
 constexpr StringData DocumentSourceChangeStream::kUpdateOpType;
 constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
@@ -82,6 +86,9 @@ constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
+constexpr StringData DocumentSourceChangeStream::kRegexAllCollections;
+constexpr StringData DocumentSourceChangeStream::kRegexAllDBs;
+constexpr StringData DocumentSourceChangeStream::kRegexCmdColl;
 
 namespace {
 
@@ -101,13 +108,17 @@ const char* DocumentSourceOplogMatch::getSourceName() const {
 
 DocumentSource::StageConstraints DocumentSourceOplogMatch::constraints(
     Pipeline::SplitState pipeState) const {
-    return {StreamType::kStreaming,
-            PositionRequirement::kFirst,
-            HostTypeRequirement::kAnyShard,
-            DiskUseRequirement::kNoDiskUse,
-            FacetRequirement::kNotAllowed,
-            TransactionRequirement::kNotAllowed,
-            ChangeStreamRequirement::kChangeStreamStage};
+
+    StageConstraints constraints(StreamType::kStreaming,
+                                 PositionRequirement::kFirst,
+                                 HostTypeRequirement::kAnyShard,
+                                 DiskUseRequirement::kNoDiskUse,
+                                 FacetRequirement::kNotAllowed,
+                                 TransactionRequirement::kNotAllowed,
+                                 ChangeStreamRequirement::kChangeStreamStage);
+    constraints.isIndependentOfAnyCollection =
+        pExpCtx->ns.isCollectionlessAggregateNS() ? true : false;
+    return constraints;
 }
 
 /**
@@ -124,15 +135,6 @@ Value DocumentSourceOplogMatch::serialize(optional<ExplainOptions::Verbosity> ex
 DocumentSourceOplogMatch::DocumentSourceOplogMatch(BSONObj filter,
                                                    const intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSourceMatch(std::move(filter), expCtx) {}
-
-void checkValueType(const Value v, const StringData filedName, BSONType expectedType) {
-    uassert(40532,
-            str::stream() << "Entry field \"" << filedName << "\" should be "
-                          << typeName(expectedType)
-                          << ", found: "
-                          << typeName(v.getType()),
-            (v.getType() == expectedType));
-}
 
 namespace {
 /**
@@ -217,7 +219,8 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
 
     auto doc = nextInput.getDocument();
     const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
-    checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
+    DocumentSourceChangeStream::checkValueType(
+        doc[kOperationTypeField], kOperationTypeField, BSONType::String);
     auto operationType = doc[kOperationTypeField].getString();
     if (operationType == DocumentSourceChangeStream::kInvalidateOpType) {
         // Pass the invalidation forward, so that it can be included in the results, or
@@ -231,36 +234,121 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
 
 }  // namespace
 
+void DocumentSourceChangeStream::checkValueType(const Value v,
+                                                const StringData filedName,
+                                                BSONType expectedType) {
+    uassert(40532,
+            str::stream() << "Entry field \"" << filedName << "\" should be "
+                          << typeName(expectedType)
+                          << ", found: "
+                          << typeName(v.getType()),
+            (v.getType() == expectedType));
+}
+
+//
+// Helpers for building the oplog filter.
+//
+namespace {
+
+/**
+ * Constructs the filter which will match 'applyOps' oplog entries that are:
+ * 1) Part of a transaction
+ * 2) Have sub-entries which should be returned in the change stream
+ */
+BSONObj getTxnApplyOpsFilter(BSONElement nsMatch, const NamespaceString& nss) {
+    BSONObjBuilder applyOpsBuilder;
+    applyOpsBuilder.append("op", "c");
+    applyOpsBuilder.append("lsid", BSON("$exists" << true));
+    applyOpsBuilder.append("txnNumber", BSON("$exists" << true));
+    const std::string& kApplyOpsNs = "o.applyOps.ns";
+    applyOpsBuilder.appendAs(nsMatch, kApplyOpsNs);
+    return applyOpsBuilder.obj();
+}
+}  // namespace
+
+DocumentSourceChangeStream::ChangeStreamType DocumentSourceChangeStream::getChangeStreamType(
+    const NamespaceString& nss) {
+
+    // If we have been permitted to run on admin, 'allChangesForCluster' must be true.
+    return (nss.isAdminDB()
+                ? ChangeStreamType::kAllChangesForCluster
+                : (nss.isCollectionlessAggregateNS() ? ChangeStreamType::kSingleDatabase
+                                                     : ChangeStreamType::kSingleCollection));
+}
+
+std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const NamespaceString& nss) {
+    auto type = getChangeStreamType(nss);
+    switch (type) {
+        case ChangeStreamType::kSingleCollection:
+            // Match the target namespace exactly.
+            return "^" + nss.ns() + "$";
+        case ChangeStreamType::kSingleDatabase:
+            // Match all namespaces that start with db name, followed by ".", then NOT followed by
+            // '$' or 'system.'
+            return "^" + nss.db() + kRegexAllCollections;
+        case ChangeStreamType::kAllChangesForCluster:
+            // Match all namespaces that start with any db name other than admin, config, or local,
+            // followed by ".", then NOT followed by '$' or 'system.'
+            return "^" + kRegexAllDBs + kRegexAllCollections;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+
 BSONObj DocumentSourceChangeStream::buildMatchFilter(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp startFrom, bool isResume) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Timestamp startFrom,
+    bool startFromInclusive) {
     auto nss = expCtx->ns;
-    auto target = nss.ns();
+
+    ChangeStreamType sourceType = getChangeStreamType(nss);
 
     // 1) Supported commands that have the target db namespace (e.g. test.$cmd) in "ns" field.
     BSONArrayBuilder invalidatingCommands;
     invalidatingCommands.append(BSON("o.dropDatabase" << 1));
-    invalidatingCommands.append(BSON("o.drop" << nss.coll()));
-    invalidatingCommands.append(BSON("o.renameCollection" << target));
-    if (expCtx->collation.isEmpty()) {
-        // If the user did not specify a collation, they should be using the collection's default
-        // collation. So a "create" command which has any collation present would invalidate the
-        // change stream, since that must mean the stream was created before the collection existed
-        // and used the simple collation, which is no longer the default.
-        invalidatingCommands.append(
-            BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
+
+    if (sourceType == ChangeStreamType::kSingleCollection) {
+        invalidatingCommands.append(BSON("o.drop" << nss.coll()));
+        invalidatingCommands.append(BSON("o.renameCollection" << nss.ns()));
+        if (expCtx->collation.isEmpty()) {
+            // If the user did not specify a collation, they should be using the collection's
+            // default collation. So a "create" command which has any collation present would
+            // invalidate the change stream, since that must mean the stream was created before the
+            // collection existed and used the simple collation, which is no longer the default.
+            invalidatingCommands.append(
+                BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
+        }
+    } else {
+        // For change streams on an entire database, the stream is invalidated if any collections in
+        // that database are dropped or renamed. For cluster-wide streams, drops or renames of any
+        // collection in any database (aside from the internal databases admin, config and local)
+        // will invalidate the stream.
+        invalidatingCommands.append(BSON("o.drop" << BSON("$exists" << true)));
+        invalidatingCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
     }
-    // 1.1) Commands that are on target db and one of the above.
+
+    // For cluster-wide $changeStream, match the command namespace of any database other than admin,
+    // config, or local. Otherwise, match only against the target db's command namespace.
+    auto cmdNsFilter = (sourceType == ChangeStreamType::kAllChangesForCluster
+                            ? BSON("ns" << BSONRegEx("^" + kRegexAllDBs + kRegexCmdColl))
+                            : BSON("ns" << nss.getCommandNS().ns()));
+
+    // 1.1) Commands that are on target db(s) and one of the above invalidating commands.
     auto commandsOnTargetDb =
-        BSON("$and" << BSON_ARRAY(BSON("ns" << nss.getCommandNS().ns())
-                                  << BSON("$or" << invalidatingCommands.arr())));
+        BSON("$and" << BSON_ARRAY(cmdNsFilter << BSON("$or" << invalidatingCommands.arr())));
+
     // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
-    auto renameDropTarget = BSON("o.to" << target);
+    auto renameDropTarget = (sourceType == ChangeStreamType::kAllChangesForCluster
+                                 ? BSON("o.to" << BSON("$exists" << true))
+                                 : BSON("o.to" << nss.ns()));
+
     // All supported commands that are either (1.1) or (1.2).
     BSONObj commandMatch = BSON("op"
                                 << "c"
                                 << OR(commandsOnTargetDb, renameDropTarget));
 
-    // 2.1) Normal CRUD ops on the target collection.
+    // 2.1) Normal CRUD ops.
     auto normalOpTypeMatch = BSON("op" << NE << "n");
 
     // 2.2) A chunk gets migrated to a new shard that doesn't have any chunks.
@@ -268,23 +356,34 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
                                    << "n"
                                    << "o2.type"
                                    << "migrateChunkToNewShard");
+
     // 2) Supported operations on the target namespace.
-    auto opMatch = BSON("ns" << target << OR(normalOpTypeMatch, chunkMigratedMatch));
+    BSONObj nsMatch = BSON("ns" << BSONRegEx(getNsRegexForChangeStream(nss)));
+    auto opMatch = BSON(nsMatch["ns"] << OR(normalOpTypeMatch, chunkMigratedMatch));
+
+    // 3) Look for 'applyOps' which were created as part of a transaction.
+    BSONObj applyOps = getTxnApplyOpsFilter(nsMatch["ns"], nss);
 
     // Match oplog entries after "start" and are either supported (1) commands or (2) operations,
-    // excepting those tagged "fromMigrate".
-    // Include the resume token, if resuming, so we can verify it was still present in the oplog.
-    return BSON("$and" << BSON_ARRAY(BSON("ts" << (isResume ? GTE : GT) << startFrom)
-                                     << BSON(OR(opMatch, commandMatch))
+    // excepting those tagged "fromMigrate". Include the resume token, if resuming, so we can verify
+    // it was still present in the oplog.
+    return BSON("$and" << BSON_ARRAY(BSON("ts" << (startFromInclusive ? GTE : GT) << startFrom)
+                                     << BSON(OR(opMatch, commandMatch, applyOps))
                                      << BSON("fromMigrate" << NE << true)));
 }
 
-list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    // A change stream is a tailable + awaitData cursor.
-    expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
+namespace {
 
-    boost::optional<Timestamp> startFrom;
+/**
+ * Parses the resume options in 'spec', optionally populating the resume stage and cluster time to
+ * start from.  Throws an AssertionException if not running on a replica set or multiple resume
+ * options are specified.
+ */
+void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
+                        const DocumentSourceChangeStreamSpec& spec,
+                        ServerGlobalParams::FeatureCompatibility::Version fcv,
+                        intrusive_ptr<DocumentSource>* resumeStageOut,
+                        boost::optional<Timestamp>* startFromOut) {
     if (!expCtx->inMongos) {
         auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
         uassert(40573,
@@ -292,12 +391,9 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                 replCoord &&
                     replCoord->getReplicationMode() ==
                         repl::ReplicationCoordinator::Mode::modeReplSet);
-        startFrom = replCoord->getMyLastAppliedOpTime().getTimestamp();
+        *startFromOut = replCoord->getMyLastAppliedOpTime().getTimestamp();
     }
 
-    intrusive_ptr<DocumentSource> resumeStage = nullptr;
-    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
-                                                      elem.embeddedObject());
     if (auto resumeAfter = spec.getResumeAfter()) {
         ResumeToken token = resumeAfter.get();
         ResumeTokenData tokenData = token.getData();
@@ -306,29 +402,83 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                 tokenData.uuid);
         auto resumeNamespace =
             UUIDCatalog::get(expCtx->opCtx).lookupNSSByUUID(tokenData.uuid.get());
-        if (!expCtx->inMongos) {
+        // If the resume token's UUID does not exist - implying that it has been dropped in the time
+        // since the resume token was generated - then we prohibit resuming the stream, because we
+        // can no longer determine whether that collection had a default collation. However, the
+        // concept of a default collation does not exist at the database or cluster levels, and we
+        // therefore skip this check for whole-database and cluster-wide change streams.
+        if (!expCtx->inMongos && expCtx->isSingleNamespaceAggregation()) {
             uassert(40615,
                     "The resume token UUID does not exist. Has the collection been dropped?",
                     !resumeNamespace.isEmpty());
         }
-        startFrom = tokenData.clusterTime;
+        *startFromOut = tokenData.clusterTime;
         if (expCtx->needsMerge) {
-            resumeStage = DocumentSourceShardCheckResumability::create(expCtx, std::move(token));
+            *resumeStageOut =
+                DocumentSourceShardCheckResumability::create(expCtx, tokenData.clusterTime);
         } else {
-            resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
+            *resumeStageOut =
+                DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
         }
     }
-    if (auto resumeAfterClusterTime = spec.getResumeAfterClusterTime()) {
-        uassert(40674,
-                str::stream() << "Do not specify both "
-                              << DocumentSourceChangeStreamSpec::kResumeAfterFieldName
-                              << " and "
-                              << DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName
-                              << " in a $changeStream stage.",
-                !resumeStage);
-        startFrom = resumeAfterClusterTime->getTimestamp();
+
+    auto resumeAfterClusterTime = spec.getResumeAfterClusterTimeDeprecated();
+    auto startAtClusterTime = spec.getStartAtClusterTime();
+
+    uassert(40674,
+            "Only one type of resume option is allowed, but multiple were found.",
+            !(*resumeStageOut) || (!resumeAfterClusterTime && !startAtClusterTime));
+
+    if (resumeAfterClusterTime) {
+        if (fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+            warning() << "The '$_resumeAfterClusterTime' option is deprecated, please use "
+                         "'startAtClusterTime' instead.";
+        }
+        *startFromOut = resumeAfterClusterTime->getTimestamp();
     }
-    const bool changeStreamIsResuming = (resumeStage != nullptr);
+
+    // New field name starting in 4.0 is 'startAtClusterTime'.
+    if (startAtClusterTime) {
+        uassert(ErrorCodes::QueryFeatureNotAllowed,
+                str::stream() << "The startAtClusterTime option is not allowed in the current "
+                                 "feature compatibility version. See "
+                              << feature_compatibility_version_documentation::kCompatibilityLink
+                              << " for more information.",
+                fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+        uassert(50573,
+                str::stream()
+                    << "Do not specify both "
+                    << DocumentSourceChangeStreamSpec::kStartAtClusterTimeFieldName
+                    << " and "
+                    << DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeDeprecatedFieldName
+                    << " in a $changeStream stage.",
+                !resumeAfterClusterTime);
+        *startFromOut = startAtClusterTime->getTimestamp();
+        *resumeStageOut = DocumentSourceShardCheckResumability::create(expCtx, **startFromOut);
+    }
+}
+
+}  // namespace
+
+list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(50808,
+            "$changeStream stage expects a document as argument.",
+            elem.type() == BSONType::Object);
+
+    // A change stream is a tailable + awaitData cursor.
+    expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
+
+    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
+                                                      elem.embeddedObject());
+
+    const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
+    // Make sure that it is legal to run this $changeStream before proceeding.
+    DocumentSourceChangeStream::assertIsLegalSpecification(expCtx, spec, fcv);
+
+    boost::optional<Timestamp> startFrom;
+    intrusive_ptr<DocumentSource> resumeStage = nullptr;
+    parseResumeOptions(expCtx, spec, fcv, &resumeStage, &startFrom);
 
     auto fullDocOption = spec.getFullDocument();
     uassert(40575,
@@ -338,6 +488,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
                           << fullDocOption
                           << "\"",
             fullDocOption == "updateLookup"_sd || fullDocOption == "default"_sd);
+
     const bool shouldLookupPostImage = (fullDocOption == "updateLookup"_sd);
 
     list<intrusive_ptr<DocumentSource>> stages;
@@ -346,11 +497,12 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     // 'resumeAfter' starting point, or should start from the latest majority committed operation.
     invariant(expCtx->inMongos || static_cast<bool>(startFrom));
     if (startFrom) {
+        const bool startFromInclusive = (resumeStage != nullptr);
         stages.push_back(DocumentSourceOplogMatch::create(
-            buildMatchFilter(expCtx, *startFrom, changeStreamIsResuming), expCtx));
+            buildMatchFilter(expCtx, *startFrom, startFromInclusive), expCtx));
     }
 
-    stages.push_back(createTransformationStage(elem.embeddedObject(), expCtx));
+    stages.push_back(createTransformationStage(expCtx, elem.embeddedObject(), fcv));
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
@@ -380,9 +532,9 @@ BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj or
         pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
     changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
 
-    // If the command was initially specified with a resumeAfterClusterTime, we need to remove it
+    // If the command was initially specified with a startAtClusterTime, we need to remove it
     // to use the new resume token.
-    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName] = Value();
+    changeStreamStage[DocumentSourceChangeStreamSpec::kStartAtClusterTimeFieldName] = Value();
     pipeline[0] =
         Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
     MutableDocument newCmd(originalCmd);
@@ -390,211 +542,51 @@ BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj or
     return newCmd.freeze().toBson();
 }
 
+void DocumentSourceChangeStream::assertIsLegalSpecification(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const DocumentSourceChangeStreamSpec& spec,
+    ServerGlobalParams::FeatureCompatibility::Version fcv) {
+    // Change stream on an entire database is a new 4.0 feature.
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << "$changeStream on an entire database is not allowed in the current "
+                             "feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            !expCtx->ns.isCollectionlessAggregateNS() ||
+                fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+    // If 'allChangesForCluster' is true, the stream must be opened on the 'admin' database with
+    // {aggregate: 1}.
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "A $changeStream with 'allChangesForCluster:true' may only be opened "
+                             "on the 'admin' database, and with no collection name; found "
+                          << expCtx->ns.ns(),
+            !spec.getAllChangesForCluster() ||
+                (expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS()));
+
+    // Prevent $changeStream from running on internal databases. A stream may run against the
+    // 'admin' database iff 'allChangesForCluster' is true.
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.db()
+                          << " database",
+            expCtx->ns.isAdminDB() ? spec.getAllChangesForCluster()
+                                   : (!expCtx->ns.isLocal() && !expCtx->ns.isConfigDB()));
+
+    // Prevent $changeStream from running on internal collections in any database.
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.ns()
+                          << " collection",
+            !expCtx->ns.isSystem());
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
-    BSONObj changeStreamSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
-    return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
-        expCtx,
-        stdx::make_unique<Transformation>(expCtx, changeStreamSpec),
-        kStageName.toString()));
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    BSONObj changeStreamSpec,
+    ServerGlobalParams::FeatureCompatibility::Version fcv) {
+    // Mark the transformation stage as independent of any collection if the change stream is
+    // watching all collections in the database.
+    const bool isIndependentOfAnyCollection = expCtx->ns.isCollectionlessAggregateNS();
+    return intrusive_ptr<DocumentSource>(new DocumentSourceChangeStreamTransform(
+        expCtx, changeStreamSpec, fcv, isIndependentOfAnyCollection));
 }
-
-Document DocumentSourceChangeStream::Transformation::applyTransformation(const Document& input) {
-    // If we're executing a change stream pipeline that was forwarded from mongos, then we expect it
-    // to "need merge"---we expect to be executing the shards part of a split pipeline. It is never
-    // correct for mongos to pass through the change stream without splitting into into a merging
-    // part executed on mongos and a shards part.
-    //
-    // This is necessary so that mongos can correctly handle "invalidate" and "retryNeeded" change
-    // notifications. See SERVER-31978 for an example of why the pipeline must be split.
-    //
-    // We have to check this invariant at run-time of the change stream rather than parse time,
-    // since a mongos may forward a change stream in an invalid position (e.g. in a nested $lookup
-    // or $facet pipeline). In this case, mongod is responsible for parsing the pipeline and
-    // throwing an error without ever executing the change stream.
-    if (_expCtx->fromMongos) {
-        invariant(_expCtx->needsMerge);
-    }
-
-    MutableDocument doc;
-
-    // Extract the fields we need.
-    checkValueType(input[repl::OplogEntry::kOpTypeFieldName],
-                   repl::OplogEntry::kOpTypeFieldName,
-                   BSONType::String);
-    string op = input[repl::OplogEntry::kOpTypeFieldName].getString();
-    Value ts = input[repl::OplogEntry::kTimestampFieldName];
-    Value ns = input[repl::OplogEntry::kNamespaceFieldName];
-    checkValueType(ns, repl::OplogEntry::kNamespaceFieldName, BSONType::String);
-    Value uuid = input[repl::OplogEntry::kUuidFieldName];
-    if (!uuid.missing()) {
-        checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
-        // We need to retrieve the document key fields if our cached copy has not been populated. If
-        // the collection was unsharded but has now transitioned to a sharded state, we must update
-        // the documentKey fields to include the shard key. We only need to re-check the documentKey
-        // while the collection is unsharded; if the collection is or becomes sharded, then the
-        // documentKey is final and will not change.
-        if (!_documentKeyFieldsSharded) {
-            // If this is not a shard server, 'catalogCache' will be nullptr and we will skip the
-            // routing table check.
-            auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
-            const bool collectionIsSharded = catalogCache && [catalogCache, this]() {
-                auto routingInfo =
-                    catalogCache->getCollectionRoutingInfo(_expCtx->opCtx, _expCtx->ns);
-                return routingInfo.isOK() && routingInfo.getValue().cm();
-            }();
-            if (_documentKeyFields.empty() || collectionIsSharded) {
-                _documentKeyFields = _expCtx->mongoProcessInterface->collectDocumentKeyFields(
-                    _expCtx->opCtx, _expCtx->ns, uuid.getUuid());
-                _documentKeyFieldsSharded = collectionIsSharded;
-            }
-        }
-    }
-    NamespaceString nss(ns.getString());
-    Value id = input.getNestedField("o._id");
-    // Non-replace updates have the _id in field "o2".
-    StringData operationType;
-    Value fullDocument;
-    Value updateDescription;
-    Value documentKey;
-
-    // Deal with CRUD operations and commands.
-    auto opType = repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op);
-    switch (opType) {
-        case repl::OpTypeEnum::kInsert: {
-            operationType = kInsertOpType;
-            fullDocument = input[repl::OplogEntry::kObjectFieldName];
-            documentKey = Value(document_path_support::extractDocumentKeyFromDoc(
-                fullDocument.getDocument(), _documentKeyFields));
-            break;
-        }
-        case repl::OpTypeEnum::kDelete: {
-            operationType = kDeleteOpType;
-            documentKey = input[repl::OplogEntry::kObjectFieldName];
-            break;
-        }
-        case repl::OpTypeEnum::kUpdate: {
-            if (id.missing()) {
-                operationType = kUpdateOpType;
-                checkValueType(input[repl::OplogEntry::kObjectFieldName],
-                               repl::OplogEntry::kObjectFieldName,
-                               BSONType::Object);
-                Document opObject = input[repl::OplogEntry::kObjectFieldName].getDocument();
-                Value updatedFields = opObject["$set"];
-                Value removedFields = opObject["$unset"];
-
-                // Extract the field names of $unset document.
-                vector<Value> removedFieldsVector;
-                if (removedFields.getType() == BSONType::Object) {
-                    auto iter = removedFields.getDocument().fieldIterator();
-                    while (iter.more()) {
-                        removedFieldsVector.push_back(Value(iter.next().first));
-                    }
-                }
-                updateDescription = Value(Document{
-                    {"updatedFields", updatedFields.missing() ? Value(Document()) : updatedFields},
-                    {"removedFields", removedFieldsVector}});
-            } else {
-                operationType = kReplaceOpType;
-                fullDocument = input[repl::OplogEntry::kObjectFieldName];
-            }
-            documentKey = input[repl::OplogEntry::kObject2FieldName];
-            break;
-        }
-        case repl::OpTypeEnum::kCommand: {
-            // Any command that makes it through our filter is an invalidating command such as a
-            // drop.
-            operationType = kInvalidateOpType;
-            // Make sure the result doesn't have a document key.
-            documentKey = Value();
-            break;
-        }
-        case repl::OpTypeEnum::kNoop: {
-            operationType = kNewShardDetectedOpType;
-            // Generate a fake document Id for NewShardDetected operation so that we can resume
-            // after this operation.
-            documentKey = Value(Document{{kIdField, input[repl::OplogEntry::kObject2FieldName]}});
-            break;
-        }
-        default: { MONGO_UNREACHABLE; }
-    }
-
-    // UUID should always be present except for invalidate entries.  It will not be under
-    // FCV 3.4, so we should close the stream as invalid.
-    if (operationType != kInvalidateOpType && uuid.missing()) {
-        warning() << "Saw a CRUD op without a UUID.  Did Feature Compatibility Version get "
-                     "downgraded after opening the stream?";
-        operationType = kInvalidateOpType;
-        fullDocument = Value();
-        updateDescription = Value();
-        documentKey = Value();
-    }
-
-    // Note that 'documentKey' and/or 'uuid' might be missing, in which case the missing fields will
-    // not appear in the output.
-    ResumeTokenData resumeTokenData;
-    resumeTokenData.clusterTime = ts.getTimestamp();
-    resumeTokenData.documentKey = documentKey;
-    if (!uuid.missing())
-        resumeTokenData.uuid = uuid.getUuid();
-    doc.addField(kIdField, Value(ResumeToken(resumeTokenData).toDocument()));
-    doc.addField(kOperationTypeField, Value(operationType));
-
-    // If we're in a sharded environment, we'll need to merge the results by their sort key, so add
-    // that as metadata.
-    if (_expCtx->needsMerge) {
-        doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
-    }
-
-    // "invalidate" and "newShardDetected" entries have fewer fields.
-    if (operationType == kInvalidateOpType || operationType == kNewShardDetectedOpType) {
-        return doc.freeze();
-    }
-
-    doc.addField(kFullDocumentField, fullDocument);
-    doc.addField(kNamespaceField, Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
-    doc.addField(kDocumentKeyField, documentKey);
-
-    // Note that 'updateDescription' might be the 'missing' value, in which case it will not be
-    // serialized.
-    doc.addField("updateDescription", updateDescription);
-    return doc.freeze();
-}
-
-Document DocumentSourceChangeStream::Transformation::serializeStageOptions(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    Document changeStreamOptions(_changeStreamSpec);
-    // If we're on a mongos and no other start time is specified, we want to start at the current
-    // cluster time on the mongos.  This ensures all shards use the same start time.
-    if (_expCtx->inMongos &&
-        changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
-        changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName]
-            .missing()) {
-        MutableDocument newChangeStreamOptions(changeStreamOptions);
-        newChangeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName]
-                              [ResumeTokenClusterTime::kTimestampFieldName] =
-                                  Value(LogicalClock::get(_expCtx->opCtx)
-                                            ->getClusterTime()
-                                            .asTimestamp());
-        changeStreamOptions = newChangeStreamOptions.freeze();
-    }
-    return changeStreamOptions;
-}
-
-DocumentSource::GetDepsReturn DocumentSourceChangeStream::Transformation::addDependencies(
-    DepsTracker* deps) const {
-    deps->fields.insert(repl::OplogEntry::kOpTypeFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kTimestampFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kNamespaceFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kUuidFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kObjectFieldName.toString());
-    deps->fields.insert(repl::OplogEntry::kObject2FieldName.toString());
-    return DocumentSource::GetDepsReturn::EXHAUSTIVE_ALL;
-}
-
-DocumentSource::GetModPathsReturn DocumentSourceChangeStream::Transformation::getModifiedPaths()
-    const {
-    // All paths are modified.
-    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<string>{}, {}};
-}
-
 }  // namespace mongo

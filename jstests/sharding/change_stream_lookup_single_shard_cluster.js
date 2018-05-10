@@ -36,14 +36,21 @@
     assert.eq(explainPlan.mergeType, "mongos");
 
     // Open a $changeStream on the collection with 'updateLookup' and update the test doc.
-    const stream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
+    const stream = mongosColl.watch([], {fullDocument: "updateLookup"});
+    const wholeDbStream = mongosDB.watch([], {fullDocument: "updateLookup"});
+
     mongosColl.update({_id: 1}, {$set: {updated: true}});
 
-    // Verify that the document is successfully retrieved from the sharded collection.
+    // Verify that the document is successfully retrieved from the single-collection and whole-db
+    // change streams.
     assert.soon(() => stream.hasNext());
     assert.docEq(stream.next().fullDocument, {_id: 1, updated: true});
 
+    assert.soon(() => wholeDbStream.hasNext());
+    assert.docEq(wholeDbStream.next().fullDocument, {_id: 1, updated: true});
+
     stream.close();
+    wholeDbStream.close();
 
     st.stop();
 })();

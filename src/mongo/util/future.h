@@ -41,6 +41,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/scopeguard.h"
 
@@ -342,8 +343,9 @@ public:
 
         stdx::unique_lock<stdx::mutex> lk(mx);
         cv->wait(lk, [&] {
-            // The mutex guarantees acquire/release semantics so this can be a relaxed load.
-            return state.load(std::memory_order_relaxed) == SSBState::kFinished;
+            // The mx locking above is insufficient to establish an acquire if state transitions to
+            // kFinished before we get here, but we aquire mx before the producer does.
+            return state.load(std::memory_order_acquire) == SSBState::kFinished;
         });
     }
 
@@ -354,6 +356,27 @@ public:
             return;
 
         dassert(oldState == SSBState::kWaiting);
+
+        DEV {
+            // If you hit this limit one of two things has probably happened
+            //
+            // 1. The justForContinuation optimization isn't working.
+            // 2. You may be creating a variable length chain.
+            //
+            // If those statements don't mean anything to you, please ask an editor of this file.
+            // If they don't work here anymore, I'm sorry.
+            const size_t kMaxDepth = 32;
+
+            size_t depth = 0;
+            for (auto ssb = continuation.get(); ssb;
+                 ssb = ssb->state.load(std::memory_order_acquire) == SSBState::kWaiting
+                     ? ssb->continuation.get()
+                     : nullptr) {
+                depth++;
+
+                invariant(depth < kMaxDepth);
+            }
+        }
 
         if (callback) {
             callback(this);
@@ -368,7 +391,7 @@ public:
 
     void setError(Status statusArg) noexcept {
         invariant(!statusArg.isOK());
-        dassert(state.load() < SSBState::kFinished);
+        dassert(state.load() < SSBState::kFinished, statusArg.toString());
         status = std::move(statusArg);
         transitionToFinished();
     }
@@ -465,7 +488,7 @@ using future_details::Future;
  * order.
  *
  * If the Future has been extracted, but no value or error has been set at the time this Promise is
- * destoyed, a error will be set with ErrorCode::BrokenPromise. This should generally be considered
+ * destroyed, a error will be set with ErrorCode::BrokenPromise. This should generally be considered
  * a programmer error, and should not be relied upon. We may make it debug-fatal in the future.
  *
  * Only one thread can use a given Promise at a time. It is legal to have different threads setting
@@ -534,6 +557,11 @@ public:
     void setError(Status status) noexcept {
         invariant(!status.isOK());
         setImpl([&] { sharedState->setError(std::move(status)); });
+    }
+
+    // TODO rename to not XXXWith and handle void
+    void setFromStatusWith(StatusWith<T> sw) noexcept {
+        setImpl([&] { sharedState->setFromStatusWith(std::move(sw)); });
     }
 
     /**
@@ -651,6 +679,10 @@ public:
     Future(const Future&) = delete;
     Future& operator=(const Future&) = delete;
 
+    /* implicit */ Future(T val) : Future(makeReady(std::move(val))) {}
+    /* implicit */ Future(Status status) : Future(makeReady(std::move(status))) {}
+    /* implicit */ Future(StatusWith<T> sw) : Future(makeReady(std::move(sw))) {}
+
     /**
      * Make a ready Future<T> from a value for cases where you don't need to wait asynchronously.
      *
@@ -679,6 +711,25 @@ public:
         if (val.isOK())
             return makeReady(std::move(val.getValue()));
         return makeReady(val.getStatus());
+    }
+
+    /**
+     * If this returns true, get() is guaranteed not to block and callbacks will be immediately
+     * invoked. You can't assume anything if this returns false since it may be completed
+     * immediately after checking (unless you have independent knowledge that this Future can't
+     * complete in the background).
+     *
+     * Callers must still call get() or similar, even on Future<void>, to ensure that they are
+     * correctly sequenced with the completing task, and to be informed about whether the Promise
+     * completed successfully.
+     *
+     * This is generally only useful as an optimization to avoid prep work, such as setting up
+     * timeouts, that is unnecessary if the Future is ready already.
+     */
+    bool isReady() const {
+        // This can be a relaxed load because callers are not allowed to use it to establish
+        // ordering.
+        return immediate || shared->state.load(std::memory_order_relaxed) == SSBState::kFinished;
     }
 
     /**
@@ -984,6 +1035,15 @@ public:
                        [](Func && func, const Status& status) noexcept { call(func, status); });
     }
 
+    /**
+     * Ignores the return value of a future, transforming it down into a Future<void>.
+     *
+     * This only ignores values, not errors.  Those remain propogated until an onError handler.
+     *
+     * Equivalent to then([](auto&&){});
+     */
+    Future<void> ignoreValue() && noexcept;
+
 private:
     template <typename T2>
     friend class Future;
@@ -1124,7 +1184,8 @@ class MONGO_WARN_UNUSED_RESULT_CLASS future_details::Future<void> {
 public:
     using value_type = void;
 
-    Future() = default;
+    /* implicit */ Future() : Future(makeReady()) {}
+    /* implicit */ Future(Status status) : Future(makeReady(std::move(status))) {}
 
     static Future<void> makeReady() {
         return Future<FakeVoid>::makeReady(FakeVoid{});
@@ -1134,6 +1195,10 @@ public:
         if (status.isOK())
             return makeReady();
         return Future<FakeVoid>::makeReady(std::move(status));
+    }
+
+    bool isReady() const {
+        return inner.isReady();
     }
 
     void get() const {
@@ -1174,6 +1239,10 @@ public:
         return std::move(inner).tapAll(std::forward<Func>(func));
     }
 
+    Future<void> ignoreValue() && noexcept {
+        return std::move(*this);
+    }
+
 private:
     template <typename T>
     friend class Future;
@@ -1195,6 +1264,11 @@ private:
 
     Future<FakeVoid> inner;
 };
+
+template <typename T>
+    Future<void> Future<T>::ignoreValue() && noexcept {
+    return std::move(*this).then([](auto&&) {});
+}
 
 /**
  * Makes a ready Future with the return value of a nullary function. This has the same semantics as

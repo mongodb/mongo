@@ -1,6 +1,4 @@
-"""
-Interface of the different fixtures for executing JSTests against.
-"""
+"""Interface of the different fixtures for executing JSTests against."""
 
 from __future__ import absolute_import
 
@@ -16,14 +14,11 @@ from ... import logging
 from ... import utils
 from ...utils import registry
 
-
-_FIXTURES = {}
+_FIXTURES = {}  # type: ignore
 
 
 def make_fixture(class_name, *args, **kwargs):
-    """
-    Factory function for creating Fixture instances.
-    """
+    """Provide factory function for creating Fixture instances."""
 
     if class_name not in _FIXTURES:
         raise ValueError("Unknown fixture class '%s'" % class_name)
@@ -31,20 +26,16 @@ def make_fixture(class_name, *args, **kwargs):
 
 
 class Fixture(object):
-    """
-    Base class for all fixtures.
-    """
+    """Base class for all fixtures."""
 
-    __metaclass__ = registry.make_registry_metaclass(_FIXTURES)
+    __metaclass__ = registry.make_registry_metaclass(_FIXTURES)  # type: ignore
 
     # We explicitly set the 'REGISTERED_NAME' attribute so that PyLint realizes that the attribute
     # is defined for all subclasses of Fixture.
     REGISTERED_NAME = "Fixture"
 
     def __init__(self, logger, job_num, dbpath_prefix=None):
-        """
-        Initializes the fixture with a logger instance.
-        """
+        """Initialize the fixture with a logger instance."""
 
         if not isinstance(logger, logging.Logger):
             raise TypeError("logger must be a Logger instance")
@@ -62,20 +53,15 @@ class Fixture(object):
         self._dbpath_prefix = os.path.join(dbpath_prefix, "job{}".format(self.job_num))
 
     def setup(self):
-        """
-        Creates the fixture.
-        """
+        """Create the fixture."""
         pass
 
     def await_ready(self):
-        """
-        Blocks until the fixture can be used for testing.
-        """
+        """Block until the fixture can be used for testing."""
         pass
 
-    def teardown(self, finished=False):
-        """
-        Destroys the fixture.
+    def teardown(self, finished=False):  # noqa
+        """Destroy the fixture.
 
         The fixture's logging handlers are closed if 'finished' is true,
         which should happen when setup() won't be called again.
@@ -93,9 +79,8 @@ class Fixture(object):
                     # want the logs to eventually get flushed.
                     logging.flush.close_later(handler)
 
-    def _do_teardown(self):
-        """
-        Destroys the fixture.
+    def _do_teardown(self):  # noqa
+        """Destroy the fixture.
 
         This method must be implemented by subclasses.
 
@@ -104,36 +89,32 @@ class Fixture(object):
         """
         pass
 
-    def is_running(self):
-        """
-        Returns true if the fixture is still operating and more tests
-        can be run, and false otherwise.
-        """
+    def is_running(self):  # pylint: disable=no-self-use
+        """Return true if the fixture is still operating and more tests and can be run."""
         return True
 
     def get_dbpath_prefix(self):
+        """Return dbpath prefix."""
         return self._dbpath_prefix
 
     def get_internal_connection_string(self):
-        """
-        Returns the connection string for this fixture. This is NOT a
-        driver connection string, but a connection string of the format
+        """Return the connection string for this fixture.
+
+        This is NOT a driver connection string, but a connection string of the format
         expected by the mongo::ConnectionString class.
         """
         raise NotImplementedError("get_connection_string must be implemented by Fixture subclasses")
 
     def get_driver_connection_url(self):
-        """
-        Return the mongodb connection string as defined here:
+        """Return the mongodb connection string as defined below.
+
         https://docs.mongodb.com/manual/reference/connection-string/
         """
         raise NotImplementedError(
             "get_driver_connection_url must be implemented by Fixture subclasses")
 
     def mongo_client(self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
-        """
-        Returns a pymongo.MongoClient connecting to this fixture with a read
-        preference of 'read_preference'.
+        """Return a pymongo.MongoClient connecting to this fixture with specified 'read_preference'.
 
         The PyMongo driver will wait up to 'timeout_millis' milliseconds
         before concluding that the server is unavailable.
@@ -145,8 +126,7 @@ class Fixture(object):
             kwargs["connect"] = True
 
         return pymongo.MongoClient(host=self.get_driver_connection_url(),
-                                   read_preference=read_preference,
-                                   **kwargs)
+                                   read_preference=read_preference, **kwargs)
 
     def __str__(self):
         return "%s (Job #%d)" % (self.__class__.__name__, self.job_num)
@@ -156,30 +136,23 @@ class Fixture(object):
 
 
 class ReplFixture(Fixture):
-    """
-    Base class for all fixtures that support replication.
-    """
+    """Base class for all fixtures that support replication."""
 
-    REGISTERED_NAME = registry.LEAVE_UNREGISTERED
+    REGISTERED_NAME = registry.LEAVE_UNREGISTERED  # type: ignore
 
     AWAIT_REPL_TIMEOUT_MINS = 5
 
     def get_primary(self):
-        """
-        Returns the primary of a replica set, or the master of a
-        master-slave deployment.
-        """
+        """Return the primary of a replica set."""
         raise NotImplementedError("get_primary must be implemented by ReplFixture subclasses")
 
     def get_secondaries(self):
-        """
-        Returns a list containing the secondaries of a replica set, or
-        the slave of a master-slave deployment.
-        """
+        """Return a list containing the secondaries of a replica set."""
         raise NotImplementedError("get_secondaries must be implemented by ReplFixture subclasses")
 
     def retry_until_wtimeout(self, insert_fn):
-        """
+        """Retry until wtimeout reached.
+
         Given a callback function representing an insert operation on
         the primary, handle any connection failures, and keep retrying
         the operation for up to 'AWAIT_REPL_TIMEOUT_MINS' minutes.
@@ -223,9 +196,11 @@ class NoOpFixture(Fixture):
     REGISTERED_NAME = "NoOpFixture"
 
     def get_internal_connection_string(self):
+        """Return the internal connection string."""
         return None
 
     def get_driver_connection_url(self):
+        """Return the driver connection URL."""
         return None
 
 
@@ -233,7 +208,7 @@ class FixtureTeardownHandler(object):
     """A helper class used to teardown nodes inside a cluster and keep track of errors."""
 
     def __init__(self, logger):
-        """Initializes a FixtureTeardownHandler.
+        """Initialize a FixtureTeardownHandler.
 
         Args:
             logger: A logger to use to log teardown activity.
@@ -243,19 +218,18 @@ class FixtureTeardownHandler(object):
         self._message = None
 
     def was_successful(self):
-        """Indicates whether the teardowns performed by this instance were all successful."""
+        """Indicate whether the teardowns performed by this instance were all successful."""
         return self._success
 
     def get_error_message(self):
-        """
-        Retrieves the combined error message for all the teardown failures or None if all the
-        teardowns were successful.
+        """Retrieve the combined error message for all the teardown failures.
+
+        Return None if all the teardowns were successful.
         """
         return self._message
 
-    def teardown(self, fixture, name):
-        """
-        Tears down the given fixture and logs errors instead of raising a ServerFailure exception.
+    def teardown(self, fixture, name):  # noqa: D406,D407,D411,D413
+        """Tear down the given fixture and log errors instead of raising a ServerFailure exception.
 
         Args:
             fixture: The fixture to tear down.

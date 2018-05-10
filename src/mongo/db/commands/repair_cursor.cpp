@@ -77,14 +77,12 @@ public:
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::NamespaceNotFound, "ns does not exist: " + ns.ns()));
+            uasserted(ErrorCodes::NamespaceNotFound, "ns does not exist: " + ns.ns());
         }
 
         auto cursor = collection->getRecordStore()->getCursorForRepair(opCtx);
         if (!cursor) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::CommandNotSupported, "repair iterator not supported"));
+            uasserted(ErrorCodes::CommandNotSupported, "repair iterator not supported");
         }
 
         std::unique_ptr<WorkingSet> ws(new WorkingSet());

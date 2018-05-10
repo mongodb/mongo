@@ -926,9 +926,9 @@ var DB;
         });
     };
 
-    DB.prototype._getCollectionInfosCommand = function(filter) {
+    DB.prototype._getCollectionInfosCommand = function(filter, nameOnly = false) {
         filter = filter || {};
-        var res = this.runCommand({listCollections: 1, filter: filter});
+        var res = this.runCommand({listCollections: 1, filter: filter, nameOnly: nameOnly});
         if (res.code == 59) {
             // command doesn't exist, old mongod
             return null;
@@ -950,8 +950,8 @@ var DB;
      * collection name. An optional filter can be specified to match only collections with certain
      * metadata.
      */
-    DB.prototype.getCollectionInfos = function(filter) {
-        var res = this._getCollectionInfosCommand(filter);
+    DB.prototype.getCollectionInfos = function(filter, nameOnly = false) {
+        var res = this._getCollectionInfosCommand(filter, nameOnly);
         if (res) {
             return res;
         }
@@ -962,7 +962,7 @@ var DB;
      * Returns this database's list of collection names in sorted order.
      */
     DB.prototype.getCollectionNames = function() {
-        return this.getCollectionInfos().map(function(infoObj) {
+        return this.getCollectionInfos({}, true).map(function(infoObj) {
             return infoObj.name;
         });
     };
@@ -1854,6 +1854,63 @@ var DB;
 
     DB.prototype.setLogLevel = function(logLevel, component) {
         return this.getMongo().setLogLevel(logLevel, component, this.getSession());
+    };
+
+    DB.prototype.watch = function(pipeline, options) {
+        pipeline = pipeline || [];
+        options = options || {};
+        assert(pipeline instanceof Array, "'pipeline' argument must be an array");
+        assert(options instanceof Object, "'options' argument must be an object");
+
+        let changeStreamStage = {fullDocument: options.fullDocument || "default"};
+        delete options.fullDocument;
+
+        if (options.hasOwnProperty("resumeAfter")) {
+            changeStreamStage.resumeAfter = options.resumeAfter;
+            delete options.resumeAfter;
+        }
+
+        if (options.hasOwnProperty("startAtClusterTime")) {
+            changeStreamStage.startAtClusterTime = options.startAtClusterTime;
+            delete options.startAtClusterTime;
+        }
+
+        pipeline.unshift({$changeStream: changeStreamStage});
+        return this._runAggregate({aggregate: 1, pipeline: pipeline}, options);
+    };
+
+    DB.prototype.getFreeMonitoringStatus = function() {
+        'use strict';
+        return assert.commandWorked(this.adminCommand({getFreeMonitoringStatus: 1}));
+    };
+
+    DB.prototype.enableFreeMonitoring = function() {
+        'use strict';
+        assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'enable'}));
+
+        const cmd = this.adminCommand({getFreeMonitoringStatus: 1});
+        if (!cmd.ok && (cmd.code == ErrorCode.Unauthorized)) {
+            // Edge case: It's technically possible that a user can change free-mon state,
+            // but is not allowed to inspect it.
+            print("Successfully initiated free monitoring, but unable to determine status " +
+                  "as you lack the 'checkFreeMonitoringStatus' privilege.");
+            return null;
+        }
+        assert.commandWorked(cmd);
+
+        if (cmd.state !== 'enabled') {
+            print("Successfully initiated free monitoring. The registration is " +
+                  "proceeding in the background. ");
+            print("Run db.getFreeMonitoringStatus() at any time to check on the progress.");
+            return null;
+        }
+
+        return cmd;
+    };
+
+    DB.prototype.disableFreeMonitoring = function() {
+        'use strict';
+        assert.commandWorked(this.adminCommand({setFreeMonitoring: 1, action: 'disable'}));
     };
 
     // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the

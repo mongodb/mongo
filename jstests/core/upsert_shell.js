@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, requires_fastcount]
 
 // tests to make sure that the new _id is returned after the insert in the shell
 var l;
@@ -43,15 +43,3 @@ assert.eq(l.getUpsertedId()._id, 1233, "F2 - " + tojson(l));
 l = t.update({_id: {a: 1, b: 2}}, {$set: {a: 123}}, true);
 assert(l.getUpsertedId(), "G1 - " + tojson(l));
 assert.eq(l.getUpsertedId()._id, {a: 1, b: 2}, "G2 - " + tojson(l));
-
-// test with no _id inserted
-db.no_id.drop();
-db.createCollection("no_id", {autoIndexId: false});
-l = db.no_id.update({foo: 1}, {$set: {a: 1}}, true);
-assert(l.getUpsertedId(), "H1 - " + tojson(l));
-assert(!l.hasWriteError(), "H1.5 No error expected - " + tojson(l));
-assert.eq(0, db.no_id.getIndexes().length, "H2");
-assert.eq(1, db.no_id.count(), "H3");
-var newDoc = db.no_id.findOne();
-delete newDoc["_id"];
-assert.eq({foo: 1, a: 1}, newDoc, "H4");

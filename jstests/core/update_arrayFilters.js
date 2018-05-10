@@ -6,8 +6,10 @@
 (function() {
     "use strict";
 
-    let coll = db.update_arrayFilters;
+    const collName = "update_arrayFilters";
+    let coll = db[collName];
     coll.drop();
+    assert.commandWorked(db.createCollection(collName));
     let res;
 
     //
@@ -26,11 +28,6 @@
         // Non-object array filter fails to parse.
         assert.writeError(coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: ["bad"]}),
                           ErrorCodes.TypeMismatch);
-
-        // $isolated in array filter fails to parse.
-        assert.writeError(
-            coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 2, $isolated: true}]}),
-            ErrorCodes.FailedToParse);
 
         // Bad array filter fails to parse.
         res = coll.update({_id: 0}, {$set: {"a.$[i]": 5}}, {arrayFilters: [{i: 0, j: 0}]});
@@ -517,9 +514,9 @@
 
         // arrayFilters respect the collection default collation.
         coll.drop();
-        assert.commandWorked(db.createCollection("update_arrayFilters",
-                                                 {collation: {locale: "en_US", strength: 2}}));
-        coll = db.update_arrayFilters;
+        assert.commandWorked(
+            db.createCollection(collName, {collation: {locale: "en_US", strength: 2}}));
+        coll = db[collName];
         assert.writeOK(coll.insert({_id: 0, a: ["foo", "FOO"]}));
         assert.writeOK(
             coll.update({_id: 0}, {$set: {"a.$[i]": "bar"}}, {arrayFilters: [{i: "foo"}]}));

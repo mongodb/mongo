@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 
@@ -40,6 +42,8 @@ class StorageEngineLockFile {
     MONGO_DISALLOW_COPYING(StorageEngineLockFile);
 
 public:
+    static boost::optional<StorageEngineLockFile>& get(ServiceContext* service);
+
     /**
      * Checks existing lock file, if present, to see if it contains data from a previous
      * unclean shutdown. A clean shutdown should have produced a zero length lock file.

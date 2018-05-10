@@ -1,6 +1,4 @@
-"""
-Utility to support asynchronously signaling the current process.
-"""
+"""Utility to support asynchronously signaling the current process."""
 
 from __future__ import absolute_import
 
@@ -12,25 +10,23 @@ import threading
 import time
 import traceback
 
-_is_windows = (sys.platform == "win32")
-if _is_windows:
+_IS_WINDOWS = (sys.platform == "win32")
+if _IS_WINDOWS:
     import win32api
     import win32event
 
-from . import reportfile
-from . import testing
+from . import reportfile  # pylint: disable=wrong-import-position
+from . import testing  # pylint: disable=wrong-import-position
 
 
 def register(logger, suites, start_time):
-    """
-    On Windows, set up an event object to wait for signal, otherwise, register a signal handler
-    for the SIGUSR1 signal.
-    """
+    """Register an event object to wait for signal, or a signal handler for SIGUSR1."""
 
-    def _handle_sigusr1(signum, frame):
-        """
-        Signal handler that will dump the stacks of all threads and
-        then write out the report file and log suite summaries.
+    def _handle_sigusr1(signum, frame):  # pylint: disable=unused-argument
+        """Signal handler for SIGUSR1.
+
+        The handler will dump the stacks of all threads and write out the report file and
+        log suite summaries.
         """
 
         header_msg = "Dumping stacks due to SIGUSR1 signal"
@@ -38,9 +34,10 @@ def register(logger, suites, start_time):
         _dump_and_log(header_msg)
 
     def _handle_set_event(event_handle):
-        """
-        Windows event object handler that will dump the stacks of all threads and then write out
-        the report file and log suite summaries.
+        """Event object handler for Windows.
+
+        The handler will dump the stacks of all threads and write out the report file and
+        log suite summaries.
         """
 
         while True:
@@ -58,18 +55,15 @@ def register(logger, suites, start_time):
                 _dump_and_log(header_msg)
 
     def _dump_and_log(header_msg):
-        """
-        Dumps the stacks of all threads, writes the report file, and logs the suite summaries.
-        """
+        """Dump the stacks of all threads, write report file, and log suite summaries."""
         _dump_stacks(logger, header_msg)
         reportfile.write(suites)
 
         testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
-
     # On Windows spawn a thread to wait on an event object for signal to dump stacks. For Cygwin
     # platforms, we use a signal handler since it supports POSIX signals.
-    if _is_windows:
+    if _IS_WINDOWS:
         # Create unique event_name.
         event_name = "Global\\Mongo_Python_" + str(os.getpid())
 
@@ -77,10 +71,8 @@ def register(logger, suites, start_time):
             security_attributes = None
             manual_reset = False
             initial_state = False
-            task_timeout_handle = win32event.CreateEvent(security_attributes,
-                                                         manual_reset,
-                                                         initial_state,
-                                                         event_name)
+            task_timeout_handle = win32event.CreateEvent(security_attributes, manual_reset,
+                                                         initial_state, event_name)
         except win32event.error as err:
             logger.error("Exception from win32event.CreateEvent with error: %s" % err)
             return
@@ -100,14 +92,12 @@ def register(logger, suites, start_time):
 
 
 def _dump_stacks(logger, header_msg):
-    """
-    Signal handler that will dump the stacks of all threads.
-    """
+    """Signal handler that will dump the stacks of all threads."""
 
     sb = []
     sb.append(header_msg)
 
-    frames = sys._current_frames()
+    frames = sys._current_frames()  # pylint: disable=protected-access
     sb.append("Total threads: %d" % (len(frames)))
     sb.append("")
 

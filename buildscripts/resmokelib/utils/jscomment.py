@@ -1,6 +1,4 @@
-"""
-Utility for parsing JS comments.
-"""
+"""Utility for parsing JS comments."""
 
 from __future__ import absolute_import
 
@@ -8,15 +6,14 @@ import re
 
 import yaml
 
-
 # TODO: use a more robust regular expression for matching tags
 _JSTEST_TAGS_RE = re.compile(r".*@tags\s*:\s*(\[[^\]]*\])", re.DOTALL)
 
 
 def get_tags(pathname):
-    """
-    Returns the list of tags found in the (JS-style) comments of
-    'pathname'. The definition can span multiple lines, use unquoted,
+    """Return the list of tags found in the (JS-style) comments of 'pathname'.
+
+    The definition can span multiple lines, use unquoted,
     single-quoted, or double-quoted strings, and use the '#' character
     for inline commenting.
 
@@ -43,15 +40,16 @@ def get_tags(pathname):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
                 return tags
             except yaml.YAMLError as err:
-                raise ValueError("File '%s' contained invalid tags (expected YAML): %s"
-                                 % (pathname, err))
+                raise ValueError("File '%s' contained invalid tags (expected YAML): %s" % (pathname,
+                                                                                           err))
 
     return []
 
 
-def _strip_jscomments(s):
-    """
-    Given a string 's' that represents the contents after the "@tags:"
+def _strip_jscomments(string):
+    """Strip JS comments from a 'string'.
+
+    Given a string 'string' that represents the contents after the "@tags:"
     annotation in the JS file, this function returns a string that can
     be converted to YAML.
 
@@ -70,7 +68,7 @@ def _strip_jscomments(s):
 
     yaml_lines = []
 
-    for line in s.splitlines():
+    for line in string.splitlines():
         # Remove leading whitespace and symbols that commonly appear in JS comments.
         line = line.lstrip("\t ").lstrip("*/")
         yaml_lines.append(line)

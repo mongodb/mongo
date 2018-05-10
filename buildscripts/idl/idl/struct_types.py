@@ -44,13 +44,7 @@ class ArgumentInfo(object):
 class MethodInfo(object):
     """Class that encapslates information about a method and how to declare, define, and call it."""
 
-    def __init__(self,
-                 class_name,
-                 method_name,
-                 args,
-                 return_type=None,
-                 static=False,
-                 const=False,
+    def __init__(self, class_name, method_name, args, return_type=None, static=False, const=False,
                  explicit=False):
         # type: (unicode, unicode, List[unicode], unicode, bool, bool, bool) -> None
         # pylint: disable=too-many-arguments
@@ -84,11 +78,8 @@ class MethodInfo(object):
 
         return common.template_args(
             "${pre_modifiers}${return_type}${method_name}(${args})${post_modifiers};",
-            pre_modifiers=pre_modifiers,
-            return_type=return_type_str,
-            method_name=self.method_name,
-            args=', '.join([str(arg) for arg in self.args]),
-            post_modifiers=post_modifiers)
+            pre_modifiers=pre_modifiers, return_type=return_type_str, method_name=self.method_name,
+            args=', '.join([str(arg) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_definition(self):
         # type: () -> unicode
@@ -105,12 +96,9 @@ class MethodInfo(object):
 
         return common.template_args(
             "${pre_modifiers}${return_type}${class_name}::${method_name}(${args})${post_modifiers}",
-            pre_modifiers=pre_modifiers,
-            return_type=return_type_str,
-            class_name=self.class_name,
-            method_name=self.method_name,
-            args=', '.join([str(arg) for arg in self.args]),
-            post_modifiers=post_modifiers)
+            pre_modifiers=pre_modifiers, return_type=return_type_str, class_name=self.class_name,
+            method_name=self.method_name, args=', '.join(
+                [str(arg) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_call(self, obj):
         # type: (Optional[unicode]) -> unicode
@@ -119,11 +107,11 @@ class MethodInfo(object):
         args = ', '.join([arg.name for arg in self.args])
 
         if obj:
-            return common.template_args(
-                "${obj}.${method_name}(${args});", obj=obj, method_name=self.method_name, args=args)
+            return common.template_args("${obj}.${method_name}(${args});", obj=obj,
+                                        method_name=self.method_name, args=args)
 
-        return common.template_args(
-            "${method_name}(${args});", method_name=self.method_name, args=args)
+        return common.template_args("${method_name}(${args});", method_name=self.method_name,
+                                    args=args)
 
 
 class StructTypeInfoBase(object):
@@ -223,11 +211,9 @@ class _StructTypeInfo(StructTypeInfoBase):
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(
-            class_name,
-            'parse', ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'],
-            class_name,
-            static=True)
+        return MethodInfo(class_name, 'parse',
+                          ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'],
+                          class_name, static=True)
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
@@ -238,10 +224,8 @@ class _StructTypeInfo(StructTypeInfoBase):
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'serialize', ['BSONObjBuilder* builder'],
-            'void',
-            const=True)
+            common.title_case(self._struct.cpp_name), 'serialize', ['BSONObjBuilder* builder'],
+            'void', const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
@@ -290,19 +274,15 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'serialize', ['const BSONObj& commandPassthroughFields'],
-            'OpMsgRequest',
-            const=True)
+            common.title_case(self._struct.cpp_name), 'serialize',
+            ['const BSONObj& commandPassthroughFields'], 'OpMsgRequest', const=True)
 
     def get_op_msg_request_deserializer_static_method(self):
         # type: () -> Optional[MethodInfo]
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(
-            class_name,
-            'parse', ['const IDLParserErrorContext& ctxt', 'const OpMsgRequest& request'],
-            class_name,
-            static=True)
+        return MethodInfo(class_name, 'parse',
+                          ['const IDLParserErrorContext& ctxt', 'const OpMsgRequest& request'],
+                          class_name, static=True)
 
     def get_op_msg_request_deserializer_method(self):
         # type: () -> Optional[MethodInfo]
@@ -324,35 +304,16 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'serialize', ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'],
-            'void',
+            common.title_case(self._struct.cpp_name), 'serialize',
+            ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'], 'void',
             const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         # Commands that require namespaces require it as a parameter to serialize()
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'toBSON', ['const BSONObj& commandPassthroughFields'],
-            'BSONObj',
-            const=True)
-
-    def get_deserializer_static_method(self):
-        # type: () -> MethodInfo
-        return super(_IgnoredCommandTypeInfo, self).get_deserializer_static_method()
-
-    def get_deserializer_method(self):
-        # type: () -> MethodInfo
-        return super(_IgnoredCommandTypeInfo, self).get_deserializer_method()
-
-    def gen_getter_method(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        super(_IgnoredCommandTypeInfo, self).gen_getter_method(indented_writer)
-
-    def gen_member(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
-        super(_IgnoredCommandTypeInfo, self).gen_member(indented_writer)
+            common.title_case(self._struct.cpp_name), 'toBSON',
+            ['const BSONObj& commandPassthroughFields'], 'BSONObj', const=True)
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -388,18 +349,15 @@ class _CommandFromType(_CommandBaseTypeInfo):
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'serialize', ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'],
-            'void',
+            common.title_case(self._struct.cpp_name), 'serialize',
+            ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'], 'void',
             const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'toBSON', ['const BSONObj& commandPassthroughFields'],
-            'BSONObj',
-            const=True)
+            common.title_case(self._struct.cpp_name), 'toBSON',
+            ['const BSONObj& commandPassthroughFields'], 'BSONObj', const=True)
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
@@ -443,18 +401,15 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
     def get_serializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'serialize', ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'],
-            'void',
+            common.title_case(self._struct.cpp_name), 'serialize',
+            ['const BSONObj& commandPassthroughFields', 'BSONObjBuilder* builder'], 'void',
             const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
-            common.title_case(self._struct.cpp_name),
-            'toBSON', ['const BSONObj& commandPassthroughFields'],
-            'BSONObj',
-            const=True)
+            common.title_case(self._struct.cpp_name), 'toBSON',
+            ['const BSONObj& commandPassthroughFields'], 'BSONObj', const=True)
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
@@ -480,8 +435,8 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         # type: (writer.IndentedTextWriter, unicode, unicode) -> None
         # TODO: should the name of the first element be validated??
         indented_writer.write_line('invariant(_nss.isEmpty());')
-        indented_writer.write_line('_nss = ctxt.parseNSCollectionRequired(%s, %s);' %
-                                   (db_name, element))
+        indented_writer.write_line('_nss = ctxt.parseNSCollectionRequired(%s, %s);' % (db_name,
+                                                                                       element))
 
 
 def get_struct_info(struct):
@@ -493,7 +448,6 @@ def get_struct_info(struct):
             return _IgnoredCommandTypeInfo(struct)
         elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
             return _CommandWithNamespaceTypeInfo(struct)
-        else:
-            return _CommandFromType(struct)
+        return _CommandFromType(struct)
 
     return _StructTypeInfo(struct)

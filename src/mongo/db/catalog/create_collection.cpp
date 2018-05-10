@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -72,7 +73,7 @@ Status createCollection(OperationContext* opCtx,
     BSONObjBuilder optionsBuilder;
     while (it.more()) {
         const auto elem = it.next();
-        if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData()))
+        if (!isGenericArgument(elem.fieldNameStringData()))
             optionsBuilder.append(elem);
         if (elem.fieldNameStringData() == "viewOn") {
             // Views don't have UUIDs so it should always be parsed for command.
@@ -100,8 +101,8 @@ Status createCollection(OperationContext* opCtx,
 
         // Create collection.
         const bool createDefaultIndexes = true;
-        status =
-            userCreateNS(opCtx, ctx.db(), nss.ns(), options, kind, createDefaultIndexes, idIndex);
+        status = Database::userCreateNS(
+            opCtx, ctx.db(), nss.ns(), options, kind, createDefaultIndexes, idIndex);
 
         if (!status.isOK()) {
             return status;
@@ -136,7 +137,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     auto newCmd = cmdObj;
 
     auto* const serviceContext = opCtx->getServiceContext();
-    auto* const db = dbHolder().get(opCtx, dbName);
+    auto* const db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
 
     // If a UUID is given, see if we need to rename a collection out of the way, and whether the
     // collection already exists under a different name. If so, rename it into place. As this is
@@ -207,7 +208,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    newCollName,
                                                    tmpName,
                                                    futureColl->uuid(),
-                                                   /*dropTarget*/ false,
                                                    /*dropTargetUUID*/ {},
                                                    stayTemp);
                 }
@@ -228,7 +228,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    currentName,
                                                    newCollName,
                                                    uuid,
-                                                   /*dropTarget*/ false,
                                                    /*dropTargetUUID*/ {},
                                                    stayTemp);
 

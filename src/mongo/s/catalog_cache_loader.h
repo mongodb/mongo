@@ -35,6 +35,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/concurrency/notification.h"
@@ -126,6 +127,21 @@ public:
             callbackFn) = 0;
 
     /**
+     * Non-blocking call, which requests the most recent db version for the given dbName from the
+     * the persistent metadata store and invokes the callback function with the result.
+     * The callback function must never throw - it is a fatal error to do so.
+     *
+     * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
+     * shutdown), throws a DBException. Otherwise it is guaranteed that the callback function will
+     * be invoked even on error.
+     *
+     * The callbackFn object must not be destroyed until it has been called.
+     */
+    virtual void getDatabase(
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) = 0;
+
+    /**
      * Waits for any pending changes for the specified collection to be persisted locally (not
      * necessarily replicated). If newer changes come after this method has started running, they
      * will not be waited for except if there is a drop.
@@ -137,6 +153,8 @@ public:
      * and must fassert.
      */
     virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
+
+    virtual void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) = 0;
 
     /**
      * Only used for unit-tests, clears a previously-created catalog cache loader from the specified

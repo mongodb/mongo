@@ -4,6 +4,7 @@
 // Symbol type, so we just use unique string values instead.
 var Topology = {
     kStandalone: 'stand-alone',
+    kRouter: 'mongos router',
     kReplicaSet: 'replica set',
     kShardedCluster: 'sharded cluster',
 };
@@ -58,7 +59,21 @@ var DiscoverTopology = (function() {
             shardHosts[shardInfo._id] = getDataMemberConnectionStrings(shardConn);
         }
 
-        return {type: Topology.kShardedCluster, configsvr: configsvrHosts, shards: shardHosts};
+        // Discover mongos URIs from the connection string. If a mongos is not passed in explicitly,
+        // it will not be discovered.
+        const mongosUris = new MongoURI("mongodb://" + conn.host);
+
+        const mongos = {
+            type: Topology.kRouter,
+            nodes: mongosUris.servers.map(uriObj => uriObj.server),
+        };
+
+        return {
+            type: Topology.kShardedCluster,
+            configsvr: configsvrHosts,
+            shards: shardHosts,
+            mongos: mongos,
+        };
     }
 
     return {
@@ -83,6 +98,10 @@ var DiscoverTopology = (function() {
          *       <shard-name1>: {type: Topology.kStandalone, mongod: ...},
          *       <shard-name2>: {type: Topology.kReplicaSet, nodes: [...]},
          *       ...
+         *     },
+         *     mongos: {
+         *       type: Topology.kRouter,
+         *       nodes: [...],
          *     }
          *   }
          * is returned, where the description for each shard depends on whether it is a stand-alone

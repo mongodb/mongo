@@ -109,7 +109,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         auto* const css = CollectionShardingState::get(opCtx, nss);
         auto* const self = forTestOnly ? forTestOnly : &css->_metadataManager->_rangesToClean;
 
-        auto scopedCollectionMetadata = css->getMetadata();
+        auto scopedCollectionMetadata = css->getMetadata(opCtx);
 
         if (!forTestOnly && (!collection || !scopedCollectionMetadata)) {
             if (!collection) {
@@ -268,7 +268,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     }
 
     invariant(range);
-    invariantOK(wrote.getStatus());
+    invariant(wrote.getStatus());
     invariant(wrote.getValue() > 0);
 
     notification.abandon();

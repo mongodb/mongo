@@ -89,7 +89,13 @@ public:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
         override;
 
+    void getDatabase(
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) override;
+
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
+
+    void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
 
 private:
     // Differentiates the server's role in the replica set so that the chunk loader knows whether to
@@ -101,9 +107,9 @@ private:
      * apply a set up updated chunks to the shard persisted metadata store or to drop the persisted
      * metadata for a specific collection.
      */
-    struct Task {
-        MONGO_DISALLOW_COPYING(Task);
-        Task(Task&&) = default;
+    struct collAndChunkTask {
+        MONGO_DISALLOW_COPYING(collAndChunkTask);
+        collAndChunkTask(collAndChunkTask&&) = default;
 
         /**
          * Initializes a task for either dropping or updating the persisted metadata for the
@@ -118,9 +124,10 @@ private:
          * 'maxQueryVersion' is either set to the highest chunk version in
          * 'collectionAndChangedChunks' or ChunkVersion::UNSHARDED().
          */
-        Task(StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
-             ChunkVersion minimumQueryVersion,
-             long long currentTerm);
+        collAndChunkTask(
+            StatusWith<CollectionAndChangedChunks> statusWithCollectionAndChangedChunks,
+            ChunkVersion minimumQueryVersion,
+            long long currentTerm);
 
         // Always-incrementing task number to uniquely identify different tasks
         uint64_t taskNum;
@@ -130,16 +137,47 @@ private:
 
         // The highest version that the loader had before going to the config server's metadata
         // store for updated chunks.
-        // Used by the TaskList below to enforce consistent updates are applied.
+        // Used by the CollAndChunkTaskList below to enforce consistent updates are applied.
         ChunkVersion minQueryVersion;
 
         // Either the highest chunk version in 'collectionAndChangedChunks' or the same as
         // 'minQueryVersion' if 'dropped' is true.
-        // Used by the TaskList below to enforce consistent updates are applied.
+        // Used by the CollAndChunkTaskList below to enforce consistent updates are
+        // applied.
         ChunkVersion maxQueryVersion;
 
         // Indicates whether the collection metadata must be cleared.
         bool dropped{false};
+
+        // The term in which the loader scheduled this task.
+        uint32_t termCreated;
+    };
+
+    /**
+     * This represents an update task for the persisted database metadata. The task will either be
+     * to persist an update to the shard persisted metadata store or to drop the persisted
+     * metadata for a specific database.
+     */
+    struct dbTask {
+        MONGO_DISALLOW_COPYING(dbTask);
+        dbTask(dbTask&&) = default;
+
+        /**
+         * Initializes a task for either dropping or updating the persisted metadata for the
+         * associated database. Which type of task is determined by the Status of 'swDatabaseType',
+         * whether it is NamespaceNotFound or OK.
+         *
+         * Note: swDatabaseType must always be NamespaceNotFound or OK, otherwise the constructor
+         * will invariant because there is no task to complete.
+         */
+        dbTask(StatusWith<DatabaseType> swDatabaseType, long long currentTerm);
+
+        // Always-incrementing task number to uniquely identify different tasks
+        uint64_t taskNum;
+
+        // If boost::none, indicates this task is for a drop. Otherwise, contains the refreshed
+        // database entry.
+        boost::optional<DatabaseType> dbType;
 
         // The term in which the loader scheduled this task.
         uint32_t termCreated;
@@ -155,9 +193,9 @@ private:
      *
      *     minQueryVersion == ChunkVersion::UNSHARDED().
      */
-    class TaskList {
+    class CollAndChunkTaskList {
     public:
-        TaskList();
+        CollAndChunkTaskList();
 
         /**
          * Adds 'task' to the back of the 'tasks' list.
@@ -166,7 +204,7 @@ private:
          * don't waste time applying changes we will just delete. If the one remaining task in the
          * list is already a drop task, the new one isn't added because it is redundant.
          */
-        void addTask(Task task);
+        void addTask(collAndChunkTask task);
 
         auto& front() {
             invariant(!_tasks.empty());
@@ -223,14 +261,83 @@ private:
         CollectionAndChangedChunks getEnqueuedMetadataForTerm(const long long term) const;
 
     private:
-        std::list<Task> _tasks{};
+        std::list<collAndChunkTask> _tasks{};
 
         // Condition variable which will be signaled whenever the active task from the tasks list is
         // completed. Must be used in conjunction with the loader's mutex.
         std::shared_ptr<stdx::condition_variable> _activeTaskCompletedCondVar;
     };
 
-    typedef std::map<NamespaceString, TaskList> TaskLists;
+    /**
+     * A list (work queue) of updates to apply to the shard persisted metadata store for a specific
+     * database.
+     */
+    class DbTaskList {
+    public:
+        DbTaskList();
+
+        /**
+         * Adds 'task' to the back of the 'tasks' list.
+         *
+         * If 'task' is a drop task, clears 'tasks' except for the front active task, so that we
+         * don't waste time applying changes we will just delete. If the one remaining task in the
+         * list is already a drop task, the new one isn't added because it is redundant.
+         */
+        void addTask(dbTask task);
+
+        auto& front() {
+            invariant(!_tasks.empty());
+            return _tasks.front();
+        }
+
+        auto& back() {
+            invariant(!_tasks.empty());
+            return _tasks.back();
+        }
+
+        auto begin() {
+            invariant(!_tasks.empty());
+            return _tasks.begin();
+        }
+
+        auto end() {
+            invariant(!_tasks.empty());
+            return _tasks.end();
+        }
+
+        void pop_front();
+
+        bool empty() const {
+            return _tasks.empty();
+        }
+
+        /**
+         * Must only be called if there is an active task. Behaves like a condition variable and
+         * will be signaled when the active task has been completed.
+         *
+         * NOTE: Because this call unlocks and locks the provided mutex, it is not safe to use the
+         * same task object on which it was called because it might have been deleted during the
+         * unlocked period.
+         */
+        void waitForActiveTaskCompletion(stdx::unique_lock<stdx::mutex>& lg);
+
+        /**
+         * Checks whether 'term' matches the term of the latest task in the task list. This is
+         * useful to check whether the task list has outdated data that's no longer valid to use in
+         * the current/new term specified by 'term'.
+         */
+        bool hasTasksFromThisTerm(long long term) const;
+
+    private:
+        std::list<dbTask> _tasks{};
+
+        // Condition variable which will be signaled whenever the active task from the tasks list is
+        // completed. Must be used in conjunction with the loader's mutex.
+        std::shared_ptr<stdx::condition_variable> _activeTaskCompletedCondVar;
+    };
+
+    typedef std::map<NamespaceString, CollAndChunkTaskList> CollAndChunkTaskLists;
+    typedef std::map<std::string, DbTaskList> DbTaskLists;
 
     /**
      * Forces the primary to refresh its metadata for 'nss' and waits until this node's metadata
@@ -249,7 +356,7 @@ private:
      * of the shard's persisted metadata store with the latest updates retrieved from the config
      * server.
      *
-     * Then calls 'callbackFn' with metadata retrived locally from the shard persisted metadata
+     * Then calls 'callbackFn' with metadata retrieved locally from the shard persisted metadata
      * store and any in-memory tasks with terms matching 'currentTerm' enqueued to update that
      * store, GTE to 'catalogCacheSinceVersion'.
      *
@@ -263,6 +370,32 @@ private:
         stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
         std::shared_ptr<Notification<void>> notify);
 
+    /**
+     * Forces the primary to refresh its metadata for 'dbName' and waits until this node's metadata
+     * has caught up to the primary's.
+     * Then retrieves the db version from this node's persisted metadata store and passes it to
+     * 'callbackFn'.
+     */
+    void _runSecondaryGetDatabase(
+        OperationContext* opCtx,
+        StringData dbName,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
+
+    /**
+     * Refreshes db version from the config server's metadata store, and schedules maintenance
+     * of the shard's persisted metadata store with the latest updates retrieved from the config
+     * server.
+     *
+     * Then calls 'callbackFn' with metadata retrieved locally from the shard persisted metadata
+     * to update that store.
+     *
+     * Only run on the shard primary.
+     */
+    void _schedulePrimaryGetDatabase(
+        OperationContext* opCtx,
+        StringData dbName,
+        long long termScheduled,
+        stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn);
 
     /**
      * Loads chunk metadata from the shard persisted metadata store and any in-memory tasks with
@@ -306,16 +439,21 @@ private:
      *
      * Only run on the shard primary.
      */
-    Status _ensureMajorityPrimaryAndScheduleTask(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 Task task);
+    Status _ensureMajorityPrimaryAndScheduleCollAndChunksTask(OperationContext* opCtx,
+                                                              const NamespaceString& nss,
+                                                              collAndChunkTask task);
 
+    Status _ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
+                                                   StringData dbName,
+                                                   dbTask task);
     /**
      * Schedules tasks in the 'nss' task list to execute until the task list is depleted.
      *
      * Only run on the shard primary.
      */
-    void _runTasks(const NamespaceString& nss);
+    void _runCollAndChunksTasks(const NamespaceString& nss);
+
+    void _runDbTasks(StringData dbName);
 
     /**
      * Executes the task at the front of the task list for 'nss'. The task will either drop 'nss's
@@ -323,7 +461,9 @@ private:
      *
      * Only run on the shard primary.
      */
-    void _updatePersistedMetadata(OperationContext* opCtx, const NamespaceString& nss);
+    void _updatePersistedCollAndChunksMetadata(OperationContext* opCtx, const NamespaceString& nss);
+
+    void _updatePersistedDbMetadata(OperationContext* opCtx, StringData dbName);
 
     /**
      * Attempts to read the collection and chunk metadata since 'version' from the shard persisted
@@ -349,7 +489,8 @@ private:
     stdx::mutex _mutex;
 
     // Map to track in progress persisted cache updates on the shard primary.
-    TaskLists _taskLists;
+    CollAndChunkTaskLists _collAndChunkTaskLists;
+    DbTaskLists _dbTaskLists;
 
     // This value is bumped every time the set of currently scheduled tasks should no longer be
     // running. This includes, replica set state transitions and shutdown.

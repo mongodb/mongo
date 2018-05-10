@@ -111,7 +111,7 @@ public:
         std::shared_ptr<Shard> shard;
 
         if (!routingInfo.cm()) {
-            shard = routingInfo.primary();
+            shard = routingInfo.db().primary();
         } else {
             chunkMgr = routingInfo.cm();
 
@@ -121,7 +121,7 @@ public:
             const auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
             shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk->getShardId()));
+                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getShardId()));
         }
 
         const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
@@ -162,8 +162,12 @@ public:
         const auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         if (!routingInfo.cm()) {
-            _runCommand(
-                opCtx, routingInfo.primaryId(), ChunkVersion::UNSHARDED(), nss, cmdObj, &result);
+            _runCommand(opCtx,
+                        routingInfo.db().primaryId(),
+                        ChunkVersion::UNSHARDED(),
+                        nss,
+                        cmdObj,
+                        &result);
             return true;
         }
 
@@ -175,13 +179,13 @@ public:
         auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
         _runCommand(opCtx,
-                    chunk->getShardId(),
-                    chunkMgr->getVersion(chunk->getShardId()),
+                    chunk.getShardId(),
+                    chunkMgr->getVersion(chunk.getShardId()),
                     nss,
                     cmdObj,
                     &result);
         updateChunkWriteStatsAndSplitIfNeeded(
-            opCtx, chunkMgr.get(), chunk.get(), cmdObj.getObjectField("update").objsize());
+            opCtx, chunkMgr.get(), chunk, cmdObj.getObjectField("update").objsize());
 
         return true;
     }

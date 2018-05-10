@@ -34,15 +34,16 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/message.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -84,12 +85,20 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
     LastError::get(client).startRequest();
     AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
 
+    CurOp::get(opCtx)->ensureStarted();
+
     DbMessage dbm(message);
 
     // This is before the try block since it handles all exceptions that should not cause the
     // connection to close.
     if (op == dbMsg || (op == dbQuery && NamespaceString(dbm.getns()).isCommand())) {
-        return Strategy::clientCommand(opCtx, message);
+        auto dbResponse = Strategy::clientCommand(opCtx, message);
+
+        // Mark the op as complete, populate the response length, and log it if appropriate.
+        CurOp::get(opCtx)->completeAndLogOperation(
+            opCtx, logger::LogComponent::kCommand, dbResponse.response.size());
+
+        return dbResponse;
     }
 
     NamespaceString nss;
@@ -151,7 +160,13 @@ DbResponse ServiceEntryPointMongos::handleRequest(OperationContext* opCtx, const
 
         // We *always* populate the last error for now
         LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.what());
+        CurOp::get(opCtx)->debug().errInfo = ex.toStatus();
     }
+
+    // Mark the op as complete, populate the response length, and log it if appropriate.
+    CurOp::get(opCtx)->completeAndLogOperation(
+        opCtx, logger::LogComponent::kCommand, dbResponse.response.size());
+
     return dbResponse;
 }
 

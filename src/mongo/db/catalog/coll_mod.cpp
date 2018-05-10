@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -89,7 +90,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
     BSONForEach(e, cmdObj) {
         const auto fieldName = e.fieldNameStringData();
-        if (CommandHelpers::isGenericArgument(fieldName)) {
+        if (isGenericArgument(fieldName)) {
             continue;  // Don't add to oplog builder.
         } else if (fieldName == "collMod") {
             // no-op
@@ -409,11 +410,11 @@ Status _collModInternal(OperationContext* opCtx,
 
     // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
     if (!cmr.collValidator.eoo())
-        invariantOK(coll->setValidator(opCtx, cmr.collValidator.Obj()));
+        invariant(coll->setValidator(opCtx, cmr.collValidator.Obj()));
     if (!cmr.collValidationAction.empty())
-        invariantOK(coll->setValidationAction(opCtx, cmr.collValidationAction));
+        invariant(coll->setValidationAction(opCtx, cmr.collValidationAction));
     if (!cmr.collValidationLevel.empty())
-        invariantOK(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
+        invariant(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
 
     // UsePowerof2Sizes
     if (!cmr.usePowerOf2Sizes.eoo())
@@ -441,7 +442,6 @@ Status _collModInternal(OperationContext* opCtx,
                                         << nss.ns());
         }
         coll->refreshUUID(opCtx);
-        opCtx->recoveryUnit()->onRollback([coll, opCtx]() { coll->refreshUUID(opCtx); });
     }
 
     // Only observe non-view collMods, as view operations are observed as operations on the
@@ -558,9 +558,9 @@ void addCollectionUUIDs(OperationContext* opCtx) {
 
     // Add UUIDs to all collections of all databases if they do not already have UUIDs.
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
     {
-        Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::max());
+        Lock::GlobalLock lk(opCtx, MODE_IS);
         storageEngine->listDatabases(&dbNames);
     }
 

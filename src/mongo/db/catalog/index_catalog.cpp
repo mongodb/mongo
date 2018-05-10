@@ -37,19 +37,7 @@
 namespace mongo {
 IndexCatalog::Impl::~Impl() = default;
 
-namespace {
-IndexCatalog::factory_function_type factory;
-}  // namespace
-
-void IndexCatalog::registerFactory(decltype(factory) newFactory) {
-    factory = std::move(newFactory);
-}
-
-auto IndexCatalog::makeImpl(IndexCatalog* const this_,
-                            Collection* const collection,
-                            const int maxNumIndexesAllowed) -> std::unique_ptr<Impl> {
-    return factory(this_, collection, maxNumIndexesAllowed);
-}
+MONGO_DEFINE_SHIM(IndexCatalog::makeImpl);
 
 void IndexCatalog::TUHook::hook() noexcept {}
 
@@ -63,38 +51,11 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(
 
 IndexCatalog::IndexIterator::Impl::~Impl() = default;
 
-namespace {
-IndexCatalog::IndexIterator::factory_function_type iteratorFactory;
-}  // namespace
-
-void IndexCatalog::IndexIterator::registerFactory(decltype(iteratorFactory) newFactory) {
-    iteratorFactory = std::move(newFactory);
-}
-
-auto IndexCatalog::IndexIterator::makeImpl(OperationContext* const opCtx,
-                                           const IndexCatalog* const cat,
-                                           const bool includeUnfinishedIndexes)
-    -> std::unique_ptr<Impl> {
-    return iteratorFactory(opCtx, cat, includeUnfinishedIndexes);
-}
+MONGO_DEFINE_SHIM(IndexCatalog::IndexIterator::makeImpl);
 
 void IndexCatalog::IndexIterator::TUHook::hook() noexcept {}
 
-namespace {
-stdx::function<decltype(IndexCatalog::fixIndexKey)> fixIndexKeyImpl;
-}  // namespace
-
-void IndexCatalog::registerFixIndexKeyImpl(decltype(fixIndexKeyImpl) impl) {
-    fixIndexKeyImpl = std::move(impl);
-}
-
-BSONObj IndexCatalog::fixIndexKey(const BSONObj& key) {
-    return fixIndexKeyImpl(key);
-}
-
-namespace {
-stdx::function<decltype(IndexCatalog::prepareInsertDeleteOptions)> prepareInsertDeleteOptionsImpl;
-}  // namespace
+MONGO_DEFINE_SHIM(IndexCatalog::fixIndexKey);
 
 std::string::size_type IndexCatalog::getLongestIndexNameLength(OperationContext* opCtx) const {
     IndexCatalog::IndexIterator it = getIndexIterator(opCtx, true);
@@ -107,14 +68,5 @@ std::string::size_type IndexCatalog::getLongestIndexNameLength(OperationContext*
     return longestIndexNameLength;
 }
 
-void IndexCatalog::prepareInsertDeleteOptions(OperationContext* const opCtx,
-                                              const IndexDescriptor* const desc,
-                                              InsertDeleteOptions* const options) {
-    return prepareInsertDeleteOptionsImpl(opCtx, desc, options);
-}
-
-void IndexCatalog::registerPrepareInsertDeleteOptionsImpl(
-    stdx::function<decltype(prepareInsertDeleteOptions)> impl) {
-    prepareInsertDeleteOptionsImpl = std::move(impl);
-}
+MONGO_DEFINE_SHIM(IndexCatalog::prepareInsertDeleteOptions);
 }  // namespace mongo

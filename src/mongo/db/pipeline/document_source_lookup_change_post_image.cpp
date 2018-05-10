@@ -73,7 +73,7 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::getNext() {
     return output.freeze();
 }
 
-NamespaceString DocumentSourceLookupChangePostImage::assertNamespaceMatches(
+NamespaceString DocumentSourceLookupChangePostImage::assertValidNamespace(
     const Document& inputDoc) const {
     auto namespaceObject =
         assertFieldHasType(inputDoc, DocumentSourceChangeStream::kNamespaceField, BSONType::Object)
@@ -81,17 +81,23 @@ NamespaceString DocumentSourceLookupChangePostImage::assertNamespaceMatches(
     auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::String);
     auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::String);
     NamespaceString nss(dbName.getString(), collectionName.getString());
+
+    // Change streams on an entire database only need to verify that the database names match. If
+    // the database is 'admin', then this is a cluster-wide $changeStream and we are permitted to
+    // lookup into any namespace.
     uassert(40579,
             str::stream() << "unexpected namespace during post image lookup: " << nss.ns()
                           << ", expected "
                           << pExpCtx->ns.ns(),
-            nss == pExpCtx->ns);
+            nss == pExpCtx->ns ||
+                (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss.db())));
+
     return nss;
 }
 
 Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updateOp) const {
     // Make sure we have a well-formed input.
-    auto nss = assertNamespaceMatches(updateOp);
+    auto nss = assertValidNamespace(updateOp);
 
     auto documentKey = assertFieldHasType(updateOp,
                                           DocumentSourceChangeStream::kDocumentKeyField,

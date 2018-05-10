@@ -305,6 +305,9 @@ struct CollectionScanNode : public QuerySolutionNode {
 
     // maxScan option to .find() limits how many docs we look at.
     int maxScan;
+
+    // Whether or not to wait for oplog visibility on oplog collection scans.
+    bool shouldWaitForOplogVisibility = false;
 };
 
 struct AndHashNode : public QuerySolutionNode {

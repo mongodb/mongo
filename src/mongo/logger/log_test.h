@@ -51,8 +51,8 @@ class LogTest : public unittest::Test {
 public:
     LogTest() : _severityOld(globalLogDomain()->getMinimumLogSeverity()) {
         globalLogDomain()->clearAppenders();
-        _appenderHandle = globalLogDomain()->attachAppender(
-            MessageLogDomain::AppenderAutoPtr(new LogTestAppender(this)));
+        _appenderHandle =
+            globalLogDomain()->attachAppender(std::make_unique<LogTestAppender>(this));
     }
 
     virtual ~LogTest() {

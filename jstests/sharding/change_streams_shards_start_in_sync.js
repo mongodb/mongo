@@ -52,7 +52,8 @@
     function checkStream() {
         db = db.getSiblingDB(jsTestName());
         let coll = db[jsTestName()];
-        let changeStream = coll.aggregate([{$changeStream: {}}, {$project: {_id: 0}}]);
+        let changeStream =
+            coll.aggregate([{$changeStream: {}}, {$project: {_id: 0, clusterTime: 0}}]);
 
         assert.soon(() => changeStream.hasNext());
         assert.docEq(changeStream.next(), {

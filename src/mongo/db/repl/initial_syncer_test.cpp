@@ -227,10 +227,6 @@ public:
         return *_storageInterface;
     }
 
-    ThreadPool& getDbWorkThreadPool() {
-        return *_dbWorkThreadPool;
-    }
-
 protected:
     struct StorageInterfaceResults {
         bool createOplogCalled = false;
@@ -324,13 +320,14 @@ protected:
 
         InitialSyncerOptions options;
         options.initialSyncRetryWait = Milliseconds(1);
+        options.batchLimits.bytes = 512 * 1024 * 1024U;
+        options.batchLimits.ops = 5000U;
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTime& opTime,
                                          ReplicationCoordinator::DataConsistency consistency) {
             _setMyLastOptime(opTime, consistency);
         };
         options.resetOptimes = [this]() { _myLastOpTime = OpTime(); };
-        options.getSlaveDelay = [this]() { return Seconds(0); };
         options.syncSourceSelector = this;
 
         _options = options;
@@ -345,7 +342,6 @@ protected:
 
         auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
         dataReplicatorExternalState->taskExecutor = _executorProxy.get();
-        dataReplicatorExternalState->dbWorkThreadPool = &getDbWorkThreadPool();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
@@ -377,6 +373,7 @@ protected:
             _initialSyncer = stdx::make_unique<InitialSyncer>(
                 options,
                 std::move(dataReplicatorExternalState),
+                _dbWorkThreadPool.get(),
                 _storageInterface.get(),
                 _replicationProcess.get(),
                 [this](const StatusWith<OpTimeWithHash>& lastApplied) {
@@ -601,7 +598,6 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
     options.setMyLastOptime = [](const OpTime&,
                                  ReplicationCoordinator::DataConsistency consistency) {};
     options.resetOptimes = []() {};
-    options.getSlaveDelay = []() { return Seconds(0); };
     options.syncSourceSelector = this;
     auto callback = [](const StatusWith<OpTimeWithHash>&) {};
 
@@ -610,6 +606,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
         auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
         ASSERT_THROWS_CODE_AND_WHAT(InitialSyncer(options,
                                                   std::move(dataReplicatorExternalState),
+                                                  _dbWorkThreadPool.get(),
                                                   _storageInterface.get(),
                                                   _replicationProcess.get(),
                                                   callback),
@@ -624,6 +621,7 @@ TEST_F(InitialSyncerTest, InvalidConstruction) {
         dataReplicatorExternalState->taskExecutor = &getExecutor();
         ASSERT_THROWS_CODE_AND_WHAT(InitialSyncer(options,
                                                   std::move(dataReplicatorExternalState),
+                                                  _dbWorkThreadPool.get(),
                                                   _storageInterface.get(),
                                                   _replicationProcess.get(),
                                                   InitialSyncer::OnCompletionFn()),
@@ -961,6 +959,7 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOnCompletionCallbackFunctionPointer
     auto initialSyncer = stdx::make_unique<InitialSyncer>(
         _options,
         std::move(dataReplicatorExternalState),
+        _dbWorkThreadPool.get(),
         _storageInterface.get(),
         _replicationProcess.get(),
         [&lastApplied, sharedCallbackData](const StatusWith<OpTimeWithHash>& result) {
@@ -3284,7 +3283,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughMultiApplierCallbackError) {
     auto opCtx = makeOpCtx();
 
     getExternalState()->multiApplyFn =
-        [](OperationContext*, const MultiApplier::Operations&, MultiApplier::ApplyOperationFn) {
+        [](OperationContext*, const MultiApplier::Operations&, OplogApplier::Observer*) {
             return Status(ErrorCodes::OperationFailed, "multiApply failed");
         };
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
@@ -3574,26 +3573,17 @@ TEST_F(
     // missing document.
     // This forces InitialSyncer to evaluate its end timestamp for applying operations after each
     // batch.
-    getExternalState()->multiApplyFn = [](OperationContext* opCtx,
-                                          const MultiApplier::Operations& ops,
-                                          MultiApplier::ApplyOperationFn applyOperation) {
-        // 'OperationPtr*' is ignored by our overridden _multiInitialSyncApply().
-        ASSERT_OK(applyOperation(opCtx, nullptr, nullptr));
+    bool fetchCountIncremented = false;
+    getExternalState()->multiApplyFn = [&fetchCountIncremented](OperationContext* opCtx,
+                                                                const MultiApplier::Operations& ops,
+                                                                OplogApplier::Observer* observer) {
+        if (!fetchCountIncremented) {
+            auto entry = makeOplogEntry(1);
+            observer->onMissingDocumentsFetchedAndInserted({std::make_pair(entry, BSONObj())});
+            fetchCountIncremented = true;
+        }
         return ops.back().getOpTime();
     };
-    bool fetchCountIncremented = false;
-    getExternalState()->multiInitialSyncApplyFn =
-        [&fetchCountIncremented](OperationContext*,
-                                 MultiApplier::OperationPtrs*,
-                                 const HostAndPort&,
-                                 AtomicUInt32* fetchCount,
-                                 WorkerMultikeyPathInfo*) {
-            if (!fetchCountIncremented) {
-                fetchCount->addAndFetch(1);
-                fetchCountIncremented = true;
-            }
-            return Status::OK();
-        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
@@ -3998,6 +3988,72 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt1["durationMillis"].type(), NumberInt) << attempt1;
     ASSERT_EQUALS(attempt1.getStringField("syncSource"), std::string("localhost:27017"))
         << attempt1;
+}
+
+TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExceedBsonLimit) {
+    auto initialSyncer = &getInitialSyncer();
+    auto opCtx = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), 2U));
+
+    const std::size_t numCollections = 200000U;
+
+    auto net = getNet();
+    int baseRollbackId = 1;
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Base rollback ID.
+        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(baseRollbackId));
+        net->runReadyNetworkOperations();
+
+        // Last oplog entry.
+        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
+
+        // Feature Compatibility Version.
+        processSuccessfulFCVFetcherResponse36();
+
+        // listDatabases
+        NamespaceString nss("a.a");
+        auto request =
+            net->scheduleSuccessfulResponse(makeListDatabasesResponse({nss.db().toString()}));
+        assertRemoteCommandNameEquals("listDatabases", request);
+        net->runReadyNetworkOperations();
+
+        // Ignore oplog tailing query.
+        request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(1LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
+        assertRemoteCommandNameEquals("find", request);
+        ASSERT_TRUE(request.cmdObj.getBoolField("oplogReplay"));
+        net->runReadyNetworkOperations();
+
+        // listCollections for "a"
+        std::vector<BSONObj> collectionInfos;
+        for (std::size_t i = 0; i < numCollections; ++i) {
+            const std::string collName = str::stream() << "coll-" << i;
+            collectionInfos.push_back(BSON("name" << collName << "options" << BSONObj()));
+        }
+        request = net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, nss.getCommandNS(), collectionInfos));
+        assertRemoteCommandNameEquals("listCollections", request);
+        net->runReadyNetworkOperations();
+    }
+
+    // This returns a valid document because we omit the cloner stats when they do not fit in a
+    // BSON document.
+    auto progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_FALSE(progress.hasField("databases")) << progress;
+
+    // Initial sync will attempt to log stats again at shutdown in a callback, where it should not
+    // terminate because we now return a valid stats document.
+    ASSERT_OK(initialSyncer->shutdown());
+
+    // Deliver cancellation signal to callbacks.
+    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+
+    initialSyncer->join();
 }
 
 }  // namespace

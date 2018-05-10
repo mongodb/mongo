@@ -25,6 +25,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
 
 #include "mongo/platform/basic.h"
 
@@ -34,7 +35,8 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/util/icu.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/log.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
 
@@ -43,60 +45,6 @@ namespace mongo {
 namespace {
 const auto getSASLServerMechanismRegistry =
     ServiceContext::declareDecoration<std::unique_ptr<SASLServerMechanismRegistry>>();
-
-/**
- * Fetch credentials for the named user either using the unnormalized form provided,
- * or the form returned from saslPrep().
- * If both forms exist as different user records, produce an error.
- */
-User* getUserPtr(OperationContext* opCtx, const UserName& userName) {
-    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
-
-    User* rawObj = nullptr;
-    const auto rawStatus = authManager->acquireUser(opCtx, userName, &rawObj);
-    auto rawGuard = MakeGuard([authManager, &rawObj] {
-        if (rawObj) {
-            authManager->releaseUser(rawObj);
-        }
-    });
-
-    // Attempt to normalize the provided username (excluding DB portion).
-    // If saslPrep() fails, then there can't possibly be another user with
-    // compatibility equivalence, so fall-through.
-    const auto swPrepUser = saslPrep(userName.getUser());
-    if (swPrepUser.isOK()) {
-        UserName prepUserName(swPrepUser.getValue(), userName.getDB());
-        if (prepUserName != userName) {
-            // User has a SASLPREPable name which differs from the raw presentation.
-            // Double check that we don't have a different user by that new name.
-            User* prepObj = nullptr;
-            const auto prepStatus = authManager->acquireUser(opCtx, prepUserName, &prepObj);
-
-            auto prepGuard = MakeGuard([authManager, &prepObj] {
-                if (prepObj) {
-                    authManager->releaseUser(prepObj);
-                }
-            });
-
-            if (prepStatus.isOK()) {
-                // If both statuses are OK, then we have two distinct users with "different" names.
-                uassert(ErrorCodes::BadValue,
-                        "Two users exist with names exhibiting compatibility equivalence",
-                        !rawStatus.isOK());
-                // Otherwise, only the normalized version exists.
-                User* returnObj = nullptr;
-                std::swap(returnObj, prepObj);
-                return returnObj;
-            }
-        }
-    }
-
-    uassertStatusOK(rawStatus);
-    User* returnObj = nullptr;
-    std::swap(returnObj, rawObj);
-    return returnObj;
-}
-
 }  // namespace
 
 SASLServerMechanismRegistry& SASLServerMechanismRegistry::get(ServiceContext* serviceContext) {
@@ -133,12 +81,24 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     if (saslSupportedMechs.type() == BSONType::String) {
 
         const auto userName = uassertStatusOK(UserName::parse(saslSupportedMechs.String()));
-        const auto userPtr = getUserPtr(opCtx, userName);
-        auto guard = MakeGuard([&opCtx, &userPtr] {
-            AuthorizationManager* authManager =
-                AuthorizationManager::get(opCtx->getServiceContext());
-            authManager->releaseUser(userPtr);
+
+        AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
+
+        User* user = nullptr;
+        const auto status = authManager->acquireUser(opCtx, userName, &user);
+        auto guard = MakeGuard([authManager, &user] {
+            if (user) {
+                authManager->releaseUser(user);
+            }
         });
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::UserNotFound) {
+                log() << "Supported SASL mechanisms requested for unknown user '" << userName
+                      << "'";
+                return;
+            }
+            uassertStatusOK(status);
+        }
 
         BSONArrayBuilder mechanismsBuilder;
         auto& map = _getMapRef(userName.getDB());
@@ -151,7 +111,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
                 continue;
             }
 
-            if (factoryIt.second->canMakeMechanismForUser(userPtr)) {
+            if (factoryIt.second->canMakeMechanismForUser(user)) {
                 mechanismsBuilder << factoryIt.first;
             }
         }
@@ -164,16 +124,23 @@ bool SASLServerMechanismRegistry::_mechanismSupportedByConfig(StringData mechNam
     return sequenceContains(saslGlobalParams.authenticationMechanisms, mechName);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateSASLServerMechanismRegistry, ("SetGlobalEnvironment"))
-(::mongo::InitializerContext* context) {
-    if (saslGlobalParams.hostName.empty())
-        saslGlobalParams.hostName = getHostNameCached();
-    if (saslGlobalParams.serviceName.empty())
-        saslGlobalParams.serviceName = "mongodb";
+GlobalInitializerRegisterer SASLServerMechanismRegistryInitializer(
+    "CreateSASLServerMechanismRegistry",
+    {"ServiceContext"},
+    [](InitializerContext* context) {
+        if (saslGlobalParams.hostName.empty())
+            saslGlobalParams.hostName = getHostNameCached();
+        if (saslGlobalParams.serviceName.empty())
+            saslGlobalParams.serviceName = "mongodb";
 
-    auto registry = stdx::make_unique<SASLServerMechanismRegistry>();
-    SASLServerMechanismRegistry::set(getGlobalServiceContext(), std::move(registry));
-    return Status::OK();
-}
+        auto registry = stdx::make_unique<SASLServerMechanismRegistry>();
+        SASLServerMechanismRegistry::set(getGlobalServiceContext(), std::move(registry));
+        return Status::OK();
+    },
+    [](DeinitializerContext* context) {
+        SASLServerMechanismRegistry::set(getGlobalServiceContext(), nullptr);
+
+        return Status::OK();
+    });
 
 }  // namespace mongo

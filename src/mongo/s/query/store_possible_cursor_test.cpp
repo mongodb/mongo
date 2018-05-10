@@ -32,6 +32,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -46,15 +47,22 @@ const ShardId shardId("testshard");
 
 class StorePossibleCursorTest : public unittest::Test {
 protected:
-    StorePossibleCursorTest() : _manager(&_clockSourceMock) {}
+    StorePossibleCursorTest() : _manager(&_clockSourceMock) {
+        _opCtx = _serviceContext.makeOperationContext();
+    }
+
+    OperationContext* opCtx() const {
+        return _opCtx.get();
+    }
 
     ClusterCursorManager* getManager() {
         return &_manager;
     }
 
 private:
+    QueryTestServiceContext _serviceContext;
+    ServiceContext::UniqueOperationContext _opCtx;
     ClockSourceMock _clockSourceMock;
-
     ClusterCursorManager _manager;
 };
 
@@ -63,7 +71,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     CursorResponse cursorResponse(nss, CursorId(0), batch);
     auto outgoingCursorResponse =
-        storePossibleCursor(nullptr,  // OperationContext*
+        storePossibleCursor(opCtx(),
                             shardId,
                             hostAndPort,
                             cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
@@ -83,7 +91,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 
 // Test that storePossibleCursor() propagates an error if it cannot parse the cursor response.
 TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
-    auto outgoingCursorResponse = storePossibleCursor(nullptr,  // OperationContext*
+    auto outgoingCursorResponse = storePossibleCursor(opCtx(),
                                                       shardId,
                                                       hostAndPort,
                                                       fromjson("{ok: 1, cursor: {}}"),
@@ -99,7 +107,7 @@ TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
 TEST_F(StorePossibleCursorTest, PassesUpCommandResultIfItDoesNotDescribeACursor) {
     BSONObj notACursorObj = BSON("not"
                                  << "cursor");
-    auto outgoingCursorResponse = storePossibleCursor(nullptr,  // OperationContext*
+    auto outgoingCursorResponse = storePossibleCursor(opCtx(),
                                                       shardId,
                                                       hostAndPort,
                                                       notACursorObj,

@@ -187,8 +187,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	    NULL, NULL,
 	    confchk_WT_CONNECTION_reconfigure_statistics_log_subconfigs, 5 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
-	    ",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
+	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
+	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
 	    NULL, 0 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\","
@@ -238,10 +239,12 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_alter[] = {
 	{ "access_pattern_hint", "string",
 	    NULL, "choices=[\"none\",\"random\",\"sequential\"]",
 	    NULL, 0 },
+	{ "app_metadata", "string", NULL, NULL, NULL, 0 },
 	{ "assert", "category",
 	    NULL, NULL,
 	    confchk_assert_subconfigs, 2 },
 	{ "cache_resident", "boolean", NULL, NULL, NULL, 0 },
+	{ "exclusive_refreshed", "boolean", NULL, NULL, NULL, 0 },
 	{ "log", "category",
 	    NULL, NULL,
 	    confchk_WT_SESSION_create_log_subconfigs, 1 },
@@ -597,7 +600,6 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "cache_resident", "boolean", NULL, NULL, NULL, 0 },
 	{ "checkpoint", "string", NULL, NULL, NULL, 0 },
 	{ "checkpoint_lsn", "string", NULL, NULL, NULL, 0 },
-	{ "checkpoint_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ "checksum", "string",
 	    NULL, "choices=[\"on\",\"off\",\"uncompressed\"]",
 	    NULL, 0 },
@@ -867,8 +869,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
-	    ",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
+	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
+	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -969,8 +972,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
-	    ",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
+	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
+	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -1068,8 +1072,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
-	    ",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
+	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
+	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -1165,8 +1170,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"internal_page_split_race\""
-	    ",\"page_split_race\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
+	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
+	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -1274,9 +1280,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_CURSOR_reconfigure, 2
 	},
 	{ "WT_SESSION.alter",
-	  "access_pattern_hint=none,assert=(commit_timestamp=none,"
-	  "read_timestamp=none),cache_resident=false,log=(enabled=true)",
-	  confchk_WT_SESSION_alter, 4
+	  "access_pattern_hint=none,app_metadata=,"
+	  "assert=(commit_timestamp=none,read_timestamp=none),"
+	  "cache_resident=false,exclusive_refreshed=true,log=(enabled=true)",
+	  confchk_WT_SESSION_alter, 6
 	},
 	{ "WT_SESSION.begin_transaction",
 	  "ignore_prepare=false,isolation=,name=,priority=0,read_timestamp="
@@ -1428,19 +1435,18 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "access_pattern_hint=none,allocation_size=4KB,app_metadata=,"
 	  "assert=(commit_timestamp=none,read_timestamp=none),"
 	  "block_allocation=best,block_compressor=,cache_resident=false,"
-	  "checkpoint=,checkpoint_lsn=,checkpoint_timestamp=,"
-	  "checksum=uncompressed,collator=,columns=,dictionary=0,"
-	  "encryption=(keyid=,name=),format=btree,huffman_key=,"
-	  "huffman_value=,id=,ignore_in_memory_cache_size=false,"
-	  "internal_item_max=0,internal_key_max=0,"
-	  "internal_key_truncate=true,internal_page_max=4KB,key_format=u,"
-	  "key_gap=10,leaf_item_max=0,leaf_key_max=0,leaf_page_max=32KB,"
-	  "leaf_value_max=0,log=(enabled=true),memory_page_max=5MB,"
-	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=false,"
-	  "prefix_compression_min=4,split_deepen_min_child=0,"
-	  "split_deepen_per_child=0,split_pct=90,value_format=u,"
-	  "version=(major=0,minor=0)",
-	  confchk_file_meta, 41
+	  "checkpoint=,checkpoint_lsn=,checksum=uncompressed,collator=,"
+	  "columns=,dictionary=0,encryption=(keyid=,name=),format=btree,"
+	  "huffman_key=,huffman_value=,id=,"
+	  "ignore_in_memory_cache_size=false,internal_item_max=0,"
+	  "internal_key_max=0,internal_key_truncate=true,"
+	  "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
+	  "leaf_key_max=0,leaf_page_max=32KB,leaf_value_max=0,"
+	  "log=(enabled=true),memory_page_max=5MB,os_cache_dirty_max=0,"
+	  "os_cache_max=0,prefix_compression=false,prefix_compression_min=4"
+	  ",split_deepen_min_child=0,split_deepen_per_child=0,split_pct=90,"
+	  "value_format=u,version=(major=0,minor=0)",
+	  confchk_file_meta, 40
 	},
 	{ "index.meta",
 	  "app_metadata=,collator=,columns=,extractor=,immutable=false,"

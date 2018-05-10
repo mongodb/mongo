@@ -50,7 +50,7 @@
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/storage/mmap_v1/repair_database_interface.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
@@ -266,20 +266,22 @@ Status repairDatabase(OperationContext* opCtx,
     }
 
     // Close the db and invalidate all current users and caches.
-    dbHolder().close(opCtx, dbName, "database closed for repair");
+    DatabaseHolder::getDatabaseHolder().close(opCtx, dbName, "database closed for repair");
     ON_BLOCK_EXIT([&dbName, &opCtx] {
         try {
+            // Ensure that we don't trigger an exception when attempting to take locks.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
             // Open the db after everything finishes.
-            auto db = dbHolder().openDb(opCtx, dbName);
+            auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
 
             // Set the minimum snapshot for all Collections in this db. This ensures that readers
             // using majority readConcern level can only use the collections after their repaired
             // versions are in the committed view.
-            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            auto snapshotName = replCoord->getMinimumVisibleSnapshot(opCtx);
+            auto clusterTime = LogicalClock::getClusterTimeForReplicaSet(opCtx).asTimestamp();
 
             for (auto&& collection : *db) {
-                collection->setMinimumVisibleSnapshot(snapshotName);
+                collection->setMinimumVisibleSnapshot(clusterTime);
             }
 
             // Restore oplog Collection pointer cache.

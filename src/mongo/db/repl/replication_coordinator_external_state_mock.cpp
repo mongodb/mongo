@@ -201,6 +201,8 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
 
 void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationContext* opCtx) {}
 
+void ReplicationCoordinatorExternalStateMock::killAllTransactionCursors(OperationContext* opCtx) {}
+
 void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
@@ -214,6 +216,8 @@ void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
 void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(
     const OpTime& newCommitPoint) {}
 
+void ReplicationCoordinatorExternalStateMock::updateLocalSnapshot(const OpTime& optime) {}
+
 bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
     return _areSnapshotsEnabled;
 }
@@ -224,6 +228,11 @@ void ReplicationCoordinatorExternalStateMock::setAreSnapshotsEnabled(bool val) {
 
 void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters(
     const OpTime& committedOpTime) {}
+
+boost::optional<OpTime> ReplicationCoordinatorExternalStateMock::getEarliestDropPendingOpTime()
+    const {
+    return {};
+}
 
 double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFraction() const {
     return 0.15;
@@ -239,27 +248,16 @@ bool ReplicationCoordinatorExternalStateMock::isReadConcernSnapshotSupportedBySt
     return true;
 }
 
-StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
-    OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
-Status ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
-    OperationContext* opCtx,
-    MultiApplier::OperationPtrs* ops,
-    const HostAndPort& source,
-    AtomicUInt32* fetchCount,
-    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    return Status::OK();
-}
-
-std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(
-    OperationContext* opCtx) const {
-    return stdx::make_unique<OplogBufferBlockingQueue>();
-}
-
 std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRestarts() const {
     return 0;
+}
+
+OplogApplier::BatchLimits ReplicationCoordinatorExternalStateMock::getInitialSyncBatchLimits()
+    const {
+    OplogApplier::BatchLimits batchLimits;
+    batchLimits.bytes = 512 * 1024 * 1024U;
+    batchLimits.ops = 5000U;
+    return batchLimits;
 }
 
 void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {

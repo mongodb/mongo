@@ -1,4 +1,4 @@
-// @tags: [requires_getmore]
+// @tags: [requires_getmore, requires_fastcount]
 
 t = db.indexe;
 t.drop();

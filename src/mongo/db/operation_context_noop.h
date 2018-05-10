@@ -48,14 +48,15 @@ public:
      */
     OperationContextNoop() : OperationContextNoop(nullptr, 0) {}
     OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0) {
-        setRecoveryUnit(ru, kNotInUnitOfWork);
+        setRecoveryUnit(ru, WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
 
     /**
      * This constructor is for use by ServiceContexts, and should not be called directly.
      */
     OperationContextNoop(Client* client, unsigned int opId) : OperationContext(client, opId) {
-        setRecoveryUnit(new RecoveryUnitNoop(), kNotInUnitOfWork);
+        setRecoveryUnit(new RecoveryUnitNoop(),
+                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         setLockState(stdx::make_unique<LockerNoop>());
     }
 };

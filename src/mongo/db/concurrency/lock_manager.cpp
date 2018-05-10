@@ -188,7 +188,7 @@ struct LockHead {
     }
 
     /**
-     * Finish creation of request and put it on the lockhead's conflict or granted queues. Returns
+     * Finish creation of request and put it on the LockHead's conflict or granted queues. Returns
      * LOCK_WAITING for conflict case and LOCK_OK otherwise.
      */
     LockResult newRequest(LockRequest* request) {
@@ -282,7 +282,7 @@ struct LockHead {
     // the end of the queue. Conversion requests are granted from the beginning forward.
     LockRequestList grantedList;
 
-    // Counts the grants and coversion counts for each of the supported lock modes. These
+    // Counts the grants and conversion counts for each of the supported lock modes. These
     // counts should exactly match the aggregated modes on the granted list.
     uint32_t grantedCounts[LockModesCount];
 
@@ -297,7 +297,7 @@ struct LockHead {
     // Doubly-linked list of requests, which have not been granted yet because they conflict
     // with the set of granted modes. Requests are queued at the end of the queue and are
     // granted from the beginning forward, which gives these locks FIFO ordering. Exceptions
-    // are high-priorty locks, such as the MMAP V1 flush lock.
+    // are high-priority locks, such as the MMAP V1 flush lock.
     LockRequestList conflictList;
 
     // Counts the conflicting requests for each of the lock modes. These counts should exactly
@@ -338,7 +338,7 @@ struct LockHead {
  * of resourceId to PartitionedLockHead.
  *
  * As long as all lock requests for a resource have an intent mode, as opposed to a conflicting
- * mode, its LockHead may reference ParitionedLockHeads. A partitioned LockHead will not have
+ * mode, its LockHead may reference PartitionedLockHeads. A partitioned LockHead will not have
  * any conflicts. The total set of granted requests (with intent mode) is the union of
  * its grantedList and all grantedLists in PartitionedLockHeads.
  *
@@ -397,7 +397,7 @@ void LockHead::migratePartitionedLockHeads() {
             partition->data.erase(it);
             delete partitionedLock;
         }
-        // Don't pop-back to early as otherwise the lock will be considered not partioned in
+        // Don't pop-back to early as otherwise the lock will be considered not partitioned in
         // newRequest().
         partitions.pop_back();
     }
@@ -630,7 +630,7 @@ bool LockManager::unlock(LockRequest* request) {
         _onLockModeChanged(lock, lock->grantedCounts[request->convertMode] == 0);
     } else {
         // Invalid request status
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
     return (request->recursiveCount == 0);

@@ -42,6 +42,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -61,28 +62,36 @@ class RouterExecStage;
  * this cursor have been processed.
  */
 struct ClusterClientCursorParams {
-    struct RemoteCursor {
-        RemoteCursor(ShardId shardId, HostAndPort hostAndPort, CursorResponse cursorResponse)
-            : shardId(std::move(shardId)),
-              hostAndPort(std::move(hostAndPort)),
-              cursorResponse(std::move(cursorResponse)) {}
-
-        // The shardId of the shard on which the cursor resides.
-        ShardId shardId;
-
-        // The exact host (within the shard) on which the cursor resides.
-        HostAndPort hostAndPort;
-
-        // Encompasses the state of the established cursor.
-        CursorResponse cursorResponse;
-    };
-
     ClusterClientCursorParams(NamespaceString nss,
                               boost::optional<ReadPreferenceSetting> readPref = boost::none)
         : nsString(std::move(nss)) {
         if (readPref) {
             readPreference = std::move(readPref.get());
         }
+    }
+
+    /**
+     * Extracts the subset of fields here needed by the AsyncResultsMerger. The returned
+     * AsyncResultsMergerParams will assume ownership of 'remotes'.
+     */
+    AsyncResultsMergerParams extractARMParams() {
+        AsyncResultsMergerParams armParams;
+        if (!sort.isEmpty()) {
+            armParams.setSort(sort);
+        }
+        armParams.setCompareWholeSortKey(compareWholeSortKey);
+        armParams.setRemotes(std::move(remotes));
+        armParams.setTailableMode(tailableMode);
+        armParams.setBatchSize(batchSize);
+        armParams.setNss(nsString);
+        armParams.setAllowPartialResults(isAllowPartialResults);
+
+        OperationSessionInfo sessionInfo;
+        sessionInfo.setSessionId(lsid);
+        sessionInfo.setTxnNumber(txnNumber);
+        armParams.setOperationSessionInfo(sessionInfo);
+
+        return armParams;
     }
 
     // Namespace against which the cursors exist.
@@ -108,7 +117,7 @@ struct ClusterClientCursorParams {
 
     // The number of results per batch. Optional. If specified, will be specified as the batch for
     // each getMore.
-    boost::optional<long long> batchSize;
+    boost::optional<std::int64_t> batchSize;
 
     // Limits the number of results returned by the ClusterClientCursor to this many. Optional.
     // Should be forwarded to the remote hosts in 'cmdObj'.
@@ -119,7 +128,7 @@ struct ClusterClientCursorParams {
 
     // Whether this cursor is tailing a capped collection, and whether it has the awaitData option
     // set.
-    TailableMode tailableMode = TailableMode::kNormal;
+    TailableModeEnum tailableMode = TailableModeEnum::kNormal;
 
     // Set if a readPreference must be respected throughout the lifetime of the cursor.
     boost::optional<ReadPreferenceSetting> readPreference;
@@ -133,6 +142,12 @@ struct ClusterClientCursorParams {
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.
     bool isAllowPartialResults = false;
+
+    // The logical session id of the command that created the cursor.
+    boost::optional<LogicalSessionId> lsid;
+
+    // The transaction number of the command that created the cursor.
+    boost::optional<TxnNumber> txnNumber;
 };
 
 }  // mongo

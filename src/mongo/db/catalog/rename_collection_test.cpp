@@ -98,7 +98,6 @@ public:
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     OptionalCollectionUUID uuid,
-                                    bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
                                     bool stayTemp) override;
 
@@ -110,6 +109,7 @@ public:
     bool onInsertsIsGlobalWriteLockExclusive = false;
 
     bool onRenameCollectionCalled = false;
+    OptionalCollectionUUID onRenameCollectionDropTarget;
     repl::OpTime renameOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 
 private:
@@ -171,14 +171,14 @@ repl::OpTime OpObserverMock::onRenameCollection(OperationContext* opCtx,
                                                 const NamespaceString& fromCollection,
                                                 const NamespaceString& toCollection,
                                                 OptionalCollectionUUID uuid,
-                                                bool dropTarget,
                                                 OptionalCollectionUUID dropTargetUUID,
                                                 bool stayTemp) {
     _logOp(opCtx, fromCollection, "rename");
     OpObserver::Times::get(opCtx).reservedOpTimes.push_back(renameOpTime);
     OpObserverNoop::onRenameCollection(
-        opCtx, fromCollection, toCollection, uuid, dropTarget, dropTargetUUID, stayTemp);
+        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     onRenameCollectionCalled = true;
+    onRenameCollectionDropTarget = dropTargetUUID;
     return {};
 }
 
@@ -664,8 +664,8 @@ TEST_F(RenameCollectionTest,
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfDropTargetIsTrue) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    _createCollection(_opCtx.get(), _targetNss);
+    _createCollectionWithUUID(_opCtx.get(), _sourceNss);
+    auto targetUUID = _createCollectionWithUUID(_opCtx.get(), _targetNss);
     RenameCollectionOptions options;
     options.dropTarget = true;
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
@@ -675,6 +675,7 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
                                                              << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
+    ASSERT_EQUALS(targetUUID, _opObserver->onRenameCollectionDropTarget);
 
     auto renameOpTime = _opObserver->renameOpTime;
     ASSERT_GREATER_THAN(renameOpTime, repl::OpTime());
@@ -684,6 +685,21 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
     ASSERT_TRUE(_collectionExists(_opCtx.get(), dpns))
         << "target collection " << _targetNss
         << " not renamed to drop-pending collection after successful rename";
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionOverridesDropTargetIfTargetCollectionIsMissingAndDropTargetIsTrue) {
+    _createCollectionWithUUID(_opCtx.get(), _sourceNss);
+    RenameCollectionOptions options;
+    options.dropTarget = true;
+    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
+        << "source collection " << _sourceNss << " still exists after successful rename";
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss)) << "target collection " << _targetNss
+                                                             << " missing after successful rename";
+
+    ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
+    ASSERT_FALSE(_opObserver->onRenameCollectionDropTarget);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWritesAreReplicated) {

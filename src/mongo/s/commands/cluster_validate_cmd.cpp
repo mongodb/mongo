@@ -76,6 +76,7 @@ public:
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         auto results = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
+            nss.db(),
             nss,
             routingInfo,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
@@ -127,7 +128,8 @@ public:
         if (firstFailedShardStatus.isOK())
             output.appendBool("valid", isValid);
 
-        return CommandHelpers::appendCommandStatus(output, firstFailedShardStatus);
+        uassertStatusOK(firstFailedShardStatus);
+        return true;
     }
 
 } validateCmd;

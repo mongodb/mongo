@@ -165,9 +165,7 @@ public:
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder firstBatch;

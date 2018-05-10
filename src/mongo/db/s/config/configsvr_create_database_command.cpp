@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -48,21 +49,71 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::set;
-using std::string;
-
 namespace {
 
 /**
  * Internal sharding command run on config servers to create a database.
  * Call with { _configsvrCreateDatabase: <string dbName> }
  */
-class ConfigSvrCreateDatabaseCommand : public BasicCommand {
+class ConfigSvrCreateDatabaseCommand final : public TypedCommand<ConfigSvrCreateDatabaseCommand> {
 public:
-    ConfigSvrCreateDatabaseCommand() : BasicCommand("_configsvrCreateDatabase") {}
+    using Request = ConfigsvrCreateDatabase;
 
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_configsvrCreateDatabase can only be run on config servers",
+                    serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+            // Set the operation context read concern level to local for reads into the config
+            // database.
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            auto dbname = request().getCommandParameter();
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "invalid db name specified: " << dbname,
+                    NamespaceString::validDBName(dbname,
+                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "createDatabase must be called with majority writeConcern",
+                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            // Make sure to force update of any stale metadata
+            ON_BLOCK_EXIT(
+                [opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
+
+            auto dbDistLock =
+                uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
+                    opCtx, dbname, "createDatabase", DistLockManager::kDefaultLockTimeout));
+
+            ShardingCatalogManager::get(opCtx)->createDatabase(opCtx, dbname.toString());
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName());
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::internal));
+        }
+    };
+
+private:
     std::string help() const override {
         return "Internal command, which is exported by the sharding config server. Do not call "
                "directly. Create a database.";
@@ -75,59 +126,6 @@ public:
     bool adminOnly() const override {
         return true;
     }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::internal)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname_unused,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrCreateDatabase can only be run on config servers"));
-        }
-
-        auto createDatabaseRequest = ConfigsvrCreateDatabase::parse(
-            IDLParserErrorContext("ConfigsvrCreateDatabase"), cmdObj);
-        const string dbname = createDatabaseRequest.get_configsvrCreateDatabase().toString();
-
-        uassert(
-            ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << dbname,
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
-
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "createDatabase must be called with majority writeConcern, got "
-                              << cmdObj,
-                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
-        // Make sure to force update of any stale metadata
-        ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
-
-        auto dbDistLock =
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
-                opCtx, dbname, "createDatabase", DistLockManager::kDefaultLockTimeout));
-
-        ShardingCatalogManager::get(opCtx)->createDatabase(opCtx, dbname);
-
-        return true;
-    }
-
 } configsvrCreateDatabaseCmd;
 
 }  // namespace

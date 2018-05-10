@@ -18,10 +18,6 @@ var $config = (function() {
             query._id = Random.randInt(options.numDocs);
         }
 
-        if (options.isolated) {
-            query.$isolated = 1;
-        }
-
         return query;
     }
 
@@ -48,8 +44,7 @@ var $config = (function() {
             var updateDoc = makeRandomUpdateDoc();
 
             // apply this update
-            var query =
-                makeQuery({multi: this.multi, isolated: this.isolated, numDocs: this.numDocs});
+            var query = makeQuery({multi: this.multi, numDocs: this.numDocs});
             var res = db[collName].update(query, updateDoc, {multi: this.multi});
             this.assertResult(res, db, collName, query);
         }
@@ -105,7 +100,6 @@ var $config = (function() {
                 }
             },
             multi: false,
-            isolated: false,
         },
         setup: setup
     };

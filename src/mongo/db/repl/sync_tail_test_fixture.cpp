@@ -94,38 +94,20 @@ void SyncTailTest::setUp() {
     ReplicationCoordinator::set(service, stdx::make_unique<ReplicationCoordinatorMock>(service));
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
-    StorageInterface::set(service, stdx::make_unique<StorageInterfaceImpl>());
-    auto storageInterface = StorageInterface::get(service);
+    _storageInterface = stdx::make_unique<StorageInterfaceImpl>();
 
     DropPendingCollectionReaper::set(
-        service, stdx::make_unique<DropPendingCollectionReaper>(storageInterface));
+        service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface.get()));
     repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 
-    _replicationProcess =
-        new ReplicationProcess(storageInterface,
-                               stdx::make_unique<ReplicationConsistencyMarkersMock>(),
-                               stdx::make_unique<ReplicationRecoveryMock>());
-    ReplicationProcess::set(cc().getServiceContext(),
-                            std::unique_ptr<ReplicationProcess>(_replicationProcess));
+    _consistencyMarkers = stdx::make_unique<ReplicationConsistencyMarkersMock>();
 
     // Set up an OpObserver to track the documents SyncTail inserts.
     auto opObserver = std::make_unique<SyncTailOpObserver>();
     _opObserver = opObserver.get();
     auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
     opObserverRegistry->addObserver(std::move(opObserver));
-
-    _opsApplied = 0;
-    _applyOp = [](OperationContext* opCtx,
-                  Database* db,
-                  const BSONObj& op,
-                  bool alwaysUpsert,
-                  OplogApplication::Mode oplogApplicationMode,
-                  stdx::function<void()>) { return Status::OK(); };
-    _applyCmd = [](OperationContext* opCtx,
-                   const BSONObj& op,
-                   OplogApplication::Mode oplogApplicationMode) { return Status::OK(); };
-    _incOps = [this]() { _opsApplied++; };
 
     // Initialize the featureCompatibilityVersion server parameter. This is necessary because this
     // test fixture does not create a featureCompatibilityVersion document from which to initialize
@@ -137,54 +119,63 @@ void SyncTailTest::setUp() {
 void SyncTailTest::tearDown() {
     auto service = getServiceContext();
     _opCtx.reset();
-    ReplicationProcess::set(service, {});
+    _storageInterface = {};
+    _consistencyMarkers = {};
     DropPendingCollectionReaper::set(service, {});
     StorageInterface::set(service, {});
     ServiceContextMongoDTest::tearDown();
+}
+
+ReplicationConsistencyMarkers* SyncTailTest::getConsistencyMarkers() const {
+    return _consistencyMarkers.get();
+}
+
+StorageInterface* SyncTailTest::getStorageInterface() const {
+    return _storageInterface.get();
 }
 
 void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                                const BSONObj& op,
                                                bool expectedApplyOpCalled) {
     bool applyOpCalled = false;
-    SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
-                                                   Database* db,
-                                                   const BSONObj& theOperation,
-                                                   bool alwaysUpsert,
-                                                   OplogApplication::Mode oplogApplicationMode,
-                                                   stdx::function<void()>) {
-        applyOpCalled = true;
+
+    auto checkOpCtx = [](OperationContext* opCtx) {
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_IX));
         ASSERT_FALSE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode("test.t", MODE_IX));
         ASSERT_FALSE(opCtx->writesAreReplicated());
         ASSERT_TRUE(documentValidationDisabled(opCtx));
-        ASSERT_TRUE(db);
-        ASSERT_BSONOBJ_EQ(op, theOperation);
-        ASSERT_TRUE(alwaysUpsert);
-        ASSERT_EQUALS(oplogApplicationMode, OplogApplication::Mode::kSecondary);
+    };
+
+    _opObserver->onInsertsFn =
+        [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+            applyOpCalled = true;
+            checkOpCtx(opCtx);
+            ASSERT_EQUALS(NamespaceString("test.t"), nss);
+            ASSERT_EQUALS(1U, docs.size());
+            ASSERT_BSONOBJ_EQ(op["o"].Obj(), docs[0]);
+            return Status::OK();
+        };
+
+    _opObserver->onDeleteFn = [&](OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  OptionalCollectionUUID uuid,
+                                  StmtId stmtId,
+                                  bool fromMigrate,
+                                  const boost::optional<BSONObj>& deletedDoc) {
+        applyOpCalled = true;
+        checkOpCtx(opCtx);
+        ASSERT_EQUALS(NamespaceString("test.t"), nss);
+        ASSERT(deletedDoc);
+        ASSERT_BSONOBJ_EQ(op["o"].Obj(), *deletedDoc);
         return Status::OK();
     };
     ASSERT_TRUE(_opCtx->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_opCtx.get()));
-    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(),
-                                  op,
-                                  OplogApplication::Mode::kSecondary,
-                                  applyOp,
-                                  failedApplyCommand,
-                                  _incOps),
+    ASSERT_EQ(SyncTail::syncApply(_opCtx.get(), op, OplogApplication::Mode::kSecondary),
               expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
-}
-
-void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError) {
-    _testSyncApplyCrudOperation(expectedError,
-                                BSON("op"
-                                     << "i"
-                                     << "ns"
-                                     << "test.t"),
-                                expectedError == ErrorCodes::OK);
 }
 
 Status failedApplyCommand(OperationContext* opCtx,
@@ -199,7 +190,11 @@ Status SyncTailTest::runOpSteadyState(const OplogEntry& op) {
 }
 
 Status SyncTailTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      SyncTail::MultiSyncApplyFunc(),
+                      nullptr);
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);
@@ -213,14 +208,17 @@ Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {
 }
 
 Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
+    SyncTail syncTail(nullptr,
+                      getConsistencyMarkers(),
+                      getStorageInterface(),
+                      SyncTail::MultiSyncApplyFunc(),
+                      nullptr);
     MultiApplier::OperationPtrs opsPtrs;
     for (auto& op : ops) {
         opsPtrs.push_back(&op);
     }
-    AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    return multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &fetchCount, &pathInfo);
+    return multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
 }
 
 

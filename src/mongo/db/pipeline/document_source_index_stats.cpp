@@ -32,7 +32,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/server_options.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 

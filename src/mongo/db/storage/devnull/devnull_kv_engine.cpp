@@ -134,7 +134,7 @@ public:
                                                      const RecordData& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages) {
-        invariant(false);
+        MONGO_UNREACHABLE;
     }
 
 

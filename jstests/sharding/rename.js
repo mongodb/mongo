@@ -66,7 +66,13 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // Kill any node. Don't care if it's a primary or secondary.
     replTest.stop(0);
-    replTest.awaitSecondaryNodes();
+
+    // Call getPrimary() to populate replTest._slaves.
+    replTest.getPrimary();
+    let liveSlaves = replTest._slaves.filter(function(node) {
+        return node.host !== replTest.nodes[0].host;
+    });
+    replTest.awaitSecondaryNodes(null, liveSlaves);
     awaitRSClientHosts(s.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
 
     assert.writeOK(db.foo.insert({_id: 4}));

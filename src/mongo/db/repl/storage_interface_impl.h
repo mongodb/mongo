@@ -147,7 +147,11 @@ public:
         OperationContext* opCtx, const NamespaceString& nss) override;
 
     StatusWith<StorageInterface::CollectionCount> getCollectionCount(
-        OperationContext* opCtx, const NamespaceString& nss) override;
+        OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) override;
+
+    Status setCollectionCount(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              long long newCount) override;
 
     StatusWith<OptionalCollectionUUID> getCollectionUUID(OperationContext* opCtx,
                                                          const NamespaceString& nss) override;
@@ -156,7 +160,7 @@ public:
 
     void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
-    StatusWith<Timestamp> recoverToStableTimestamp(ServiceContext* serviceCtx) override;
+    StatusWith<Timestamp> recoverToStableTimestamp(OperationContext* opCtx) override;
 
     bool supportsRecoverToStableTimestamp(ServiceContext* serviceCtx) const override;
 
@@ -171,6 +175,9 @@ public:
     void oplogDiskLocRegister(OperationContext* opCtx,
                               const Timestamp& ts,
                               bool orderedCommit) override;
+
+    boost::optional<Timestamp> getLastStableCheckpointTimestamp(
+        ServiceContext* serviceCtx) const override;
 
 private:
     const NamespaceString _rollbackIdNss;

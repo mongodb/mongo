@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "asio/detail/assert.hpp"
+#include "mongo/util/assert_util.h"
 
 namespace asio {
 namespace ssl {
@@ -66,7 +67,7 @@ ssl_want SSLHandshakeManager::nextHandshake(asio::error_code& ec, HandshakeState
                 return ssl_want::want_nothing;
             }
 
-            want = doServerHandshake(true, ec, pHandshakeState);
+            want = doServerHandshake(ec, pHandshakeState);
             if (ec) {
                 return want;
             }
@@ -92,7 +93,7 @@ ssl_want SSLHandshakeManager::nextHandshake(asio::error_code& ec, HandshakeState
         ssl_want want;
 
         if (_mode == HandshakeMode::Server) {
-            want = doServerHandshake(false, ec, pHandshakeState);
+            want = doServerHandshake(ec, pHandshakeState);
         } else {
             want = doClientHandshake(ec);
         }
@@ -254,8 +255,7 @@ ssl_want SSLHandshakeManager::startShutdown(asio::error_code& ec) {
     return ssl_want::want_nothing;
 }
 
-ssl_want SSLHandshakeManager::doServerHandshake(bool newConversation,
-                                                asio::error_code& ec,
+ssl_want SSLHandshakeManager::doServerHandshake(asio::error_code& ec,
                                                 HandshakeState* pHandshakeState) {
     TimeStamp lifetime;
 
@@ -294,7 +294,7 @@ ssl_want SSLHandshakeManager::doServerHandshake(bool newConversation,
     ULONG retAttribs = 0;
 
     SECURITY_STATUS ss = AcceptSecurityContext(_phcred,
-                                               newConversation ? NULL : _phctxt,
+                                               SecIsValidHandle(_phctxt) ? _phctxt : NULL,
                                                &inputBufferDesc,
                                                attribs,
                                                0,
@@ -320,7 +320,10 @@ ssl_want SSLHandshakeManager::doServerHandshake(bool newConversation,
 
         return ssl_want::want_nothing;
     }
-    invariant(attribs == retAttribs);
+
+    // ASC_RET_EXTENDED_ERROR is not support on Windows 7/Windows 2008 R2.
+    // ASC_RET_MUTUAL_AUTH is not set since we do our own certificate validation later.
+    invariant(attribs == (retAttribs | ASC_RET_EXTENDED_ERROR | ASC_RET_MUTUAL_AUTH));
 
     if (inputBuffers[1].BufferType == SECBUFFER_EXTRA) {
         _pExtraEncryptedBuffer->reset();
@@ -456,7 +459,8 @@ ssl_want SSLHandshakeManager::doClientHandshake(asio::error_code& ec) {
 
         return ssl_want::want_nothing;
     }
-    invariant(sspiFlags == retAttribs);
+    // ASC_RET_EXTENDED_ERROR is not support on Windows 7/Windows 2008 R2
+    invariant(sspiFlags == (retAttribs | ASC_RET_EXTENDED_ERROR));
 
     if (_pInBuffer->size()) {
         // Locate (optional) extra buffer
@@ -559,63 +563,80 @@ ssl_want SSLReadManager::readDecryptedData(void* data,
 }
 
 ssl_want SSLReadManager::decryptBuffer(asio::error_code& ec, DecryptState* pDecryptState) {
-    std::array<SecBuffer, 4> securityBuffers;
-    securityBuffers[0].cbBuffer = _pInBuffer->size();
-    securityBuffers[0].BufferType = SECBUFFER_DATA;
-    securityBuffers[0].pvBuffer = _pInBuffer->data();
+    while (true) {
+        std::array<SecBuffer, 4> securityBuffers;
+        securityBuffers[0].cbBuffer = _pInBuffer->size();
+        securityBuffers[0].BufferType = SECBUFFER_DATA;
+        securityBuffers[0].pvBuffer = _pInBuffer->data();
 
-    securityBuffers[1].cbBuffer = 0;
-    securityBuffers[1].BufferType = SECBUFFER_EMPTY;
-    securityBuffers[1].pvBuffer = NULL;
+        securityBuffers[1].cbBuffer = 0;
+        securityBuffers[1].BufferType = SECBUFFER_EMPTY;
+        securityBuffers[1].pvBuffer = NULL;
 
-    securityBuffers[2].cbBuffer = 0;
-    securityBuffers[2].BufferType = SECBUFFER_EMPTY;
-    securityBuffers[2].pvBuffer = NULL;
+        securityBuffers[2].cbBuffer = 0;
+        securityBuffers[2].BufferType = SECBUFFER_EMPTY;
+        securityBuffers[2].pvBuffer = NULL;
 
-    securityBuffers[3].cbBuffer = 0;
-    securityBuffers[3].BufferType = SECBUFFER_EMPTY;
-    securityBuffers[3].pvBuffer = NULL;
+        securityBuffers[3].cbBuffer = 0;
+        securityBuffers[3].BufferType = SECBUFFER_EMPTY;
+        securityBuffers[3].pvBuffer = NULL;
 
-    SecBufferDesc bufferDesc;
-    bufferDesc.ulVersion = SECBUFFER_VERSION;
-    bufferDesc.cBuffers = securityBuffers.size();
-    bufferDesc.pBuffers = securityBuffers.data();
+        SecBufferDesc bufferDesc;
+        bufferDesc.ulVersion = SECBUFFER_VERSION;
+        bufferDesc.cBuffers = securityBuffers.size();
+        bufferDesc.pBuffers = securityBuffers.data();
 
-    SECURITY_STATUS ss = DecryptMessage(_phctxt, &bufferDesc, 0, NULL);
+        SECURITY_STATUS ss = DecryptMessage(_phctxt, &bufferDesc, 0, NULL);
 
-    if (ss < SEC_E_OK) {
-        if (ss == SEC_E_INCOMPLETE_MESSAGE) {
-            return ssl_want::want_input_and_retry;
-        } else {
-            ec = asio::error_code(ss, asio::error::get_ssl_category());
+        if (ss < SEC_E_OK) {
+            if (ss == SEC_E_INCOMPLETE_MESSAGE) {
+                return ssl_want::want_input_and_retry;
+            } else {
+                ec = asio::error_code(ss, asio::error::get_ssl_category());
+                return ssl_want::want_nothing;
+            }
+        }
+
+        // Shutdown has been initiated at the client side
+        if (ss == SEC_I_CONTEXT_EXPIRED) {
+            *pDecryptState = DecryptState::Shutdown;
+        } else if (ss == SEC_I_RENEGOTIATE) {
+            *pDecryptState = DecryptState::Renegotiate;
+
+            // Fail the connection on SSL renegotiations
+            ec = asio::ssl::error::stream_truncated;
             return ssl_want::want_nothing;
         }
+
+        // The network layer may have read more then 1 SSL packet so remember the extra data.
+        if (securityBuffers[3].BufferType == SECBUFFER_EXTRA && securityBuffers[3].cbBuffer > 0) {
+            ASIO_ASSERT(_pExtraEncryptedBuffer->empty());
+            _pExtraEncryptedBuffer->append(securityBuffers[3].pvBuffer,
+                                           securityBuffers[3].cbBuffer);
+        }
+
+        // Check if we have application data
+        if (securityBuffers[1].cbBuffer > 0) {
+            _pInBuffer->resetPos(securityBuffers[1].pvBuffer, securityBuffers[1].cbBuffer);
+
+            setState(State::HaveDecryptedData);
+
+            return ssl_want::want_nothing;
+        } else {
+            // Sigh, this means that the remote side sent us an TLS record with just a encryption
+            // header/trailer but no actual data.
+            //
+            // If we have extra encrypted data, we may have a TLS record with some data, otherwise
+            // we need more data from the remote side
+            if (!_pExtraEncryptedBuffer->empty()) {
+                _pInBuffer->swap(*_pExtraEncryptedBuffer);
+                _pExtraEncryptedBuffer->reset();
+                continue;
+            }
+
+            return ssl_want::want_input_and_retry;
+        }
     }
-
-    // Shutdown has been initiated at the client side
-    if (ss == SEC_I_CONTEXT_EXPIRED) {
-        *pDecryptState = DecryptState::Shutdown;
-    } else if (ss == SEC_I_RENEGOTIATE) {
-        *pDecryptState = DecryptState::Renegotiate;
-
-        // Fail the connection on SSL renegotiations
-        ec = asio::ssl::error::stream_truncated;
-        return ssl_want::want_nothing;
-    }
-
-    if (securityBuffers[1].cbBuffer > 0) {
-        _pInBuffer->resetPos(securityBuffers[1].pvBuffer, securityBuffers[1].cbBuffer);
-    }
-
-    // The network layer may have read more then 1 SSL packet so remember the extra data.
-    if (securityBuffers[3].BufferType == SECBUFFER_EXTRA && securityBuffers[3].cbBuffer > 0) {
-        ASIO_ASSERT(_pExtraEncryptedBuffer->empty());
-        _pExtraEncryptedBuffer->append(securityBuffers[3].pvBuffer, securityBuffers[3].cbBuffer);
-    }
-
-    setState(State::HaveDecryptedData);
-
-    return ssl_want::want_nothing;
 }
 
 

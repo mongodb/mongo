@@ -349,9 +349,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             // A nullptr for 'parsedExpression' indicates that the particular operator should not
             // be added to 'root', because it is handled outside of the MatchExpressionParser
             // library. The following operators currently follow this convention:
-            //    - $atomic   is explicitly handled in CanonicalQuery::init()
             //    - $comment  has no action associated with the operator.
-            //    - $isolated is explicitly handled in CanoncialQuery::init()
             if (parsedExpression.getValue().get()) {
                 root->add(parsedExpression.getValue().release());
             }
@@ -399,24 +397,6 @@ StatusWithMatchExpression parse(const BSONObj& obj,
     }
 
     return {std::move(root)};
-}
-
-StatusWithMatchExpression parseAtomicOrIsolated(
-    StringData name,
-    BSONElement elem,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const ExtensionsCallback* extensionsCallback,
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-    DocumentParseLevel currentLevel) {
-    if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kIsolated) == 0u) {
-        return {Status(ErrorCodes::QueryFeatureNotAllowed,
-                       "$isolated ($atomic) is not allowed in this context")};
-    }
-    if (currentLevel != DocumentParseLevel::kPredicateTopLevel) {
-        return {
-            Status(ErrorCodes::FailedToParse, "$isolated ($atomic) has to be at the top level")};
-    }
-    return {nullptr};
 }
 
 StatusWithMatchExpression parseComment(StringData name,
@@ -1837,12 +1817,10 @@ MONGO_INITIALIZER(PathlessOperatorMap)(InitializerContext* context) {
             {"alwaysFalse", &parseAlwaysBoolean<AlwaysFalseMatchExpression>},
             {"alwaysTrue", &parseAlwaysBoolean<AlwaysTrueMatchExpression>},
             {"and", &parseTreeTopLevel<AndMatchExpression>},
-            {"atomic", &parseAtomicOrIsolated},
             {"comment", &parseComment},
             {"db", &parseDBRef},
             {"expr", &parseExpr},
             {"id", &parseDBRef},
-            {"isolated", &parseAtomicOrIsolated},
             {"jsonSchema", &parseJSONSchema},
             {"nor", &parseTreeTopLevel<NorMatchExpression>},
             {"or", &parseTreeTopLevel<OrMatchExpression>},

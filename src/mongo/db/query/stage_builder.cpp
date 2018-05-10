@@ -82,6 +82,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
             params.maxScan = csn->maxScan;
+            params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
             return new CollectionScan(opCtx, params, ws, csn->filter.get());
         }
         case STAGE_IXSCAN: {
@@ -296,7 +297,7 @@ PlanStage* buildStages(OperationContext* opCtx,
             }
             return new ShardFilterStage(
                 opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(),
+                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
                 ws,
                 childStage);
         }

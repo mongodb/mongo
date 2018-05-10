@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.multi2;
 t.drop();

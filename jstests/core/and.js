@@ -1,4 +1,8 @@
 // Some tests for $and SERVER-1089
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
 
 t = db.jstests_and;
 t.drop();

@@ -100,7 +100,7 @@ protected:
         auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReadConcernLevel::kLocalReadConcern,
             ShardType::ConfigNS,
             BSON(ShardType::name() << shardName),
             BSONObj(),
@@ -313,7 +313,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     auto response = assertGet(shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernLevel::kLocalReadConcern,
         ShardType::ConfigNS,
         BSON(ShardType::name() << shard1.getName()),
         BSONObj(),

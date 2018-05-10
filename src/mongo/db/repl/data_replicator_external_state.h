@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
@@ -76,11 +77,6 @@ public:
     virtual executor::TaskExecutor* getTaskExecutor() const = 0;
 
     /**
-     * Returns shared db worker thread pool for collection cloning.
-     */
-    virtual ThreadPool* getDbWorkThreadPool() const = 0;
-
-    /**
      * Returns the current term and last committed optime.
      * Returns (OpTime::kUninitializedTerm, OpTime()) if not available.
      */
@@ -112,34 +108,31 @@ public:
         OperationContext* opCtx) const = 0;
 
     /**
+     * Returns a new batch of operations to apply.
+     *
+     * This function is a passthrough for OplogApplier::getNextApplierBatch()
+     */
+    virtual StatusWith<OplogApplier::Operations> getNextApplierBatch(
+        OperationContext* opCtx,
+        OplogBuffer* oplogBuffer,
+        const OplogApplier::BatchLimits& batchLimits) = 0;
+
+    /**
      * Returns the current replica set config if there is one, or an error why there isn't.
      */
     virtual StatusWith<ReplSetConfig> getCurrentConfig() const = 0;
 
 private:
     /**
-     * Applies the operations described in the oplog entries contained in "ops" using the
-     * "applyOperation" function.
+     * Applies the operations described in the oplog entries contained in "ops".
      *
      * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
     virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
                                            MultiApplier::Operations ops,
-                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
-
-    /**
-     * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a
-     * pointer to a counter that is incremented every time we fetch a missing document.
-     * `workerMultikeyPathInfo` is a pointer to a list of objects tracking which indexes to set as
-     * multikey at the end of the batch. It should never be null.
-     *
-     * Used exclusively by the InitialSyncer to construct a MultiApplier.
-     */
-    virtual Status _multiInitialSyncApply(OperationContext* opCtx,
-                                          MultiApplier::OperationPtrs* ops,
-                                          const HostAndPort& source,
-                                          AtomicUInt32* fetchCount,
-                                          WorkerMultikeyPathInfo* workerMultikeyPathInfo) = 0;
+                                           OplogApplier::Observer* observer,
+                                           const HostAndPort& source,
+                                           ThreadPool* writerPool) = 0;
 
     // Provides InitialSyncer with access to _multiApply, _multiSyncApply and
     // _multiInitialSyncApply.

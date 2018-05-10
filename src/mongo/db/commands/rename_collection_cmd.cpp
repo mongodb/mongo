@@ -77,6 +77,10 @@ public:
         return " example: { renameCollection: foo.a, to: bar.b }";
     }
 
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
+    }
+
     static void dropCollection(OperationContext* opCtx, Database* db, StringData collName) {
         WriteUnitOfWork wunit(opCtx);
         if (db->dropCollection(opCtx, collName).isOK()) {
@@ -145,19 +149,17 @@ public:
         }
 
         if (source.isServerConfigurationCollection()) {
-            CommandHelpers::appendCommandStatus(result,
-                                                Status(ErrorCodes::IllegalOperation,
-                                                       "renaming the server configuration "
-                                                       "collection (admin.system.version) is not "
-                                                       "allowed"));
-            return false;
+            uasserted(ErrorCodes::IllegalOperation,
+                      "renaming the server configuration "
+                      "collection (admin.system.version) is not "
+                      "allowed");
         }
 
         RenameCollectionOptions options;
         options.dropTarget = cmdObj["dropTarget"].trueValue();
         options.stayTemp = cmdObj["stayTemp"].trueValue();
-        return CommandHelpers::appendCommandStatus(
-            result, renameCollection(opCtx, source, target, options));
+        uassertStatusOK(renameCollection(opCtx, source, target, options));
+        return true;
     }
 
 } cmdrenamecollection;

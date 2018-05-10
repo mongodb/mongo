@@ -3,8 +3,6 @@
 (function() {
     "use strict";
 
-    var exceededTimeLimitCode = 50;
-    var writeConcernFailedCode = 64;
     var replTest = new ReplSetTest({nodes: 3});
     replTest.startSet();
     replTest.initiate();
@@ -16,14 +14,14 @@
     // Test wtimeout
     var res = testDB.runCommand(
         {insert: 'foo', documents: [{a: 1}], writeConcern: {w: 3, wtimeout: 1000}});
-    assert.commandWorked(res);  // Commands with write concern errors still report success.
-    assert.eq(writeConcernFailedCode, res.writeConcernError.code);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    assert.eq(ErrorCodes.WriteConcernFailed, res.writeConcernError.code);
 
     // Test maxTimeMS timeout
     res = testDB.runCommand(
         {insert: 'foo', documents: [{a: 1}], writeConcern: {w: 3}, maxTimeMS: 1000});
-    assert.commandWorked(res);  // Commands with write concern errors still report success.
-    assert.eq(exceededTimeLimitCode, res.writeConcernError.code);
+    assert.commandFailedWithCode(res, ErrorCodes.ExceededTimeLimit);
+    assert.eq(ErrorCodes.ExceededTimeLimit, res.writeConcernError.code);
 
     // Test with wtimeout < maxTimeMS
     res = testDB.runCommand({
@@ -32,8 +30,8 @@
         writeConcern: {w: 3, wtimeout: 1000},
         maxTimeMS: 10 * 1000
     });
-    assert.commandWorked(res);  // Commands with write concern errors still report success.
-    assert.eq(writeConcernFailedCode, res.writeConcernError.code);
+    assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
+    assert.eq(ErrorCodes.WriteConcernFailed, res.writeConcernError.code);
 
     // Test with wtimeout > maxTimeMS
     res = testDB.runCommand({
@@ -42,8 +40,8 @@
         writeConcern: {w: 3, wtimeout: 10 * 1000},
         maxTimeMS: 1000
     });
-    assert.commandWorked(res);  // Commands with write concern errors still report success.
-    assert.eq(exceededTimeLimitCode, res.writeConcernError.code);
+    assert.commandFailedWithCode(res, ErrorCodes.ExceededTimeLimit);
+    assert.eq(ErrorCodes.ExceededTimeLimit, res.writeConcernError.code);
     replTest.stopSet();
 
 })();

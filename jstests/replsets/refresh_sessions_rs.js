@@ -14,8 +14,8 @@
     var primary = replTest.getPrimary();
 
     replTest.awaitSecondaryNodes();
-    var server2 = replTest.liveNodes.slaves[0];
-    var server3 = replTest.liveNodes.slaves[1];
+    var server2 = replTest._slaves[0];
+    var server3 = replTest._slaves[1];
 
     var db1 = primary.getDB(dbName);
     var db2 = server2.getDB(dbName);

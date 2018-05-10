@@ -32,9 +32,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {

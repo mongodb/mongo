@@ -1,6 +1,9 @@
 // Tests distinct with geospatial field values.
 // 1. Test distinct with geo values for 'key' (SERVER-2135)
 // 2. Test distinct with geo predicates for 'query' (SERVER-13769)
+//
+// @tags: [requires_fastcount]
+
 (function() {
     "use strict";
     const coll = db.geo_distinct;

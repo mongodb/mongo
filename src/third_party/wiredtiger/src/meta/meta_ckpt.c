@@ -375,7 +375,6 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 	time_t secs;
 	int64_t maxorder;
 	const char *sep;
-	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 2];
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	maxorder = 0;
@@ -453,21 +452,6 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_buf_catfmt(session, buf,
 		    ",checkpoint_lsn=(%" PRIu32 ",%" PRIuMAX ")",
 		    ckptlsn->l.file, (uintmax_t)ckptlsn->l.offset));
-	hex_timestamp[0] = '0';
-	hex_timestamp[1] = '\0';
-#ifdef HAVE_TIMESTAMPS
-	/*
-	 * We need to record the timestamp of the checkpoint in the metadata's
-	 * checkpoint record. Although the read_timestamp remains set for the
-	 * duration of the checkpoint, we set and unset the flag based on the
-	 * file's durability. Record the timestamp if the flag is set.
-	 */
-	if (F_ISSET(&session->txn, WT_TXN_HAS_TS_READ))
-		WT_ERR(__wt_timestamp_to_hex_string(session, hex_timestamp,
-		    &session->txn.read_timestamp));
-#endif
-	WT_ERR(__wt_buf_catfmt(session, buf,
-	    ",checkpoint_timestamp=\"%s\"", hex_timestamp));
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(session, &buf);
@@ -507,6 +491,49 @@ __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	__wt_free(session, ckpt->bpriv);
 
 	WT_CLEAR(*ckpt);		/* Clear to prepare for re-use. */
+}
+
+/*
+ * __wt_meta_sysinfo_set --
+ *	Set the system information in the metadata.
+ */
+int
+__wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
+{
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+	char hex_timestamp[2 * WT_TIMESTAMP_SIZE + 2];
+
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
+	hex_timestamp[0] = '0';
+	hex_timestamp[1] = '\0';
+#ifdef HAVE_TIMESTAMPS
+	/*
+	 * We need to record the timestamp of the checkpoint in the metadata.
+	 * The timestamp value is set at a higher level, either in checkpoint
+	 * or in recovery.
+	 */
+	WT_ERR(__wt_timestamp_to_hex_string(session, hex_timestamp,
+	    &S2C(session)->txn_global.meta_ckpt_timestamp));
+#endif
+
+	/*
+	 * Don't leave a zero entry in the metadata: remove it.  This avoids
+	 * downgrade issues if the metadata is opened with an older version of
+	 * WiredTiger that does not understand the new entry.
+	 */
+	if (strcmp(hex_timestamp, "0") == 0)
+		WT_ERR_NOTFOUND_OK(
+		    __wt_metadata_remove(session, WT_SYSTEM_CKPT_URI));
+	else {
+		WT_ERR(__wt_buf_catfmt(session, buf,
+		    "checkpoint_timestamp=\"%s\"", hex_timestamp));
+		WT_ERR(__wt_metadata_update(
+		    session, WT_SYSTEM_CKPT_URI, buf->data));
+	}
+
+err:	__wt_scr_free(session, &buf);
+	return (ret);
 }
 
 /*

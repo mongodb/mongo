@@ -65,8 +65,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     rst.stopSet();
 
     // Test querying a replica set primary through mongos.
-    var st = new ShardingTest({shards: 1, rs: true});
+    var st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
     rst = st.rs0;
-    runTest(st.s0.host, rst);
+    runTest(st.s0.host, rst, true);
     st.stop();
 })();

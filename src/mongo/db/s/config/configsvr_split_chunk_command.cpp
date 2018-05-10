@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/split_chunk_request_type.h"
@@ -93,7 +94,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -104,6 +105,10 @@ public:
             uasserted(ErrorCodes::IllegalOperation,
                       "_configsvrCommitChunkSplit can only be run on config servers");
         }
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
 

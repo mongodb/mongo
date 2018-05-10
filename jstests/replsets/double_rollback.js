@@ -10,6 +10,9 @@
  * to node 1 and tried to apply its oplog despite not being in a consistent state.
  */
 
+// Rollback to a stable timestamp does not set a minValid and should be able to sync from any node.
+// @tags: [requires_mmapv1]
+
 (function() {
     'use strict';
 

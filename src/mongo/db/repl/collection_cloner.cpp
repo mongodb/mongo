@@ -43,7 +43,6 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point_service.h"
@@ -249,8 +248,17 @@ void CollectionCloner::shutdown() {
 
 void CollectionCloner::_cancelRemainingWork_inlock() {
     if (_arm) {
-        Client::initThreadIfNotAlready();
-        _killArmHandle = _arm->kill(cc().getOperationContext());
+        // This method can be called from a callback from either a TaskExecutor or a TaskRunner. The
+        // TaskExecutor should never have an OperationContext attached to the Client, and the
+        // TaskRunner should always have an OperationContext attached. Unfortunately, we don't know
+        // which situation we're in, so have to handle both.
+        auto& client = cc();
+        if (auto opCtx = client.getOperationContext()) {
+            _killArmHandle = _arm->kill(opCtx);
+        } else {
+            auto newOpCtx = client.makeOperationContext();
+            _killArmHandle = _arm->kill(newOpCtx.get());
+        }
     }
     _countScheduler.shutdown();
     _listIndexesFetcher.shutdown();
@@ -613,20 +621,26 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
            << " cursors established.";
 
     // Initialize the 'AsyncResultsMerger'(ARM).
-    std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors;
+    std::vector<RemoteCursor> remoteCursors;
     for (auto&& cursorResponse : cursorResponses) {
         // A placeholder 'ShardId' is used until the ARM is made less sharding specific.
-        remoteCursors.emplace_back(
-            ShardId("CollectionClonerSyncSource"), _source, std::move(cursorResponse));
+        remoteCursors.emplace_back();
+        auto& newCursor = remoteCursors.back();
+        newCursor.setShardId("CollectionClonerSyncSource");
+        newCursor.setHostAndPort(_source);
+        newCursor.setCursorResponse(std::move(cursorResponse));
     }
 
-    _clusterClientCursorParams = stdx::make_unique<ClusterClientCursorParams>(_sourceNss);
-    _clusterClientCursorParams->remotes = std::move(remoteCursors);
-    if (_collectionCloningBatchSize > 0)
-        _clusterClientCursorParams->batchSize = _collectionCloningBatchSize;
-    Client::initThreadIfNotAlready();
-    _arm = stdx::make_unique<AsyncResultsMerger>(
-        cc().getOperationContext(), _executor, _clusterClientCursorParams.get());
+    AsyncResultsMergerParams armParams;
+    armParams.setNss(_sourceNss);
+    armParams.setRemotes(std::move(remoteCursors));
+    if (_collectionCloningBatchSize > 0) {
+        armParams.setBatchSize(_collectionCloningBatchSize);
+    }
+    auto opCtx = cc().makeOperationContext();
+    _arm = stdx::make_unique<AsyncResultsMerger>(opCtx.get(), _executor, std::move(armParams));
+    _arm->detachFromOperationContext();
+    opCtx.reset();
 
     // This completion guard invokes _finishCallback on destruction.
     auto cancelRemainingWorkInLock = [this]() { _cancelRemainingWork_inlock(); };
@@ -639,7 +653,6 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
     // outside the mutex. This is a necessary condition to invoke _finishCallback.
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     Status scheduleStatus = _scheduleNextARMResultsCallback(onCompletionGuard);
-    _arm->detachFromOperationContext();
     if (!scheduleStatus.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, scheduleStatus);
         return;
@@ -663,9 +676,10 @@ StatusWith<std::vector<BSONElement>> CollectionCloner::_parseParallelCollectionS
 }
 
 Status CollectionCloner::_bufferNextBatchFromArm(WithLock lock) {
-    Client::initThreadIfNotAlready();
-    auto opCtx = cc().getOperationContext();
-    _arm->reattachToOperationContext(opCtx);
+    // We expect this callback to execute in a thread from a TaskExecutor which will not have an
+    // OperationContext populated. We must make one ourselves.
+    auto opCtx = cc().makeOperationContext();
+    _arm->reattachToOperationContext(opCtx.get());
     while (_arm->ready()) {
         auto armResultStatus = _arm->nextReady();
         if (!armResultStatus.getStatus().isOK()) {
@@ -686,8 +700,10 @@ Status CollectionCloner::_bufferNextBatchFromArm(WithLock lock) {
 
 Status CollectionCloner::_scheduleNextARMResultsCallback(
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
-    Client::initThreadIfNotAlready();
-    _arm->reattachToOperationContext(cc().getOperationContext());
+    // We expect this callback to execute in a thread from a TaskExecutor which will not have an
+    // OperationContext populated. We must make one ourselves.
+    auto opCtx = cc().makeOperationContext();
+    _arm->reattachToOperationContext(opCtx.get());
     auto nextEvent = _arm->nextEvent();
     _arm->detachFromOperationContext();
     if (!nextEvent.isOK()) {

@@ -129,13 +129,12 @@ public:
                 ->setFindHostReturnValue(kDonorConnStr.getServers()[0]);
         }
 
-        SessionCatalog::create(getServiceContext());
         SessionCatalog::get(getServiceContext())->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
     }
 
     void tearDown() override {
-        SessionCatalog::reset_forTest(getServiceContext());
+        SessionCatalog::get(getServiceContext())->reset_forTest();
         ShardServerTestFixture::tearDown();
     }
 
@@ -243,7 +242,8 @@ public:
             // requests with txnNumbers aren't allowed. To get around this, we have to manually set
             // up the session state and perform the insert.
             initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
-            OperationContextSession sessionTxnState(innerOpCtx.get(), true, boost::none);
+            OperationContextSession sessionTxnState(
+                innerOpCtx.get(), true, boost::none, boost::none, "testDB", "insert");
 
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);

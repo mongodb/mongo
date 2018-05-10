@@ -193,7 +193,7 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
     return std::vector<SockAddr>(ret.begin(), ret.end());
 }
 
-SockAddr::SockAddr(struct sockaddr_storage& other, socklen_t size)
+SockAddr::SockAddr(const sockaddr_storage& other, socklen_t size)
     : addressSize(size), _hostOrIp(), sa(other), _isValid(true) {
     _hostOrIp = toString(true);
 }

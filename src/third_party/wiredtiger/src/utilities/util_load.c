@@ -124,8 +124,10 @@ load_dump(WT_SESSION *session)
 	    "dump=%s%s%s",
 	    hex ? "hex" : "print",
 	    append ? ",append" : "",
-	    no_overwrite ? ",overwrite=false" : "")) != 0)
-		return (util_err(session, ret, NULL));
+	    no_overwrite ? ",overwrite=false" : "")) != 0) {
+		ret = util_err(session, ret, NULL);
+		goto err;
+	}
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0) {
 		ret = util_err(session, ret, "%s: session.open_cursor", uri);
@@ -484,7 +486,7 @@ config_rename(WT_SESSION *session, char **urip, const char *name)
 		return (util_err(session, errno, NULL));
 
 	/*
-	 * Find the separating colon characters, but not the trailing one may
+	 * Find the separating colon characters, but note the trailing one may
 	 * not be there.
 	 */
 	if ((p = strchr(*urip, ':')) == NULL) {
@@ -494,8 +496,10 @@ config_rename(WT_SESSION *session, char **urip, const char *name)
 	*p = '\0';
 	p = strchr(p + 1, ':');
 	if ((ret = __wt_snprintf(
-	    buf, len, "%s:%s%s", *urip, name, p == NULL ? "" : p)) != 0)
+	    buf, len, "%s:%s%s", *urip, name, p == NULL ? "" : p)) != 0) {
+		free(buf);
 		return (util_err(session, ret, NULL));
+	}
 	*urip = buf;
 
 	return (0);

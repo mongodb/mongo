@@ -1,4 +1,5 @@
 // tests gridfs with a sharded fs.chunks collection.
+// @tags: [requires_sharding]
 
 var test = new ShardingTest({shards: 3, mongos: 1, config: 1, verbose: 2, other: {chunkSize: 1}});
 

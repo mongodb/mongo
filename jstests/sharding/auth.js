@@ -203,7 +203,7 @@
         return d1Chunks > 0 && d2Chunks > 0 && (d1Chunks + d2Chunks == totalChunks);
     }, "Chunks failed to balance", 60000, 5000);
 
-    // SERVER-3645
+    // SERVER-33753: count() without predicate can be wrong on sharded collections.
     // assert.eq(s.getDB("test").foo.count(), num+1);
     var numDocs = s.getDB("test").foo.find().itcount();
     if (numDocs != num) {

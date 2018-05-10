@@ -2,47 +2,53 @@
 // certificate to the login keychain of the evergreen user. See,
 // https://github.com/10gen/buildslave-cookbooks/commit/af7cabe5b6e0885902ebd4902f7f974b64cc8961
 // for details.
-((function() {
+// To install trusted-ca.pem for local testing on OSX, invoke the following at a console:
+//   security add-trusted-cert -d jstests/libs/trusted-ca.pem
+(function() {
     'use strict';
-    // Do not fail if this test leaves unterminated processes because testWithCerts
-    // is expected to throw before it calls stopMongod.
-    TestData.failIfUnterminatedProcesses = false;
 
     const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
-
     if (HOST_TYPE == "windows") {
+        // OpenSSL backed imports Root CA and intermediate CA
         runProgram(
             "certutil.exe", "-addstore", "-user", "-f", "CA", "jstests\\libs\\trusted-ca.pem");
+
+        // SChannel backed follows Windows rules and only trusts the Root store in Local Machine and
+        // Current User.
+        runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
     }
 
-    var testWithCerts = function(serverPem) {
+    function testWithCerts(prefix) {
         jsTest.log(`Testing with SSL certs $ {
-            serverPem
+            clientPem connecting to serverPem
         }`);
-        // allowSSL instead of requireSSL so that the non-SSL connection succeeds.
-        var conn = MongoRunner.runMongod(
-            {sslMode: 'requireSSL', sslPEMKeyFile: "jstests/libs/" + serverPem});
 
-        // Should not be able to authenticate with x509.
-        // Authenticate call will return 1 on success, 0 on error.
-        var argv =
-            ['./mongo', '--ssl', '--port', conn.port, '--eval', ('db.runCommand({buildInfo: 1})')];
+        // allowSSL to get a non-SSL control connection.
+        const conn = MongoRunner.runMongod(
+            {sslMode: 'allowSSL', sslPEMKeyFile: 'jstests/libs/' + prefix + 'server.pem'});
+
+        let argv = [
+            './mongo',
+            '--ssl',
+            '--port',
+            conn.port,
+            '--sslPEMKeyFile',
+            'jstests/libs/' + prefix + 'client.pem',
+            '--eval',
+            ';'
+        ];
+
         if (HOST_TYPE == "linux") {
             // On Linux we override the default path to the system CA store to point to our
             // "trusted" CA. On Windows, this CA will have been added to the user's trusted CA list
             argv.unshift("env", "SSL_CERT_FILE=jstests/libs/trusted-ca.pem");
         }
-        var exitStatus = runMongoProgram.apply(null, argv);
-        assert.eq(exitStatus, 0, "successfully connected with SSL");
 
+        const exitCode = runMongoProgram.apply(null, argv);
         MongoRunner.stopMongod(conn);
-    };
+        return exitCode;
+    }
 
-    assert.throws(function() {
-        // Note: this leaves a running mongod process.
-        testWithCerts("server.pem", "client.pem");
-    });
-    assert.doesNotThrow(function() {
-        testWithCerts("trusted-server.pem", "trusted-client.pem");
-    });
-})());
+    assert.neq(0, testWithCerts(''), 'Certs signed with untrusted CA');
+    assert.eq(0, testWithCerts('trusted-'), 'Certs signed with trusted CA');
+})();

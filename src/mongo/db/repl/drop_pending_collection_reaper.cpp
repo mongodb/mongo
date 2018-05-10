@@ -135,10 +135,10 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
     DropPendingNamespaces toDrop;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        auto it = _dropPendingNamespaces.cbegin();
-        while (it != _dropPendingNamespaces.cend() && it->first <= opTime) {
+        for (auto it = _dropPendingNamespaces.cbegin();
+             it != _dropPendingNamespaces.cend() && it->first <= opTime;
+             ++it) {
             toDrop.insert(*it);
-            it = _dropPendingNamespaces.erase(it);
         }
     }
 
@@ -146,19 +146,36 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
         return;
     }
 
-    // Every node cleans up its own drop-pending collections. We should never replicate these drops
-    // because these are internal operations.
-    UnreplicatedWritesBlock uwb(opCtx);
+    {
+        // Every node cleans up its own drop-pending collections. We should never replicate these
+        // drops because these are internal operations.
+        UnreplicatedWritesBlock uwb(opCtx);
 
-    for (const auto& opTimeAndNamespace : toDrop) {
-        const auto& dropOpTime = opTimeAndNamespace.first;
-        const auto& nss = opTimeAndNamespace.second;
-        log() << "Completing collection drop for " << nss << " with drop optime " << dropOpTime
-              << " (notification optime: " << opTime << ")";
-        auto status = _storageInterface->dropCollection(opCtx, nss);
-        if (!status.isOK()) {
-            warning() << "Failed to remove drop-pending collection " << nss << " with drop optime "
-                      << dropOpTime << " (notification optime: " << opTime << "): " << status;
+        for (const auto& opTimeAndNamespace : toDrop) {
+            const auto& dropOpTime = opTimeAndNamespace.first;
+            const auto& nss = opTimeAndNamespace.second;
+            log() << "Completing collection drop for " << nss << " with drop optime " << dropOpTime
+                  << " (notification optime: " << opTime << ")";
+            auto status = _storageInterface->dropCollection(opCtx, nss);
+            if (!status.isOK()) {
+                warning() << "Failed to remove drop-pending collection " << nss
+                          << " with drop optime " << dropOpTime
+                          << " (notification optime: " << opTime << "): " << status;
+            }
+        }
+    }
+
+    {
+        // Entries must be removed AFTER drops are completed, so that getEarliestDropOpTime()
+        // returns appropriate results.
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        auto it = _dropPendingNamespaces.cbegin();
+        while (it != _dropPendingNamespaces.cend() && it->first <= opTime) {
+            if (toDrop.find(it->first) != toDrop.cend()) {
+                it = _dropPendingNamespaces.erase(it);
+            } else {
+                ++it;
+            }
         }
     }
 }

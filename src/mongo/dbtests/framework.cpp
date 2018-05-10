@@ -44,6 +44,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
@@ -71,10 +72,10 @@ int runDbTests(int argc, char** argv) {
 
         // We may be shut down before we have a global storage
         // engine.
-        if (!getGlobalServiceContext()->getGlobalStorageEngine())
+        if (!getGlobalServiceContext()->getStorageEngine())
             return;
 
-        getGlobalServiceContext()->shutdownGlobalStorageEngineCleanly();
+        shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
     });
 
     Client::initThread("testsuite");
@@ -89,8 +90,8 @@ int runDbTests(int argc, char** argv) {
 
     srand((unsigned)frameworkGlobalParams.seed);
 
-    checked_cast<ServiceContextMongoD*>(globalServiceContext)->createLockFile();
-    globalServiceContext->initializeGlobalStorageEngine();
+    createLockFile(globalServiceContext);
+    initializeStorageEngine(globalServiceContext);
     auto registry = stdx::make_unique<OpObserverRegistry>();
     registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     globalServiceContext->setOpObserver(std::move(registry));

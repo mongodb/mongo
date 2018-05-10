@@ -35,6 +35,7 @@
 
 #include "mongo/s/catalog_cache_test_fixture.h"
 
+#include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
@@ -75,11 +76,19 @@ void CatalogCacheTestFixture::setupNShards(int numShards) {
     setupShards([&]() {
         std::vector<ShardType> shards;
         for (int i = 0; i < numShards; i++) {
-            ShardType shard;
-            shard.setName(str::stream() << i);
-            shard.setHost(str::stream() << "Host" << i << ":12345");
+            ShardId name(str::stream() << i);
+            HostAndPort host(str::stream() << "Host" << i << ":12345");
 
+            ShardType shard;
+            shard.setName(name.toString());
+            shard.setHost(host.toString());
             shards.emplace_back(std::move(shard));
+
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                stdx::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(ConnectionString(host));
+            targeter->setFindHostReturnValue(host);
+            targeterFactory()->addTargeterToReturn(ConnectionString(host), std::move(targeter));
         }
 
         return shards;
@@ -145,9 +154,58 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
 
     auto routingInfo = future.timed_get(kFutureTimeout);
     ASSERT(routingInfo->cm());
-    ASSERT(routingInfo->primary());
+    ASSERT(routingInfo->db().primary());
 
     return routingInfo->cm();
+}
+
+void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss) {
+    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+        DatabaseType db(nss.db().toString(), {"0"}, true);
+        return std::vector<BSONObj>{db.toBSON()};
+    }());
+}
+
+void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
+                                                  OID epoch,
+                                                  const ShardKeyPattern& shardKeyPattern) {
+    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+        CollectionType collType;
+        collType.setNs(nss);
+        collType.setEpoch(epoch);
+        collType.setKeyPattern(shardKeyPattern.toBSON());
+        collType.setUnique(false);
+
+        return std::vector<BSONObj>{collType.toBSON()};
+    }());
+}
+
+CachedCollectionRoutingInfo CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
+    NamespaceString nss) {
+    const OID epoch = OID::gen();
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    auto future = scheduleRoutingInfoRefresh(nss);
+
+    // Mock the expected config server queries.
+    expectGetDatabase(nss);
+    expectGetCollection(nss, epoch, shardKeyPattern);
+    expectGetCollection(nss, epoch, shardKeyPattern);
+    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+        ChunkVersion version(1, 0, epoch);
+
+        ChunkType chunk1(
+            nss, {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << 0)}, version, {"0"});
+        version.incMinor();
+
+        ChunkType chunk2(
+            nss, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"1"});
+        version.incMinor();
+
+        return std::vector<BSONObj>{chunk1.toConfigBSON(), chunk2.toConfigBSON()};
+    }());
+
+    return future.timed_get(kFutureTimeout).get();
 }
 
 }  // namespace mongo

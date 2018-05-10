@@ -82,19 +82,6 @@ protected:
     virtual ~KillOpListenerInterface() = default;
 };
 
-class StorageFactoriesIterator {
-    MONGO_DISALLOW_COPYING(StorageFactoriesIterator);
-
-public:
-    virtual ~StorageFactoriesIterator() = default;
-
-    virtual bool more() const = 0;
-    virtual const StorageEngine::Factory* next() = 0;
-
-protected:
-    StorageFactoriesIterator() = default;
-};
-
 /**
  * Class representing the context of a service, such as a MongoD database service or
  * a MongoS routing service.
@@ -239,37 +226,16 @@ public:
     //
 
     /**
-     * Register a storage engine.  Called from a MONGO_INIT that depends on initializiation of
-     * the global environment.
-     * Ownership of 'factory' is transferred to global environment upon registration.
+     * Sets the storage engine for this instance. May be called up to once per instance.
      */
-    virtual void registerStorageEngine(const std::string& name,
-                                       const StorageEngine::Factory* factory) = 0;
-
-    /**
-     * Returns true if "name" refers to a registered storage engine.
-     */
-    virtual bool isRegisteredStorageEngine(const std::string& name) = 0;
-
-    /**
-     * Produce an iterator over all registered storage engine factories.
-     * Caller owns the returned object and is responsible for deleting when finished.
-     *
-     * Never returns nullptr.
-     */
-    virtual StorageFactoriesIterator* makeStorageFactoriesIterator() = 0;
-
-    virtual void initializeGlobalStorageEngine() = 0;
-
-    /**
-     * Shuts down storage engine cleanly and releases any locks on mongod.lock.
-     */
-    virtual void shutdownGlobalStorageEngineCleanly() = 0;
+    void setStorageEngine(std::unique_ptr<StorageEngine> engine);
 
     /**
      * Return the storage engine instance we're using.
      */
-    virtual StorageEngine* getGlobalStorageEngine() = 0;
+    StorageEngine* getStorageEngine() {
+        return _storageEngine.get();
+    }
 
     //
     // Global operation management.  This may not belong here and there may be too many methods
@@ -461,6 +427,11 @@ private:
     virtual std::unique_ptr<OperationContext> _newOpCtx(Client* client, unsigned opId) = 0;
 
     /**
+     * The storage engine, if any.
+     */
+    std::unique_ptr<StorageEngine> _storageEngine;
+
+    /**
      * The periodic runner.
      */
     std::unique_ptr<PeriodicRunner> _runner;
@@ -561,30 +532,5 @@ bool supportsDocLocking();
  * Returns true if the storage engine in use is MMAPV1.
  */
 bool isMMAPV1();
-
-/*
- * Extracts the storageEngine bson from the CollectionOptions provided.  Loops through each
- * provided storageEngine and asks the matching registered storage engine if the
- * collection/index options are valid.  Returns an error if the collection/index options are
- * invalid.
- * If no matching registered storage engine is found, return an error.
- * Validation function 'func' must be either:
- * - &StorageEngine::Factory::validateCollectionStorageOptions; or
- * - &StorageEngine::Factory::validateIndexStorageOptions
- */
-Status validateStorageOptions(
-    const BSONObj& storageEngineOptions,
-    stdx::function<Status(const StorageEngine::Factory* const, const BSONObj&)> validateFunc);
-
-/*
- * Returns a BSONArray containing the names of available storage engines, or an empty
- * array if there is no global ServiceContext
- */
-BSONArray storageEngineList();
-
-/*
- * Appends a the list of available storage engines to a BSONObjBuilder for reporting purposes.
- */
-void appendStorageEngineList(BSONObjBuilder* result);
 
 }  // namespace mongo

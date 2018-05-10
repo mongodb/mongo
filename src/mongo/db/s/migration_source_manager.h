@@ -70,6 +70,11 @@ class MigrationSourceManager {
     MONGO_DISALLOW_COPYING(MigrationSourceManager);
 
 public:
+    static MigrationSourceManager* get(CollectionShardingState& css);
+    static MigrationSourceManager* get(CollectionShardingState* css) {
+        return get(*css);
+    }
+
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be
      * called with the distributed lock acquired in advance (not asserted).

@@ -50,8 +50,8 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -67,6 +67,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 
@@ -90,6 +91,7 @@ public:
     const Timestamp nullTs = Timestamp();
     const int presentTerm = 1;
     repl::ReplicationCoordinatorMock* _coordinatorMock;
+    repl::ReplicationConsistencyMarkers* _consistencyMarkers;
 
     StorageTimestampTest() {
         if (mongo::storageGlobalParams.engine != "wiredTiger") {
@@ -116,6 +118,9 @@ public:
         repl::ReplicationProcess::set(
             cc().getServiceContext(),
             std::unique_ptr<repl::ReplicationProcess>(replicationProcess));
+
+        _consistencyMarkers =
+            repl::ReplicationProcess::get(cc().getServiceContext())->getConsistencyMarkers();
 
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
@@ -257,31 +262,6 @@ public:
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
     }
 
-    void assertCheckpointTimestampDocumentAtTimestamp(
-        Collection* coll,
-        const Timestamp& ts,
-        const repl::CheckpointTimestampDocument& expectedDoc) {
-        auto recoveryUnit = _opCtx->recoveryUnit();
-        recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(ts));
-        auto doc = repl::CheckpointTimestampDocument::parse(
-            IDLParserErrorContext("CheckpointTimestampDocument"), findOne(coll));
-        ASSERT_EQ(expectedDoc.getCheckpointTimestamp(), doc.getCheckpointTimestamp())
-            << "checkpoint timestamps weren't equal at " << ts.toString()
-            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
-        ASSERT_EQ(expectedDoc.get_id(), doc.get_id())
-            << "checkpoint timestamp ids weren't equal at " << ts.toString()
-            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
-    }
-
-    void assertEmptyCollectionAtTimestamp(Collection* coll, const Timestamp& ts) {
-        auto recoveryUnit = _opCtx->recoveryUnit();
-        recoveryUnit->abandonSnapshot();
-        ASSERT_OK(recoveryUnit->setPointInTimeReadTimestamp(ts));
-        ASSERT_EQ(0, itCount(coll)) << "collection " << coll->ns() << " isn't empty at "
-                                    << ts.toString() << ". One document is " << findOne(coll);
-    }
-
     void assertDocumentAtTimestamp(Collection* coll,
                                    const Timestamp& ts,
                                    const BSONObj& expectedDoc) {
@@ -315,7 +295,7 @@ public:
                                  Timestamp ts,
                                  bool shouldExpect) {
         KVCatalog* kvCatalog =
-            static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine())
+            static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine())
                 ->getCatalog();
 
         auto recoveryUnit = _opCtx->recoveryUnit();
@@ -1250,8 +1230,10 @@ public:
                       << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
-        repl::SyncTail syncTail(nullptr, repl::multiSyncApply, writerPool.get());
+        repl::SyncTail syncTail(
+            nullptr, _consistencyMarkers, storageInterface, repl::multiSyncApply, writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(syncTail.multiApply(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1353,16 +1335,13 @@ public:
         // after bulk index builds.
         std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
 
-        AtomicUInt32 fetchCount(0);
-        auto applyOpFn = [&fetchCount](OperationContext* opCtx,
-                                       repl::MultiApplier::OperationPtrs* ops,
-                                       repl::SyncTail* st,
-                                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-            return repl::multiInitialSyncApply(opCtx, ops, st, &fetchCount, workerMultikeyPathInfo);
-        };
-
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
-        repl::SyncTail syncTail(nullptr, applyOpFn, writerPool.get());
+        repl::SyncTail syncTail(nullptr,
+                                _consistencyMarkers,
+                                storageInterface,
+                                repl::multiInitialSyncApply,
+                                writerPool.get());
         auto lastTime = unittest::assertGet(syncTail.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
@@ -1614,61 +1593,6 @@ public:
     }
 };
 
-class WriteCheckpointTimestamp : public StorageTimestampTest {
-public:
-    void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
-        NamespaceString nss(
-            repl::ReplicationConsistencyMarkersImpl::kDefaultCheckpointTimestampNamespace);
-        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
-        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
-
-        repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
-            repl::StorageInterface::get(_opCtx));
-
-        unittest::log() << "Writing checkpoint timestamp at " << presentTs;
-        ASSERT_EQ(nullTs, consistencyMarkers.getCheckpointTimestamp(_opCtx));
-        consistencyMarkers.writeCheckpointTimestamp(_opCtx, presentTs);
-        ASSERT_EQ(presentTs, consistencyMarkers.getCheckpointTimestamp(_opCtx));
-
-        repl::CheckpointTimestampDocument expectedCheckpointTsPresent;
-        expectedCheckpointTsPresent.setCheckpointTimestamp(presentTs);
-        expectedCheckpointTsPresent.set_id("checkpointTimestamp");
-
-        AutoGetCollectionForReadCommand autoColl(_opCtx, nss);
-        auto checkpointTsColl = autoColl.getCollection();
-        ASSERT(checkpointTsColl);
-
-        assertEmptyCollectionAtTimestamp(checkpointTsColl, pastTs);
-        assertCheckpointTimestampDocumentAtTimestamp(
-            checkpointTsColl, presentTs, expectedCheckpointTsPresent);
-        assertCheckpointTimestampDocumentAtTimestamp(
-            checkpointTsColl, futureTs, expectedCheckpointTsPresent);
-        assertCheckpointTimestampDocumentAtTimestamp(
-            checkpointTsColl, nullTs, expectedCheckpointTsPresent);
-
-        unittest::log() << "Writing checkpoint timestamp at " << futureTs;
-        consistencyMarkers.writeCheckpointTimestamp(_opCtx, futureTs);
-        ASSERT_EQ(futureTs, consistencyMarkers.getCheckpointTimestamp(_opCtx));
-
-        repl::CheckpointTimestampDocument expectedCheckpointTsFuture;
-        expectedCheckpointTsFuture.setCheckpointTimestamp(futureTs);
-        expectedCheckpointTsFuture.set_id("checkpointTimestamp");
-
-        assertEmptyCollectionAtTimestamp(checkpointTsColl, pastTs);
-        assertCheckpointTimestampDocumentAtTimestamp(
-            checkpointTsColl, presentTs, expectedCheckpointTsPresent);
-        assertCheckpointTimestampDocumentAtTimestamp(
-            checkpointTsColl, futureTs, expectedCheckpointTsFuture);
-        assertCheckpointTimestampDocumentAtTimestamp(
-            checkpointTsColl, nullTs, expectedCheckpointTsFuture);
-    }
-};
-
 /**
  * This KVDropDatabase test only exists in this file for historical reasons, the final phase of
  * timestamping `dropDatabase` side-effects no longer applies. The purpose of this test is to
@@ -1688,7 +1612,7 @@ public:
             stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
 
         auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
 
         // Declare the database to be in a "synced" state, i.e: in steady-state replication.
@@ -1762,8 +1686,17 @@ public:
  * This test asserts that the catalog updates that represent the beginning and end of an index
  * build are timestamped. Additionally, the index will be `multikey` and that catalog update that
  * finishes the index build will also observe the index is multikey.
+ *
+ * Primaries log no-ops when starting an index build to acquire a timestamp. A primary committing
+ * an index build gets timestamped when the `createIndexes` command creates an oplog entry. That
+ * step is mimiced here.
+ *
+ * Secondaries timestamp starting their index build by being in a `TimestampBlock` when the oplog
+ * entry is processed. Secondaries will look at the logical clock when completing the index
+ * build. This is safe so long as completion is not racing with secondary oplog application (i.e:
+ * enforced via the parallel batch writer lock).
  */
-template <bool SimulateBackground>
+template <bool SimulatePrimary>
 class TimestampIndexBuilds : public StorageTimestampTest {
 public:
     void run() {
@@ -1772,8 +1705,15 @@ public:
             return;
         }
 
+        const bool SimulateSecondary = !SimulatePrimary;
+        if (SimulateSecondary) {
+            // The MemberState is inspected during index builds to use a "ghost" write to timestamp
+            // index completion.
+            ASSERT_OK(_coordinatorMock->setFollowerMode({repl::MemberState::MS::RS_SECONDARY}));
+        }
+
         auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getStorageEngine());
         KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
 
         NamespaceString nss("unittests.timestampIndexBuilds");
@@ -1799,20 +1739,30 @@ public:
         // Build an index on `{a: 1}`. This index will be multikey.
         MultiIndexBlock indexer(_opCtx, autoColl.getCollection());
         const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
+        BSONObj indexInfoObj;
         {
+            // Primaries do not have a wrapping `TimestampBlock`; secondaries do.
             const Timestamp commitTimestamp =
-                SimulateBackground ? Timestamp::min() : beforeIndexBuild.addTicks(1).asTimestamp();
+                SimulatePrimary ? Timestamp::min() : beforeIndexBuild.addTicks(1).asTimestamp();
             TimestampBlock tsBlock(_opCtx, commitTimestamp);
 
-            ASSERT_OK(indexer
-                          .init({BSON("v" << 2 << "unique" << true << "name"
-                                          << "a_1"
-                                          << "ns"
-                                          << nss.ns()
-                                          << "key"
-                                          << BSON("a" << 1))})
-                          .getStatus());
+            // Secondaries will also be in an `UnreplicatedWritesBlock` that prevents the `logOp`
+            // from making creating an entry.
+            boost::optional<repl::UnreplicatedWritesBlock> unreplicated;
+            if (SimulateSecondary) {
+                unreplicated.emplace(_opCtx);
+            }
+
+            auto swIndexInfoObj = indexer.init({BSON("v" << 2 << "unique" << true << "name"
+                                                         << "a_1"
+                                                         << "ns"
+                                                         << nss.ns()
+                                                         << "key"
+                                                         << BSON("a" << 1))});
+            ASSERT_OK(swIndexInfoObj.getStatus());
+            indexInfoObj = std::move(swIndexInfoObj.getValue()[0]);
         }
+
         const LogicalTime afterIndexInit = _clock->reserveTicks(2);
 
         // Inserting all the documents has the side-effect of setting internal state on the index
@@ -1820,12 +1770,16 @@ public:
         ASSERT_OK(indexer.insertAllDocumentsInCollection());
 
         {
-            const Timestamp commitTimestamp =
-                SimulateBackground ? Timestamp::min() : afterIndexInit.addTicks(1).asTimestamp();
-            TimestampBlock tsBlock(_opCtx, commitTimestamp);
-
             WriteUnitOfWork wuow(_opCtx);
+            // Primaries will perform no timestamping in the indexer's commit. Secondaries will
+            // look at the logical clock.
             indexer.commit();
+            if (SimulatePrimary) {
+                // The op observer is not called from the index builder, but rather the
+                // `createIndexes` command.
+                _opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    _opCtx, nss, autoColl.getCollection()->uuid(), indexInfoObj, false);
+            }
             wuow.commit();
         }
 
@@ -1864,6 +1818,106 @@ public:
     }
 };
 
+class SecondaryReadsDuringBatchApplicationAreAllowed : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+        ASSERT(_opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot());
+
+        NamespaceString ns("unittest.secondaryReadsDuringBatchApplicationAreAllowed");
+        reset(ns);
+        UUID uuid = UUID::gen();
+        {
+            AutoGetCollectionForRead autoColl(_opCtx, ns);
+            uuid = autoColl.getCollection()->uuid().get();
+            ASSERT_EQ(itCount(autoColl.getCollection()), 0);
+        }
+
+        // Returns true when the batch has started, meaning the applier is holding the PBWM lock.
+        // Will return false if the lock was not held.
+        Promise<bool> batchInProgressPromise;
+        // Attempt to read when in the middle of a batch.
+        stdx::packaged_task<bool()> task([&] {
+            Client::initThread(getThreadName());
+            auto readOp = cc().makeOperationContext();
+
+            // Wait for the batch to start or fail.
+            if (!batchInProgressPromise.getFuture().get()) {
+                return false;
+            }
+            AutoGetCollectionForRead autoColl(readOp.get(), ns);
+            return !readOp->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
+                                                           MODE_IS);
+        });
+        auto taskFuture = task.get_future();
+        stdx::thread taskThread{std::move(task)};
+
+        auto joinGuard = MakeGuard([&] {
+            batchInProgressPromise.emplaceValue(false);
+            taskThread.join();
+        });
+
+        // This apply operation function will block until the reader has tried acquiring a
+        // collection lock. This returns BadValue statuses instead of asserting so that the worker
+        // threads can cleanly exit and this test case fails without crashing the entire suite.
+        auto applyOperationFn = [&](OperationContext* opCtx,
+                                    std::vector<const repl::OplogEntry*>* operationsToApply,
+                                    repl::SyncTail* st,
+                                    std::vector<MultikeyPathInfo>* pathInfo) -> Status {
+            if (!_opCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode,
+                                                        MODE_X)) {
+                return {ErrorCodes::BadValue, "Batch applied was not holding PBWM lock in MODE_X"};
+            }
+
+            // Insert the document. A reader without a PBWM lock should not see it yet.
+            auto status = repl::multiSyncApply(opCtx, operationsToApply, st, pathInfo);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // Signals the reader to acquire a collection read lock.
+            batchInProgressPromise.emplaceValue(true);
+
+            // Block while holding the PBWM lock until the reader is done.
+            if (!taskFuture.get()) {
+                return {ErrorCodes::BadValue, "Client was holding PBWM lock in MODE_IS"};
+            }
+            return Status::OK();
+        };
+
+        // Make a simple insert operation.
+        BSONObj doc0 = BSON("_id" << 0 << "a" << 0);
+        auto insertOp = repl::OplogEntry(
+            BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                      << "i"
+                      << "ns"
+                      << ns.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc0));
+
+        // Apply the operation.
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
+        auto writerPool = repl::SyncTail::makeWriterPool(1);
+        repl::SyncTail syncTail(
+            nullptr, _consistencyMarkers, storageInterface, applyOperationFn, writerPool.get());
+        auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
+        ASSERT_EQ(insertOp.getOpTime(), lastOpTime);
+
+        joinGuard.Dismiss();
+        taskThread.join();
+
+        // Read on the local snapshot to verify the document was inserted.
+        AutoGetCollectionForRead autoColl(_opCtx, ns);
+        assertDocumentAtTimestamp(autoColl.getCollection(), futureTs, doc0);
+    }
+};
+
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
@@ -1887,11 +1941,11 @@ public:
         add<SetMinValidInitialSyncFlag>();
         add<SetMinValidToAtLeast>();
         add<SetMinValidAppliedThrough>();
-        add<WriteCheckpointTimestamp>();
         add<KVDropDatabase>();
-        // Timestamp<SimulateBackground>
+        // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
+        add<SecondaryReadsDuringBatchApplicationAreAllowed>();
     }
 };
 

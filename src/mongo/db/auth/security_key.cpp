@@ -37,7 +37,6 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/auth/action_set.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/user.h"

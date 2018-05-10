@@ -48,7 +48,6 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
 namespace {
 
 BSONObj lsidQuery(const LogicalSessionId& lsid) {
@@ -93,7 +92,8 @@ auto runIfStandaloneOrPrimary(const NamespaceString& ns,
     bool isStandaloneOrPrimary;
     {
         Lock::DBLock lk(opCtx, ns.db(), mode);
-        Lock::CollectionLock lock(opCtx->lockState(), SessionsCollection::kSessionsFullNS, mode);
+        Lock::CollectionLock lock(
+            opCtx->lockState(), SessionsCollection::kSessionsNamespaceString.ns(), mode);
 
         auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
 
@@ -144,25 +144,25 @@ auto dispatch(const NamespaceString& ns,
 }  // namespace
 
 Status SessionsCollectionRS::setupSessionsCollection(OperationContext* opCtx) {
-    return dispatch(kSessionsNamespaceString,
-                    MODE_IX,
-                    opCtx,
-                    [&] {
-                        // Creating the TTL index will auto-generate the collection.
-                        DBDirectClient client(opCtx);
-                        BSONObj info;
-                        auto cmd = generateCreateIndexesCmd();
-                        if (!client.runCommand(kSessionsDb.toString(), cmd, info)) {
-                            return getStatusFromCommandResult(info);
-                        }
+    return dispatch(
+        kSessionsNamespaceString,
+        MODE_IX,
+        opCtx,
+        [&] {
+            // Creating the TTL index will auto-generate the collection.
+            DBDirectClient client(opCtx);
+            BSONObj info;
+            auto cmd = generateCreateIndexesCmd();
+            if (!client.runCommand(kSessionsNamespaceString.db().toString(), cmd, info)) {
+                return getStatusFromCommandResult(info);
+            }
 
-                        return Status::OK();
-                    },
-                    [&](DBClientBase*) {
-                        // If we are not the primary, we aren't going to do writes
-                        // anyway, so just return ok.
-                        return Status::OK();
-                    });
+            return Status::OK();
+        },
+        [&](DBClientBase*) {
+            // If we are not the primary, we aren't going to do writes anyway, so just return ok.
+            return Status::OK();
+        });
 }
 
 Status SessionsCollectionRS::refreshSessions(OperationContext* opCtx,

@@ -1241,9 +1241,8 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
     ASSERT(!conn1);
 
     // Get conn2 (which should have an extra second before the timeout)
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn2;
     pool.get(HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-        conn2 = std::move(swConn);
+        ASSERT_EQ(swConn.getStatus(), ErrorCodes::ShutdownInProgress);
     });
 
     PoolImpl::setNow(now + Seconds(2));
@@ -1251,8 +1250,6 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
     ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
-
-    ASSERT(!conn2);
 }
 
 /**
@@ -1294,9 +1291,8 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
     ASSERT(!conn1);
 
     // Get conn2 (which should have an extra second before the timeout)
-    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn2;
     pool.get(HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
-        conn2 = std::move(swConn);
+        ASSERT_EQ(swConn.getStatus(), ErrorCodes::ShutdownInProgress);
     });
 
     PoolImpl::setNow(now + Seconds(5));
@@ -1304,8 +1300,6 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
     ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
-
-    ASSERT(!conn2);
 }
 
 template <typename T>

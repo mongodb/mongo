@@ -88,6 +88,24 @@ Status parseProcMemInfoFile(StringData filename,
                             BSONObjBuilder* builder);
 
 /**
+ * Read a string matching /proc/net/netstat format, and write the keys
+ * found in that string into builder.
+ *
+ * data - string to parse
+ * builder - BSON output
+ */
+Status parseProcNetstat(const std::vector<StringData>& keys,
+                        StringData data,
+                        BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the keys found in that file into builder.
+ */
+Status parseProcNetstatFile(const std::vector<StringData>& keys,
+                            StringData filename,
+                            BSONObjBuilder* builder);
+
+/**
  * Read a string matching /proc/diskstats format, and write the specified list of disks in builder.
  *
  * disks - vector of block devices to include in output. For each disk selected, 11 fields are

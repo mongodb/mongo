@@ -49,14 +49,30 @@ protected:
         MockReplCoordServerFixture::setUp();
 
         auto service = opCtx()->getServiceContext();
-        SessionCatalog::reset_forTest(service);
-        SessionCatalog::create(service);
+        SessionCatalog::get(service)->reset_forTest();
         SessionCatalog::get(service)->onStepUp(opCtx());
     }
 
     SessionCatalog* catalog() {
         return SessionCatalog::get(opCtx()->getServiceContext());
     }
+};
+
+// When this class is in scope, makes the system behave as if we're in a DBDirectClient
+class DirectClientSetter {
+public:
+    explicit DirectClientSetter(OperationContext* opCtx)
+        : _opCtx(opCtx), _wasInDirectClient(opCtx->getClient()->isInDirectClient()) {
+        opCtx->getClient()->setInDirectClient(true);
+    }
+
+    ~DirectClientSetter() {
+        _opCtx->getClient()->setInDirectClient(_wasInDirectClient);
+    }
+
+private:
+    const OperationContext* _opCtx;
+    const bool _wasInDirectClient;
 };
 
 TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {
@@ -73,7 +89,7 @@ TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
     const TxnNumber txnNum = 20;
     opCtx()->setTxnNumber(txnNum);
 
-    OperationContextSession ocs(opCtx(), true, boost::none);
+    OperationContextSession ocs(opCtx(), true, boost::none, boost::none, "testDB", "insert");
     auto session = OperationContextSession::get(opCtx());
     ASSERT(session);
     ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
@@ -82,7 +98,7 @@ TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
 TEST_F(SessionCatalogTest, OperationContextNonCheckedOutSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
-    OperationContextSession ocs(opCtx(), false, boost::none);
+    OperationContextSession ocs(opCtx(), false, boost::none, boost::none, "testDB", "insert");
     auto session = OperationContextSession::get(opCtx());
 
     ASSERT(!session);
@@ -101,7 +117,7 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     opCtx()->setLogicalSessionId(lsid);
 
     boost::optional<OperationContextSession> ocs;
-    ocs.emplace(opCtx(), true, boost::none);
+    ocs.emplace(opCtx(), true, boost::none, false, "testDB", "insert");
 
     stdx::async(stdx::launch::async, [&] {
         Client::initThreadIfNotAlready();
@@ -130,10 +146,13 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(opCtx(), true, boost::none);
+        OperationContextSession outerScopedSession(
+            opCtx(), true, boost::none, boost::none, "testDB", "insert");
 
         {
-            OperationContextSession innerScopedSession(opCtx(), true, boost::none);
+            DirectClientSetter inDirectClient(opCtx());
+            OperationContextSession innerScopedSession(
+                opCtx(), true, boost::none, boost::none, "testDB", "insert");
 
             auto session = OperationContextSession::get(opCtx());
             ASSERT(session);
@@ -141,6 +160,7 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
         }
 
         {
+            DirectClientSetter inDirectClient(opCtx());
             auto session = OperationContextSession::get(opCtx());
             ASSERT(session);
             ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
@@ -150,22 +170,89 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     ASSERT(!OperationContextSession::get(opCtx()));
 }
 
-TEST_F(SessionCatalogTest, CannotAccessTopLevelSessionInNestedOnes) {
+TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(1);
 
     {
-        OperationContextSession outerScopedSession(opCtx(), true, boost::none);
+        OperationContextSession outerScopedSession(
+            opCtx(), true, boost::none, boost::none, "testDB", "find");
 
-        auto* session = outerScopedSession.get(opCtx(), true);
-        ASSERT(session);
+        Locker* originalLocker = opCtx()->lockState();
+        RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
+        ASSERT(originalLocker);
+        ASSERT(originalRecoveryUnit);
+
+        // Set the readConcern on the OperationContext.
+        repl::ReadConcernArgs readConcernArgs;
+        ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                                  << "test"
+                                                  << repl::ReadConcernArgs::kReadConcernFieldName
+                                                  << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                          << "snapshot"))));
+        repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+        // Perform initial unstash, which sets up a WriteUnitOfWork.
+        OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
+        ASSERT_EQUALS(originalLocker, opCtx()->lockState());
+        ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+        ASSERT(opCtx()->getWriteUnitOfWork());
+
         {
-            OperationContextSession innerScopedSession(opCtx(), true, boost::none);
+            // Make it look like we're in a DBDirectClient running a nested operation.
+            DirectClientSetter inDirectClient(opCtx());
+            OperationContextSession innerScopedSession(
+                opCtx(), true, boost::none, boost::none, "testDB", "find");
 
-            // Cannot get the top level session since we're a nested one.
-            const bool topLevelOnly = true;
-            auto* innerSession = OperationContextSession::get(opCtx(), topLevelOnly);
-            ASSERT(!innerSession);
+            // Report to Session that there is a stashed cursor. If we were not in a nested session,
+            // this would ensure that stashing is not a noop.
+            Session::registerCursorExistsFunction([](LogicalSessionId, TxnNumber) { return true; });
+
+            OperationContextSession::get(opCtx())->stashTransactionResources(opCtx());
+
+            // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the
+            // OperationContext are unaffected.
+            ASSERT_EQUALS(originalLocker, opCtx()->lockState());
+            ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+            ASSERT(opCtx()->getWriteUnitOfWork());
+        }
+    }
+}
+
+TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(1);
+
+    {
+        OperationContextSession outerScopedSession(
+            opCtx(), true, boost::none, boost::none, "testDB", "find");
+
+        Locker* originalLocker = opCtx()->lockState();
+        RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
+        ASSERT(originalLocker);
+        ASSERT(originalRecoveryUnit);
+
+        // Set the readConcern on the OperationContext.
+        repl::ReadConcernArgs readConcernArgs;
+        ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                                  << "test"
+                                                  << repl::ReadConcernArgs::kReadConcernFieldName
+                                                  << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                          << "snapshot"))));
+        repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+        {
+            // Make it look like we're in a DBDirectClient running a nested operation.
+            DirectClientSetter inDirectClient(opCtx());
+            OperationContextSession innerScopedSession(
+                opCtx(), true, boost::none, boost::none, "testDB", "find");
+
+            OperationContextSession::get(opCtx())->unstashTransactionResources(opCtx(), "find");
+
+            // The unstash was a noop, so the OperationContext did not get a WriteUnitOfWork.
+            ASSERT_EQUALS(originalLocker, opCtx()->lockState());
+            ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+            ASSERT_FALSE(opCtx()->getWriteUnitOfWork());
         }
     }
 }

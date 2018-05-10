@@ -88,6 +88,9 @@ private:
     std::string _nonce;
 };
 
+extern template class SaslSCRAMServerMechanism<SCRAMSHA1Policy>;
+extern template class SaslSCRAMServerMechanism<SCRAMSHA256Policy>;
+
 template <typename ScramMechanism>
 class SCRAMServerFactory : public MakeServerFactory<ScramMechanism> {
 public:

@@ -33,10 +33,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace {
@@ -46,7 +48,11 @@ public:
     CmdCommitTxn() : BasicCommand("commitTransaction") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        return AllowedOnSecondary::kAlways;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -71,28 +77,95 @@ public:
         uassert(
             ErrorCodes::CommandFailed, "commitTransaction must be run within a session", session);
 
-        // TODO SERVER-33501 Change this when commitTransaction is retryable.
-        uassert(ErrorCodes::CommandFailed,
-                "Transaction isn't in progress",
-                opCtx->getWriteUnitOfWork() && session->inMultiDocumentTransaction());
+        // commitTransaction is retryable.
+        if (session->transactionIsCommitted()) {
+            return true;
+        }
 
-        auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        invariant(opObserver);
-        opObserver->onTransactionCommit(opCtx);
-        opCtx->getWriteUnitOfWork()->commit();
-        opCtx->setWriteUnitOfWork(nullptr);
+        uassert(ErrorCodes::NoSuchTransaction,
+                "Transaction isn't in progress",
+                session->inMultiDocumentTransaction());
+
+        session->commitTransaction(opCtx);
 
         return true;
     }
 
 } commitTxn;
 
+MONGO_FP_DECLARE(pauseAfterTransactionPrepare);
+
+// TODO: This is a stub for testing storage prepare functionality.
+class CmdPrepareTxn : public BasicCommand {
+public:
+    CmdPrepareTxn() : BasicCommand("prepareTransaction") {}
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kNever;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    std::string help() const override {
+        return "Preprares a transaction. THIS IS A STUB FOR TESTING.";
+    }
+
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) const override {
+        return Status::OK();
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        auto session = OperationContextSession::get(opCtx);
+        uassert(
+            ErrorCodes::CommandFailed, "prepareTransaction must be run within a session", session);
+
+        uassert(ErrorCodes::NoSuchTransaction,
+                "Transaction isn't in progress",
+                session->inMultiDocumentTransaction());
+
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onTransactionPrepare(opCtx);
+
+        // For testing purposes, this command prepares and immediately aborts the transaction,
+        // Running commit after prepare is not allowed yet.
+        // Prepared units of work cannot be released by the session, so we immediately abort here.
+        opCtx->getWriteUnitOfWork()->prepare();
+        // This failpoint will cause readers of prepared documents to return prepare conflicts.
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseAfterTransactionPrepare);
+        session->abortActiveTransaction(opCtx);
+        return true;
+    }
+};
+
+MONGO_INITIALIZER(RegisterPrepareTxnCmd)(InitializerContext* context) {
+    if (getTestCommandsEnabled()) {
+        new CmdPrepareTxn();
+    }
+    return Status::OK();
+}
+
 class CmdAbortTxn : public BasicCommand {
 public:
     CmdAbortTxn() : BasicCommand("abortTransaction") {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        return AllowedOnSecondary::kAlways;
+    }
+
+    virtual bool adminOnly() const {
+        return true;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -113,6 +186,16 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        auto session = OperationContextSession::get(opCtx);
+        uassert(
+            ErrorCodes::CommandFailed, "abortTransaction must be run within a session", session);
+
+        // TODO SERVER-33501 Change this when abortTransaction is retryable.
+        uassert(ErrorCodes::NoSuchTransaction,
+                "Transaction isn't in progress",
+                session->inMultiDocumentTransaction());
+
+        session->abortActiveTransaction(opCtx);
         return true;
     }
 

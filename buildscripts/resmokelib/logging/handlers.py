@@ -1,7 +1,4 @@
-"""
-Additional handlers that are used as the base classes of the buildlogger
-handler.
-"""
+"""Additional handlers that are used as the base classes of the buildlogger handler."""
 
 from __future__ import absolute_import
 
@@ -27,17 +24,16 @@ _TIMEOUT_SECS = 10
 
 
 class BufferedHandler(logging.Handler):
-    """
-    A handler class that buffers logging records in memory. Whenever
-    each record is added to the buffer, a check is made to see if the
-    buffer should be flushed. If it should, then flush() is expected to
-    do what's needed.
+    """A handler class that buffers logging records in memory.
+
+    Whenever each record is added to the buffer, a check is made to see if the buffer
+    should be flushed. If it should, then flush() is expected to do what's needed.
     """
 
     def __init__(self, capacity, interval_secs):
-        """
-        Initializes the handler with the buffer size and timeout after
-        which the buffer is flushed regardless.
+        """Initialize the handler with the buffer size and timeout.
+
+        These values determine when the buffer is flushed regardless.
         """
 
         logging.Handler.__init__(self)
@@ -68,18 +64,19 @@ class BufferedHandler(logging.Handler):
     # close() serialize accesses to 'self.__emit_buffer' in a more granular way via
     # 'self.__emit_lock'.
     def createLock(self):
+        """Create lock."""
         pass
 
     def acquire(self):
+        """Acquire."""
         pass
 
     def release(self):
+        """Release."""
         pass
 
-    def process_record(self, record):
-        """
-        Applies a transformation to the record before it gets added to
-        the buffer.
+    def process_record(self, record):  # pylint: disable=no-self-use
+        """Apply a transformation to the record before it gets added to the buffer.
 
         The default implementation returns 'record' unmodified.
         """
@@ -87,8 +84,7 @@ class BufferedHandler(logging.Handler):
         return record
 
     def emit(self, record):
-        """
-        Emits a record.
+        """Emit a record.
 
         Append the record to the buffer after it has been transformed by
         process_record(). If the length of the buffer is greater than or
@@ -117,9 +113,7 @@ class BufferedHandler(logging.Handler):
                     self.__flush_scheduled_by_emit = True
 
     def flush(self):
-        """
-        Ensures all logging output has been flushed.
-        """
+        """Ensure all logging output has been flushed."""
 
         self.__flush(close_called=False)
 
@@ -132,9 +126,7 @@ class BufferedHandler(logging.Handler):
                 self.__flush_scheduled_by_emit = False
 
     def __flush(self, close_called):
-        """
-        Ensures all logging output has been flushed.
-        """
+        """Ensure all logging output has been flushed."""
 
         with self.__emit_lock:
             buf = self.__emit_buffer
@@ -147,18 +139,13 @@ class BufferedHandler(logging.Handler):
                 self._flush_buffer_with_lock(buf, close_called)
 
     def _flush_buffer_with_lock(self, buf, close_called):
-        """
-        Ensures all logging output has been flushed.
-        """
+        """Ensure all logging output has been flushed."""
 
         raise NotImplementedError("_flush_buffer_with_lock must be implemented by BufferedHandler"
                                   " subclasses")
 
     def close(self):
-        """
-        Flushes the buffer and tidies up any resources used by this
-        handler.
-        """
+        """Flush the buffer and tidies up any resources used by this handler."""
 
         with self.__emit_lock:
             if self.__flush_event is not None:
@@ -170,15 +157,10 @@ class BufferedHandler(logging.Handler):
 
 
 class HTTPHandler(object):
-    """
-    A class which sends data to a web server using POST requests.
-    """
+    """A class which sends data to a web server using POST requests."""
 
     def __init__(self, url_root, username, password):
-        """
-        Initializes the handler with the necessary authentication
-        credentials.
-        """
+        """Initialize the handler with the necessary authentication credentials."""
 
         self.auth_handler = requests.auth.HTTPBasicAuth(username, password)
 
@@ -188,11 +170,9 @@ class HTTPHandler(object):
         return "%s/%s/" % (self.url_root.rstrip("/"), endpoint.strip("/"))
 
     def post(self, endpoint, data=None, headers=None, timeout_secs=_TIMEOUT_SECS):
-        """
-        Sends a POST request to the specified endpoint with the supplied
-        data.
+        """Send a POST request to the specified endpoint with the supplied data.
 
-        Returns the response, either as a string or a JSON object based
+        Return the response, either as a string or a JSON object based
         on the content type.
         """
 
@@ -225,12 +205,8 @@ class HTTPHandler(object):
                     # that defined InsecureRequestWarning.
                     pass
 
-            response = requests.post(url,
-                                     data=data,
-                                     headers=headers,
-                                     timeout=timeout_secs,
-                                     auth=self.auth_handler,
-                                     verify=should_validate_certificates)
+            response = requests.post(url, data=data, headers=headers, timeout=timeout_secs,
+                                     auth=self.auth_handler, verify=should_validate_certificates)
 
         response.raise_for_status()
 

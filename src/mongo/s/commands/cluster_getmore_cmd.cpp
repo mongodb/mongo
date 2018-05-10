@@ -81,6 +81,10 @@ public:
         return "retrieve more documents for a cursor id";
     }
 
+    LogicalOp getLogicalOp() const final {
+        return LogicalOp::opGetMore;
+    }
+
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) const final {
@@ -102,15 +106,11 @@ public:
         globalOpCounters.gotGetMore();
 
         StatusWith<GetMoreRequest> parseStatus = GetMoreRequest::parseFromBSON(dbname, cmdObj);
-        if (!parseStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, parseStatus.getStatus());
-        }
+        uassertStatusOK(parseStatus.getStatus());
         const GetMoreRequest& request = parseStatus.getValue();
 
         auto response = ClusterFind::runGetMore(opCtx, request);
-        if (!response.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, response.getStatus());
-        }
+        uassertStatusOK(response.getStatus());
 
         response.getValue().addToBSON(CursorResponse::ResponseType::SubsequentResponse, &result);
         return true;

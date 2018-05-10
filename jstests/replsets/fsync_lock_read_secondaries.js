@@ -48,9 +48,8 @@
     waitForAllMembers(master.getDB("foo"));
     replTest.awaitReplication();
 
-    // Calling getPrimary also makes available the liveNodes structure, which looks like this:
-    // liveNodes = {master: masterNode, slaves: [slave1, slave2] }
-    var slaves = replTest.liveNodes.slaves;
+    // Calling getPrimary also populates '_slaves'.
+    var slaves = replTest._slaves;
     slaves[0].setSlaveOk();
 
     assert.commandWorked(slaves[0].getDB("admin").runCommand({fsync: 1, lock: 1}));

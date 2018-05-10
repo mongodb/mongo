@@ -103,6 +103,11 @@ public:
 
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
 
+        // Check whether we are allowed to read from this node after acquiring our locks.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassertStatusOK(replCoord->checkCanServeReadsFor(
+            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
         Collection* collection = ctx.getCollection();
         if (!collection) {
             errmsg = "can't find ns";

@@ -182,11 +182,10 @@ if (typeof _threadInject != "undefined") {
 
             "connections_opened.js",  // counts connections, globally
             "opcounters_write_cmd.js",
-            "set_param1.js",                  // changes global state
-            "geo_update_btree2.js",           // SERVER-11132 test disables table scans
-            "update_setOnInsert.js",          // SERVER-9982
-            "max_time_ms.js",                 // Sensitive to query execution time, by design
-            "collection_info_cache_race.js",  // Requires collection exists
+            "set_param1.js",          // changes global state
+            "geo_update_btree2.js",   // SERVER-11132 test disables table scans
+            "update_setOnInsert.js",  // SERVER-9982
+            "max_time_ms.js",         // Sensitive to query execution time, by design
 
             // This overwrites MinKey/MaxKey's singleton which breaks
             // any other test that uses MinKey/MaxKey
@@ -228,6 +227,10 @@ if (typeof _threadInject != "undefined") {
             return fileList;
         };
 
+        // Transactions are not supported on standalone nodes so we do not run them here.
+        let txnsTestFiles = getFilesRecursive("jstests/core/txns").map(f => ("txns/" + f.baseName));
+        Object.assign(skipTests, makeKeys(txnsTestFiles));
+
         var parallelFilesDir = "jstests/core";
 
         // some tests can't be run in parallel with each other
@@ -268,6 +271,13 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_repair_cursor.js",
             parallelFilesDir + "/profile_sampling.js",
             parallelFilesDir + "/profile_update.js",
+
+            // These tests can't be run in parallel because they expect an awaitData cursor to
+            // return after maxTimeMS, however this doesn't work if a long running blocking
+            // operation is running in parallel.
+            // TODO: Remove this restriction as part of SERVER-33942.
+            parallelFilesDir + "/compact_keeps_indexes.js",
+            parallelFilesDir + "/awaitdata_getmore_cmd.js",
         ];
         var serialTests = makeKeys(serialTestsArr);
 
@@ -308,6 +318,10 @@ if (typeof _threadInject != "undefined") {
         args.forEach(function(x) {
             print("         S" + suite + " Test : " + x + " ...");
             var time = Date.timeFunc(function() {
+                // Create a new connection to the db for each file. If tests share the same
+                // connection it can create difficult to debug issues.
+                db = new Mongo(db.getMongo().host).getDB(db.getName());
+                gc();
                 load(x);
             }, 1);
             print("         S" + suite + " Test : " + x + " " + time + "ms");

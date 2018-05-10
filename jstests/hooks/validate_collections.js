@@ -70,7 +70,9 @@ function CollectionValidator() {
                           ' since collection was not found');
                     continue;
                 }
-                print('Collection validation failed with response: ' + tojson(res));
+                const host = db.getMongo().host;
+                print('Collection validation failed on host ' + host + ' with response: ' +
+                      tojson(res));
                 dumpCollection(coll, 100);
                 success = false;
             }
@@ -92,14 +94,14 @@ function CollectionValidator() {
             const dbNames = conn.getDBNames();
             for (let dbName of dbNames) {
                 if (!validatorFunc(conn.getDB(dbName), {full: true})) {
-                    return {ok: 0};
+                    return {ok: 0, host: host};
                 }
             }
             return {ok: 1};
         } catch (e) {
             print('Exception caught in scoped thread running validationCollections on server: ' +
                   host);
-            return {ok: 0, error: e.toString(), stack: e.stack};
+            return {ok: 0, error: e.toString(), stack: e.stack, host: host};
         }
     };
 

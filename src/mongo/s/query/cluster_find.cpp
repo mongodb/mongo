@@ -42,6 +42,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
@@ -50,10 +52,12 @@
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
@@ -160,35 +164,79 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     // Therefore, we must always send singleBatch=false (wantMore=true) to the shards.
     newQR->setWantMore(true);
 
-    invariantOK(newQR->validate());
+    invariant(newQR->validate());
     return std::move(newQR);
+}
+
+/**
+ * Constructs the find commands sent to each targeted shard to establish cursors, attaching the
+ * shardVersion and txnNumber, if necessary.
+ */
+std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
+    OperationContext* opCtx,
+    const CachedCollectionRoutingInfo& routingInfo,
+    const std::set<ShardId>& shardIds,
+    const CanonicalQuery& query,
+    bool appendGeoNearDistanceProjection,
+    boost::optional<LogicalTime> atClusterTime) {
+    const auto qrToForward = uassertStatusOK(
+        transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection));
+
+    if (atClusterTime) {
+        auto readConcernAtClusterTime =
+            appendAtClusterTimeToReadConcern(qrToForward->getReadConcern(), *atClusterTime);
+        qrToForward->setReadConcern(readConcernAtClusterTime);
+    }
+
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    std::vector<std::pair<ShardId, BSONObj>> requests;
+    for (const auto& shardId : shardIds) {
+        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+        invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::INVALID);
+
+        BSONObjBuilder cmdBuilder;
+        qrToForward->asFindCommand(&cmdBuilder);
+
+        if (routingInfo.cm()) {
+            ChunkVersion version(routingInfo.cm()->getVersion(shardId));
+            version.appendForCommands(&cmdBuilder);
+        } else if (!query.nss().isOnInternalDb()) {
+            ChunkVersion version(ChunkVersion::UNSHARDED());
+            version.appendForCommands(&cmdBuilder);
+        }
+
+        // TODO SERVER-33702: standardize method for attaching txnNumber through mongos.
+        if (opCtx->getTxnNumber()) {
+            cmdBuilder.append(OperationSessionInfo::kTxnNumberFieldName, *opCtx->getTxnNumber());
+        }
+
+        requests.emplace_back(shardId, cmdBuilder.obj());
+    }
+
+    return requests;
 }
 
 CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
-                                 ChunkManager* chunkManager,
-                                 std::shared_ptr<Shard> primary,
+                                 const CachedCollectionRoutingInfo& routingInfo,
                                  std::vector<BSONObj>* results) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
     // Get the set of shards on which we will run the query.
+    auto shardIds = getTargetedShardsForQuery(opCtx,
+                                              routingInfo,
+                                              query.getQueryRequest().getFilter(),
+                                              query.getQueryRequest().getCollation());
 
-    std::vector<std::shared_ptr<Shard>> shards;
-    if (chunkManager) {
-        std::set<ShardId> shardIds;
-        chunkManager->getShardIdsForQuery(opCtx,
-                                          query.getQueryRequest().getFilter(),
-                                          query.getQueryRequest().getCollation(),
-                                          &shardIds);
+    // Determine atClusterTime for snapshot reads. This will be a null time for requests with any
+    // other readConcern.
+    auto atClusterTime = computeAtClusterTime(opCtx,
+                                              false,
+                                              shardIds,
+                                              query.nss(),
+                                              query.getQueryRequest().getFilter(),
+                                              query.getQueryRequest().getCollation());
 
-        for (auto id : shardIds) {
-            shards.emplace_back(uassertStatusOK(shardRegistry->getShard(opCtx, id)));
-        }
-    } else {
-        shards.emplace_back(std::move(primary));
-    }
-
+    invariant(!atClusterTime || *atClusterTime != LogicalTime::kUninitialized);
     // Construct the query and parameters.
 
     ClusterClientCursorParams params(query.nss(), readPref);
@@ -198,6 +246,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.skip = query.getQueryRequest().getSkip();
     params.tailableMode = query.getQueryRequest().getTailableMode();
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
+    params.lsid = opCtx->getLogicalSessionId();
+    params.txnNumber = opCtx->getTxnNumber();
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
@@ -228,27 +278,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Tailable cursors can't have a sort, which should have already been validated.
     invariant(params.sort.isEmpty() || !query.getQueryRequest().isTailable());
 
-    const auto qrToForward = uassertStatusOK(
-        transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection));
-    // Construct the find command that we will use to establish cursors, attaching the shardVersion.
+    // Construct the requests that we will use to establish cursors on the targeted shards,
+    // attaching the shardVersion and txnNumber, if necessary.
 
-    std::vector<std::pair<ShardId, BSONObj>> requests;
-    for (const auto& shard : shards) {
-        invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::INVALID);
-
-        BSONObjBuilder cmdBuilder;
-        qrToForward->asFindCommand(&cmdBuilder);
-
-        if (chunkManager) {
-            ChunkVersion version(chunkManager->getVersion(shard->getId()));
-            version.appendForCommands(&cmdBuilder);
-        } else if (!query.nss().isOnInternalDb()) {
-            ChunkVersion version(ChunkVersion::UNSHARDED());
-            version.appendForCommands(&cmdBuilder);
-        }
-
-        requests.emplace_back(shard->getId(), cmdBuilder.obj());
-    }
+    auto requests = constructRequestsForShards(
+        opCtx, routingInfo, shardIds, query, appendGeoNearDistanceProjection, atClusterTime);
 
     // Establish the cursors with a consistent shardVersion across shards.
 
@@ -271,6 +305,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
     // Retrieve enough data from the ClusterClientCursor for the first batch of results.
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &waitInFindBeforeMakingBatch, opCtx, "waitInFindBeforeMakingBatch");
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
@@ -310,9 +347,14 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
+    // Fill out query exec properties.
+    CurOp::get(opCtx)->debug().nShards = ccc->getNumRemotes();
+    CurOp::get(opCtx)->debug().nreturned = results->size();
+
     // If the cursor is exhausted, then there are no more results to return and we don't need to
     // allocate a cursor id.
     if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
+        CurOp::get(opCtx)->debug().cursorExhausted = true;
         return CursorId(0);
     }
 
@@ -324,8 +366,12 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         : ClusterCursorManager::CursorLifetime::Mortal;
     auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
 
-    return uassertStatusOK(cursorManager->registerCursor(
+    auto cursorId = uassertStatusOK(cursorManager->registerCursor(
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUsers));
+
+    // Record the cursorID in CurOp.
+    CurOp::get(opCtx)->debug().cursorid = cursorId;
+    return cursorId;
 }
 
 /**
@@ -340,12 +386,9 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
     }
 
     if (cursor->isTailableAndAwaitData()) {
-        // A maxTimeMS specified on a tailable, awaitData cursor is special. Instead of imposing a
-        // deadline on the operation, it is used to communicate how long the server should wait for
-        // new results. Here we clear any deadline set during command processing and track the
-        // deadline instead via the 'waitForInsertsDeadline' decoration. This deadline defaults to
-        // 1 second if the user didn't specify a maxTimeMS.
-        opCtx->clearDeadline();
+        // For tailable + awaitData cursors, the request may have indicated a maximum amount of time
+        // to wait for new data. If not, default it to 1 second.  We track the deadline instead via
+        // the 'waitForInsertsDeadline' decoration.
         auto timeout = request.awaitDataTimeout.value_or(Milliseconds{1000});
         awaitDataState(opCtx).waitForInsertsDeadline =
             opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
@@ -363,7 +406,7 @@ Status setUpOperationContextStateForGetMore(OperationContext* opCtx,
 
 }  // namespace
 
-const size_t ClusterFind::kMaxStaleConfigRetries = 10;
+const size_t ClusterFind::kMaxRetries = 10;
 
 CursorId ClusterFind::runQuery(OperationContext* opCtx,
                                const CanonicalQuery& query,
@@ -384,7 +427,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
 
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
-    for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
+    for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
         auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, query.nss());
         if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
@@ -395,28 +438,118 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
         auto routingInfo = uassertStatusOK(routingInfoStatus);
 
         try {
-            return runQueryWithoutRetrying(
-                opCtx, query, readPref, routingInfo.cm().get(), routingInfo.primary(), results);
-        } catch (const DBException& ex) {
-            if (!ErrorCodes::isStaleShardingError(ex.code()) &&
-                ex.code() != ErrorCodes::ShardNotFound) {
-                // Errors other than trying to reach a non existent shard or receiving a stale
-                // metadata message from MongoD are fatal to the operation. Network errors and
-                // replication retries happen at the level of the AsyncResultsMerger.
+            return runQueryWithoutRetrying(opCtx, query, readPref, routingInfo, results);
+        } catch (DBException& ex) {
+            if (retries >= kMaxRetries) {
+                // Check if there are no retries remaining, so the last received error can be
+                // propagated to the caller.
+                ex.addContext(str::stream() << "Failed to run query after " << kMaxRetries
+                                            << " retries");
+                throw;
+            } else if (!ErrorCodes::isStaleShardVersionError(ex.code()) &&
+                       !ErrorCodes::isSnapshotError(ex.code()) &&
+                       ex.code() != ErrorCodes::ShardNotFound) {
+                // Errors other than stale metadata, snapshot unavailable, or from trying to reach a
+                // non existent shard are fatal to the operation. Network errors and replication
+                // retries happen at the level of the AsyncResultsMerger.
+                ex.addContext("Encountered non-retryable error during query");
                 throw;
             }
 
             LOG(1) << "Received error status for query " << redact(query.toStringShort())
-                   << " on attempt " << retries << " of " << kMaxStaleConfigRetries << ": "
-                   << redact(ex);
+                   << " on attempt " << retries << " of " << kMaxRetries << ": " << redact(ex);
 
-            catalogCache->onStaleConfigError(std::move(routingInfo));
+            // Note: there is no need to refresh metadata on snapshot errors since the request
+            // failed because atClusterTime was too low, not because the wrong shards were targeted,
+            // and subsequent attempts will choose a later atClusterTime.
+            if (ErrorCodes::isStaleShardVersionError(ex.code()) ||
+                ex.code() == ErrorCodes::ShardNotFound) {
+                catalogCache->onStaleShardVersion(std::move(routingInfo));
+            }
         }
     }
 
-    uasserted(ErrorCodes::StaleShardVersion,
-              str::stream() << "Retried " << kMaxStaleConfigRetries
-                            << " times without successfully establishing shard version.");
+    MONGO_UNREACHABLE
+}
+
+/**
+ * Validates that the lsid on the OperationContext matches that on the cursor, returning it to the
+ * ClusterClusterCursor manager if it does not.
+ */
+void validateLSID(OperationContext* opCtx,
+                  const GetMoreRequest& request,
+                  ClusterCursorManager::PinnedCursor* cursor) {
+    if (opCtx->getLogicalSessionId() && !cursor->getLsid()) {
+        uasserted(50799,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was not created in a session, in session "
+                                << *opCtx->getLogicalSessionId());
+    }
+
+    if (!opCtx->getLogicalSessionId() && cursor->getLsid()) {
+        uasserted(50800,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in session "
+                                << *cursor->getLsid()
+                                << ", without an lsid");
+    }
+
+    if (opCtx->getLogicalSessionId() && cursor->getLsid() &&
+        (*opCtx->getLogicalSessionId() != *cursor->getLsid())) {
+        uasserted(50801,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in session "
+                                << *cursor->getLsid()
+                                << ", in session "
+                                << *opCtx->getLogicalSessionId());
+    }
+}
+
+/**
+ * Validates that the txnNumber on the OperationContext matches that on the cursor, returning it to
+ * the ClusterClusterCursor manager if it does not.
+ */
+void validateTxnNumber(OperationContext* opCtx,
+                       const GetMoreRequest& request,
+                       ClusterCursorManager::PinnedCursor* cursor) {
+    if (opCtx->getTxnNumber() && !cursor->getTxnNumber()) {
+        uasserted(50802,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was not created in a transaction, in transaction "
+                                << *opCtx->getTxnNumber());
+    }
+
+    if (!opCtx->getTxnNumber() && cursor->getTxnNumber()) {
+        uasserted(50803,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in transaction "
+                                << *cursor->getTxnNumber()
+                                << ", without a txnNumber");
+    }
+
+    if (opCtx->getTxnNumber() && cursor->getTxnNumber() &&
+        (*opCtx->getTxnNumber() != *cursor->getTxnNumber())) {
+        uasserted(50804,
+                  str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                                << ", which was created in transaction "
+                                << *cursor->getTxnNumber()
+                                << ", in transaction "
+                                << *opCtx->getTxnNumber());
+    }
+}
+
+/**
+ * Validates that the OperationSessionInfo (i.e. txnNumber and lsid) on the OperationContext match
+ * that stored on the cursor. The cursor is returned to the ClusterCursorManager if it does not.
+ */
+void validateOperationSessionInfo(OperationContext* opCtx,
+                                  const GetMoreRequest& request,
+                                  ClusterCursorManager::PinnedCursor* cursor) {
+    ScopeGuard returnCursorGuard = MakeGuard(
+        [cursor] { cursor->returnCursor(ClusterCursorManager::CursorState::NotExhausted); });
+    validateLSID(opCtx, request, cursor);
+    validateTxnNumber(opCtx, request, cursor);
+    returnCursorGuard.Dismiss();
 }
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
@@ -437,16 +570,24 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
 
+    validateOperationSessionInfo(opCtx, request, &pinnedCursor.getValue());
+
     // Set the originatingCommand object and the cursorID in CurOp.
     {
+        CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue().getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = request.cursorid;
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setOriginatingCommand_inlock(
             pinnedCursor.getValue().getOriginatingCommand());
     }
 
-    // If the fail point is enabled, busy wait until it is disabled.
-    while (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+    // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the 'msg'
+    // field of this operation's CurOp to signal that we've hit this point.
+    if (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &waitAfterPinningCursorBeforeGetMoreBatch,
+            opCtx,
+            "waitAfterPinningCursorBeforeGetMoreBatch");
     }
 
     auto opCtxSetupStatus =
@@ -515,6 +656,18 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)
         ? CursorId(0)
         : request.cursorid;
+
+    // Set nReturned and whether the cursor has been exhausted.
+    CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
+    CurOp::get(opCtx)->debug().nreturned = batch.size();
+
+    if (MONGO_FAIL_POINT(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch,
+            opCtx,
+            "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
+    }
+
     return CursorResponse(request.nss, idToReturn, std::move(batch), startingFrom);
 }
 

@@ -90,6 +90,10 @@ void CatalogCacheLoaderMock::waitForCollectionFlush(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) {
+    MONGO_UNREACHABLE;
+}
+
 std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
     const NamespaceString& nss,
     ChunkVersion version,
@@ -122,6 +126,12 @@ std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
     }));
 
     return notify;
+}
+
+void CatalogCacheLoaderMock::getDatabase(
+    StringData dbName,
+    stdx::function<void(OperationContext*, StatusWith<DatabaseType>)> callbackFn) {
+    // Not implemented
 }
 
 void CatalogCacheLoaderMock::setCollectionRefreshReturnValue(

@@ -3,7 +3,7 @@
 // @tags: [requires_sharding]
 //
 
-// TODO: SERVER-33444 remove shardAsReplicaSet: false
+// TODO: SERVER-33601 remove shardAsReplicaSet: false
 var st = new ShardingTest({shards: 2, mongos: 1, other: {shardAsReplicaSet: false}});
 
 var mongos = st.s0;

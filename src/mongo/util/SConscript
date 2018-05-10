@@ -343,9 +343,12 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
             'heap_profiler.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/db/server_parameters',
             '$BUILD_DIR/mongo/transport/service_executor',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/commands/server_status',
+            'processinfo',
         ],
         LIBDEPS_DEPENDENTS=[
             '$BUILD_DIR/mongo/mongodmain',

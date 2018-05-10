@@ -189,12 +189,4 @@ LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromCl
     return lsids;
 }
 
-Status SessionsCommandFCV34Status(StringData command) {
-    StringBuilder sb;
-    sb << command;
-    sb << " is not available in featureCompatibilityVersion 3.4. See ";
-    sb << feature_compatibility_version_documentation::kCompatibilityLink << " .";
-    return {ErrorCodes::InvalidOptions, sb.str()};
-}
-
 }  // namespace mongo

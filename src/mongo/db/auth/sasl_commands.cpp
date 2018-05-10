@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -282,10 +283,7 @@ bool CmdSaslStart::run(OperationContext* opCtx,
 
     StatusWith<std::unique_ptr<AuthenticationSession>> swSession =
         doSaslStart(opCtx, db, cmdObj, &result);
-    CommandHelpers::appendCommandStatus(result, swSession.getStatus());
-    if (!swSession.isOK()) {
-        return false;
-    }
+    uassertStatusOK(swSession.getStatus());
     auto session = std::move(swSession.getValue());
 
     auto& mechanism = session->getMechanism();
@@ -316,8 +314,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     AuthenticationSession::swap(client, sessionGuard);
 
     if (!sessionGuard) {
-        return CommandHelpers::appendCommandStatus(
-            result, Status(ErrorCodes::ProtocolError, "No SASL session state found"));
+        uasserted(ErrorCodes::ProtocolError, "No SASL session state found");
     }
 
     AuthenticationSession* session = static_cast<AuthenticationSession*>(sessionGuard.get());
@@ -326,14 +323,12 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     // Authenticating the __system@local user to the admin database on mongos is required
     // by the auth passthrough test suite.
     if (mechanism.getAuthenticationDatabase() != db && !getTestCommandsEnabled()) {
-        return CommandHelpers::appendCommandStatus(
-            result,
-            Status(ErrorCodes::ProtocolError,
-                   "Attempt to switch database target during SASL authentication."));
+        uasserted(ErrorCodes::ProtocolError,
+                  "Attempt to switch database target during SASL authentication.");
     }
 
     Status status = doSaslContinue(opCtx, session, cmdObj, &result);
-    CommandHelpers::appendCommandStatus(result, status);
+    CommandHelpers::appendCommandStatusNoThrow(result, status);
 
     if (mechanism.isDone()) {
         audit::logAuthentication(
@@ -351,8 +346,8 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
 // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
 MONGO_INITIALIZER(PreSaslCommands)
 (InitializerContext*) {
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
-        CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
+    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism))
+        disableAuthMechanism(kX509AuthMechanism);
 
     return Status::OK();
 }

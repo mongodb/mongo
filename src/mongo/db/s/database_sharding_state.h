@@ -35,6 +35,7 @@
 
 namespace mongo {
 
+class MovePrimarySourceManager;
 class OperationContext;
 
 /**
@@ -63,6 +64,13 @@ public:
     }
 
     /**
+     * Returns this shard server's cached dbVersion, if one is cached.
+     *
+     * Invariants that the caller holds the DBLock in X or IS.
+     */
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const;
+
+    /**
      * Sets this shard server's cached dbVersion to newVersion.
      *
      * Invariants that the caller holds the DBLock in X mode.
@@ -76,6 +84,25 @@ public:
      */
     void checkDbVersion(OperationContext* opCtx) const;
 
+    /**
+     * Returns the active movePrimary source manager, if one is available.
+     */
+    MovePrimarySourceManager* getMovePrimarySourceManager();
+
+    /**
+     * Attaches a movePrimary source manager to this database's sharding state. Must be called with
+     * the database lock in X mode. May not be called if there is a movePrimary source manager
+     * already installed. Must be followed by a call to clearMovePrimarySourceManager.
+     */
+    void setMovePrimarySourceManager(OperationContext* opCtx, MovePrimarySourceManager* sourceMgr);
+
+    /**
+     * Removes a movePrimary source manager from this database's sharding state. Must be called with
+     * with the database lock in X mode. May not be called if there isn't a movePrimary source
+     * manager installed already through a previous call to setMovePrimarySourceManager.
+     */
+    void clearMovePrimarySourceManager(OperationContext* opCtx);
+
 private:
     // Modifying the state below requires holding the DBLock in X mode; holding the DBLock in any
     // mode is acceptable for reading it. (Note: accessing this class at all requires holding the
@@ -86,6 +113,13 @@ private:
     // This shard server's cached dbVersion. If boost::none, indicates this shard server does not
     // know the dbVersion.
     boost::optional<DatabaseVersion> _dbVersion = boost::none;
+
+    // If this database is serving as a source shard for a movePrimary, the source manager will be
+    // non-null. To write this value, there needs to be X-lock on the database in order to
+    // synchronize with other callers which will read the source manager.
+    //
+    // NOTE: The source manager is not owned by this class.
+    MovePrimarySourceManager* _sourceMgr{nullptr};
 };
 
 }  // namespace mongo

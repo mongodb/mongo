@@ -39,15 +39,15 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/version.h"
@@ -123,7 +123,7 @@ Status addMongoShellOptions(moe::OptionSection* options) {
                            "gssapiServiceName",
                            moe::String,
                            "Service name to use when authenticating using GSSAPI/Kerberos")
-        .setDefault(moe::Value(std::string(saslDefaultServiceName)));
+        .setDefault(moe::Value(saslDefaultServiceName.toString()));
 
     authenticationOptions.addOptionChaining(
         "gssapiHostName",

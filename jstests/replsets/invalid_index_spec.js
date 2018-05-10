@@ -32,14 +32,6 @@
     assert.commandWorked(primaryDB.runCommand(
         {createIndexes: "test", indexes: [{v: 2, name: "x_1", key: {x: 1}, invalidOption2: 1}]}));
 
-    const msg1 = "Fatal assertion 34437";
-    const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
-
-    const assertFn = function() {
-        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
-    };
-    assert.soon(assertFn, "Replication should have aborted on invalid index specification", 60000);
-
     assert.soon(function() {
         try {
             secondaryAdminDB.runCommand({ping: 1});
@@ -50,5 +42,12 @@
     }, "Node did not terminate due to invalid index spec", 60 * 1000);
 
     replTest.stop(secondary, undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
+
+    const msg1 = "Fatal assertion 34437";
+    const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
+
+    assert(rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2),
+           "Replication should have aborted on invalid index specification");
+
     replTest.stopSet();
 })();

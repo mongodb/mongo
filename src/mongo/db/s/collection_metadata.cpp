@@ -52,10 +52,10 @@ RangeMap CollectionMetadata::getChunks() const {
     RangeMap chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>());
 
     for (const auto& chunk : _cm->chunks()) {
-        if (chunk->getShardId() != _thisShardId)
+        if (chunk.getShardId() != _thisShardId)
             continue;
 
-        chunksMap.emplace_hint(chunksMap.end(), chunk->getMin(), chunk->getMax());
+        chunksMap.emplace_hint(chunksMap.end(), chunk.getMin(), chunk.getMax());
     }
 
     return chunksMap;
@@ -67,18 +67,18 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
         return false;
 
     const auto& nextChunk = *foundIt.begin();
-    chunk->setMin(nextChunk->getMin());
-    chunk->setMax(nextChunk->getMax());
+    chunk->setMin(nextChunk.getMin());
+    chunk->setMax(nextChunk.getMax());
     return true;
 }
 
 bool CollectionMetadata::getDifferentChunk(const BSONObj& chunkMinKey,
                                            ChunkType* differentChunk) const {
     for (const auto& found : _cm->chunks()) {
-        if (found->getShardId() == _thisShardId) {
-            if (found->getMin().woCompare(chunkMinKey) != 0) {
-                differentChunk->setMin(found->getMin());
-                differentChunk->setMax(found->getMax());
+        if (found.getShardId() == _thisShardId) {
+            if (found.getMin().woCompare(chunkMinKey) != 0) {
+                differentChunk->setMin(found.getMin());
+                differentChunk->setMax(found.getMax());
                 return true;
             }
         }
@@ -116,10 +116,10 @@ void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
 
 void CollectionMetadata::toBSONChunks(BSONArrayBuilder& bb) const {
     for (const auto& chunk : _cm->chunks()) {
-        if (chunk->getShardId() == _thisShardId) {
+        if (chunk.getShardId() == _thisShardId) {
             BSONArrayBuilder chunkBB(bb.subarrayStart());
-            chunkBB.append(chunk->getMin());
-            chunkBB.append(chunk->getMax());
+            chunkBB.append(chunk.getMin());
+            chunkBB.append(chunk.getMax());
             chunkBB.done();
         }
     }

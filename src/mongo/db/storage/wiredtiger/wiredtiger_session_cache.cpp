@@ -49,29 +49,37 @@
 
 namespace mongo {
 
-AtomicInt32 kWiredTigerCursorCacheSize(10000);
+// The "wiredTigerCursorCacheSize" parameter has the following meaning.
+//
+// wiredTigerCursorCacheSize == 0
+// For this setting, cursors are only cached in the WiredTiger storage engine
+// itself. Operations that need exclusive access such as drop or verify will
+// not be blocked by inactive cached cursors with this setting. However, this
+// setting may reduce the performance of certain workloads that normally
+// benefit from cursor caching above the storage engine.
+//
+// wiredTigerCursorCacheSize > 0
+// WiredTiger-level caching of cursors is disabled but cursor caching does
+// occur above the storage engine. The value of this setting represents the
+// maximum number of cursors that are cached. Setting the value to 10000 will
+// give the old (<= 3.6) behavior. Note that cursors remain cached, even when a
+// session is released back to the cache. Thus, exclusive operations may be
+// blocked temporarily, and in some cases, a long time. Drops that fail because
+// of exclusivity silently succeed and are queued for retries.
+//
+// wiredTigerCursorCacheSize < 0
+// This is a hybrid approach of the above two, and is the default. The the
+// absolute value of the setting is used as the number of cursors cached above
+// the storage engine. When a session is released, all cursors are closed, and
+// will be cached in WiredTiger. Exclusive operations should only be blocked
+// for a short time, except if a cursor is held by a long running session. This
+// is a good compromise for most workloads.
+AtomicInt32 kWiredTigerCursorCacheSize(-100);
 
-class WiredTigerCursorCacheSize
-    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
-public:
-    WiredTigerCursorCacheSize()
-        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(),
-              "wiredTigerCursorCacheSize",
-              &kWiredTigerCursorCacheSize) {}
-
-    virtual Status validate(const std::int32_t& potentialNewValue) {
-        if (potentialNewValue < 0) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "wiredTigerCursorCacheSize must be greater than or equal "
-                              << "to 0, but attempted to set to: "
-                              << potentialNewValue);
-        }
-
-        return Status::OK();
-    }
-} WiredTigerCursorCacheSizeSetting;
+ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>
+    WiredTigerCursorCacheSizeSetting(ServerParameterSet::getGlobal(),
+                                     "wiredTigerCursorCacheSize",
+                                     &kWiredTigerCursorCacheSize);
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
     : _epoch(epoch), _cursorEpoch(cursorEpoch), _session(NULL), _cursorGen(0), _cursorsOut(0) {
@@ -128,8 +136,10 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     // Cursors are pushed to the front of the list and removed from the back
     _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor));
 
-    std::uint64_t cursorCacheSize = static_cast<std::uint64_t>(kWiredTigerCursorCacheSize.load());
-    while (!_cursors.empty() && _cursorGen - _cursors.back()._gen > cursorCacheSize) {
+    // A negative value for wiredTigercursorCacheSize means to use hybrid caching.
+    std::uint32_t cacheSize = abs(kWiredTigerCursorCacheSize.load());
+
+    while (!_cursors.empty() && _cursorGen - _cursors.back()._gen > cacheSize) {
         cursor = _cursors.back()._cursor;
         _cursors.pop_back();
         invariantWTOK(cursor->close(cursor));
@@ -235,14 +245,8 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
         {
             stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
             JournalListener::Token token = _journalListener->getToken();
-            const bool keepOldBehavior = true;
-            if (keepOldBehavior) {
-                invariantWTOK(s->checkpoint(s, nullptr));
-            } else {
-                std::string config =
-                    stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
-                invariantWTOK(s->checkpoint(s, config.c_str()));
-            }
+            auto config = stableCheckpoint ? "use_timestamp=true" : "use_timestamp=false";
+            invariantWTOK(s->checkpoint(s, config));
             _journalListener->onDurable(token);
         }
         LOG(4) << "created checkpoint (forced)";
@@ -283,6 +287,25 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableC
     }
     _journalListener->onDurable(token);
 }
+
+void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(OperationContext* opCtx) {
+    invariant(opCtx);
+    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+
+    auto lastCounter = _lastCommitOrAbortCounter;
+    opCtx->waitForConditionOrInterrupt(_prepareCommittedOrAbortedCond, lk, [&] {
+        return lastCounter != _lastCommitOrAbortCounter;
+    });
+}
+
+void WiredTigerSessionCache::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
+    {
+        stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
+        _lastCommitOrAbortCounter++;
+    }
+    _prepareCommittedOrAbortedCond.notify_all();
+}
+
 
 void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
@@ -368,6 +391,11 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         invariant(range == 0);
 
         // Release resources in the session we're about to cache.
+        // If we are using hybrid caching, then close cursors now and let them
+        // be cached at the WiredTiger level.
+        if (kWiredTigerCursorCacheSize.load() < 0) {
+            session->closeAllCursors("");
+        }
         invariantWTOK(ss->reset(ss));
     }
 
@@ -378,6 +406,11 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 
     bool returnedToCache = false;
     uint64_t currentEpoch = _epoch.load();
+    bool dropQueuedIdentsAtSessionEnd = session->isDropQueuedIdentsAtSessionEndAllowed();
+
+    // Reset this session's flag for dropping queued idents to default, before returning it to
+    // session cache.
+    session->dropQueuedIdentsAtSessionEndAllowed(true);
 
     if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
         stdx::lock_guard<stdx::mutex> lock(_cacheLock);
@@ -391,7 +424,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     if (!returnedToCache)
         delete session;
 
-    if (_engine && _engine->haveDropsQueued())
+    if (dropQueuedIdentsAtSessionEnd && _engine && _engine->haveDropsQueued())
         _engine->dropSomeQueuedIdents();
 }
 
@@ -399,6 +432,10 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
     stdx::unique_lock<stdx::mutex> lk(_journalListenerMutex);
     _journalListener = jl;
+}
+
+bool WiredTigerSessionCache::isEngineCachingCursors() {
+    return kWiredTigerCursorCacheSize.load() <= 0;
 }
 
 void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(

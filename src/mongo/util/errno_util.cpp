@@ -48,7 +48,7 @@ const int kBuflen = 256;  // strerror strings in non-English locales can be larg
 
 std::string errnoWithDescription(int errNumber) {
 #if defined(_WIN32)
-    if (errNumber < 0)
+    if (errNumber == -1)
         errNumber = GetLastError();
 #else
     if (errNumber < 0)

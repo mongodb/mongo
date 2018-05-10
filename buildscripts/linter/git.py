@@ -69,7 +69,7 @@ class Repo(_git.Repository):
 
         Returns the full path to the file for clang-format to consume.
         """
-        if candidates is not None and len(candidates) > 0:
+        if candidates is not None and len(candidates) > 0:  # pylint: disable=len-as-condition
             candidates = [self._get_local_dir(f) for f in candidates]
             valid_files = list(
                 set(candidates).intersection(self.get_candidate_files(filter_function)))
@@ -150,7 +150,7 @@ def get_files_to_check(files, filter_function):
     candidates_nested = [expand_file_string(f) for f in files]
     candidates = list(itertools.chain.from_iterable(candidates_nested))
 
-    if len(files) > 0 and len(candidates) == 0:
+    if files and not candidates:
         raise ValueError("Globs '%s' did not find any files with glob." % (files))
 
     repos = get_repos()
@@ -159,7 +159,7 @@ def get_files_to_check(files, filter_function):
         itertools.chain.from_iterable(
             [r.get_candidates(candidates, filter_function) for r in repos]))
 
-    if len(files) > 0 and len(valid_files) == 0:
+    if files and not valid_files:
         raise ValueError("Globs '%s' did not find any files with glob in git." % (files))
 
     return valid_files

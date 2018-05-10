@@ -220,8 +220,8 @@ function runTest(s) {
 
     // Verify that data is also on secondary
     jsTestLog("Test G");
-    var primary = s.rs0.liveNodes.master;
-    var secondaries = s.rs0.liveNodes.slaves;
+    var primary = s.rs0._master;
+    var secondaries = s.rs0._slaves;
 
     // Stop the balancer to prevent new writes from happening and make sure
     // that replication can keep up even on slow machines.

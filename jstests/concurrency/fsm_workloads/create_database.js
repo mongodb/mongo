@@ -149,7 +149,7 @@ var $config = (function() {
         // * 30 iterations worth of data to disk, or about 10GB, which can be slow on
         // test hosts.
         threadCount: 10,
-        iterations: 180, states, transitions,
+        iterations: 120, states, transitions,
         skip: skip,
     };
 })();

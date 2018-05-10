@@ -7,29 +7,23 @@ import jira
 
 class JiraClient(object):
     """A client for JIRA."""
+
     CLOSE_TRANSITION_NAME = "Close Issue"
     RESOLVE_TRANSITION_NAME = "Resolve Issue"
     FIXED_RESOLUTION_NAME = "Fixed"
     WONT_FIX_RESOLUTION_NAME = "Won't Fix"
 
-    def __init__(self,
-                 server,
-                 username=None,
-                 password=None,
-                 access_token=None,
-                 access_token_secret=None,
-                 consumer_key=None,
-                 key_cert=None):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, server, username=None, password=None, access_token=None, access_token_secret=None,
+            consumer_key=None, key_cert=None):
         """Initialize the JiraClient with the server URL and user credentials."""
         opts = {"server": server, "verify": True}
         basic_auth = None
         oauth_dict = None
         if access_token and access_token_secret and consumer_key and key_cert:
             oauth_dict = {
-                "access_token": access_token,
-                "access_token_secret": access_token_secret,
-                "consumer_key": consumer_key,
-                "key_cert": key_cert
+                "access_token": access_token, "access_token_secret": access_token_secret,
+                "consumer_key": consumer_key, "key_cert": key_cert
             }
         elif username and password:
             basic_auth = (username, password)
@@ -37,18 +31,17 @@ class JiraClient(object):
             raise TypeError("Must specify Basic Auth (using arguments username & password)"
                             " or OAuth (using arguments access_token, access_token_secret,"
                             " consumer_key & key_cert_file) credentials")
-        self._jira = jira.JIRA(
-            options=opts, basic_auth=basic_auth, oauth=oauth_dict, validate=True)
+        self._jira = jira.JIRA(options=opts, basic_auth=basic_auth, oauth=oauth_dict, validate=True)
 
         self._transitions = {}
         self._resolutions = {}
 
     def create_issue(self, project, summary, description, labels=None):
         """Create an issue."""
-        fields = {"project": project,
-                  "issuetype": {"name": "Task"},
-                  "summary": summary,
-                  "description": description}
+        fields = {
+            "project": project, "issuetype": {"name": "Task"}, "summary": summary,
+            "description": description
+        }
         new_issue = self._jira.create_issue(fields=fields)
         if labels:
             new_issue.update(fields={"labels": labels})

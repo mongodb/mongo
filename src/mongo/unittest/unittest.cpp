@@ -76,9 +76,9 @@ logger::LogstreamBuilder log() {
 }
 
 void setupTestLogger() {
-    unittestOutput->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
-        new logger::ConsoleAppender<logger::MessageLogDomain::Event>(
-            new logger::MessageEventDetailsEncoder)));
+    unittestOutput->attachAppender(
+        std::make_unique<logger::ConsoleAppender<logger::MessageLogDomain::Event>>(
+            std::make_unique<logger::MessageEventDetailsEncoder>()));
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput, ("GlobalLogManager", "default"))
@@ -231,7 +231,7 @@ void Test::startCapturingLogMessages() {
     invariant(!_isCapturingLogMessages);
     _capturedLogMessages.clear();
     if (!_captureAppender) {
-        _captureAppender = stdx::make_unique<StringVectorAppender>(&_capturedLogMessages);
+        _captureAppender = std::make_unique<StringVectorAppender>(&_capturedLogMessages);
     }
     checked_cast<StringVectorAppender*>(_captureAppender.get())->enable();
     _captureAppenderHandle = logger::globalLogDomain()->attachAppender(std::move(_captureAppender));
@@ -266,7 +266,7 @@ Suite::Suite(const std::string& name) : _name(name) {
 Suite::~Suite() {}
 
 void Suite::add(const std::string& name, const TestFunction& testFn) {
-    _tests.push_back(stdx::make_unique<TestHolder>(name, testFn));
+    _tests.push_back(std::make_unique<TestHolder>(name, testFn));
 }
 
 Result* Suite::run(const std::string& filter, int runsPerTest) {

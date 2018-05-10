@@ -110,28 +110,35 @@ std::ostream& operator<<(std::ostream& os, const Status& status) {
     return os << status.codeString() << " " << status.reason();
 }
 
-std::string Status::toString() const {
-    StringBuilder ss;
-    ss << codeString();
-    if (!isOK()) {
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& sb, const Status& status) {
+    sb << status.codeString();
+    if (!status.isOK()) {
         try {
-            if (auto extra = extraInfo()) {
+            if (auto extra = status.extraInfo()) {
                 BSONObjBuilder bob;
                 extra->serialize(&bob);
-                ss << bob.obj();
+                sb << bob.obj();
             }
         } catch (const DBException&) {
             // This really shouldn't happen but it would be really annoying if it broke error
             // logging in production.
             if (kDebugBuild) {
-                severe() << "Error serializing extra info for " << code()
+                severe() << "Error serializing extra info for " << status.code()
                          << " in Status::toString()";
                 std::terminate();
             }
         }
-        ss << ": " << reason();
+        sb << ": " << status.reason();
     }
-    return ss.str();
+    return sb;
+}
+template StringBuilder& operator<<(StringBuilder& sb, const Status& status);
+
+std::string Status::toString() const {
+    StringBuilder sb;
+    sb << *this;
+    return sb.str();
 }
 
 }  // namespace mongo

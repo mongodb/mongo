@@ -55,8 +55,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/profile_common.h"
+#include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/commands/shutdown.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -86,6 +87,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/storage_stats.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
@@ -93,6 +95,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -102,41 +105,6 @@ using std::stringstream;
 using std::unique_ptr;
 
 namespace {
-
-class CmdShutdownMongoD : public CmdShutdown {
-public:
-    std::string help() const override {
-        return "shutdown the database.  must be ran against admin db and "
-               "either (1) ran from localhost or (2) authenticated. If "
-               "this is a primary in a replica set and there is no member "
-               "within 10 seconds of its optime, it will not shutdown "
-               "without force : true.  You can also specify timeoutSecs : "
-               "N to wait N seconds for other members to catch up.";
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-
-        long long timeoutSecs = 10;
-        if (cmdObj.hasField("timeoutSecs")) {
-            timeoutSecs = cmdObj["timeoutSecs"].numberLong();
-        }
-
-        Status status = repl::ReplicationCoordinator::get(opCtx)->stepDown(
-            opCtx, force, Seconds(timeoutSecs), Seconds(120));
-        if (!status.isOK() && status.code() != ErrorCodes::NotMaster) {  // ignore not master
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
-        // Never returns
-        shutdownHelper(cmdObj);
-        return true;
-    }
-
-} cmdShutdownMongoD;
 
 class CmdDropDatabase : public BasicCommand {
 public:
@@ -169,37 +137,33 @@ public:
         // disallow dropping the config database
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
             (dbname == NamespaceString::kConfigDb)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "Cannot drop 'config' database if mongod started "
-                       "with --configsvr"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      "Cannot drop 'config' database if mongod started "
+                      "with --configsvr");
         }
 
         if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
             (dbname == NamespaceString::kLocalDb)) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       str::stream() << "Cannot drop '" << dbname
-                                     << "' database while replication is active"));
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot drop '" << dbname
+                                    << "' database while replication is active");
         }
         BSONElement e = cmdObj.firstElement();
         int p = (int)e.number();
         if (p != 1) {
-            return CommandHelpers::appendCommandStatus(
-                result, Status(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter"));
+            uasserted(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter");
         }
 
         Status status = dropDatabase(opCtx, dbname);
         if (status == ErrorCodes::NamespaceNotFound) {
-            return CommandHelpers::appendCommandStatus(result, Status::OK());
+            return true;
         }
         if (status.isOK()) {
             result.append("dropped", dbname);
         }
-        return CommandHelpers::appendCommandStatus(result, status);
+        uassertStatusOK(status);
+        return true;
     }
 
 } cmdDropDatabase;
@@ -244,18 +208,17 @@ public:
 
         // Closing a database requires a global lock.
         Lock::GlobalWrite lk(opCtx);
-        auto db = dbHolder().get(opCtx, dbname);
+        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbname);
         if (db) {
             if (db->isDropPending(opCtx)) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    Status(ErrorCodes::DatabaseDropPending,
-                           str::stream() << "Cannot repair database " << dbname
-                                         << " since it is pending being dropped."));
+                uasserted(ErrorCodes::DatabaseDropPending,
+                          str::stream() << "Cannot repair database " << dbname
+                                        << " since it is pending being dropped.");
             }
         } else {
             // If the name doesn't make an exact match, check for a case insensitive match.
-            std::set<std::string> otherCasing = dbHolder().getNamesWithConflictingCasing(dbname);
+            std::set<std::string> otherCasing =
+                DatabaseHolder::getDatabaseHolder().getNamesWithConflictingCasing(dbname);
             if (otherCasing.empty()) {
                 // Database doesn't exist. Treat this as a success (historical behavior).
                 return true;
@@ -283,119 +246,17 @@ public:
         e = cmdObj.getField("backupOriginalFiles");
         bool backupOriginalFiles = e.isBoolean() && e.boolean();
 
-        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
+        StorageEngine* engine = getGlobalServiceContext()->getStorageEngine();
         repl::UnreplicatedWritesBlock uwb(opCtx);
         Status status = repairDatabase(
             opCtx, engine, dbname, preserveClonedFilesOnFailure, backupOriginalFiles);
 
         // Open database before returning
-        dbHolder().openDb(opCtx, dbname);
-        return CommandHelpers::appendCommandStatus(result, status);
+        DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbname);
+        uassertStatusOK(status);
+        return true;
     }
 } cmdRepairDatabase;
-
-/* set db profiling level
-   todo: how do we handle profiling information put in the db with replication?
-         sensibly or not?
-*/
-class CmdProfile : public ErrmsgCommandDeprecated {
-public:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    std::string help() const override {
-        return "enable or disable performance profiling\n"
-               "{ profile : <n> }\n"
-               "0=off 1=log slow ops 2=log all\n"
-               "-1 to get current values\n"
-               "http://docs.mongodb.org/manual/reference/command/profile/#dbcmd.profile";
-    }
-
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-
-        if (cmdObj.firstElement().numberInt() == -1 && !cmdObj.hasField("slowms") &&
-            !cmdObj.hasField("sampleRate")) {
-            // If you just want to get the current profiling level you can do so with just
-            // read access to system.profile, even if you can't change the profiling level.
-            if (authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(dbname, "system.profile")),
-                    ActionType::find)) {
-                return Status::OK();
-            }
-        }
-
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
-                                                           ActionType::enableProfiler)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
-    }
-
-    CmdProfile() : ErrmsgCommandDeprecated("profile") {}
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
-        BSONElement firstElement = cmdObj.firstElement();
-        int profilingLevel = firstElement.numberInt();
-
-        // If profilingLevel is 0, 1, or 2, needs to be locked exclusively,
-        // because creates the system.profile collection in the local database.
-
-        const bool readOnly = (profilingLevel < 0 || profilingLevel > 2);
-        const LockMode dbMode = readOnly ? MODE_S : MODE_X;
-
-        Status status = Status::OK();
-
-        AutoGetDb ctx(opCtx, dbname, dbMode);
-        Database* db = ctx.getDb();
-
-        result.append("was", db ? db->getProfilingLevel() : serverGlobalParams.defaultProfile);
-        result.append("slowms", serverGlobalParams.slowMS);
-        result.append("sampleRate", serverGlobalParams.sampleRate);
-
-        if (!readOnly) {
-            if (!db) {
-                // When setting the profiling level, create the database if it didn't already exist.
-                // When just reading the profiling level, we do not create the database.
-                db = dbHolder().openDb(opCtx, dbname);
-            }
-            status = db->setProfilingLevel(opCtx, profilingLevel);
-        }
-
-        const BSONElement slow = cmdObj["slowms"];
-        if (slow.isNumber()) {
-            serverGlobalParams.slowMS = slow.numberInt();
-        }
-
-        double newSampleRate;
-        uassertStatusOK(bsonExtractDoubleFieldWithDefault(
-            cmdObj, "sampleRate"_sd, serverGlobalParams.sampleRate, &newSampleRate));
-        uassert(ErrorCodes::BadValue,
-                "sampleRate must be between 0.0 and 1.0 inclusive",
-                newSampleRate >= 0.0 && newSampleRate <= 1.0);
-        serverGlobalParams.sampleRate = newSampleRate;
-
-        if (!status.isOK()) {
-            errmsg = status.reason();
-        }
-
-        return status.isOK();
-    }
-
-} cmdProfile;
 
 /* drop collection */
 class CmdDrop : public ErrmsgCommandDeprecated {
@@ -442,13 +303,13 @@ public:
             return false;
         }
 
-        return CommandHelpers::appendCommandStatus(
-            result,
+        uassertStatusOK(
             dropCollection(opCtx,
                            nsToDrop,
                            result,
                            {},
                            DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+        return true;
     }
 
 } cmdDrop;
@@ -496,24 +357,19 @@ public:
         // Validate _id index spec and fill in missing fields.
         if (auto idIndexElem = cmdObj["idIndex"]) {
             if (cmdObj["viewOn"]) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::InvalidOptions,
-                     str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexElem});
+                uasserted(ErrorCodes::InvalidOptions,
+                          str::stream() << "'idIndex' is not allowed with 'viewOn': "
+                                        << idIndexElem);
             }
             if (cmdObj["autoIndexId"]) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::InvalidOptions,
-                     str::stream() << "'idIndex' is not allowed with 'autoIndexId': "
-                                   << idIndexElem});
+                uasserted(ErrorCodes::InvalidOptions,
+                          str::stream() << "'idIndex' is not allowed with 'autoIndexId': "
+                                        << idIndexElem);
             }
 
             if (idIndexElem.type() != BSONType::Object) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::TypeMismatch,
-                     str::stream() << "'idIndex' has to be a document: " << idIndexElem});
+                uasserted(ErrorCodes::TypeMismatch,
+                          str::stream() << "'idIndex' has to be a document: " << idIndexElem);
             }
 
             auto idIndexSpec = idIndexElem.Obj();
@@ -527,16 +383,13 @@ public:
             std::unique_ptr<CollatorInterface> defaultCollator;
             if (auto collationElem = cmdObj["collation"]) {
                 if (collationElem.type() != BSONType::Object) {
-                    return CommandHelpers::appendCommandStatus(
-                        result,
-                        {ErrorCodes::TypeMismatch,
-                         str::stream() << "'collation' has to be a document: " << collationElem});
+                    uasserted(ErrorCodes::TypeMismatch,
+                              str::stream() << "'collation' has to be a document: "
+                                            << collationElem);
                 }
                 auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(collationElem.Obj());
-                if (!collatorStatus.isOK()) {
-                    return CommandHelpers::appendCommandStatus(result, collatorStatus.getStatus());
-                }
+                uassertStatusOK(collatorStatus.getStatus());
                 defaultCollator = std::move(collatorStatus.getValue());
             }
             idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpecCollation(
@@ -551,25 +404,24 @@ public:
                 idIndexCollator = std::move(collatorStatus.getValue());
             }
             if (!CollatorInterface::collatorsMatch(defaultCollator.get(), idIndexCollator.get())) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::BadValue,
-                     "'idIndex' must have the same collation as the collection."});
+                uasserted(ErrorCodes::BadValue,
+                          "'idIndex' must have the same collation as the collection.");
             }
 
             // Remove "idIndex" field from command.
             auto resolvedCmdObj = cmdObj.removeField("idIndex");
 
-            return CommandHelpers::appendCommandStatus(
-                result, createCollection(opCtx, dbname, resolvedCmdObj, idIndexSpec));
+            uassertStatusOK(createCollection(opCtx, dbname, resolvedCmdObj, idIndexSpec));
+            return true;
         }
 
         BSONObj idIndexSpec;
-        return CommandHelpers::appendCommandStatus(
-            result, createCollection(opCtx, dbname, cmdObj, idIndexSpec));
+        uassertStatusOK(createCollection(opCtx, dbname, cmdObj, idIndexSpec));
+        return true;
     }
 } cmdCreate;
 
+<<<<<<< HEAD
 class CmdFileMD5 : public BasicCommand {
 public:
     CmdFileMD5() : BasicCommand("filemd5") {}
@@ -750,9 +602,11 @@ public:
 
 } cmdFileMD5;
 
+=======
+>>>>>>> e2ff0151038bc01a4e8992169ed37c63de1d5a6a
 class CmdDatasize : public ErrmsgCommandDeprecated {
     virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
 public:
@@ -883,10 +737,8 @@ public:
 
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             warning() << "Internal error while reading " << ns;
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error while reading during dataSize command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                "Executor error while reading during dataSize command"));
         }
 
         ostringstream os;
@@ -979,7 +831,8 @@ public:
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
-        return CommandHelpers::appendCommandStatus(result, collMod(opCtx, nss, jsobj, &result));
+        uassertStatusOK(collMod(opCtx, nss, jsobj, &result));
+        return true;
     }
 
 } collectionModCommand;
@@ -1061,7 +914,7 @@ public:
             result.appendNumber("indexes", 0);
             result.appendNumber("indexSize", 0);
             result.appendNumber("fileSize", 0);
-            if (!getGlobalServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+            if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
                 result.appendNumber("fsUsedSize", 0);
                 result.appendNumber("fsTotalSize", 0);
             }
@@ -1080,55 +933,42 @@ public:
 
 } cmdDBStats;
 
-/* Returns client's uri */
-class CmdWhatsMyUri : public BasicCommand {
+class CmdBuildInfo : public BasicCommand {
 public:
-    CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
+    CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool requiresAuth() const override {
         return false;
     }
-    std::string help() const override {
-        return "{whatsmyuri:1}";
+
+    virtual bool adminOnly() const {
+        return false;
+    }
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);
+    std::string help() const override {
+        return "get version #, etc.\n"
+               "{ buildinfo:1 }";
+    }
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& jsobj,
+             BSONObjBuilder& result) {
+        VersionInfoInterface::instance().appendBuildInfo(&result);
+        appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;
     }
-} cmdWhatsMyUri;
 
-class AvailableQueryOptions : public BasicCommand {
-public:
-    AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return Status::OK();
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result << "options" << QueryOption_AllSupported;
-        return true;
-    }
-} availableQueryOptionsCmd;
+} cmdBuildInfo;
 
 }  // namespace
 }  // namespace mongo

@@ -57,7 +57,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     alarmInfo->waitMutex = m.mutex();
     const auto waiterThreadId = stdx::this_thread::get_id();
     bool invokedAlarmInline = false;
-    invariantOK(setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
+    invariant(setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
         stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
         alarmInfo->cvWaitResult = stdx::cv_status::timeout;
         if (!alarmInfo->waitMutex) {

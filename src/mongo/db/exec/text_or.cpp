@@ -157,7 +157,7 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
             break;
         case State::kDone:
             // Should have been handled above.
-            invariant(false);
+            MONGO_UNREACHABLE;
             break;
     }
 

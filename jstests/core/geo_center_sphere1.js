@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 t = db.geo_center_sphere1;
 
 function test(index) {

@@ -148,8 +148,8 @@ public:
 
         Collection* const collection = ctx->getCollection();
 
-        auto executor = uassertStatusOK(getExecutorDistinct(
-            opCtx, collection, nss.ns(), &parsedDistinct, PlanExecutor::YIELD_AUTO));
+        auto executor =
+            uassertStatusOK(getExecutorDistinct(opCtx, collection, nss.ns(), &parsedDistinct));
 
         Explain::explainStages(executor.get(), collection, verbosity, out);
         return Status::OK();
@@ -171,14 +171,17 @@ public:
         auto parsedDistinct =
             uassertStatusOK(ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false));
 
+        // Check whether we are allowed to read from this node after acquiring our locks.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        uassertStatusOK(replCoord->checkCanServeReadsFor(
+            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
 
             auto viewAggregation = parsedDistinct.asAggregationCommand();
-            if (!viewAggregation.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
-            }
+            uassertStatusOK(viewAggregation.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
@@ -188,11 +191,8 @@ public:
 
         Collection* const collection = ctx->getCollection();
 
-        auto executor = getExecutorDistinct(
-            opCtx, collection, nss.ns(), &parsedDistinct, PlanExecutor::YIELD_AUTO);
-        if (!executor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, executor.getStatus());
-        }
+        auto executor = getExecutorDistinct(opCtx, collection, nss.ns(), &parsedDistinct);
+        uassertStatusOK(executor.getStatus());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -243,10 +243,8 @@ public:
                   << redact(PlanExecutor::statestr(state))
                   << ", stats: " << redact(Explain::getWinningPlanStats(executor.getValue().get()));
 
-            return CommandHelpers::appendCommandStatus(
-                result,
-                WorkingSetCommon::getMemberObjectStatus(obj).withContext(
-                    "Executor error during distinct command"));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                "Executor error during distinct command"));
         }
 
 

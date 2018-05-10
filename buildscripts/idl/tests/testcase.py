@@ -39,11 +39,6 @@ def errors_to_str(errors):
 class NothingImportResolver(idl.parser.ImportResolverBase):
     """An import resolver that does nothing."""
 
-    def __init__(self):
-        # type: () -> None
-        """Construct a NothingImportResolver."""
-        super(NothingImportResolver, self).__init__()
-
     def resolve(self, base_file, imported_file_name):
         # type: (unicode, unicode) -> unicode
         """Return the complete path to an imported file name."""

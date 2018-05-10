@@ -6,6 +6,7 @@
 //   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
 //   requires_non_retryable_writes,
+//   requires_fastcount,
 // ]
 
 //

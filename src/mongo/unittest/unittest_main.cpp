@@ -44,6 +44,7 @@ using mongo::Status;
 int main(int argc, char** argv, char** envp) {
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
+
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     namespace moe = ::mongo::optionenvironment;
@@ -77,8 +78,8 @@ int main(int argc, char** argv, char** envp) {
     std::string filter;
     int repeat = 1;
     // "list" and "repeat" will be assigned with default values, if not present.
-    invariantOK(environment.get("list", &list));
-    invariantOK(environment.get("repeat", &repeat));
+    invariant(environment.get("list", &list));
+    invariant(environment.get("repeat", &repeat));
     // The default values of "suite" and "filter" are empty.
     environment.get("suite", &suites).ignore();
     environment.get("filter", &filter).ignore();

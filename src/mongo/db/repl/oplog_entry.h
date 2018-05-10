@@ -73,6 +73,9 @@ public:
                                              boost::optional<UUID> uuid,
                                              const BSONObj& docToDelete);
 
+    // Get the in-memory size in bytes of a ReplOperation.
+    static size_t getReplOperationSize(const ReplOperation& op);
+
     static StatusWith<OplogEntry> parse(const BSONObj& object);
 
     OplogEntry(OpTime opTime,

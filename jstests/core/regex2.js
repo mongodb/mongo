@@ -1,3 +1,4 @@
+// @tags: [requires_fastcount]
 
 t = db.regex2;
 t.drop();

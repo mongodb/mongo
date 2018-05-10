@@ -35,10 +35,10 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
@@ -125,9 +125,7 @@ public:
 
         BSONElement mechanismElement;
         Status status = bsonExtractField(cmdObj, saslCommandMechanismFieldName, &mechanismElement);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
+        uassertStatusOK(status);
 
         BSONElement payloadElement;
         status = bsonExtractField(cmdObj, saslCommandPayloadFieldName, &payloadElement);
@@ -146,7 +144,7 @@ public:
         if (!authConn->runCommand(
                 fromDb, BSON("saslStart" << 1 << mechanismElement << payloadElement), ret)) {
             authConn.reset();
-            return CommandHelpers::appendCommandStatus(result, getStatusFromCommandResult(ret));
+            uassertStatusOK(getStatusFromCommandResult(ret));
         }
 
         CommandHelpers::filterCommandReplyForPassthrough(ret, &result);

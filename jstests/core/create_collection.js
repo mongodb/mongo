@@ -134,4 +134,6 @@
     indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
     assert.neq(indexSpec, null);
     assert.eq(indexSpec.collation.locale, "en_US", tojson(indexSpec));
+
+    assert.commandFailed(db.createCollection('capped_no_size', {capped: true}));
 })();

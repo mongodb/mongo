@@ -95,6 +95,8 @@
 
 #include <sspi.h>
 
+#define CERT_CHAIN_PARA_HAS_EXTRA_FIELDS
+
 #include <schannel.h>
 
 #undef WIN32_NO_STATUS

@@ -116,6 +116,27 @@ public:
      */
     void checkForInterrupt();
 
+    /**
+     * Returns true if this is a collectionless aggregation on the specified database.
+     */
+    bool isDBAggregation(StringData dbName) const {
+        return ns.db() == dbName && ns.isCollectionlessAggregateNS();
+    }
+
+    /**
+     * Returns true if this is a collectionless aggregation on the 'admin' database.
+     */
+    bool isClusterAggregation() const {
+        return ns.isAdminDB() && ns.isCollectionlessAggregateNS();
+    }
+
+    /**
+     * Returns true if this aggregation is running on a single, specific namespace.
+     */
+    bool isSingleNamespaceAggregation() const {
+        return !ns.isCollectionlessAggregateNS();
+    }
+
     const CollatorInterface* getCollator() const {
         return _collator;
     }
@@ -161,7 +182,7 @@ public:
      * query.
      */
     bool isTailableAwaitData() const {
-        return tailableMode == TailableMode::kTailableAndAwaitData;
+        return tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
@@ -175,6 +196,7 @@ public:
     bool inMongos = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
+    bool inSnapshotReadOrMultiDocumentTransaction = false;
 
     NamespaceString ns;
     boost::optional<UUID> uuid;
@@ -197,7 +219,7 @@ public:
     Variables variables;
     VariablesParseState variablesParseState;
 
-    TailableMode tailableMode = TailableMode::kNormal;
+    TailableModeEnum tailableMode = TailableModeEnum::kNormal;
 
     // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
     size_t subPipelineDepth = 0;

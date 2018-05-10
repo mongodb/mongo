@@ -335,7 +335,7 @@ TEST(NamespaceStringTest, NamespaceStringParse2) {
 
 TEST(NamespaceStringTest, NamespaceStringParse3) {
     NamespaceString ns("abc");
-    ASSERT_EQUALS(std::string(""), ns.db());
+    ASSERT_EQUALS(std::string("abc"), ns.db());
     ASSERT_EQUALS(std::string(""), ns.coll());
 }
 

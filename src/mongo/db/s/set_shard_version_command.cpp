@@ -229,8 +229,8 @@ public:
 
             auto css = CollectionShardingState::get(opCtx, nss);
             const ChunkVersion collectionShardVersion =
-                (css->getMetadata() ? css->getMetadata()->getShardVersion()
-                                    : ChunkVersion::UNSHARDED());
+                (css->getMetadata(opCtx) ? css->getMetadata(opCtx)->getShardVersion()
+                                         : ChunkVersion::UNSHARDED());
 
             if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
                 // MongoS and MongoD agree on what is the collection's shard version
@@ -341,7 +341,7 @@ public:
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
             ChunkVersion currVersion = ChunkVersion::UNSHARDED();
-            auto collMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata();
+            auto collMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
             if (collMetadata) {
                 currVersion = collMetadata->getShardVersion();
             }

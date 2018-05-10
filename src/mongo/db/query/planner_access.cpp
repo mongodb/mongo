@@ -153,6 +153,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->maxScan = query.getQueryRequest().getMaxScan();
     csn->shouldTrackLatestOplogTimestamp =
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    csn->shouldWaitForOplogVisibility =
+        params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
 
     // If the hint is {$natural: +-1} this changes the direction of the collection scan.
     if (!query.getQueryRequest().getHint().isEmpty()) {
@@ -1336,7 +1338,7 @@ void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
         handleFilterAnd(scanState);
     } else {
         // We must be building leaves for either and AND or an OR.
-        invariant(0);
+        MONGO_UNREACHABLE;
     }
 }
 

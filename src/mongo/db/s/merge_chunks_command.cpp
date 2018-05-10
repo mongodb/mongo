@@ -62,7 +62,7 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
                              const BSONObj& maxKey) {
     const auto metadataAfterMerge = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     uassert(ErrorCodes::StaleEpoch,
@@ -107,7 +107,7 @@ Status mergeChunks(OperationContext* opCtx,
 
     const auto metadata = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata();
+        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
     if (!metadata) {
@@ -292,9 +292,8 @@ public:
     MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
     std::string help() const override {
-        return "Merge Chunks command\n"
-               "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
-               " (opt) epoch : <epoch> }";
+        return "Internal command to merge a contiguous range of chunks.\n"
+               "Usage: { mergeChunks: <ns>, epoch: <epoch>, bounds: [<min key>, <max key>] }";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -308,7 +307,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool adminOnly() const override {
@@ -337,12 +336,7 @@ public:
                    BSONObjBuilder& result) override {
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        string ns = parseNs(dbname, cmdObj);
-
-        if (ns.size() == 0) {
-            errmsg = "no namespace specified";
-            return false;
-        }
+        const NamespaceString nss(parseNs(dbname, cmdObj));
 
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
@@ -378,8 +372,9 @@ public:
             return false;
         }
 
-        auto mergeStatus = mergeChunks(opCtx, NamespaceString(ns), minKey, maxKey, epoch);
-        return CommandHelpers::appendCommandStatus(result, mergeStatus);
+        auto mergeStatus = mergeChunks(opCtx, nss, minKey, maxKey, epoch);
+        uassertStatusOK(mergeStatus);
+        return true;
     }
 
 } mergeChunksCmd;

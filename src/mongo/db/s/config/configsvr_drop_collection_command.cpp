@@ -86,26 +86,22 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        uassert(ErrorCodes::IllegalOperation,
+                "_configsvrDropCollection can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "_configsvrDropCollection can only be run on config servers"));
-        }
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(
-            ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << nss.db(),
-            NamespaceString::validDBName(nss.db(), NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "dropCollection must be called with majority writeConcern, got "
@@ -128,7 +124,7 @@ public:
             [opCtx, nss] { Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss); });
 
         auto collStatus =
-            catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            catalogClient->getCollection(opCtx, nss, repl::ReadConcernArgs::get(opCtx).getLevel());
         if (collStatus == ErrorCodes::NamespaceNotFound) {
             // We checked the sharding catalog and found that this collection doesn't exist.
             // This may be because it never existed, or because a drop command was sent
@@ -139,15 +135,31 @@ public:
 
             // If the DB isn't in the sharding catalog either, consider the drop a success.
             auto dbStatus = catalogClient->getDatabase(
-                opCtx, nss.db().toString(), repl::ReadConcernLevel::kLocalReadConcern);
+                opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel());
             if (dbStatus == ErrorCodes::NamespaceNotFound) {
                 return true;
             }
             uassertStatusOK(dbStatus);
             // If we found the DB but not the collection, the collection might exist and not be
             // sharded, so send the command to the primary shard.
-            _dropUnshardedCollectionFromShard(
-                opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
+            try {
+                _dropUnshardedCollectionFromShard(
+                    opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
+            } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
+                // If attempting to drop the collection as unsharded fails due to stale shard
+                // version, this means that the collection became sharded after this drop operation
+                // started. With the distributed lock in place, this can only happen if the lock was
+                // overtaken or metadata is manually tampered with. Since retrying the drop at this
+                // point could potentially cause orphaned chunk data to remain, instead of retrying
+                // just fail the drop.
+                uassertStatusOKWithContext(
+                    Status(ErrorCodes::ConflictingOperationInProgress,
+                           str::stream()
+                               << "Collection "
+                               << nss.ns()
+                               << " became sharded while the drop operation was in progress."),
+                    ex.toString());
+            }
         } else {
             uassertStatusOK(collStatus);
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->dropCollection(opCtx, nss));

@@ -111,6 +111,9 @@ public:
 
     stdx::thread::id getThreadId() const override;
 
+    void updateThreadIdToCurrentThread() override;
+    void unsetThreadId() override;
+
     void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
         _sharedLocksShouldTwoPhaseLock = sharedLocksShouldTwoPhaseLock;
     }
@@ -172,6 +175,7 @@ public:
     virtual ResourceId getWaitingResource() const;
 
     virtual void getLockerInfo(LockerInfo* lockerInfo) const;
+    virtual boost::optional<LockerInfo> getLockerInfo() const final;
 
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 
@@ -201,10 +205,14 @@ public:
      * In other words for each call to lockBegin, which does not return LOCK_OK, there needs to
      * be a corresponding call to either lockComplete or unlock.
      *
+     * If an operation context is provided that represents an interrupted operation, lockBegin will
+     * throw an exception whenever it would have been possible to grant the lock with LOCK_OK. This
+     * behavior can be disabled with an UninterruptibleLockGuard.
+     *
      * NOTE: These methods are not public and should only be used inside the class
      * implementation and for unit-tests and not called directly.
      */
-    LockResult lockBegin(ResourceId resId, LockMode mode);
+    LockResult lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode);
 
     /**
      * Waits for the completion of a lock, previously requested through lockBegin or
@@ -228,10 +236,18 @@ public:
         return lockComplete(nullptr, resId, mode, deadline, checkDeadlock);
     }
 
+    /**
+     * This function is for unit testing only.
+     */
+    FastMapNoAlloc<ResourceId, LockRequest> getRequestsForTest() const {
+        scoped_spinlock scopedLock(_lock);
+        return _requests;
+    }
+
 private:
     friend class AutoYieldFlushLockForMMAPV1Commit;
 
-    typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
+    typedef FastMapNoAlloc<ResourceId, LockRequest> LockRequestsMap;
 
     /**
      * Like lockGlobalBegin, but accepts a deadline for acquiring a ticket.
@@ -280,6 +296,9 @@ private:
     //
     // This has to be locked inside const methods, hence the mutable.
     mutable SpinLock _lock;
+    // Note: this data structure must always guarantee the continued validity of pointers/references
+    // to its contents (LockRequests). The LockManager maintains a LockRequestList of pointers to
+    // the LockRequests managed by this data structure.
     LockRequestsMap _requests;
 
     // Reuse the notification object across requests so we don't have to create a new mutex
@@ -293,7 +312,6 @@ private:
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel;
-    std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
 
     // Mode for which the Locker acquired a ticket, or MODE_NONE if no ticket was acquired.
     LockMode _modeForTicket = MODE_NONE;

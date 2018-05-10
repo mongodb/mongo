@@ -59,7 +59,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
     : _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           uassertLockTimeout(
               str::stream() << "database " << dbName, mode, deadline, _dbLock.isLocked());
-          return dbHolder().get(opCtx, dbName);
+          return DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
       }()) {
     if (_db) {
         DatabaseShardingState::get(_db).checkDbVersion(opCtx);
@@ -113,9 +113,29 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                             << " disappeared after successufully resolving "
                             << nsOrUUID.toString());
 
-    // If the collection exists, there is no need to check for views
-    if (_coll)
+    if (_coll) {
+        // Unlike read concern majority, read concern snapshot cannot yield and wait when there are
+        // pending catalog changes. Instead, we must return an error in such situations. We ignore
+        // this restriction for the oplog, since it never has pending catalog changes.
+        if (opCtx->recoveryUnit()->getReadConcernLevel() ==
+                repl::ReadConcernLevel::kSnapshotReadConcern &&
+            _resolvedNss != NamespaceString::kRsOplogNamespace) {
+            auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+            invariant(mySnapshot);
+            auto minSnapshot = _coll->getMinimumVisibleSnapshot();
+            uassert(
+                ErrorCodes::SnapshotUnavailable,
+                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
+                                 "changes; please retry the operation. Snapshot timestamp is "
+                              << mySnapshot->toString()
+                              << ". Collection minimum is "
+                              << minSnapshot->toString(),
+                !minSnapshot || *mySnapshot >= *minSnapshot);
+        }
+
+        // If the collection exists, there is no need to check for views.
         return;
+    }
 
     _view = db->getViewCatalog()->lookup(opCtx, _resolvedNss.ns());
     uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -159,7 +179,7 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
             _autoDb.emplace(opCtx, dbName, MODE_X, deadline);
         }
 
-        _db = dbHolder().openDb(opCtx, dbName, &_justCreated);
+        _db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName, &_justCreated);
     }
 
     DatabaseShardingState::get(_db).checkDbVersion(opCtx);

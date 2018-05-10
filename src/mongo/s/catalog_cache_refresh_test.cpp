@@ -128,10 +128,10 @@ TEST_F(CatalogCacheRefreshTest, DatabaseNotFound) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(str::stream() << "Returning no database did not fail and returned "
-                           << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+                           << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NamespaceNotFound, ex.code());
     }
@@ -149,10 +149,10 @@ TEST_F(CatalogCacheRefreshTest, DatabaseBSONCorrupted) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(str::stream() << "Returning corrupted database entry did not fail and returned "
-                           << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+                           << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
@@ -168,8 +168,8 @@ TEST_F(CatalogCacheRefreshTest, CollectionNotFound) {
 
     auto routingInfo = future.timed_get(kFutureTimeout);
     ASSERT(!routingInfo->cm());
-    ASSERT(routingInfo->primary());
-    ASSERT_EQ(ShardId{"0"}, routingInfo->primaryId());
+    ASSERT(routingInfo->db().primary());
+    ASSERT_EQ(ShardId{"0"}, routingInfo->db().primaryId());
 }
 
 TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
@@ -186,10 +186,10 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
-                           << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+                           << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::FailedToParse, ex.code());
     }
@@ -217,10 +217,10 @@ TEST_F(CatalogCacheRefreshTest, NoChunksFoundForCollection) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+                           << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
@@ -251,10 +251,10 @@ TEST_F(CatalogCacheRefreshTest, ChunksBSONCorrupted) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(str::stream() << "Returning no chunks for collection did not fail and returned "
-                           << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+                           << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
     }
@@ -306,11 +306,11 @@ TEST_F(CatalogCacheRefreshTest, IncompleteChunksFoundForCollection) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(
             str::stream() << "Returning incomplete chunks for collection did not fail and returned "
-                          << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+                          << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }
@@ -353,11 +353,11 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoad) {
     try {
         auto routingInfo = future.timed_get(kFutureTimeout);
         auto cm = routingInfo->cm();
-        auto primary = routingInfo->primary();
+        auto primary = routingInfo->db().primary();
 
         FAIL(str::stream()
              << "Returning chunks with different epoch for collection did not fail and returned "
-             << (cm ? cm->toString() : routingInfo->primaryId().toString()));
+             << (cm ? cm->toString() : routingInfo->db().primaryId().toString()));
     } catch (const DBException& ex) {
         ASSERT_EQ(ErrorCodes::ConflictingOperationInProgress, ex.code());
     }

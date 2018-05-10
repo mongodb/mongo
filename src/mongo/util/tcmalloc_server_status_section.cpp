@@ -43,7 +43,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/listen.h"
 
 namespace mongo {
 

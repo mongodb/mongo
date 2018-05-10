@@ -162,7 +162,8 @@ Status ViewCatalog::_createOrUpdateView_inlock(OperationContext* opCtx,
     });
 
     // We may get invalidated, but we're exclusively locked, so the change must be ours.
-    opCtx->recoveryUnit()->onCommit([this]() { this->_valid.store(true); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { this->_valid.store(true); });
     return Status::OK();
 }
 
@@ -377,7 +378,8 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
     });
 
     // We may get invalidated, but we're exclusively locked, so the change must be ours.
-    opCtx->recoveryUnit()->onCommit([this]() { this->_valid.store(true); });
+    opCtx->recoveryUnit()->onCommit(
+        [this](boost::optional<Timestamp>) { this->_valid.store(true); });
     return Status::OK();
 }
 

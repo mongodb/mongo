@@ -33,13 +33,17 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -47,6 +51,8 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
 
@@ -124,7 +130,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
 
 bool FeatureCompatibilityVersion::isCleanStartUp() {
     std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     storageEngine->listDatabases(&dbNames);
 
     for (auto&& dbName : dbNames) {
@@ -153,11 +159,17 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
               << FeatureCompatibilityVersionParser::toString(newVersion);
     }
 
-    // On commit, update the server parameters, and close any connections with a wire version that
-    // is below the minimum.
-    opCtx->recoveryUnit()->onCommit([opCtx, newVersion]() {
+    opCtx->recoveryUnit()->onCommit([opCtx, newVersion](boost::optional<Timestamp>) {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
+
+        if (ShardingState::get(opCtx)->enabled() &&
+            (newVersion ==
+                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36 ||
+             newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40)) {
+            CollectionShardingState::resetAll(opCtx);
+            Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
+        }
 
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
             // Close all incoming connections from internal clients with binary versions lower than
@@ -168,6 +180,14 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
             // Close all outgoing connections to servers with binary versions lower than ours.
             executor::EgressTagCloserManager::get(opCtx->getServiceContext())
                 .dropConnections(transport::Session::kKeepOpen);
+        }
+
+        if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+            // Transactions are only allowed when the featureCompatibilityVersion is 4.0, so abort
+            // any open transactions when downgrading featureCompatibilityVersion.
+            SessionKiller::Matcher matcherAllSessions(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+            killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
         }
     });
 }
@@ -250,6 +270,10 @@ public:
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) {
         BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
+        uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
+                str::stream() << FeatureCompatibilityVersionParser::kParameterName
+                              << " is not yet known.",
+                serverGlobalParams.featureCompatibility.isVersionInitialized());
         switch (serverGlobalParams.featureCompatibility.getVersion()) {
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
                 featureCompatibilityVersionBuilder.append(

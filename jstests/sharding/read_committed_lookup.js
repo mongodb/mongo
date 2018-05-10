@@ -37,7 +37,7 @@ load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
 
     rst.initiate(config);
 
-    let shardSecondary = rst.liveNodes.slaves[0];
+    let shardSecondary = rst._slaves[0];
 
     // Confirm read committed works on a cluster with a database that is not sharding enabled.
     let st = new ShardingTest({

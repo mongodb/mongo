@@ -1,0 +1,38 @@
+# Copyright (C) 2018 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+
+commands:
+
+  profile:
+    description: "Parser for the 'profile' command."
+    cpp_name: ProfileCmdRequest
+    strict: false
+    namespace: type
+    type: safeInt32
+    fields:
+      slowms:
+        type: safeInt32
+        description: "The threshold, in milliseconds, at which ops are profiled and logged."
+        optional: true
+      sampleRate:
+        type: double
+        description: "The fraction of eligible ops, in the range [0,1), to be logged/profiled."
+        optional: true

@@ -32,8 +32,8 @@
 #include <utility>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/util/net/message.h"
 
 namespace mongo {
 namespace rpc {

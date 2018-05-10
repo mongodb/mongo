@@ -44,8 +44,8 @@ function unlockNodes(nodes) {
 var lockedNodes = [];
 try {
     // lock secondaries
-    jsTestLog('Locking nodes: ' + tojson(replTest.liveNodes.slaves));
-    replTest.liveNodes.slaves.forEach(function(node) {
+    jsTestLog('Locking nodes: ' + tojson(replTest._slaves));
+    replTest._slaves.forEach(function(node) {
         jsTestLog('Locking node: ' + node);
         jsTestLog(
             'fsync lock ' + node + ' result: ' +
@@ -125,8 +125,8 @@ assert.soon(function() {
 replTest.add();
 print("\ncheck shutdown command");
 
-master = replTest.liveNodes.master;
-var slave = replTest.liveNodes.slaves[0];
+master = replTest._master;
+var slave = replTest._slaves[0];
 
 try {
     slave.adminCommand({shutdown: 1});

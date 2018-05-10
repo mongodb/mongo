@@ -43,6 +43,7 @@ class ClusterClientCursorMock final : public ClusterClientCursor {
 
 public:
     ClusterClientCursorMock(boost::optional<LogicalSessionId> lsid,
+                            boost::optional<TxnNumber> txnNumber,
                             stdx::function<void(void)> killCallback = stdx::function<void(void)>());
 
     ~ClusterClientCursorMock();
@@ -69,6 +70,8 @@ public:
 
     BSONObj getOriginatingCommand() const final;
 
+    std::size_t getNumRemotes() const final;
+
     long long getNumReturnedSoFar() const final;
 
     void queueResult(const ClusterQueryResult& result) final;
@@ -76,6 +79,8 @@ public:
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
 
     boost::optional<LogicalSessionId> getLsid() const final;
+
+    boost::optional<TxnNumber> getTxnNumber() const final;
 
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
@@ -107,6 +112,8 @@ private:
     bool _remotesExhausted = true;
 
     boost::optional<LogicalSessionId> _lsid;
+
+    boost::optional<TxnNumber> _txnNumber;
 
     OperationContext* _opCtx = nullptr;
 };

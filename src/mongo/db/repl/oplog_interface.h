@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
@@ -57,6 +58,11 @@ public:
      * Produces an iterator over oplog collection in reverse natural order.
      */
     virtual std::unique_ptr<Iterator> makeIterator() const = 0;
+
+    /**
+     * The host and port of the server.
+     */
+    virtual HostAndPort hostAndPort() const = 0;
 
 protected:
     OplogInterface() = default;

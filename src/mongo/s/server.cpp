@@ -61,6 +61,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/db/session_killer.h"
 #include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/wire_version.h"
@@ -99,9 +100,8 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/message.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
@@ -319,6 +319,8 @@ Status initializeSharding(OperationContext* opCtx) {
     if (!status.isOK()) {
         return status;
     }
+
+    Grid::get(opCtx)->setShardingInitialized();
 
     return Status::OK();
 }
@@ -549,13 +551,14 @@ MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* c
     return Status::OK();
 }
 
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-    getGlobalServiceContext()->setTickSource(stdx::make_unique<SystemTickSource>());
-    getGlobalServiceContext()->setFastClockSource(stdx::make_unique<SystemClockSource>());
-    getGlobalServiceContext()->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
-    return Status::OK();
-}
+ServiceContextRegistrar serviceContextCreator([]() {
+    auto service = std::make_unique<ServiceContextNoop>();
+    service->setTickSource(std::make_unique<SystemTickSource>());
+    service->setFastClockSource(std::make_unique<SystemClockSource>());
+    service->setPreciseClockSource(std::make_unique<SystemClockSource>());
+    return service;
+});
+
 
 #ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))

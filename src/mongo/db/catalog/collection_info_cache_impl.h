@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/collection_info_cache.h"
 
+#include "mongo/base/shim.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_settings.h"

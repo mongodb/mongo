@@ -67,6 +67,7 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
@@ -78,25 +79,26 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER(InitializeDatabaseFactory)(InitializerContext* const) {
-    Database::registerFactory([](Database* const this_,
-                                 OperationContext* const opCtx,
-                                 const StringData name,
-                                 DatabaseCatalogEntry* const dbEntry) {
-        return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry);
-    });
-    return Status::OK();
+MONGO_REGISTER_SHIM(Database::makeImpl)
+(Database* const this_,
+ OperationContext* const opCtx,
+ const StringData name,
+ DatabaseCatalogEntry* const dbEntry,
+ PrivateTo<Database>)
+    ->std::unique_ptr<Database::Impl> {
+    return stdx::make_unique<DatabaseImpl>(this_, opCtx, name, dbEntry);
 }
+
+namespace {
 MONGO_FP_DECLARE(hangBeforeLoggingCreateCollection);
 }  // namespace
 
-using std::unique_ptr;
 using std::endl;
 using std::list;
 using std::set;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 
 void uassertNamespaceNotIndex(StringData ns, StringData caller) {
@@ -110,16 +112,16 @@ public:
     AddCollectionChange(OperationContext* opCtx, DatabaseImpl* db, StringData ns)
         : _opCtx(opCtx), _db(db), _ns(ns.toString()) {}
 
-    virtual void commit() {
+    virtual void commit(boost::optional<Timestamp> commitTime) {
         CollectionMap::const_iterator it = _db->_collections.find(_ns);
 
         if (it == _db->_collections.end())
             return;
 
         // Ban reading from this collection on committed reads on snapshots before now.
-        auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-        auto snapshotName = replCoord->getMinimumVisibleSnapshot(_opCtx);
-        it->second->setMinimumVisibleSnapshot(snapshotName);
+        if (commitTime) {
+            it->second->setMinimumVisibleSnapshot(commitTime.get());
+        }
     }
 
     virtual void rollback() {
@@ -142,7 +144,7 @@ public:
     // Takes ownership of coll (but not db).
     RemoveCollectionChange(DatabaseImpl* db, Collection* coll) : _db(db), _coll(coll) {}
 
-    virtual void commit() {
+    virtual void commit(boost::optional<Timestamp>) {
         delete _coll;
     }
 
@@ -218,7 +220,10 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     auto uuid = cce->getCollectionOptions(opCtx).uuid;
 
     unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
-    invariant(rs.get());  // if cce exists, so should this
+    invariant(
+        rs.get(),
+        str::stream() << "Record store did not exist. Collection: " << nss.ns() << " UUID: "
+                      << (uuid ? uuid->toString() : "none"));  // if cce exists, so should this
 
     // Not registering AddCollectionChange since this is for collections that already exist.
     Collection* coll = new Collection(opCtx, nss.ns(), uuid, cce.release(), rs.release(), _dbEntry);
@@ -406,7 +411,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
     _dbEntry->appendExtraStats(opCtx, output, scale);
 
-    if (!opCtx->getServiceContext()->getGlobalStorageEngine()->isEphemeral()) {
+    if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         boost::filesystem::path dbpath(storageGlobalParams.dbpath);
         if (storageGlobalParams.directoryperdb) {
             dbpath /= _name;
@@ -451,7 +456,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                   "turn off profiling before dropping system.profile collection");
             } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
                          nss == SessionsCollection::kSessionsNamespaceString ||
-                         nss.ns() == NamespaceString::kSystemKeysCollectionName)) {
+                         nss == NamespaceString::kSystemKeysNamespace)) {
                 return Status(ErrorCodes::IllegalOperation,
                               str::stream() << "can't drop system collection " << fullns);
             }
@@ -812,13 +817,16 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                 optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
                 // createCollection() may be called before the in-memory fCV parameter is
                 // initialized, so use the unsafe fCV getter here.
-                const auto featureCompatibilityVersion =
-                    serverGlobalParams.featureCompatibility.getVersionUnsafe();
                 IndexCatalog* ic = collection->getIndexCatalog();
                 fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
-                    opCtx,
-                    !idIndex.isEmpty() ? idIndex
-                                       : ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));
+                    opCtx, !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec()));
+            } else {
+                // autoIndexId: false is only allowed on unreplicated collections.
+                uassert(50001,
+                        str::stream() << "autoIndexId:false is not allowed for collection "
+                                      << nss.ns()
+                                      << " because it can be replicated",
+                        !nss.isReplicated());
             }
         }
 
@@ -859,9 +867,9 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
         Top::get(serviceContext).collectionDropped(coll->ns().ns(), true);
     }
 
-    dbHolder().close(opCtx, name, "database dropped");
+    DatabaseHolder::getDatabaseHolder().close(opCtx, name, "database dropped");
 
-    auto const storageEngine = serviceContext->getGlobalStorageEngine();
+    auto const storageEngine = serviceContext->getStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", name, [&] {
         storageEngine->dropDatabase(opCtx, name).transitional_ignore();
     });
@@ -888,9 +896,8 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
     }
 
     if (!_uniqueCollectionNamespacePseudoRandom) {
-        Timestamp ts;
         _uniqueCollectionNamespacePseudoRandom =
-            stdx::make_unique<PseudoRandom>(Date_t::now().asInt64());
+            std::make_unique<PseudoRandom>(Date_t::now().asInt64());
     }
 
     const auto charsToChooseFrom =
@@ -930,60 +937,19 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                       << " attempts due to namespace conflicts with existing collections.");
 }
 
-namespace {
-MONGO_INITIALIZER(InitializeDropDatabaseImpl)(InitializerContext* const) {
-    Database::registerDropDatabaseImpl(DatabaseImpl::dropDatabase);
-    return Status::OK();
-}
-MONGO_INITIALIZER(InitializeUserCreateNSImpl)(InitializerContext* const) {
-    registerUserCreateNSImpl(userCreateNSImpl);
-    return Status::OK();
+MONGO_REGISTER_SHIM(Database::dropDatabase)(OperationContext* opCtx, Database* db)->void {
+    return DatabaseImpl::dropDatabase(opCtx, db);
 }
 
-MONGO_INITIALIZER(InitializeDropAllDatabasesExceptLocalImpl)(InitializerContext* const) {
-    registerDropAllDatabasesExceptLocalImpl(dropAllDatabasesExceptLocalImpl);
-    return Status::OK();
-}
-}  // namespace
-}  // namespace mongo
-
-void mongo::dropAllDatabasesExceptLocalImpl(OperationContext* opCtx) {
-    Lock::GlobalWrite lk(opCtx);
-
-    vector<string> n;
-    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
-    storageEngine->listDatabases(&n);
-
-    if (n.size() == 0)
-        return;
-    log() << "dropAllDatabasesExceptLocal " << n.size();
-
-    repl::ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
-
-    for (const auto& dbName : n) {
-        if (dbName != "local") {
-            writeConflictRetry(opCtx, "dropAllDatabasesExceptLocal", dbName, [&opCtx, &dbName] {
-                Database* db = dbHolder().get(opCtx, dbName);
-
-                // This is needed since dropDatabase can't be rolled back.
-                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed
-                if (db == nullptr) {
-                    log() << "database disappeared after listDatabases but before drop: " << dbName;
-                } else {
-                    DatabaseImpl::dropDatabase(opCtx, db);
-                }
-            });
-        }
-    }
-}
-
-auto mongo::userCreateNSImpl(OperationContext* opCtx,
-                             Database* db,
-                             StringData ns,
-                             BSONObj options,
-                             CollectionOptions::ParseKind parseKind,
-                             bool createDefaultIndexes,
-                             const BSONObj& idIndex) -> Status {
+MONGO_REGISTER_SHIM(Database::userCreateNS)
+(OperationContext* opCtx,
+ Database* db,
+ StringData ns,
+ BSONObj options,
+ CollectionOptions::ParseKind parseKind,
+ bool createDefaultIndexes,
+ const BSONObj& idIndex)
+    ->Status {
     invariant(db);
 
     LOG(1) << "create collection " << ns << ' ' << options;
@@ -1054,18 +1020,19 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
         }
     }
 
-    status =
-        validateStorageOptions(collectionOptions.storageEngine, [](const auto& x, const auto& y) {
-            return x->validateCollectionStorageOptions(y);
-        });
+    status = validateStorageOptions(
+        opCtx->getServiceContext(),
+        collectionOptions.storageEngine,
+        [](const auto& x, const auto& y) { return x->validateCollectionStorageOptions(y); });
 
     if (!status.isOK())
         return status;
 
     if (auto indexOptions = collectionOptions.indexOptionDefaults["storageEngine"]) {
-        status = validateStorageOptions(indexOptions.Obj(), [](const auto& x, const auto& y) {
-            return x->validateIndexStorageOptions(y);
-        });
+        status = validateStorageOptions(
+            opCtx->getServiceContext(), indexOptions.Obj(), [](const auto& x, const auto& y) {
+                return x->validateIndexStorageOptions(y);
+            });
 
         if (!status.isOK()) {
             return status;
@@ -1082,3 +1049,34 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
 
     return Status::OK();
 }
+
+MONGO_REGISTER_SHIM(Database::dropAllDatabasesExceptLocal)(OperationContext* opCtx)->void {
+    Lock::GlobalWrite lk(opCtx);
+
+    vector<string> n;
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    storageEngine->listDatabases(&n);
+
+    if (n.size() == 0)
+        return;
+    log() << "dropAllDatabasesExceptLocal " << n.size();
+
+    repl::ReplicationCoordinator::get(opCtx)->dropAllSnapshots();
+
+    for (const auto& dbName : n) {
+        if (dbName != "local") {
+            writeConflictRetry(opCtx, "dropAllDatabasesExceptLocal", dbName, [&opCtx, &dbName] {
+                Database* db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
+
+                // This is needed since dropDatabase can't be rolled back.
+                // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed
+                if (db == nullptr) {
+                    log() << "database disappeared after listDatabases but before drop: " << dbName;
+                } else {
+                    DatabaseImpl::dropDatabase(opCtx, db);
+                }
+            });
+        }
+    }
+}
+}  // namespace mongo

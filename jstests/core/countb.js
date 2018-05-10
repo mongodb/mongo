@@ -1,4 +1,8 @@
 // Test fast count mode with single key index unsatisfiable constraints on a multi key index.
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting,
+// ]
 
 t = db.jstests_countb;
 t.drop();

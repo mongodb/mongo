@@ -6,7 +6,6 @@
     'use strict';
 
     load('jstests/libs/profiler.js');
-
     const dbName = "test";
     const collName = "foo";
     const ns = dbName + "." + collName;
@@ -20,8 +19,8 @@
         if (testCase.skip) {
             for (let key of Object.keys(testCase)) {
                 assert(
-                    key === "skip" || key === "enterpriseOnly",
-                    "if a test case specifies 'skip', it must not specify any other fields besides 'enterpriseOnly': " +
+                    key === "skip" || key === "conditional",
+                    "if a test case specifies 'skip', it must not specify any other fields besides 'conditional': " +
                         key + ": " + tojson(testCase));
             }
             return;
@@ -35,6 +34,10 @@
 
         // Check that all present fields are of the correct type.
         assert(typeof(testCase.command) === "object");
+        assert(testCase.runsAgainstAdminDb ? typeof(testCase.runsAgainstAdminDb) === "boolean"
+                                           : true);
+        assert(testCase.skipProfilerCheck ? typeof(testCase.skipProfilerCheck) === "boolean"
+                                          : true);
         assert(typeof(testCase.sendsDbVersion) === "boolean");
         assert(typeof(testCase.sendsShardVersion) === "boolean");
         assert(testCase.setUp ? typeof(testCase.setUp) === "function" : true,
@@ -91,7 +94,7 @@
         connPoolSync: {skip: "executes locally on mongos (not sent to any remote node)"},
         connectionStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
         convertToCapped: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
@@ -102,8 +105,7 @@
                 assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             }
         },
-        copydb:
-            {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        copydb: {skip: "not allowed through mongos"},
         count: {
             sendsDbVersion: true,
             sendsShardVersion: true,
@@ -118,8 +120,19 @@
                 assert(mongosConn.getDB(dbName).getCollection(collName).drop());
             }
         },
-        createIndexes:
-            {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        createIndexes: {
+            skipProfilerCheck: true,
+            sendsDbVersion: true,
+            sendsShardVersion: false,
+            setUp: function(mongosConn) {
+                // Expects the collection to exist, and doesn't implicitly create it.
+                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
+            },
+            command: {createIndexes: collName, indexes: [{key: {a: 1}, name: "index"}]},
+            cleanUp: function(mongosConn) {
+                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
+            },
+        },
         createRole: {skip: "always targets the config server"},
         createUser: {skip: "always targets the config server"},
         currentOp: {skip: "not on a user database"},
@@ -142,11 +155,11 @@
             command: {dbStats: 1, scale: 1}
         },
         delete: {
+            skipProfilerCheck: true,
             sendsDbVersion: false,
             // The profiler extracts the individual deletes from the 'deletes' array, and so loses
             // the overall delete command's attached shardVersion, though one is sent.
-            // The versioning for delete will be tested separately (TODO SERVER-33429).
-            sendsShardVersion: false,
+            sendsShardVersion: true,
             command: {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]}
         },
         distinct: {
@@ -154,11 +167,19 @@
             sendsShardVersion: true,
             command: {distinct: collName, key: "x"},
         },
-        drop: {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        drop: {
+            skipProfilerCheck: true,
+            sendsDbVersion: false,
+            sendsShardVersion: false,
+            setUp: function(mongosConn) {
+                // Expects the collection to exist, and doesn't implicitly create it.
+                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
+            },
+            command: {drop: collName},
+        },
         dropAllRolesFromDatabase: {skip: "always targets the config server"},
         dropAllUsersFromDatabase: {skip: "always targets the config server"},
-        dropDatabase:
-            {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        dropDatabase: {skip: "drops the database from the cluster, changing the UUID"},
         dropIndexes: {
             sendsDbVersion: true,
             sendsShardVersion: true,
@@ -173,6 +194,7 @@
         },
         dropRole: {skip: "always targets the config server"},
         dropUser: {skip: "always targets the config server"},
+        echo: {skip: "does not forward command to primary shard"},
         enableSharding: {skip: "does not forward command to primary shard"},
         endSessions: {skip: "goes through the cluster write path"},
         eval: {
@@ -259,14 +281,16 @@
         killAllSessionsByPattern: {skip: "always broadcast to all hosts in the cluster"},
         killOp: {skip: "does not forward command to primary shard"},
         killSessions: {skip: "always broadcast to all hosts in the cluster"},
-        listCollections:
-            {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        listCollections: {
+            skipProfilerCheck: true,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
+            command: {listCollections: 1},
+        },
         listCommands: {skip: "executes locally on mongos (not sent to any remote node)"},
         listDatabases: {skip: "does not forward command to primary shard"},
         listIndexes: {
-            sendsDbVersion: false,
-            // It's a known bug that listIndexes uses ShardConnection without connection versioning
-            // (SERVER-33434).
+            sendsDbVersion: true,
             sendsShardVersion: false,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
@@ -278,7 +302,7 @@
             }
         },
         listShards: {skip: "does not forward command to primary shard"},
-        logApplicationMessage: {skip: "not on a user database", enterpriseOnly: true},
+        logApplicationMessage: {skip: "not on a user database", conditional: true},
         logRotate: {skip: "executes locally on mongos (not sent to any remote node)"},
         logout: {skip: "not on a user database"},
         mapReduce: {
@@ -372,8 +396,23 @@
         refreshSessionsInternal: {skip: "executes locally on mongos (not sent to any remote node)"},
         removeShard: {skip: "not on a user database"},
         removeShardFromZone: {skip: "not on a user database"},
-        renameCollection:
-            {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        renameCollection: {
+            runsAgainstAdminDb: true,
+            skipProfilerCheck: true,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
+            setUp: function(mongosConn) {
+                // Expects the collection to exist, and doesn't implicitly create it.
+                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
+            },
+            command: {
+                renameCollection: dbName + "." + collName,
+                to: dbName + "." + collName + "_renamed"
+            },
+            cleanUp: function(mongosConn) {
+                assert(mongosConn.getDB(dbName).getCollection(collName + "_renamed").drop());
+            }
+        },
         replSetGetStatus: {skip: "not supported in mongos"},
         resetError: {skip: "not on a user database"},
         restartCatalog: {skip: "not on a user database"},
@@ -385,6 +424,8 @@
         saslStart: {skip: "not on a user database"},
         serverStatus: {skip: "executes locally on mongos (not sent to any remote node)"},
         setFeatureCompatibilityVersion: {skip: "not on a user database"},
+        setFreeMonitoring:
+            {skip: "explicitly fails for mongos, primary mongod only", conditional: true},
         setParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
         shardCollection: {skip: "does not forward command to primary shard"},
         shardConnPoolStats: {skip: "does not forward command to primary shard"},
@@ -393,11 +434,11 @@
         splitVector: {skip: "does not forward command to primary shard"},
         startSession: {skip: "executes locally on mongos (not sent to any remote node)"},
         update: {
+            skipProfilerCheck: true,
             sendsDbVersion: false,
             // The profiler extracts the individual updates from the 'updates' array, and so loses
             // the overall update command's attached shardVersion, though one is sent.
-            // The versioning for update will be tested separately (TODO SERVER-33429).
-            sendsShardVersion: false,
+            sendsShardVersion: true,
             command: {
                 update: collName,
                 updates: [{q: {_id: 2}, u: {_id: 2}, upsert: true, multi: false}]
@@ -407,86 +448,182 @@
         updateUser: {skip: "always targets the config server"},
         updateZoneKeyRange: {skip: "not on a user database"},
         usersInfo: {skip: "always targets the config server"},
-        validate:
-            {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
+        validate: {
+            skipProfilerCheck: true,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
+            setUp: function(mongosConn) {
+                // Expects the collection to exist, and doesn't implicitly create it.
+                assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
+            },
+            command: {validate: collName},
+            cleanUp: function(mongosConn) {
+                assert(mongosConn.getDB(dbName).getCollection(collName).drop());
+            },
+        },
         whatsmyuri: {skip: "executes locally on mongos (not sent to any remote node)"},
     };
 
-    var st = new ShardingTest({shards: 1});
+    class AllCommandsTestRunner {
+        constructor() {
+            this.st = new ShardingTest(this.getShardingTestOptions());
+            let db = this.st.s.getDB(dbName);
+            // We do this create and drop so that we create an entry for the database in the
+            // sharding catalog.
+            assert.commandWorked(db.createCollection(collName));
+            assert.commandWorked(db.runCommand({drop: collName}));
+            this.primaryShard = this.st.shard0;
+            this.st.ensurePrimaryShard(dbName, this.primaryShard.shardName);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    let dbVersion = st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
-    st.shard0.getDB(dbName).setProfilingLevel(2);
+            this.dbVersion =
+                this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+            this.previousDbVersion = null;
 
-    let res = st.s.adminCommand({listCommands: 1});
-    assert.commandWorked(res);
-    let commands = Object.keys(res.commands);
-
-    // Use the profiler to check that the command was received with or without a databaseVersion and
-    // shardVersion as expected by the 'testCase' for the command.
-    for (let command of commands) {
-        let testCase = testCases[command];
-        assert(testCase !== undefined, "coverage failure: must define a test case for " + command);
-        validateTestCase(testCase);
-        testCases[command].validated = true;
-
-        if (testCase.skip) {
-            print("skipping " + command + ": " + testCase.skip);
-            continue;
+            let res = this.st.s.adminCommand({listCommands: 1});
+            assert.commandWorked(res);
+            this.commands = Object.keys(res.commands);
         }
 
-        // Drop the profiler collection before each command, so in case this test case fails, it's
-        // easy to find this command in the profiler output that gets logged.
-        st.shard0.getDB(dbName).setProfilingLevel(0);
-        assert(st.shard0.getDB(dbName).getCollection("system.profile").drop());
-        st.shard0.getDB(dbName).setProfilingLevel(2);
-
-        jsTest.log("testing command " + tojson(testCase.command));
-
-        if (testCase.setUp) {
-            testCase.setUp(st.s);
+        shutdown() {
+            this.st.stop();
         }
 
-        let commandProfile = buildCommandProfile(testCase.command, false);
-        commandProfile["command.shardVersion"] =
-            testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
-
-        st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "alwaysOn"});
-        if (testCase.sendsDbVersion) {
-            commandProfile["command.databaseVersion"] = dbVersion;
-            assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(testCase.command),
-                                         ErrorCodes.StaleDbVersion);
-
-            // TODO: Currently, commands are profiled if they call CurOp::raiseDbProfilingLevel().
-            // But, some commands do so only after calling AutoGetDb, where dbVersion is checked.
-            // So, commands that send dbVersion will throw inside of AutoGetDb and may not be
-            // profiled. SERVER-33499 will change the server so that CurOp::raiseDbProfilingLevel()
-            // is called as part of generic command processing, before AutoGetDb can be called. Once
-            // that is in, we should check that the dbVersion sent matched what was expected.
-            // profilerHasSingleMatchingEntryOrThrow(
-            //    {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
-        } else {
-            commandProfile["command.databaseVersion"] = {$exists: false};
-            assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
-            profilerHasSingleMatchingEntryOrThrow(
-                {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
+        getShardingTestOptions() {
+            throw new Error("not implemented");
         }
-        st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "off"});
+        makeShardDatabaseCacheStale() {
+            throw new Error("not implemented");
+        }
 
-        if (testCase.cleanUp) {
-            testCase.cleanUp(st.s);
+        assertSentDatabaseVersion(testCase, commandProfile) {
+            const res = this.primaryShard.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq(this.dbVersion, res.dbVersion);
+
+            // If the test case is marked as not tracked by the profiler, then we won't be able to
+            // verify the version was not sent here. Any test cases marked with this flag should be
+            // fixed in SERVER-33499.
+            if (!testCase.skipProfilerCheck) {
+                commandProfile["command.databaseVersion"] = this.dbVersion;
+                profilerHasSingleMatchingEntryOrThrow(
+                    {profileDB: this.primaryShard.getDB(dbName), filter: commandProfile});
+            }
+        }
+
+        assertDidNotSendDatabaseVersion(testCase, commandProfile) {
+            const res = this.primaryShard.adminCommand({getDatabaseVersion: dbName});
+            assert.commandWorked(res);
+            assert.eq({}, res.dbVersion);
+
+            // If the test case is marked as not tracked by the profiler, then we won't be able to
+            // verify the version was not sent here. Any test cases marked with this flag should be
+            // fixed in SERVER-33499.
+            if (!testCase.skipProfilerCheck) {
+                commandProfile["command.databaseVersion"] = {$exists: false};
+                profilerHasSingleMatchingEntryOrThrow(
+                    {profileDB: this.primaryShard.getDB(dbName), filter: commandProfile});
+            }
+        }
+
+        runCommands() {
+            // Use the profiler to check that the command was received with or without a
+            // databaseVersion and shardVersion as expected by the 'testCase' for the command.
+            for (let command of this.commands) {
+                let testCase = testCases[command];
+                assert(testCase !== undefined,
+                       "coverage failure: must define a test case for " + command);
+                if (!testCases[command].validated) {
+                    validateTestCase(testCase);
+                    testCases[command].validated = true;
+                }
+
+                if (testCase.skip) {
+                    print("skipping " + command + ": " + testCase.skip);
+                    continue;
+                }
+
+                this.primaryShard.getDB(dbName).setProfilingLevel(2);
+
+                jsTest.log("testing command " + tojson(testCase.command));
+
+                if (testCase.setUp) {
+                    testCase.setUp(this.st.s);
+                }
+
+                let commandProfile = buildCommandProfile(testCase.command, false);
+                commandProfile["command.shardVersion"] =
+                    testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
+
+                if (testCase.runsAgainstAdminDb) {
+                    assert.commandWorked(this.st.s.adminCommand(testCase.command));
+                } else {
+                    assert.commandWorked(this.st.s.getDB(dbName).runCommand(testCase.command));
+                }
+
+                if (testCase.sendsDbVersion) {
+                    this.assertSentDatabaseVersion(testCase, commandProfile);
+                } else {
+                    this.assertDidNotSendDatabaseVersion(testCase, commandProfile);
+                }
+
+                if (testCase.cleanUp) {
+                    testCase.cleanUp(this.st.s);
+                }
+
+                // Clear the profiler collection in between testing each command.
+                this.primaryShard.getDB(dbName).setProfilingLevel(0);
+                assert(this.primaryShard.getDB(dbName).getCollection("system.profile").drop());
+
+                this.makeShardDatabaseCacheStale();
+            }
+
+            // After iterating through all the existing commands, ensure there were no additional
+            // test cases that did not correspond to any mongos command.
+            for (let key of Object.keys(testCases)) {
+                assert(testCases[key].validated || testCases[key].conditional,
+                       "you defined a test case for a command '" + key +
+                           "' that does not exist on mongos: " + tojson(testCases[key]));
+            }
         }
     }
 
-    // After iterating through all the existing commands, ensure there were no additional test cases
-    // that did not correspond to any mongos command.
-    for (let key of Object.keys(testCases)) {
-        assert(testCases[key].validated || testCases[key].enterpriseOnly,
-               "you defined a test case for a command '" + key +
-                   "' that does not exist on mongos: " + tojson(testCases[key]));
+    class DropDatabaseTestRunner extends AllCommandsTestRunner {
+        getShardingTestOptions() {
+            return {shards: 1};
+        }
+
+        makeShardDatabaseCacheStale() {
+            // Drop the database from the shard to clear the shard's cached in-memory database info.
+            assert.commandWorked(this.primaryShard.getDB(dbName).runCommand({dropDatabase: 1}));
+        }
     }
 
-    st.stop();
+    class MovePrimaryTestRunner extends AllCommandsTestRunner {
+        getShardingTestOptions() {
+            return {shards: 2};
+        }
 
+        makeShardDatabaseCacheStale() {
+            let fromShard = this.st.getPrimaryShard(dbName);
+            let toShard = this.st.getOther(fromShard);
+
+            this.primaryShard = toShard;
+            this.previousDbVersion = this.dbVersion;
+
+            assert.commandWorked(this.st.s0.adminCommand({movePrimary: dbName, to: toShard.name}));
+            this.dbVersion =
+                this.st.s.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
+
+            // The dbVersion should have changed due to the movePrimary operation.
+            assert.eq(this.dbVersion.lastMod, this.previousDbVersion.lastMod + 1);
+        }
+    }
+
+    let dropDatabaseTestRunner = new DropDatabaseTestRunner();
+    dropDatabaseTestRunner.runCommands();
+    dropDatabaseTestRunner.shutdown();
+
+    let movePrimaryTestRunner = new MovePrimaryTestRunner();
+    movePrimaryTestRunner.runCommands();
+    movePrimaryTestRunner.shutdown();
 })();

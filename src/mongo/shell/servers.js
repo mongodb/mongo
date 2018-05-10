@@ -7,7 +7,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     var shellVersion = version;
 
     // Record the exit codes of mongod and mongos processes that crashed during startup keyed by
-    // pid. This map is cleared when MongoRunner._startWithArgs and MongoRunner.stopMongod/s are
+    // port. This map is cleared when MongoRunner._startWithArgs and MongoRunner.stopMongod/s are
     // called.
     var serverExitCodeMap = {};
 
@@ -889,7 +889,9 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      *      auth: {
      *        user {string}: admin user name
      *        pwd {string}: admin password
-     *      }
+     *      },
+     *      skipValidation: <bool>,
+     *      allowedExitCode: <int>
      *    }
      *
      * Note: The auth option is required in a authenticated mongod running in Windows since
@@ -921,14 +923,20 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         // If the return code is in the serverExitCodeMap, it means the server crashed on startup.
         // We just use the recorded return code instead of stopping the program.
         var returnCode;
-        if (pid in serverExitCodeMap) {
-            returnCode = serverExitCodeMap[pid];
-            delete serverExitCodeMap[pid];
+        if (serverExitCodeMap.hasOwnProperty(port)) {
+            returnCode = serverExitCodeMap[port];
+            delete serverExitCodeMap[port];
         } else {
             // Invoke callback to validate collections and indexes before shutting down mongod.
             // We skip calling the callback function when the expected return code of
             // the mongod process is non-zero since it's likely the process has already exited.
-            if (allowedExitCode === MongoRunner.EXIT_CLEAN) {
+
+            var skipValidation = false;
+            if (opts.skipValidation) {
+                skipValidation = true;
+            }
+
+            if (allowedExitCode === MongoRunner.EXIT_CLEAN && !skipValidation) {
                 MongoRunner.validateCollectionsCallback(port);
             }
 
@@ -1234,10 +1242,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             pid = _startMongoProgram({args: argArray, env: env});
         }
 
-        delete serverExitCodeMap[pid];
+        delete serverExitCodeMap[port];
         if (!waitForConnect) {
             return {
                 pid: pid,
+                port: port,
             };
         }
 
@@ -1251,7 +1260,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 var res = checkProgram(pid);
                 if (!res.alive) {
                     print("Could not start mongo program at " + port + ", process ended");
-                    serverExitCodeMap[pid] = res.exitCode;
+                    serverExitCodeMap[port] = res.exitCode;
                     return true;
                 }
             }

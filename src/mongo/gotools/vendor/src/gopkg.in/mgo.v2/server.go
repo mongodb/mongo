@@ -47,6 +47,7 @@ type mongoServer struct {
 	unusedSockets []*mongoSocket
 	liveSockets   []*mongoSocket
 	closed        bool
+	closedCh      chan struct{}
 	abended       bool
 	sync          chan bool
 	dial          dialer
@@ -85,6 +86,7 @@ func newServer(addr string, tcpaddr *net.TCPAddr, sync chan bool, dial dialer) *
 		dial:         dial,
 		info:         &defaultServerInfo,
 		pingValue:    time.Hour, // Push it back before an actual ping.
+		closedCh:     make(chan struct{}),
 	}
 	go server.pinger(true)
 	return server
@@ -188,6 +190,10 @@ func (server *mongoServer) Connect(timeout time.Duration) (*mongoSocket, error) 
 // they're currently in use or not.
 func (server *mongoServer) Close() {
 	server.Lock()
+	if !server.closed {
+		// close once
+		close(server.closedCh)
+	}
 	server.closed = true
 	liveSockets := server.liveSockets
 	unusedSockets := server.unusedSockets
@@ -297,12 +303,20 @@ func (server *mongoServer) pinger(loop bool) {
 		limit:      -1,
 	}
 	for {
-		if loop {
-			time.Sleep(delay)
-		}
-		op := op
-		socket, _, err := server.AcquireSocket(0, delay)
-		if err == nil {
+		timer := time.NewTimer(delay)
+		select {
+		case <-server.closedCh:
+			timer.Stop()
+			return
+		case <-timer.C:
+			op := op
+			socket, _, err := server.AcquireSocket(0, delay)
+			if err != nil {
+				break
+			} else if err == errServerClosed {
+				return
+			}
+
 			start := time.Now()
 			_, _ = socket.SimpleQuery(&op)
 			delay := time.Now().Sub(start)
@@ -319,16 +333,14 @@ func (server *mongoServer) pinger(loop bool) {
 			socket.Release()
 			server.Lock()
 			if server.closed {
-				loop = false
+				// server may have been closed since we acquired this
+				// socket
+				server.Unlock()
+				return
 			}
 			server.pingValue = max
 			server.Unlock()
 			logf("Ping for %s is %d ms", server.Addr, max/time.Millisecond)
-		} else if err == errServerClosed {
-			return
-		}
-		if !loop {
-			return
 		}
 	}
 }

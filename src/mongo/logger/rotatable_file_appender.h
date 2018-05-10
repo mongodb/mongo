@@ -47,12 +47,15 @@ class RotatableFileAppender : public Appender<Event> {
 public:
     typedef Encoder<Event> EventEncoder;
 
+    // TODO: Remove this ctor once raw pointer use is gone
+    RotatableFileAppender(EventEncoder* encoder, RotatableFileWriter* writer)
+        : _encoder(encoder), _writer(writer) {}
     /**
      * Constructs an appender, that owns "encoder", but not "writer."  Caller must
      * keep "writer" in scope at least as long as the constructed appender.
      */
-    RotatableFileAppender(EventEncoder* encoder, RotatableFileWriter* writer)
-        : _encoder(encoder), _writer(writer) {}
+    RotatableFileAppender(std::unique_ptr<EventEncoder> encoder, RotatableFileWriter* writer)
+        : _encoder(std::move(encoder)), _writer(writer) {}
 
     virtual Status append(const Event& event) {
         RotatableFileWriter::Use useWriter(_writer);

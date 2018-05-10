@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/op_observer_noop.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 
@@ -40,8 +41,6 @@ class BSONObj;
 class OperationContext;
 
 namespace repl {
-
-class ReplicationProcess;
 
 /**
  * OpObserver for SyncTail test fixture.
@@ -103,13 +102,10 @@ protected:
     void _testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                      const BSONObj& op,
                                      bool expectedApplyOpCalled);
-    void _testSyncApplyInsertDocument(ErrorCodes::Error expectedError);
+
     ServiceContext::UniqueOperationContext _opCtx;
-    unsigned int _opsApplied;
-    SyncTail::ApplyOperationInLockFn _applyOp;
-    SyncTail::ApplyCommandInLockFn _applyCmd;
-    SyncTail::IncrementOpsAppliedStatsFn _incOps;
-    ReplicationProcess* _replicationProcess = nullptr;
+    std::unique_ptr<ReplicationConsistencyMarkers> _consistencyMarkers;
+    std::unique_ptr<StorageInterface> _storageInterface;
     SyncTailOpObserver* _opObserver = nullptr;
 
     // Implements the SyncTail::MultiSyncApplyFn interface and does nothing.
@@ -127,6 +123,9 @@ protected:
 
     void setUp() override;
     void tearDown() override;
+
+    ReplicationConsistencyMarkers* getConsistencyMarkers() const;
+    StorageInterface* getStorageInterface() const;
 
     Status runOpSteadyState(const OplogEntry& op);
     Status runOpsSteadyState(std::vector<OplogEntry> ops);

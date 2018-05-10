@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/util/log.h"
 
@@ -86,26 +87,36 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        Lock::GlobalLock global(opCtx, MODE_X, Date_t::max());
+        Lock::GlobalLock global(opCtx, MODE_X);
 
         // This command will fail without modifying the catalog if there are any databases that are
         // marked drop-pending. (Otherwise, the Database object will be reconstructed when
         // re-opening the catalog, but with the drop pending flag cleared.)
         std::vector<std::string> allDbs;
-        getGlobalServiceContext()->getGlobalStorageEngine()->listDatabases(&allDbs);
+        getGlobalServiceContext()->getStorageEngine()->listDatabases(&allDbs);
         for (auto&& dbName : allDbs) {
-            const auto db = dbHolder().get(opCtx, dbName);
+            const auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
             if (db->isDropPending(opCtx)) {
-                return CommandHelpers::appendCommandStatus(
-                    result,
-                    {ErrorCodes::DatabaseDropPending,
-                     str::stream() << "cannot restart the catalog because database " << dbName
-                                   << " is pending removal"});
+                uasserted(ErrorCodes::DatabaseDropPending,
+                          str::stream() << "cannot restart the catalog because database " << dbName
+                                        << " is pending removal");
             }
         }
 
+        auto restoreOplogPointerGuard = MakeGuard([opCtx]() {
+            auto db = DatabaseHolder::getDatabaseHolder().openDb(
+                opCtx, NamespaceString::kRsOplogNamespace.db());
+            invariant(db, "failed to reopen database after early exit from restartCatalog");
+
+            auto oplog = db->getCollection(opCtx, NamespaceString::kRsOplogNamespace.coll());
+            invariant(oplog, "failed to get oplog after early exit from restartCatalog");
+            repl::establishOplogCollectionForLogging(opCtx, oplog);
+        });
+
         log() << "Closing database catalog";
         catalog::closeCatalog(opCtx);
+
+        restoreOplogPointerGuard.Dismiss();
 
         log() << "Reopening database catalog";
         catalog::openCatalog(opCtx);

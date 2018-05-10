@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/value.h"
@@ -214,7 +215,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             request.setAllowDiskUse(elem.Bool());
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
-        } else if (!CommandHelpers::isGenericArgument(fieldName)) {
+        } else if (!isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
         }

@@ -59,7 +59,7 @@
 
     // Restart the primary shard and ensure that it is no longer aware that the collection is
     // sharded.
-    st.rs0.restart(0);
+    st.restartShardRS(0);
     assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
 
     const mongos1DB = st.s1.getDB(testName);
@@ -68,11 +68,8 @@
     // Establish change stream cursor on the second mongos, which is not aware that the
     // collection is sharded.
     let cstMongos1 = new ChangeStreamTest(mongos1DB);
-    let cursorMongos1 = cstMongos1.startWatchingChanges({
-        pipeline: [{$changeStream: {fullDocument: "updateLookup"}}],
-        collection: mongos1Coll,
-        includeToken: true
-    });
+    let cursorMongos1 = cstMongos1.startWatchingChanges(
+        {pipeline: [{$changeStream: {fullDocument: "updateLookup"}}], collection: mongos1Coll});
     assert.eq(0, cursorMongos1.firstBatch.length, "Cursor had changes: " + tojson(cursorMongos1));
 
     // Establish a change stream cursor on the now sharded collection through the first mongos.
@@ -141,7 +138,7 @@
 
     // Restart the primary shard and ensure that it is no longer aware that the collection is
     // sharded.
-    st.rs0.restart(0);
+    st.restartShardRS(0);
     assert.eq(false, isShardAware(st.rs0.getPrimary(), mongosColl.getFullName()));
 
     // Establish change stream cursor on mongos2 using the resume token from the change steam on

@@ -43,10 +43,11 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
@@ -771,9 +772,8 @@ int _main(int argc, char* argv[], char** envp) {
 
     logger::globalLogManager()
         ->getNamedDomain("javascriptOutput")
-        ->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
-            new logger::ConsoleAppender<logger::MessageEventEphemeral>(
-                new logger::MessageEventUnadornedEncoder)));
+        ->attachAppender(std::make_unique<logger::ConsoleAppender<logger::MessageEventEphemeral>>(
+            std::make_unique<logger::MessageEventUnadornedEncoder>()));
 
     std::string& cmdlineURI = shellGlobalParams.url;
     MongoURI parsedURI;

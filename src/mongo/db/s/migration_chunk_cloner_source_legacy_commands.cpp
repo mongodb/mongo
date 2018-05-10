@@ -70,15 +70,16 @@ public:
                 str::stream() << "Collection " << nss->ns() << " does not exist",
                 _autoColl->getCollection());
 
-        auto css = CollectionShardingState::get(opCtx, *nss);
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "No active migrations were found for collection " << nss->ns(),
-                css->getMigrationSourceManager());
+        if (auto msm = MigrationSourceManager::get(CollectionShardingState::get(opCtx, *nss))) {
+            // It is now safe to access the cloner
+            _chunkCloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(msm->getCloner());
+            invariant(_chunkCloner);
 
-        // It is now safe to access the cloner
-        _chunkCloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(
-            css->getMigrationSourceManager()->getCloner());
-        invariant(_chunkCloner);
+        } else {
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream() << "No active migrations were found for collection "
+                                    << nss->ns());
+        }
 
         // Ensure the session ids are correct
         uassert(ErrorCodes::IllegalOperation,

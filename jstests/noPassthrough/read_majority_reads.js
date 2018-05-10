@@ -234,7 +234,9 @@
         }
     });
     replTest.startSet();
-    replTest.initiate();
+    // Cannot wait for a stable checkpoint with 'testingSnapshotBehaviorInIsolation' set.
+    replTest.initiateWithAnyNodeAsPrimary(
+        null, "replSetInitiate", {doNotWaitForStableCheckpoint: true});
 
     var mongod = replTest.getPrimary();
 

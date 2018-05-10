@@ -26,7 +26,7 @@ import idl.compiler
 
 def main():
     # type: () -> None
-    """Main Entry point."""
+    """Execute Main Entry point."""
     parser = argparse.ArgumentParser(description='MongoDB IDL Compiler.')
 
     parser.add_argument('file', type=str, help="IDL input file")
@@ -35,26 +35,18 @@ def main():
 
     parser.add_argument('--header', type=str, help="IDL output header file")
 
-    parser.add_argument(
-        '-i',
-        '--include',
-        type=str,
-        action="append",
-        help="Directory to search for IDL import files")
+    parser.add_argument('-i', '--include', type=str, action="append",
+                        help="Directory to search for IDL import files")
 
     parser.add_argument('-v', '--verbose', action='count', help="Enable verbose tracing")
 
     parser.add_argument('--base_dir', type=str, help="IDL output relative base directory")
 
-    parser.add_argument(
-        '--write-dependencies',
-        action='store_true',
-        help='only print out a list of dependent imports')
+    parser.add_argument('--write-dependencies', action='store_true',
+                        help='only print out a list of dependent imports')
 
-    parser.add_argument(
-        '--target_arch',
-        type=str,
-        help="IDL target archiecture (amd64, s390x). defaults to current machine")
+    parser.add_argument('--target_arch', type=str,
+                        help="IDL target archiecture (amd64, s390x). defaults to current machine")
 
     args = parser.parse_args()
 

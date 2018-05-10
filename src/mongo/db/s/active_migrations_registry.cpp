@@ -120,9 +120,9 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
         // Lock the collection so nothing changes while we're getting the migration report.
         AutoGetCollection autoColl(opCtx, nss.get(), MODE_IS);
 
-        auto css = CollectionShardingState::get(opCtx, nss.get());
-        if (css->getMigrationSourceManager()) {
-            return css->getMigrationSourceManager()->getMigrationStatusReport();
+        if (auto msm =
+                MigrationSourceManager::get(CollectionShardingState::get(opCtx, nss.get()))) {
+            return msm->getMigrationStatusReport();
         }
     }
 

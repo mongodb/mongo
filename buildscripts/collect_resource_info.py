@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-
-"""
-Collect system resource information on processes running in Evergreen on a given interval.
-"""
+"""Collect system resource information on processes running in Evergreen on a given interval."""
 
 from __future__ import absolute_import
 from __future__ import print_function
@@ -16,29 +13,24 @@ import time
 from bson.json_util import dumps
 import requests
 
-
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.resmokelib import utils
-    
+from buildscripts.resmokelib import utils  # pylint: disable=wrong-import-position
+
 
 def main():
+    """Main."""
     usage = "usage: %prog [options]"
     parser = optparse.OptionParser(description=__doc__, usage=usage)
-    parser.add_option("-i", "--interval",
-                      dest="interval",
-                      default=5,
-                      type="int",
+    parser.add_option("-i", "--interval", dest="interval", default=5, type="int",
                       help="Collect system resource information every <interval> seconds. "
-                           "Default is every 5 seconds.")
-    parser.add_option("-o", "--output-file",
-                      dest="outfile",
-                      default="-",
+                      "Default is every 5 seconds.")
+    parser.add_option("-o", "--output-file", dest="outfile", default="-",
                       help="If '-', then the file is written to stdout."
-                           " Any other value is treated as the output file name. By default,"
-                           " output is written to stdout.")
+                      " Any other value is treated as the output file name. By default,"
+                      " output is written to stdout.")
 
     (options, _) = parser.parse_args()
 

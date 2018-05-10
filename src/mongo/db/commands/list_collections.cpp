@@ -44,6 +44,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
@@ -84,9 +85,9 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
     if (matchType == MatchExpression::EQ) {
         auto eqMatch = checked_cast<const EqualityMatchExpression*>(matcher);
         if (eqMatch->path() == "name") {
-            auto& elem = eqMatch->getData();
-            if (elem.type() == String) {
-                return {vector<StringData>{elem.valueStringData()}};
+            StringData name(eqMatch->getData().valuestrsafe());
+            if (name.size()) {
+                return {vector<StringData>{name}};
             } else {
                 return vector<StringData>();
             }
@@ -96,7 +97,8 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
         if (matchIn->path() == "name" && matchIn->getRegexes().empty()) {
             vector<StringData> exactMatches;
             for (auto&& elem : matchIn->getEqualities()) {
-                if (elem.type() == String) {
+                StringData name(elem.valuestrsafe());
+                if (name.size()) {
                     exactMatches.push_back(elem.valueStringData());
                 }
             }
@@ -130,10 +132,14 @@ void _addWorkingSetMember(OperationContext* opCtx,
     root->pushBack(id);
 }
 
-BSONObj buildViewBson(const ViewDefinition& view) {
+BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     BSONObjBuilder b;
     b.append("name", view.name().coll());
     b.append("type", "view");
+
+    if (nameOnly) {
+        return b.obj();
+    }
 
     BSONObjBuilder optionsBuilder(b.subobjStart("options"));
     optionsBuilder.append("viewOn", view.viewOn().coll());
@@ -148,9 +154,13 @@ BSONObj buildViewBson(const ViewDefinition& view) {
     return b.obj();
 }
 
+/**
+ * Return an object describing the collection. Takes a collection lock if nameOnly is false.
+ */
 BSONObj buildCollectionBson(OperationContext* opCtx,
                             const Collection* collection,
-                            bool includePendingDrops) {
+                            bool includePendingDrops,
+                            bool nameOnly) {
 
     if (!collection) {
         return {};
@@ -173,6 +183,11 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     b.append("name", collectionName);
     b.append("type", "collection");
 
+    if (nameOnly) {
+        return b.obj();
+    }
+
+    Lock::CollectionLock clk(opCtx->lockState(), nss.ns(), MODE_IS);
     CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
@@ -232,21 +247,20 @@ public:
              BSONObjBuilder& result) {
         unique_ptr<MatchExpression> matcher;
 
+        const bool nameOnly = jsobj["nameOnly"].trueValue();
+
         // Check for 'filter' argument.
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
             if (filterElt.type() != mongo::Object) {
-                return CommandHelpers::appendCommandStatus(
-                    result, Status(ErrorCodes::BadValue, "\"filter\" must be an object"));
+                uasserted(ErrorCodes::BadValue, "\"filter\" must be an object");
             }
             // The collator is null because collection objects are compared using binary comparison.
             const CollatorInterface* collator = nullptr;
             boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
             StatusWithMatchExpression statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
-            if (!statusWithMatcher.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, statusWithMatcher.getStatus());
-            }
+            uassertStatusOK(statusWithMatcher.getStatus());
             matcher = std::move(statusWithMatcher.getValue());
         }
 
@@ -254,21 +268,16 @@ public:
         long long batchSize;
         Status parseCursorStatus =
             CursorRequest::parseCommandCursorOptions(jsobj, defaultBatchSize, &batchSize);
-        if (!parseCursorStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, parseCursorStatus);
-        }
+        uassertStatusOK(parseCursorStatus);
 
         // Check for 'includePendingDrops' flag. The default is to not include drop-pending
         // collections.
         bool includePendingDrops;
         Status status = bsonExtractBooleanFieldWithDefault(
             jsobj, "includePendingDrops", false, &includePendingDrops);
+        uassertStatusOK(status);
 
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
-        AutoGetDb autoDb(opCtx, dbname, MODE_S);
+        AutoGetDb autoDb(opCtx, dbname, MODE_IS);
 
         Database* db = autoDb.getDb();
 
@@ -280,14 +289,16 @@ public:
                 for (auto&& collName : *collNames) {
                     auto nss = NamespaceString(db->name(), collName);
                     Collection* collection = db->getCollection(opCtx, nss);
-                    BSONObj collBson = buildCollectionBson(opCtx, collection, includePendingDrops);
+                    BSONObj collBson =
+                        buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
                     if (!collBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
                     }
                 }
             } else {
                 for (auto&& collection : *db) {
-                    BSONObj collBson = buildCollectionBson(opCtx, collection, includePendingDrops);
+                    BSONObj collBson =
+                        buildCollectionBson(opCtx, collection, includePendingDrops, nameOnly);
                     if (!collBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, collBson, matcher.get(), ws.get(), root.get());
                     }
@@ -300,7 +311,7 @@ public:
                     filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
             if (!skipViews) {
                 db->getViewCatalog()->iterate(opCtx, [&](const ViewDefinition& view) {
-                    BSONObj viewBson = buildViewBson(view);
+                    BSONObj viewBson = buildViewBson(view, nameOnly);
                     if (!viewBson.isEmpty()) {
                         _addWorkingSetMember(opCtx, viewBson, matcher.get(), ws.get(), root.get());
                     }
@@ -312,9 +323,7 @@ public:
 
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
-        if (!statusWithPlanExecutor.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
-        }
+        uassertStatusOK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         BSONArrayBuilder firstBatch;

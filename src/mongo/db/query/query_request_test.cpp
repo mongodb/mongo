@@ -240,22 +240,6 @@ TEST(QueryRequestTest, AllowTailableWithNaturalSort) {
     ASSERT_BSONOBJ_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
 }
 
-TEST(QueryRequestTest, IsIsolatedReturnsTrueWithIsolated) {
-    ASSERT_TRUE(QueryRequest::isQueryIsolated(BSON("$isolated" << 1)));
-}
-
-TEST(QueryRequestTest, IsIsolatedReturnsTrueWithAtomic) {
-    ASSERT_TRUE(QueryRequest::isQueryIsolated(BSON("$atomic" << 1)));
-}
-
-TEST(QueryRequestTest, IsIsolatedReturnsFalseWithIsolated) {
-    ASSERT_FALSE(QueryRequest::isQueryIsolated(BSON("$isolated" << false)));
-}
-
-TEST(QueryRequestTest, IsIsolatedReturnsFalseWithAtomic) {
-    ASSERT_FALSE(QueryRequest::isQueryIsolated(BSON("$atomic" << false)));
-}
-
 //
 // Test compatibility of various projection and sort objects.
 //
@@ -1181,7 +1165,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
 
 TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
     QueryRequest qr(testns);
-    qr.setTailableMode(TailableMode::kTailable);
+    qr.setTailableMode(TailableModeEnum::kTailable);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
@@ -1199,7 +1183,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithNoCursorTimeoutFails) {
 
 TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
     QueryRequest qr(testns);
-    qr.setTailableMode(TailableMode::kTailableAndAwaitData);
+    qr.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 

@@ -62,6 +62,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/update/update_common',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         'common_s',
     ],
 )
@@ -74,6 +75,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongos',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
@@ -115,8 +117,10 @@ env.Library(
         'catalog/type_mongos.cpp',
         'catalog/type_shard.cpp',
         'catalog/type_shard_collection.cpp',
+        'catalog/type_shard_database.cpp',
         'catalog/type_tags.cpp',
         'chunk_version.cpp',
+        'database_version_helpers.cpp',
         'request_types/add_shard_request_type.cpp',
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/balance_chunk_request_type.cpp',
@@ -129,12 +133,13 @@ env.Library(
         'request_types/split_chunk_request_type.cpp',
         'request_types/update_zone_key_range_request_type.cpp',
         'shard_id.cpp',
-        'versioning.cpp',
         env.Idlc('catalog/type_chunk_base.idl')[0],
         env.Idlc('request_types/clone_catalog_data.idl')[0],
         env.Idlc('request_types/create_collection.idl')[0],
         env.Idlc('request_types/create_database.idl')[0],
+        env.Idlc('request_types/flush_database_cache_updates.idl')[0],
         env.Idlc('request_types/flush_routing_table_cache_updates.idl')[0],
+        env.Idlc('request_types/get_database_version.idl')[0],
         env.Idlc('request_types/move_primary.idl')[0],
         env.Idlc('request_types/shard_collection.idl')[0],
     ],
@@ -281,6 +286,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'cluster_last_error_info',
@@ -331,8 +337,20 @@ env.Library(
         'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'grid',
+    ],
+)
+
+env.Benchmark(
+    target='chunk_manager_refresh_bm',
+    source=[
+        'chunk_manager_refresh_bm.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_routing_table',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
     ],
 )
 
@@ -340,10 +358,22 @@ env.CppUnitTest(
     target='sharding_routing_table_test',
     source=[
         'catalog_cache_refresh_test.cpp',
-        'catalog_cache_test_fixture.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
+        'metadata_filtering_test.cpp',
         'shard_key_pattern_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/db/serveronly',
+        'catalog_cache_test_fixture',
+    ]
+)
+
+env.Library(
+    target='catalog_cache_test_fixture',
+    source=[
+        'catalog_cache_test_fixture.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

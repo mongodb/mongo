@@ -1,4 +1,7 @@
 // Test that duplicate query results are not returned.
+//
+// @tags: [requires_fastcount]
+
 (function() {
     "use strict";
 

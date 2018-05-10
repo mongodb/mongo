@@ -1,17 +1,11 @@
 /**
  * Test to ensure that rollback waits for in-progress background index builds to finish before
  * starting the rollback process. Only applies to Recoverable Rollback via WiredTiger checkpoints.
+ *
+ * @tags: [requires_wiredtiger, requires_journaling]
  */
 (function() {
     'use strict';
-
-    let skip = true;
-
-    // TODO: Re-enable test once Recoverable Rollback via WT Checkpoints is complete and ready to
-    // test. See SERVER-32844.
-    if (skip) {
-        return;
-    }
 
     load('jstests/libs/check_log.js');
     load("jstests/replsets/rslib.js");

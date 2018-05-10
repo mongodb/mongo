@@ -50,7 +50,7 @@ load("jstests/replsets/rslib.js");
         return;
     }
 
-    var slaves = replTest.liveNodes.slaves;
+    var slaves = replTest._slaves;
     slaves[0].setSlaveOk();
     slaves[1].setSlaveOk();
 

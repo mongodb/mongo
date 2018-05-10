@@ -109,8 +109,8 @@ public:
             return false;
         }
 
-        return CommandHelpers::appendCommandStatus(
-            result, collection->touch(opCtx, touch_data, touch_indexes, &result));
+        uassertStatusOK(collection->touch(opCtx, touch_data, touch_indexes, &result));
+        return true;
     }
 };
 static TouchCmd touchCmd;

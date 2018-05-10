@@ -15,8 +15,17 @@
     var shard1 = st.shard1.shardName;
 
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+
     st.ensurePrimaryShard(kDbName, shard0);
     assert.eq(shard0, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
+
+    // If we are in a mixed version suite (sharding_last_stable_mongos_and_mixed_shards) we may not
+    // get a version back. If not, we will skip this part of the test.
+    let versionBeforeMovePrimary = null;
+    if (mongos.getDB('config').databases.findOne({_id: kDbName}).version) {
+        versionBeforeMovePrimary =
+            mongos.getDB('config').databases.findOne({_id: kDbName}).version.lastMod;
+    }
 
     // Can run only against the admin database.
     assert.commandFailedWithCode(
@@ -40,11 +49,16 @@
     assert.commandFailed(mongos.adminCommand({movePrimary: kDbName, to: '', forTest: true}));
     assert.commandFailed(mongos.adminCommand({movePrimary: kDbName, forTest: true}));
 
-    // Succeed if 'to' shard is already the primary shard for the db.
+    // Succeed if 'to' shard exists and verify metadata changes.
+    assert.eq(shard0, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
     assert.commandWorked(mongos.adminCommand({movePrimary: kDbName, to: shard1, forTest: true}));
-    // The following line will be uncommented when the underlying fcv 4.0 movePrimary logic is
-    // complete.
-    // assert.eq(shard1, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
+
+    assert.eq(shard1, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
+
+    if (versionBeforeMovePrimary) {
+        assert.eq(versionBeforeMovePrimary + 1,
+                  mongos.getDB('config').databases.findOne({_id: kDbName}).version.lastMod);
+    }
 
     st.stop();
 

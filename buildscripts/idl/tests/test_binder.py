@@ -1298,17 +1298,6 @@ class TestBinder(testcase.IDLTestcase):
                     foo1: array<foo>
             """), idl.errors.ERROR_ID_NO_ARRAY_ENUM)
 
-        # Test default
-        self.assert_bind_fail(test_preamble + textwrap.dedent("""
-        structs:
-            foo1:
-                description: foo
-                fields:
-                    foo1:
-                        type: foo
-                        default: 1
-            """), idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_ENUM)
-
     def test_command_positive(self):
         # type: () -> None
         """Positive command tests."""

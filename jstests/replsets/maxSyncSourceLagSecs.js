@@ -22,7 +22,7 @@
     replTest.awaitNodesAgreeOnPrimary();
 
     var master = replTest.getPrimary();
-    var slaves = replTest.liveNodes.slaves;
+    var slaves = replTest._slaves;
     syncFrom(slaves[0], master, replTest);
     syncFrom(slaves[1], master, replTest);
     master.getDB("foo").bar.save({a: 1});

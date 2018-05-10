@@ -39,10 +39,15 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/scopeguard.h"
@@ -162,11 +167,51 @@ public:
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before upgrade procedures begin right after
                 //     this.
-                Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
+                Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
+                                                  opCtx, repl::ReadConcernLevel::kLocalReadConcern))
+                                  .value;
+
+                // The 'config' dataabase contains the sharded 'config.system.sessions' collection,
+                // but does not have an entry in config.databases.
+                allDbs.emplace_back("config", ShardId("config"), true);
+
+                auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+                for (const auto& db : allDbs) {
+                    const auto dbVersion = databaseVersion::makeNew();
+
+                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                        opCtx,
+                        DatabaseType::ConfigNS,
+                        BSON(DatabaseType::name(db.getName())),
+                        BSON("$set" << BSON(DatabaseType::version(dbVersion.toBSON()))),
+                        false,
+                        ShardingCatalogClient::kLocalWriteConcern));
+
+                    // Enumerate all collections
+                    auto collections =
+                        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
+                            opCtx,
+                            &db.getName(),
+                            nullptr,
+                            repl::ReadConcernLevel::kLocalReadConcern));
+
+                    for (const auto& coll : collections) {
+                        if (!coll.getDropped()) {
+                            uassertStatusOK(
+                                ShardingCatalogManager::get(opCtx)->upgradeChunksHistory(
+                                    opCtx, coll.getNs(), coll.getEpoch(), clusterTime));
+                        }
+                    }
+                }
+
+                // Now that new metadata are written out to disk flush the local in memory state.
+                Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
+
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx,
@@ -204,7 +249,7 @@ public:
                 //   - The global IX/X locked operation began prior to the FCV change, is acting on
                 //     that assumption and will finish before downgrade procedures begin right after
                 //     this.
-                Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
+                Lock::GlobalLock lk(opCtx, MODE_S);
             }
 
             // Downgrade shards before config finishes its downgrade.
@@ -217,6 +262,43 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersionCommandParser::kCommandName
                                      << requestedVersion)))));
+
+                auto allDbs = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllDBs(
+                                                  opCtx, repl::ReadConcernLevel::kLocalReadConcern))
+                                  .value;
+
+                // The 'config' dataabase contains the sharded 'config.system.sessions' collection,
+                // but does not have an entry in config.databases.
+                allDbs.emplace_back("config", ShardId("config"), true);
+
+                for (const auto& db : allDbs) {
+                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                        opCtx,
+                        DatabaseType::ConfigNS,
+                        BSON(DatabaseType::name(db.getName())),
+                        BSON("$unset" << BSON("version"
+                                              << "")),
+                        false,
+                        ShardingCatalogClient::kLocalWriteConcern));
+
+                    // Enumerate all collections
+                    auto collections =
+                        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
+                            opCtx,
+                            &db.getName(),
+                            nullptr,
+                            repl::ReadConcernLevel::kLocalReadConcern));
+
+                    for (const auto& coll : collections) {
+                        if (!coll.getDropped()) {
+                            uassertStatusOK(
+                                ShardingCatalogManager::get(opCtx)->downgradeChunksHistory(
+                                    opCtx, coll.getNs(), coll.getEpoch()));
+                        }
+                    }
+                }
+                // Now that new metadata are written out to disk flush the local in memory state.
+                Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
             }
 
             FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);

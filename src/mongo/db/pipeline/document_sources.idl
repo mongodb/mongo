@@ -42,7 +42,11 @@ types:
         bson_serialization_type: object
         description: An object representing a resume token for a change stream
         cpp_type: ResumeToken
-        serializer: ResumeToken::toBSON
+        # The IDL requires a serializer for any custom type. The serializer for this type actually
+        # needs to know which format to use though, so requires an argument which is not currently
+        # supported by the IDL. We don't expect anyone to use the IDL to serialize the type, so we
+        # just provide a dummy serializer here.
+        serializer: ResumeToken::toBSON_do_not_use
         deserializer: ResumeToken::parse
 
     # The document key element in a resume token can be any BSON element, so we need a custom type
@@ -75,18 +79,32 @@ structs:
               description: An object representing the point at which we should resume reporting
                            changes from.
           $_resumeAfterClusterTime:
-              cpp_name: resumeAfterClusterTime
+              cpp_name: resumeAfterClusterTimeDeprecated
               type: ResumeTokenClusterTime
               optional: true
               description: The cluster time after which we should start reporting changes.
                            Only one of resumeAfter and _resumeAfterClusterTime should be
-                           specified.  For internal use only.
+                           specified.  For internal use only. Deprecated in 4.0, use 
+                           startAtClusterTime instead.
+          startAtClusterTime:
+              cpp_name: startAtClusterTime
+              type: ResumeTokenClusterTime 
+              optional: true
+              description: The cluster time after which we should start reporting changes.
+                           Only one of resumeAfter, _resumeAfterClusterTimeDeprecated, and 
+                           startAtClusterTime should be specified.
           fullDocument:
               cpp_name: fullDocument
               type: string
               default: '"default"'
               description: A string '"updateLookup"' or '"default"', indicating whether or not we
                            should return a full document or just changes for an update.
+          allChangesForCluster:
+              cpp_name: allChangesForCluster
+              type: bool
+              default: false
+              description: A flag indicating whether the stream should report all changes that occur
+                           on the deployment, aside from those on internal databases or collections.
 
   ListSessionsUser:
     description: "A struct representing a $listSessions/$listLocalSessions User"

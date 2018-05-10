@@ -38,10 +38,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -139,14 +141,6 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
     uassert(
         ErrorCodes::InvalidOptions, "cannot have empty shard key", !request->getKey().isEmpty());
 
-    // Ensure the proposed shard key is valid.
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream()
-                << "Unsupported shard key pattern "
-                << shardKeyPattern.toString()
-                << ". Pattern must either be a single hashed field, or a list of ascending fields",
-            shardKeyPattern.isValid());
-
     // Ensure that hashed and unique are not both set.
     uassert(ErrorCodes::InvalidOptions,
             "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
@@ -156,7 +150,7 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
     // Ensure the namespace is valid.
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
-            !nss.isSystem() || nss.ns() == SessionsCollection::kSessionsFullNS);
+            !nss.isSystem() || nss == SessionsCollection::kSessionsNamespaceString);
 
     // Ensure the collation is valid. Currently we only allow the simple collation.
     bool simpleCollationSpecified = false;
@@ -564,15 +558,15 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
         const auto to = toStatus.getValue();
 
         // Can't move chunk to shard it's already on
-        if (to->getId() == chunk->getShardId()) {
+        if (to->getId() == chunk.getShardId()) {
             continue;
         }
 
         ChunkType chunkType;
         chunkType.setNS(nss);
-        chunkType.setMin(chunk->getMin());
-        chunkType.setMax(chunk->getMax());
-        chunkType.setShard(chunk->getShardId());
+        chunkType.setMin(chunk.getMin());
+        chunkType.setMax(chunk.getMax());
+        chunkType.setShard(chunk.getShardId());
         chunkType.setVersion(chunkManager->getVersion());
 
         Status moveStatus = configsvr_client::moveChunk(
@@ -583,7 +577,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
             true);
         if (!moveStatus.isOK()) {
-            warning() << "couldn't move chunk " << redact(chunk->toString()) << " to shard " << *to
+            warning() << "couldn't move chunk " << redact(chunk.toString()) << " to shard " << *to
                       << " while sharding collection " << nss.ns() << causedBy(redact(moveStatus));
         }
     }
@@ -602,7 +596,8 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
 
     // Subdivide the big chunks by splitting at each of the points in "allSplits"
     // that we haven't already split by.
-    auto currentChunk = chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[0]);
+    boost::optional<Chunk> currentChunk(
+        chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[0]));
 
     std::vector<BSONObj> subSplits;
     for (unsigned i = 0; i <= allSplits.size(); i++) {
@@ -626,7 +621,8 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
             }
 
             if (i < allSplits.size()) {
-                currentChunk = chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[i]);
+                currentChunk.emplace(
+                    chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[i]));
             }
         } else {
             BSONObj splitPoint(allSplits[i]);
@@ -720,7 +716,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -731,6 +727,10 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrShardCollection can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+        // Set the operation context read concern level to local for reads into the config database.
+        repl::ReadConcernArgs::get(opCtx) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "shardCollection must be called with majority writeConcern, got "
@@ -744,6 +744,7 @@ public:
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
+        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         // Make the distlocks boost::optional so that they can be released by being reset below.
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock(
@@ -760,7 +761,7 @@ public:
         auto dbType =
             uassertStatusOK(
                 Grid::get(opCtx)->catalogClient()->getDatabase(
-                    opCtx, nss.db().toString(), repl::ReadConcernLevel::kLocalReadConcern))
+                    opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel()))
                 .value;
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding not enabled for db " << nss.db(),
@@ -772,7 +773,7 @@ public:
         ShardKeyPattern shardKeyPattern(proposedKey);
 
         std::vector<ShardId> shardIds;
-        Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
+        shardRegistry->getAllShardIds(opCtx, &shardIds);
         const int numShards = shardIds.size();
 
         uassert(ErrorCodes::IllegalOperation,
@@ -781,14 +782,13 @@ public:
 
         // Handle collections in the config db separately.
         if (nss.db() == NamespaceString::kConfigDb) {
-            // Only whitelisted collections in config may be sharded
-            // (unless we are in test mode)
+            // Only whitelisted collections in config may be sharded (unless we are in test mode)
             uassert(ErrorCodes::IllegalOperation,
                     "only special collections in the config db may be sharded",
-                    nss.ns() == SessionsCollection::kSessionsFullNS || getTestCommandsEnabled());
+                    nss == SessionsCollection::kSessionsNamespaceString ||
+                        getTestCommandsEnabled());
 
-            auto configShard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbType.getPrimary()));
+            auto configShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
             ScopedDbConnection configConn(configShard->getConnString());
             ON_BLOCK_EXIT([&configConn] { configConn.done(); });
 
@@ -809,8 +809,7 @@ public:
             }
         }();
 
-        auto primaryShard =
-            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, primaryShardId));
+        auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, primaryShardId));
         ScopedDbConnection conn(primaryShard->getConnString());
         ON_BLOCK_EXIT([&conn] { conn.done(); });
 

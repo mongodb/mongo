@@ -22,6 +22,7 @@
 #include "asio/detail/handler_type_requirements.hpp"
 #include "asio/detail/noncopyable.hpp"
 #include "asio/detail/type_traits.hpp"
+#include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl/detail/buffered_handshake_op.hpp"
 #include "mongo/util/net/ssl/detail/handshake_op.hpp"
@@ -67,6 +68,8 @@ public:
     typedef PCtxtHandle native_handle_type;
 #elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
     typedef SSL* native_handle_type;
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+    typedef ::SSLContextRef native_handle_type;
 #else
 #error "Unknown SSL Provider"
 #endif
@@ -91,9 +94,11 @@ public:
      * @param ctx The SSL context to be used for the stream.
      */
     template <typename Arg>
-    stream(Arg&& arg, context& ctx)
+    stream(Arg&& arg, context& ctx, const std::string& remoteHostName)
         : next_layer_(ASIO_MOVE_CAST(Arg)(arg)),
-          core_(ctx.native_handle(), next_layer_.lowest_layer().get_executor().context()) {}
+          core_(ctx.native_handle(),
+                remoteHostName,
+                next_layer_.lowest_layer().get_executor().context()) {}
 #else   // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
     template <typename Arg>
     stream(Arg& arg, context& ctx)
@@ -570,6 +575,10 @@ public:
                          init.completion_handler);
 
         return init.result.get();
+    }
+
+    asio::mutable_buffer& getCoreOutputBuffer() {
+        return core_.output_;
     }
 
 private:

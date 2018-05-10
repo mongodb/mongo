@@ -76,6 +76,15 @@ TEST(Empty, EmptyFieldName) {
     ASSERT_EQUALS(fieldRef.dottedField(), field);
 }
 
+TEST(Empty, ReinitializeWithEmptyString) {
+    FieldRef fieldRef("a.b.c.d.e");
+    ASSERT_EQUALS(fieldRef.numParts(), 5U);
+
+    fieldRef.parse("");
+    ASSERT_EQUALS(fieldRef.numParts(), 0U);
+    ASSERT_EQUALS(fieldRef.dottedField(), "");
+}
+
 TEST(Normal, SinglePart) {
     string field = "a";
     FieldRef fieldRef(field);

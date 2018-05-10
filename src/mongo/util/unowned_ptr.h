@@ -35,7 +35,7 @@ namespace mongo {
 
 /**
  * A "smart" pointer that explicitly indicates a lack of ownership.
- * It will implicitly convert from any compatible pointer type except auto_ptr.
+ * It will implicitly convert from any compatible pointer type.
  *
  * Note that like other pointer types const applies to the pointer not the pointee:
  * - const unowned_ptr<T>  =>  T* const

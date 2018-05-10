@@ -79,7 +79,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -109,7 +109,7 @@ public:
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         CollectionShardingState* const css = CollectionShardingState::get(opCtx, nss);
 
-        const auto metadata = css->getMetadata();
+        const auto metadata = css->getMetadata(opCtx);
         if (metadata) {
             result.appendTimestamp("global", metadata->getShardVersion().toLong());
         } else {

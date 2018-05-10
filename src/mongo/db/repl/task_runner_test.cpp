@@ -215,7 +215,7 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
         uassert(ErrorCodes::OperationFailed, "task failure", false);
 
         // not reached.
-        invariant(false);
+        MONGO_UNREACHABLE;
         return TaskRunner::NextAction::kKeepOperationContext;
     };
     getTaskRunner().schedule(task);

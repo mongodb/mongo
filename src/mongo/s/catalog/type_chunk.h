@@ -254,8 +254,11 @@ public:
     }
     void setJumbo(bool jumbo);
 
-    void setHistory(std::vector<ChunkHistory>&& history) {
+    void setHistory(std::vector<ChunkHistory> history) {
         _history = std::move(history);
+        if (!_history.empty()) {
+            invariant(_shard == _history.front().getShard());
+        }
     }
     const std::vector<ChunkHistory>& getHistory() const {
         return _history;

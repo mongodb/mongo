@@ -1,7 +1,4 @@
-"""
-Testing hook for verifying correctness of a secondary's behavior during
-an unclean shutdown.
-"""
+"""Test hook for verifying correctness of secondary's behavior during an unclean shutdown."""
 
 from __future__ import absolute_import
 
@@ -20,15 +17,16 @@ from ... import errors
 
 
 class PeriodicKillSecondaries(interface.Hook):
-    """
-    Periodically kills the secondaries in a replica set and verifies
-    that they can reach the SECONDARY state without having connectivity
+    """Periodically kills the secondaries in a replica set.
+
+    Also verifies that the secondaries can reach the SECONDARY state without having connectivity
     to the primary after an unclean shutdown.
     """
 
     DEFAULT_PERIOD_SECS = 30
 
     def __init__(self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS):
+        """Initialize PeriodicKillSecondaries."""
         if not isinstance(rs_fixture, replicaset.ReplicaSetFixture):
             raise TypeError("{} either does not support replication or does not support writing to"
                             " its oplog early".format(rs_fixture.__class__.__name__))
@@ -46,6 +44,7 @@ class PeriodicKillSecondaries(interface.Hook):
         self._last_test = None
 
     def after_suite(self, test_report):
+        """Run after suite."""
         if self._start_time is not None:
             # Ensure that we test killing the secondary and having it reach state SECONDARY after
             # being restarted at least once when running the suite.
@@ -54,6 +53,7 @@ class PeriodicKillSecondaries(interface.Hook):
             self._run(test_report)
 
     def before_test(self, test, test_report):
+        """Run before test."""
         if self._start_time is not None:
             # The "rsSyncApplyStop" failpoint is already enabled.
             return
@@ -66,6 +66,7 @@ class PeriodicKillSecondaries(interface.Hook):
         self._start_time = time.time()
 
     def after_test(self, test, test_report):
+        """Run after test."""
         self._last_test = test
 
         # Kill the secondaries and verify that they can reach the SECONDARY state if the specified
@@ -77,26 +78,28 @@ class PeriodicKillSecondaries(interface.Hook):
         self._run(test_report)
 
     def _run(self, test_report):
-        hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
-            self.logger.test_case_logger, self._last_test, self, test_report)
-        hook_test_case.configure(self.fixture)
-        hook_test_case.run_dynamic_test(test_report)
-
-        # Set the hook back into a state where it will disable oplog application at the start
-        # of the next test that runs.
-        self._start_time = None
+        try:
+            hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
+                self.logger.test_case_logger, self._last_test, self, test_report)
+            hook_test_case.configure(self.fixture)
+            hook_test_case.run_dynamic_test(test_report)
+        finally:
+            # Set the hook back into a state where it will disable oplog application at the start
+            # of the next test that runs.
+            # Always reset _start_time to prevent the hook from running in after_suite immediately
+            # after failing in after_test.
+            self._start_time = None
 
     def _enable_rssyncapplystop(self, secondary):
         # Enable the "rsSyncApplyStop" failpoint on the secondary to prevent them from
         # applying any oplog entries while the test is running.
         client = secondary.mongo_client()
         try:
-            client.admin.command(bson.SON([
-                ("configureFailPoint", "rsSyncApplyStop"),
-                ("mode", "alwaysOn")]))
+            client.admin.command(
+                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "alwaysOn")]))
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception(
-                "Unable to disable oplog application on the mongod on port %d", secondary.port)
+            self.logger.exception("Unable to disable oplog application on the mongod on port %d",
+                                  secondary.port)
             raise errors.ServerFailure(
                 "Unable to disable oplog application on the mongod on port {}: {}".format(
                     secondary.port, err.args[0]))
@@ -106,25 +109,28 @@ class PeriodicKillSecondaries(interface.Hook):
         # oplog entries.
         client = secondary.mongo_client()
         try:
-            client.admin.command(bson.SON([
-                ("configureFailPoint", "rsSyncApplyStop"),
-                ("mode", "off")]))
+            client.admin.command(
+                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "off")]))
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception(
-                "Unable to re-enable oplog application on the mongod on port %d",
-                secondary.port)
+            self.logger.exception("Unable to re-enable oplog application on the mongod on port %d",
+                                  secondary.port)
             raise errors.ServerFailure(
                 "Unable to re-enable oplog application on the mongod on port {}: {}".format(
                     secondary.port, err.args[0]))
 
 
 class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
-    def __init__(self, logger, test_name, description, base_test_name, hook, test_report):
-        interface.DynamicTestCase.__init__(self, logger, test_name, description,
-                                           base_test_name, hook)
+    """PeriodicKillSecondariesTestCase class."""
+
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, test_name, description, base_test_name, hook, test_report):
+        """Initialize PeriodicKillSecondariesTestCase."""
+        interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
+                                           hook)
         self._test_report = test_report
 
     def run_test(self):
+        """Run the test."""
         self._kill_secondaries()
         self._check_secondaries_and_restart_fixture()
 
@@ -146,7 +152,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         for secondary in self.fixture.get_secondaries():
             # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
             # oplog entries.
-            self._hook._disable_rssyncapplystop(secondary)
+            self._hook._disable_rssyncapplystop(secondary)  # pylint: disable=protected-access
 
             # Wait a little bit for the secondary to start apply oplog entries so that we are more
             # likely to kill the mongod process while it is partway into applying a batch.
@@ -232,7 +238,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         self.fixture.setup()
         self.fixture.await_ready()
 
-    def _check_invariants_as_standalone(self, secondary):
+    def _check_invariants_as_standalone(self, secondary):  # pylint: disable=too-many-branches
         # We remove the --replSet option in order to start the node as a standalone.
         replset_name = secondary.mongod_options.pop("replSet")
 
@@ -243,10 +249,11 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             client = secondary.mongo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
-            checkpoint_timestamp_doc = client.local["replset.checkpointTimestamp"].find_one()
+            self.logger.info("minValid: {}, oTAP: {}".format(minvalid_doc,
+                                                             oplog_truncate_after_doc))
 
-            latest_oplog_doc = client.local["oplog.rs"].find_one(
-                sort=[("$natural", pymongo.DESCENDING)])
+            latest_oplog_doc = client.local["oplog.rs"].find_one(sort=[("$natural",
+                                                                        pymongo.DESCENDING)])
 
             null_ts = bson.Timestamp(0, 0)
 
@@ -255,8 +262,8 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             if latest_oplog_doc is not None:
                 latest_oplog_entry_ts = latest_oplog_doc.get("ts")
                 if latest_oplog_entry_ts is None:
-                    raise errors.ServerFailure("Latest oplog entry had no 'ts' field: {}".format(
-                        latest_oplog_doc))
+                    raise errors.ServerFailure(
+                        "Latest oplog entry had no 'ts' field: {}".format(latest_oplog_doc))
 
             # The "oplogTruncateAfterPoint" document may not exist at startup. If so, we default
             # it to null.
@@ -265,56 +272,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 oplog_truncate_after_ts = oplog_truncate_after_doc.get(
                     "oplogTruncateAfterPoint", null_ts)
 
-            # The "checkpointTimestamp" document may not exist at startup. If so, we default
-            # it to null.
-            checkpoint_timestamp = null_ts
-            if checkpoint_timestamp_doc is not None:
-                checkpoint_timestamp = checkpoint_timestamp_doc.get("checkpointTimestamp")
-                if checkpoint_timestamp is None:
-                    raise errors.ServerFailure(
-                        "Checkpoint timestamp document had no 'checkpointTimestamp'"
-                        "field: {}".format(checkpoint_timestamp_doc))
-
-            # checkpointTimestamp <= top of oplog
-            # If the oplog is empty, the checkpoint timestamp should also be null.
-            if not checkpoint_timestamp <= latest_oplog_entry_ts:
-                raise errors.ServerFailure(
-                    "The condition checkpointTimestamp <= top of oplog ({} <= {}) doesn't hold:"
-                    " checkpointTimestamp document={}, latest oplog entry={}".format(
-                        checkpoint_timestamp, latest_oplog_entry_ts, checkpoint_timestamp_doc,
-                        latest_oplog_doc))
-
             if minvalid_doc is not None:
                 applied_through_ts = minvalid_doc.get("begin", {}).get("ts", null_ts)
                 minvalid_ts = minvalid_doc.get("ts", null_ts)
-
-                # The "appliedThrough" value should always equal the "checkpointTimestamp".
-                # The writes to "appliedThrough" are given the timestamp of the end of the batch,
-                # and batch boundaries are the only valid timestamps in which we could take
-                # checkpoints, so if you see a non-null applied through in a stable checkpoint it
-                # must be at the same timestamp as the checkpoint.
-                if (checkpoint_timestamp != null_ts
-                        and applied_through_ts != null_ts
-                        and (not checkpoint_timestamp == applied_through_ts)):
-                    raise errors.ServerFailure(
-                        "The condition checkpointTimestamp ({}) == appliedThrough ({})"
-                        " doesn't hold: minValid document={},"
-                        " checkpointTimestamp document={}, last oplog entry={}".format(
-                            checkpoint_timestamp, applied_through_ts, minvalid_doc,
-                            checkpoint_timestamp_doc, latest_oplog_doc))
-
-                if applied_through_ts == null_ts:
-                    # We clear "appliedThrough" to represent having applied through the top of the
-                    # oplog in PRIMARY state or immediately after "rollback via refetch".
-                    # If we are using a storage engine that supports "recover to a checkpoint,"
-                    # then we will have a "checkpointTimestamp" and we should use that as our
-                    # "appliedThrough" (similarly to why we assert their equality above).
-                    # If both are null, then we are in PRIMARY state on a storage engine that does
-                    # not support "recover to a checkpoint" or in RECOVERING immediately after
-                    # "rollback via refetch". Since we do not update "minValid" in PRIMARY state,
-                    # we leave "appliedThrough" as null so that the invariants below hold, rather
-                    # than substituting the latest oplog entry for the "appliedThrough" value.
-                    applied_through_ts = checkpoint_timestamp
 
                 if minvalid_ts == null_ts:
                     # The server treats the "ts" field in the minValid document as missing when its
@@ -357,9 +317,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     raise errors.ServerFailure(
                         "The condition minValid <= oplogTruncateAfterPoint ({} <= {}) doesn't"
                         " hold: minValid document={}, oplogTruncateAfterPoint document={},"
-                        " latest oplog entry={}".format(
-                            minvalid_ts, oplog_truncate_after_ts, minvalid_doc,
-                            oplog_truncate_after_doc, latest_oplog_doc))
+                        " latest oplog entry={}".format(minvalid_ts, oplog_truncate_after_ts,
+                                                        minvalid_doc, oplog_truncate_after_doc,
+                                                        latest_oplog_doc))
 
                 # minvalid <= latest oplog entry
                 # "minValid" is set to the end of a batch after the batch is written to the oplog.
@@ -368,8 +328,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                     raise errors.ServerFailure(
                         "The condition minValid <= top of oplog ({} <= {}) doesn't"
                         " hold: minValid document={}, latest oplog entry={}".format(
-                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc,
-                            latest_oplog_doc))
+                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc, latest_oplog_doc))
 
             try:
                 secondary.teardown()
@@ -380,11 +339,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
-                " the checkpointTimestamp document, or the latest oplog entry from the mongod on"
-                " port %d", secondary.port)
+                " or the latest oplog entry from the mongod on port %d", secondary.port)
             raise errors.ServerFailure(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
-                " the checkpointTimestamp document, or the latest oplog entry from the mongod on"
+                " or the latest oplog entry from the mongod on"
                 " port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.
@@ -393,15 +351,16 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     def _await_secondary_state(self, secondary):
         client = secondary.mongo_client()
         try:
-            client.admin.command(bson.SON([
-                ("replSetTest", 1),
-                ("waitForMemberState", 2),  # 2 = SECONDARY
-                ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)]))
+            client.admin.command(
+                bson.SON([
+                    ("replSetTest", 1),
+                    ("waitForMemberState", 2),  # 2 = SECONDARY
+                    ("timeoutMillis", fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)
+                ]))
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "mongod on port %d failed to reach state SECONDARY after %d seconds",
-                secondary.port,
-                fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
+                secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
             raise errors.ServerFailure(
                 "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
                     secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))

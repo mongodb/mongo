@@ -36,10 +36,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 
-class MigrationSourceManager;
 class OperationContext;
 
 /**
@@ -50,7 +50,7 @@ class OperationContext;
  * Synchronization rules: In order to look-up this object in the instance's sharding map, one must
  * have some lock on the respective collection.
  */
-class CollectionShardingState {
+class CollectionShardingState : public Decorable<CollectionShardingState> {
     MONGO_DISALLOW_COPYING(CollectionShardingState);
 
 public:
@@ -60,22 +60,6 @@ public:
      * Instantiates a new per-collection sharding state as unsharded.
      */
     CollectionShardingState(ServiceContext* sc, NamespaceString nss);
-    ~CollectionShardingState();
-
-    /**
-     * Details of documents being removed from a sharded collection.
-     */
-    struct DeleteState {
-        // Contains the fields of the document that are in the collection's shard key, and "_id".
-        BSONObj documentKey;
-
-        // True if the document being deleted belongs to a chunk which, while still in the shard,
-        // is being migrated out. (Not to be confused with "fromMigrate", which tags operations
-        // that are steps in performing the migration.)
-        bool isMigrating;
-    };
-
-    DeleteState makeDeleteState(BSONObj const& doc);
 
     /**
      * Obtains the sharding state for the specified collection. If it does not exist, it will be
@@ -87,14 +71,17 @@ public:
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
     static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
 
+    static void resetAll(OperationContext* opCtx);
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Returns the chunk metadata for the collection. The metadata it represents lives as long as
      * the object itself, and the collection, exist. After dropping the collection lock, the
      * collection may no longer exist, but it is still safe to destroy the object.
+     * The metadata is tied to a specific point in time (atClusterTime) and the time is retrieved
+     * from the operation context (opCtx).
      */
-    ScopedCollectionMetadata getMetadata();
+    ScopedCollectionMetadata getMetadata(OperationContext* opCtx);
 
     /**
      * BSON output of the pending metadata into a BSONArray
@@ -166,24 +153,6 @@ public:
     }
 
     /**
-     * Attaches a migration source manager to this collection's sharding state. Must be called with
-     * collection X lock. May not be called if there is a migration source manager already
-     * installed. Must be followed by a call to clearMigrationSourceManager.
-     */
-    void setMigrationSourceManager(OperationContext* opCtx, MigrationSourceManager* sourceMgr);
-
-    auto getMigrationSourceManager() const {
-        return _sourceMgr;
-    }
-
-    /**
-     * Removes a migration source manager from this collection's sharding state. Must be called with
-     * collection X lock. May not be called if there isn't a migration source manager installed
-     * already through a previous call to setMigrationSourceManager.
-     */
-    void clearMigrationSourceManager(OperationContext* opCtx);
-
-    /**
      * Checks whether the shard version in the context is compatible with the shard version of the
      * collection locally and if not throws StaleConfigException populated with the expected and
      * actual versions.
@@ -198,7 +167,7 @@ public:
      * Returns whether this collection is sharded. Valid only if mongoD is primary.
      * TODO SERVER-24960: This method may return a false positive until SERVER-24960 is fixed.
      */
-    bool collectionIsSharded();
+    bool collectionIsSharded(OperationContext* opCtx);
 
     /**
      * Tracks deletion of any documents within the range, returning when deletion is complete.
@@ -223,24 +192,6 @@ public:
      * startingFrom key value, if any, or boost::none if there is no such range.
      */
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
-
-    /**
-     * Replication oplog OpObserver hooks. Informs the sharding system of changes that may be
-     * relevant to ongoing operations.
-     *
-     * The global exclusive lock is expected to be held by the caller of any of these functions.
-     */
-    void onInsertOp(OperationContext* opCtx,
-                    const BSONObj& insertedDoc,
-                    const repl::OpTime& opTime);
-    void onUpdateOp(OperationContext* opCtx,
-                    const BSONObj& updatedDoc,
-                    const repl::OpTime& opTime,
-                    const repl::OpTime& prePostImageOpTime);
-    void onDeleteOp(OperationContext* opCtx,
-                    const DeleteState& deleteState,
-                    const repl::OpTime& opTime,
-                    const repl::OpTime& preImageOpTime);
 
 private:
     /**
@@ -268,13 +219,6 @@ private:
     std::shared_ptr<MetadataManager> _metadataManager;
 
     ShardingMigrationCriticalSection _critSec;
-
-    // If this collection is serving as a source shard for chunk migration, this value will be
-    // non-null. To write this value there needs to be X-lock on the collection in order to
-    // synchronize with other callers, which read it.
-    //
-    // NOTE: The value is not owned by this class.
-    MigrationSourceManager* _sourceMgr{nullptr};
 
     // for access to _metadataManager
     friend auto CollectionRangeDeleter::cleanUpNextRange(OperationContext*,

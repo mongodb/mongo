@@ -52,8 +52,10 @@ Status addOptions(optionenvironment::OptionSection* options) {
 
     moe::OptionSection storage_options("Storage options");
 
-    storage_options.addOptionChaining(
-        "storage.engine", "storageEngine", moe::String, "what storage engine to use");
+    storage_options
+        .addOptionChaining(
+            "storage.engine", "storageEngine", moe::String, "what storage engine to use")
+        .setDefault(optionenvironment::Value("mobile"));
 
 #ifdef _WIN32
     boost::filesystem::path currentPath = boost::filesystem::current_path();

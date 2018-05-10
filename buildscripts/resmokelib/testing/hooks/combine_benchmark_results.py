@@ -12,7 +12,8 @@ from buildscripts.resmokelib.testing.hooks import interface
 
 
 class CombineBenchmarkResults(interface.Hook):
-    """
+    """CombineBenchmarkResults class.
+
     The CombineBenchmarkResults hook combines test results from
     individual benchmark files to a single file. This is useful for
     generating the json file to feed into the Evergreen performance
@@ -22,6 +23,7 @@ class CombineBenchmarkResults(interface.Hook):
     DESCRIPTION = "Combine JSON results from individual benchmarks"
 
     def __init__(self, hook_logger, fixture):
+        """Initialize CombineBenchmarkResults."""
         interface.Hook.__init__(self, hook_logger, fixture, CombineBenchmarkResults.DESCRIPTION)
         self.report_file = _config.PERF_REPORT_FILE
 
@@ -35,80 +37,47 @@ class CombineBenchmarkResults(interface.Hook):
     def _strftime(time):
         return time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def after_test(self, test_case, test_report):
+    def after_test(self, test, test_report):
+        """Update test report."""
         if self.report_file is None:
             return
 
-        bm_report_path = test_case.report_name()
+        bm_report_path = test.report_name()
 
         with open(bm_report_path, "r") as report_file:
             report_dict = json.load(report_file)
             self._parse_report(report_dict)
 
     def before_suite(self, test_report):
+        """Set suite start time."""
         self.create_time = datetime.datetime.now()
 
     def after_suite(self, test_report):
-        self.end_time = datetime.datetime.now()
+        """Update test report."""
+        if self.report_file is None:
+            return
 
-        if self.report_file is not None:
-            report = self._generate_perf_plugin_report()
-            with open(self.report_file, "w") as f:
-                json.dump(report, f)
+        self.end_time = datetime.datetime.now()
+        report = self._generate_perf_plugin_report()
+        with open(self.report_file, "w") as fh:
+            json.dump(report, fh)
 
     def _generate_perf_plugin_report(self):
-        """
-        Format the data to look like a perf plugin report, which has
-        the following format:
-        
-        "name": "perf",
-        "task_name": "update",
-        "project_id": "performance",
-        "task_id": "TASK_ID",
-        "build_id": "BUILD_ID",
-        "variant": "linux-wt-standalone",
-        "version_id": "performance_cfe9d2477fab36aa57ccd2f63206955a248cf266",
-        "create_time": "2018-02-28T03:44:16Z",
-        "is_patch": false,
-        "order": 11249,
-        "revision": "cfe9d2477fab36aa57ccd2f63206955a248cf266",
-        "data": {
-          "end": "2018-02-28T05:36:13.127Z",
-          "errors": [],
-          "results": [
-            {
-              "name": "Update.SetWithIndex.Random",
-              "results": {
-                ...
-        """
+        """Format the data to look like a perf plugin report."""
         perf_report = {
-            "build_id": None,
-            "create_time": self._strftime(self.create_time),
-            "is_patch": _config.EVERGREEN_PATCH_BUILD,
-            "name": "perf",
-            "order": None,
-            "project_id": _config.EVERGREEN_PROJECT_NAME,
-            "revision": _config.EVERGREEN_REVISION,
-            "task_id": _config.EVERGREEN_TASK_ID,
-            "task_name": _config.EVERGREEN_TASK_NAME,
-            "variant": _config.EVERGREEN_VARIANT_NAME,
-            "version_id": None,
-
-            "data": {
-                "end": self._strftime(self.end_time),
-                "errors": [],  # There are no errors if we have gotten this far.
-                "results": []
-            }
+            "start": self._strftime(self.create_time),
+            "end": self._strftime(self.end_time),
+            "errors": [],  # There are no errors if we have gotten this far.
+            "results": []
         }
 
         for name, report in self.benchmark_reports.items():
             test_report = {
-                "name": name,
-                "results": report.generate_perf_plugin_dict(),
-                "context": report.context._asdict()
+                "name": name, "context": report.context._asdict(),
+                "results": report.generate_perf_plugin_dict()
             }
 
-            perf_report["data"]["results"].append(test_report)
+            perf_report["results"].append(test_report)
 
         return perf_report
 
@@ -116,15 +85,25 @@ class CombineBenchmarkResults(interface.Hook):
         context = report_dict["context"]
 
         for benchmark_res in report_dict["benchmarks"]:
-            name_no_thread = benchmark_res["name"].rsplit("/", 1)[0]
+            bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res["name"])
 
-            if name_no_thread not in self.benchmark_reports:
-                self.benchmark_reports[name_no_thread] = _BenchmarkThreadsReport(context)
-            self.benchmark_reports[name_no_thread].add_report(benchmark_res)
+            # Don't show Benchmark's included statistics to prevent cluttering up the graph.
+            if bm_name_obj.statistic_type is not None:
+                continue
+
+            if bm_name_obj.base_name not in self.benchmark_reports:
+                self.benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
+            self.benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
+
+
+# Capture information from a Benchmark name in a logical format.
+_BenchmarkName = collections.namedtuple("_BenchmarkName",
+                                        ["base_name", "thread_count", "statistic_type"])
 
 
 class _BenchmarkThreadsReport(object):
-    """
+    """_BenchmarkThreadsReport class.
+
     Class representation of a report for all thread levels of a single
     benchmark test. Each report is designed to correspond to one graph
     in the Evergreen perf plugin.
@@ -150,14 +129,11 @@ class _BenchmarkThreadsReport(object):
       ]
     }
     """
+
     CONTEXT_FIELDS = [
-        "date",
-        "cpu_scaling_enabled",
-        "num_cpus",
-        "mhz_per_cpu",
-        "library_build_type"
+        "date", "cpu_scaling_enabled", "num_cpus", "mhz_per_cpu", "library_build_type"
     ]
-    Context = collections.namedtuple("Context", CONTEXT_FIELDS)
+    Context = collections.namedtuple("Context", CONTEXT_FIELDS)  # type: ignore
 
     def __init__(self, context_dict):
         self.context = self.Context(**context_dict)
@@ -165,13 +141,12 @@ class _BenchmarkThreadsReport(object):
         # list of benchmark runs for each thread.
         self.thread_benchmark_map = collections.defaultdict(list)
 
-    def add_report(self, report):
-        thread_count = self._thread_from_name(report["name"])
-        self.thread_benchmark_map[thread_count].append(report)
+    def add_report(self, bm_name_obj, report):
+        """Add to report."""
+        self.thread_benchmark_map[bm_name_obj.thread_count].append(report)
 
     def generate_perf_plugin_dict(self):
-        """
-        Generate perf plugin data points of the following format:
+        """Generate perf plugin data points of the following format.
 
         "1": {
           "error_values": [
@@ -190,12 +165,6 @@ class _BenchmarkThreadsReport(object):
 
         res = {}
         for thread_count, reports in self.thread_benchmark_map.items():
-            if (thread_count.endswith("median")
-                    or thread_count.endswith("mean") or thread_count.endswith("stddev")):
-                # We don't use Benchmark's included statistics for now, in case they're not
-                # available. Just store them as-is for future reference.
-                res[thread_count] = reports[0]
-
             thread_report = {
                 "error_values": [0 for _ in range(len(reports))],
                 "ops_per_sec_values": []  # This is actually storing latency per op, not ops/s
@@ -211,7 +180,36 @@ class _BenchmarkThreadsReport(object):
         return res
 
     @staticmethod
-    def _thread_from_name(name):
-        # Get the thread from a string that looks like this:
-        # "BM_SetInsert/arg name:1024/threads:10".
-        return name.rsplit("/", 1)[-1].split(":")[-1]
+    def parse_bm_name(name_str):
+        """
+        Split the benchmark name into base_name, thread_count and statistic_type.
+
+        The base name is the benchmark name minus the thread count and any statistics.
+        Testcases of the same group will be shown on a single perf graph.
+
+        name_str look like the following:
+        "BM_SetInsert/arg name:1024/threads:10_mean"
+        "BM_SetInsert/arg 1/arg 2"
+        "BM_SetInsert_mean"
+        """
+
+        base_name = None
+        thread_count = None
+        statistic_type = None
+
+        # Step 1: get the statistic type.
+        if name_str.count("_") == 2:  # There is statistics.
+            statistic_type = name_str.rsplit("_", 1)[-1]
+            # Remove the statistic type suffix from the name.
+            name_str = name_str[:-len(statistic_type) - 1]
+
+        # Step 2: Get the thread count and name.
+        thread_section = name_str.rsplit("/", 1)[-1]
+        if thread_section.startswith("threads:"):
+            base_name = name_str.rsplit("/", 1)[0]
+            thread_count = thread_section.split(":")[-1]
+        else:  # There is no explicit thread count, so the thread count is 1.
+            thread_count = "1"
+            base_name = name_str
+
+        return _BenchmarkName(base_name, thread_count, statistic_type)

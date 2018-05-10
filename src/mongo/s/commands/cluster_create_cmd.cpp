@@ -74,8 +74,13 @@ public:
 
         uassertStatusOK(createShardDatabase(opCtx, dbName));
 
-        ConfigsvrCreateCollection configCreateCmd;
-        configCreateCmd.setNs(nss);
+        uassert(ErrorCodes::InvalidOptions,
+                "specify size:<n> when capped is true",
+                !cmdObj["capped"].trueValue() || cmdObj["size"].isNumber() ||
+                    cmdObj.hasField("$nExtents"));
+
+        ConfigsvrCreateCollection configCreateCmd(nss);
+        configCreateCmd.setDbName(NamespaceString::kAdminDb);
 
         {
             BSONObjIterator cmdIter(cmdObj);
@@ -91,7 +96,8 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 "admin",
-                CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON()),
+                CommandHelpers::appendMajorityWriteConcern(
+                    CommandHelpers::appendPassthroughFields(cmdObj, configCreateCmd.toBSON({}))),
                 Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));

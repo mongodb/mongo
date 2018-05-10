@@ -1,41 +1,49 @@
-var baseName = "jstests_ssl_ssl_options";
+// Test redaction of passwords in command line SSL option parsing.
 
-jsTest.log("Testing censorship of ssl options");
+load('jstests/ssl/libs/ssl_helpers.js');
+requireSSLProvider('openssl', function() {
+    'use strict';
 
-var mongodConfig = {
-    sslPEMKeyFile: "jstests/libs/password_protected.pem",
-    sslMode: "requireSSL",
-    sslPEMKeyPassword: "qwerty",
-    sslClusterPassword: "qwerty",
-    sslCAFile: "jstests/libs/ca.pem"
-};
-var mongodSource = MongoRunner.runMongod(mongodConfig);
+    const baseName = "jstests_ssl_ssl_options";
 
-var getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
+    jsTest.log("Testing censorship of ssl options");
 
-var i;
-var isPassword = false;
-for (i = 0; i < getCmdLineOptsResult.argv.length; i++) {
-    if (isPassword) {
-        assert.eq(getCmdLineOptsResult.argv[i],
-                  "<password>",
-                  "Password not properly censored: " + tojson(getCmdLineOptsResult));
-        isPassword = false;
-        continue;
+    const mongodConfig = {
+        sslPEMKeyFile: "jstests/libs/password_protected.pem",
+        sslMode: "requireSSL",
+        sslPEMKeyPassword: "qwerty",
+        sslClusterPassword: "qwerty",
+        sslCAFile: "jstests/libs/ca.pem"
+    };
+    const mongodSource = MongoRunner.runMongod(mongodConfig);
+
+    const getCmdLineOptsResult = mongodSource.adminCommand("getCmdLineOpts");
+
+    let i;
+    let isPassword = false;
+    for (i = 0; i < getCmdLineOptsResult.argv.length; i++) {
+        if (isPassword) {
+            assert.eq(getCmdLineOptsResult.argv[i],
+                      "<password>",
+                      "Password not properly censored: " + tojson(getCmdLineOptsResult));
+            isPassword = false;
+            continue;
+        }
+
+        if (getCmdLineOptsResult.argv[i] === "--sslPEMKeyPassword" ||
+            getCmdLineOptsResult.argv[i] === "--sslClusterPassword") {
+            isPassword = true;
+        }
     }
 
-    if (getCmdLineOptsResult.argv[i] === "--sslPEMKeyPassword" ||
-        getCmdLineOptsResult.argv[i] === "--sslClusterPassword") {
-        isPassword = true;
-    }
-}
-assert.eq(getCmdLineOptsResult.parsed.net.ssl.PEMKeyPassword,
-          "<password>",
-          "Password not properly censored: " + tojson(getCmdLineOptsResult));
-assert.eq(getCmdLineOptsResult.parsed.net.ssl.clusterPassword,
-          "<password>",
-          "Password not properly censored: " + tojson(getCmdLineOptsResult));
+    assert.eq(getCmdLineOptsResult.parsed.net.ssl.PEMKeyPassword,
+              "<password>",
+              "Password not properly censored: " + tojson(getCmdLineOptsResult));
+    assert.eq(getCmdLineOptsResult.parsed.net.ssl.clusterPassword,
+              "<password>",
+              "Password not properly censored: " + tojson(getCmdLineOptsResult));
 
-MongoRunner.stopMongod(mongodSource);
+    MongoRunner.stopMongod(mongodSource);
 
-print(baseName + " succeeded.");
+    print(baseName + " succeeded.");
+});

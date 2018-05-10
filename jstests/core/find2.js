@@ -1,4 +1,6 @@
 // Test object id sorting.
+//
+// @tags: [requires_fastcount]
 
 function testObjectIdFind(db) {
     r = db.ed_db_find2_oif;

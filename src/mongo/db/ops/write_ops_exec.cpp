@@ -85,6 +85,7 @@ namespace {
 MONGO_FP_DECLARE(failAllInserts);
 MONGO_FP_DECLARE(failAllUpdates);
 MONGO_FP_DECLARE(failAllRemoves);
+MONGO_FP_DECLARE(hangDuringBatchInsert);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {
@@ -114,24 +115,29 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
                    << ": " << curOp->debug().errInfo.toString();
         }
 
-        const bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
-                                                                 logger::LogSeverity::Debug(1));
-        const bool logSlow = executionTimeMicros > (serverGlobalParams.slowMS * 1000LL);
+        // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
+        // this op should be sampled for profiling.
+        const bool shouldSample =
+            curOp->completeAndLogOperation(opCtx, MONGO_LOG_DEFAULT_COMPONENT);
 
-        const bool shouldSample = serverGlobalParams.sampleRate == 1.0
-            ? true
-            : opCtx->getClient()->getPrng().nextCanonicalDouble() < serverGlobalParams.sampleRate;
-
-        if (logAll || (shouldSample && logSlow)) {
-            Locker::LockerInfo lockerInfo;
-            opCtx->lockState()->getLockerInfo(&lockerInfo);
-            log() << curOp->debug().report(opCtx->getClient(), *curOp, lockerInfo.stats);
-        }
-
-        // Do not profile individual statements in a write command if we are in a transaction.
         auto session = OperationContextSession::get(opCtx);
-        if (curOp->shouldDBProfile(shouldSample) &&
-            !(session && session->inSnapshotReadOrMultiDocumentTransaction())) {
+        if (curOp->shouldDBProfile(shouldSample)) {
+            boost::optional<Session::TxnResources> txnResources;
+            if (session && session->inSnapshotReadOrMultiDocumentTransaction()) {
+                // Stash the current transaction so that writes to the profile collection are not
+                // done as part of the transaction. This must be done under the client lock, since
+                // we are modifying 'opCtx'.
+                stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+                txnResources = Session::TxnResources(opCtx);
+            }
+            ON_BLOCK_EXIT([&] {
+                if (txnResources) {
+                    // Restore the transaction state onto 'opCtx'. This must be done under the
+                    // client lock, since we are modifying 'opCtx'.
+                    stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+                    txnResources->release(opCtx);
+                }
+            });
             profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
         }
     } catch (const DBException& ex) {
@@ -143,7 +149,9 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
 }
 
 /**
- * Sets the Client's LastOp to the system OpTime if needed.
+ * Sets the Client's LastOp to the system OpTime if needed. This is especially helpful for
+ * adjusting the client opTime for cases when batched write performed multiple writes, but
+ * when the last write was a no-op (which will not advance the client opTime).
  */
 class LastOpFixer {
 public:
@@ -191,13 +199,20 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 }
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
+    auto session = OperationContextSession::get(opCtx);
+    auto inTransaction = session && session->inSnapshotReadOrMultiDocumentTransaction();
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Cannot create namespace " << ns.ns()
+                          << " in multi-document transaction.",
+            !inTransaction);
+
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
         AutoGetOrCreateDb db(opCtx, ns.db(), MODE_X);
         assertCanWrite_inlock(opCtx, ns);
         if (!db.getDb()->getCollection(opCtx, ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(userCreateNS(opCtx, db.getDb(), ns.ns(), BSONObj()));
+            uassertStatusOK(Database::userCreateNS(opCtx, db.getDb(), ns.ns(), BSONObj()));
             wuow.commit();
         }
     });
@@ -242,7 +257,10 @@ bool handleError(OperationContext* opCtx,
         out->results.emplace_back(ex.toStatus());
 
         if (ShardingState::get(opCtx)->enabled()) {
-            onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss());
+            // Ignore status since we already put the cannot implicitly create error as the
+            // result of the write.
+            onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss())
+                .ignore();
         }
 
         return false;
@@ -325,11 +343,15 @@ void insertDocuments(OperationContext* opCtx,
     // This must only be done for doc-locking storage engines, which are allowed to insert oplog
     // documents out-of-timestamp-order.  For other storage engines, the oplog entries must be
     // physically written in timestamp order, so we defer optime assignment until the oplog is about
-    // to be written.
+    // to be written. Multidocument transactions should not generate opTimes because they are
+    // generated at the time of commit.
     auto batchSize = std::distance(begin, end);
     if (supportsDocLocking()) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (!replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
+        auto session = OperationContextSession::get(opCtx);
+        auto inTransaction = session && session->inMultiDocumentTransaction();
+
+        if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection->ns())) {
             // Populate 'slots' with new optimes for each insert.
             // This also notifies the storage engine of each new timestamp.
             auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
@@ -361,7 +383,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     auto acquireCollection = [&] {
         while (true) {
-            opCtx->checkForInterrupt();
+            if (MONGO_FAIL_POINT(hangDuringBatchInsert)) {
+                log() << "batch insert - hangDuringBatchInsert fail point enabled. Blocking until "
+                         "fail point is disabled.";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangDuringBatchInsert);
+            }
 
             if (MONGO_FAIL_POINT(failAllInserts)) {
                 uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
@@ -560,9 +586,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const write_ops::UpdateOpEntry& op) {
+    auto session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with multi=true",
-            !(opCtx->getTxnNumber() && op.getMulti()));
+            (session && session->inMultiDocumentTransaction()) || !opCtx->getTxnNumber() ||
+                !op.getMulti());
 
     globalOpCounters.gotUpdate();
     auto& curOp = *CurOp::get(opCtx);
@@ -587,17 +615,16 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     request.setUpsert(op.getUpsert());
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    request.setYieldPolicy(
-        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
-            ? PlanExecutor::INTERRUPT_ONLY
-            : PlanExecutor::YIELD_AUTO);  // ParsedUpdate overrides this for $isolated.
+    request.setYieldPolicy(readConcernArgs.getLevel() ==
+                                   repl::ReadConcernLevel::kSnapshotReadConcern
+                               ? PlanExecutor::INTERRUPT_ONLY
+                               : PlanExecutor::YIELD_AUTO);
 
     ParsedUpdate parsedUpdate(opCtx, &request);
     uassertStatusOK(parsedUpdate.parseRequest());
 
     boost::optional<AutoGetCollection> collection;
     while (true) {
-        opCtx->checkForInterrupt();
         if (MONGO_FAIL_POINT(failAllUpdates)) {
             uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
         }
@@ -605,7 +632,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         collection.emplace(opCtx,
                            ns,
                            MODE_IX,  // DB is always IX, even if collection is X.
-                           parsedUpdate.isIsolated() ? MODE_X : MODE_IX);
+                           MODE_IX);
         if (collection->getCollection() || !op.getUpsert())
             break;
 
@@ -720,9 +747,11 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                StmtId stmtId,
                                                const write_ops::DeleteOpEntry& op) {
+    auto session = OperationContextSession::get(opCtx);
     uassert(ErrorCodes::InvalidOptions,
             "Cannot use (or request) retryable writes with limit=0",
-            !(opCtx->getTxnNumber() && op.getMulti()));
+            (session && session->inMultiDocumentTransaction()) || !opCtx->getTxnNumber() ||
+                !op.getMulti());
 
     globalOpCounters.gotDelete();
     auto& curOp = *CurOp::get(opCtx);
@@ -742,16 +771,14 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     request.setCollation(write_ops::collationOf(op));
     request.setMulti(op.getMulti());
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    request.setYieldPolicy(
-        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
-            ? PlanExecutor::INTERRUPT_ONLY
-            : PlanExecutor::YIELD_AUTO);  // ParsedDelete overrides this for $isolated.
+    request.setYieldPolicy(readConcernArgs.getLevel() ==
+                                   repl::ReadConcernLevel::kSnapshotReadConcern
+                               ? PlanExecutor::INTERRUPT_ONLY
+                               : PlanExecutor::YIELD_AUTO);
     request.setStmtId(stmtId);
 
     ParsedDelete parsedDelete(opCtx, &request);
     uassertStatusOK(parsedDelete.parseRequest());
-
-    opCtx->checkForInterrupt();
 
     if (MONGO_FAIL_POINT(failAllRemoves)) {
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
@@ -760,7 +787,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     AutoGetCollection collection(opCtx,
                                  ns,
                                  MODE_IX,  // DB is always IX, even if collection is X.
-                                 parsedDelete.isIsolated() ? MODE_X : MODE_IX);
+                                 MODE_IX);
     if (collection.getDb()) {
         curOp.raiseDbProfileLevel(collection.getDb()->getProfilingLevel());
     }

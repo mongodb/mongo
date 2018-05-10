@@ -1,75 +1,63 @@
 #!/usr/bin/env python
-
-"""Produces a report of all assertions in the MongoDB server codebase.
+"""Produce a report of all assertions in the MongoDB server codebase.
 
 Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
 """
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 import bisect
-import os
+import os.path
 import sys
-import utils
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
+
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from buildscripts import utils  # pylint: disable=wrong-import-position
 
 try:
     import regex as re
 except ImportError:
     print("*** Run 'pip2 install --user regex' to speed up error code checking")
-    import re
+    import re  # type: ignore
 
-ASSERT_NAMES = [ "uassert" , "massert", "fassert", "fassertFailed" ]
+ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
 MINIMUM_CODE = 10000
 
-codes = []
+# pylint: disable=invalid-name
+codes = []  # type: ignore
+# pylint: enable=invalid-name
 
 # Each AssertLocation identifies the C++ source location of an assertion
-AssertLocation = namedtuple( "AssertLocation", ['sourceFile', 'byteOffset', 'lines', 'code'] )
+AssertLocation = namedtuple("AssertLocation", ['sourceFile', 'byteOffset', 'lines', 'code'])
 
-list_files = False
-
-# Of historical interest only
-def assignErrorCodes():
-    cur = MINIMUM_CODE
-    for root in ASSERT_NAMES:
-        for x in utils.getAllSourceFiles():
-            print( x )
-            didAnything = False
-            fixed = ""
-            for line in open( x ):
-                s = line.partition( root + "(" )
-                if s[1] == "" or line.startswith( "#define " + root):
-                    fixed += line
-                    continue
-                fixed += s[0] + root + "( " + str( cur ) + " , " + s[2]
-                cur = cur + 1
-                didAnything = True
-            if didAnything:
-                out = open( x , 'w' )
-                out.write( fixed )
-                out.close()
+list_files = False  # pylint: disable=invalid-name
 
 
-def parseSourceFiles( callback ):
-    """Walks MongoDB sourcefiles and invokes callback for each AssertLocation found."""
+def parse_source_files(callback):
+    """Walk MongoDB sourcefiles and invoke a callback for each AssertLocation found."""
 
     quick = ["assert", "Exception", "ErrorCodes::Error"]
 
     patterns = [
-        re.compile( r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE ) ,
-        re.compile( r"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE ),
-        re.compile( r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
-                    re.MULTILINE ),
-        re.compile( r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE )
+        re.compile(r"(?:u|m(?:sg)?)asser(?:t|ted)(?:NoTrace)?\s*\(\s*(\d+)", re.MULTILINE),
+        re.compile(r"(?:DB|Assertion)Exception\s*[({]\s*(\d+)", re.MULTILINE),
+        re.compile(r"fassert(?:Failed)?(?:WithStatus)?(?:NoTrace)?(?:StatusOK)?\s*\(\s*(\d+)",
+                   re.MULTILINE),
+        re.compile(r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
     ]
 
-    for sourceFile in utils.getAllSourceFiles(prefix='src/mongo/'):
+    for source_file in utils.get_all_source_files(prefix='src/mongo/'):
         if list_files:
-            print 'scanning file: ' + sourceFile
+            print('scanning file: ' + source_file)
 
-        with open(sourceFile) as f:
-            text = f.read()
+        with open(source_file) as fh:
+            text = fh.read()
 
             if not any([zz in text for zz in quick]):
                 continue
@@ -78,23 +66,24 @@ def parseSourceFiles( callback ):
             for matchiter in matchiters:
                 for match in matchiter:
                     code = match.group(1)
-                    codeOffset = match.start(1)
+                    code_offset = match.start(1)
 
                     # Note that this will include the text of the full match but will report the
                     # position of the beginning of the code portion rather than the beginning of the
                     # match. This is to position editors on the spot that needs to change.
-                    thisLoc = AssertLocation(sourceFile,
-                                             codeOffset,
-                                             text[match.start():match.end()],
-                                             code)
+                    this_loc = AssertLocation(source_file, code_offset,
+                                              text[match.start():match.end()], code)
 
-                    callback( thisLoc )
+                    callback(this_loc)
 
-# Converts an absolute position in a file into a line number.
-def getLineAndColumnForPosition(loc, _file_cache={}):
+
+def get_line_and_column_for_position(loc, _file_cache=None):
+    """Convert an absolute position in a file into a line number."""
+    if _file_cache is None:
+        _file_cache = {}
     if loc.sourceFile not in _file_cache:
-        with open(loc.sourceFile) as f:
-            text = f.read()
+        with open(loc.sourceFile) as fh:
+            text = fh.read()
             line_offsets = [0]
             for line in text.splitlines(True):
                 line_offsets.append(line_offsets[-1] + len(line))
@@ -105,183 +94,145 @@ def getLineAndColumnForPosition(loc, _file_cache={}):
     column = loc.byteOffset - _file_cache[loc.sourceFile][line - 1] + 1
     return (line, column)
 
-def isTerminated( lines ):
-    """Given .cpp/.h source lines as text, determine if assert is terminated."""
-    x = " ".join(lines)
-    return ';' in x \
-        or x.count('(') - x.count(')') <= 0
+
+def is_terminated(lines):
+    """Determine if assert is terminated, from .cpp/.h source lines as text."""
+    code_block = " ".join(lines)
+    return ';' in code_block or code_block.count('(') - code_block.count(')') <= 0
 
 
-def getNextCode():
-    """Finds next unused assertion code.
+def get_next_code():
+    """Find next unused assertion code.
 
     Called by: SConstruct and main()
     Since SConstruct calls us, codes[] must be global OR WE REPARSE EVERYTHING
     """
-    if not len(codes) > 0:
-        readErrorCodes()
+    if not codes:
+        read_error_codes()
 
-    highest = reduce( lambda x, y: max(int(x), int(y)),
-                      (loc.code for loc in codes) )
+    highest = reduce(lambda x, y: max(int(x), int(y)), (loc.code for loc in codes))
     return highest + 1
 
 
-def checkErrorCodes():
-    """SConstruct expects a boolean response from this function.
-    """
-    (codes, errors) = readErrorCodes()
-    return len( errors ) == 0
+def check_error_codes():
+    """Check error codes as SConstruct expects a boolean response from this function."""
+    (_, errors) = read_error_codes()
+    return len(errors) == 0
 
 
-def readErrorCodes():
-    """Defines callback, calls parseSourceFiles() with callback,
-    and saves matches to global codes list.
-    """
+def read_error_codes():
+    """Define callback, call parse_source_files() with callback, save matches to global codes list."""
     seen = {}
     errors = []
     dups = defaultdict(list)
 
     # define callback
-    def checkDups( assertLoc ):
-        codes.append( assertLoc )
-        code = assertLoc.code
+    def check_dups(assert_loc):
+        """Check for duplicates."""
+        codes.append(assert_loc)
+        code = assert_loc.code
 
         if not code in seen:
-            seen[code] = assertLoc
+            seen[code] = assert_loc
         else:
             if not code in dups:
                 # on first duplicate, add original to dups, errors
-                dups[code].append( seen[code] )
-                errors.append( seen[code] )
+                dups[code].append(seen[code])
+                errors.append(seen[code])
 
-            dups[code].append( assertLoc )
-            errors.append( assertLoc )
+            dups[code].append(assert_loc)
+            errors.append(assert_loc)
 
-    parseSourceFiles( checkDups )
+    parse_source_files(check_dups)
 
-    if seen.has_key("0"):
+    if "0" in seen:
         code = "0"
         bad = seen[code]
-        errors.append( bad )
-        line, col = getLineAndColumnForPosition(bad)
-        print( "ZERO_CODE:" )
-        print( "  %s:%d:%d:%s" % (bad.sourceFile, line, col, bad.lines) )
+        errors.append(bad)
+        line, col = get_line_and_column_for_position(bad)
+        print("ZERO_CODE:")
+        print("  %s:%d:%d:%s" % (bad.sourceFile, line, col, bad.lines))
 
     for code, locations in dups.items():
-        print( "DUPLICATE IDS: %s" % code )
+        print("DUPLICATE IDS: %s" % code)
         for loc in locations:
-            line, col = getLineAndColumnForPosition(loc)
-            print( "  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines) )
+            line, col = get_line_and_column_for_position(loc)
+            print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
 
     return (codes, errors)
 
 
-def replaceBadCodes( errors, nextCode ):
-    """Modifies C++ source files to replace invalid assertion codes.
+def replace_bad_codes(errors, next_code):  # pylint: disable=too-many-locals
+    """Modify C++ source files to replace invalid assertion codes.
+
     For now, we only modify zero codes.
 
     Args:
         errors: list of AssertLocation
-        nextCode: int, next non-conflicting assertion code
+        next_code: int, next non-conflicting assertion code
     """
     zero_errors = [e for e in errors if int(e.code) == 0]
     skip_errors = [e for e in errors if int(e.code) != 0]
 
     for loc in skip_errors:
-        line, col = getLineAndColumnForPosition(loc)
-        print ("SKIPPING NONZERO code=%s: %s:%d:%d"
-                % (loc.code, loc.sourceFile, line, col))
+        line, col = get_line_and_column_for_position(loc)
+        print("SKIPPING NONZERO code=%s: %s:%d:%d" % (loc.code, loc.sourceFile, line, col))
 
     # Dedupe, sort, and reverse so we don't have to update offsets as we go.
-    for assertLoc in reversed(sorted(set(zero_errors))):
-        (sourceFile, byteOffset, lines, code) = assertLoc
-        lineNum, _ = getLineAndColumnForPosition(assertLoc)
-        print "UPDATING_FILE: %s:%s" % (sourceFile, lineNum)
+    for assert_loc in reversed(sorted(set(zero_errors))):
+        (source_file, byte_offset, _, _) = assert_loc
+        line_num, _ = get_line_and_column_for_position(assert_loc)
+        print("UPDATING_FILE: %s:%s" % (source_file, line_num))
 
-        ln = lineNum - 1
+        ln = line_num - 1
 
-        with open(sourceFile, 'r+') as f:
-            print "LINE_%d_BEFORE:%s" % (lineNum, f.readlines()[ln].rstrip())
+        with open(source_file, 'r+') as fh:
+            print("LINE_%d_BEFORE:%s" % (line_num, fh.readlines()[ln].rstrip()))
 
-            f.seek(0)
-            text = f.read()
-            assert text[byteOffset] == '0'
-            f.seek(0)
-            f.write(text[:byteOffset])
-            f.write(str(nextCode))
-            f.write(text[byteOffset+1:])
-            f.seek(0)
+            fh.seek(0)
+            text = fh.read()
+            assert text[byte_offset] == '0'
+            fh.seek(0)
+            fh.write(text[:byte_offset])
+            fh.write(str(next_code))
+            fh.write(text[byte_offset + 1:])
+            fh.seek(0)
 
-            print "LINE_%d_AFTER :%s" % (lineNum, f.readlines()[ln].rstrip())
-        nextCode += 1
+            print("LINE_%d_AFTER :%s" % (line_num, fh.readlines()[ln].rstrip()))
+        next_code += 1
 
-
-def getBestMessage( lines , codeStr ):
-    """Extracts message from one AssertionLocation.lines entry
-
-    Args:
-        lines: list of contiguous C++ source lines
-        codeStr: assertion code found in first line
-    """
-    line = lines if isinstance(lines, str) else " ".join(lines)
-
-    err = line.partition( codeStr )[2]
-    if not err:
-        return ""
-
-    # Trim to outer quotes
-    m = re.search(r'"(.*)"', err)
-    if not m:
-        return ""
-    err = m.group(1)
-
-    # Trim inner quote pairs
-    err = re.sub(r'" +"', '', err)
-    err = re.sub(r'" *<< *"', '', err)
-    err = re.sub(r'" *<<[^<]+<< *"', '<X>', err)
-    err = re.sub(r'" *\+[^+]+\+ *"', '<X>', err)
-
-    # Trim escaped quotes
-    err = re.sub(r'\\"', '', err)
-
-    # Iff doublequote still present, trim that and any trailing text
-    err = re.sub(r'".*$', '', err)
-
-    return err.strip()
 
 def main():
+    """Main."""
     parser = OptionParser(description=__doc__.strip())
-    parser.add_option("--fix", dest="replace",
-                      action="store_true", default=False,
+    parser.add_option("--fix", dest="replace", action="store_true", default=False,
                       help="Fix zero codes in source files [default: %default]")
-    parser.add_option("-q", "--quiet", dest="quiet",
-                      action="store_true", default=False,
+    parser.add_option("-q", "--quiet", dest="quiet", action="store_true", default=False,
                       help="Suppress output on success [default: %default]")
-    parser.add_option("--list-files", dest="list_files",
-                      action="store_true", default=False,
+    parser.add_option("--list-files", dest="list_files", action="store_true", default=False,
                       help="Print the name of each file as it is scanned [default: %default]")
-    (options, args) = parser.parse_args()
+    (options, _) = parser.parse_args()
 
-    global list_files
+    global list_files  # pylint: disable=global-statement,invalid-name
     list_files = options.list_files
 
-    (codes, errors) = readErrorCodes()
+    (_, errors) = read_error_codes()
     ok = len(errors) == 0
 
     if ok and options.quiet:
         return
 
-    next = getNextCode()
+    next_code = get_next_code()
 
     print("ok: %s" % ok)
-    print("next: %s" % next)
+    print("next: %s" % next_code)
 
     if ok:
         sys.exit(0)
     elif options.replace:
-        replaceBadCodes(errors, next)
+        replace_bad_codes(errors, next_code)
     else:
-        print ERROR_HELP
+        print(ERROR_HELP)
         sys.exit(1)
 
 

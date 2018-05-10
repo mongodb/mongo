@@ -38,20 +38,25 @@
     assert.commandWorked(mongosDB.adminCommand(
         {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
-    // Establish a change stream then do one write to each shard.
+    // Establish a change stream...
     const changeStream = mongosColl.aggregate([{$changeStream: {}}]);
+
+    // ... then do one write to produce a resume token...
+    assert.writeOK(mongosColl.insert({_id: -2}));
+    assert.soon(() => changeStream.hasNext());
+    const resumeToken = changeStream.next()._id;
+
+    // ... followed by one write to each chunk for testing purposes, i.e. shards 0 and 1.
     assert.writeOK(mongosColl.insert({_id: -1}));
     assert.writeOK(mongosColl.insert({_id: 1}));
 
     // The change stream should see all the inserts after establishing cursors on all shards.
-    let resumeToken = null;  // We'll fill this out to be the token of the last change.
     for (let nextId of[-1, 1]) {
         assert.soon(() => changeStream.hasNext());
         let next = changeStream.next();
         assert.eq(next.operationType, "insert");
         assert.eq(next.fullDocument, {_id: nextId});
         jsTestLog(`Saw insert for _id ${nextId}`);
-        resumeToken = next._id;
     }
 
     // Now try to resume the change stream. We expect this to fail until we resolve SERVER-32088,
@@ -59,10 +64,30 @@
     // it has been dropped.
     changeStream.close();
     ChangeStreamTest.assertChangeStreamThrowsCode({
-        collection: mongosColl,
+        db: mongosDB,
+        collName: mongosColl.getName(),
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         expectedCode: 40615
     });
+
+    // However, if we use the resume token to seed a whole-db or cluster-wide change stream rather
+    // than a stream on the 'test' collection itself, then we are able to resume successfully. This
+    // is because the prohibition on resuming a dropped collection's stream is due to our inability
+    // to determine what that collection's default collation was, whereas there are no default
+    // collations at the database and cluster levels.
+    const wholeDbCursor = mongosDB.watch([], {resumeAfter: resumeToken});
+    const wholeClusterCursor = mongosDB.getMongo().watch([], {resumeAfter: resumeToken});
+
+    for (let resumedCursor of[wholeDbCursor, wholeClusterCursor]) {
+        print(`Testing resumed stream on ns '${resumedCursor._ns}'`);
+        for (let nextId of[-1, 1]) {
+            assert.soon(() => resumedCursor.hasNext());
+            let next = resumedCursor.next();
+            assert.eq(next.operationType, "insert");
+            assert.eq(next.fullDocument, {_id: nextId});
+            jsTestLog(`Saw insert for _id ${nextId}`);
+        }
+    }
 
     st.stop();
 }());

@@ -115,12 +115,6 @@ public:
      */
     static bool isValidSortOrder(const BSONObj& sortObj);
 
-    /**
-     * Returns true if the query described by "query" should execute
-     * at an elevated level of isolation (i.e., $isolated was specified).
-     */
-    static bool isQueryIsolated(const BSONObj& query);
-
     // Read preference is attached to commands in "wrapped" form, e.g.
     //   { $query: { <cmd>: ... } , <kWrappedReadPrefField>: { ... } }
     //
@@ -325,19 +319,19 @@ public:
     }
 
     bool isTailable() const {
-        return _tailableMode == TailableMode::kTailable ||
-            _tailableMode == TailableMode::kTailableAndAwaitData;
+        return _tailableMode == TailableModeEnum::kTailable ||
+            _tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
     bool isTailableAndAwaitData() const {
-        return _tailableMode == TailableMode::kTailableAndAwaitData;
+        return _tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
-    void setTailableMode(TailableMode tailableMode) {
+    void setTailableMode(TailableModeEnum tailableMode) {
         _tailableMode = tailableMode;
     }
 
-    TailableMode getTailableMode() const {
+    TailableModeEnum getTailableMode() const {
         return _tailableMode;
     }
 
@@ -504,7 +498,7 @@ private:
     bool _hasReadPref = false;
 
     // Options that can be specified in the OP_QUERY 'flags' header.
-    TailableMode _tailableMode = TailableMode::kNormal;
+    TailableModeEnum _tailableMode = TailableModeEnum::kNormal;
     bool _slaveOk = false;
     bool _oplogReplay = false;
     bool _noCursorTimeout = false;

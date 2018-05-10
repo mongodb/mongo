@@ -39,9 +39,10 @@
 #include "mongo/db/server_options.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_database.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/versioning.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -122,7 +123,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
             ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 ||
         serverGlobalParams.featureCompatibility.getVersion() ==
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-        dbVersion = Versioning::newDatabaseVersion();
+        dbVersion = databaseVersion::makeNew();
     }
 
     // Insert an entry for the new database into the sharding catalog.
@@ -183,6 +184,96 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::getDatabasesForShar
     }
 
     return dbs;
+}
+
+Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
+                                                 const StringData dbname,
+                                                 const ShardId& toShard) {
+
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    // Check if the FCV has been changed under us.
+    invariant(!opCtx->lockState()->isLocked());
+    Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+
+    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    // If we're not in 4.0, then fail. We want to have assurance that the schema will accept a
+    // version field in config.databases.
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "committing movePrimary failed due to version mismatch",
+            currentFCV == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+    // Must use local read concern because we will perform subsequent writes.
+    auto findResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            DatabaseType::ConfigNS,
+                                            BSON(DatabaseType::name << dbname),
+                                            BSON(DatabaseType::name << -1),
+                                            1));
+
+    const auto databasesVector = std::move(findResponse.docs);
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find max database version for database '" << dbname
+                          << "', but found no databases",
+            !databasesVector.empty());
+
+    const auto dbType = uassertStatusOK(DatabaseType::fromBSON(databasesVector.front()));
+
+    if (dbType.getPrimary() == toShard) {
+        // The primary has already been set to the destination shard. It's likely that there was a
+        // network error and the shard resent the command.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        return Status::OK();
+    }
+
+    auto newDbType = dbType;
+    newDbType.setPrimary(toShard);
+
+    auto const currentDatabaseVersion = dbType.getVersion();
+
+    uassert(ErrorCodes::InternalError,
+            str::stream() << "DatabaseVersion doesn't exist in database entry despite the config "
+                          << "server being in FCV 4.0"
+                          << dbType.toBSON(),
+            currentDatabaseVersion != boost::none);
+
+    newDbType.setVersion(databaseVersion::makeIncremented(*currentDatabaseVersion));
+
+    auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
+    updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion->toBSON());
+
+    auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        DatabaseType::ConfigNS,
+        updateQueryBuilder.obj(),
+        newDbType.toBSON(),
+        true,
+        ShardingCatalogClient::kMajorityWriteConcern);
+
+    if (!updateStatus.isOK()) {
+        log() << "error committing movePrimary: " << dbname
+              << causedBy(redact(updateStatus.getStatus()));
+        return updateStatus.getStatus();
+    }
+
+    // If this assertion is tripped, it means that the request sent fine, but no documents were
+    // updated. This is likely because the database version was changed in between the query and
+    // the update, so no documents were found to change. This shouldn't happen however, because we
+    // are holding the dist lock during the movePrimary operation.
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to update primary shard for database '" << dbname
+                          << " with version "
+                          << currentDatabaseVersion->getLastMod(),
+            updateStatus.getValue());
+
+    // Ensure the next attempt to retrieve the database or any of its collections will do a full
+    // reload
+    Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname);
+
+    return Status::OK();
 }
 
 }  // namespace mongo

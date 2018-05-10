@@ -42,9 +42,9 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/util/time_support.h"
 
-namespace LogicalSessionTests {
-
+namespace mongo {
 namespace {
+
 constexpr StringData kTestNS = "config.system.sessions"_sd;
 
 LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
@@ -85,8 +85,6 @@ StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
     }
 }
 
-}  // namespace
-
 class SessionsCollectionStandaloneTest {
 public:
     SessionsCollectionStandaloneTest()
@@ -111,7 +109,7 @@ public:
     }
 
     std::string ns() {
-        return SessionsCollection::kSessionsFullNS.toString();
+        return SessionsCollection::kSessionsNamespaceString.toString();
     }
 
 private:
@@ -272,6 +270,7 @@ public:
         }
     }
 };
+
 class All : public Suite {
 public:
     All() : Suite("logical_sessions") {}
@@ -285,4 +284,5 @@ public:
 
 SuiteInstance<All> all;
 
-}  // namespace LogicalSessionTests
+}  // namespace
+}  // namespace mongo

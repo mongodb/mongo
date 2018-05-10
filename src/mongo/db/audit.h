@@ -36,7 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/util/net/op_msg.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 
@@ -61,7 +61,7 @@ class CommandInterface {
 public:
     virtual ~CommandInterface() = default;
     virtual void redactForLogging(mutablebson::Document* cmdObj) const = 0;
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const = 0;
+    virtual NamespaceString ns() const = 0;
 };
 
 /**
@@ -84,7 +84,7 @@ void logAuthentication(Client* client,
  */
 void logCommandAuthzCheck(Client* client,
                           const OpMsgRequest& cmdObj,
-                          CommandInterface* command,
+                          const CommandInterface& command,
                           ErrorCodes::Error result);
 
 /**

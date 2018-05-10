@@ -82,11 +82,12 @@
 
         if (docsInserted % 10000 == 0) {
             print("Inserted " + docsInserted + " documents.");
-            checkDocuments();
             st.printShardingStatus();
         }
 
         if (docsInserted > numDocs / 3 && !balancerOn) {
+            // Do one check before we turn balancer on
+            checkDocuments();
             print('Turning on balancer after ' + docsInserted + ' documents inserted.');
             st.startBalancer();
             balancerOn = true;

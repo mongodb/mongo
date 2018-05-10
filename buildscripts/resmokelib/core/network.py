@@ -1,7 +1,4 @@
-"""
-Class used to allocate ports for use by various mongod and mongos
-processes involved in running the tests.
-"""
+"""Class used to allocate ports for mongod and mongos processes involved in running the tests."""
 
 from __future__ import absolute_import
 
@@ -14,16 +11,14 @@ from .. import errors
 
 
 def _check_port(func):
-    """
-    A decorator that verifies the port returned by the wrapped function
-    is in the valid range.
+    """Provide decorator that verifies the port returned by the wrapped function is in range.
 
-    Returns the port if it is valid, and raises a PortAllocationError
-    otherwise.
+    Returns the port if it is valid, and raises a PortAllocationError otherwise.
     """
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """Provide wrapper function."""
         port = func(*args, **kwargs)
 
         if port < 0:
@@ -39,8 +34,7 @@ def _check_port(func):
 
 
 class PortAllocator(object):
-    """
-    This class is responsible for allocating ranges of ports.
+    """Class responsible for allocating ranges of ports.
 
     It reserves a range of ports for each job with the first part of
     that range used for the fixture started by that job, and the second
@@ -49,7 +43,7 @@ class PortAllocator(object):
     """
 
     # A PortAllocator will not return any port greater than this number.
-    MAX_PORT = 2 ** 16 - 1
+    MAX_PORT = 2**16 - 1
 
     # Each job gets a contiguous range of _PORTS_PER_JOB ports, with job 0 getting the first block
     # of ports, job 1 getting the second block, and so on.
@@ -57,18 +51,17 @@ class PortAllocator(object):
 
     # The first _PORTS_PER_FIXTURE ports of each range are reserved for the fixtures, the remainder
     # of the port range is used by tests.
-    _PORTS_PER_FIXTURE = 10
+    _PORTS_PER_FIXTURE = 20
 
     _NUM_USED_PORTS_LOCK = threading.Lock()
 
     # Used to keep track of how many ports a fixture has allocated.
-    _NUM_USED_PORTS = collections.defaultdict(int)
+    _NUM_USED_PORTS = collections.defaultdict(int)  # type: ignore
 
     @classmethod
     @_check_port
     def next_fixture_port(cls, job_num):
-        """
-        Returns the next port for a fixture to use.
+        """Return the next port for a fixture to use.
 
         Raises a PortAllocationError if the fixture has requested more
         ports than are reserved per job, or if the next port is not a
@@ -83,17 +76,15 @@ class PortAllocator(object):
 
             if next_port >= start_port + cls._PORTS_PER_FIXTURE:
                 raise errors.PortAllocationError(
-                    "Fixture has requested more than the %d ports reserved per fixture"
-                    % cls._PORTS_PER_FIXTURE)
+                    "Fixture has requested more than the %d ports reserved per fixture" %
+                    cls._PORTS_PER_FIXTURE)
 
             return next_port
 
     @classmethod
     @_check_port
     def min_test_port(cls, job_num):
-        """
-        For the given job, returns the lowest port that is reserved for
-        use by tests.
+        """Return the lowest port that is reserved for use by tests, for specified job.
 
         Raises a PortAllocationError if that port is higher than the
         maximum port.
@@ -103,9 +94,7 @@ class PortAllocator(object):
     @classmethod
     @_check_port
     def max_test_port(cls, job_num):
-        """
-        For the given job, returns the highest port that is reserved
-        for use by tests.
+        """Return the highest port that is reserved for use by tests, for specified job.
 
         Raises a PortAllocationError if that port is higher than the
         maximum port.
@@ -115,8 +104,7 @@ class PortAllocator(object):
 
     @classmethod
     def reset(cls):
-        """
-        Resets the internal state of the PortAllocator.
+        """Reset the internal state of the PortAllocator.
 
         This method is intended to be called each time resmoke.py starts
         a new test suite.

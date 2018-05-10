@@ -42,19 +42,22 @@ public:
 
 private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId cursorId) const final {
-        auto authzSession = AuthorizationSession::get(client);
+        auto const authzSession = AuthorizationSession::get(client);
         auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
             return authzSession->checkAuthForKillCursors(nss, userNames);
         };
-        return grid.getCursorManager()->checkAuthForKillCursors(
-            client->getOperationContext(), nss, cursorId, authChecker);
+
+        return Grid::get(client->getOperationContext())
+            ->getCursorManager()
+            ->checkAuthForKillCursors(client->getOperationContext(), nss, cursorId, authChecker);
     }
 
     Status _killCursor(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CursorId cursorId) const final {
-        return grid.getCursorManager()->killCursor(opCtx, nss, cursorId);
+        return Grid::get(opCtx)->getCursorManager()->killCursor(opCtx, nss, cursorId);
     }
+
 } clusterKillCursorsCmd;
 
 }  // namespace

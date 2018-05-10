@@ -77,7 +77,7 @@ public:
       *                 lock becomes granted, the notification will not be invoked.
       *
       *                 If the return value is LOCK_WAITING, the notification object *must*
-      *                 live at least until the notfy method has been invoked or unlock has
+      *                 live at least until the notify method has been invoked or unlock has
       *                 been called for the resource it was assigned to. Failure to do so will
       *                 cause the lock manager to call into an invalid memory location.
       * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.

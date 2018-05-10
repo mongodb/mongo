@@ -677,7 +677,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UPDATE **updp;
 	wt_timestamp_t prev_commit_timestamp, ts;
 	uint32_t previous_state;
-	bool update_timestamp;
+	bool prepared_transaction, update_timestamp;
 #endif
 
 	txn = &session->txn;
@@ -698,8 +698,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (cval.len != 0) {
 #ifdef HAVE_TIMESTAMPS
 		WT_ERR(__wt_txn_parse_timestamp(session, "commit", &ts, &cval));
-		WT_ERR(__wt_timestamp_validate(session,
-		    "commit", &ts, &cval, true, true, true));
+		WT_ERR(__wt_timestamp_validate(session, "commit", &ts, &cval));
 		__wt_timestamp_set(&txn->commit_timestamp, &ts);
 		__wt_txn_set_commit_timestamp(session);
 #else
@@ -794,6 +793,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Note: we're going to commit: nothing can fail after this point. */
 
+#ifdef HAVE_TIMESTAMPS
+	prepared_transaction = F_ISSET(txn, WT_TXN_PREPARE);
+#endif
 	/* Process and free updates. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
 		switch (op->type) {
@@ -827,7 +829,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			if (!__wt_txn_update_needs_timestamp(session, op))
 				break;
 
-			if (F_ISSET(txn, WT_TXN_PREPARE)) {
+			if (prepared_transaction) {
 				/*
 				 * In case of a prepared transaction, the order
 				 * of modification of the prepare timestamp to
@@ -839,10 +841,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 				 * As updating timestamp might not be an atomic
 				 * operation, we will manage using state.
 				 */
-				upd->state = WT_UPDATE_STATE_LOCKED;
+				upd->prepare_state = WT_PREPARE_LOCKED;
+				WT_WRITE_BARRIER();
 				__wt_timestamp_set(
 				    &upd->timestamp, &txn->commit_timestamp);
-				upd->state = WT_UPDATE_STATE_READY;
+				WT_PUBLISH(upd->prepare_state,
+				    WT_PREPARE_RESOLVED);
 			} else
 				__wt_timestamp_set(
 				    &upd->timestamp, &txn->commit_timestamp);
@@ -855,8 +859,21 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 				break;
 
 			ref = op->u.ref;
-			__wt_timestamp_set(
-			    &ref->page_del->timestamp, &txn->commit_timestamp);
+			if (prepared_transaction) {
+				/*
+				 * As updating timestamp might not be an atomic
+				 * operation, we will manage using state.
+				 */
+				ref->page_del->prepare_state =
+				    WT_PREPARE_LOCKED;
+				WT_WRITE_BARRIER();
+				__wt_timestamp_set(&ref->page_del->timestamp,
+				    &txn->commit_timestamp);
+				WT_PUBLISH(ref->page_del->prepare_state,
+				    WT_PREPARE_RESOLVED);
+			} else
+				__wt_timestamp_set(&ref->page_del->timestamp,
+				    &txn->commit_timestamp);
 
 			/*
 			 * The page-deleted list can be discarded by eviction,
@@ -865,18 +882,43 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			if (ref->page_del->update_list == NULL)
 				break;
 
-			for (;;) {
+			for (;; __wt_yield()) {
 				previous_state = ref->state;
-				if (__wt_atomic_casv32(
+				if (previous_state != WT_REF_LOCKED &&
+				    __wt_atomic_casv32(
 				    &ref->state, previous_state, WT_REF_LOCKED))
 					break;
 			}
 
-			if ((updp = ref->page_del->update_list) != NULL)
-				for (; *updp != NULL; ++updp)
+			if ((updp = ref->page_del->update_list) == NULL) {
+				/*
+				 * Publish to ensure we don't let the page be
+				 * evicted and the updates discarded before
+				 * being written.
+				 */
+				WT_PUBLISH(ref->state, previous_state);
+				break;
+			}
+
+			for (; *updp != NULL; ++updp) {
+				if (prepared_transaction) {
+					/*
+					 * As ref state is LOCKED, timestamp
+					 * and prepare state are updated in
+					 * exclusive access, hence no need for
+					 * temporary state WT_PREPARE_LOCKED
+					 * and BARRIER.
+					 */
 					__wt_timestamp_set(
 					    &(*updp)->timestamp,
 					    &txn->commit_timestamp);
+					(*updp)->prepare_state =
+					    WT_PREPARE_RESOLVED;
+				} else
+					__wt_timestamp_set(
+					    &(*updp)->timestamp,
+					    &txn->commit_timestamp);
+			}
 
 			/*
 			 * Publish to ensure we don't let the page be evicted
@@ -980,7 +1022,6 @@ int
 __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 {
 #ifdef HAVE_TIMESTAMPS
-	WT_CONFIG_ITEM cval;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	WT_UPDATE *upd;
@@ -990,22 +1031,14 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 
 	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
-	/* Transaction should not have a commit timestamp set. */
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT));
 	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
 	/* Transaction should not have updated any of the logged tables. */
 	WT_ASSERT(session, txn->logrec == NULL);
 
 	WT_RET(__wt_txn_context_check(session, true));
 
-	/* Look for a prepare timestamp.  */
-	WT_RET(
-	    __wt_config_gets_def(session, cfg, "prepare_timestamp", 0, &cval));
-	if (cval.len == 0)
-		WT_RET_MSG(session, EINVAL, "prepare timestamp is required");
-
-	/* TODO : Validate prepare timestamp.  */
-	WT_RET(__wt_txn_parse_timestamp(session, "prepare", &ts, &cval));
+	/* Parse and validate the prepare timestamp.  */
+	WT_RET(__wt_txn_parse_prepare_timestamp(session, cfg, &ts));
 	__wt_timestamp_set(&txn->prepare_timestamp, &ts);
 
 	/*
@@ -1051,11 +1084,13 @@ __wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 			/* Set prepare timestamp. */
 			__wt_timestamp_set(&upd->timestamp, &ts);
 
-			upd->state = WT_UPDATE_STATE_PREPARED;
+			WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
 			break;
 		case WT_TXN_OP_REF_DELETE:
 			__wt_timestamp_set(
 			    &op->u.ref->page_del->timestamp, &ts);
+			WT_PUBLISH(op->u.ref->page_del->prepare_state,
+			    WT_PREPARE_INPROGRESS);
 			break;
 		case WT_TXN_OP_TRUNCATE_COL:
 		case WT_TXN_OP_TRUNCATE_ROW:
@@ -1262,17 +1297,31 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_release_resources --
+ *	Release resources for a session's transaction data.
+ */
+void
+__wt_txn_release_resources(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+
+	WT_ASSERT(session, txn->mod_count == 0);
+	__wt_free(session, txn->mod);
+	txn->mod_alloc = 0;
+	txn->mod_count = 0;
+}
+
+/*
  * __wt_txn_destroy --
  *	Destroy a session's transaction data.
  */
 void
 __wt_txn_destroy(WT_SESSION_IMPL *session)
 {
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	__wt_free(session, txn->mod);
-	__wt_free(session, txn->snapshot);
+	__wt_txn_release_resources(session);
+	__wt_free(session, session->txn.snapshot);
 }
 
 /*
@@ -1346,17 +1395,15 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_global_shutdown --
- *	Shut down the global transaction state.
+ * __wt_txn_activity_drain --
+ *	Wait for transactions to quiesce.
  */
 int
-__wt_txn_global_shutdown(WT_SESSION_IMPL *session)
+__wt_txn_activity_drain(WT_SESSION_IMPL *session)
 {
 	bool txn_active;
 
 	/*
-	 * We're shutting down.  Make sure everything gets freed.
-	 *
 	 * It's possible that the eviction server is in the middle of a long
 	 * operation, with a transaction ID pinned.  In that case, we will loop
 	 * here until the transaction ID is released, when the oldest
@@ -1371,15 +1418,30 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session)
 		__wt_yield();
 	}
 
+	return (0);
+}
+
+/*
+ * __wt_txn_global_shutdown --
+ *	Shut down the global transaction state.
+ */
+void
+__wt_txn_global_shutdown(WT_SESSION_IMPL *session)
+{
 #ifdef HAVE_TIMESTAMPS
 	/*
-	 * Now that all transactions have completed, no timestamps should be
-	 * pinned.
+	 * All application transactions have completed, ignore the pinned
+	 * timestamp so that updates can be evicted from the cache during
+	 * connection close.
+	 *
+	 * Note that we are relying on a special case in __wt_txn_visible_all
+	 * that returns true during close when there is no pinned timestamp
+	 * set.
 	 */
-	__wt_timestamp_set_inf(&S2C(session)->txn_global.pinned_timestamp);
+	S2C(session)->txn_global.has_pinned_timestamp = false;
+#else
+	WT_UNUSED(session);
 #endif
-
-	return (0);
 }
 
 /*
@@ -1394,8 +1456,7 @@ __wt_verbose_dump_txn_one(WT_SESSION_IMPL *session, WT_TXN *txn)
 #endif
 	const char *iso_tag;
 
-	iso_tag = "INVALID";
-	WT_NOT_READ(iso_tag);
+	WT_NOT_READ(iso_tag, "INVALID");
 	switch (txn->isolation) {
 	case WT_ISO_READ_COMMITTED:
 		iso_tag = "WT_ISO_READ_COMMITTED";

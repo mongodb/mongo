@@ -232,7 +232,14 @@ public:
      */
     std::shared_ptr<Shard> lookupRSName(const std::string& name) const;
 
-    void getAllShardIds(std::vector<ShardId>* all) const;
+    void getAllShardIdsNoReload(std::vector<ShardId>* all) const;
+
+    /**
+     * Like getAllShardIdsNoReload(), but does a reload internally in the case that
+     * getAllShardIdsNoReload() comes back empty
+     */
+    void getAllShardIds(OperationContext* opCtx, std::vector<ShardId>* all);
+
     int getNumShards() const;
 
     void toBSON(BSONObjBuilder* result) const;

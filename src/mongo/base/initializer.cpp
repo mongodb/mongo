@@ -25,13 +25,17 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/initializer.h"
+
+#include <iostream>
 
 #include "mongo/base/deinitializer_context.h"
 #include "mongo/base/global_initializer.h"
+#include "mongo/base/initializer_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
-#include <iostream>
 
 namespace mongo {
 
@@ -81,7 +85,7 @@ Status Initializer::executeDeinitializers() {
     if (Status::OK() != status)
         return status;
 
-    DeinitializerContext context;
+    DeinitializerContext context{};
 
     // Execute deinitialization in reverse order from initialization.
     for (auto it = sortedNodes.rbegin(), end = sortedNodes.rend(); it != end; ++it) {

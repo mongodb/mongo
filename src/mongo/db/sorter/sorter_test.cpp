@@ -38,7 +38,7 @@
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/stdx/memory.h"
+#include "mongo/db/service_context_registrar.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -46,6 +46,8 @@
 
 // Need access to internal classes
 #include "mongo/db/sorter/sorter.cpp"
+
+#include <memory>
 
 namespace mongo {
 using namespace mongo::sorter;
@@ -55,10 +57,9 @@ using std::pair;
 namespace {
 
 // Stub to avoid including the server environment library.
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-    return Status::OK();
-}
+ServiceContextRegistrar serviceContextCreator([]() {
+    return std::make_unique<ServiceContextNoop>();
+});
 }  // namespace
 
 //

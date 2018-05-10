@@ -92,14 +92,9 @@ public:
     UpdateDriver* getDriver();
 
     /**
-     * Get the YieldPolicy, adjusted for $isolated and GodMode.
+     * Get the YieldPolicy, adjusted for GodMode.
      */
     PlanExecutor::YieldPolicy yieldPolicy() const;
-
-    /**
-     * Is this update supposed to be isolated?
-     */
-    bool isIsolated() const;
 
     /**
      * As an optimization, we don't create a canonical query for updates with simple _id

@@ -13,8 +13,7 @@
     const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
     const kFailpointOptions = {shouldCheckForInterrupt: true};
 
-    // TODO: SERVER-33444 remove shardAsReplicaSet: false
-    const st = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
+    const st = new ShardingTest({shards: 2});
     const kDBName = "test";
     const kDivideByZeroErrCode = 16608;
     const mongosDB = st.s.getDB(kDBName);

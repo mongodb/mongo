@@ -85,8 +85,6 @@ void RollbackTest::setUp() {
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
     setOplogCollectionName(serviceContext);
 
-    SessionCatalog::create(serviceContext);
-
     _opCtx = cc().makeOperationContext();
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
@@ -101,11 +99,11 @@ void RollbackTest::tearDown() {
     _coordinator = nullptr;
     _opCtx.reset();
 
-    SessionCatalog::reset_forTest(_serviceContextMongoDTest.getServiceContext());
+    SessionCatalog::get(_serviceContextMongoDTest.getServiceContext())->reset_forTest();
 
     // We cannot unset the global replication coordinator because ServiceContextMongoD::tearDown()
-    // calls dropAllDatabasesExceptLocal() which requires the replication coordinator to clear all
-    // snapshots.
+    // calls Databse::dropAllDatabasesExceptLocal() which requires the replication coordinator to
+    // clear all snapshots.
     _serviceContextMongoDTest.tearDown();
 
     // ServiceContextMongoD::tearDown() does not destroy service context so it is okay
@@ -181,7 +179,7 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
                                             const CollectionOptions& options) {
     Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
     mongo::WriteUnitOfWork wuow(opCtx);
-    auto db = dbHolder().openDb(opCtx, nss.db());
+    auto db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
     db->dropCollection(opCtx, nss.ns()).transitional_ignore();
     auto coll = db->createCollection(opCtx, nss.ns(), options);
@@ -279,8 +277,18 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
     auto nss = NamespaceString(dbName, collName);
 
     auto coll = _createCollection(_opCtx.get(), nss.toString(), localCollOptions);
-    auto commonOperation =
-        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+
+    auto commonOpUuid = unittest::assertGet(UUID::parse("f005ba11-cafe-bead-f00d-123456789abc"));
+    auto commonOpBson = BSON("ts" << Timestamp(1, 1) << "h" << 1LL << "t" << 1LL << "op"
+                                  << "n"
+                                  << "o"
+                                  << BSONObj()
+                                  << "ns"
+                                  << "rollback_test.test"
+                                  << "ui"
+                                  << commonOpUuid);
+
+    auto commonOperation = std::make_pair(commonOpBson, RecordId(1));
 
     auto collectionModificationOperation =
         makeCommandOp(Timestamp(Seconds(2), 0), coll->uuid(), nss.toString(), collModCmd, 2);

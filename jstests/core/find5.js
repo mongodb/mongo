@@ -1,3 +1,5 @@
+// @tags: [requires_fastcount]
+
 (function() {
     "use strict";
 

@@ -153,11 +153,9 @@ public:
         // If db/collection does not exist, short circuit and return.
         if (!collDB || !collection) {
             if (view)
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::CommandNotSupportedOnView, "can't compact a view"});
+                uasserted(ErrorCodes::CommandNotSupportedOnView, "can't compact a view");
             else
-                return CommandHelpers::appendCommandStatus(
-                    result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
+                uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
         }
 
         OldClientContext ctx(opCtx, nss.ns());
@@ -166,8 +164,7 @@ public:
         log() << "compact " << nss.ns() << " begin, options: " << compactOptions;
 
         StatusWith<CompactStats> status = collection->compact(opCtx, &compactOptions);
-        if (!status.isOK())
-            return CommandHelpers::appendCommandStatus(result, status.getStatus());
+        uassertStatusOK(status.getStatus());
 
         if (status.getValue().corruptDocuments > 0)
             result.append("invalidObjects", status.getValue().corruptDocuments);

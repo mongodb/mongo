@@ -1,6 +1,4 @@
-"""
-unittest.TestCase for JavaScript tests.
-"""
+"""The unittest.TestCase for JavaScript tests."""
 
 from __future__ import absolute_import
 
@@ -18,20 +16,12 @@ from ...utils import registry
 
 
 class _SingleJSTestCase(interface.ProcessTestCase):
-    """
-    A jstest to execute.
-    """
+    """A jstest to execute."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self,
-                 logger,
-                 js_filename,
-                 shell_executable=None,
-                 shell_options=None):
-        """
-        Initializes the _SingleJSTestCase with the JS file to run.
-        """
+    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
+        """Initialize the _SingleJSTestCase with the JS file to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
 
@@ -42,11 +32,11 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
+        """Configure the jstest."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
     def configure_shell(self):
-        """
-        Sets up the global variables for the shell, and data/ directory for the mongod.
+        """Set up the global variables for the shell, and data/ directory for the mongod.
 
         configure_shell() only needs to be called once per test. Therefore if creating multiple
         _SingleJSTestCase instances to be run in parallel, only call configure_shell() on one of
@@ -105,67 +95,53 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         self.shell_options["process_kwargs"] = process_kwargs
 
     def _get_data_dir(self, global_vars):
-        """
-        Returns the value that the mongo shell should set for the
-        MongoRunner.dataDir property.
-        """
-
+        """Return the value that mongo shell should set for the MongoRunner.dataDir property."""
         # Command line options override the YAML configuration.
         data_dir_prefix = utils.default_if_none(config.DBPATH_PREFIX,
                                                 global_vars.get("MongoRunner.dataDir"))
         data_dir_prefix = utils.default_if_none(data_dir_prefix, config.DEFAULT_DBPATH_PREFIX)
-        return os.path.join(data_dir_prefix,
-                            "job%d" % self.fixture.job_num,
+        return os.path.join(data_dir_prefix, "job%d" % self.fixture.job_num,
                             config.MONGO_RUNNER_SUBDIR)
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger,
-            executable=self.shell_executable,
-            filename=self.js_filename,
-            connection_string=self.fixture.get_driver_connection_url(),
-            **self.shell_options)
+            self.logger, executable=self.shell_executable, filename=self.js_filename,
+            connection_string=self.fixture.get_driver_connection_url(), **self.shell_options)
 
 
 class JSTestCase(interface.ProcessTestCase):
-    """
-    A wrapper for several copies of a SingleJSTest to execute.
-    """
+    """A wrapper for several copies of a SingleJSTest to execute."""
 
     REGISTERED_NAME = "js_test"
 
     class ThreadWithException(threading.Thread):
-        """
-        A wrapper for the thread class that lets us propagate exceptions.
-        """
+        """A wrapper for the thread class that lets us propagate exceptions."""
 
         def __init__(self, *args, **kwargs):
+            """Initialize JSTestCase."""
             threading.Thread.__init__(self, *args, **kwargs)
             self.exc_info = None
 
         def run(self):
+            """Run the jstest."""
             try:
                 threading.Thread.run(self)
-            except:
+            except:  # pylint: disable=bare-except
                 self.exc_info = sys.exc_info()
 
     DEFAULT_CLIENT_NUM = 1
 
-    def __init__(self,
-                 logger,
-                 js_filename,
-                 shell_executable=None,
-                 shell_options=None):
-        """
-        Initializes the JSTestCase with the JS file to run.
-        """
+    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
+        """Initialize the JSTestCase with the JS file to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
         self.num_clients = JSTestCase.DEFAULT_CLIENT_NUM
         self.test_case_template = _SingleJSTestCase(logger, js_filename, shell_executable,
                                                     shell_options)
 
-    def configure(self, fixture, num_clients=DEFAULT_CLIENT_NUM, *args, **kwargs):
+    def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
+            self, fixture, num_clients=DEFAULT_CLIENT_NUM, *args, **kwargs):
+        """Configure the jstest."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
         self.num_clients = num_clients
         self.test_case_template.configure(fixture, *args, **kwargs)
@@ -173,12 +149,10 @@ class JSTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         # This function should only be called by interface.py's as_command().
-        return self.test_case_template._make_process()
+        return self.test_case_template._make_process()  # pylint: disable=protected-access
 
     def _get_shell_options_for_thread(self, thread_id):
-        """
-        Get shell_options with an initialized TestData object for given thread.
-        """
+        """Get shell_options with an initialized TestData object for given thread."""
 
         # We give each _SingleJSTestCase its own copy of the shell_options.
         shell_options = self.test_case_template.shell_options.copy()
@@ -199,15 +173,11 @@ class JSTestCase(interface.ProcessTestCase):
         return shell_options
 
     def _create_test_case_for_thread(self, logger, thread_id):
-        """
-        Create and configure a _SingleJSTestCase to be run in a separate thread.
-        """
+        """Create and configure a _SingleJSTestCase to be run in a separate thread."""
 
         shell_options = self._get_shell_options_for_thread(thread_id)
-        test_case = _SingleJSTestCase(logger,
-                                      self.test_case_template.js_filename,
-                                      self.test_case_template.shell_executable,
-                                      shell_options)
+        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
+                                      self.test_case_template.shell_executable, shell_options)
 
         test_case.configure(self.fixture)
         return test_case
@@ -253,12 +223,12 @@ class JSTestCase(interface.ProcessTestCase):
                 if thread.exc_info is not None:
                     if not isinstance(thread.exc_info[1], self.failureException):
                         self.logger.error(
-                            "Encountered an error inside thread %d running jstest %s.",
-                            thread_id, self.basename(),
-                            exc_info=thread.exc_info)
+                            "Encountered an error inside thread %d running jstest %s.", thread_id,
+                            self.basename(), exc_info=thread.exc_info)
                     raise thread.exc_info
 
     def run_test(self):
+        """Execute the test."""
         if self.num_clients == 1:
             self._run_single_copy()
         else:

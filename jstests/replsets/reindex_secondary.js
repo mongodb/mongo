@@ -7,7 +7,7 @@ replTest.initiate();
 var master = replTest.getPrimary();
 replTest.awaitSecondaryNodes();
 
-var slaves = replTest.liveNodes.slaves;
+var slaves = replTest._slaves;
 assert(slaves.length == 1, "Expected 1 slave but length was " + slaves.length);
 slave = slaves[0];
 
