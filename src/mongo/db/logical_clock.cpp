@@ -107,7 +107,6 @@ LogicalTime LogicalClock::getClusterTime() {
 
 Status LogicalClock::advanceClusterTime(const LogicalTime newTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_isEnabled);
 
     auto rateLimitStatus = _passesRateLimiter_inlock(newTime);
     if (!rateLimitStatus.isOK()) {
@@ -126,7 +125,6 @@ LogicalTime LogicalClock::reserveTicks(uint64_t nTicks) {
     invariant(nTicks > 0 && nTicks <= kMaxSignedInt);
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    invariant(_isEnabled);
 
     LogicalTime clusterTime = _clusterTime;
 
@@ -209,9 +207,9 @@ bool LogicalClock::isEnabled() const {
     return _isEnabled;
 }
 
-void LogicalClock::setEnabled(bool isEnabled) {
+void LogicalClock::disable() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    _isEnabled = isEnabled;
+    _isEnabled = false;
 }
 
 }  // namespace mongo

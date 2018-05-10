@@ -58,7 +58,7 @@ public:
     static LogicalTime getClusterTimeForReplicaSet(OperationContext* opCtx);
 
     /**
-     *  Creates an instance of LogicalClock.
+     * Creates an instance of LogicalClock.
      */
     LogicalClock(ServiceContext*);
 
@@ -89,14 +89,15 @@ public:
     void setClusterTimeFromTrustedSource(LogicalTime newTime);
 
     /**
-     *  Returns true if the clock is enabled and can be used.
+     * Returns true if the clock is enabled and can be used. Defaults to true.
      */
     bool isEnabled() const;
 
     /**
-     * Passing "true" enables the clock.
+     * Disables the logical clock. A disabled clock won't process logical times and can't be
+     * re-enabled.
      */
-    void setEnabled(bool isEnabled);
+    void disable();
 
 private:
     /**

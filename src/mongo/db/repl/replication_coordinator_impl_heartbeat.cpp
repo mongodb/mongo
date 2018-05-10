@@ -531,7 +531,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             newConfig.getMemberAt(myIndex.getValue()).isArbiter();
 
         if (isArbiter) {
-            LogicalClock::get(getGlobalServiceContext())->setEnabled(false);
+            LogicalClock::get(getGlobalServiceContext())->disable();
             if (auto validator = LogicalTimeValidator::get(getGlobalServiceContext())) {
                 validator->resetKeyManager();
             }
