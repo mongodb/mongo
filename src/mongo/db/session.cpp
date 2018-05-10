@@ -106,6 +106,7 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"geoSearch", 1},
                                         {"getMore", 1},
                                         {"insert", 1},
+                                        {"killCursors", 1},
                                         {"prepareTransaction", 1},
                                         {"update", 1}};
 

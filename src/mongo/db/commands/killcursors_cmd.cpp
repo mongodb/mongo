@@ -47,6 +47,14 @@ class KillCursorsCmd final : public KillCursorsCmdBase {
 public:
     KillCursorsCmd() = default;
 
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const final {
+        // killCursors must support snapshot read concern in order to be run in transactions.
+        return level == repl::ReadConcernLevel::kLocalReadConcern ||
+            level == repl::ReadConcernLevel::kSnapshotReadConcern;
+    }
+
 private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
         auto opCtx = client->getOperationContext();
