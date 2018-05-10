@@ -261,12 +261,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
         }
 
         if (auto lsid = clientOpCtx->getLogicalSessionId()) {
-            BSONObjBuilder bob(infoBuilder->subobjStart("lsid"));
-            lsid->serialize(&bob);
+            BSONObjBuilder lsidBuilder(infoBuilder->subobjStart("lsid"));
+            lsid->serialize(&lsidBuilder);
         }
 
         if (auto txnNumber = clientOpCtx->getTxnNumber()) {
-            infoBuilder->append("txnNumber", *txnNumber);
+            infoBuilder->append("transaction",
+                                BSON("parameters" << BSON("txnNumber" << *txnNumber)));
         }
 
         CurOp::get(clientOpCtx)->reportState(infoBuilder, truncateOps);

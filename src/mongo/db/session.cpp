@@ -1083,7 +1083,8 @@ void Session::reportStashedState(BSONObjBuilder* builder) const {
                 BSONObjBuilder lsid(builder->subobjStart("lsid"));
                 getSessionId().serialize(&lsid);
             }
-            builder->append("txnNumber", _activeTxnNumber);
+            builder->append("transaction",
+                            BSON("parameters" << BSON("txnNumber" << _activeTxnNumber)));
             builder->append("waitingForLock", false);
             builder->append("active", false);
             fillLockerInfo(*lockerInfo, *builder);

@@ -745,13 +745,14 @@ TEST_F(SessionTest, ReportStashedResources) {
     const auto lockerInfo = opCtx()->lockState()->getLockerInfo();
     ASSERT(lockerInfo);
 
+    auto txnDoc = BSON("parameters" << BSON("txnNumber" << txnNum));
     auto reportBuilder =
         std::move(BSONObjBuilder() << "host" << getHostNameCachedAndPort() << "desc"
                                    << "inactive transaction"
                                    << "lsid"
                                    << sessionId.toBSON()
-                                   << "txnNumber"
-                                   << txnNum
+                                   << "transaction"
+                                   << txnDoc
                                    << "waitingForLock"
                                    << false
                                    << "active"

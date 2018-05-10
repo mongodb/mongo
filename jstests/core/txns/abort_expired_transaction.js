@@ -54,8 +54,9 @@
                 const sessionFilter = {
                     active: false,
                     opid: {$exists: false},
-                    desc: "inactive transaction", "lsid.id": session.getSessionId().id,
-                    txnNumber: NumberLong(txnNumber),
+                    desc: "inactive transaction",
+                    "transaction.parameters.txnNumber": NumberLong(txnNumber),
+                    "lsid.id": session.getSessionId().id
                 };
                 const res = db.getSiblingDB("admin").aggregate(
                     [{$currentOp: {allUsers: true, idleSessions: true}}, {$match: sessionFilter}]);
