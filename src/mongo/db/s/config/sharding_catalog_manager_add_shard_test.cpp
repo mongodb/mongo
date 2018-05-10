@@ -387,6 +387,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     DatabaseType discoveredDB1("TestDB1", ShardId("StandaloneShard"), false);
     DatabaseType discoveredDB2("TestDB2", ShardId("StandaloneShard"), false);
 
+    operationContext()->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
+
     auto future = launchAsync([this, expectedShardName] {
         Client::initThreadIfNotAlready();
         auto shardName =
@@ -418,7 +420,6 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // The shard receives the setFeatureCompatibilityVersion command.
-    operationContext()->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
     expectSetFeatureCompatibilityVersion(
         shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
 
