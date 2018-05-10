@@ -17,6 +17,7 @@ selector:
 
 executor:
   archive:
+    tests: true
     hooks:
       - PeriodicKillSecondaries
   config:
