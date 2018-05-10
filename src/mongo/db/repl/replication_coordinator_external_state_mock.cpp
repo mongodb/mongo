@@ -252,6 +252,14 @@ std::size_t ReplicationCoordinatorExternalStateMock::getOplogFetcherMaxFetcherRe
     return 0;
 }
 
+OplogApplier::BatchLimits ReplicationCoordinatorExternalStateMock::getInitialSyncBatchLimits()
+    const {
+    OplogApplier::BatchLimits batchLimits;
+    batchLimits.bytes = 512 * 1024 * 1024U;
+    batchLimits.ops = 5000U;
+    return batchLimits;
+}
+
 void ReplicationCoordinatorExternalStateMock::setIsReadCommittedEnabled(bool val) {
     _isReadCommittedSupported = val;
 }

@@ -883,6 +883,14 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRe
     return oplogFetcherMaxFetcherRestarts.load();
 }
 
+OplogApplier::BatchLimits ReplicationCoordinatorExternalStateImpl::getInitialSyncBatchLimits()
+    const {
+    OplogApplier::BatchLimits batchLimits;
+    batchLimits.bytes = SyncTail::replBatchLimitBytes;
+    batchLimits.ops = std::size_t(SyncTail::replBatchLimitOperations.load());
+    return batchLimits;
+}
+
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
     return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTime();
 }

@@ -298,6 +298,11 @@ public:
      */
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const = 0;
 
+    /**
+     * Returns initial sync oplog application batch limits.
+     */
+    virtual OplogApplier::BatchLimits getInitialSyncBatchLimits() const = 0;
+
     /*
      * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,
      * hence it must be called before multi-threaded operations start.
