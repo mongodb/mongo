@@ -115,6 +115,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               OptionalCollectionUUID targetUUID,
                               repl::OpTime renameOpTimeFromApplyOps,
                               const RenameCollectionOptions& options) {
+    auto uuidString = targetUUID ? targetUUID->toString() : "no UUID";
+    log() << "renameCollection: renaming collection " << uuidString << " from " << source << " to "
+          << target;
+
     // A valid 'renameOpTimeFromApplyOps' is not allowed when writes are replicated.
     if (!renameOpTimeFromApplyOps.isNull() && opCtx->writesAreReplicated()) {
         return Status(
@@ -475,10 +479,6 @@ Status renameCollection(OperationContext* opCtx,
                                     << source.toString());
     }
 
-    const std::string dropTargetMsg =
-        options.dropTarget ? " and drop " + target.toString() + "." : ".";
-    log() << "renameCollectionForCommand: rename " << source << " to " << target << dropTargetMsg;
-
     OptionalCollectionUUID noTargetUUID;
     return renameCollectionCommon(opCtx, source, target, noTargetUUID, {}, options);
 }
@@ -550,11 +550,6 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                           << sourceNss.toString());
     }
 
-    const std::string dropTargetMsg =
-        options.dropTargetUUID ? " and drop " + options.dropTargetUUID.get().toString() + "." : ".";
-    log() << "renameCollectionForApplyOps: rename " << sourceNss << " (" << targetUUID.get()
-          << ") to " << targetNss << dropTargetMsg;
-
     options.stayTemp = cmd["stayTemp"].trueValue();
     return renameCollectionCommon(opCtx, sourceNss, targetNss, targetUUID, renameOpTime, options);
 }
@@ -573,9 +568,6 @@ Status renameCollectionForRollback(OperationContext* opCtx,
 
     RenameCollectionOptions options;
     invariant(!options.dropTarget);
-
-    log() << "renameCollectionForRollback: rename " << source << " (" << uuid << ") to " << target
-          << ".";
 
     return renameCollectionCommon(opCtx, source, target, uuid, {}, options);
 }

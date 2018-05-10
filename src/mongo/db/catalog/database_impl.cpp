@@ -691,9 +691,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         _clearCollectionCache(opCtx, toNS, clearCacheReason, /*collectionGoingAway*/ false);
 
         Top::get(opCtx->getServiceContext()).collectionDropped(fromNS.toString());
-
-        log() << "renameCollection: renaming collection " << coll->uuid().get() << " from "
-              << fromNS << " to " << toNS;
     }
 
     Status s = _dbEntry->renameCollection(opCtx, fromNS, toNS, stayTemp);
