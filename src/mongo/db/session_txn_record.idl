@@ -40,6 +40,7 @@ imports:
 structs:
     sessionTxnRecord:
         description: "A document used for storing session transaction states."
+        strict: false
         fields:
             _id:
                 cpp_name: sessionId
