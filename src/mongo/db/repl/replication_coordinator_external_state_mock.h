@@ -105,6 +105,7 @@ public:
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
+    SyncTail::BatchLimits getInitialSyncBatchLimits() const final;
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

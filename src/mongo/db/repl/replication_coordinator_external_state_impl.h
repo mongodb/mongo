@@ -117,6 +117,7 @@ public:
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
         OperationContext* opCtx) const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
+    SyncTail::BatchLimits getInitialSyncBatchLimits() const final;
 
     // Methods from JournalListener.
     virtual JournalListener::Token getToken();
