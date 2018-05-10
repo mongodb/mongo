@@ -50,6 +50,8 @@ namespace repl {
 
 namespace {
 
+const auto kRecoveryLogLevel = logger::LogSeverity::Debug(2);
+
 /**
  * OplogBuffer adaptor for a DBClient query on the oplog.
  * Implements only functions used by OplogApplier::getNextApplierBatch().
@@ -307,25 +309,54 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     OplogBufferLocalOplog oplogBuffer(oplogApplicationStartPoint);
     oplogBuffer.startup(opCtx);
 
-    // Apply remaining ops one at at time, but don't log them because they are already logged.
-    UnreplicatedWritesBlock uwb(opCtx);
-    DisableDocumentValidation validationDisabler(opCtx);
+    auto writerPool = SyncTail::makeWriterPool();
+    OplogApplier::Options options;
+    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+    options.skipWritesToOplog = true;
+    OplogApplier oplogApplier(nullptr,
+                              &oplogBuffer,
+                              nullptr,
+                              nullptr,
+                              _consistencyMarkers,
+                              _storageInterface,
+                              options,
+                              writerPool.get());
+
+    OplogApplier::BatchLimits batchLimits;
+    batchLimits.bytes = SyncTail::calculateBatchLimitBytes(opCtx, _storageInterface);
+    batchLimits.ops = std::size_t(SyncTail::replBatchLimitOperations.load());
 
     OpTime applyThroughOpTime;
-    BSONObj entry;
-    while (oplogBuffer.tryPop(opCtx, &entry)) {
-        LOG_FOR_RECOVERY(2) << "Applying op during replication recovery: " << redact(entry);
-        fassert(40294, SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
+    OplogApplier::Operations batch;
+    std::size_t numBatches = 0;
+    std::size_t numOpsApplied = 0;
+    while (
+        !(batch = fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits))).empty()) {
 
-        auto oplogEntry = fassert(50763, OplogEntry::parse(entry));
-        applyThroughOpTime = oplogEntry.getOpTime();
-        if (auto txnTableOplog = Session::createMatchingTransactionTableUpdate(oplogEntry)) {
-            fassert(50764,
-                    SyncTail::syncApply(
-                        opCtx, txnTableOplog->toBSON(), OplogApplication::Mode::kRecovering));
+        numBatches++;
+        LOG_FOR_RECOVERY(kRecoveryLogLevel)
+            << "Applying operations in batch: " << numBatches << "(" << batch.size()
+            << " operations from " << batch.front().getOpTime() << " (inclusive) to "
+            << batch.back().getOpTime()
+            << " (inclusive)). Operations applied so far: " << numOpsApplied;
+
+        numOpsApplied += batch.size();
+        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kRecoveryLogLevel)) {
+            std::size_t i = 0;
+            for (const auto& entry : batch) {
+                i++;
+                LOG_FOR_RECOVERY(kRecoveryLogLevel)
+                    << "Applying op " << i << " of " << batch.size() << " (in batch " << numBatches
+                    << ") during replication recovery: " << redact(entry.raw);
+            }
         }
+
+        applyThroughOpTime = uassertStatusOK(oplogApplier.multiApply(opCtx, std::move(batch)));
     }
 
+    LOG_FOR_RECOVERY(kRecoveryLogLevel)
+        << "Applied " << numOpsApplied << " operations in " << numBatches
+        << " batches. Last operation applied with optime: " << applyThroughOpTime;
     invariant(oplogBuffer.isEmpty(),
               str::stream() << "Oplog buffer not empty after applying operations. Last operation "
                                "applied with optime: "
