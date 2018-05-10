@@ -246,8 +246,8 @@ TEST_F(DocumentSourceSortExecutionTest, IdenticalSort) {
 }
 
 /** 
- * Same sort spec with first ascendening field and then a descending field. 
- * The result should follow a descending order
+ * Same sort spec with first an ascendening field and then a descending field. 
+ * The result should follow a descending order.
  * */
 TEST_F(DocumentSourceSortExecutionTest, FirstAscendingThenDescending) {
     checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", 2}}, Document{{"_id", 2}, {"a", 1}}},
@@ -257,7 +257,7 @@ TEST_F(DocumentSourceSortExecutionTest, FirstAscendingThenDescending) {
 
 /** 
  * Same sort spec with first descending field and then a ascending field. 
- * The result should follow a ascending order
+ * The result should follow a ascending order.
 */
 TEST_F(DocumentSourceSortExecutionTest, FirstDescendingThenAscending) {
     checkResults({Document{{"_id", 0}, {"a", 2}}, Document{{"_id", 1}, {"a", 1}}, Document{{"_id", 2}, {"a", 2}}},
