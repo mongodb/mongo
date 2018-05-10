@@ -69,7 +69,6 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
@@ -322,8 +321,7 @@ InitialSyncerOptions createInitialSyncerOptions(
     options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
     options.getSlaveDelay = [replCoord]() { return replCoord->getSlaveDelaySecs(); };
     options.syncSourceSelector = replCoord;
-    options.batchLimits.bytes = dur::UncommittedBytesLimit;
-    options.batchLimits.ops = 5000U;
+    options.batchLimits = externalState->getInitialSyncBatchLimits();
     options.oplogFetcherMaxFetcherRestarts = externalState->getOplogFetcherMaxFetcherRestarts();
     return options;
 }
