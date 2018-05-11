@@ -31,6 +31,13 @@
         return;
     }
 
+    // Increase the timeout for the transaction reaper. This will make the test easier to debug if
+    // it hangs.
+    // TODO SERVER-34595: This should no longer be necessary once the transaction reaper timeout
+    // is increased for all noPassthrough tests.
+    assert.commandWorked(
+        db.adminCommand({"setParameter": 1, transactionLifetimeLimitSeconds: 60 * 60 * 3}));
+
     TestData.sessionId = assert.commandWorked(adminDB.runCommand({startSession: 1})).id;
     TestData.txnNumber = 0;
 
