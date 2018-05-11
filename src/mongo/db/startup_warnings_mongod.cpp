@@ -369,23 +369,6 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
         warned = true;
     }
 
-    if (storageParams.engine == "wiredTiger") {
-        // If the filesystemMaxCacheSize / totalMemorySize > 0.4, we should raise this
-        // warning because it leads to terrible performance for WiredTiger
-        const double filesystemCachePercentageThreshold = 0.4;
-        if (p.getMaxSystemFileCachePercentage() > filesystemCachePercentageThreshold) {
-            log() << startupWarningsLog;
-            log()
-                << "** WARNING: The file system cache of this machine is configured to be greater "
-                << "than " << 100 * filesystemCachePercentageThreshold << "% of the total memory. "
-                << "This can lead to increased memory pressure and poor performance."
-                << startupWarningsLog;
-            log() << "See http://dochub.mongodb.org/core/wt-windows-system-file-cache"
-                  << startupWarningsLog;
-            warned = true;
-        }
-    }
-
 #endif  // #ifdef _WIN32
 
     if (storageParams.engine == "ephemeralForTest") {
