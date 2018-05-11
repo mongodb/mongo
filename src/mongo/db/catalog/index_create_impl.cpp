@@ -179,6 +179,10 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
     if (!_needToCleanup || _indexes.empty())
         return;
 
+    // Make lock acquisition uninterruptible because onOpMessage() and WUOW.commit() could take
+    // locks.
+    UninterruptibleLockGuard(_opCtx->lockState());
+
     while (true) {
         try {
             WriteUnitOfWork wunit(_opCtx);
@@ -192,8 +196,6 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
             if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
                 // Primaries must timestamp the failure of an index build (via an op message).
                 // Secondaries may not fail index builds.
-                // Make lock acquisition uninterruptible because writing an op message takes a lock.
-                UninterruptibleLockGuard(_opCtx->lockState());
                 _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                     _opCtx,
                     BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
