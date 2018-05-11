@@ -61,6 +61,7 @@
                 h: NumberLong(1),
                 op: 'i',
                 ns: ns,
+                v: 2,
                 o: {_id: num},
             }));
         });
