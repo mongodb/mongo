@@ -45,7 +45,7 @@ namespace mongo {
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceLookUp final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static constexpr size_t kMaxSubPipelineDepth = 20;
 

@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-class DocumentSourceSkip final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceSkip final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static constexpr StringData kStageName = "$skip"_sd;
 
@@ -82,7 +82,7 @@ public:
         return SEE_NEXT;  // This doesn't affect needed fields
     }
 
-    // Virtuals for SplittableDocumentSource
+    // Virtuals for NeedsMergerDocumentSource
     // Need to run on rounter. Can't run on shards.
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
         return NULL;

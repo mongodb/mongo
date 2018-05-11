@@ -46,15 +46,15 @@ namespace {
  *
  * It is not safe to call this optimization multiple times.
  *
- * NOTE: looks for SplittableDocumentSources and uses that API
+ * NOTE: looks for NeedsMergerDocumentSources and uses that API
  */
 void findSplitPoint(Pipeline* shardPipe, Pipeline* mergePipe) {
     while (!mergePipe->getSources().empty()) {
         boost::intrusive_ptr<DocumentSource> current = mergePipe->popFront();
 
         // Check if this source is splittable.
-        SplittableDocumentSource* splittable =
-            dynamic_cast<SplittableDocumentSource*>(current.get());
+        NeedsMergerDocumentSource* splittable =
+            dynamic_cast<NeedsMergerDocumentSource*>(current.get());
 
         if (!splittable) {
             // Move the source from the merger _sources to the shard _sources.

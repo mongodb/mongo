@@ -42,7 +42,7 @@ namespace mongo {
  * random participating shard otherwise.
  */
 class DocumentSourceInternalSplitPipeline final : public DocumentSource,
-                                                  public SplittableDocumentSource {
+                                                  public NeedsMergerDocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSplitPipeline"_sd;
 

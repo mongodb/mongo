@@ -542,7 +542,7 @@ protected:
     intrusive_ptr<DocumentSource> createMerger() {
         // Set up a group merger to simulate merging results in the router.  In this
         // case only one shard is in use.
-        SplittableDocumentSource* splittable = dynamic_cast<SplittableDocumentSource*>(group());
+        NeedsMergerDocumentSource* splittable = dynamic_cast<NeedsMergerDocumentSource*>(group());
         ASSERT(splittable);
         auto routerSources = splittable->getMergeSources();
         ASSERT_EQ(routerSources.size(), 1UL);

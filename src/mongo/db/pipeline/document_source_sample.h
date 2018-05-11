@@ -33,7 +33,7 @@
 
 namespace mongo {
 
-class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
+class DocumentSourceSample final : public DocumentSource, public NeedsMergerDocumentSource {
 public:
     static constexpr StringData kStageName = "$sample"_sd;
 
