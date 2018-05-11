@@ -8,9 +8,10 @@ package db
 
 import (
 	"fmt"
+	"strings"
+
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"strings"
 )
 
 // Query flags
@@ -129,6 +130,28 @@ func (sp *SessionProvider) IsMongos() (bool, error) {
 		return false, err
 	}
 	return nodeType == Mongos, nil
+}
+
+// SupportsCollectionUUID returns true if the connected server identifies
+// collections with UUIDs
+func (sp *SessionProvider) SupportsCollectionUUID() (bool, error) {
+	session, err := sp.GetSession()
+	if err != nil {
+		return false, err
+	}
+	defer session.Close()
+
+	collInfo, err := GetCollectionInfo(session.DB("admin").C("system.version"))
+	if err != nil {
+		return false, err
+	}
+
+	// On FCV 3.6+, admin.system.version will have a UUID
+	if collInfo != nil && collInfo.GetUUID() != "" {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // SupportsRepairCursor takes in an example db and collection name and

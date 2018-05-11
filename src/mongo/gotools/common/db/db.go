@@ -94,8 +94,8 @@ type Oplog struct {
 	Version   int                 `bson:"v"`
 	Operation string              `bson:"op"`
 	Namespace string              `bson:"ns"`
-	Object    bson.RawD           `bson:"o"`
-	Query     bson.RawD           `bson:"o2"`
+	Object    bson.D              `bson:"o"`
+	Query     bson.D              `bson:"o2"`
 	UI        *bson.Binary        `bson:"ui,omitempty"`
 }
 

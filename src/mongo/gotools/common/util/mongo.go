@@ -62,14 +62,8 @@ func CreateConnectionAddrs(host, port string) []string {
 }
 
 // SplitNamespace splits a namespace path into a database and collection,
-// returned in that order. An error is returned if the namespace is invalid.
-func SplitAndValidateNamespace(namespace string) (string, string, error) {
-
-	// first, run validation checks
-	if err := ValidateFullNamespace(namespace); err != nil {
-		return "", "", fmt.Errorf("namespace '%v' is not valid: %v",
-			namespace, err)
-	}
+// returned in that order.
+func SplitNamespace(namespace string) (string, string) {
 
 	// find the first instance of "." in the namespace
 	firstDotIndex := strings.Index(namespace, ".")
@@ -84,6 +78,20 @@ func SplitAndValidateNamespace(namespace string) (string, string, error) {
 		database = namespace
 	}
 
+	return database, collection
+}
+
+// SplitAndValidateNamespace splits a namespace path into a database and collection,
+// returned in that order. An error is returned if the namespace is invalid.
+func SplitAndValidateNamespace(namespace string) (string, string, error) {
+
+	// first, run validation checks
+	if err := ValidateFullNamespace(namespace); err != nil {
+		return "", "", fmt.Errorf("namespace '%v' is not valid: %v",
+			namespace, err)
+	}
+
+	database, collection := SplitNamespace(namespace)
 	return database, collection, nil
 }
 

@@ -49,6 +49,7 @@ type OutputOptions struct {
 	NumInsertionWorkers      int    `long:"numInsertionWorkersPerCollection" description:"number of insert operations to run concurrently per collection (1 by default)" default:"1" default-mask:"-"`
 	StopOnError              bool   `long:"stopOnError" description:"stop restoring if an error is encountered on insert (off by default)"`
 	BypassDocumentValidation bool   `long:"bypassDocumentValidation" description:"bypass document validation"`
+	PreserveUUID             bool   `long:"preserveUUID" description:"preserve original collection UUIDs (off by default, requires drop)"`
 	TempUsersColl            string `long:"tempUsersColl" default:"tempusers" hidden:"true"`
 	TempRolesColl            string `long:"tempRolesColl" default:"temproles" hidden:"true"`
 	BulkBufferSize           int    `long:"batchSize" default:"1000" hidden:"true"`

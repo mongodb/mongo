@@ -7,6 +7,7 @@
 package mongorestore
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/mongodb/mongo-tools/common"
@@ -38,6 +39,7 @@ type authVersionPair struct {
 type Metadata struct {
 	Options bson.D          `json:"options,omitempty"`
 	Indexes []IndexDocument `json:"indexes"`
+	UUID    string          `json:"uuid"`
 }
 
 // this struct is used to read in the options of a set of indexes
@@ -54,17 +56,17 @@ type IndexDocument struct {
 
 // MetadataFromJSON takes a slice of JSON bytes and unmarshals them into usable
 // collection options and indexes for restoring collections.
-func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []IndexDocument, error) {
+func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (*Metadata, error) {
 	if len(jsonBytes) == 0 {
 		// skip metadata parsing if the file is empty
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	meta := &Metadata{}
 
 	err := json.Unmarshal(jsonBytes, meta)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// first get the ordered key information for each index,
@@ -72,7 +74,7 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 	metaAsMap := metaDataMapIndex{}
 	err = json.Unmarshal(jsonBytes, &metaAsMap)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error unmarshalling metadata as map: %v", err)
+		return nil, fmt.Errorf("error unmarshalling metadata as map: %v", err)
 	}
 	for i := range meta.Indexes {
 		// remove "key", and "partialFilterExpression" from the map so we can decode them properly later
@@ -82,21 +84,21 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 		// parse extra index fields
 		meta.Indexes[i].Options = metaAsMap.Indexes[i]
 		if err := bsonutil.ConvertJSONDocumentToBSON(meta.Indexes[i].Options); err != nil {
-			return nil, nil, fmt.Errorf("extended json error: %v", err)
+			return nil, fmt.Errorf("extended json error: %v", err)
 		}
 
 		// parse the values of the index keys, so we can support extended json
 		for pos, field := range meta.Indexes[i].Key {
 			meta.Indexes[i].Key[pos].Value, err = bsonutil.ParseJSONValue(field.Value)
 			if err != nil {
-				return nil, nil, fmt.Errorf("extended json in 'key.%v' field: %v", field.Name, err)
+				return nil, fmt.Errorf("extended json in 'key.%v' field: %v", field.Name, err)
 			}
 		}
 		// parse the values of the index keys, so we can support extended json
 		for pos, field := range meta.Indexes[i].PartialFilterExpression {
 			meta.Indexes[i].PartialFilterExpression[pos].Value, err = bsonutil.ParseJSONValue(field.Value)
 			if err != nil {
-				return nil, nil, fmt.Errorf("extended json in 'partialFilterExpression.%v' field: %v", field.Name, err)
+				return nil, fmt.Errorf("extended json in 'partialFilterExpression.%v' field: %v", field.Name, err)
 			}
 		}
 	}
@@ -104,10 +106,10 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 	// parse the values of options fields, to support extended json
 	meta.Options, err = bsonutil.GetExtendedBsonD(meta.Options)
 	if err != nil {
-		return nil, nil, fmt.Errorf("extended json in 'options': %v", err)
+		return nil, fmt.Errorf("extended json in 'options': %v", err)
 	}
 
-	return meta.Options, meta.Indexes, nil
+	return meta, nil
 }
 
 // LoadIndexesFromBSON reads indexes from the index BSON files and
@@ -258,17 +260,27 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index Ind
 
 // CreateCollection creates the collection specified in the intent with the
 // given options.
-func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bson.D) error {
-	command := append(bson.D{{"create", intent.C}}, options...)
-
+func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bson.D, uuid string) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
 	defer session.Close()
 
+	switch {
+
+	case uuid != "":
+		return restore.createCollectionWithApplyOps(session, intent, options, uuid)
+	default:
+		return restore.createCollectionWithCommand(session, intent, options)
+	}
+
+}
+
+func (restore *MongoRestore) createCollectionWithCommand(session *mgo.Session, intent *intents.Intent, options bson.D) error {
+	command := createCollectionCommand(intent, options)
 	res := bson.M{}
-	err = session.DB(intent.DB).Run(command, &res)
+	err := session.DB(intent.DB).Run(command, &res)
 	if err != nil {
 		return fmt.Errorf("error running create command: %v", err)
 	}
@@ -276,6 +288,43 @@ func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bs
 		return fmt.Errorf("create command: %v", res["errmsg"])
 	}
 	return nil
+
+}
+
+func (restore *MongoRestore) createCollectionWithApplyOps(session *mgo.Session, intent *intents.Intent, options bson.D, uuidHex string) error {
+	command := createCollectionCommand(intent, options)
+	uuid, err := hex.DecodeString(uuidHex)
+	if err != nil {
+		return fmt.Errorf("Couldn't restore UUID because UUID was invalid: %s", err)
+	}
+
+	b, err := bson.Marshal(command)
+	if err != nil {
+		return err
+	}
+	var rawCommand bson.RawD
+	err = bson.Unmarshal(b, &rawCommand)
+	if err != nil {
+		return err
+	}
+
+	createOp := struct {
+		Operation string       `bson:"op"`
+		Namespace string       `bson:"ns"`
+		Object    bson.RawD    `bson:"o"`
+		UI        *bson.Binary `bson:"ui,omitempty"`
+	}{
+		Operation: "c",
+		Namespace: intent.DB + ".$cmd",
+		Object:    rawCommand,
+		UI:        &bson.Binary{Kind: 0x04, Data: uuid},
+	}
+
+	return restore.ApplyOps(session, []interface{}{createOp})
+}
+
+func createCollectionCommand(intent *intents.Intent, options bson.D) bson.D {
+	return append(bson.D{{"create", intent.C}}, options...)
 }
 
 // RestoreUsersOrRoles accepts a users intent and a roles intent, and restores

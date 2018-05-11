@@ -87,8 +87,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 			break
 		}
 
-		// TODO: TOOLS-1817 will add support for conditionally keeping UUIDS
-		entryAsOplog, err = filterUUIDs(entryAsOplog)
+		entryAsOplog, err = restore.filterUUIDs(entryAsOplog)
 		if err != nil {
 			return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
 		}
@@ -168,13 +167,22 @@ func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
 }
 
 // filterUUIDs removes 'ui' entries from ops, including nested applyOps ops.
-func filterUUIDs(op db.Oplog) (db.Oplog, error) {
+// It also modifies ops that rely on 'ui'.
+func (restore *MongoRestore) filterUUIDs(op db.Oplog) (db.Oplog, error) {
 	// Remove UUIDs from oplog entries
-	op.UI = nil
+	if !restore.OutputOptions.PreserveUUID {
+		op.UI = nil
+
+		// new createIndexes oplog command requires 'ui', so if we aren't
+		// preserving UUIDs, we must convert it to an old style index insert
+		if op.Operation == "c" && op.Object[0].Name == "createIndexes" {
+			return convertCreateIndexToIndexInsert(op)
+		}
+	}
 
 	// Check for and filter nested applyOps ops
 	if op.Operation == "c" && isApplyOpsCmd(op.Object) {
-		filtered, err := newFilteredApplyOps(op.Object)
+		filtered, err := restore.newFilteredApplyOps(op.Object)
 		if err != nil {
 			return db.Oplog{}, err
 		}
@@ -184,8 +192,36 @@ func filterUUIDs(op db.Oplog) (db.Oplog, error) {
 	return op, nil
 }
 
+// convertCreateIndexToIndexInsert converts from new-style create indexes
+// command to old style special index insert.
+func convertCreateIndexToIndexInsert(op db.Oplog) (db.Oplog, error) {
+	dbName, _ := util.SplitNamespace(op.Namespace)
+
+	cmdValue := op.Object[0].Value
+	collName, ok := cmdValue.(string)
+	if !ok {
+		return db.Oplog{}, fmt.Errorf("unknown format for createIndexes")
+	}
+
+	indexSpec := op.Object[1:]
+	if len(indexSpec) < 3 {
+		return db.Oplog{}, fmt.Errorf("unknown format for createIndexes, index spec " +
+			"must have at least \"v\", \"key\", and \"name\" fields")
+	}
+
+	// createIndexes does not include the "ns" field but index inserts
+	// do. Add it as the third field, after "v", "key", and "name".
+	ns := bson.D{{"ns", fmt.Sprintf("%s.%s", dbName, collName)}}
+	indexSpec = append(indexSpec[:3], append(ns, indexSpec[3:]...)...)
+	op.Object = indexSpec
+	op.Namespace = fmt.Sprintf("%s.system.indexes", dbName)
+	op.Operation = "i"
+
+	return op, nil
+}
+
 // isApplyOpsCmd returns true if a document seems to be an applyOps command.
-func isApplyOpsCmd(cmd bson.RawD) bool {
+func isApplyOpsCmd(cmd bson.D) bool {
 	for _, v := range cmd {
 		if v.Name == "applyOps" {
 			return true
@@ -196,7 +232,7 @@ func isApplyOpsCmd(cmd bson.RawD) bool {
 
 // newFilteredApplyOps iterates over nested ops in an applyOps document and
 // returns a new applyOps document that omits the 'ui' field from nested ops.
-func newFilteredApplyOps(cmd bson.RawD) (bson.RawD, error) {
+func (restore *MongoRestore) newFilteredApplyOps(cmd bson.D) (bson.D, error) {
 	ops, err := unwrapNestedApplyOps(cmd)
 	if err != nil {
 		return nil, err
@@ -204,7 +240,7 @@ func newFilteredApplyOps(cmd bson.RawD) (bson.RawD, error) {
 
 	filtered := make([]db.Oplog, len(ops))
 	for i, v := range ops {
-		filtered[i], err = filterUUIDs(v)
+		filtered[i], err = restore.filterUUIDs(v)
 		if err != nil {
 			return nil, err
 		}
@@ -223,10 +259,10 @@ type nestedApplyOps struct {
 	ApplyOps []db.Oplog `bson:"applyOps"`
 }
 
-// unwrapNestedApplyOps converts a RawD to a typed data structure.
+// unwrapNestedApplyOps converts a bson.D to a typed data structure.
 // Unfortunately, we're forced to convert by marshaling to bytes and
 // unmarshaling.
-func unwrapNestedApplyOps(doc bson.RawD) ([]db.Oplog, error) {
+func unwrapNestedApplyOps(doc bson.D) ([]db.Oplog, error) {
 	// Doc to bytes
 	bs, err := bson.Marshal(doc)
 	if err != nil {
@@ -243,10 +279,10 @@ func unwrapNestedApplyOps(doc bson.RawD) ([]db.Oplog, error) {
 	return cmd.ApplyOps, nil
 }
 
-// wrapNestedApplyOps converts a typed data structure to a RawD.
+// wrapNestedApplyOps converts a typed data structure to a bson.D.
 // Unfortunately, we're forced to convert by marshaling to bytes and
 // unmarshaling.
-func wrapNestedApplyOps(ops []db.Oplog) (bson.RawD, error) {
+func wrapNestedApplyOps(ops []db.Oplog) (bson.D, error) {
 	cmd := &nestedApplyOps{ApplyOps: ops}
 
 	// Typed data to bytes
@@ -256,7 +292,7 @@ func wrapNestedApplyOps(ops []db.Oplog) (bson.RawD, error) {
 	}
 
 	// Bytes to doc
-	var doc bson.RawD
+	var doc bson.D
 	err = bson.Unmarshal(raw, &doc)
 	if err != nil {
 		return nil, fmt.Errorf("cannot reunmarshal nested applyOps op: %s", err)

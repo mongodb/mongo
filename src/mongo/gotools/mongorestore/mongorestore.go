@@ -226,6 +226,20 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 			"cannot specify a negative number of insertion workers per collection")
 	}
 
+	if restore.OutputOptions.PreserveUUID {
+		if !restore.OutputOptions.Drop {
+			return fmt.Errorf("cannot specify --preserveUUID without --drop")
+		}
+
+		ok, err := restore.SessionProvider.SupportsCollectionUUID()
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("target host does not support --preserveUUID")
+		}
+	}
+
 	// a single dash signals reading from stdin
 	if restore.TargetDirectory == "-" {
 		if restore.InputOptions.Archive != "" {

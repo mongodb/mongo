@@ -131,6 +131,17 @@ func TestOplogRestore(t *testing.T) {
 		t.Fatalf("No server available")
 	}
 
+	session, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
+	defer session.Close()
+	fcv := testutil.GetFCV(session)
+	var shouldPreserveUUID bool
+	if cmp, err := testutil.CompareFCV(fcv, "3.6"); err != nil || cmp >= 0 {
+		shouldPreserveUUID = true
+	}
+
 	Convey("With a test MongoRestore", t, func() {
 		inputOptions := &InputOptions{
 			Directory:   "testdata/oplogdump",
@@ -140,6 +151,7 @@ func TestOplogRestore(t *testing.T) {
 			NumParallelCollections: 1,
 			NumInsertionWorkers:    1,
 			Drop:                   true,
+			PreserveUUID:           shouldPreserveUUID,
 		}
 		nsOptions := &NSOptions{}
 		provider, toolOpts, err := testutil.GetBareSessionProvider()
@@ -168,5 +180,43 @@ func TestOplogRestore(t *testing.T) {
 		count, err := c1.Count()
 		So(err, ShouldBeNil)
 		So(count, ShouldEqual, 10)
+	})
+}
+
+func TestOplogRestoreTools2002(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
+	_, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
+
+	Convey("With a test MongoRestore", t, func() {
+		inputOptions := &InputOptions{
+			Directory:   "testdata/tools-2002",
+			OplogReplay: true,
+		}
+		outputOptions := &OutputOptions{
+			NumParallelCollections: 1,
+			NumInsertionWorkers:    1,
+			Drop:                   true,
+		}
+		nsOptions := &NSOptions{}
+		provider, toolOpts, err := testutil.GetBareSessionProvider()
+		if err != nil {
+			log.Logvf(log.Always, "error connecting to host: %v", err)
+			os.Exit(util.ExitError)
+		}
+		restore := MongoRestore{
+			ToolOptions:     toolOpts,
+			OutputOptions:   outputOptions,
+			InputOptions:    inputOptions,
+			NSOptions:       nsOptions,
+			SessionProvider: provider,
+			TargetDirectory: inputOptions.Directory,
+		}
+
+		// Run mongorestore
+		err = restore.Restore()
+		So(err, ShouldBeNil)
 	})
 }

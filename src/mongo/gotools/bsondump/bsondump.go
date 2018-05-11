@@ -10,16 +10,19 @@ package bsondump
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/failpoint"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
-	"io"
-	"os"
-	"strings"
 )
 
 // BSONDump is a container for the user-specified options and
@@ -130,6 +133,10 @@ func (bd *BSONDump) JSON() (int, error) {
 			}
 		}
 		numFound++
+		if failpoint.Enabled(failpoint.SlowBSONDump) {
+			time.Sleep(2 * time.Second)
+		}
+
 	}
 	if err := decodedStream.Err(); err != nil {
 		return numFound, err
