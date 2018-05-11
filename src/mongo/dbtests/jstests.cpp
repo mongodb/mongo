@@ -46,7 +46,9 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/future.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 using std::cout;
@@ -950,6 +952,57 @@ public:
             caught = true;
         }
         ASSERT(caught);
+    }
+};
+
+class SleepInterruption {
+public:
+    void run() {
+        std::shared_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
+
+        Promise<void> sleepPromise{};
+        auto sleepFuture = sleepPromise.getFuture();
+
+        Promise<void> awakenedPromise{};
+        auto awakenedFuture = awakenedPromise.getFuture();
+
+        // Spawn a thread which attempts to sleep indefinitely.
+        stdx::thread([
+            preSleep = std::move(sleepPromise),
+            onAwake = std::move(awakenedPromise),
+            scope
+        ]() mutable {
+            preSleep.emplaceValue();
+            onAwake.setWith([&] {
+                scope->exec(
+                    ""
+                    "  try {"
+                    "    sleep(99999999999);"
+                    "  } finally {"
+                    "    throw \"FAILURE\";"
+                    "  }"
+                    "",
+                    "test",
+                    false,
+                    false,
+                    true);
+            });
+        }).detach();
+
+        // Wait until just before the sleep begins.
+        sleepFuture.get();
+
+        // Attempt to wait until Javascript enters the sleep.
+        // It's OK if we kill the function prematurely, before it begins sleeping. Either cause of
+        // death will emit an error with the Interrupted code.
+        sleepsecs(1);
+
+        // Send the operation a kill signal.
+        scope->kill();
+
+        // Wait for the error.
+        auto result = awakenedFuture.getNoThrow();
+        ASSERT_EQ(ErrorCodes::Interrupted, result);
     }
 };
 
@@ -2428,6 +2481,7 @@ public:
         add<ExecTimeout>();
         add<ExecNoTimeout>();
         add<InvokeTimeout>();
+        add<SleepInterruption>();
         add<InvokeNoTimeout>();
 
         add<ObjectMapping>();

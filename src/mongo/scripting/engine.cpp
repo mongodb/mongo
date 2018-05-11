@@ -446,6 +446,9 @@ public:
     void requireOwnedObjects() override {
         _real->requireOwnedObjects();
     }
+    void kill() {
+        _real->kill();
+    }
     bool isKillPending() const {
         return _real->isKillPending();
     }

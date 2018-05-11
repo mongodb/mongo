@@ -92,7 +92,7 @@ public:
 
     void reset() override;
 
-    void kill();
+    void kill() override;
 
     void interrupt();
 
@@ -353,6 +353,8 @@ public:
 
         static ASANHandles* getThreadASANHandles();
     };
+
+    void setStatus(Status status);
 
 private:
     template <typename ImplScopeFunction>

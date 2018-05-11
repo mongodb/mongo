@@ -113,6 +113,11 @@ public:
 
     void reset() override;
 
+    /**
+     * Thread safe. Kills the running operation
+     */
+    void kill() override;
+
     bool isKillPending() const override;
 
     void registerOperation(OperationContext* opCtx) override;
@@ -172,11 +177,6 @@ public:
     ScriptingFunction _createFunction(const char* code) override;
 
     OperationContext* getOpContext() const;
-
-    /**
-     * Thread safe. Kills the running operation
-     */
-    void kill();
 
     void interrupt();
 
