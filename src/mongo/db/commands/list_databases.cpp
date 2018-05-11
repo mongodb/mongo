@@ -35,6 +35,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -154,7 +155,8 @@ public:
                 const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
                 invariant(entry);
 
-                size = entry->sizeOnDisk(opCtx);
+                writeConflictRetry(
+                    opCtx, "sizeOnDisk", dbname, [&] { size = entry->sizeOnDisk(opCtx); });
                 b.append("sizeOnDisk", static_cast<double>(size));
 
                 b.appendBool("empty", entry->isEmpty());
