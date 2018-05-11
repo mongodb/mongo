@@ -252,6 +252,10 @@ private:
     const bool _maintenanceModeSet;
 };
 
+bool hasClusterTime(BSONObj metadata) {
+    return metadata.hasField(rpc::LogicalTimeMetadata::fieldName());
+}
+
 // Called from the error contexts where request may not be available.
 // It only attaches clusterTime and operationTime.
 void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadataBob) {
@@ -271,8 +275,10 @@ void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadat
             } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
                 auto currentTime =
                     validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
+                if (currentTime.getKeyId() != 0) {
+                    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                    logicalTimeMetadata.writeToMetadata(metadataBob);
+                }
             }
         }
     }
@@ -310,8 +316,11 @@ void appendReplyMetadata(OperationContext* opCtx,
             } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
                 auto currentTime =
                     validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
+                // Do not add $clusterTime if the signature and keyId is dummy.
+                if (currentTime.getKeyId() != 0) {
+                    rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+                    logicalTimeMetadata.writeToMetadata(metadataBob);
+                }
             }
         }
     }
@@ -530,22 +539,23 @@ bool runCommandImpl(OperationContext* opCtx,
 
     Command::appendCommandStatus(inPlaceReplyBob, result);
 
-    auto operationTime = computeOperationTime(
-        opCtx, startOperationTime, repl::ReadConcernArgs::get(opCtx).getLevel());
+    BSONObjBuilder metadataBob;
+    appendReplyMetadata(opCtx, request, &metadataBob);
+    auto metadata = metadataBob.done();
 
-    // An uninitialized operation time means the cluster time is not propagated, so the operation
-    // time should not be attached to the response.
-    if (operationTime != LogicalTime::kUninitialized &&
+    if (hasClusterTime(metadata) &&
         (serverGlobalParams.featureCompatibility.getVersion() ==
          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        operationTime.appendAsOperationTime(&inPlaceReplyBob);
+        auto operationTime = computeOperationTime(
+            opCtx, startOperationTime, repl::ReadConcernArgs::get(opCtx).getLevel());
+
+        if (operationTime != LogicalTime::kUninitialized) {
+            operationTime.appendAsOperationTime(&inPlaceReplyBob);
+        }
     }
 
     inPlaceReplyBob.doneFast();
-
-    BSONObjBuilder metadataBob;
-    appendReplyMetadata(opCtx, request, &metadataBob);
-    replyBuilder->setMetadata(metadataBob.done());
+    replyBuilder->setMetadata(metadata);
 
     return result;
 }
@@ -775,35 +785,37 @@ void execCommandDatabase(OperationContext* opCtx,
 
         BSONObjBuilder metadataBob;
         appendReplyMetadata(opCtx, request, &metadataBob);
-
-        // Note: the read concern may not have been successfully or yet placed on the opCtx, so
-        // parsing it separately here.
-        const std::string db = request.getDatabase().toString();
-        auto readConcernArgsStatus = _extractReadConcern(
-            request.body, command->supportsNonLocalReadConcern(db, request.body));
-        auto operationTime = readConcernArgsStatus.isOK()
-            ? computeOperationTime(
-                  opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())
-            : LogicalClock::get(opCtx)->getClusterTime();
+        auto metadata = metadataBob.obj();
 
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
-        if (operationTime != LogicalTime::kUninitialized &&
+        if (hasClusterTime(metadata) &&
             (serverGlobalParams.featureCompatibility.getVersion() ==
              ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
+
+            // Note: the read concern may not have been successfully or yet placed on the opCtx, so
+            // parsing it separately here.
+            const std::string db = request.getDatabase().toString();
+            auto readConcernArgsStatus = _extractReadConcern(
+                request.body, command->supportsNonLocalReadConcern(db, request.body));
+            auto operationTime = readConcernArgsStatus.isOK()
+                ? computeOperationTime(
+                      opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())
+                : LogicalClock::get(opCtx)->getClusterTime();
+
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '" << command->getRedactedCopyForLogging(request.body)
                    << "' and operationTime '" << operationTime.toString() << "': " << e.toString();
 
-            _generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj(), operationTime);
+            _generateErrorResponse(opCtx, replyBuilder, e, metadata, operationTime);
         } else {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '" << command->getRedactedCopyForLogging(request.body)
                    << "': " << e.toString();
 
-            _generateErrorResponse(opCtx, replyBuilder, e, metadataBob.obj());
+            _generateErrorResponse(opCtx, replyBuilder, e, metadata);
         }
     }
 }
@@ -836,14 +848,20 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
             if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
                 throw;
 
-            auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
             BSONObjBuilder metadataBob;
             appendReplyMetadataOnError(opCtx, &metadataBob);
+            auto metadata = metadataBob.obj();
+
             // Otherwise, reply with the parse error. This is useful for cases where parsing fails
             // due to user-supplied input, such as the document too deep error. Since we failed
             // during parsing, we can't log anything about the command.
             LOG(1) << "assertion while parsing command: " << ex.toString();
-            _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadataBob.obj(), operationTime);
+            if (hasClusterTime(metadata)) {
+                auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+                _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, operationTime);
+            } else {
+                _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata);
+            }
 
             return;  // From lambda. Don't try executing if parsing failed.
         }
@@ -878,11 +896,17 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
         } catch (const DBException& ex) {
             BSONObjBuilder metadataBob;
             appendReplyMetadataOnError(opCtx, &metadataBob);
-            auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
-            LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
-                   << "on database '" << request.getDatabase() << "': " << ex.toString();
+            auto metadata = metadataBob.obj();
 
-            _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadataBob.obj(), operationTime);
+            if (hasClusterTime(metadata)) {
+                auto operationTime = LogicalClock::get(opCtx)->getClusterTime();
+                LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+                       << "on database '" << request.getDatabase() << "': " << ex.toString();
+
+                _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata, operationTime);
+            } else {
+                _generateErrorResponse(opCtx, replyBuilder.get(), ex, metadata);
+            }
         }
     }();
 

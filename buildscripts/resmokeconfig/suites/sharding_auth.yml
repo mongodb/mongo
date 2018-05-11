@@ -33,6 +33,8 @@ selector:
   - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js       # SERVER-21713
   - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
+  # Runs with auth enabled.
+  - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
 
 executor:
   config:
