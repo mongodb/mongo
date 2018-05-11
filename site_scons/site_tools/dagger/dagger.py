@@ -48,19 +48,6 @@ LIB_DB = [] # Stores every SCons library nodes
 OBJ_DB = [] # Stores every SCons object file node
 EXE_DB = {} # Stores every SCons executable node, with the object files that build into it {Executable: [object files]}
 
-
-class DependencyCycleError(SCons.Errors.UserError):
-    """Exception representing a cycle discovered in library dependencies."""
-
-    def __init__(self, first_node):
-        super(DependencyCycleError, self).__init__()
-        self.cycle_nodes = [first_node]
-
-    def __str__(self):
-        return "Library dependency cycle detected: " + " => ".join(
-            str(n) for n in self.cycle_nodes)
-
-
 def list_process(items):
     """From WIL, converts lists generated from an NM command with unicode strings to lists
     with ascii strings
@@ -146,28 +133,12 @@ def __compute_libdeps(node):
     the attribute that it uses is populated by the Libdeps.py script
     """
 
-    if getattr(node.attributes, 'libdeps_exploring', False):
-        raise DependencyCycleError(node)
-
     env = node.get_env()
     deps = set()
-    node.attributes.libdeps_exploring = True
-    try:
-        try:
-            for child in env.Flatten(getattr(node.attributes, 'libdeps_direct',
-                                             [])):
-                if not child:
-                    continue
-                deps.add(child)
-
-        except DependencyCycleError as e:
-            if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[
-                    -1]:
-                e.cycle_nodes.insert(0, node)
-
-            logging.error("Found a dependency cycle" + str(e.cycle_nodes))
-    finally:
-        node.attributes.libdeps_exploring = False
+    for child in env.Flatten(getattr(node.attributes, 'libdeps_direct', [])):
+        if not child:
+            continue
+        deps.add(child)
 
     return deps
 
