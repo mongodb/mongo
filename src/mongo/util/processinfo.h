@@ -159,12 +159,6 @@ public:
     static bool blockInMemory(const void* start);
 
     /**
-     * Returns a positive floating point number between 0.0 and 1.0 that
-     * reflects the maximum percentage of RAM the filesystem cache is allowed to grow.
-     */
-    static double getMaxSystemFileCachePercentage();
-
-    /**
      * Returns a positive floating point number between 0.0 and 1.0 to inform MMapV1 how much it
      * must remap pages to bring the system page file implementation back below a certain
      * threshold. A number of 1.0 means remap everything.

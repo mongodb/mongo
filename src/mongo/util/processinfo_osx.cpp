@@ -118,10 +118,6 @@ int ProcessInfo::getResidentSize() {
     return (int)(ti.resident_size / (1024 * 1024));
 }
 
-double ProcessInfo::getMaxSystemFileCachePercentage() {
-    return 0.0;
-}
-
 double ProcessInfo::getSystemMemoryPressurePercentage() {
     return 0.0;
 }
