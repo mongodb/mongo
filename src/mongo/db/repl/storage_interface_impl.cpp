@@ -59,6 +59,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_clock.h"
@@ -568,112 +569,121 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     auto isFind = mode == FindDeleteMode::kFind;
     auto opStr = isFind ? "StorageInterfaceImpl::find" : "StorageInterfaceImpl::delete";
 
+    return writeConflictRetry(
+        opCtx, opStr, nsOrUUID.toString(), [&]() -> StatusWith<std::vector<BSONObj>> {
+            // We need to explicitly use this in a few places to help the type inference.  Use a
+            // shorthand.
+            using Result = StatusWith<std::vector<BSONObj>>;
 
-    return writeConflictRetry(opCtx, opStr, nsOrUUID.toString(), [&] {
-        // We need to explicitly use this in a few places to help the type inference.  Use a
-        // shorthand.
-        using Result = StatusWith<std::vector<BSONObj>>;
+            auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
+            AutoGetCollection autoColl(opCtx, nsOrUUID, collectionAccessMode);
+            auto collectionResult = getCollection(
+                autoColl, nsOrUUID, str::stream() << "Unable to proceed with " << opStr << ".");
+            if (!collectionResult.isOK()) {
+                return Result(collectionResult.getStatus());
+            }
+            auto collection = collectionResult.getValue();
 
-        auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-        AutoGetCollection autoColl(opCtx, nsOrUUID, collectionAccessMode);
-        auto collectionResult = getCollection(
-            autoColl, nsOrUUID, str::stream() << "Unable to proceed with " << opStr << ".");
-        if (!collectionResult.isOK()) {
-            return Result(collectionResult.getStatus());
-        }
-        auto collection = collectionResult.getValue();
+            auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
+            auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
 
-        auto isForward = scanDirection == StorageInterface::ScanDirection::kForward;
-        auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
-
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor;
-        if (!indexName) {
-            if (!startKey.isEmpty()) {
-                return Result(ErrorCodes::NoSuchKey,
-                              "non-empty startKey not allowed for collection scan");
-            }
-            if (boundInclusion != BoundInclusion::kIncludeStartKeyOnly) {
-                return Result(ErrorCodes::InvalidOptions,
-                              "bound inclusion must be BoundInclusion::kIncludeStartKeyOnly for "
-                              "collection scan");
-            }
-            // Use collection scan.
-            planExecutor = isFind
-                ? InternalPlanner::collectionScan(
-                      opCtx, nsOrUUID.toString(), collection, PlanExecutor::NO_YIELD, direction)
-                : InternalPlanner::deleteWithCollectionScan(
-                      opCtx,
-                      collection,
-                      makeDeleteStageParamsForDeleteDocuments(),
-                      PlanExecutor::NO_YIELD,
-                      direction);
-        } else {
-            // Use index scan.
-            auto indexCatalog = collection->getIndexCatalog();
-            invariant(indexCatalog);
-            bool includeUnfinishedIndexes = false;
-            IndexDescriptor* indexDescriptor =
-                indexCatalog->findIndexByName(opCtx, *indexName, includeUnfinishedIndexes);
-            if (!indexDescriptor) {
-                return Result(ErrorCodes::IndexNotFound,
-                              str::stream() << "Index not found, ns:" << nsOrUUID.toString()
-                                            << ", index: "
-                                            << *indexName);
-            }
-            if (indexDescriptor->isPartial()) {
-                return Result(ErrorCodes::IndexOptionsConflict,
-                              str::stream()
-                                  << "Partial index is not allowed for this operation, ns:"
-                                  << nsOrUUID.toString()
-                                  << ", index: "
-                                  << *indexName);
-            }
-
-            KeyPattern keyPattern(indexDescriptor->keyPattern());
-            auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
-            auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
-            auto bounds =
-                isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
-            if (!startKey.isEmpty()) {
-                bounds.first = startKey;
-            }
-            if (!endKey.isEmpty()) {
-                bounds.second = endKey;
-            }
-            planExecutor = isFind
-                ? InternalPlanner::indexScan(opCtx,
-                                             collection,
-                                             indexDescriptor,
-                                             bounds.first,
-                                             bounds.second,
-                                             boundInclusion,
-                                             PlanExecutor::NO_YIELD,
-                                             direction,
-                                             InternalPlanner::IXSCAN_FETCH)
-                : InternalPlanner::deleteWithIndexScan(opCtx,
-                                                       collection,
-                                                       makeDeleteStageParamsForDeleteDocuments(),
-                                                       indexDescriptor,
-                                                       bounds.first,
-                                                       bounds.second,
-                                                       boundInclusion,
-                                                       PlanExecutor::NO_YIELD,
-                                                       direction);
-        }
-
-        std::vector<BSONObj> docs;
-        while (docs.size() < limit) {
-            BSONObj doc;
-            auto state = planExecutor->getNext(&doc, nullptr);
-            if (PlanExecutor::ADVANCED == state) {
-                docs.push_back(doc.getOwned());
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor;
+            if (!indexName) {
+                if (!startKey.isEmpty()) {
+                    return Result(ErrorCodes::NoSuchKey,
+                                  "non-empty startKey not allowed for collection scan");
+                }
+                if (boundInclusion != BoundInclusion::kIncludeStartKeyOnly) {
+                    return Result(
+                        ErrorCodes::InvalidOptions,
+                        "bound inclusion must be BoundInclusion::kIncludeStartKeyOnly for "
+                        "collection scan");
+                }
+                // Use collection scan.
+                planExecutor = isFind
+                    ? InternalPlanner::collectionScan(
+                          opCtx, nsOrUUID.toString(), collection, PlanExecutor::NO_YIELD, direction)
+                    : InternalPlanner::deleteWithCollectionScan(
+                          opCtx,
+                          collection,
+                          makeDeleteStageParamsForDeleteDocuments(),
+                          PlanExecutor::NO_YIELD,
+                          direction);
             } else {
-                invariant(PlanExecutor::IS_EOF == state);
-                break;
+                // Use index scan.
+                auto indexCatalog = collection->getIndexCatalog();
+                invariant(indexCatalog);
+                bool includeUnfinishedIndexes = false;
+                IndexDescriptor* indexDescriptor =
+                    indexCatalog->findIndexByName(opCtx, *indexName, includeUnfinishedIndexes);
+                if (!indexDescriptor) {
+                    return Result(ErrorCodes::IndexNotFound,
+                                  str::stream() << "Index not found, ns:" << nsOrUUID.toString()
+                                                << ", index: "
+                                                << *indexName);
+                }
+                if (indexDescriptor->isPartial()) {
+                    return Result(ErrorCodes::IndexOptionsConflict,
+                                  str::stream()
+                                      << "Partial index is not allowed for this operation, ns:"
+                                      << nsOrUUID.toString()
+                                      << ", index: "
+                                      << *indexName);
+                }
+
+                KeyPattern keyPattern(indexDescriptor->keyPattern());
+                auto minKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, false));
+                auto maxKey = Helpers::toKeyFormat(keyPattern.extendRangeBound({}, true));
+                auto bounds =
+                    isForward ? std::make_pair(minKey, maxKey) : std::make_pair(maxKey, minKey);
+                if (!startKey.isEmpty()) {
+                    bounds.first = startKey;
+                }
+                if (!endKey.isEmpty()) {
+                    bounds.second = endKey;
+                }
+                planExecutor = isFind ? InternalPlanner::indexScan(opCtx,
+                                                                   collection,
+                                                                   indexDescriptor,
+                                                                   bounds.first,
+                                                                   bounds.second,
+                                                                   boundInclusion,
+                                                                   PlanExecutor::NO_YIELD,
+                                                                   direction,
+                                                                   InternalPlanner::IXSCAN_FETCH)
+                                      : InternalPlanner::deleteWithIndexScan(
+                                            opCtx,
+                                            collection,
+                                            makeDeleteStageParamsForDeleteDocuments(),
+                                            indexDescriptor,
+                                            bounds.first,
+                                            bounds.second,
+                                            boundInclusion,
+                                            PlanExecutor::NO_YIELD,
+                                            direction);
             }
-        }
-        return Result(docs);
-    });
+
+            std::vector<BSONObj> docs;
+            BSONObj out;
+            PlanExecutor::ExecState state = PlanExecutor::ExecState::ADVANCED;
+            while (state == PlanExecutor::ExecState::ADVANCED && docs.size() < limit) {
+                state = planExecutor->getNext(&out, nullptr);
+                if (state == PlanExecutor::ExecState::ADVANCED) {
+                    docs.push_back(out.getOwned());
+                }
+            }
+
+            switch (state) {
+                case PlanExecutor::ADVANCED:
+                case PlanExecutor::IS_EOF:
+                    return Result(docs);
+                case PlanExecutor::FAILURE:
+                case PlanExecutor::DEAD:
+                    return WorkingSetCommon::getMemberObjectStatus(out);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        });
 }
 
 StatusWith<BSONObj> _findOrDeleteById(OperationContext* opCtx,

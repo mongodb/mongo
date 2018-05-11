@@ -53,6 +53,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace {
@@ -1004,7 +1005,7 @@ void _assertDocumentsEqual(const StatusWith<std::vector<BSONObj>>& statusWithDoc
 /**
  * Returns first BSONObj from a StatusWith<std::vector<BSONObj>>.
  */
-BSONObj _assetGetFront(const StatusWith<std::vector<BSONObj>>& statusWithDocs) {
+BSONObj _assertGetFront(const StatusWith<std::vector<BSONObj>>& statusWithDocs) {
     auto&& docs = statusWithDocs.getValue();
     ASSERT_FALSE(docs.empty());
     return docs.front();
@@ -1029,13 +1030,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             {},
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              {},
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     // startKey not provided. limit is 0.
     _assertDocumentsEqual(storage.findDocuments(opCtx,
@@ -1060,75 +1061,75 @@ TEST_F(StorageInterfaceImplTest,
     // startKey provided; include start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 0),
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 0),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 1),
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 1),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 0.5),
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 0.5),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     // startKey provided; include both start and end keys
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 1),
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 1),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     // startKey provided; exclude start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 1),
-                                             BoundInclusion::kIncludeEndKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 1),
+                                              BoundInclusion::kIncludeEndKeyOnly,
+                                              1U)));
 
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 1.5),
-                                             BoundInclusion::kIncludeEndKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 1.5),
+                                              BoundInclusion::kIncludeEndKeyOnly,
+                                              1U)));
 
     // startKey provided; exclude both start and end keys
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kForward,
-                                             BSON("" << 1),
-                                             BoundInclusion::kExcludeBothStartAndEndKeys,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kForward,
+                                              BSON("" << 1),
+                                              BoundInclusion::kExcludeBothStartAndEndKeys,
+                                              1U)));
 
     // startKey provided; exclude both start and end keys.
     // A limit of 3 should return 2 documents because we reached the end of the collection.
@@ -1166,13 +1167,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 4),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             {},
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              {},
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     // startKey not provided. limit is 0.
     _assertDocumentsEqual(storage.findDocuments(opCtx,
@@ -1197,55 +1198,55 @@ TEST_F(StorageInterfaceImplTest,
     // startKey provided; include start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 4),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             BSON("" << 4),
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              BSON("" << 4),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 3),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             BSON("" << 3),
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              BSON("" << 3),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     // startKey provided; include both start and end keys
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 4),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             BSON("" << 4),
-                                             BoundInclusion::kIncludeBothStartAndEndKeys,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              BSON("" << 4),
+                                              BoundInclusion::kIncludeBothStartAndEndKeys,
+                                              1U)));
 
     // startKey provided; exclude start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             BSON("" << 3),
-                                             BoundInclusion::kIncludeEndKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              BSON("" << 3),
+                                              BoundInclusion::kIncludeEndKeyOnly,
+                                              1U)));
 
     // startKey provided; exclude both start and end keys
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             indexName,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             BSON("" << 3),
-                                             BoundInclusion::kExcludeBothStartAndEndKeys,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              indexName,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              BSON("" << 3),
+                                              BoundInclusion::kExcludeBothStartAndEndKeys,
+                                              1U)));
 
     // startKey provided; exclude both start and end keys.
     // A limit of 3 should return 2 documents because we reached the beginning of the collection.
@@ -1278,13 +1279,13 @@ TEST_F(StorageInterfaceImplTest,
                                  {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             boost::none,
-                                             StorageInterface::ScanDirection::kForward,
-                                             {},
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              boost::none,
+                                              StorageInterface::ScanDirection::kForward,
+                                              {},
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     // Check collection contents. OplogInterface returns documents in reverse natural order.
     OplogInterfaceLocal oplog(opCtx, nss.ns());
@@ -1309,13 +1310,13 @@ TEST_F(StorageInterfaceImplTest,
                                  {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        _assetGetFront(storage.findDocuments(opCtx,
-                                             nss,
-                                             boost::none,
-                                             StorageInterface::ScanDirection::kBackward,
-                                             {},
-                                             BoundInclusion::kIncludeStartKeyOnly,
-                                             1U)));
+        _assertGetFront(storage.findDocuments(opCtx,
+                                              nss,
+                                              boost::none,
+                                              StorageInterface::ScanDirection::kBackward,
+                                              {},
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              1U)));
 
     _assertDocumentsInCollectionEquals(
         opCtx, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)});
@@ -1442,13 +1443,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               indexName,
-                                               StorageInterface::ScanDirection::kForward,
-                                               {},
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(opCtx,
                                        nss,
@@ -1483,13 +1484,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey provided; include start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               indexName,
-                                               StorageInterface::ScanDirection::kForward,
-                                               BSON("" << 2),
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                BSON("" << 2),
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(opCtx,
                                        nss,
@@ -1503,13 +1504,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey provided; exclude start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 5),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               indexName,
-                                               StorageInterface::ScanDirection::kForward,
-                                               BSON("" << 4),
-                                               BoundInclusion::kIncludeEndKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                BSON("" << 4),
+                                                BoundInclusion::kIncludeEndKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(
         opCtx,
@@ -1553,13 +1554,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 7),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               indexName,
-                                               StorageInterface::ScanDirection::kBackward,
-                                               {},
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(opCtx,
                                        nss,
@@ -1594,13 +1595,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey provided; include start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 5),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               indexName,
-                                               StorageInterface::ScanDirection::kBackward,
-                                               BSON("" << 5),
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                BSON("" << 5),
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(opCtx,
                                        nss,
@@ -1614,13 +1615,13 @@ TEST_F(StorageInterfaceImplTest,
     // startKey provided; exclude start key
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               indexName,
-                                               StorageInterface::ScanDirection::kBackward,
-                                               BSON("" << 3),
-                                               BoundInclusion::kIncludeEndKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                BSON("" << 3),
+                                                BoundInclusion::kIncludeEndKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(
         opCtx,
@@ -1656,13 +1657,13 @@ TEST_F(StorageInterfaceImplTest,
                                  {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               boost::none,
-                                               StorageInterface::ScanDirection::kForward,
-                                               {},
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                boost::none,
+                                                StorageInterface::ScanDirection::kForward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 2), BSON("_id" << 0)});
 }
@@ -1681,13 +1682,13 @@ TEST_F(StorageInterfaceImplTest,
                                  {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        _assetGetFront(storage.deleteDocuments(opCtx,
-                                               nss,
-                                               boost::none,
-                                               StorageInterface::ScanDirection::kBackward,
-                                               {},
-                                               BoundInclusion::kIncludeStartKeyOnly,
-                                               1U)));
+        _assertGetFront(storage.deleteDocuments(opCtx,
+                                                nss,
+                                                boost::none,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                1U)));
 
     _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 1), BSON("_id" << 2)});
 }
@@ -1974,6 +1975,26 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsDocumentWhenDocumentExists) {
     ASSERT_BSONOBJ_EQ(doc2,
                       unittest::assertGet(storage.findById(
                           opCtx, {nss.db().toString(), *options.uuid}, doc2["_id"])));
+}
+
+TEST_F(StorageInterfaceImplTest, FindByIdReturnsBadStatusIfPlanExecutorFails) {
+    auto opCtx = getOperationContext();
+    auto nss = makeNamespace(_agent);
+    auto options = generateOptionsWithUuid();
+
+    StorageInterfaceImpl storage;
+    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    auto doc1 = BSON("_id" << 0 << "x" << 0);
+    auto doc2 = BSON("_id" << 1 << "x" << 1);
+    auto doc3 = BSON("_id" << 2 << "x" << 2);
+    ASSERT_OK(storage.insertDocuments(opCtx,
+                                      nss,
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc2, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc3, Timestamp(0), OpTime::kUninitializedTerm}}));
+
+    FailPointEnableBlock planExecKiller("planExecutorAlwaysFails");
+    ASSERT_NOT_OK(storage.findById(opCtx, nss, doc2["_id"]));
 }
 
 TEST_F(StorageInterfaceImplTest, DeleteByIdThrowsIfUUIDNotInCatalog) {
