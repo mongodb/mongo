@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -103,7 +104,7 @@ private:
 };
 
 std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return stdx::make_unique<WiredTigerRecoveryUnitHarnessHelper>();
+    return std::make_unique<WiredTigerRecoveryUnitHarnessHelper>();
 }
 
 MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {

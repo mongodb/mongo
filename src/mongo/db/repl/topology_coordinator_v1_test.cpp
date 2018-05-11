@@ -74,16 +74,16 @@ public:
     virtual void setUp() {
         _options = TopologyCoordinator::Options{};
         _options.maxSyncSourceLagSecs = Seconds{100};
-        _topo.reset(new TopologyCoordinator(_options));
+        _topo = std::make_unique<TopologyCoordinator>(_options);
         _now = Date_t();
         _selfIndex = -1;
-        _cbData.reset(new executor::TaskExecutor::CallbackArgs(
-            NULL, executor::TaskExecutor::CallbackHandle(), Status::OK()));
+        _cbData = std::make_unique<executor::TaskExecutor::CallbackArgs>(
+            nullptr, executor::TaskExecutor::CallbackHandle(), Status::OK());
     }
 
     virtual void tearDown() {
-        _topo.reset(NULL);
-        _cbData.reset(NULL);
+        _topo = nullptr;
+        _cbData = nullptr;
     }
 
 protected:

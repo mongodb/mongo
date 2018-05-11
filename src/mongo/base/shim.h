@@ -146,7 +146,7 @@ const bool checkShimsViaTUHook = false;
             struct LibTUHookTypeBase {                                                            \
                 LibTUHookTypeBase();                                                              \
             };                                                                                    \
-            template <bool required = mongo::checkShimsViaTUHook>                                 \
+            template <bool required = true>                                                       \
             struct LibTUHookType : LibTUHookTypeBase {};                                          \
             using LibTUHook = LibTUHookType<>;                                                    \
             struct ImplTUHookTypeBase {                                                           \
@@ -166,7 +166,7 @@ const bool checkShimsViaTUHook = false;
                 return this;                                                                      \
             }                                                                                     \
             MongoShimImplGuts* lib(const LibTUHook* const) {                                      \
-                MONGO_SHIM_TU_HOOK(LibTUHook);                                                    \
+                LibTUHook{};                                                                      \
                 return this;                                                                      \
             }                                                                                     \
             MongoShimImplGuts* impl(const ImplTUHook* const) {                                    \

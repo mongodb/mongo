@@ -364,6 +364,7 @@ env.CppUnitTest(
         'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/db/serveronly',
         'catalog_cache_test_fixture',

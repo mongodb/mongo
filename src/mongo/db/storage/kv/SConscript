@@ -118,7 +118,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init'
+        '$BUILD_DIR/mongo/db/auth/authmocks'
     ],
 )
 
@@ -136,7 +136,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init'
+        '$BUILD_DIR/mongo/db/auth/authmocks'
     ],
 )
 
@@ -146,6 +146,7 @@ env.CppUnitTest(
         'kv_storage_engine_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repair_database',

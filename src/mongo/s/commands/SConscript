@@ -95,7 +95,8 @@ env.Library(
         env.Idlc('cluster_multicast.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/saslauth',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/commands/current_op_common',
         '$BUILD_DIR/mongo/db/commands/servers',
@@ -125,7 +126,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'shared_cluster_commands',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -140,7 +141,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'shared_cluster_commands',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -154,7 +155,8 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'cluster_commands',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/auth/saslauth',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
     ],

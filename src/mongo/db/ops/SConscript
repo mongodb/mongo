@@ -67,6 +67,7 @@ env.CppUnitTest(
     target='write_ops_retryability_test',
     source='write_ops_retryability_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',

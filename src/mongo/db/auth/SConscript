@@ -17,15 +17,44 @@ env.Library('auth_rolename', ['role_name.cpp'],
 )
 
 env.Library(
-    target = 'authentication_restriction',
-    source = [
+    target='authentication_restriction',
+    source=[
         'restriction_environment.cpp',
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
+
+env.CppUnitTest(
+    target='restriction_test',
+    source='restriction_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'authentication_restriction',
+    ],
+)
+
+# The Auth library should consist only of the shimmed API for Auth usage and the implementations of
+# the data structures used in that API.  No actual Auth subsystem implementation should exist in
+# this library.
+env.Library(
+    target='auth',
+    source=[
+        'authorization_manager.cpp',
+        'authorization_session.cpp',
+        'auth_decorations.cpp',
+    ],
+    LIBDEPS=[
+        'auth_rolename',
+        'user_name',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/audit_metadata',
+    ],
+)
+
 
 env.Library(
     target='user_name',
@@ -37,55 +66,61 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target = 'restriction_test',
-    source = 'restriction_test.cpp',
-    LIBDEPS = [
+env.Library(
+    target='user',
+    source=[
+        'user.cpp',
+    ],
+    LIBDEPS=[
+        'authprivilege',
         '$BUILD_DIR/mongo/base',
-        'authentication_restriction',
+        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
     ],
 )
 
-
-# Just the data structures used
 env.Library(
-    target='authcore',
+    target='auth_impl_internal_local',
     source=[
-        'authorization_manager.cpp',
-        'authorization_session.cpp',
-        'auth_decorations.cpp',
-        'authz_manager_external_state.cpp',
         'authz_manager_external_state_local.cpp',
+    ],
+    LIBDEPS=[
+        'auth_impl_internal',
+    ],
+)
+
+env.Library(
+    target='auth_impl_internal',
+    source=[
+        'authorization_manager_impl.cpp',
+        'authorization_session_impl.cpp',
+        'authz_manager_external_state.cpp',
         'authz_session_external_state.cpp',
         'role_graph.cpp',
         'role_graph_update.cpp',
         'role_graph_builtin_roles.cpp',
-        'user.cpp',
         'user_document_parser.cpp',
-        'user_management_commands_parser.cpp',
-        'user_set.cpp'
+        'user_set.cpp',
     ],
     LIBDEPS=[
-             'address_restriction',
-             'authprivilege',
-             'auth_rolename',
-             'authentication_restriction',
-             'sasl_options',
-             'user_name',
-             '$BUILD_DIR/mongo/base',
-             '$BUILD_DIR/mongo/base/secure_allocator',
-             '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-             '$BUILD_DIR/mongo/bson/util/bson_extract',
-             '$BUILD_DIR/mongo/db/catalog/document_validation',
-             '$BUILD_DIR/mongo/db/common',
-             '$BUILD_DIR/mongo/db/global_settings',
-             '$BUILD_DIR/mongo/db/namespace_string',
-             '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
-             '$BUILD_DIR/mongo/db/service_context',
-             '$BUILD_DIR/mongo/db/update/update_driver',
-             '$BUILD_DIR/mongo/util/md5',
-             '$BUILD_DIR/mongo/util/icu',
-             '$BUILD_DIR/mongo/util/net/ssl_manager',
+        'address_restriction',
+        'auth',
+        'auth_rolename',
+        'authentication_restriction',
+        'authprivilege',
+        'sasl_options',
+        'user',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/base/secure_allocator',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/global_settings',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/mongo/util/icu',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
     ],
 )
 
@@ -94,11 +129,15 @@ env.Library(
     source=[
         'action_set.cpp',
         'action_type.cpp',
+        'impersonation_session.cpp',
         'privilege.cpp',
         'privilege_parser.cpp',
         'resource_pattern.cpp',
+        'user_management_commands_parser.cpp',
     ],
     LIBDEPS=[
+        'auth',
+        'address_restriction',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
     ]
@@ -121,24 +160,10 @@ env.Library('authorization_manager_global',
                 'authorization_manager_global.cpp',
             ],
             LIBDEPS=[
-                'authcore',
+                'auth',
                 '$BUILD_DIR/mongo/db/server_options_core',
                 '$BUILD_DIR/mongo/db/service_context',
             ])
-
-env.Library(
-    target='authorization_manager_mock_init',
-    source=[
-        'authorization_manager_mock_init.cpp'
-    ],
-    LIBDEPS=[
-        'authcore',
-        'authmocks',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/network_interface_factory'
-    ],
-)
 
 env.Library(
     target='authservercommon',
@@ -148,8 +173,9 @@ env.Library(
         'security_key.cpp',
     ],
     LIBDEPS=[
+        'auth',
         'authcommon',
-        'authcore',
+        'auth_impl_internal',
         'authorization_manager_global',
         'saslauth',
         'security_file',
@@ -187,11 +213,17 @@ env.Library(
         'sasl_scram_server_conversation.cpp',
     ],
     LIBDEPS=[
-        'authcore',
+        'auth',
+        'authprivilege',
         'sasl_options',
+        'user',
+        'user_name',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
+        '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/util/icu',
+        '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
     ],
 )
@@ -209,10 +241,10 @@ env.CppUnitTest(target='sasl_mechanism_registry_test',
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',
              'authz_session_external_state_d.cpp',
-             'impersonation_session.cpp'
             ],
             LIBDEPS=[
                 'authservercommon',
+                'auth_impl_internal_local',
                 '$BUILD_DIR/mongo/db/db_raii',
                 '$BUILD_DIR/mongo/db/dbdirectclient',
                 '$BUILD_DIR/mongo/db/dbhelpers',
@@ -235,32 +267,35 @@ env.Library('authmongos',
 env.Library(
     target='authmocks',
     source=[
-        'authz_manager_external_state_mock.cpp'
+        'authz_manager_external_state_mock.cpp',
+        'authz_session_external_state_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/update/update_driver',
-        'authcore'
+        'auth',
+        'auth_impl_internal',
+        'auth_impl_internal_local',
     ]
 )
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['auth', 'authmocks'])
 env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['auth', 'authmocks'])
 env.CppUnitTest('role_graph_test', 'role_graph_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['auth', 'authmocks'])
 env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['auth', 'authmocks'])
 env.CppUnitTest('user_set_test', 'user_set_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['auth', 'authmocks'])
 env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/transport/transport_layer_common',
                     '$BUILD_DIR/mongo/transport/transport_layer_mock',
-                    'authcore',
-                    'authmocks'
+                    'auth',
+                    'authmocks',
                 ])
 
 env.Library(
@@ -269,7 +304,8 @@ env.Library(
         'authorization_session_for_test.cpp',
     ],
     LIBDEPS=[
-        'authcore',
+        'auth',
+        'auth_impl_internal',
     ]
 )
 
@@ -279,7 +315,7 @@ env.CppUnitTest(
         'authorization_session_test.cpp',
     ],
     LIBDEPS=[
-        'authcore',
+        'auth',
         'authmocks',
         'saslauth',
         'authorization_session_for_test',
@@ -322,6 +358,7 @@ env.CppUnitTest(
     LIBDEPS_PRIVATE=[
         'authmocks',
         'saslauth',
+        'authmocks',
         '$BUILD_DIR/mongo/client/sasl_client',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],

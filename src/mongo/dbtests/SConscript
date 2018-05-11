@@ -118,7 +118,7 @@ dbtest = env.Program(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils",
-        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/auth/authmongod",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/commands/mongod",
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",

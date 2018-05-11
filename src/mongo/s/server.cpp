@@ -528,6 +528,7 @@ ExitCode main(ServiceContext* serviceContext) {
     return runMongosServer(serviceContext);
 }
 
+namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     forkServerOrDie();
@@ -546,11 +547,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion40, ("EndStar
     return Status::OK();
 }
 
-MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* context) {
-    AuthzManagerExternalState::create = &createAuthzManagerExternalStateMongos;
-    return Status::OK();
-}
-
 ServiceContextRegistrar serviceContextCreator([]() {
     auto service = std::make_unique<ServiceContextNoop>();
     service->setTickSource(std::make_unique<SystemTickSource>());
@@ -558,7 +554,6 @@ ServiceContextRegistrar serviceContextCreator([]() {
     service->setPreciseClockSource(std::make_unique<SystemClockSource>());
     return service;
 });
-
 
 #ifdef MONGO_CONFIG_SSL
 MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManager"))
@@ -612,6 +607,7 @@ ExitCode mongoSMain(int argc, char* argv[], char** envp) {
     }
 }
 
+}  // namespace
 }  // namespace mongo
 
 #if defined(_WIN32)

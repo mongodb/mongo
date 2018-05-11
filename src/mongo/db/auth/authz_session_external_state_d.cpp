@@ -66,4 +66,9 @@ bool AuthzSessionExternalStateMongod::serverIsArbiter() const {
         repl::ReplicationCoordinator::get(getGlobalServiceContext())->getMemberState().arbiter());
 }
 
+MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
+(AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
+    return std::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+}
+
 }  // namespace mongo

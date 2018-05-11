@@ -13,6 +13,7 @@
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
@@ -68,8 +69,9 @@ SaslConversation::SaslConversation(std::string mech)
     : opClient(serviceContext.makeClient("saslTest")),
       opCtx(serviceContext.makeOperationContext(opClient.get())),
       authManagerExternalState(new AuthzManagerExternalStateMock),
-      authManager(new AuthorizationManager(
-          std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState))),
+      authManager(new AuthorizationManagerImpl(
+          std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState),
+          AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{})),
       authSession(authManager->makeAuthorizationSession()),
       mechanism(mech) {
 

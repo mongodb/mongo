@@ -46,4 +46,9 @@ void AuthzSessionExternalStateMongos::startRequest(OperationContext* opCtx) {
     _checkShouldAllowLocalhost(opCtx);
 }
 
+MONGO_REGISTER_SHIM(AuthzSessionExternalState::create)
+(AuthorizationManager* const authzManager)->std::unique_ptr<AuthzSessionExternalState> {
+    return std::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+}
+
 }  // namespace mongo

@@ -47,9 +47,13 @@ class OperationContext;
  * easier to test as well as to allow different implementations in mongos and mongod.
  */
 class AuthzSessionExternalState {
-    MONGO_DISALLOW_COPYING(AuthzSessionExternalState);
+    AuthzSessionExternalState(const AuthzSessionExternalState&) = delete;
+    AuthzSessionExternalState& operator=(const AuthzSessionExternalState&) = delete;
 
 public:
+    static MONGO_DECLARE_SHIM(
+        (AuthorizationManager * authzManager)->std::unique_ptr<AuthzSessionExternalState>) create;
+
     virtual ~AuthzSessionExternalState();
 
     AuthorizationManager& getAuthorizationManager();

@@ -51,6 +51,12 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
+()->std::unique_ptr<AuthzManagerExternalState> {
+    return std::make_unique<AuthzManagerExternalStateMongos>();
+}
+
 namespace {
 
 /**

@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -92,14 +93,9 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(startupAuthSchemaValidation, bool, true);
 
 GlobalInitializerRegisterer authorizationManagerInitializer(
     "CreateAuthorizationManager",
-    {"SetupInternalSecurityUser",
-     "OIDGeneration",
-     "CreateAuthorizationExternalStateFactory",
-     "EndStartupOptionStorage",
-     "ServiceContext"},
+    {"SetupInternalSecurityUser", "OIDGeneration", "EndStartupOptionStorage", "ServiceContext"},
     [](InitializerContext* context) {
-        auto authzManager =
-            stdx::make_unique<AuthorizationManager>(AuthzManagerExternalState::create());
+        auto authzManager = AuthorizationManager::create();
         authzManager->setAuthEnabled(serverGlobalParams.authState ==
                                      ServerGlobalParams::AuthState::kEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(startupAuthSchemaValidation);

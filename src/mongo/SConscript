@@ -292,6 +292,8 @@ env.Library(
         "db/db.cpp",
     ],
     LIBDEPS_PRIVATE=[
+        'base',
+        'db/auth/authmongod',
         'db/catalog/health_log',
         'db/commands/mongod',
         'db/commands/mongod_fcv',
@@ -462,8 +464,9 @@ if not has_option('noshell') and usemozjs:
                     "shell/shell_utils_launcher.cpp",
                 ],
                 LIBDEPS=[
-                    'db/logical_session_id_helpers',
                     'db/catalog/index_key_validate',
+                    'db/logical_session_id_helpers',
+                    'db/mongohasher',
                     'db/query/command_request_response',
                     'db/query/query_request',
                     'db/server_options_core',

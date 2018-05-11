@@ -36,7 +36,9 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -189,15 +191,18 @@ protected:
         opCtx = serviceContext->makeOperationContext(client.get());
 
         auto uniqueAuthzManagerExternalStateMock =
-            stdx::make_unique<AuthzManagerExternalStateMock>();
+            std::make_unique<AuthzManagerExternalStateMock>();
         authzManagerExternalState = uniqueAuthzManagerExternalStateMock.get();
-        authzManager = new AuthorizationManager(std::move(uniqueAuthzManagerExternalStateMock));
-        authzSession = stdx::make_unique<AuthorizationSession>(
-            stdx::make_unique<AuthzSessionExternalStateMock>(authzManager));
-        AuthorizationManager::set(serviceContext.get(),
-                                  std::unique_ptr<AuthorizationManager>(authzManager));
+        auto newManager = std::make_unique<AuthorizationManagerImpl>(
+            std::move(uniqueAuthzManagerExternalStateMock),
+            AuthorizationManagerImpl::InstallMockForTestingOrAuthImpl{});
+        authzSession = std::make_unique<AuthorizationSessionImpl>(
+            std::make_unique<AuthzSessionExternalStateMock>(newManager.get()),
+            AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
+        authzManager = newManager.get();
+        AuthorizationManager::set(serviceContext.get(), std::move(newManager));
 
-        saslClientSession = stdx::make_unique<NativeSaslClientSession>();
+        saslClientSession = std::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism,
                                         saslServerSession->mechanismName());
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceName, "mongodb");

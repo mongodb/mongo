@@ -106,12 +106,17 @@ public:
     /**
      * Returns the user name for this user.
      */
-    const UserName& getName() const;
+    const UserName& getName() const {
+        return _name;
+    }
 
     /**
      * Returns a digest of the user's identity
      */
-    const SHA256Block& getDigest() const;
+    const SHA256Block& getDigest() const {
+        return _digest;
+    }
+
 
     /**
      * Returns an iterator over the names of the user's direct roles

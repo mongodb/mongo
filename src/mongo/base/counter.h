@@ -1,5 +1,3 @@
-// counter.h
-
 /**
 *    Copyright (C) 2008-2012 10gen Inc.
 *
@@ -66,4 +64,4 @@ public:
 private:
     AtomicInt64 _counter;
 };
-}
+}  // namespace mongo

@@ -220,6 +220,7 @@ if mmapv1:
         source=['mmap_v1_init_test.cpp',
                 ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/auth/authmocks',
             '$BUILD_DIR/mongo/db/serveronly',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/db/service_context_d',

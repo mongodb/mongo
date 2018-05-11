@@ -120,6 +120,7 @@ if wiredtiger:
         source=['wiredtiger_init_test.cpp',
                 ],
         LIBDEPS=[
+            '$BUILD_DIR/mongo/db/auth/authmocks',
             '$BUILD_DIR/mongo/db/serveronly',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/db/service_context_d',
@@ -168,7 +169,7 @@ if wiredtiger:
     )
 
     # All of these tests fail to compile under undefined behavior
-    # sanitizer due to unexpressed circular dependency edges. In particualr
+    # sanitizer due to unexpressed circular dependency edges. In particular
     # they all need a definition from the 'catalog'.
     if not using_ubsan:
         wtEnv.CppUnitTest(
@@ -217,7 +218,7 @@ if wiredtiger:
                 'wiredtiger_kv_engine_test.cpp',
             ],
             LIBDEPS=[
-                '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+                '$BUILD_DIR/mongo/db/auth/authmocks',
                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
                 'storage_wiredtiger_mock',
             ],

@@ -91,4 +91,9 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                             << query);
 }
 
+MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
+()->std::unique_ptr<AuthzManagerExternalState> {
+    return std::make_unique<AuthzManagerExternalStateMongod>();
+}
+
 }  // namespace mongo

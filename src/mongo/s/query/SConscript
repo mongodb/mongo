@@ -29,7 +29,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'cluster_query',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/catalog_cache_test_fixture',
     ],
@@ -76,7 +76,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'router_exec_stage',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )
@@ -115,7 +115,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'async_results_merger',
         'cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
@@ -130,7 +130,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'async_results_merger',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
@@ -157,7 +157,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'store_possible_cursor',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/util/clock_source_mock',
@@ -171,7 +171,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/generic_cursor',
         '$BUILD_DIR/mongo/db/kill_sessions',
         '$BUILD_DIR/mongo/db/logical_session_cache',
@@ -211,7 +212,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'cluster_client_cursor',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )

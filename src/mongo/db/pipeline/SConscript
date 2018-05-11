@@ -224,7 +224,7 @@ env.CppUnitTest(
         'sequential_document_cache_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
@@ -241,7 +241,7 @@ env.CppUnitTest(
     target='document_source_facet_test',
     source='document_source_facet_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
         'pipeline',
@@ -351,7 +351,7 @@ env.CppUnitTest(
     target='tee_buffer_test',
     source='tee_buffer_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/s/is_mongos',
         'document_source_mock',
@@ -392,7 +392,7 @@ env.CppUnitTest(
         'pipeline_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context',
@@ -503,7 +503,7 @@ env.CppUnitTest(
     source='resume_token_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         'document_sources_idl',
     ],
 )

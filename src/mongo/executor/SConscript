@@ -144,6 +144,7 @@ env.Library(target='network_test_env',
             source=['network_test_env.cpp',],
             LIBDEPS=[
                 '$BUILD_DIR/mongo/db/commands',
+                '$BUILD_DIR/mongo/db/query/command_request_response',
                 'network_interface_mock',
                 'task_executor_interface',
             ])
@@ -286,7 +287,7 @@ env.CppIntegrationTest(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/util/version_impl',

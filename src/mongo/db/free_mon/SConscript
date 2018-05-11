@@ -63,7 +63,7 @@ else:
             'free_mon',
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/commands',
-            '$BUILD_DIR/mongo/db/auth/authcore',
+            '$BUILD_DIR/mongo/db/auth/auth',
             '$BUILD_DIR/mongo/db/auth/authprivilege',
         ],
     )
@@ -77,6 +77,7 @@ fmEnv.CppUnitTest(
         'free_mon_storage_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/serveronly',

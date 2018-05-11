@@ -36,7 +36,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -87,7 +86,7 @@ AuthorizationManager* AuthorizationManager::get(ServiceContext& service) {
 void AuthorizationManager::set(ServiceContext* service,
                                std::unique_ptr<AuthorizationManager> authzManager) {
     getAuthorizationManager(service) = std::move(authzManager);
-    service->registerClientObserver(stdx::make_unique<AuthzClientObserver>());
+    service->registerClientObserver(std::make_unique<AuthzClientObserver>());
 }
 
 AuthorizationSession* AuthorizationSession::get(Client* client) {

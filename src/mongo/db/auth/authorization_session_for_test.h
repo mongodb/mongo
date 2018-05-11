@@ -32,15 +32,16 @@
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/user.h"
 
 namespace mongo {
 
-class AuthorizationSessionForTest : public AuthorizationSession {
+class AuthorizationSessionForTest : public AuthorizationSessionImpl {
     MONGO_DISALLOW_COPYING(AuthorizationSessionForTest);
 
 public:
-    using AuthorizationSession::AuthorizationSession;
+    using AuthorizationSessionImpl::AuthorizationSessionImpl;
 
     // A database name used for testing purposes, deliberately named to minimize collisions with
     // other test users.

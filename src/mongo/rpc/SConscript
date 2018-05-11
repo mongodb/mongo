@@ -132,13 +132,12 @@ env.Library(
     ],
 )
 
-env.Clone().InjectModule("enterprise").Library(
+env.Library(
     target=[
         'metadata',
     ],
     source=[
         'metadata.cpp',
-        'metadata/audit_metadata.cpp',
         'metadata/config_server_metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
         'metadata/logical_time_metadata.cpp',
@@ -149,12 +148,30 @@ env.Clone().InjectModule("enterprise").Library(
     ],
     LIBDEPS=[
         'client_metadata',
+        'audit_metadata',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/logical_time_validator',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/signed_logical_time',
+    ],
+)
+
+env.Clone().InjectModule("enterprise").Library(
+    target=[
+        'audit_metadata',
+    ],
+    source=[
+        'metadata/audit_metadata.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/auth/auth_rolename',
+        '$BUILD_DIR/mongo/db/auth/user_name',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 

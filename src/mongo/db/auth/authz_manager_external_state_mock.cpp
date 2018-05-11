@@ -47,6 +47,12 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+MONGO_REGISTER_SHIM(AuthzManagerExternalState::create)
+()->std::unique_ptr<AuthzManagerExternalState> {
+    return std::make_unique<AuthzManagerExternalStateMock>();
+}
+
 namespace {
 void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
     fassert(17175, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, role.getRole()));

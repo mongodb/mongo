@@ -91,7 +91,7 @@ env.CppUnitTest(
         'storage_mobile_core',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/service_context_repl_mock_init',
     ],
 )

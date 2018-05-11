@@ -70,7 +70,7 @@ env.CppUnitTest(
         'write_op_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'cluster_write_op',
     ]

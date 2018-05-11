@@ -1,4 +1,3 @@
-// mongo/shell/shell_utils.cpp
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -443,4 +442,4 @@ bool fileExists(const std::string& file) {
 
 stdx::mutex& mongoProgramOutputMutex(*(new stdx::mutex()));
 }
-}
+}  // namespace mongo
