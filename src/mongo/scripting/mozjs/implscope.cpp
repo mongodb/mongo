@@ -801,7 +801,10 @@ void MozJSImplScope::gc() {
 void MozJSImplScope::sleep(Milliseconds ms) {
     std::unique_lock<std::mutex> lk(_sleepMutex);
 
-    _sleepCondition.wait_for(lk, ms.toSystemDuration(), [this] { return _pendingKill.load(); });
+    uassert(ErrorCodes::JSUncatchableError,
+            "sleep was interrupted by kill",
+            !_sleepCondition.wait_for(
+                lk, ms.toSystemDuration(), [this] { return _pendingKill.load(); }));
 }
 
 void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
@@ -907,9 +910,19 @@ void MozJSImplScope::installFork() {
     _jsThreadProto.install(_global);
 }
 
+void MozJSImplScope::setStatus(Status status) {
+    _status = std::move(status);
+}
+
 bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool assertOnError) {
-    if (success)
+    if (isKillPending()) {
+        success = false;
+        _status = Status(ErrorCodes::Interrupted, "JavaScript execution interrupted");
+    }
+
+    if (success) {
         return false;
+    }
 
     if (_status.isOK()) {
         JS::RootedValue excn(_context);

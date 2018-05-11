@@ -43,31 +43,20 @@
 namespace mongo {
 namespace mozjs {
 
-namespace {
-
-JSErrorFormatString kErrorFormatString = {"{0}", 1, JSEXN_ERR};
-const JSErrorFormatString* errorCallback(void* data, const unsigned code) {
-    return &kErrorFormatString;
-}
-
-JSErrorFormatString kUncatchableErrorFormatString = {"{0}", 1, JSEXN_NONE};
-const JSErrorFormatString* uncatchableErrorCallback(void* data, const unsigned code) {
-    return &kUncatchableErrorFormatString;
-}
-
-MONGO_STATIC_ASSERT_MSG(
-    UINT_MAX - JSErr_Limit > ErrorCodes::MaxError,
-    "Not enough space in an unsigned int for Mongo ErrorCodes and JSErrorNumbers");
-
-}  // namespace
-
 void mongoToJSException(JSContext* cx) {
     auto status = exceptionToStatus();
 
-    JS::RootedValue val(cx);
-    statusToJSException(cx, status, &val);
+    if (status.code() != ErrorCodes::JSUncatchableError) {
+        JS::RootedValue val(cx);
+        statusToJSException(cx, status, &val);
 
-    JS_SetPendingException(cx, val);
+        JS_SetPendingException(cx, val);
+    } else {
+        // If a JSAPI callback returns false without setting a pending exception, SpiderMonkey will
+        // treat it as an uncatchable error.
+        auto scope = getScope(cx);
+        scope->setStatus(status);
+    }
 }
 
 std::string currentJSStackToString(JSContext* cx) {
