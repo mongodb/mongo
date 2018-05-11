@@ -34,7 +34,7 @@
     }
 
     function runTest({useCausalConsistency, establishCursorCmd}) {
-        primaryDB.coll.drop();
+        primaryDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 
         const session =
             primaryDB.getMongo().startSession({causalConsistency: useCausalConsistency});

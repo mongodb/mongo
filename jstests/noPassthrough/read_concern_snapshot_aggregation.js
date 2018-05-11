@@ -81,10 +81,10 @@
     // cursor and verifies that the result set matches 'expectedResults'.
     function testLookupReadConcernSnapshotIsolation(
         {localDocsPre, foreignDocsPre, localDocsPost, foreignDocsPost, pipeline, expectedResults}) {
+        sessionDB.runCommand({drop: "local", writeConcern: {w: "majority"}});
+        sessionDB.runCommand({drop: "foreign", writeConcern: {w: "majority"}});
         let localColl = sessionDB.local;
         let foreignColl = sessionDB.foreign;
-        localColl.drop();
-        foreignColl.drop();
         assert.commandWorked(localColl.insert(localDocsPre, kWCMajority));
         assert.commandWorked(foreignColl.insert(foreignDocsPre, kWCMajority));
         let cmdRes = sessionDB.runCommand({
@@ -167,14 +167,14 @@
 
     // Test that snapshot isolation works for $geoNear. Special care is taken to test snapshot
     // isolation across getMore for $geoNear as it is an initial document source.
-    const coll = sessionDB.getCollection(kCollName);
-    coll.drop();
+    assert.commandWorked(sessionDB.runCommand({drop: kCollName, writeConcern: {w: "majority"}}));
     assert.commandWorked(sessionDB.runCommand({
         createIndexes: kCollName,
         indexes: [{key: {geo: "2dsphere"}, name: "geo_2dsphere"}],
         writeConcern: {w: "majority"}
     }));
 
+    const coll = sessionDB.getCollection(kCollName);
     let bulk = coll.initializeUnorderedBulkOp();
     const numInitialGeoInsert = 4;
     for (let i = 0; i < numInitialGeoInsert; ++i) {
@@ -218,7 +218,7 @@
     assert.eq(cmdRes.cursor.nextBatch.length, numInitialGeoInsert);
 
     // Test that snapshot reads are legal for $facet.
-    coll.drop();
+    assert.commandWorked(sessionDB.runCommand({drop: kCollName, writeConcern: {w: "majority"}}));
     assert.commandWorked(coll.insert(
         [
           {group1: 1, group2: 1, val: 1},
