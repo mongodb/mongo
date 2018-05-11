@@ -96,6 +96,8 @@ public:
 
     virtual bool hasOutOfMemoryException() = 0;
 
+    virtual void kill() = 0;
+
     virtual bool isKillPending() const = 0;
 
     virtual void gc() = 0;
