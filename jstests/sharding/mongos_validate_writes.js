@@ -21,7 +21,11 @@
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
     coll.ensureIndex({a: 1});
-    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {a: 1}}));
+
+    // Shard the collection on {a: 1} and move one chunk to another shard. Updates need to be across
+    // two shards to trigger an error, otherwise they are versioned and will succeed after raising
+    // a StaleConfigException.
+    st.shardColl(coll, {a: 1}, {a: 0}, {a: 1}, coll.getDB(), true);
 
     // Let the stale mongos see the collection state
     staleCollA.findOne();
@@ -30,7 +34,7 @@
     // Change the collection sharding state
     coll.drop();
     coll.ensureIndex({b: 1});
-    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {b: 1}}));
+    st.shardColl(coll, {b: 1}, {b: 0}, {b: 1}, coll.getDB(), true);
 
     // Make sure that we can successfully insert, even though we have stale state
     assert.writeOK(staleCollA.insert({b: "b"}));
@@ -41,7 +45,7 @@
     // Change the collection sharding state
     coll.drop();
     coll.ensureIndex({c: 1});
-    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {c: 1}}));
+    st.shardColl(coll, {c: 1}, {c: 0}, {c: 1}, coll.getDB(), true);
 
     // Make sure we can successfully upsert, even though we have stale state
     assert.writeOK(staleCollA.update({c: "c"}, {c: "c"}, true));
@@ -52,7 +56,7 @@
     // Change the collection sharding state
     coll.drop();
     coll.ensureIndex({d: 1});
-    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {d: 1}}));
+    st.shardColl(coll, {d: 1}, {d: 0}, {d: 1}, coll.getDB(), true);
 
     // Make sure we can successfully update, even though we have stale state
     assert.writeOK(coll.insert({d: "d"}));
@@ -67,13 +71,9 @@
     // Change the collection sharding state
     coll.drop();
     coll.ensureIndex({e: 1});
-    // Deletes need to be across two shards to trigger an error - this is probably an exceptional
-    // case
+    // Deletes need to be across two shards to trigger an error.
     st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
-    assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {e: 1}}));
-    assert.commandWorked(admin.runCommand({split: coll + "", middle: {e: 0}}));
-    assert.commandWorked(
-        admin.runCommand({moveChunk: coll + "", find: {e: 0}, to: st.shard1.shardName}));
+    st.shardColl(coll, {e: 1}, {e: 0}, {e: 1}, coll.getDB(), true);
 
     // Make sure we can successfully remove, even though we have stale state
     assert.writeOK(coll.insert({e: "e"}));

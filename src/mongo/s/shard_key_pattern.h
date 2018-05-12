@@ -145,6 +145,14 @@ public:
     BSONObj extractShardKeyFromDoc(const BSONObj& doc) const;
 
     /**
+     * Returns the set of shard key fields which are absent from the given document. Note that the
+     * vector returned by this method contains StringData elements pointing into ShardKeyPattern's
+     * underlying BSONObj. If the fieldnames are required to survive beyond the lifetime of this
+     * ShardKeyPattern, callers should create their own copies.
+     */
+    std::vector<StringData> findMissingShardKeyFieldsFromDoc(const BSONObj doc) const;
+
+    /**
      * Given a simple BSON query, extracts the shard key corresponding to the key pattern
      * from equality matches in the query.  The query expression *must not* be a complex query
      * with sorts or other attributes.

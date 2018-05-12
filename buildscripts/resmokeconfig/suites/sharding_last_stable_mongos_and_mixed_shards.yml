@@ -75,6 +75,8 @@ selector:
   - jstests/sharding/accurate_count_with_predicate.js
   # Enable when SERVER-33538 is backported.
   - jstests/sharding/mapReduce_outSharded_checkUUID.js
+  # Enable if SERVER-34971 is backported or 4.2 becomes last-stable
+  - jstests/sharding/update_replace_id.js
 
 executor:
   config:

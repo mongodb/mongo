@@ -275,6 +275,17 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     return extractShardKeyFromMatchable(matchable);
 }
 
+std::vector<StringData> ShardKeyPattern::findMissingShardKeyFieldsFromDoc(const BSONObj doc) const {
+    std::vector<StringData> missingFields;
+    BSONMatchableDocument matchable(doc);
+    for (const auto& skField : _keyPattern.toBSON()) {
+        auto matchEl = extractKeyElementFromMatchable(matchable, skField.fieldNameStringData());
+        if (!isValidShardKeyElement(matchEl))
+            missingFields.emplace_back(skField.fieldNameStringData());
+    }
+    return missingFields;
+}
+
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
