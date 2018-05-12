@@ -30,8 +30,13 @@
 
 #include <iterator>
 
+#include "mongo/client/connection_pool.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclientmockcursor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
+#include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/unittest/unittest.h"
 
@@ -399,6 +404,82 @@ TEST(SyncRollBackLocalOperationsTest, DifferentTimestampEndOfRemoteOplog) {
                                               });
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, result.getStatus().code());
     ASSERT_STRING_CONTAINS(result.getStatus().reason(), "reached beginning of remote oplog");
+}
+
+class DBClientConnectionForTest : public DBClientConnection {
+public:
+    DBClientConnectionForTest(int numInitFailures) : _initFailuresLeft(numInitFailures) {}
+
+    using DBClientConnection::query;
+
+    std::unique_ptr<DBClientCursor> query(const std::string& ns,
+                                          Query query,
+                                          int nToReturn,
+                                          int nToSkip,
+                                          const BSONObj* fieldsToReturn,
+                                          int queryOptions,
+                                          int batchSize) override {
+        if (_initFailuresLeft > 0) {
+            _initFailuresLeft--;
+            unittest::log()
+                << "Throwing DBException on DBClientCursorForTest::query(). Failures left: "
+                << _initFailuresLeft;
+            uasserted(226530, "Simulated network error");
+            MONGO_UNREACHABLE;
+        }
+
+        unittest::log() << "Returning success on DBClientCursorForTest::query()";
+
+        BSONArrayBuilder builder;
+        builder.append(makeOp(1, 1));
+        builder.append(makeOp(2, 2));
+        return std::make_unique<DBClientMockCursor>(this, builder.arr());
+    }
+
+private:
+    int _initFailuresLeft;
+};
+
+void checkRemoteIterator(int numNetworkFailures, bool expectedToSucceed) {
+
+    DBClientConnectionForTest conn(numNetworkFailures);
+    auto getConnection = [&]() -> DBClientBase* { return &conn; };
+
+    auto localOperation = makeOpAndRecordId(1, 1);
+    OplogInterfaceRemote remoteOplogMock(
+        HostAndPort("229w43rd", 10036), getConnection, "somecollection", 0);
+
+    auto result = Status::OK();
+
+    try {
+        result = syncRollBackLocalOperations(OplogInterfaceMock({localOperation}),
+                                             remoteOplogMock,
+                                             [&](const BSONObj&) { return Status::OK(); })
+                     .getStatus();
+    } catch (...) {
+        // For the failure scenario.
+        ASSERT_FALSE(expectedToSucceed);
+        return;
+    }
+    // For the success scenario.
+    ASSERT_TRUE(expectedToSucceed);
+    ASSERT_OK(result);
+}
+
+TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithNoNetworkFailures) {
+    checkRemoteIterator(0, true);
+}
+
+TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithOneNetworkFailure) {
+    checkRemoteIterator(1, true);
+}
+
+TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorSucceedsWithTwoNetworkFailures) {
+    checkRemoteIterator(2, true);
+}
+
+TEST(SyncRollBackLocalOperationsTest, RemoteOplogMakeIteratorFailsWithTooManyNetworkFailures) {
+    checkRemoteIterator(3, false);
 }
 
 }  // namespace
