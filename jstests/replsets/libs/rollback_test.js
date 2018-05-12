@@ -376,4 +376,11 @@ function RollbackTest(name = "RollbackTest", replSet) {
         curSecondary = rst.getSecondary();
         assert.neq(curPrimary, curSecondary);
     };
+
+    /**
+     * Returns the underlying ReplSetTest in case the user needs to make adjustments to it.
+     */
+    this.getTestFixture = function() {
+        return rst;
+    };
 }

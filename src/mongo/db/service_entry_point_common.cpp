@@ -582,11 +582,16 @@ void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandNam
         if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
             closeConnection) {
             opCtx->getClient()->session()->end();
+            log() << "Failing command '" << commandName
+                  << "' via 'failCommand' failpoint. Action: closing connection.";
             uasserted(50838, "Failing command due to 'failCommand' failpoint");
         }
 
         long long errorCode;
         if (bsonExtractIntegerField(data.getData(), "errorCode", &errorCode).isOK()) {
+            log() << "Failing command '" << commandName
+                  << "' via 'failCommand' failpoint. Action: returning error code " << errorCode
+                  << ".";
             uasserted(ErrorCodes::Error(errorCode),
                       "Failing command due to 'failCommand' failpoint");
         }

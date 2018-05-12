@@ -1557,6 +1557,7 @@ env.CppUnitTest(
     source='roll_back_local_operations_test.cpp',
     LIBDEPS=[
         'oplog_interface_mock',
+        'oplog_interface_remote',
         'roll_back_local_operations',
     ],
 )

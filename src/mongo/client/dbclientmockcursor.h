@@ -33,9 +33,13 @@
 
 namespace mongo {
 
-class DBClientMockCursor {
+class DBClientMockCursor : public DBClientCursor {
 public:
-    DBClientMockCursor(const BSONArray& mockCollection) : _iter(mockCollection) {}
+    DBClientMockCursor(mongo::DBClientBase* client, const BSONArray& mockCollection)
+        : mongo::DBClientCursor(client, "", 0, 0, 0),
+          _collectionArray(mockCollection),
+          _iter(_collectionArray) {}
+
     virtual ~DBClientMockCursor() {}
 
     bool more() {
@@ -46,6 +50,9 @@ public:
     }
 
 private:
+    // The BSONObjIterator expects the underlying BSONObj to stay in scope while the
+    // iterator is in use, so we store it here.
+    BSONArray _collectionArray;
     BSONObjIterator _iter;
 
     // non-copyable , non-assignable
