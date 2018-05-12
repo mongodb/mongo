@@ -107,6 +107,8 @@ public:
 
     void tailingQuery(const char* ns, const BSONObj& query);
 
+    void tailingQueryOne(const char* ns, const BSONObj& query);
+
     void tailingQueryGTE(const char* ns, Timestamp t);
 
     bool more() {

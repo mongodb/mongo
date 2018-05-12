@@ -113,6 +113,12 @@ void OplogReader::tailingQuery(const char* ns, const BSONObj& query) {
     cursor.reset(_conn->query(ns, query, 0, 0, nullptr, _tailingQueryOptions).release());
 }
 
+void OplogReader::tailingQueryOne(const char* ns, const BSONObj& query) {
+    verify(!haveCursor());
+    LOG(2) << ns << ".find(" << query.toString() << ')' << endl;
+    cursor.reset(_conn->query(ns, query, 1, 0, nullptr, _tailingQueryOptions).release());
+}
+
 void OplogReader::tailingQueryGTE(const char* ns, Timestamp optime) {
     BSONObjBuilder gte;
     gte.append("$gte", optime);
@@ -225,11 +231,12 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             // This query is structured so that it is executed on the sync source using the oplog
             // start hack (oplogReplay=true and $gt/$gte predicate over "ts").
             auto ts = requiredOpTime.getTimestamp();
-            tailingQuery(rsOplogName.c_str(), BSON("ts" << BSON("$gte" << ts << "$lte" << ts)));
+            tailingQueryOne(rsOplogName.c_str(), BSON("ts" << BSON("$gte" << ts)));
             auto status = _compareRequiredOpTimeWithQueryResponse(requiredOpTime);
             if (!status.isOK()) {
                 const auto blacklistDuration = Seconds(60);
                 const auto until = Date_t::now() + blacklistDuration;
+                warning() << "Required optime does not exist because " << status.toString();
                 warning() << "We cannot use " << candidate.toString()
                           << " as a sync source because it does not contain the necessary "
                              "operations for us to reach a consistent state: "
