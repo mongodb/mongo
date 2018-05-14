@@ -150,6 +150,7 @@ selector:
   # "Cowardly refusing to run test with overridden read preference when it reads from a
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
+  - requires_collstats
 
 executor:
   archive:
