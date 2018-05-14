@@ -348,16 +348,7 @@ tasks:
       vars:
         wtdevelop: -wtdevelop
 
-- name: compile_proxy
-  commands:
-    - command: shell.exec
-      params:
-        script: |
-          echo "compile_proxy just exists to depend on the correct actual compile task in another variant."
-
 - name: industry_benchmarks_WT
-  depends_on:
-    - name: compile_proxy
   priority: 5
   commands:
     - func: "prepare environment"
@@ -372,8 +363,6 @@ tasks:
         # script_flags: --ycsb-throughput-analysis reports
 
 - name: industry_benchmarks_secondary_reads_WT
-  depends_on:
-    - name: compile_proxy
   priority: 5
   commands:
     - func: "prepare environment"
@@ -388,8 +377,6 @@ tasks:
 
 - name: industry_benchmarks_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -403,8 +390,6 @@ tasks:
 
 - name: industry_benchmarks_wmajority_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -418,8 +403,6 @@ tasks:
 
 - name: industry_benchmarks_wmajority_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -433,8 +416,6 @@ tasks:
 
 - name: crud_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -447,8 +428,6 @@ tasks:
 
 - name: mixed_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -461,8 +440,6 @@ tasks:
 
 - name: misc_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -475,8 +452,6 @@ tasks:
 
 - name: map_reduce_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -489,8 +464,6 @@ tasks:
 
 - name: smoke_test
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -503,8 +476,6 @@ tasks:
 
 - name: crud_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -517,8 +488,6 @@ tasks:
 
 - name: mixed_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -531,8 +500,6 @@ tasks:
 
 - name: misc_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -545,8 +512,6 @@ tasks:
 
 - name: map_reduce_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -559,8 +524,6 @@ tasks:
 
 - name: retryable_writes_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -573,8 +536,6 @@ tasks:
 
 - name: snapshot_reads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -587,8 +548,6 @@ tasks:
 
 - name: secondary_reads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -601,8 +560,6 @@ tasks:
 
 - name: bestbuy_agg_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -615,8 +572,6 @@ tasks:
 
 - name: bestbuy_query_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -629,8 +584,6 @@ tasks:
 
 - name: bestbuy_agg_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -643,8 +596,6 @@ tasks:
 
 - name: bestbuy_query_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -657,8 +608,6 @@ tasks:
 
 - name: non_sharded_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -671,8 +620,6 @@ tasks:
 
 - name: non_sharded_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -685,8 +632,6 @@ tasks:
 
 - name: mongos_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -699,8 +644,6 @@ tasks:
 
 - name: mongos_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -713,8 +656,6 @@ tasks:
 
 - name: move_chunk_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -727,8 +668,6 @@ tasks:
 
 - name: move_chunk_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -741,8 +680,6 @@ tasks:
 
 - name: move_chunk_waiting_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -755,8 +692,6 @@ tasks:
 
 - name: secondary_performance_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -771,8 +706,6 @@ tasks:
 
 - name: secondary_performance_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -787,8 +720,6 @@ tasks:
 
 - name: initialsync_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -800,8 +731,6 @@ tasks:
 
 - name: initialsync_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -813,8 +742,6 @@ tasks:
 
 - name: initialsync-logkeeper_WT
   priority: 5
-  depends_on:
-    - name: compile_proxy
   exec_timeout_secs: 216000 # 2.5 days
   commands:
     - func: "prepare environment"
@@ -827,8 +754,6 @@ tasks:
 
 - name: change_streams_throughput
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -841,8 +766,6 @@ tasks:
 
 - name: change_streams_latency
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -855,8 +778,6 @@ tasks:
 
 - name: change_streams_multi_mongos
   priority: 5
-  depends_on:
-    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -932,13 +853,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
@@ -973,13 +891,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
@@ -1010,13 +925,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-shard"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
@@ -1056,13 +968,10 @@ buildvariants:
     authentication: disabled
   run_on:
       - "rhel70-perf-shard-lite"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: bestbuy_agg_WT
     - name: bestbuy_query_WT
     - name: change_streams_latency
@@ -1089,13 +998,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: industry_benchmarks_secondary_reads_WT
     - name: crud_workloads_WT
@@ -1133,15 +1039,12 @@ buildvariants:
     cluster: replica
     platform: linux
     project: *project
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   run_on:
       - "rhel70-perf-replset"
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: initialsync_WT
     - name: initialsync_MMAPv1
 
@@ -1156,13 +1059,10 @@ buildvariants:
     project: *project
   run_on:
       - "rhel70-perf-initialsync-logkeeper"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: initialsync-logkeeper_WT
 
 #######################################
@@ -1183,13 +1083,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-single"
+  depends_on:
+      - name: compile_wtdevelop
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile_wtdevelop
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
@@ -1216,13 +1113,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-single"
+  depends_on:
+      - name: compile_wtdevelop
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile_wtdevelop
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
     - name: mixed_workloads_WT
@@ -1245,13 +1139,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-replset"
+  depends_on:
+      - name: compile_wtdevelop
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile_wtdevelop
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: industry_benchmarks_WT
     - name: industry_benchmarks_secondary_reads_WT
     - name: crud_workloads_WT
@@ -1282,13 +1173,10 @@ buildvariants:
     authentication: enabled
   run_on:
       - "rhel70-perf-shard-lite"
+  depends_on:
+      - name: compile_wtdevelop
+        variant: compile-rhel70
   tasks:
-    - name: compile_proxy
-      depends_on:
-        - name: compile_wtdevelop
-          variant: compile-rhel70
-      distros:
-        - rhel70
     - name: bestbuy_agg_WT
     - name: bestbuy_query_WT
     - name: change_streams_latency
