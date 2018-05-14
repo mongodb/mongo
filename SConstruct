@@ -444,7 +444,7 @@ add_option('cache-dir',
 )
 
 add_option("cxx-std",
-    choices=["14"],
+    choices=["14", "17"],
     default="14",
     help="Select the C++ langauge standard to build with",
 )
@@ -2252,15 +2252,24 @@ def doConfigure(myenv):
         usingLibStdCxx = conf.CheckLibStdCxx()
         conf.Finish()
 
-    if not myenv.ToolchainIs('msvc'):
+    if myenv.ToolchainIs('msvc'):
+        if get_option('cxx-std') == "14":
+            myenv.AppendUnique(CCFLAGS=['/std:c++14'])
+        elif get_option('cxx-std') == "17":
+            myenv.AppendUnique(CCFLAGS=['/std:c++17', '/Zc:__cplusplus'])
+    else:
         if get_option('cxx-std') == "14":
             if not AddToCXXFLAGSIfSupported(myenv, '-std=c++14'):
                 myenv.ConfError('Compiler does not honor -std=c++14')
+        elif get_option('cxx-std') == "17":
+            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++17'):
+                myenv.ConfError('Compiler does not honor -std=c++17')
+
         if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
-            myenv.ConfError("C++14 mode selected for C++ files, but can't enable C11 for C files")
+            myenv.ConfError("C++14/17 mode selected for C++ files, but can't enable C11 for C files")
 
     if using_system_version_of_cxx_libraries():
-        print( 'WARNING: System versions of C++ libraries must be compiled with C++14 support' )
+        print( 'WARNING: System versions of C++ libraries must be compiled with C++14/17 support' )
 
     # We appear to have C++14, or at least a flag to enable it. Check that the declared C++
     # language level is not less than C++14, and that we can at least compile an 'auto'
@@ -2285,12 +2294,29 @@ def doConfigure(myenv):
         context.Result(ret)
         return ret
 
+    def CheckCxx17(context):
+        test_body = """
+        #if __cplusplus < 201703L
+        #error
+        #endif
+        namespace NestedNamespaceDecls::AreACXX17Feature {};
+        """
+
+        context.Message('Checking for C++17... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+        context.Result(ret)
+        return ret
+
     conf = Configure(myenv, help=False, custom_tests = {
         'CheckCxx14' : CheckCxx14,
+        'CheckCxx17' : CheckCxx17,
     })
 
     if not conf.CheckCxx14():
         myenv.ConfError('C++14 support is required to build MongoDB')
+
+    if get_option('cxx-std') == "17" and not conf.CheckCxx17():
+        myenv.ConfError('C++17 was requested, but the compiler appears not to offer it')
 
     conf.Finish()
 
@@ -3128,16 +3154,17 @@ def doConfigure(myenv):
         test_body = """
         #include <atomic>
 
-        int main() {{
+        int main(int argc, char* argv[]) {{
             std::atomic<{0}> x;
 
             x.store(0);
-            {0} y = 1;
+            // Use argc to ensure we can't optimize everything away.
+            {0} y = argc;
             x.fetch_add(y);
             x.fetch_sub(y);
             x.exchange(y);
-            x.compare_exchange_strong(y, x);
-            x.is_lock_free();
+            if (x.compare_exchange_strong(y, x) && x.is_lock_free())
+                return 0;
             return x.load();
         }}
         """.format(base_type)
