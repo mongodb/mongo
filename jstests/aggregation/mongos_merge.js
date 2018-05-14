@@ -28,10 +28,6 @@
 
     assert.commandWorked(mongosDB.dropDatabase());
 
-    // Enable profiling on each shard to verify that no $mergeCursors occur.
-    assert.commandWorked(shard0DB.setProfilingLevel(2));
-    assert.commandWorked(shard1DB.setProfilingLevel(2));
-
     // Always merge pipelines which cannot merge on mongoS on the primary shard instead, so we know
     // where to check for $mergeCursors.
     assert.commandWorked(
@@ -76,6 +72,14 @@
     }
 
     let testNameHistory = new Set();
+
+    // Clears system.profile and restarts the profiler on the primary shard. We enable profiling to
+    // verify that no $mergeCursors occur during tests where we expect the merge to run on mongoS.
+    function startProfiling() {
+        assert.commandWorked(primaryShardDB.setProfilingLevel(0));
+        primaryShardDB.system.profile.drop();
+        assert.commandWorked(primaryShardDB.setProfilingLevel(2));
+    }
 
     /**
      * Runs the aggregation specified by 'pipeline', verifying that:
@@ -389,10 +393,17 @@
 
     // Run all test cases for each potential value of 'allowDiskUse'.
     for (let allowDiskUse of[false, undefined, true]) {
+        // Reset the profiler and clear the list of tests that ran on the previous iteration.
+        testNameHistory.clear();
+        startProfiling();
+
+        // Run all test cases.
         runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allowDiskUse);
         runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse);
-        testNameHistory.clear();
     }
+
+    // Start a new profiling session before running the final few tests.
+    startProfiling();
 
     // Test that merge pipelines containing all mongos-runnable stages produce the expected output.
     assertMergeOnMongoS({
