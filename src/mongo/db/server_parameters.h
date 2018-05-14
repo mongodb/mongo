@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/stringutils.h"
@@ -263,24 +264,21 @@ private:
     T _value;
 };
 
+namespace server_parameter_detail {
+
+template <typename T, typename...>
+struct IsOneOf : std::false_type {};
+
+template <typename T, typename U0, typename... Us>
+struct IsOneOf<T, U0, Us...>
+    : std::conditional_t<std::is_same<T, U0>::value, std::true_type, IsOneOf<T, Us...>> {};
+
 /**
  * Type trait for ServerParameterType to identify which types are safe to use at runtime because
  * they have std::atomic or equivalent types.
  */
 template <typename T>
-class is_safe_runtime_parameter_type : public std::false_type {};
-
-template <>
-class is_safe_runtime_parameter_type<bool> : public std::true_type {};
-
-template <>
-class is_safe_runtime_parameter_type<int> : public std::true_type {};
-
-template <>
-class is_safe_runtime_parameter_type<long long> : public std::true_type {};
-
-template <>
-class is_safe_runtime_parameter_type<double> : public std::true_type {};
+struct IsSafeRuntimeType : IsOneOf<T, bool, int, long long, double> {};
 
 /**
  * Get the type of storage to use for a given tuple of <type, ServerParameterType>.
@@ -290,52 +288,51 @@ class is_safe_runtime_parameter_type<double> : public std::true_type {};
  * server parameters are processed on the main thread while it is single-threaded during startup.
  */
 template <typename T, ServerParameterType paramType>
-class server_parameter_storage_type {
-public:
-    using value_type = AtomicWord<T>;
+struct StorageTraits {
+    /**
+     * For kStartupOnly parameters, we can use the type T as storage directly.
+     * Otherwise if T is double, use AtomicDouble. Otherwise use AtomicWord<T>.
+     */
+    using value_type = std::conditional_t<
+        paramType == ServerParameterType::kStartupOnly,
+        T,
+        std::conditional_t<std::is_same<T, double>::value, AtomicDouble, AtomicWord<T>>>;
+
     static T get(value_type* v) {
+        return _get(v);
+    }
+
+    static void set(value_type* v, const T& newValue) {
+        _set(v, newValue);
+    }
+
+private:
+    static T _get(AtomicDouble* v) {
         return v->load();
     }
-    static void set(value_type* v, const T& newValue) {
-        v->store(newValue);
+    template <typename U>
+    static T _get(AtomicWord<U>* v) {
+        return v->load();
     }
-};
-
-template <typename T>
-class server_parameter_storage_type<T, ServerParameterType::kStartupOnly> {
-public:
-    using value_type = T;
-    static T get(value_type* v) {
+    template <typename U>
+    static T _get(U* v) {
         return *v;
     }
-    static void set(value_type* v, const T& newValue) {
+
+    static void _set(AtomicDouble* v, const T& newValue) {
+        v->store(newValue);
+    }
+    template <typename U>
+    static void _set(AtomicWord<U>* v, const T& newValue) {
+        v->store(newValue);
+    }
+    template <typename U>
+    static void _set(U* v, const T& newValue) {
         *v = newValue;
     }
 };
 
-template <>
-class server_parameter_storage_type<double, ServerParameterType::kRuntimeOnly> {
-public:
-    using value_type = AtomicDouble;
-    static double get(value_type* v) {
-        return v->load();
-    }
-    static void set(value_type* v, const double& newValue) {
-        v->store(newValue);
-    }
-};
-
-template <>
-class server_parameter_storage_type<double, ServerParameterType::kStartupAndRuntime> {
-public:
-    using value_type = AtomicDouble;
-    static double get(value_type* v) {
-        return v->load();
-    }
-    static void set(value_type* v, const double& newValue) {
-        v->store(newValue);
-    }
-};
+}  // namespace server_parameter_detail
 
 /**
  * Implementation of BoundServerParameter for reading and writing a server parameter with a given
@@ -348,10 +345,12 @@ template <typename T, ServerParameterType paramType>
 class ExportedServerParameter : public BoundServerParameter<T> {
 public:
     MONGO_STATIC_ASSERT_MSG(paramType == ServerParameterType::kStartupOnly ||
-                                is_safe_runtime_parameter_type<T>::value,
+                                server_parameter_detail::IsSafeRuntimeType<T>::value,
                             "This type is not supported as a runtime server parameter.");
 
-    using storage_type = typename server_parameter_storage_type<T, paramType>::value_type;
+    using storage_traits = server_parameter_detail::StorageTraits<T, paramType>;
+    using storage_type = typename storage_traits::value_type;
+    using validator_function = stdx::function<Status(const T&)>;
 
     /**
      * Construct an ExportedServerParameter in parameter set "sps", named "name", whose storage
@@ -362,107 +361,73 @@ public:
      * may be set at runtime, e.g.  via the setParameter command.
      */
     ExportedServerParameter(ServerParameterSet* sps, const std::string& name, storage_type* value)
-        : BoundServerParameter<T>(
-              sps,
-              name,
-              [this](const T& v) { return set(v); },
-              [this] { return server_parameter_storage_type<T, paramType>::get(_value); },
-              paramType),
+        : BoundServerParameter<T>(sps,
+                                  name,
+                                  [this](const T& v) { return set(v); },
+                                  [this] { return storage_traits::get(_value); },
+                                  paramType),
           _value(value) {}
-    ~ExportedServerParameter() override {}
 
     // Don't let the template method hide our inherited method
-    Status set(const BSONElement& newValueElement) override {
-        return BoundServerParameter<T>::set(newValueElement);
-    }
+    using BoundServerParameter<T>::set;
 
     virtual Status set(const T& newValue) {
         auto const status = validate(newValue);
         if (!status.isOK()) {
             return status;
         }
-        server_parameter_storage_type<T, paramType>::set(_value, newValue);
+        storage_traits::set(_value, newValue);
         return Status::OK();
     }
 
+    ExportedServerParameter* withValidator(validator_function validator) {
+        invariant(!_validator);
+        _validator = std::move(validator);
+        return this;
+    }
+
 protected:
+    /**
+     * Note that if a subclass overrides the validate member function, the validator provided via
+     * withValidate will not be used.
+     **/
     virtual Status validate(const T& potentialNewValue) {
+        if (_validator) {
+            return _validator(potentialNewValue);
+        }
         return Status::OK();
     }
 
     storage_type* const _value;  // owned elsewhere
-};
-
-/**
- * An exported server parameter with a validation function.
- */
-template <typename T, ServerParameterType paramType>
-class ExportedServerParameterWithValidator : public ExportedServerParameter<T, paramType> {
-public:
-    using storage_type = typename server_parameter_storage_type<T, paramType>::value_type;
-    using validator_function = stdx::function<Status(const T&)>;
-
-    ExportedServerParameterWithValidator(ServerParameterSet* sps,
-                                         const std::string& name,
-                                         storage_type* value,
-                                         validator_function validator)
-        : ExportedServerParameter<T, paramType>(sps, name, value),
-          _validator(std::move(validator)) {}
-
-protected:
-    Status validate(const T& potentialNewValue) final {
-        return _validator(potentialNewValue);
-    }
-
-private:
     validator_function _validator;
 };
+
 }  // namespace mongo
 
-
-#define MONGO_EXPORT_SERVER_PARAMETER_IMPL(NAME, TYPE, INITIAL_VALUE, PARAM_TYPE)    \
-    server_parameter_storage_type<TYPE, PARAM_TYPE>::value_type NAME(INITIAL_VALUE); \
-    ExportedServerParameter<TYPE, PARAM_TYPE> _##NAME(ServerParameterSet::getGlobal(), #NAME, &NAME)
+#define MONGO_EXPORT_SERVER_PARAMETER_IMPL_(NAME, TYPE, INITIAL_VALUE, PARAM_TYPE) \
+    ExportedServerParameter<TYPE, PARAM_TYPE>::storage_type NAME(INITIAL_VALUE);   \
+    MONGO_COMPILER_VARIABLE_UNUSED auto _exportedParameter_##NAME =                \
+        (new ExportedServerParameter<TYPE, PARAM_TYPE>(                            \
+            ServerParameterSet::getGlobal(), #NAME, &NAME))
 
 /**
  * Create a global variable of type "TYPE" named "NAME" with the given INITIAL_VALUE.  The
  * value may be set at startup or at runtime.
  */
 #define MONGO_EXPORT_SERVER_PARAMETER(NAME, TYPE, INITIAL_VALUE) \
-    MONGO_EXPORT_SERVER_PARAMETER_IMPL(                          \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL_(                         \
         NAME, TYPE, INITIAL_VALUE, ServerParameterType::kStartupAndRuntime)
 
 /**
  * Like MONGO_EXPORT_SERVER_PARAMETER, but the value may only be set at startup.
  */
 #define MONGO_EXPORT_STARTUP_SERVER_PARAMETER(NAME, TYPE, INITIAL_VALUE) \
-    MONGO_EXPORT_SERVER_PARAMETER_IMPL(NAME, TYPE, INITIAL_VALUE, ServerParameterType::kStartupOnly)
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL_(                                 \
+        NAME, TYPE, INITIAL_VALUE, ServerParameterType::kStartupOnly)
 
 /**
  * Like MONGO_EXPORT_SERVER_PARAMETER, but the value may only be set at runtime.
  */
 #define MONGO_EXPORT_RUNTIME_SERVER_PARAMETER(NAME, TYPE, INITIAL_VALUE) \
-    MONGO_EXPORT_SERVER_PARAMETER_IMPL(NAME, TYPE, INITIAL_VALUE, ServerParameterType::kRuntimeOnly)
-
-
-/**
- * Copies of above macros, but with the ability to pass in a callable to validate the input
- */
-#define MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                           \
-    NAME, TYPE, INITIAL_VALUE, VALIDATOR, PARAM_TYPE)                                \
-    server_parameter_storage_type<TYPE, PARAM_TYPE>::value_type NAME(INITIAL_VALUE); \
-    ExportedServerParameterWithValidator<TYPE, PARAM_TYPE> _##NAME(                  \
-        ServerParameterSet::getGlobal(), #NAME, &NAME, VALIDATOR)
-
-
-#define MONGO_EXPORT_SERVER_PARAMETER_WITH_VALIDATOR(NAME, TYPE, INITIAL_VALUE, VALIDATOR) \
-    MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                                     \
-        NAME, TYPE, INITIAL_VALUE, VALIDATOR, ServerParameterType::kStartupAndRuntime)
-
-#define MONGO_EXPORT_STARTUP_SERVER_PARAMETER_WITH_VALIDATOR(NAME, TYPE, INITIAL_VALUE, VALIDATOR) \
-    MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                                             \
-        NAME, TYPE, INITIAL_VALUE, VALIDATOR, ServerParameterType::kStartupOnly)
-
-#define MONGO_EXPORT_RUNTIME_SERVER_PARAMETER_WITH_VALIDATOR(NAME, TYPE, INITIAL_VALUE, VALIDATOR) \
-    MONGO_EXPORT_SERVER_PARAMETER_IMPL_WITH_VALIDATOR(                                             \
-        NAME, TYPE, INITIAL_VALUE, VALIDATOR, ServerParameterType::kRuntimeOnly)
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL_(                                 \
+        NAME, TYPE, INITIAL_VALUE, ServerParameterType::kRuntimeOnly)
