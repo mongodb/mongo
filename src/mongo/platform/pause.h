@@ -55,7 +55,7 @@
 /* ori 0,0,0 is the PPC64 noop instruction */
 #define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("ori 0,0,0" ::: "memory")
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm__)
 
 #define MONGO_YIELD_CORE_FOR_SMT() __asm__ volatile("yield" ::: "memory")
 

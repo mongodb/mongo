@@ -278,7 +278,7 @@ Status parseProcStat(const std::vector<StringData>& keys,
                     value = 0;
                 }
 
-                builder->appendNumber(key, value);
+                builder->appendNumber(key, static_cast<long long>(value));
             }
         }
     }
@@ -383,10 +383,10 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
                     keyWithSuffix.append("_kb");
                 }
 
-                builder->appendNumber(keyWithSuffix, value);
+                builder->appendNumber(keyWithSuffix, static_cast<long long>(value));
             } else {
 
-                builder->appendNumber(key, value);
+                builder->appendNumber(key, static_cast<long long>(value));
             }
         }
     }
@@ -478,7 +478,7 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
                     StringData stringValue((*valuesIt).begin(), (*valuesIt).end());
                     uint64_t value;
                     if (parseNumberFromString(stringValue, &value).isOK()) {
-                        builder->appendNumber(prefix.toString() + key.toString(), value);
+                        builder->appendNumber(prefix.toString() + key.toString(), static_cast<long long>(value));
                         foundKeys = true;
                     }
                 }
@@ -614,7 +614,7 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
                 BSONObjBuilder sub(builder->subobjStart(disk));
 
                 for (size_t index = 0; index < stats.size() && index < kDiskFieldCount; ++index) {
-                    sub.appendNumber(kDiskFields[index], stats[index]);
+                    sub.appendNumber(kDiskFields[index], static_cast<long long>(stats[index]));
                 }
 
                 sub.doneFast();
