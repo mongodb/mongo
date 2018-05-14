@@ -212,7 +212,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     }
 
     const auto appliedThrough = _consistencyMarkers->getAppliedThrough(opCtx);
-    invariant(!stableTimestamp || appliedThrough.isNull() ||
+    invariant(!stableTimestamp || stableTimestamp->isNull() || appliedThrough.isNull() ||
                   *stableTimestamp == appliedThrough.getTimestamp(),
               str::stream() << "Stable timestamp " << stableTimestamp->toString()
                             << " does not equal appliedThrough timestamp "
