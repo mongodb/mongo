@@ -123,30 +123,14 @@ MONGO_FP_DECLARE(dropPendingCollectionReaperHang);
 
 // Set this to specify maximum number of times the oplog fetcher will consecutively restart the
 // oplog tailing query on non-cancellation errors.
-server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
-    oplogFetcherMaxFetcherRestarts(3);
-class ExportedOplogFetcherMaxFetcherRestartsServerParameter
-    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
-public:
-    ExportedOplogFetcherMaxFetcherRestartsServerParameter();
-    Status validate(const int& potentialNewValue) override;
-} _exportedOplogFetcherMaxFetcherRestartsServerParameter;
-
-ExportedOplogFetcherMaxFetcherRestartsServerParameter::
-    ExportedOplogFetcherMaxFetcherRestartsServerParameter()
-    : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
-          ServerParameterSet::getGlobal(),
-          "oplogFetcherMaxFetcherRestarts",
-          &oplogFetcherMaxFetcherRestarts) {}
-
-Status ExportedOplogFetcherMaxFetcherRestartsServerParameter::validate(
-    const int& potentialNewValue) {
-    if (potentialNewValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      "oplogFetcherMaxFetcherRestarts must be greater than or equal to 0");
-    }
-    return Status::OK();
-}
+MONGO_EXPORT_SERVER_PARAMETER(oplogFetcherMaxFetcherRestarts, int, 3)
+    ->withValidator([](const int& potentialNewValue) {
+        if (potentialNewValue < 0) {
+            return Status(ErrorCodes::BadValue,
+                          "oplogFetcherMaxFetcherRestarts must be nonnegative");
+        }
+        return Status::OK();
+    });
 
 /**
  * Returns new thread pool for thread pool task executor.

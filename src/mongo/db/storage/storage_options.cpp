@@ -31,6 +31,7 @@
 #include "mongo/db/storage/storage_options.h"
 
 #include "mongo/db/server_parameters.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -51,6 +52,7 @@ const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 const int StorageGlobalParams::kMaxJournalCommitIntervalMs = 500;
 const double StorageGlobalParams::kMaxSyncdelaySecs = 9.0 * 1000.0 * 1000.0;
 
+namespace {
 /**
  * Specify whether all queries must use indexes.
  * If 1, MongoDB will not execute queries that require a table scan and will return an error.
@@ -64,50 +66,40 @@ ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> NoTableSc
  * working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
  * In almost every situation you should not set this value and use the default setting.
  */
-class SyncdelaySetting
-    : public ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime> {
-public:
-    SyncdelaySetting()
-        : ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay) {}
-
-    virtual Status validate(const double& potentialNewValue) {
-        if (potentialNewValue < 0.0 || potentialNewValue > StorageGlobalParams::kMaxSyncdelaySecs) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "syncdelay must be between 0 and "
-                                        << StorageGlobalParams::kMaxSyncdelaySecs
-                                        << ", but attempted to set to: "
-                                        << potentialNewValue);
-        }
-
-        return Status::OK();
-    }
-} syncdelaySetting;
+MONGO_COMPILER_VARIABLE_UNUSED auto _exportedSyncdelay =
+    (new ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime>(
+        ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay))
+        -> withValidator([](const double& potentialNewValue) {
+            if (potentialNewValue < 0.0 ||
+                potentialNewValue > StorageGlobalParams::kMaxSyncdelaySecs) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "syncdelay must be between 0 and "
+                                            << StorageGlobalParams::kMaxSyncdelaySecs
+                                            << ", but attempted to set to: "
+                                            << potentialNewValue);
+            }
+            return Status::OK();
+        });
 
 /**
  * Specify an integer between 1 and kMaxJournalCommitInterval signifying the number of milliseconds
  * (ms) between journal commits.
  */
-class JournalCommitIntervalSetting
-    : public ExportedServerParameter<int, ServerParameterType::kRuntimeOnly> {
-public:
-    JournalCommitIntervalSetting()
-        : ExportedServerParameter<int, ServerParameterType::kRuntimeOnly>(
-              ServerParameterSet::getGlobal(),
-              "journalCommitInterval",
-              &storageGlobalParams.journalCommitIntervalMs) {}
-
-    virtual Status validate(const int& potentialNewValue) {
-        if (potentialNewValue < 1 ||
-            potentialNewValue > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "journalCommitInterval must be between 1 and "
-                                        << StorageGlobalParams::kMaxJournalCommitIntervalMs
-                                        << ", but attempted to set to: "
-                                        << potentialNewValue);
-        }
-
-        return Status::OK();
-    }
-} journalCommitIntervalSetting;
+MONGO_COMPILER_VARIABLE_UNUSED auto _exportedJournalCommitInterval =
+    (new ExportedServerParameter<int, ServerParameterType::kRuntimeOnly>(
+        ServerParameterSet::getGlobal(),
+        "journalCommitInterval",
+        &storageGlobalParams.journalCommitIntervalMs))
+        -> withValidator([](const int& potentialNewValue) {
+            if (potentialNewValue < 1 ||
+                potentialNewValue > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "journalCommitInterval must be between 1 and "
+                                            << StorageGlobalParams::kMaxJournalCommitIntervalMs
+                                            << ", but attempted to set to: "
+                                            << potentialNewValue);
+            }
+            return Status::OK();
+        });
+}  // namespace
 }  // namespace mongo

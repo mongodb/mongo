@@ -44,29 +44,18 @@ namespace mongo {
 
 constexpr Seconds LogicalClock::kMaxAcceptableLogicalClockDriftSecs;
 
-server_parameter_storage_type<long long, ServerParameterType::kStartupOnly>::value_type
-    maxAcceptableLogicalClockDriftSecs(LogicalClock::kMaxAcceptableLogicalClockDriftSecs.count());
-
-class MaxAcceptableLogicalClockDriftSecs
-    : public ExportedServerParameter<long long, ServerParameterType::kStartupOnly> {
-public:
-    MaxAcceptableLogicalClockDriftSecs()
-        : ExportedServerParameter<long long, ServerParameterType::kStartupOnly>(
-              ServerParameterSet::getGlobal(),
-              "maxAcceptableLogicalClockDriftSecs",
-              &maxAcceptableLogicalClockDriftSecs) {}
-
-    Status validate(const long long& potentialNewValue) {
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(maxAcceptableLogicalClockDriftSecs,
+                                      long long,
+                                      LogicalClock::kMaxAcceptableLogicalClockDriftSecs.count())
+    ->withValidator([](const long long& potentialNewValue) {
         if (potentialNewValue <= 0) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "maxAcceptableLogicalClockDriftSecs must be positive, "
                                            "but attempted to set to: "
                                         << potentialNewValue);
         }
-
         return Status::OK();
-    }
-} maxAcceptableLogicalClockDriftSecsParameter;
+    });
 
 namespace {
 const auto getLogicalClock = ServiceContext::declareDecoration<std::unique_ptr<LogicalClock>>();

@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/mutex.h"
@@ -60,35 +61,35 @@ Date_t lastInvalidationTime;
 
 class ExportedInvalidationIntervalParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
+    using Base = ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>;
+
 public:
     ExportedInvalidationIntervalParameter()
-        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(),
-              "userCacheInvalidationIntervalSecs",
-              &userCacheInvalidationIntervalSecs) {}
+        : Base(ServerParameterSet::getGlobal(),
+               "userCacheInvalidationIntervalSecs",
+               &userCacheInvalidationIntervalSecs) {}
 
-    virtual Status validate(const int& potentialNewValue) {
-        if (potentialNewValue < 1 || potentialNewValue > 86400) {
-            return Status(ErrorCodes::BadValue,
-                          "userCacheInvalidationIntervalSecs must be between 1 "
-                          "and 86400 (24 hours)");
-        }
-        return Status::OK();
-    }
+    // Don't hide Base::set(const BSONElement&)
+    using Base::set;
 
-    // Without this the compiler complains that defining set(const int&)
-    // hides set(const BSONElement&)
-    using ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>::set;
-
-    virtual Status set(const int& newValue) {
+    Status set(const int& newValue) override {
         stdx::unique_lock<stdx::mutex> lock(invalidationIntervalMutex);
-        Status status =
-            ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>::set(newValue);
+        Status status = Base::set(newValue);
         invalidationIntervalChangedCondition.notify_all();
         return status;
     }
+};
 
-} exportedIntervalParam;
+MONGO_COMPILER_VARIABLE_UNUSED auto _exportedInterval =
+    (new ExportedInvalidationIntervalParameter())
+        -> withValidator([](const int& potentialNewValue) {
+            if (potentialNewValue < 1 || potentialNewValue > 86400) {
+                return Status(ErrorCodes::BadValue,
+                              "userCacheInvalidationIntervalSecs must be between 1 "
+                              "and 86400 (24 hours)");
+            }
+            return Status::OK();
+        });
 
 StatusWith<OID> getCurrentCacheGeneration(OperationContext* opCtx) {
     try {

@@ -79,8 +79,8 @@ Session::CursorExistsFunction Session::_cursorExistsFunction;
 
 // Server parameter that dictates the lifetime given to each transaction.
 // Transactions must eventually expire to preempt storage cache pressure immobilizing the system.
-MONGO_EXPORT_SERVER_PARAMETER_WITH_VALIDATOR(
-    transactionLifetimeLimitSeconds, std::int32_t, 60, [](const auto& potentialNewValue) {
+MONGO_EXPORT_SERVER_PARAMETER(transactionLifetimeLimitSeconds, std::int32_t, 60)
+    ->withValidator([](const auto& potentialNewValue) {
         if (potentialNewValue < 1) {
             return Status(ErrorCodes::BadValue,
                           "transactionLifetimeLimitSeconds must be greater than or equal to 1s");
