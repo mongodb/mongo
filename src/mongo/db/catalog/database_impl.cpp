@@ -452,10 +452,10 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                 if (_profile != 0)
                     return Status(ErrorCodes::IllegalOperation,
                                   "turn off profiling before dropping system.profile collection");
-            } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
+            } else if (!(nss.isSystemDotViews() || nss.isHealthlog() || 
+                         nss.isSystemDotJs() ||
                          nss == SessionsCollection::kSessionsNamespaceString ||
-                         nss == NamespaceString::kSystemKeysNamespace ||
-                         nss.isSystemDotJs())) {
+                         nss == NamespaceString::kSystemKeysNamespace )) {
                 return Status(ErrorCodes::IllegalOperation,
                               str::stream() << "can't drop system collection " << fullns);
             }
