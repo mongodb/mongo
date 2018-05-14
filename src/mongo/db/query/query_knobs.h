@@ -72,6 +72,13 @@ extern AtomicInt32 internalQueryCacheFeedbacksStored;
 // and replanning?
 extern AtomicDouble internalQueryCacheEvictionRatio;
 
+// How quickly the the 'works' value in an inactive cache entry will grow. It grows
+// exponentially. The value of this server parameter is the base.
+extern AtomicDouble internalQueryCacheWorksGrowthCoefficient;
+
+// Whether or not cache entries can be marked as "inactive."
+extern AtomicBool internalQueryCacheDisableInactiveEntries;
+
 //
 // Planning and enumeration.
 //

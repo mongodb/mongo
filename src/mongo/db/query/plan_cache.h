@@ -280,19 +280,55 @@ public:
     // Annotations from cached runs.  The CachedPlanStage provides these stats about its
     // runs when they complete.
     std::vector<PlanCacheEntryFeedback*> feedback;
+
+    // Whether or not the cache entry is active. Inactive cache entries should not be used for
+    // planning.
+    bool isActive = false;
+
+    // The number of "works" required for a plan to run on this shape before it becomes
+    // active. This value is also used to determine the number of works necessary in order to
+    // trigger a replan. Running a query of the same shape while this cache entry is inactive may
+    // cause this value to be increased.
+    size_t works = 0;
 };
 
 /**
  * Caches the best solution to a query.  Aside from the (CanonicalQuery -> QuerySolution)
  * mapping, the cache contains information on why that mapping was made and statistics on the
  * cache entry's actual performance on subsequent runs.
- *
  */
 class PlanCache {
 private:
     MONGO_DISALLOW_COPYING(PlanCache);
 
 public:
+    // We have three states for a cache entry to be in. Rather than just 'present' or 'not
+    // present', we use a notion of 'inactive entries' as a way of remembering how performant our
+    // original solution to the query was. This information is useful to prevent much slower
+    // queries from putting their plans in the cache immediately, which could cause faster queries
+    // to run with a sub-optimal plan. Since cache entries must go through the "vetting" process of
+    // being inactive, we protect ourselves from the possibility of simply adding a cache entry
+    // with a very high works value which will never be evicted.
+    enum CacheEntryState {
+        // There is no cache entry for the given query shape.
+        kNotPresent,
+
+        // There is a cache entry for the given query shape, but it is inactive, meaning that it
+        // should not be used when planning.
+        kPresentInactive,
+
+        // There is a cache entry for the given query shape, and it is active.
+        kPresentActive,
+    };
+
+    /**
+     * Encapsulates the value returned from a call to get().
+     */
+    struct GetResult {
+        CacheEntryState state;
+        std::unique_ptr<CachedSolution> cachedSolution;
+    };
+
     /**
      * We don't want to cache every possible query. This function
      * encapsulates the criteria for what makes a canonical query
@@ -304,6 +340,8 @@ public:
      * If omitted, namespace set to empty string.
      */
     PlanCache();
+
+    PlanCache(size_t size);
 
     PlanCache(const std::string& ns);
 
@@ -317,26 +355,40 @@ public:
      * for passing the current time so that the time the plan cache entry was created is stored
      * in the plan cache.
      *
-     * Takes ownership of 'why'.
+     * 'worksGrowthCoefficient' specifies what multiplier to use when growing the 'works' value of
+     * an inactive cache entry.  If boost::none is provided, the function will use
+     * 'internalQueryCacheWorksGrowthCoefficient'.
      *
-     * If the mapping was added successfully, returns Status::OK().
-     * If the mapping already existed or some other error occurred, returns another Status.
+     * If the mapping was set successfully, returns Status::OK(), even if it evicted another entry.
      */
-    Status add(const CanonicalQuery& query,
+    Status set(const CanonicalQuery& query,
                const std::vector<QuerySolution*>& solns,
-               PlanRankingDecision* why,
-               Date_t now);
+               std::unique_ptr<PlanRankingDecision> why,
+               Date_t now,
+               boost::optional<double> worksGrowthCoefficient = boost::none);
+
+    /**
+     * Set a cache entry back to the 'inactive' state. Rather than completely evicting an entry
+     * when the associated plan starts to perform poorly, we deactivate it, so that plans which
+     * perform even worse than the one already in the cache may not easily take its place.
+     */
+    void deactivate(const CanonicalQuery& query);
 
     /**
      * Look up the cached data access for the provided 'query'.  Used by the query planner
      * to shortcut planning.
      *
-     * If there is no entry in the cache for the 'query', returns an error Status.
-     *
-     * If there is an entry in the cache, populates 'crOut' and returns Status::OK().  Caller
-     * owns '*crOut'.
+     * The return value will provide the "state" of the cache entry, as well as the CachedSolution
+     * for the query (if there is one).
      */
-    Status get(const CanonicalQuery& query, CachedSolution** crOut) const;
+    GetResult get(const CanonicalQuery& query) const;
+
+    /**
+     * Determine whether or not the cache should be used. If it shouldn't be used because the cache
+     * entry exists but is inactive, log a message. Returns nullptr if the cache should not be
+     * used, and a CachedSolution otherwise.
+     */
+    std::unique_ptr<CachedSolution> getCacheEntryIfCacheable(const CanonicalQuery& cq) const;
 
     /**
      * When the CachedPlanStage runs a plan out of the cache, we want to record data about the
@@ -378,13 +430,10 @@ public:
     /**
      * Returns a copy of a cache entry.
      * Used by planCacheListPlans to display plan details.
-      *
-     * If there is no entry in the cache for the 'query', returns an error Status.
      *
-     * If there is an entry in the cache, populates 'entryOut' and returns Status::OK().  Caller
-     * owns '*entryOut'.
+     * If there is no entry in the cache for the 'query', returns an error Status.
      */
-    Status getEntry(const CanonicalQuery& cq, PlanCacheEntry** entryOut) const;
+    StatusWith<std::unique_ptr<PlanCacheEntry>> getEntry(const CanonicalQuery& cq) const;
 
     /**
      * Returns a vector of all cache entries.
@@ -395,13 +444,7 @@ public:
     std::vector<PlanCacheEntry*> getAllEntries() const;
 
     /**
-     * Returns true if there is an entry in the cache for the 'query'.
-     * Internally calls hasKey() on the LRU cache.
-     */
-    bool contains(const CanonicalQuery& cq) const;
-
-    /**
-     * Returns number of entries in cache.
+     * Returns number of entries in cache. Includes inactive entries.
      * Used for testing.
      */
     size_t size() const;
@@ -415,6 +458,16 @@ public:
     void notifyOfIndexEntries(const std::vector<IndexEntry>& indexEntries);
 
 private:
+    struct NewEntryState {
+        bool shouldBeCreated = false;
+        bool shouldBeActive = false;
+    };
+
+    NewEntryState getNewEntryState(const CanonicalQuery& query,
+                                   PlanCacheEntry* oldEntry,
+                                   size_t newWorks,
+                                   double growthCoefficient);
+
     void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) const;
     void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) const;
     void encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuilder) const;

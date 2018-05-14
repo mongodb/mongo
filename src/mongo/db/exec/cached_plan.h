@@ -103,7 +103,7 @@ private:
      * We fallback to a new plan if updatePlanCache() tells us that the performance was worse
      * than anticipated during the trial period.
      *
-     * We only write the result of re-planning to the plan cache if 'shouldCache' is true.
+     * We only modify the plan cache if 'shouldCache' is true.
      */
     Status replan(PlanYieldPolicy* yieldPolicy, bool shouldCache);
 

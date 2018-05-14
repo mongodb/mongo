@@ -44,6 +44,17 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWorksGrowthCoefficient, double, 2.0)
+    ->withValidator([](const double& newVal) {
+        if (newVal <= 1.0) {
+            return Status(ErrorCodes::BadValue,
+                          "internalQueryCacheWorksGrowthCoefficient must be > 1.0");
+        }
+        return Status::OK();
+    });
+
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheDisableInactiveEntries, bool, false);
+
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);

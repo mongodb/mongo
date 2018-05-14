@@ -13,14 +13,13 @@
     let t = db.jstests_plan_cache_list_plans;
     t.drop();
 
-    // Utility function to list plans for a query.
-    function getPlans(query, sort, projection) {
+    function getPlansForCacheEntry(query, sort, projection) {
         let key = {query: query, sort: sort, projection: projection};
         let res = t.runCommand('planCacheListPlans', key);
         assert.commandWorked(res, 'planCacheListPlans(' + tojson(key, '', true) + ' failed');
         assert(res.hasOwnProperty('plans'),
                'plans missing from planCacheListPlans(' + tojson(key, '', true) + ') result');
-        return res.plans;
+        return res;
     }
 
     // Assert that timeOfCreation exists in the cache entry. The difference between the current time
@@ -48,8 +47,8 @@
     t.ensureIndex({a: 1, b: 1});
 
     // Invalid key should be an error.
-    assert.eq(0,
-              getPlans({unknownfield: 1}, {}, {}),
+    assert.eq([],
+              getPlansForCacheEntry({unknownfield: 1}, {}, {}).plans,
               'planCacheListPlans should return empty results on unknown query shape');
 
     // Create a cache entry.
@@ -61,7 +60,12 @@
     checkTimeOfCreation({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1}, now);
 
     // Retrieve plans for valid cache entry.
-    let plans = getPlans({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1});
+    let entry = getPlansForCacheEntry({a: 1, b: 1}, {a: -1}, {_id: 0, a: 1});
+    assert(entry.hasOwnProperty('works'),
+           'works missing from planCacheListPlans() result ' + tojson(entry));
+    assert.eq(entry.isActive, false);
+
+    let plans = entry.plans;
     assert.eq(2, plans.length, 'unexpected number of plans cached for query');
 
     // Print every plan
@@ -90,7 +94,10 @@
     now = (new Date()).getTime();
     checkTimeOfCreation({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1}, now);
 
-    plans = getPlans({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1});
+    entry = getPlansForCacheEntry({a: 3, b: 3}, {a: -1}, {_id: 0, a: 1});
+    assert(entry.hasOwnProperty('works'), 'works missing from planCacheListPlans() result');
+    assert.eq(entry.isActive, true);
+    plans = entry.plans;
 
     // This should be obvious but feedback is available only for the first (winning) plan.
     print('planCacheListPlans result (after adding indexes and completing 20 executions):');

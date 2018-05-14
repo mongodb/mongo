@@ -111,7 +111,16 @@
         assert.writeOK(coll.insert({a: 5, b: i}));
         assert.writeOK(coll.insert({a: i, b: 10}));
     }
+
+    // Until we get the failpoint described in the above comment (regarding SERVER-23620), we must
+    // run the query twice. The first time will create an inactive cache entry. The second run will
+    // take the same number of works, and create an active cache entry.
     assert.neq(coll.findOne({a: 5, b: 15}), null);
+    assert.neq(coll.findOne({a: 5, b: 15}), null);
+
+    // Run a query with the same shape, but with different parameters. The plan cached for the
+    // query above will perform poorly (since the selectivities are different) and we will be
+    // forced to replan.
     assert.neq(coll.findOne({a: 15, b: 10}), null);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 

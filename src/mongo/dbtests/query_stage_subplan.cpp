@@ -176,6 +176,10 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanFromCache) {
     QueryPlannerParams plannerParams;
     fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
 
+    // For the remainder of this test, ensure that cache entries are available immediately, and
+    // don't need go through an 'inactive' state before being usable.
+    internalQueryCacheDisableInactiveEntries.store(true);
+
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
         new SubplanStage(opCtx(), collection, &ws, plannerParams, cq.get()));

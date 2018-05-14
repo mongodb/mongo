@@ -119,7 +119,6 @@ void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
 namespace {
 // The body is below in the "count hack" section but getExecutor calls it.
 bool turnIxscanIntoCount(QuerySolution* soln);
-
 }  // namespace
 
 
@@ -360,11 +359,9 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     }
 
     // Try to look up a cached solution for the query.
-    CachedSolution* rawCS;
-    if (PlanCache::shouldCacheQuery(*canonicalQuery) &&
-        collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
+    if (auto cs =
+            collection->infoCache()->getPlanCache()->getCacheEntryIfCacheable(*canonicalQuery)) {
         // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
-        unique_ptr<CachedSolution> cs(rawCS);
         auto statusWithQs = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs);
 
         if (statusWithQs.isOK()) {
