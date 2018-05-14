@@ -709,23 +709,15 @@ void FreeMonProcessor::doMetricsCollect(Client* client) {
 }
 
 std::string compressMetrics(MetricsBuffer& buffer) {
+    BSONArrayBuilder payload;
 
-    std::vector<char> rawBuffer;
-
-    size_t totalReserve = std::accumulate(
-        buffer.begin(), buffer.end(), 0, [](size_t sum, auto& o) { return sum + o.objsize(); });
-
-    rawBuffer.reserve(totalReserve);
-
-    int count = 0;
     for (const auto& obj : buffer) {
-        ++count;
-        std::copy(obj.objdata(), obj.objdata() + obj.objsize(), std::back_inserter(rawBuffer));
+        payload.append(obj);
     }
+    auto arr = payload.arr();
 
     std::string outBuffer;
-
-    snappy::Compress(rawBuffer.data(), rawBuffer.size(), &outBuffer);
+    snappy::Compress(arr.objdata(), arr.objsize(), &outBuffer);
 
     return outBuffer;
 }

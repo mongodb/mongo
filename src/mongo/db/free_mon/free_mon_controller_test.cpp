@@ -136,19 +136,17 @@ private:
     std::uint32_t _wait{0};
 };
 
-std::vector<BSONObj> decompressMetrics(ConstDataRange cdr) {
+BSONArray decompressMetrics(ConstDataRange cdr) {
     std::string outBuffer;
     snappy::Uncompress(cdr.data(), cdr.length(), &outBuffer);
 
-    std::vector<BSONObj> metrics;
-    ConstDataRangeCursor cdrc(outBuffer.data(), outBuffer.data() + outBuffer.size());
-    while (!cdrc.empty()) {
-        auto swDoc = cdrc.readAndAdvance<Validated<BSONObj>>();
-        ASSERT_OK(swDoc.getStatus());
-        metrics.emplace_back(swDoc.getValue().val.getOwned());
-    }
+    ConstDataRange raw(outBuffer.data(), outBuffer.data() + outBuffer.size());
+    auto swObj = raw.read<Validated<BSONObj>>();
+    ASSERT_OK(swObj.getStatus());
+    auto obj = swObj.getValue().val;
+    ASSERT(obj.couldBeArray());
 
-    return metrics;
+    return BSONArray(obj.getOwned());
 }
 
 /**
@@ -363,12 +361,12 @@ public:
         return _metrics.load();
     }
 
-    boost::optional<std::vector<BSONObj>> waitMetricsCalls(uint32_t count, Milliseconds wait) {
+    boost::optional<BSONArray> waitMetricsCalls(uint32_t count, Milliseconds wait) {
         _countdownMetrics.reset(count);
         return _countdownMetrics.wait_for(wait);
     }
 
-    std::vector<BSONObj> getLastMetrics() {
+    BSONArray getLastMetrics() {
         stdx::lock_guard<stdx::mutex> lock(_metricsLock);
         return _lastMetrics;
     }
@@ -381,11 +379,11 @@ private:
     executor::ThreadPoolTaskExecutor* _threadPool;
 
     stdx::mutex _metricsLock;
-    std::vector<BSONObj> _lastMetrics;
+    BSONArray _lastMetrics;
 
     Options _options;
 
-    CountdownLatchResult<std::vector<BSONObj>> _countdownMetrics;
+    CountdownLatchResult<BSONArray> _countdownMetrics;
 };
 
 class FreeMonControllerTest : public ServiceContextMongoDTest {
@@ -1179,12 +1177,12 @@ TEST_F(FreeMonControllerTest, TestPreRegistrationMetricBatching) {
     controller->turnCrankForTest(Turner().metricsSend().collect(1));
 
     // Ensure we sent all the metrics batched before registration
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 4UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 4);
 
     controller->turnCrankForTest(Turner().metricsSend().collect(1));
 
     // Ensure we only send 2 metrics in the normal happy case
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 2UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 }
 
 // Negative: Test metrics buffers on failure, and retries
@@ -1200,12 +1198,12 @@ TEST_F(FreeMonControllerTest, TestMetricBatchingOnError) {
     controller->turnCrankForTest(Turner().metricsSend().collect());
 
     // Ensure we sent all the metrics batched before registration
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 2UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 
     controller->turnCrankForTest(Turner().metricsSend().collect());
 
     // Ensure we resent all the failed metrics
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 3UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 3);
 }
 
 // Negative: Test metrics buffers on failure, and retries and ensure 2 metrics occurs after a blip
@@ -1221,20 +1219,20 @@ TEST_F(FreeMonControllerTest, TestMetricBatchingOnErrorRealtime) {
 
     // Ensure the first upload sends 2 samples
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 2UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 
     // Ensure the second upload sends 3 samples because first failed
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 3UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 3);
 
     // Ensure the third upload sends 5 samples because second failed
     // Since the second retry is 2s, we collected 2 samples
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
-    ASSERT_GTE(controller.network->getLastMetrics().size(), 4UL);
+    ASSERT_GTE(controller.network->getLastMetrics().nFields(), 4);
 
     // Ensure the fourth upload sends 2 samples
     ASSERT_TRUE(controller.network->waitMetricsCalls(1, Seconds(5)).is_initialized());
-    ASSERT_EQ(controller.network->getLastMetrics().size(), 2UL);
+    ASSERT_EQ(controller.network->getLastMetrics().nFields(), 2);
 }
 
 
