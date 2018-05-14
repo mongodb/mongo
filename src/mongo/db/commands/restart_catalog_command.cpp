@@ -125,11 +125,6 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterRestartCatalogCommand)(InitializerContext* ctx) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new RestartCatalogCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(RestartCatalogCmd);
+
 }  // namespace mongo

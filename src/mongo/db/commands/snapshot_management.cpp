@@ -84,6 +84,7 @@ public:
         return true;
     }
 };
+MONGO_REGISTER_TEST_COMMAND(CmdMakeSnapshot);
 
 class CmdSetCommittedSnapshot final : public BasicCommand {
 public:
@@ -125,13 +126,5 @@ public:
         return true;
     }
 };
-
-MONGO_INITIALIZER(RegisterSnapshotManagementCommands)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new CmdMakeSnapshot();
-        new CmdSetCommittedSnapshot();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(CmdSetCommittedSnapshot);
 }

@@ -82,12 +82,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterCpuLoadCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        new CPULoadCommand();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(CPULoadCommand);
 
 
 }  // namespace mongo

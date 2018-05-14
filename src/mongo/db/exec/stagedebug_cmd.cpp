@@ -516,12 +516,6 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterStageDebugCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new StageDebugCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(StageDebugCmd);
 
 }  // namespace mongo

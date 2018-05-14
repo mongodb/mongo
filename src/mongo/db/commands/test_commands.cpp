@@ -108,6 +108,8 @@ public:
     }
 };
 
+MONGO_REGISTER_TEST_COMMAND(GodInsert);
+
 /* for diagnostic / testing purposes. Enabled via command line. */
 class CmdSleep : public BasicCommand {
 public:
@@ -198,6 +200,8 @@ public:
     }
 };
 
+MONGO_REGISTER_TEST_COMMAND(CmdSleep);
+
 // Testing only, enabled via command-line.
 class CapTrunc : public BasicCommand {
 public:
@@ -265,6 +269,8 @@ public:
     }
 };
 
+MONGO_REGISTER_TEST_COMMAND(CapTrunc);
+
 // Testing-only, enabled via command line.
 class EmptyCapped : public BasicCommand {
 public:
@@ -291,16 +297,5 @@ public:
     }
 };
 
-// ----------------------------
-
-MONGO_INITIALIZER(RegisterEmptyCappedCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new CapTrunc();
-        new CmdSleep();
-        new EmptyCapped();
-        new GodInsert();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(EmptyCapped);
 }

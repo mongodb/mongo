@@ -33,15 +33,11 @@ namespace mongo {
 /**
  * If true, then testing commands are available. Defaults to false.
  *
- * Testing commands should conditionally register themselves by consulting this flag:
+ * Testing commands should conditionally register themselves by using
+ * MONGO_REGISTER_TEST_COMMAND (in src/mongo/db/commands.h), which consults this flag:
  *
- *     MONGO_INITIALIZER(RegisterMyTestCommand)(InitializerContext* context) {
- *         if (getTestCommandsEnabled()) {
- *             // Leaked intentionally: a Command registers itself when constructed.
- *             new MyTestCommand();
- *         }
- *         return Status::OK();
- *     }
+ *     class MyTestCommand ...;
+ *     MONGO_REGISTER_TEST_COMMAND(MyTestCommand);
  *
  * To make testing commands available by default, change the value to true before running any
  * mongo initializers:

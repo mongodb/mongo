@@ -147,12 +147,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterMulticast)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        new MulticastCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(MulticastCmd);
 
 }  // namespace
 }  // namespace mongo

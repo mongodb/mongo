@@ -123,12 +123,7 @@ public:
 };
 constexpr StringData EchoCommand::Request::kCommandName;
 
-MONGO_INITIALIZER(RegisterEcho)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        new EchoCommand();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(EchoCommand);
 
 class ListCommandsCmd : public BasicCommand {
 public:

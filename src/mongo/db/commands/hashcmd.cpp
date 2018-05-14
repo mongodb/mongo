@@ -101,11 +101,5 @@ public:
         return true;
     }
 };
-MONGO_INITIALIZER(RegisterHashEltCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new CmdHashElt();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(CmdHashElt);
 }

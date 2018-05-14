@@ -149,12 +149,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterPrepareTxnCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        new CmdPrepareTxn();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(CmdPrepareTxn);
 
 class CmdAbortTxn : public BasicCommand {
 public:

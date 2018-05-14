@@ -316,13 +316,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterClearLogCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new ClearLogCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(ClearLogCmd);
 
 }  // namespace
 

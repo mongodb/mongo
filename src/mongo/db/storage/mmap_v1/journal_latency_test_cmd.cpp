@@ -151,11 +151,5 @@ public:
         return 1;
     }
 };
-MONGO_INITIALIZER(RegisterJournalLatencyTestCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new JournalLatencyTestCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(JournalLatencyTestCmd);
 }

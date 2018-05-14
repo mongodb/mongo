@@ -115,11 +115,5 @@ public:
         return true;
     }
 };
-MONGO_INITIALIZER(RegisterFaultInjectCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new FaultInjectCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(FaultInjectCmd);
 }

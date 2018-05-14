@@ -83,13 +83,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterRefreshLogicalSessionCacheNowCommand)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new RefreshLogicalSessionCacheNowCommand();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(RefreshLogicalSessionCacheNowCommand);
 
 }  // namespace
 

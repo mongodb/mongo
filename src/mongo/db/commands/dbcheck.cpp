@@ -549,11 +549,6 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterDbCheckCmd)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        new DbCheckCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(DbCheckCmd);
 }  // namespace
 }

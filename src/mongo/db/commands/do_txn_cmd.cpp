@@ -164,12 +164,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterDoTxnCommand)(InitializerContext* ctx) {
-    if (getTestCommandsEnabled()) {
-        new DoTxnCmd();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(DoTxnCmd);
 
 }  // namespace
 }  // namespace mongo

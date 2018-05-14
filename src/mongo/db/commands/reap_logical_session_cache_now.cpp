@@ -82,13 +82,7 @@ public:
     }
 };
 
-MONGO_INITIALIZER(RegisterReapLogicalSessionCacheNowCommand)(InitializerContext* context) {
-    if (getTestCommandsEnabled()) {
-        // Leaked intentionally: a Command registers itself when constructed.
-        new ReapLogicalSessionCacheNowCommand();
-    }
-    return Status::OK();
-}
+MONGO_REGISTER_TEST_COMMAND(ReapLogicalSessionCacheNowCommand);
 
 }  // namespace
 
