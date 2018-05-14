@@ -44,8 +44,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/multikey_paths.h"
-#include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -60,41 +60,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 
-#include "mongo/db/op_observer.h"
-
 namespace mongo {
-
-namespace {
-
-/**
- * Returns true if writes to the catalog entry for the input namespace require being
- * timestamped. A ghost write is when the operation is not committed with an oplog entry and
- * implies the caller will look at the logical clock to choose a time to use.
- */
-bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) {
-    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr")) {
-        return false;
-    }
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->getSettings().usingReplSets()) {
-        return false;
-    }
-
-    // Nodes in `startup` may not have yet initialized the `LogicalClock`. Primaries do not need
-    // ghost writes. Nodes in the `applyOps` (`startup2`) phase of initial sync must not timestamp
-    // index builds before the `initialDataTimestamp`. Nodes doing replication recovery (also
-    // `startup2`) must timestamp index builds. All replication recovery index builds are
-    // foregrounded and have a "commit timestamp" set.
-    const auto memberState = replCoord->getMemberState();
-    if (memberState.primary() || memberState.startup() || memberState.startup2()) {
-        return false;
-    }
-
-    return opCtx->recoveryUnit()->getCommitTimestamp().isNull();
-}
-
-}  // namespace
 
 using std::unique_ptr;
 using std::string;
@@ -193,9 +159,15 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
             }
 
             auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-            if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
-                // Primaries must timestamp the failure of an index build (via an op message).
-                // Secondaries may not fail index builds.
+            // Nodes building an index on behalf of a user (e.g: `createIndexes`, `applyOps`) may
+            // fail, removing the existence of the index from the catalog. This update must be
+            // timestamped. A failure from `createIndexes` should not have a commit timestamp and
+            // instead write a noop entry. A foreground `applyOps` index build may have a commit
+            // timestamp already set.
+            if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
+                replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+
+                // Make lock acquisition uninterruptible because writing an op message takes a lock.
                 _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                     _opCtx,
                     BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
@@ -326,9 +298,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
     auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    if (replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
+    if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
+        replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
         // Only primaries must timestamp this write. Secondaries run this from within a
-        // `TimestampBlock`
+        // `TimestampBlock`. Primaries performing an index build via `applyOps` may have a
+        // wrapping commit timestamp that will be used instead.
         _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
             _opCtx, BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: " << ns)));
     }
@@ -563,14 +537,6 @@ void MultiIndexBlockImpl::commit() {
                 _indexes[i].block->getEntry()->setMultikey(_opCtx, *multikeyPaths);
             }
         }
-    }
-
-    if (requiresGhostCommitTimestamp(_opCtx, _collection->ns())) {
-        // Only secondaries must explicitly timestamp index completion. Primaries perform this
-        // write along with an oplog entry.
-        fassert(50701,
-                _opCtx->recoveryUnit()->setTimestamp(
-                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
     }
 
     _opCtx->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));

@@ -821,6 +821,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_create',
     ],
+    LIBDEPS_PRIVATE=[
+        "logical_clock",
+    ],
 )
 
 env.Library(

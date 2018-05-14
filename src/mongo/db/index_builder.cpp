@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -52,6 +53,42 @@ using std::endl;
 AtomicUInt32 IndexBuilder::_indexBuildCount;
 
 namespace {
+
+/**
+ * Returns true if writes to the catalog entry for the input namespace require being
+ * timestamped. A ghost write is when the operation is not committed with an oplog entry and
+ * implies the caller will look at the logical clock to choose a time to use.
+ */
+bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) {
+    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr")) {
+        return false;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->getSettings().usingReplSets()) {
+        return false;
+    }
+
+    // If there is a commit timestamp already assigned, there's no need to explicitly assign a
+    // timestamp. This case covers foreground index builds.
+    if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+        return false;
+    }
+
+    // Only oplog entries (including a user's `applyOps` command) construct indexes via
+    // `IndexBuilder`. Nodes in `startup` may not yet have initialized the `LogicalClock`, however
+    // index builds during startup replication recovery must be timestamped. These index builds
+    // are foregrounded and timestamp their catalog writes with a "commit timestamp". Nodes in the
+    // oplog application phase of initial sync (`startup2`) must not timestamp index builds before
+    // the `initialDataTimestamp`.
+    const auto memberState = replCoord->getMemberState();
+    if (memberState.startup() || memberState.startup2()) {
+        return false;
+    }
+
+    return true;
+}
+
 // Synchronization tools when replication spawns a background index in a new thread.
 // The bool is 'true' when a new background index has started in a new thread but the
 // parent thread has not yet synchronized with it.
@@ -202,9 +239,14 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     if (allowBackgroundBuilding) {
         dbLock->relockWithMode(MODE_X);
     }
-    writeConflictRetry(opCtx, "Commit index build", ns.ns(), [opCtx, &indexer] {
+    writeConflictRetry(opCtx, "Commit index build", ns.ns(), [opCtx, &indexer, &ns] {
         WriteUnitOfWork wunit(opCtx);
         indexer.commit();
+        if (requiresGhostCommitTimestamp(opCtx, ns)) {
+            fassert(50701,
+                    opCtx->recoveryUnit()->setTimestamp(
+                        LogicalClock::get(opCtx)->getClusterTime().asTimestamp()));
+        }
         wunit.commit();
     });
 
