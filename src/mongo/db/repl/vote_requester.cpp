@@ -99,9 +99,14 @@ void VoteRequester::Algorithm::processResponse(const RemoteCommandRequest& reque
     }
     _responders.insert(request.target);
     ReplSetRequestVotesResponse voteResponse;
-    const auto status = voteResponse.initialize(response.data);
+    auto status = getStatusFromCommandResult(response.data);
+    if (status.isOK()) {
+        status = voteResponse.initialize(response.data);
+    }
     if (!status.isOK()) {
         logLine << "received an invalid response from " << request.target << ": " << status;
+        logLine << "; response message: " << response.data;
+        return;
     }
 
     if (voteResponse.getVoteGranted()) {
