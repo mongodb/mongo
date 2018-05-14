@@ -3,9 +3,6 @@
  * writes. The tests indirectly checks whether resetError was called by inspecting the
  * response of the getLastError command after executing the bulk ops.
  *
- * @tags: [
- *  # getLastError command is not available on embedded
- *  incompatible_with_embedded]
  */
 
 (function() {
