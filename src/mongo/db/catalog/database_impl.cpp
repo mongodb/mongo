@@ -455,7 +455,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
             } else if (!(nss.isSystemDotViews() || nss.isHealthlog() || 
                          nss.isSystemDotJs() ||
                          nss == SessionsCollection::kSessionsNamespaceString ||
-                         nss == NamespaceString::kSystemKeysNamespace )) {
+                         nss == NamespaceString::kSystemKeysNamespace)) {
                 return Status(ErrorCodes::IllegalOperation,
                               str::stream() << "can't drop system collection " << fullns);
             }
