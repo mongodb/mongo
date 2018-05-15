@@ -83,7 +83,7 @@ public:
     const boost::optional<FieldPath>& indexPath() const {
         return _indexPath;
     }
-    
+
 private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,
