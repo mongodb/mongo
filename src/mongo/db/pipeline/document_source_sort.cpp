@@ -194,6 +194,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 
     auto sortItr = std::next(itr);
     long long skipSum = 0;
+    DocumentSourceSort* curSort = dynamic_cast<DocumentSourceSort*>((*itr).get());
     while (sortItr != container->end()) {
         auto nextStage = (*sortItr).get();
 
