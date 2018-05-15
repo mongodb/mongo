@@ -706,7 +706,8 @@ public:
         kElectionTimeout,
         kPriorityTakeover,
         kStepUpRequest,
-        kCatchupTakeover
+        kCatchupTakeover,
+        kSingleNodeStepDownTimeout
     };
 
     /**

@@ -1836,6 +1836,44 @@ TEST_F(
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
+// This test checks if a primary is chosen even if there are two simultaneous elections
+// happening because of election timeout and step-down timeout in a single node replica set.
+TEST_F(ReplCoordTest, SingleNodeReplSetStepDownTimeoutAndElectionTimeoutExpiresAtTheSameTime) {
+    init();
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234"))
+                            << "protocolVersion"
+                            << 1
+                            << "settings"
+                            << BSON("electionTimeoutMillis" << 1000)),
+                       HostAndPort("test1", 1234));
+    auto opCtx = makeOperationContext();
+    getExternalState()->setElectionTimeoutOffsetLimitFraction(0);
+    runSingleNodeElection(opCtx.get());
+
+    // Stepdown command with "force=true" resets the election timer to election timeout (10 seconds
+    // later) and allows the node to resume primary after stepdown timeout (also 10 seconds).
+    ASSERT_OK(getReplCoord()->stepDown(opCtx.get(), true, Milliseconds(0), Milliseconds(1000)));
+    getNet()->enterNetwork();
+    ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+
+    // Now run time forward and make sure that the node becomes primary again when stepdown timeout
+    // and election timeout occurs at the same time.
+    Date_t stepdownUntil = getNet()->now() + Seconds(1);
+    getNet()->runUntil(stepdownUntil);
+    ASSERT_EQUALS(stepdownUntil, getNet()->now());
+    ASSERT_TRUE(getTopoCoord().getMemberState().primary());
+    getNet()->exitNetwork();
+    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+}
+
 TEST_F(ReplCoordTest, NodeBecomesPrimaryAgainWhenStepDownTimeoutExpiresInASingleNodeSet) {
     init("mySet");
 
