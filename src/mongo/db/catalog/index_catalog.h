@@ -49,6 +49,12 @@ class IndexDescriptor;
 class IndexAccessMethod;
 struct InsertDeleteOptions;
 
+struct BsonRecord {
+    RecordId id;
+    Timestamp ts;
+    const BSONObj* docPtr;
+};
+
 /**
  * how many: 1 per Collection.
  * lifecycle: attached to a Collection.

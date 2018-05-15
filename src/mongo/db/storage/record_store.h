@@ -90,11 +90,6 @@ struct Record {
     RecordData data;
 };
 
-struct BsonRecord {
-    RecordId id;
-    const BSONObj* docPtr;
-};
-
 enum ValidateCmdLevel : int {
     kValidateIndex = 0x01,
     kValidateRecordStore = 0x02,

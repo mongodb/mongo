@@ -1378,6 +1378,13 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
     for (auto bsonRecord : bsonRecords) {
         int64_t inserted;
         invariant(bsonRecord.id != RecordId());
+
+        if (!bsonRecord.ts.isNull()) {
+            Status status = opCtx->recoveryUnit()->setTimestamp(bsonRecord.ts);
+            if (!status.isOK())
+                return status;
+        }
+
         Status status = index->accessMethod()->insert(
             opCtx, *bsonRecord.docPtr, bsonRecord.id, options, &inserted);
         if (!status.isOK())
