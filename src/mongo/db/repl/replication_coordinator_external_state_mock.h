@@ -159,6 +159,11 @@ public:
     void setAreSnapshotsEnabled(bool val);
 
     /**
+     * Sets the election timeout offset limit. Default is 0.15.
+     */
+    void setElectionTimeoutOffsetLimitFraction(double val);
+
+    /**
      * Noop
      */
     virtual void setupNoopWriter(Seconds waitTime);
@@ -191,6 +196,7 @@ private:
     bool _isReadCommittedSupported = true;
     bool _areSnapshotsEnabled = true;
     OpTime _firstOpTimeOfMyTerm;
+    double _electionTimeoutOffsetLimitFraction = 0.15;
 };
 
 }  // namespace repl

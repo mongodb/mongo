@@ -1768,6 +1768,14 @@ void ReplicationCoordinatorImpl::_handleTimePassing(
         return;
     }
 
+    // For election protocol v1, call _startElectSelfIfEligibleV1 to avoid race
+    // against other elections caused by events like election timeout, replSetStepUp etc.
+    if (isV1ElectionProtocol()) {
+        _startElectSelfIfEligibleV1(
+            TopologyCoordinator::StartElectionReason::kSingleNodeStepDownTimeout);
+        return;
+    }
+
     bool wonSingleNodeElection = [this]() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _topCoord->becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(_replExecutor->now());

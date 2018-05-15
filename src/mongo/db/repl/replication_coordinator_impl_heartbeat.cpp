@@ -832,6 +832,11 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
         return;
     }
     stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // If it is not a single node replica set, no need to start an election after stepdown timeout.
+    if (reason == TopologyCoordinator::StartElectionReason::kSingleNodeStepDownTimeout &&
+        _rsConfig.getNumMembers() != 1) {
+        return;
+    }
 
     // We should always reschedule this callback even if we do not make it to the election
     // process.
@@ -864,6 +869,10 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
                 log() << "Not starting an election for a catchup takeover, "
                       << "since we are not electable due to: " << status.reason();
                 break;
+            case TopologyCoordinator::StartElectionReason::kSingleNodeStepDownTimeout:
+                log() << "Not starting an election for a single node replica set stepdown timeout, "
+                      << "since we are not electable due to: " << status.reason();
+                break;
         }
         return;
     }
@@ -881,6 +890,9 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(
             break;
         case TopologyCoordinator::StartElectionReason::kCatchupTakeover:
             log() << "Starting an election for a catchup takeover";
+            break;
+        case TopologyCoordinator::StartElectionReason::kSingleNodeStepDownTimeout:
+            log() << "Starting an election due to single node replica set stepdown timeout";
             break;
     }
 
