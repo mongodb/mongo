@@ -57,31 +57,33 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
     def run_test(self):
         """Execute drop databases hook."""
         same_db_name = None
-        try:
-            client = self._hook.fixture.mongo_client()
-            db_names = client.database_names()
-            exclude_dbs = copy.copy(self._hook.exclude_dbs)
-            if self._hook.same_db_name:
-                same_db_name = self._find_same_db_name(db_names)
-                if same_db_name:
-                    exclude_dbs.append(same_db_name)
-            self.logger.info("Dropping all databases except for %s", exclude_dbs)
-            for db_name in [db for db in db_names if db not in exclude_dbs]:
-                self.logger.info("Dropping database %s", db_name)
+        client = self._hook.fixture.mongo_client()
+        db_names = client.database_names()
+
+        exclude_dbs = copy.copy(self._hook.exclude_dbs)
+        if self._hook.same_db_name:
+            same_db_name = self._find_same_db_name(db_names)
+            if same_db_name:
+                exclude_dbs.append(same_db_name)
+        self.logger.info("Dropping all databases except for %s", exclude_dbs)
+
+        for db_name in [db for db in db_names if db not in exclude_dbs]:
+            self.logger.info("Dropping database %s", db_name)
+            try:
                 client.drop_database(db_name)
-        except:
-            self.logger.exception("Encountered an error while dropping database %s.", db)
-            raise
+            except:
+                self.logger.exception("Encountered an error while dropping database %s.", db_name)
+                raise
 
         if self._hook.same_collection_name and same_db_name:
             self.logger.info("Dropping all collections in db %s except for %s", same_db_name,
                              self._hook.same_collection_name)
-            try:
-                colls = client[same_db_name].collection_names()
-                for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
-                    self.logger.info("Dropping db %s collection %s", same_db_name, coll)
+            colls = client[same_db_name].collection_names()
+            for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
+                self.logger.info("Dropping db %s collection %s", same_db_name, coll)
+                try:
                     client[same_db_name].drop_collection(coll)
-            except:
-                self.logger.exception("Encountered an error while dropping db % collection %s.",
-                                      same_db_name, coll)
-                raise
+                except:
+                    self.logger.exception("Encountered an error while dropping db % collection %s.",
+                                          same_db_name, coll)
+                    raise
