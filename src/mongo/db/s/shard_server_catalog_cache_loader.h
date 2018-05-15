@@ -143,36 +143,6 @@ private:
     };
 
     /**
-     * This represents an update task for the persisted database metadata. The task will either be
-     * to persist an update to the shard persisted metadata store or to drop the persisted
-     * metadata for a specific database.
-     */
-    struct dbTask {
-        MONGO_DISALLOW_COPYING(dbTask);
-        dbTask(dbTask&&) = default;
-
-        /**
-         * Initializes a task for either dropping or updating the persisted metadata for the
-         * associated database. Which type of task is determined by the Status of 'swDatabaseType',
-         * whether it is NamespaceNotFound or OK.
-         *
-         * Note: swDatabaseType must always be NamespaceNotFound or OK, otherwise the constructor
-         * will invariant because there is no task to complete.
-         */
-        dbTask(StatusWith<DatabaseType> swDatabaseType, long long currentTerm);
-
-        // Always-incrementing task number to uniquely identify different tasks
-        uint64_t taskNum;
-
-        // If boost::none, indicates this task is for a drop. Otherwise, contains the refreshed
-        // database entry.
-        boost::optional<DatabaseType> dbType;
-
-        // The term in which the loader scheduled this task.
-        uint32_t termCreated;
-    };
-
-    /**
      * A list (work queue) of updates to apply to the shard persisted metadata store for a specific
      * collection. Enforces that tasks that are added to the list are either consistent:
      *
@@ -258,6 +228,36 @@ private:
     };
 
     /**
+     * This represents an update task for the persisted database metadata. The task will either be
+     * to persist an update to the shard persisted metadata store or to drop the persisted
+     * metadata for a specific database.
+     */
+    struct DBTask {
+        MONGO_DISALLOW_COPYING(DBTask);
+        DBTask(DBTask&&) = default;
+
+        /**
+         * Initializes a task for either dropping or updating the persisted metadata for the
+         * associated database. Which type of task is determined by the Status of 'swDatabaseType',
+         * whether it is NamespaceNotFound or OK.
+         *
+         * Note: swDatabaseType must always be NamespaceNotFound or OK, otherwise the constructor
+         * will invariant because there is no task to complete.
+         */
+        DBTask(StatusWith<DatabaseType> swDatabaseType, long long currentTerm);
+
+        // Always-incrementing task number to uniquely identify different tasks
+        uint64_t taskNum;
+
+        // If boost::none, indicates this task is for a drop. Otherwise, contains the refreshed
+        // database entry.
+        boost::optional<DatabaseType> dbType;
+
+        // The term in which the loader scheduled this task.
+        uint32_t termCreated;
+    };
+
+    /**
      * A list (work queue) of updates to apply to the shard persisted metadata store for a specific
      * database.
      */
@@ -272,7 +272,7 @@ private:
          * don't waste time applying changes we will just delete. If the one remaining task in the
          * list is already a drop task, the new one isn't added because it is redundant.
          */
-        void addTask(dbTask task);
+        void addTask(DBTask task);
 
         auto& front() {
             invariant(!_tasks.empty());
@@ -318,15 +318,15 @@ private:
         bool hasTasksFromThisTerm(long long term) const;
 
     private:
-        std::list<dbTask> _tasks{};
+        std::list<DBTask> _tasks{};
 
         // Condition variable which will be signaled whenever the active task from the tasks list is
         // completed. Must be used in conjunction with the loader's mutex.
         std::shared_ptr<stdx::condition_variable> _activeTaskCompletedCondVar;
     };
+    typedef std::map<std::string, DbTaskList> DbTaskLists;
 
     typedef std::map<NamespaceString, CollAndChunkTaskList> CollAndChunkTaskLists;
-    typedef std::map<std::string, DbTaskList> DbTaskLists;
 
     /**
      * Forces the primary to refresh its metadata for 'nss' and waits until this node's metadata
@@ -435,7 +435,7 @@ private:
 
     Status _ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
                                                    StringData dbName,
-                                                   dbTask task);
+                                                   DBTask task);
     /**
      * Schedules tasks in the 'nss' task list to execute until the task list is depleted.
      *

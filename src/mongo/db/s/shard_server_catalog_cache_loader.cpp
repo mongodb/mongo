@@ -740,7 +740,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
         OperationContext * opCtx, StatusWith<DatabaseType> swDatabaseType) {
         if (swDatabaseType == ErrorCodes::NamespaceNotFound) {
             Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
-                opCtx, name, dbTask{swDatabaseType, termScheduled});
+                opCtx, name, DBTask{swDatabaseType, termScheduled});
             if (!scheduleStatus.isOK()) {
                 callbackFn(opCtx, scheduleStatus);
                 return;
@@ -751,7 +751,7 @@ void ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
 
         } else if (swDatabaseType.isOK()) {
             Status scheduleStatus = _ensureMajorityPrimaryAndScheduleDbTask(
-                opCtx, name, dbTask{swDatabaseType, termScheduled});
+                opCtx, name, DBTask{swDatabaseType, termScheduled});
             if (!scheduleStatus.isOK()) {
                 callbackFn(opCtx, scheduleStatus);
                 return;
@@ -908,7 +908,7 @@ Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndCh
 }
 
 Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
-    OperationContext* opCtx, StringData dbName, dbTask task) {
+    OperationContext* opCtx, StringData dbName, DBTask task) {
     Status linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
     if (!linearizableReadStatus.isOK()) {
         return linearizableReadStatus.withContext(
@@ -1058,7 +1058,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
                                                                StringData dbName) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
-    const dbTask& task = _dbTaskLists[dbName.toString()].front();
+    const DBTask& task = _dbTaskLists[dbName.toString()].front();
 
     // If this task is from an old term and no longer valid, do not execute and return true so that
     // the task gets removed from the task list
@@ -1142,7 +1142,7 @@ ShardServerCatalogCacheLoader::collAndChunkTask::collAndChunkTask(
     }
 }
 
-ShardServerCatalogCacheLoader::dbTask::dbTask(StatusWith<DatabaseType> swDatabaseType,
+ShardServerCatalogCacheLoader::DBTask::DBTask(StatusWith<DatabaseType> swDatabaseType,
                                               long long currentTerm)
     : taskNum(taskIdGenerator.fetchAndAdd(1)), termCreated(currentTerm) {
     if (swDatabaseType.isOK()) {
@@ -1186,7 +1186,7 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(collAndChunkTa
     }
 }
 
-void ShardServerCatalogCacheLoader::DbTaskList::addTask(dbTask task) {
+void ShardServerCatalogCacheLoader::DbTaskList::addTask(DBTask task) {
     if (_tasks.empty()) {
         _tasks.emplace_back(std::move(task));
         return;
