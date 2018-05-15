@@ -194,6 +194,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 
     auto sortItr = std::next(itr);
     long long skipSum = 0;
+    DocumentSourceSort* curSort = dynamic_cast<DocumentSourceSort*>((*itr).get());
     while (sortItr != container->end()) {
         auto nextStage = (*sortItr).get();
 
@@ -206,6 +207,22 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
             container->erase(sortItr);
             sortItr = std::next(itr);
             skipSum = 0;
+        } else if (auto nextSort = dynamic_cast<DocumentSourceSort*>(nextStage)) {
+            container->erase(sortItr);
+            sortItr = std::next(itr);
+            if (pExpCtx->getDocumentComparator().evaluate((nextSort->sortKeyPattern(SortKeySerialization::kForPipelineSerialization) == (curSort->sortKeyPattern(SortKeySerialization::kForPipelineSerialization))))) { // Exact match
+                container->erase(sortItr);
+                sortItr = std::next(itr);   
+            } else {
+                if (nextSort->_sortPattern.size() == 1 && curSort->_sortPattern.size() == 1) {
+                    if ((nextSort->_sortPattern[0].fieldPath) && (curSort->_sortPattern[0].fieldPath)) {
+                        if (nextSort->_sortPattern[0].fieldPath->fullPath() == curSort->_sortPattern[0].fieldPath->fullPath()) {
+                            container->erase(sortItr);
+                            sortItr = std::next(itr); 
+                        }
+                    }
+                }
+            }
         } else if (!nextStage->constraints().canSwapWithLimit) {
             return std::next(itr);
         } else {
