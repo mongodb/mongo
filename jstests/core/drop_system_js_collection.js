@@ -1,4 +1,4 @@
-// Specific collections with system in their name should be able to be drop.
+// Should be able to drop system.js collection.
 (function() {
     "use strict";
 
