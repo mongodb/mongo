@@ -183,7 +183,7 @@ Status _failIndexBuild(MultiIndexBlock& indexer, Status status, bool allowBackgr
 Status IndexBuilder::_build(OperationContext* opCtx,
                             Database* db,
                             bool allowBackgroundBuilding,
-                            Lock::DBLock* dbLock) const {
+                            Lock::DBLock* dbLock) const try {
     const NamespaceString ns(_index["ns"].String());
 
     Collection* coll = db->getCollection(opCtx, ns);
@@ -258,5 +258,7 @@ Status IndexBuilder::_build(OperationContext* opCtx,
     }
 
     return Status::OK();
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 }
