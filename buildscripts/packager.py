@@ -242,9 +242,7 @@ class Distro(object):
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         elif self.n == 'debian':
-            if build_os == 'debian71':
-                return 'wheezy'
-            elif build_os == 'debian81':
+            if build_os == 'debian81':
                 return 'jessie'
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
@@ -261,7 +259,7 @@ class Distro(object):
 
     def build_os(self, arch):
         """Return the build os label in the binary package to download ("rhel55", "rhel62" and "rhel70"
-        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian), and "suse11"
+        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian81" for Debian), and "suse11"
         for SUSE)"""
         # Community builds only support amd64
         if arch not in ['x86_64', 'ppc64le']:
@@ -276,7 +274,7 @@ class Distro(object):
         elif self.n == 'ubuntu':
             return [ "ubuntu1204", "ubuntu1404", "ubuntu1604", ]
         elif self.n == 'debian':
-            return [ "debian71", "debian81" ]
+            return [ "debian81" ]
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -457,12 +455,8 @@ def make_deb(distro, build_os, arch, spec, srcdir):
     sdir=setupdir(distro, build_os, arch, spec)
     if re.search("debian", distro.name()):
         os.unlink(sdir+"debian/mongod.upstart")
-        if build_os == "debian71":
-            os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
-            os.unlink(sdir+"debian/mongod.service")
-        else:
-            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
-            os.unlink(sdir+"debian/init.d")
+        os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
+        os.unlink(sdir+"debian/init.d")
     elif re.search("ubuntu", distro.name()):
         os.unlink(sdir+"debian/init.d")
         if build_os in ("ubuntu1204", "ubuntu1404", "ubuntu1410"):
