@@ -68,9 +68,11 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(
         _service->scheduleJob({"LogicalSessionCacheRefresh",
                                [this](Client* client) { _periodicRefresh(client); },
                                _refreshInterval});
-        _service->scheduleJob({"LogicalSessionCacheReap",
-                               [this](Client* client) { _periodicReap(client); },
-                               _refreshInterval});
+        if (_transactionReaper) {
+            _service->scheduleJob({"LogicalSessionCacheReap",
+                                   [this](Client* client) { _periodicReap(client); },
+                                   _refreshInterval});
+        }
     }
     _stats.setLastSessionsCollectionJobTimestamp(now());
     _stats.setLastTransactionReaperJobTimestamp(now());
@@ -206,6 +208,13 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             uniqueCtx.emplace(client->makeOperationContext());
             return uniqueCtx->get();
         }();
+
+        auto res = _sessionsColl->setupSessionsCollection(opCtx);
+        if (!res.isOK()) {
+            log() << "Sessions collection is not set up; "
+                  << "waiting until next sessions reap interval: " << res.reason();
+            return Status::OK();
+        }
 
         stdx::lock_guard<stdx::mutex> lk(_reaperMutex);
         numReaped = _transactionReaper->reap(opCtx);

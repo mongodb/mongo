@@ -94,7 +94,7 @@ Query makeQuery(Date_t now) {
 /**
  * Our impl is templatized on a type which handles the lsids we see.  It provides the top level
  * scaffolding for figuring out if we're the primary node responsible for the transaction table and
- * invoking the hanlder.
+ * invoking the handler.
  *
  * The handler here will see all of the possibly expired txn ids in the transaction table and will
  * have a lifetime associated with a single call to reap.
@@ -108,6 +108,11 @@ public:
     int reap(OperationContext* opCtx) override {
         auto const coord = mongo::repl::ReplicationCoordinator::get(opCtx);
 
+        Handler handler(opCtx, *_collection);
+        if (!handler.initialize()) {
+            return 0;
+        }
+
         AutoGetCollection autoColl(
             opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
 
@@ -117,7 +122,6 @@ public:
             return 0;
         }
 
-        Handler handler(opCtx, *_collection);
         DBDirectClient client(opCtx);
 
         auto query = makeQuery(opCtx->getServiceContext()->getFastClockSource()->now());
@@ -182,6 +186,10 @@ public:
     ReplHandler(OperationContext* opCtx, SessionsCollection& sessionsCollection)
         : _opCtx(opCtx), _sessionsCollection(sessionsCollection) {}
 
+    bool initialize() {
+        return true;
+    }
+
     void handleLsid(const LogicalSessionId& lsid) {
         _batch.insert(lsid);
 
@@ -219,28 +227,19 @@ public:
     ShardedHandler(OperationContext* opCtx, SessionsCollection& sessionsCollection)
         : _opCtx(opCtx), _sessionsCollection(sessionsCollection) {}
 
-    void handleLsid(const LogicalSessionId& lsid) {
-        // There are some lifetime issues with when the reaper starts up versus when the grid is
-        // available.  Moving routing info fetching until after we have a transaction moves us past
-        // the problem.
-        //
-        // Also, we should only need the chunk case, but that'll wait until the sessions table is
-        // actually sharded.
-        if (!(_cm || _primary)) {
-            auto routingInfo =
-                uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
-                    _opCtx, SessionsCollection::kSessionsNamespaceString));
-            _cm = routingInfo.cm();
-            _primary = routingInfo.db().primary();
-        }
+    // Returns false if the sessions collection is not set up.
+    bool initialize() {
+        auto routingInfo =
+            uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
+                _opCtx, SessionsCollection::kSessionsNamespaceString));
+        _cm = routingInfo.cm();
+        return !!_cm;
+    }
 
-        ShardId shardId;
-        if (_cm) {
-            const auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
-            shardId = chunk.getShardId();
-        } else {
-            shardId = _primary->getId();
-        }
+    void handleLsid(const LogicalSessionId& lsid) {
+        invariant(_cm);
+        const auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
+        const auto shardId = chunk.getShardId();
 
         auto& lsids = _shards[shardId];
         lsids.insert(lsid);
@@ -267,7 +266,6 @@ private:
     SessionsCollection& _sessionsCollection;
 
     std::shared_ptr<ChunkManager> _cm;
-    std::shared_ptr<Shard> _primary;
 
     stdx::unordered_map<ShardId, LogicalSessionIdSet, ShardId::Hasher> _shards;
     int _numReaped{0};
