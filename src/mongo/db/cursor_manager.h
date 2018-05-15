@@ -212,8 +212,6 @@ public:
      */
     Status checkAuthForKillCursors(OperationContext* opCtx, CursorId id);
 
-    void getCursorIds(std::set<CursorId>* openCursors) const;
-
     /**
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.
      */

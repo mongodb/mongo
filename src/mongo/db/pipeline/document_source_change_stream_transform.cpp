@@ -65,22 +65,6 @@ using std::vector;
 
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
-
-bool isOpTypeRelevant(const Document& d) {
-    Value op = d["op"];
-    invariant(!op.missing());
-
-    if (op.getString() != "n") {
-        return true;
-    }
-
-    Value type = d.getNestedField("o2.type");
-    if (!type.missing() && type.getString() == "migrateChunkToNewShard") {
-        return true;
-    }
-
-    return false;
-}
 }  // namespace
 
 DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
@@ -413,9 +397,13 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::getNext() {
 }
 
 bool DocumentSourceChangeStreamTransform::isDocumentRelevant(const Document& d) {
-    if (!isOpTypeRelevant(d)) {
-        return false;
-    }
+    invariant(
+        d["op"].getType() == BSONType::String,
+        str::stream()
+            << "Unexpected format for entry within a transaction oplog entry: 'op' field was type "
+            << typeName(d["op"].getType()));
+    invariant(ValueComparator::kInstance.evaluate(d["op"] != Value("n"_sd)),
+              "Unexpected noop entry within a transaction");
 
     Value nsField = d["ns"];
     invariant(!nsField.missing());

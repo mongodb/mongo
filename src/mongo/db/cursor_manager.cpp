@@ -757,15 +757,6 @@ void CursorManager::unpin(OperationContext* opCtx,
     cursor.release();
 }
 
-void CursorManager::getCursorIds(std::set<CursorId>* openCursors) const {
-    auto allPartitions = _cursorMap->lockAllPartitions();
-    for (auto&& partition : allPartitions) {
-        for (auto&& entry : partition) {
-            openCursors->insert(entry.first);
-        }
-    }
-}
-
 void CursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {
     auto allPartitions = _cursorMap->lockAllPartitions();
     for (auto&& partition : allPartitions) {

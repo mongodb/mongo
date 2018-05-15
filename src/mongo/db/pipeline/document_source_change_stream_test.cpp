@@ -51,6 +51,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -702,6 +703,45 @@ TEST_F(ChangeStreamStageTest, TransformEmptyApplyOps) {
 
     // Should not return anything.
     ASSERT_EQ(results.size(), 0u);
+}
+
+DEATH_TEST_F(ChangeStreamStageTest, ShouldCrashWithNoopInsideApplyOps, "Unexpected noop") {
+    Document applyOpsDoc =
+        Document{{"applyOps",
+                  Value{std::vector<Document>{
+                      Document{{"op", "n"_sd},
+                               {"ns", nss.ns()},
+                               {"ui", testUuid()},
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+    LogicalSessionFromClient lsid = testLsid();
+    getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
+}
+
+DEATH_TEST_F(ChangeStreamStageTest,
+             ShouldCrashWithEntryWithoutOpFieldInsideApplyOps,
+             "Unexpected format for entry") {
+    Document applyOpsDoc =
+        Document{{"applyOps",
+                  Value{std::vector<Document>{
+                      Document{{"ns", nss.ns()},
+                               {"ui", testUuid()},
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+    LogicalSessionFromClient lsid = testLsid();
+    getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
+}
+
+DEATH_TEST_F(ChangeStreamStageTest,
+             ShouldCrashWithEntryWithNonStringOpFieldInsideApplyOps,
+             "Unexpected format for entry") {
+    Document applyOpsDoc =
+        Document{{"applyOps",
+                  Value{std::vector<Document>{
+                      Document{{"op", 2},
+                               {"ns", nss.ns()},
+                               {"ui", testUuid()},
+                               {"o", Value{Document{{"_id", 123}, {"x", "hallo"_sd}}}}}}}}};
+    LogicalSessionFromClient lsid = testLsid();
+    getApplyOpsResults(applyOpsDoc, lsid);  // Should crash.
 }
 
 TEST_F(ChangeStreamStageTest, TransformNonTransactionApplyOps) {
