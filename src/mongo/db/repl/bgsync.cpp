@@ -81,11 +81,8 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(bgSyncOplogFetcherBatchSize, int, defaultB
 // The batchSize to use for the find/getMore queries called by the rollback common point resolver.
 // A batchSize of 0 means that the 'find' and 'getMore' commands will be given no batchSize.
 constexpr int defaultRollbackBatchSize = 0;
-MONGO_EXPORT_SERVER_PARAMETER_WITH_VALIDATOR(
-    rollbackRemoteOplogQueryBatchSize,
-    int,
-    defaultRollbackBatchSize,
-    [](const auto& potentialNewValue) {
+MONGO_EXPORT_SERVER_PARAMETER(rollbackRemoteOplogQueryBatchSize, int, defaultRollbackBatchSize)
+    ->withValidator([](const auto& potentialNewValue) {
         if (potentialNewValue < 0) {
             return Status(ErrorCodes::BadValue,
                           "rollbackRemoteOplogQueryBatchSize cannot be negative.");
