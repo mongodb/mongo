@@ -12,8 +12,11 @@ load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $confi
 
 var $config = extendWorkload($config, function($config, $super) {
 
-    // TODO: make this field name even longer?
-    var length = 100;
+    // The indexedField must be limited such that the namespace and indexedField does not
+    // exceed 128 characters. The namespace defaults to // "test<i>_fsmdb<j>.fsmcoll<k>",
+    // where i, j & k are increasing integers for each test, workload and thread.
+    // See https://docs.mongodb.com/manual/reference/limits/#Index-Name-Length
+    var length = 90;
     var prefix = 'indexed_insert_long_fieldname_';
     $config.data.indexedField = prefix + new Array(length - prefix.length + 1).join('x');
     $config.data.shardKey = {};
