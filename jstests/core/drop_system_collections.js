@@ -1,14 +1,19 @@
-
+// Specific collections with system in their name should be able to be drop.
 (function() {
     "use strict";
 
-    let systemDBName = "system_collections_drop";
+    let systemDBName = "system_DB";
     let systemDB = db.getSiblingDB(systemDBName);
     systemDB.dropDatabase();
-
-    // Create collection and a view on it.
+    // Create system.js. 
     assert.writeOK(systemDB.system.js.insert({x: 1}));
-    assert.commandWorked(viewsDB.createView("view", "coll", []));
-    assert.eq(
-        viewsDB.view.find({}, {_id: 0}).toArray(), [{x: 1}], "couldn't find expected doc in view");
+  
+    assert(systemDB.system.js.drop(), "couldn't drop system.js");
+    // Database should now be empty.
+    let res = systemDB.runCommand({listCollections: 1});
+    assert.commandWorked(res);
+    assert.eq(res.cursor.firstBatch.filter((entry) => entry.name != ("system.js")),
+              [],
+              systemDBName + " is not empty after deleting system.js");
+
 })();

@@ -60,6 +60,7 @@ public:
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
+    // Name for the system js collection
     static constexpr StringData kSystemDotJsCollectionName = "system.js"_sd;
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
