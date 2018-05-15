@@ -228,11 +228,15 @@ void ReplicationCoordinatorExternalStateMock::setAreSnapshotsEnabled(bool val) {
     _areSnapshotsEnabled = val;
 }
 
+void ReplicationCoordinatorExternalStateMock::setElectionTimeoutOffsetLimitFraction(double val) {
+    _electionTimeoutOffsetLimitFraction = val;
+}
+
 void ReplicationCoordinatorExternalStateMock::notifyOplogMetadataWaiters(
     const OpTime& committedOpTime) {}
 
 double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFraction() const {
-    return 0.15;
+    return _electionTimeoutOffsetLimitFraction;
 }
 
 bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageEngine(
