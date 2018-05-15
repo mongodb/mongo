@@ -84,8 +84,6 @@ public:
         return _indexPath;
     }
     
-    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
-                                                     Pipeline::SourceContainer* container) final;
 private:
     DocumentSourceUnwind(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                          const FieldPath& fieldPath,
