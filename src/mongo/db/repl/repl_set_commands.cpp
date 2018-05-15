@@ -135,6 +135,14 @@ public:
 
             uassertStatusOK(status);
             return true;
+        } else if (cmdObj.hasElement("getLastStableCheckpointTimestamp")) {
+            boost::optional<Timestamp> ts =
+                StorageInterface::get(getGlobalServiceContext())
+                    ->getLastStableCheckpointTimestamp(getGlobalServiceContext());
+            if (ts) {
+                result.append("lastStableCheckpointTimestamp", ts.get());
+            }
+            return true;
         }
 
         Status status = replCoord->checkReplEnabledForCommand(&result);
