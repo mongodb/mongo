@@ -414,4 +414,37 @@ TEST(FailPoint, FailPointBlockBasicTest) {
 
     ASSERT_FALSE(failPoint->shouldFail());
 }
+
+TEST(FailPoint, FailPointBlockIfBasicTest) {
+    FailPoint failPoint;
+    failPoint.setMode(FailPoint::nTimes, 1, BSON("skip" << true));
+
+    {
+        bool hit = false;
+
+        MONGO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [&](const BSONObj& obj) {
+            hit = obj["skip"].trueValue();
+            return false;
+        }) {
+            ASSERT(!"shouldn't get here");
+        }
+
+        ASSERT(hit);
+    }
+
+    {
+        bool hit = false;
+
+        MONGO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [](auto) { return true; }) {
+            hit = true;
+            ASSERT(!scopedFp.getData().isEmpty());
+        }
+
+        ASSERT(hit);
+    }
+
+    MONGO_FAIL_POINT_BLOCK_IF(failPoint, scopedFp, [](auto) { return true; }) {
+        ASSERT(!"shouldn't get here");
+    }
+}
 }

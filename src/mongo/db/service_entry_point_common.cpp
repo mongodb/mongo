@@ -558,10 +558,9 @@ bool runCommandImpl(OperationContext* opCtx,
  * Maybe uassert according to the 'failCommand' fail point.
  */
 void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
-    if (failCommandIgnoreList.find(commandName) != failCommandIgnoreList.cend()) {
-        return;  // Early return to keep tidy fail point stats.
-    }
-    MONGO_FAIL_POINT_BLOCK(failCommand, data) {
+    MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
+        return failCommandIgnoreList.find(commandName) == failCommandIgnoreList.cend();
+    }) {
         bool closeConnection;
         if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&
             closeConnection) {

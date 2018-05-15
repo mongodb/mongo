@@ -141,11 +141,16 @@ void FailPoint::disableFailPoint() {
     } while (expectedCurrentVal != currentVal);
 }
 
-FailPoint::RetCode FailPoint::slowShouldFailOpenBlock() {
+FailPoint::RetCode FailPoint::slowShouldFailOpenBlock(
+    stdx::function<bool(const BSONObj&)> cb) noexcept {
     ValType localFpInfo = _fpInfo.addAndFetch(1);
 
     if ((localFpInfo & ACTIVE_BIT) == 0) {
         return slowOff;
+    }
+
+    if (cb && !cb(getData())) {
+        return userIgnored;
     }
 
     switch (_mode) {
