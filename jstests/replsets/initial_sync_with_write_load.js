@@ -90,6 +90,9 @@ assert.soon(function() {
 print("waiting for load generation to finish");
 loadGen();
 
+// Wait for initial sync to finish.
+replTest.awaitSecondaryNodes();
+
 // Make sure oplogs & dbHashes match
 replTest.checkOplogs(testName);
 replTest.checkReplicatedDataHashes(testName);
