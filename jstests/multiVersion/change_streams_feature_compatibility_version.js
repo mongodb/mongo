@@ -68,8 +68,7 @@
 
     assert.commandFailedWithCode(testDB.runCommand({
         aggregate: coll.getName(),
-        pipeline:
-            [{$changeStream: {startAtClusterTime: {ts: failedResponse.$clusterTime.clusterTime}}}],
+        pipeline: [{$changeStream: {startAtOperationTime: failedResponse.operationTime}}],
         cursor: {}
     }),
                                  40415);
@@ -102,7 +101,7 @@
     // response to use later.
     const startTime =
         assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "4.0"}))
-            .$clusterTime.clusterTime;
+            .operationTime;
 
     // Test that we can now use 4.0 features to open a stream.
     const wholeDbCursor =
@@ -110,7 +109,7 @@
     const wholeClusterCursor = adminCST.startWatchingChanges(
         {pipeline: [{$changeStream: {allChangesForCluster: true}}], collection: 1});
     const cursorStartedWithTime = cst.startWatchingChanges({
-        pipeline: [{$changeStream: {startAtClusterTime: {ts: startTime}}}],
+        pipeline: [{$changeStream: {startAtOperationTime: startTime}}],
         collection: coll.getName()
     });
 
@@ -197,7 +196,7 @@
 
     assert.commandFailedWithCode(testDB.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{$changeStream: {startAtClusterTime: {ts: startTime}}}],
+        pipeline: [{$changeStream: {startAtOperationTime: startTime}}],
         cursor: {}
     }),
                                  ErrorCodes.QueryFeatureNotAllowed);

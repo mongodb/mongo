@@ -85,14 +85,14 @@ structs:
               description: The cluster time after which we should start reporting changes.
                            Only one of resumeAfter and _resumeAfterClusterTime should be
                            specified.  For internal use only. Deprecated in 4.0, use 
-                           startAtClusterTime instead.
-          startAtClusterTime:
-              cpp_name: startAtClusterTime
-              type: ResumeTokenClusterTime 
+                           startAtOperationTime instead.
+          startAtOperationTime:
+              cpp_name: startAtOperationTime
+              type: timestamp
               optional: true
-              description: The cluster time after which we should start reporting changes.
+              description: The operation time after which we should start reporting changes.
                            Only one of resumeAfter, _resumeAfterClusterTimeDeprecated, and 
-                           startAtClusterTime should be specified.
+                           startAtOperationTime should be specified.
           fullDocument:
               cpp_name: fullDocument
               type: string

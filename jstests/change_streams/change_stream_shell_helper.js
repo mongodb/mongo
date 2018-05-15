@@ -75,7 +75,7 @@
     // Store the cluster time of the insert as the timestamp to start from.
     const resumeTime =
         assert.commandWorked(db.runCommand({insert: coll.getName(), documents: [{_id: 1, x: 1}]}))
-            .$clusterTime.clusterTime;
+            .operationTime;
 
     checkNextChange(changeStreamCursor, {docId: 1});
 
@@ -84,9 +84,9 @@
         coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}], {resumeAfter: resumeToken});
     checkNextChange(changeStreamCursor, {docId: 1});
 
-    jsTestLog("Testing watch() with pipeline and startAtClusterTime");
+    jsTestLog("Testing watch() with pipeline and startAtOperationTime");
     changeStreamCursor = coll.watch([{$project: {_id: 0, docId: "$documentKey._id"}}],
-                                    {startAtClusterTime: {ts: resumeTime}});
+                                    {startAtOperationTime: resumeTime});
     checkNextChange(changeStreamCursor, {docId: 1});
 
     jsTestLog("Testing watch() with updateLookup");

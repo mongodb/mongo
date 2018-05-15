@@ -116,8 +116,7 @@
     // Verify that a whole-db stream returns the expected sequence of changes, including the insert
     // on the other collection but NOT the changes on the other DB or the manual applyOps.
     changeStream = cst.startWatchingChanges({
-        pipeline:
-            [{$changeStream: {startAtClusterTime: {ts: startTime}}}, {$project: {"lsid.uid": 0}}],
+        pipeline: [{$changeStream: {startAtOperationTime: startTime}}, {$project: {"lsid.uid": 0}}],
         collection: 1
     });
     cst.assertNextChangesEqual(
@@ -138,7 +137,7 @@
     cst = new ChangeStreamTest(db.getSiblingDB("admin"));
     changeStream = cst.startWatchingChanges({
         pipeline: [
-            {$changeStream: {startAtClusterTime: {ts: startTime}, allChangesForCluster: true}},
+            {$changeStream: {startAtOperationTime: startTime, allChangesForCluster: true}},
             {$project: {"lsid.uid": 0}}
         ],
         collection: 1

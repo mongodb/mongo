@@ -10,21 +10,20 @@
     const changeStream = coll.watch();
 
     const insertClusterTime =
-        assert.commandWorked(coll.runCommand("insert", {documents: [{_id: 0}]}))
-            .$clusterTime.clusterTime;
+        assert.commandWorked(coll.runCommand("insert", {documents: [{_id: 0}]})).operationTime;
 
     const updateClusterTime =
         assert
             .commandWorked(
                 coll.runCommand("update", {updates: [{q: {_id: 0}, u: {$set: {updated: true}}}]}))
-            .$clusterTime.clusterTime;
+            .operationTime;
 
     const deleteClusterTime =
         assert.commandWorked(coll.runCommand("delete", {deletes: [{q: {_id: 0}, limit: 1}]}))
-            .$clusterTime.clusterTime;
+            .operationTime;
 
     const dropClusterTime =
-        assert.commandWorked(db.runCommand({drop: coll.getName()})).$clusterTime.clusterTime;
+        assert.commandWorked(db.runCommand({drop: coll.getName()})).operationTime;
 
     // Make sure each operation has a reasonable cluster time. Note that we should not assert
     // that the cluster times are equal, because the cluster time returned from the command is

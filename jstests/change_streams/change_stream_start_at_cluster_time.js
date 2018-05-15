@@ -20,9 +20,9 @@
     let next = streamToFindClusterTime.next();
     assert.eq(next.operationType, "update");
     assert.eq(next.documentKey, {_id: -1});
-    const clusterTimeOfFirstUpdate = next.clusterTime;
+    const timeOfFirstUpdate = next.clusterTime;
 
-    let changeStream = coll.watch([], {startAtClusterTime: {ts: clusterTimeOfFirstUpdate}});
+    let changeStream = coll.watch([], {startAtOperationTime: timeOfFirstUpdate});
 
     // Test that starting at the cluster time is inclusive of the first update, so we should see
     // both updates in the new stream.
@@ -36,14 +36,12 @@
     assert.eq(next.operationType, "update", tojson(next));
     assert.eq(next.documentKey._id, 1, tojson(next));
 
-    // Test that startAtClusterTime is not allowed alongside resumeAfter or
+    // Test that startAtOperationTime is not allowed alongside resumeAfter or
     // $_resumeAfterClusterTime.
     assert.commandFailedWithCode(db.runCommand({
         aggregate: coll.getName(),
-        pipeline: [{
-            $changeStream:
-                {startAtClusterTime: {ts: clusterTimeOfFirstUpdate}, resumeAfter: next._id}
-        }],
+        pipeline:
+            [{$changeStream: {startAtOperationTime: timeOfFirstUpdate, resumeAfter: next._id}}],
         cursor: {}
     }),
                                  40674);
@@ -52,8 +50,8 @@
         aggregate: coll.getName(),
         pipeline: [{
             $changeStream: {
-                startAtClusterTime: {ts: clusterTimeOfFirstUpdate},
-                $_resumeAfterClusterTime: {ts: clusterTimeOfFirstUpdate}
+                startAtOperationTime: timeOfFirstUpdate,
+                $_resumeAfterClusterTime: {ts: timeOfFirstUpdate}
             }
         }],
         cursor: {}
@@ -65,11 +63,11 @@
     resumeTimeFarFuture =
         new Timestamp(resumeTimeFarFuture.getTime() + 60 * 60 * 6, 1);  // 6 hours in the future
 
-    let changeStreamFuture = coll.watch([], {startAtClusterTime: {ts: resumeTimeFarFuture}});
+    let changeStreamFuture = coll.watch([], {startAtOperationTime: resumeTimeFarFuture});
 
     // Resume the change stream from the start of the test and verify it picks up the changes to the
     // collection. Namely, it should see two inserts followed by two updates.
-    changeStream = coll.watch([], {startAtClusterTime: {ts: testStartTime}});
+    changeStream = coll.watch([], {startAtOperationTime: testStartTime});
     assert.soon(() => changeStream.hasNext());
     next = changeStream.next();
     assert.eq(next.operationType, "insert", tojson(next));

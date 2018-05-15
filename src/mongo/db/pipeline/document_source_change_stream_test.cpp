@@ -336,7 +336,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothResumeAfterClusterTimeAndResumeAft
         40674);
 }
 
-TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtClusterTimeAndResumeAfterOptions) {
+TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
     auto expCtx = getExpCtx();
 
     // Need to put the collection in the UUID catalog so the resume token is valid.
@@ -348,8 +348,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtClusterTimeAndResumeAfterOp
             BSON(DSChangeStream::kStageName
                  << BSON("resumeAfter"
                          << makeResumeToken(kDefaultTs, testUuid(), BSON("x" << 2 << "_id" << 1))
-                         << "startAtClusterTime"
-                         << BSON("ts" << kDefaultTs)))
+                         << "startAtOperationTime"
+                         << kDefaultTs))
                 .firstElement(),
             expCtx),
         AssertionException,
@@ -366,8 +366,8 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtAndResumeAfterClusterTimeOp
     ASSERT_THROWS_CODE(DSChangeStream::createFromBson(
                            BSON(DSChangeStream::kStageName
                                 << BSON("$_resumeAfterClusterTime" << BSON("ts" << kDefaultTs)
-                                                                   << "startAtClusterTime"
-                                                                   << BSON("ts" << kDefaultTs)))
+                                                                   << "startAtOperationTime"
+                                                                   << kDefaultTs))
                                .firstElement(),
                            expCtx),
                        AssertionException,

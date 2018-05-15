@@ -130,7 +130,7 @@
         ChangeStreamTest.assertChangeStreamThrowsCode({
             db: mongosDB,
             collName: collToWatch,
-            pipeline: [{$changeStream: {startAtClusterTime: {ts: resumeTimeFirstUpdate}}}],
+            pipeline: [{$changeStream: {startAtOperationTime: resumeTimeFirstUpdate}}],
             expectedCode: 40576
         });
 

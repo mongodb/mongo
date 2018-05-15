@@ -1932,9 +1932,9 @@ var DB;
             delete options.resumeAfter;
         }
 
-        if (options.hasOwnProperty("startAtClusterTime")) {
-            changeStreamStage.startAtClusterTime = options.startAtClusterTime;
-            delete options.startAtClusterTime;
+        if (options.hasOwnProperty("startAtOperationTime")) {
+            changeStreamStage.startAtOperationTime = options.startAtOperationTime;
+            delete options.startAtOperationTime;
         }
 
         pipeline.unshift({$changeStream: changeStreamStage});
