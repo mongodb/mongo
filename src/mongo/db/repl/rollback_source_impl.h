@@ -54,7 +54,8 @@ public:
 
     RollbackSourceImpl(GetConnectionFn getConnection,
                        const HostAndPort& source,
-                       const std::string& collectionName);
+                       const std::string& collectionName,
+                       int batchSize);
 
     const OplogInterface& getOplog() const override;
 

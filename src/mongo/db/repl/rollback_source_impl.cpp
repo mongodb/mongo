@@ -43,11 +43,12 @@ namespace repl {
 
 RollbackSourceImpl::RollbackSourceImpl(GetConnectionFn getConnection,
                                        const HostAndPort& source,
-                                       const std::string& collectionName)
+                                       const std::string& collectionName,
+                                       int batchSize)
     : _getConnection(getConnection),
       _source(source),
       _collectionName(collectionName),
-      _oplog(getConnection, collectionName) {}
+      _oplog(getConnection, collectionName, batchSize) {}
 
 const OplogInterface& RollbackSourceImpl::getOplog() const {
     return _oplog;
