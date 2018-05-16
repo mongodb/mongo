@@ -42,9 +42,7 @@ void ReadOnlyCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
 }
 
 std::shared_ptr<Notification<void>> ReadOnlyCatalogCacheLoader::getChunksSince(
-    const NamespaceString& nss,
-    ChunkVersion version,
-    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
+    const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
     return _configServerLoader.getChunksSince(nss, version, callbackFn);
 }
 

@@ -58,8 +58,7 @@ public:
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
-        override;
+        GetChunksSinceCallbackFn callbackFn) override;
 
     /**
      * Sets the mocked collection entry result that getChunksSince will use to construct its return

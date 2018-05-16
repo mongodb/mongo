@@ -61,6 +61,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {

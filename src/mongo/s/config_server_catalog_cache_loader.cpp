@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/config_server_catalog_cache_loader.h"
@@ -166,10 +168,7 @@ void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* op
 }
 
 std::shared_ptr<Notification<void>> ConfigServerCatalogCacheLoader::getChunksSince(
-    const NamespaceString& nss,
-    ChunkVersion version,
-    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
-
+    const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
     auto notify = std::make_shared<Notification<void>>();
 
     uassertStatusOK(_threadPool.schedule([ this, nss, version, notify, callbackFn ]() noexcept {
