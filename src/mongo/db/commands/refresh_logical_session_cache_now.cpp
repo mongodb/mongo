@@ -62,6 +62,10 @@ public:
         return "force the logical session cache to refresh. Test command only.";
     }
 
+    bool requiresAuth() const override {
+        return false;
+    }
+
     // No auth needed because it only works when enabled via command line.
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,

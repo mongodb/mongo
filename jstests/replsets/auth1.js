@@ -93,7 +93,7 @@ load("jstests/replsets/rslib.js");
                             "find did not throw, returned: " + tojson(r))
                         .toString();
         printjson(error);
-        assert.gt(error.indexOf("not authorized"), -1, "error was non-auth");
+        assert.gt(error.indexOf("command find requires authentication"), -1, "error was non-auth");
     }
 
     doQueryOn(slave);
