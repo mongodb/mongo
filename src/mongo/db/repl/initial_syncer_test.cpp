@@ -320,8 +320,6 @@ protected:
 
         InitialSyncerOptions options;
         options.initialSyncRetryWait = Milliseconds(1);
-        options.batchLimits.bytes = 512 * 1024 * 1024U;
-        options.batchLimits.ops = 5000U;
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
         options.setMyLastOptime = [this](const OpTime& opTime,
                                          ReplicationCoordinator::DataConsistency consistency) {
