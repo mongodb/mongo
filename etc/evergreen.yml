@@ -10668,8 +10668,8 @@ buildvariants:
   - name: push
 
 
-- name: enterprise-ubuntu1604-clang-3.8-libcxx
-  display_name: "! Enterprise Ubuntu 16.04 (Clang 3.8)"
+- name: enterprise-ubuntu-dynamic-1604-clang-3.8-libcxx
+  display_name: "! Shared Library Enterprise Ubuntu 16.04 (Clang 3.8)"
   modules:
   - enterprise
   run_on:
@@ -10681,6 +10681,26 @@ buildvariants:
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1604-build
+  - name: buildscripts_test
+
+- name: ubuntu-dynamic-1604-clang-3.8-libcxx
+  display_name: "* Shared Library Ubuntu 16.04 (Clang 3.8)"
+  run_on:
+   - ubuntu1604-test
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    lang_environment: LANG=C
+    compile_flags: --link-model=dynamic --ssl CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: ""
     build_mongoreplay: true
   display_tasks:
   - *unittests
