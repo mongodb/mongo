@@ -112,10 +112,8 @@ public:
      *
      * This function is a passthrough for OplogApplier::getNextApplierBatch()
      */
-    virtual StatusWith<OplogApplier::Operations> getNextApplierBatch(
-        OperationContext* opCtx,
-        OplogBuffer* oplogBuffer,
-        const OplogApplier::BatchLimits& batchLimits) = 0;
+    virtual StatusWith<OplogApplier::Operations> getNextApplierBatch(OperationContext* opCtx,
+                                                                     OplogBuffer* oplogBuffer) = 0;
 
     /**
      * Returns the current replica set config if there is one, or an error why there isn't.

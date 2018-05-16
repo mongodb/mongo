@@ -82,7 +82,7 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOpl
 }
 
 StatusWith<OplogApplier::Operations> DataReplicatorExternalStateMock::getNextApplierBatch(
-    OperationContext* opCtx, OplogBuffer* oplogBuffer, const OplogApplier::BatchLimits&) {
+    OperationContext* opCtx, OplogBuffer* oplogBuffer) {
     OplogApplier::Operations ops;
     OplogBuffer::Value op;
     // For testing only. Return a single batch containing all of the operations in the oplog buffer.

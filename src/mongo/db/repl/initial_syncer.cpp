@@ -1448,8 +1448,7 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
     // Access common batching logic in OplogApplier using passthrough function in
     // DataReplicatorExternalState.
     auto opCtx = makeOpCtx();
-    return _dataReplicatorExternalState->getNextApplierBatch(
-        opCtx.get(), _oplogBuffer.get(), _opts.batchLimits);
+    return _dataReplicatorExternalState->getNextApplierBatch(opCtx.get(), _oplogBuffer.get());
 }
 
 StatusWith<HostAndPort> InitialSyncer::_chooseSyncSource_inlock() {
