@@ -51,8 +51,7 @@ public:
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
-        override;
+        GetChunksSinceCallbackFn callbackFn) override;
 
     void getDatabase(
         StringData dbName,

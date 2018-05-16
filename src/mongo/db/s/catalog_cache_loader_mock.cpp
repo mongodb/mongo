@@ -95,10 +95,7 @@ void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx, Strin
 }
 
 std::shared_ptr<Notification<void>> CatalogCacheLoaderMock::getChunksSince(
-    const NamespaceString& nss,
-    ChunkVersion version,
-    stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn) {
-
+    const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) {
     auto notify = std::make_shared<Notification<void>>();
 
     uassertStatusOK(_threadPool.schedule([ this, notify, callbackFn ]() noexcept {

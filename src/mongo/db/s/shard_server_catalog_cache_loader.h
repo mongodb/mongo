@@ -73,21 +73,10 @@ public:
      */
     void notifyOfCollectionVersionUpdate(const NamespaceString& nss) override;
 
-    /**
-     * This must be called serially, never in parallel, including waiting for the returned
-     * Notification to be signalled.
-     *
-     * This function is robust to unexpected version requests from the CatalogCache. Requesting
-     * versions with epoches that do not match anything on the config server will not affect or
-     * clear the locally persisted metadata. Requesting versions higher than anything previous
-     * requested, or versions lower than already requested, will not mess up the locally persisted
-     * metadata, and will return what was requested if it exists.
-     */
     std::shared_ptr<Notification<void>> getChunksSince(
         const NamespaceString& nss,
         ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn)
-        override;
+        GetChunksSinceCallbackFn callbackFn) override;
 
     void getDatabase(
         StringData dbName,
@@ -349,7 +338,8 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& catalogCacheSinceVersion,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn);
+        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)> callbackFn,
+        std::shared_ptr<Notification<void>> notify);
 
     /**
      * Refreshes chunk metadata from the config server's metadata store, and schedules maintenance
@@ -477,20 +467,18 @@ private:
     CollectionAndChangedChunks _getCompletePersistedMetadataForSecondarySinceVersion(
         OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version);
 
-    // Used by the shard primary to retrieve chunk metadata from the config server.
+    // Loader used by the shard primary to retrieve the authoritative routing metadata from the
+    // config server
     const std::unique_ptr<CatalogCacheLoader> _configServerLoader;
 
-    // Thread pool used to load chunk metadata.
+    // Thread pool used to run blocking tasks which perform disk reads and writes
     ThreadPool _threadPool;
 
+    // Registry of notifications for changes happening to the shard's on-disk routing information
     NamespaceMetadataChangeNotifications _namespaceNotifications;
 
-    // Protects the class state below.
+    // Protects the class state below
     stdx::mutex _mutex;
-
-    // Map to track in progress persisted cache updates on the shard primary.
-    CollAndChunkTaskLists _collAndChunkTaskLists;
-    DbTaskLists _dbTaskLists;
 
     // This value is bumped every time the set of currently scheduled tasks should no longer be
     // running. This includes, replica set state transitions and shutdown.
@@ -502,6 +490,9 @@ private:
 
     // The collection of operation contexts in use by all threads.
     OperationContextGroup _contexts;
+
+    CollAndChunkTaskLists _collAndChunkTaskLists;
+    DbTaskLists _dbTaskLists;
 };
 
 }  // namespace mongo

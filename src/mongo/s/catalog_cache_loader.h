@@ -63,7 +63,6 @@ public:
     static CatalogCacheLoader& get(ServiceContext* serviceContext);
     static CatalogCacheLoader& get(OperationContext* opCtx);
 
-
     /**
      * Used as a return value for getChunksSince.
      */
@@ -87,6 +86,9 @@ public:
         // contain all the chunks in the collection.
         std::vector<ChunkType> changedChunks;
     };
+
+    using GetChunksSinceCallbackFn =
+        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>;
 
     /**
      * Initializes internal state. Must be called only once when sharding state is initialized.
@@ -121,10 +123,7 @@ public:
      * Notification object can be waited on in order to ensure that.
      */
     virtual std::shared_ptr<Notification<void>> getChunksSince(
-        const NamespaceString& nss,
-        ChunkVersion version,
-        stdx::function<void(OperationContext*, StatusWith<CollectionAndChangedChunks>)>
-            callbackFn) = 0;
+        const NamespaceString& nss, ChunkVersion version, GetChunksSinceCallbackFn callbackFn) = 0;
 
     /**
      * Non-blocking call, which requests the most recent db version for the given dbName from the

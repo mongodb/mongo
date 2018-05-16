@@ -46,6 +46,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {
@@ -114,9 +115,9 @@ public:
 
         auto it = _collections.find(ns);
         if (it == _collections.end()) {
-            auto inserted = _collections.emplace(
+            auto inserted = _collections.try_emplace(
                 ns,
-                std::make_unique<CollectionShardingState>(get.owner(this), NamespaceString(ns)));
+                std::make_shared<CollectionShardingState>(get.owner(this), NamespaceString(ns)));
             invariant(inserted.second);
             it = std::move(inserted.first);
         }
@@ -156,8 +157,7 @@ public:
 private:
     mutable stdx::mutex _mutex;
 
-    using CollectionsMap =
-        stdx::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>;
+    using CollectionsMap = StringMap<std::shared_ptr<CollectionShardingState>>;
     CollectionsMap _collections;
 };
 
