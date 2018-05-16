@@ -213,7 +213,7 @@ Status handleOplogUpdate(OperationContext* opCtx,
         return status;
 
     mutablebson::Document roleDocument;
-    status = AuthorizationManager::getBSONForRole(roleGraph, roleToUpdate, roleDocument.root());
+    status = RoleGraph::getBSONForRole(roleGraph, roleToUpdate, roleDocument.root());
     if (status == ErrorCodes::RoleNotFound) {
         // The query pattern will only contain _id, no other immutable fields are present
         const FieldRef idFieldRef("_id");

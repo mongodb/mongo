@@ -158,27 +158,6 @@ public:
      */
     static const int schemaVersion28SCRAM = 5;
 
-    // TODO: Make the following functions no longer static.
-
-    /**
-     * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
-     * representation of the privileges.
-     */
-    static Status getBSONForPrivileges(const PrivilegeVector& privileges,
-                                       mutablebson::Element resultArray);
-
-    /**
-     * Takes a role name and a role graph and fills the output param "result" with a BSON
-     * representation of the role object.
-     * This function does no locking - it is up to the caller to synchronize access to the
-     * role graph.
-     * Note: The passed in RoleGraph can't be marked const because some of its accessors can
-     * actually modify it internally (to set up built-in roles).
-     */
-    static Status getBSONForRole(/*const*/ RoleGraph* graph,
-                                 const RoleName& roleName,
-                                 mutablebson::Element result);
-
     /**
      * Returns a new AuthorizationSession for use with this AuthorizationManager.
      */

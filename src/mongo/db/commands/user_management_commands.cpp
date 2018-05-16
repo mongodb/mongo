@@ -1696,7 +1696,7 @@ public:
         mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
         status = setElement.pushBack(privilegesElement);
         uassertStatusOK(status);
-        status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
+        status = Privilege::getBSONForPrivileges(privileges, privilegesElement);
         uassertStatusOK(status);
 
         BSONObjBuilder updateBSONBuilder;
@@ -1798,7 +1798,7 @@ public:
         mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
         status = setElement.pushBack(privilegesElement);
         uassertStatusOK(status);
-        status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
+        status = Privilege::getBSONForPrivileges(privileges, privilegesElement);
         uassertStatusOK(status);
 
         audit::logRevokePrivilegesFromRole(Client::getCurrent(), roleName, privilegesToRemove);

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_name.h"
@@ -84,6 +85,19 @@ public:
      * Adds to "privileges" the necessary privileges to do absolutely anything on the system.
      */
     static void generateUniversalPrivileges(PrivilegeVector* privileges);
+
+    /**
+     * Takes a role name and a role graph and fills the output param "result" with a BSON
+     * representation of the role object.
+     * This function does no locking - it is up to the caller to synchronize access to the
+     * role graph.
+     * Note: The passed in RoleGraph can't be marked const because some of its accessors can
+     * actually modify it internally (to set up built-in roles).
+     */
+    static Status getBSONForRole(/*const*/ RoleGraph* graph,
+                                 const RoleName& roleName,
+                                 mutablebson::Element result);
+
 
     /**
      * Returns an iterator over the RoleNames of the "members" of the given role.

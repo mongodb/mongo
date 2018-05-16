@@ -424,9 +424,10 @@ TEST_F(DropDatabaseTest,
 
     auto status = dropDatabase(_opCtx.get(), _nss.db().toString());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_EQUALS(status.reason(),
-                  str::stream() << "Could not drop database " << _nss.db()
-                                << " because it does not exist after dropping 1 collection(s).");
+    ASSERT_EQUALS(
+        status.reason(),
+        std::string(str::stream() << "Could not drop database " << _nss.db()
+                                  << " because it does not exist after dropping 1 collection(s)."));
 
     ASSERT_FALSE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
 }
@@ -448,9 +449,9 @@ TEST_F(DropDatabaseTest,
     auto status = dropDatabase(_opCtx.get(), _nss.db().toString());
     ASSERT_EQUALS(ErrorCodes::PrimarySteppedDown, status);
     ASSERT_EQUALS(status.reason(),
-                  str::stream() << "Could not drop database " << _nss.db()
-                                << " because we transitioned from PRIMARY to SECONDARY"
-                                << " while waiting for 1 pending collection drop(s).");
+                  std::string(str::stream() << "Could not drop database " << _nss.db()
+                                            << " because we transitioned from PRIMARY to SECONDARY"
+                                            << " while waiting for 1 pending collection drop(s)."));
 
     // Check drop-pending flag in Database after dropDatabase() fails.
     AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);

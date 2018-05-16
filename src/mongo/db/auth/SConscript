@@ -89,16 +89,53 @@ env.Library(
 )
 
 env.Library(
+    target="role_graph",
+    source=[
+        'role_graph.cpp',
+        'role_graph_builtin_roles.cpp',
+    ],
+    LIBDEPS=[
+        'auth',
+        'authprivilege',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+    ],
+)
+
+env.Library(
+    target='user_document_parser',
+    source=[
+        'user_document_parser.cpp',
+    ],
+    LIBDEPS=[
+        'auth',
+        'user',
+        'role_graph_update',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+    ],
+)
+
+env.Library(
+    target='role_graph_update',
+    source=[
+        'role_graph_update.cpp',
+    ],
+    LIBDEPS=[
+        'auth',
+        'role_graph',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+    ],
+)
+
+env.Library(
     target='auth_impl_internal',
     source=[
         'authorization_manager_impl.cpp',
         'authorization_session_impl.cpp',
         'authz_manager_external_state.cpp',
         'authz_session_external_state.cpp',
-        'role_graph.cpp',
-        'role_graph_update.cpp',
-        'role_graph_builtin_roles.cpp',
-        'user_document_parser.cpp',
         'user_set.cpp',
     ],
     LIBDEPS=[
@@ -107,8 +144,10 @@ env.Library(
         'auth_rolename',
         'authentication_restriction',
         'authprivilege',
+        'role_graph',
         'sasl_options',
         'user',
+        'user_document_parser',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -139,6 +178,7 @@ env.Library(
         'auth',
         'address_restriction',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/common',
     ]
 )

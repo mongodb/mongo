@@ -2287,10 +2287,11 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenDatab
     auto filter = BSON("x" << 1);
     auto status = storage.deleteByFilter(opCtx, nss, filter);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_EQUALS(str::stream() << "Database [nosuchdb] not found. Unable to delete documents in "
-                                << nss.ns()
-                                << " using filter "
-                                << filter,
+    ASSERT_EQUALS(std::string(str::stream()
+                              << "Database [nosuchdb] not found. Unable to delete documents in "
+                              << nss.ns()
+                              << " using filter "
+                              << filter),
                   status.reason());
 }
 
@@ -2383,12 +2384,13 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenColle
     auto filter = BSON("x" << 1);
     auto status = storage.deleteByFilter(opCtx, wrongColl, filter);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
-    ASSERT_EQUALS(
-        str::stream() << "Collection [mydb.wrongColl] not found. Unable to delete documents in "
+    ASSERT_EQUALS(std::string(
+                      str::stream()
+                      << "Collection [mydb.wrongColl] not found. Unable to delete documents in "
                       << wrongColl.ns()
                       << " using filter "
-                      << filter,
-        status.reason());
+                      << filter),
+                  status.reason());
 }
 
 TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsSuccessIfCollectionIsEmpty) {

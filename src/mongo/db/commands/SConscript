@@ -126,6 +126,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/sasl_options',
+        '$BUILD_DIR/mongo/db/auth/user_document_parser',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/common',
@@ -294,6 +295,10 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/auth/role_graph',
+        '$BUILD_DIR/mongo/db/auth/sasl_options',
+        '$BUILD_DIR/mongo/db/auth/user',
+        '$BUILD_DIR/mongo/db/auth/user_document_parser',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/catalog_impl',

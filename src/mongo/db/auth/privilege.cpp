@@ -82,4 +82,19 @@ BSONObj Privilege::toBSON() const {
     return pp.toBSON();
 }
 
+Status Privilege::getBSONForPrivileges(const PrivilegeVector& privileges,
+                                       mutablebson::Element resultArray) try {
+    for (auto& currPriv : privileges) {
+        std::string errmsg;
+        ParsedPrivilege privilege;
+        if (!ParsedPrivilege::privilegeToParsedPrivilege(currPriv, &privilege, &errmsg)) {
+            return Status(ErrorCodes::BadValue, errmsg);
+        }
+        uassertStatusOK(resultArray.appendObject("privileges", privilege.toBSON()));
+    }
+    return Status::OK();
+} catch (...) {
+    return exceptionToStatus();
+}
+
 }  // namespace mongo
