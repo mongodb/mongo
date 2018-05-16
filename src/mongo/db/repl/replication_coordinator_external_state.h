@@ -34,10 +34,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
-#include "mongo/db/repl/multiapplier.h"
-#include "mongo/db/repl/oplog_applier.h"
-#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/time_support.h"
@@ -297,11 +295,6 @@ public:
      * tailing query on non-cancellation errors.
      */
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const = 0;
-
-    /**
-     * Returns initial sync oplog application batch limits.
-     */
-    virtual OplogApplier::BatchLimits getInitialSyncBatchLimits() const = 0;
 
     /*
      * Creates noop writer instance. Setting the _noopWriter member is not protected by a guard,
