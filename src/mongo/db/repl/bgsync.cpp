@@ -80,7 +80,10 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(bgSyncOplogFetcherBatchSize, int, defaultB
 
 // The batchSize to use for the find/getMore queries called by the rollback common point resolver.
 // A batchSize of 0 means that the 'find' and 'getMore' commands will be given no batchSize.
-constexpr int defaultRollbackBatchSize = 0;
+// We set the default to 2000 to prevent the sync source from having to read too much data at once,
+// and reduce the chance of a socket timeout.
+// We choose 2000 for (10 minute timeout) * (60 sec / min) * (50 MB / second) / (16 MB / document).
+constexpr int defaultRollbackBatchSize = 2000;
 MONGO_EXPORT_SERVER_PARAMETER(rollbackRemoteOplogQueryBatchSize, int, defaultRollbackBatchSize)
     ->withValidator([](const auto& potentialNewValue) {
         if (potentialNewValue < 0) {
