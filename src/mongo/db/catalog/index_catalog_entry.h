@@ -88,7 +88,7 @@ public:
 
         virtual HeadManager* headManager() const = 0;
 
-        virtual bool isMultikey() const = 0;
+        virtual bool isMultikey(OperationContext* opCtx) const = 0;
 
         virtual MultikeyPaths getMultikeyPaths(OperationContext* opCtx) const = 0;
 
@@ -186,8 +186,8 @@ public:
     /**
      * Returns true if this index is multikey and false otherwise.
      */
-    inline bool isMultikey() const {
-        return this->_impl().isMultikey();
+    inline bool isMultikey(OperationContext* opCtx) const {
+        return this->_impl().isMultikey(opCtx);
     }
 
     /**

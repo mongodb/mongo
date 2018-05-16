@@ -952,6 +952,7 @@ void Session::_setActiveTxn(WithLock wl,
     _hasIncompleteHistory = false;
     _txnState = MultiDocumentTransactionState::kNone;
     _speculativeTransactionReadOpTime = repl::OpTime();
+    _multikeyPathInfo.clear();
 }
 
 void Session::addTransactionOperation(OperationContext* opCtx,

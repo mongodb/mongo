@@ -116,7 +116,7 @@ public:
     /**
      * Returns true if this index is multikey, and returns false otherwise.
      */
-    bool isMultikey() const final;
+    bool isMultikey(OperationContext* opCtx) const final;
 
     /**
      * Returns the path components that cause this index to be multikey if this index supports

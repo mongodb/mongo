@@ -48,6 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -165,13 +166,49 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     return _isReady;
 }
 
-bool IndexCatalogEntryImpl::isMultikey() const {
-    return _isMultikey.load();
+bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
+    auto ret = _isMultikey.load();
+    if (ret) {
+        return true;
+    }
+
+    // Multikey updates are only persisted, to disk and in memory, when the transaction
+    // commits. In the case of multi-statement transactions, a client attempting to read their own
+    // transactions writes can return wrong results if their writes include multikey changes.
+    //
+    // To accomplish this, the write-path will persist multikey changes on the `Session` object
+    // and the read-path will query this state before determining there is no interesting multikey
+    // state. Note, it's always legal, though potentially wasteful, to return `true`.
+    auto session = OperationContextSession::get(opCtx);
+    if (!session || !session->inMultiDocumentTransaction()) {
+        return false;
+    }
+
+    for (const MultikeyPathInfo& path : session->getMultikeyPathInfo()) {
+        if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-    return _indexMultikeyPaths;
+
+    auto session = OperationContextSession::get(opCtx);
+    if (!session || !session->inMultiDocumentTransaction()) {
+        return _indexMultikeyPaths;
+    }
+
+    MultikeyPaths ret = _indexMultikeyPaths;
+    for (const MultikeyPathInfo& path : session->getMultikeyPathInfo()) {
+        if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
+            MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
+        }
+    }
+
+    return ret;
 }
 
 // ---
@@ -202,7 +239,7 @@ void IndexCatalogEntryImpl::setHead(OperationContext* opCtx, RecordId newHead) {
 
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                                         const MultikeyPaths& multikeyPaths) {
-    if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
+    if (!_indexTracksPathLevelMultikeyInfo && isMultikey(opCtx)) {
         // If the index is already set as multikey and we don't have any path-level information to
         // update, then there's nothing more for us to do.
         return;
@@ -290,6 +327,16 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                 _infoCache->clearQueryCache();
             }
         });
+
+    // Keep multikey changes in memory to correctly service later reads using this index.
+    auto session = OperationContextSession::get(opCtx);
+    if (session && session->inMultiDocumentTransaction()) {
+        MultikeyPathInfo info;
+        info.nss = _collection->ns();
+        info.indexName = _descriptor->indexName();
+        info.multikeyPaths = paths;
+        session->addMultikeyPathInfo(std::move(info));
+    }
 }
 
 // ----

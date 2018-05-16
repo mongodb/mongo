@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -364,6 +365,14 @@ public:
      */
     BSONObj reportStashedState() const;
 
+    void addMultikeyPathInfo(MultikeyPathInfo info) {
+        _multikeyPathInfo.push_back(std::move(info));
+    }
+
+    const std::vector<MultikeyPathInfo>& getMultikeyPathInfo() const {
+        return _multikeyPathInfo;
+    }
+
     /**
      * Returns a new oplog entry if the given entry has transaction state embedded within in.
      * The new oplog entry will contain the operation needed to replicate the transaction
@@ -512,6 +521,10 @@ private:
     // The OpTime a speculative transaction is reading from and also the earliest opTime it
     // should wait for write concern for on commit.
     repl::OpTime _speculativeTransactionReadOpTime;
+
+    // This member is only applicable to operations running in a transaction. It is reset when a
+    // transaction state resets.
+    std::vector<MultikeyPathInfo> _multikeyPathInfo;
 };
 
 }  // namespace mongo

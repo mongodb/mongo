@@ -1093,7 +1093,7 @@ vector<BSONObj> IndexCatalogImpl::getAndClearUnfinishedIndexes(OperationContext*
 bool IndexCatalogImpl::isMultikey(OperationContext* opCtx, const IndexDescriptor* idx) {
     IndexCatalogEntry* entry = _entries.find(idx);
     invariant(entry);
-    return entry->isMultikey();
+    return entry->isMultikey(opCtx);
 }
 
 MultikeyPaths IndexCatalogImpl::getMultikeyPaths(OperationContext* opCtx,
