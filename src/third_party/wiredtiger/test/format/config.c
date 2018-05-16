@@ -33,7 +33,6 @@ static void	   config_checksum(void);
 static void	   config_compression(const char *);
 static void	   config_encryption(void);
 static const char *config_file_type(u_int);
-static CONFIG	  *config_find(const char *, size_t);
 static void	   config_in_memory(void);
 static void	   config_in_memory_check(void);
 static int	   config_is_perm(const char *);
@@ -672,6 +671,35 @@ config_reset(void)
 }
 
 /*
+ * config_find
+ *	Find a specific configuration entry.
+ */
+static CONFIG *
+config_find(const char *s, size_t len, bool fatal)
+{
+	CONFIG *cp;
+
+	for (cp = c; cp->name != NULL; ++cp)
+		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
+			return (cp);
+
+	/*
+	 * Optionally ignore unknown keywords, it makes it easier to run old
+	 * CONFIG files.
+	 */
+	if (fatal) {
+		fprintf(stderr,
+		    "%s: %s: unknown required configuration keyword\n",
+		    progname, s);
+		exit(EXIT_FAILURE);
+	}
+	fprintf(stderr,
+	    "%s: %s: WARNING, ignoring unknown configuration keyword\n",
+	    progname, s);
+	return (NULL);
+}
+
+/*
  * config_single --
  *	Set a single configuration structure value.
  */
@@ -690,7 +718,9 @@ config_single(const char *s, int perm)
 		exit(EXIT_FAILURE);
 	}
 
-	cp = config_find(s, (size_t)(ep - s));
+	if ((cp = config_find(s, (size_t)(ep - s), false)) == NULL)
+		return;
+
 	F_SET(cp, perm ? C_PERM : C_TEMP);
 	++ep;
 
@@ -876,25 +906,6 @@ config_map_isolation(const char *s, u_int *vp)
 }
 
 /*
- * config_find
- *	Find a specific configuration entry.
- */
-static CONFIG *
-config_find(const char *s, size_t len)
-{
-	CONFIG *cp;
-
-	for (cp = c; cp->name != NULL; ++cp)
-		if (strncmp(s, cp->name, len) == 0 && cp->name[len] == '\0')
-			return (cp);
-
-	fprintf(stderr,
-	    "%s: %s: unknown configuration keyword\n", progname, s);
-	config_error();
-	exit(EXIT_FAILURE);
-}
-
-/*
  * config_is_perm
  *	Return if a specific configuration entry was permanently set.
  */
@@ -903,7 +914,7 @@ config_is_perm(const char *s)
 {
 	CONFIG *cp;
 
-	cp = config_find(s, strlen(s));
+	cp = config_find(s, strlen(s), true);
 	return (F_ISSET(cp, C_PERM) ? 1 : 0);
 }
 
