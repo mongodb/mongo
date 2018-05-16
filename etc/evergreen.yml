@@ -171,7 +171,7 @@ variables:
   client_options: --numCrudClients=20 --numFsmClients=20
   mongodb_options: --rootDir=${remote_dir}-${task_id} --mongodbBinDir=${remote_dir}
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
-  mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1\"
+  mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}'\"
 
 - &replica_sets_auth
   name: replica_sets_auth
@@ -6006,7 +6006,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
 - name: powercycle_fcv3.6
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -6028,7 +6028,7 @@ tasks:
       <<: *powercycle_test
       client_options: --numCrudClients=20 --numFsmClients=20
       mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=3.6
-      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1  --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
 - name: powercycle_replication
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -6048,7 +6048,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      mongod_extra_options: --replSet=powercycle --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+      mongod_extra_options: --replSet=powercycle --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
 - name: powercycle_replication_smalloplog
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -6068,7 +6068,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      mongod_extra_options: --replSet=powercycle --mongodOptions=\"--setParameter enableTestCommands=1 --oplogSize 20 --storageEngine wiredTiger\"
+      mongod_extra_options: --replSet=powercycle --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --oplogSize 20 --storageEngine wiredTiger\"
 
 - name: powercycle_syncdelay
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -6088,7 +6088,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
     vars:
       <<: *powercycle_test
-      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --syncdelay 10 --storageEngine wiredTiger\"
+      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --syncdelay 10 --storageEngine wiredTiger\"
 
 - name: powercycle_write_concern_majority
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -6109,7 +6109,7 @@ tasks:
     vars:
       <<: *powercycle_test
       client_options: "--numCrudClients=20 --numFsmClients=20 --writeConcern='{\"w\": \"majority\"}'"
-      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --setParameter logComponentVerbosity='{storage:{recovery:2}}' --storageEngine wiredTiger\"
 
 - name: idl_tests
   depends_on:
