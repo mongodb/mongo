@@ -191,8 +191,10 @@ void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
     Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDB(opCtx, dbName, MODE_X);
     auto db = autoDB.getDb();
-    ASSERT_TRUE(db);
-    Database::dropDatabase(opCtx, db);
+    // dropDatabase can call awaitReplication more than once, so do not attempt to drop the database
+    // twice.
+    if (db)
+        Database::dropDatabase(opCtx, db);
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {
