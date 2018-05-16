@@ -320,6 +320,10 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
         return _readAtTimestamp;
     }
 
+    if (_timestampReadSource == ReadSource::kLastApplied && !_readAtTimestamp.isNull()) {
+        return _readAtTimestamp;
+    }
+
     if (_timestampReadSource == ReadSource::kMajorityCommitted) {
         invariant(!_majorityCommittedSnapshot.isNull());
         return _majorityCommittedSnapshot;
@@ -359,8 +363,8 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         }
         case ReadSource::kLastApplied: {
             if (_sessionCache->snapshotManager().getLocalSnapshot()) {
-                _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(session,
-                                                                                 _ignorePrepared);
+                _readAtTimestamp = _sessionCache->snapshotManager().beginTransactionOnLocalSnapshot(
+                    session, _ignorePrepared);
             } else {
                 WiredTigerBeginTxnBlock(session, _ignorePrepared).done();
             }

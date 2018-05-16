@@ -149,6 +149,8 @@ public:
      *  - when using ReadSource::kProvided, the timestamp provided.
      *  - when using ReadSource::kLastAppliedSnapshot, the timestamp chosen using the storage
      * engine's last applied timestamp.
+     *  - when using ReadSource::kLastApplied, the last applied timestamp at which the current
+     * storage transaction was opened, if one is open.
      *  - when using ReadSource::kMajorityCommitted, the majority committed timestamp chosen by the
      * storage engine after a transaction has been opened or after a call to
      * obtainMajorityCommittedSnapshot().
