@@ -330,10 +330,15 @@ assert = (function() {
     /**
      * Runs the given command on the 'admin' database of the provided node. Asserts that the command
      * worked but allows network errors to occur.
+     *
+     * Returns the response if the command succeeded, or undefined if the command failed, *even* if
+     * the failure was due to a network error.
      */
     assert.adminCommandWorkedAllowingNetworkError = function(node, commandObj) {
+        let res;
         try {
-            assert.commandWorked(node.adminCommand(commandObj));
+            res = node.adminCommand(commandObj);
+            assert.commandWorked(res);
         } catch (e) {
             // Ignore errors due to connection failures.
             if (!isNetworkError(e)) {
@@ -341,6 +346,7 @@ assert = (function() {
             }
             print("Caught network error: " + tojson(e));
         }
+        return res;
     };
 
     assert.time = function(f, msg, timeout /*ms*/) {

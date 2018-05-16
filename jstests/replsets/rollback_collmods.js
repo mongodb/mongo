@@ -6,7 +6,7 @@
 (function() {
     "use strict";
 
-    load("jstests/replsets/libs/rollback_test.js");
+    load("jstests/replsets/libs/rollback_test_deluxe.js");
 
     const testName = "rollback_collmods";
     const dbName = testName;
@@ -23,7 +23,7 @@
 
     function printCollectionOptions(rollbackTest, time) {
         printCollectionOptionsForNode(rollbackTest.getPrimary(), time);
-        printCollectionOptionsForNode(rollbackTest.getSecondary(), time);
+        rollbackTest.getSecondaries().forEach(node => printCollectionOptionsForNode(node, time));
     }
 
     // Operations that will be present on both nodes, before the common point.
@@ -85,7 +85,7 @@
     };
 
     // Set up Rollback Test.
-    let rollbackTest = new RollbackTest(testName);
+    let rollbackTest = new RollbackTestDeluxe(testName);
     CommonOps(rollbackTest.getPrimary());
 
     let rollbackNode = rollbackTest.transitionToRollbackOperations();

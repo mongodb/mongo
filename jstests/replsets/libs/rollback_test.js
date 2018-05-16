@@ -1,4 +1,6 @@
 /**
+ * DEPRECATED (SERVER-35002): RollbackTest is deprecated. Please use RollbackTestDeluxe instead.
+ *
  * Wrapper around ReplSetTest for testing rollback behavior. It allows the caller to easily
  * transition between stages of a rollback without having to manually operate on the replset.
  *
@@ -22,6 +24,8 @@ load("jstests/replsets/libs/two_phase_drops.js");
 load("jstests/hooks/validate_collections.js");
 
 /**
+ * DEPRECATED (SERVER-35002): RollbackTest is deprecated. Please use RollbackTestDeluxe instead.
+ *
  * This fixture allows the user to optionally pass in a custom ReplSetTest
  * to be used for the test. The underlying replica set must meet the following
  * requirements:

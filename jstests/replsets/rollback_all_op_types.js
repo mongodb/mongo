@@ -12,7 +12,7 @@
 (function() {
     "use strict";
 
-    load("jstests/replsets/libs/rollback_test.js");
+    load("jstests/replsets/libs/rollback_test_deluxe.js");
 
     let noOp = () => {};
 
@@ -346,14 +346,36 @@
     };
 
     // Set up Rollback Test.
-    let rollbackTest = new RollbackTest();
+    let rollbackTest = new RollbackTestDeluxe();
     CommonOps(rollbackTest.getPrimary());
 
     // Perform the operations that will be rolled back.
     let rollbackNode = rollbackTest.transitionToRollbackOperations();
     RollbackOps(rollbackNode);
 
-    // Wait for rollback to finish.
+    // Complete cycle one of rollback. Data consistency is checked automatically after entering
+    // steady state.
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
+
+    // Again, perform operations that will be rolled back. This time, each node in the replica set
+    // has assumed a different role and will roll back operations that were applied in a different
+    // state (e.g. as a SECONDARY as opposed to a PRIMARY).
+    rollbackNode = rollbackTest.transitionToRollbackOperations();
+    RollbackOps(rollbackNode);
+
+    // Complete cycle two of rollback.
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
+
+    // Perform operations that will be rolled back one more time.
+    rollbackNode = rollbackTest.transitionToRollbackOperations();
+    RollbackOps(rollbackNode);
+
+    // Complete cycle three of rollback. After this cycle is completed, the replica set returns to
+    // its original topology.
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     rollbackTest.transitionToSteadyStateOperations();
