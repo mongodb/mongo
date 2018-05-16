@@ -44,6 +44,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -53,13 +54,6 @@ namespace mongo {
 MONGO_FP_DECLARE(dropDatabaseHangAfterLastCollectionDrop);
 
 namespace {
-
-// This is used to wait for the collection drops to replicate to a majority of the replica set.
-// Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is supported
-// by mongod and writeConcernMajorityJournalDefault is set to true in the ReplSetConfig.
-const WriteConcernOptions kDropDatabaseWriteConcern(WriteConcernOptions::kMajority,
-                                                    WriteConcernOptions::SyncMode::UNSET,
-                                                    Minutes(10));
 
 /**
  * Removes database from catalog and writes dropDatabase entry to oplog.
@@ -228,14 +222,35 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             return latestDropPendingOpTime;
         }();
 
+        // The user-supplied wTimeout should be used when waiting for majority write concern.
+        const auto& userWriteConcern = opCtx->getWriteConcern();
+        const auto wTimeout = !userWriteConcern.usedDefault
+            ? Milliseconds{userWriteConcern.wTimeout}
+            : duration_cast<Milliseconds>(Minutes(10));
+
+        // This is used to wait for the collection drops to replicate to a majority of the replica
+        // set. Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling
+        // is supported by mongod and writeConcernMajorityJournalDefault is set to true in the
+        // ReplSetConfig.
+        const WriteConcernOptions dropDatabaseWriteConcern(
+            WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, wTimeout);
+
         log() << "dropDatabase " << dbName << " waiting for " << awaitOpTime
-              << " to be replicated at " << kDropDatabaseWriteConcern.toBSON() << ". Dropping "
+              << " to be replicated at " << dropDatabaseWriteConcern.toBSON() << ". Dropping "
               << numCollectionsToDrop << " collections, with last collection drop at "
               << latestDropPendingOpTime;
-        auto result = replCoord->awaitReplication(opCtx, awaitOpTime, kDropDatabaseWriteConcern);
-        const auto& status = result.status;
-        if (!status.isOK()) {
-            return status.withContext(
+
+        auto result = replCoord->awaitReplication(opCtx, awaitOpTime, dropDatabaseWriteConcern);
+
+        // If the user-provided write concern is weaker than majority, this is effectively a no-op.
+        if (result.status.isOK() && !userWriteConcern.usedDefault) {
+            log() << "dropDatabase " << dbName << " waiting for " << awaitOpTime
+                  << " to be replicated at " << userWriteConcern.toBSON();
+            result = replCoord->awaitReplication(opCtx, awaitOpTime, userWriteConcern);
+        }
+
+        if (!result.status.isOK()) {
+            return result.status.withContext(
                 str::stream() << "dropDatabase " << dbName << " failed waiting for "
                               << numCollectionsToDrop
                               << " collection drops (most recent drop optime: "
