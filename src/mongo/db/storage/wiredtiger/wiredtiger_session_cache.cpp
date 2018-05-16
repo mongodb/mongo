@@ -126,52 +126,6 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
     return c;
 }
 
-WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, bool ignorePrepare)
-    : _session(session) {
-    invariant(!_rollback);
-    invariantWTOK(
-        _session->begin_transaction(_session, ignorePrepare ? "ignore_prepare=true" : nullptr));
-    _rollback = true;
-}
-
-WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, std::string config)
-    : _session(session) {
-    invariant(!_rollback);
-    invariantWTOK(_session->begin_transaction(_session, config.c_str()));
-    _rollback = true;
-}
-
-WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
-    if (_rollback) {
-        invariant(_session->rollback_transaction(_session, nullptr) == 0);
-    }
-}
-
-Status WiredTigerBeginTxnBlock::setTimestamp(Timestamp readTimestamp, bool roundToOldest) {
-    invariant(_rollback);
-    char readTSConfigString[15 /* read_timestamp= */ + 16 /* 16 hexadecimal digits */ +
-                            17 /* ,round_to_oldest= */ + 5 /* false */ + 1 /* trailing null */];
-    auto size = std::snprintf(readTSConfigString,
-                              sizeof(readTSConfigString),
-                              "read_timestamp=%llx,round_to_oldest=%s",
-                              readTimestamp.asULL(),
-                              (roundToOldest) ? "true" : "false");
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(40664);
-    }
-    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
-
-    auto status = wtRCToStatus(_session->timestamp_transaction(_session, readTSConfigString));
-    return status;
-}
-
-void WiredTigerBeginTxnBlock::done() {
-    invariant(_rollback);
-    _rollback = false;
-}
-
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     invariant(_session);
     invariant(cursor);

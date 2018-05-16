@@ -33,17 +33,10 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 
-#include <algorithm>
-#include <cstdio>
-
-#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -90,9 +83,9 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     return *_committedSnapshot;
 }
 
-Timestamp WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(WT_SESSION* session,
-                                                                     bool ignorePrepare) const {
-    WiredTigerBeginTxnBlock txnOpen(session, ignorePrepare);
+Timestamp WiredTigerSnapshotManager::beginTransactionOnLocalSnapshot(
+    WT_SESSION* session, WiredTigerBeginTxnBlock::IgnorePrepared ignorePrepared) const {
+    WiredTigerBeginTxnBlock txnOpen(session, ignorePrepared);
 
     stdx::lock_guard<stdx::mutex> lock(_localSnapshotMutex);
     invariant(_localSnapshot);

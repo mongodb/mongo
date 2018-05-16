@@ -35,6 +35,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot_manager.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -68,7 +69,8 @@ public:
      *
      * Throws if no local snapshot has been set.
      */
-    Timestamp beginTransactionOnLocalSnapshot(WT_SESSION* session, bool ignorePrepare) const;
+    Timestamp beginTransactionOnLocalSnapshot(
+        WT_SESSION* session, WiredTigerBeginTxnBlock::IgnorePrepared ignorePrepared) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to

@@ -41,6 +41,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/timer.h"
 
@@ -166,7 +167,8 @@ private:
 
     // Ignoring prepared transactions will not return prepare conflicts and allow seeing prepared,
     // but uncommitted data.
-    bool _ignorePrepared = false;
+    WiredTigerBeginTxnBlock::IgnorePrepared _ignorePrepared{
+        WiredTigerBeginTxnBlock::IgnorePrepared::kNoIgnore};
     Timestamp _commitTimestamp;
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
