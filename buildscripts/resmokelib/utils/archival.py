@@ -51,11 +51,8 @@ def directory_size(directory):
             try:
                 dir_bytes += os.path.getsize(full_name)
             except OSError:
-                # Symlinks generate an error and are ignored.
-                if os.path.islink(full_name):
-                    pass
-                else:
-                    raise
+                # A file might be deleted while we are looping through the os.walk() result.
+                pass
     return dir_bytes
 
 
