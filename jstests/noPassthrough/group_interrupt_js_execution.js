@@ -28,6 +28,7 @@
                 initial: {count: 0},
                 reduce: function(obj, prev) {
                     while (1) {
+                        sleep(1000);
                     }
                 }
             }),
