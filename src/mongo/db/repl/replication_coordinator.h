@@ -715,7 +715,10 @@ public:
 
     /*
     * Handles an incoming replSetRequestVotes command.
-    * Adds BSON to 'resultObj'; returns a Status with either OK or an error message.
+    *
+    * Populates the given 'response' object with the result of the request. If there is a failure
+    * processing the vote request, returns an error status. If an error is returned, the value of
+    * the populated 'response' object is invalid.
     */
     virtual Status processReplSetRequestVotes(OperationContext* opCtx,
                                               const ReplSetRequestVotesArgs& args,

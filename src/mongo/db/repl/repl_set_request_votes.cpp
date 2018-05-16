@@ -61,8 +61,10 @@ private:
         ReplSetRequestVotesResponse response;
         status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);
+        uassertStatusOK(status);
+
         response.addToBSON(&result);
-        return CommandHelpers::appendCommandStatusNoThrow(result, status);
+        return true;
     }
 } cmdReplSetRequestVotes;
 

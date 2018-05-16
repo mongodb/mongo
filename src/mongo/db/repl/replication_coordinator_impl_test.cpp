@@ -5512,6 +5512,67 @@ TEST_F(ReplCoordTest, NodeDoesNotStoreDryRunVotes) {
     ASSERT_EQUALS(lastVote.getValue().getCandidateIndex(), 0);
 }
 
+TEST_F(ReplCoordTest, NodeFailsVoteRequestIfItFailsToStoreLastVote) {
+    // Set up a 2-node replica set config.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id"
+                                                  << 1))),
+                       HostAndPort("node1", 12345));
+    auto time = OpTimeWithTermOne(100, 1);
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(time);
+    getReplCoord()->setMyLastDurableOpTime(time);
+    simulateSuccessfulV1Election();
+
+    // Get our current term, as primary.
+    ASSERT(getReplCoord()->getMemberState().primary());
+    auto initTerm = getReplCoord()->getTerm();
+
+    auto opCtx = makeOperationContext();
+
+    ReplSetRequestVotesArgs args;
+    ASSERT_OK(args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
+                                                         << "mySet"
+                                                         << "term"
+                                                         << initTerm + 1  // term of new candidate.
+                                                         << "candidateIndex"
+                                                         << 1LL
+                                                         << "configVersion"
+                                                         << 2LL
+                                                         << "dryRun"
+                                                         << false
+                                                         << "lastCommittedOp"
+                                                         << time.asOpTime().toBSON())));
+    ReplSetRequestVotesResponse response;
+
+    // Simulate a failure to write the 'last vote' document. The specific error code isn't
+    // important.
+    getExternalState()->setStoreLocalLastVoteDocumentStatus(
+        Status(ErrorCodes::OutOfDiskSpace, "failed to write last vote document"));
+
+    // Make sure the vote request fails. If an error is returned, the filled out response is
+    // invalid, so we do not check its contents.
+    auto status = getReplCoord()->processReplSetRequestVotes(opCtx.get(), args, &response);
+    ASSERT_EQ(ErrorCodes::OutOfDiskSpace, status.code());
+
+    auto lastVote = unittest::assertGet(getExternalState()->loadLocalLastVoteDocument(opCtx.get()));
+
+    // The last vote doc should store the vote of the first election, not the one we failed to cast
+    // our vote in.
+    ASSERT_EQUALS(lastVote.getTerm(), initTerm);
+    ASSERT_EQUALS(lastVote.getCandidateIndex(), 0);
+}
+
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl
