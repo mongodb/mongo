@@ -21,6 +21,11 @@ selector:
   - jstests/core/top.js
   - jstests/core/views/views_stats.js
 
+  # These test run commands using legacy queries, which are not supported on sessions.
+  - jstests/core/exhaust.js
+  - jstests/core/max_time_ms.js
+  - jstests/core/validate_cmd_ns.js
+
   # TODO SERVER-31249: getLastError should not be affected by no-op retries.
   - jstests/core/bulk_legacy_enforce_gle.js
 

@@ -112,6 +112,13 @@ DBQuery.prototype._exec = function() {
             var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
             this._cursor = new DBCommandCursor(this._db, cmdRes, this._batchSize);
         } else {
+            // Note that depending on how SERVER-32064 is implemented, we may need to alter this
+            // check to account for implicit sessions, so that exhaust cursors can still be used in
+            // the shell.
+            if (this._db.getSession().getSessionId() !== null) {
+                throw new Error("Cannot run a legacy query on a session.");
+            }
+
             if (this._special && this._query.readConcern) {
                 throw new Error("readConcern requires use of read commands");
             }

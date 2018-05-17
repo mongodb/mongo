@@ -7,6 +7,11 @@ selector:
   # Transactions are not supported on MongoDB standalone nodes.
   - jstests/core/txns/**/*.js
 
+  # These test run commands using legacy queries, which are not supported on sessions.
+  - jstests/core/exhaust.js
+  - jstests/core/max_time_ms.js
+  - jstests/core/validate_cmd_ns.js
+
 executor:
   archive:
     hooks:
