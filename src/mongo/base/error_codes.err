@@ -256,6 +256,7 @@ error_code("FreeMonHttpPermanentFailure", 255)
 error_code("TransactionCommitted", 256)
 error_code("TransactionTooLarge", 257)
 error_code("UnknownFeatureCompatibilityVersion", 258);
+error_code("KeyedExecutorRetry", 259);
 
 # Error codes 4000-8999 are reserved.
 
