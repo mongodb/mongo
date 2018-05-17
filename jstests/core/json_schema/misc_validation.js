@@ -22,6 +22,9 @@
 (function() {
     "use strict";
 
+    // For arrayEq.
+    load("jstests/aggregation/extras/utils.js");
+
     const testName = "json_schema_misc_validation";
     const testDB = db.getSiblingDB(testName);
     assert.commandWorked(testDB.dropDatabase());
@@ -98,7 +101,7 @@
     assert.writeOK(coll.insert({a: "str"}));
     assert.writeOK(coll.insert({a: ["STR", "str"]}));
 
-    assert.eq([1, 2], coll.distinct("a", {$jsonSchema: {properties: {a: {type: "number"}}}}));
+    assert(arrayEq([1, 2], coll.distinct("a", {$jsonSchema: {properties: {a: {type: "number"}}}})));
 
     // Test that $jsonSchema in a query does not respect the collection-default collation.
     let schema = {properties: {a: {enum: ["STR"]}}};
