@@ -10,7 +10,8 @@ var RetryableWritesUtil = (function() {
      */
     function isRetryableCode(code) {
         return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||
-            ErrorCodes.isWriteConcernError(code) || ErrorCodes.isInterruption(code);
+            ErrorCodes.isWriteConcernError(code) || ErrorCodes.isShutdownError(code) ||
+            ErrorCodes.isInterruption(code);
     }
 
     const kRetryableWriteCommands =

@@ -23,7 +23,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
     def __init__(  # pylint: disable=too-many-arguments
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-            stepdown_duration_secs=10, stepdown_interval_ms=8000, kill=False):
+            stepdown_duration_secs=10, stepdown_interval_ms=8000, terminate=False, kill=False):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -33,6 +33,12 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             shard_stepdown: whether to stepdown the shard replica sets in a sharded cluster.
             stepdown_duration_secs: the number of seconds to step down the primary.
             stepdown_interval_ms: the number of milliseconds between stepdowns.
+            terminate: shut down the node cleanly as a means of stepping it down.
+            kill: With a 50% probability, kill the node instead of shutting it down cleanly.
+
+        Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
+        "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
+        so we use a different means to achieve the same result as sending SIGTERM or SIGKILL.
         """
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousStepdown.DESCRIPTION)
 
@@ -44,15 +50,18 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
         self._rs_fixtures = []
         self._stepdown_thread = None
+
+        # kill implies terminate.
+        self._terminate = terminate or kill
         self._kill = kill
 
     def before_suite(self, test_report):
         """Before suite."""
         if not self._rs_fixtures:
             self._add_fixture(self._fixture)
-        self._stepdown_thread = _StepdownThread(self.logger, self._rs_fixtures,
-                                                self._stepdown_interval_secs,
-                                                self._stepdown_duration_secs, self._kill)
+        self._stepdown_thread = _StepdownThread(
+            self.logger, self._rs_fixtures, self._stepdown_interval_secs,
+            self._stepdown_duration_secs, self._terminate, self._kill)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -97,7 +106,8 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
-            self, logger, rs_fixtures, stepdown_interval_secs, stepdown_duration_secs, kill):
+            self, logger, rs_fixtures, stepdown_interval_secs, stepdown_duration_secs, terminate,
+            kill):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -105,6 +115,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._rs_fixtures = rs_fixtures
         self._stepdown_interval_secs = stepdown_interval_secs
         self._stepdown_duration_secs = stepdown_duration_secs
+        self._terminate = terminate
         self._kill = kill
 
         self._last_exec = time.time()
@@ -203,10 +214,13 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             raise errors.ServerFailure("ReplicaSetFixture expected to be running in"
                                        " ContinuousStepdown, but wasn't.")
 
-        if self._kill:
-            self.logger.info("Killing the primary on port %d of replica set '%s'.", primary.port,
+        if self._terminate:
+            should_kill = self._kill and random.choice([True, False])
+            action = "Killing" if should_kill else "Terminating"
+            self.logger.info("%s the primary on port %d of replica set '%s'.", action, primary.port,
                              rs_fixture.replset_name)
-            primary.mongod.stop(kill=True)
+
+            primary.mongod.stop(kill=should_kill)
             primary.mongod.wait()
         else:
             self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
@@ -251,7 +265,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                                  chosen.port, rs_fixture.replset_name)
                 secondaries.remove(chosen)
 
-        if self._kill:
+        if self._terminate:
             self.logger.info("Attempting to restart the old primary on port %d of replica set '%s.",
                              primary.port, rs_fixture.replset_name)
 

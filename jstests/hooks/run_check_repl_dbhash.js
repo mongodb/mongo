@@ -10,7 +10,11 @@
         try {
             TestData = testData;
             const excludedDBs = jsTest.options().excludedDBsFromDBHash;
-            new ReplSetTest(hosts[0]).checkReplicatedDataHashes(undefined, excludedDBs);
+            const rst = new ReplSetTest(hosts[0]);
+            rst.checkReplicatedDataHashes(undefined, excludedDBs);
+            if (TestData.checkCollectionCounts) {
+                rst.checkCollectionCounts();
+            }
             return {ok: 1};
         } catch (e) {
             return {ok: 0, hosts: hosts, error: e.toString(), stack: e.stack};

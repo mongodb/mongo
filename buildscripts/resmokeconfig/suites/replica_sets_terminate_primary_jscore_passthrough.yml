@@ -77,7 +77,7 @@ selector:
   # explain command to run.
   - jstests/core/explain2.js
 
-  # Starts a parallel shell but won't restart it after unclean shutdown.
+  # Starts a parallel shell but won't restart it after shutdown.
   # TODO SERVER-33229: Remove these exclusions
   - jstests/core/compact_keeps_indexes.js
   - jstests/core/find_and_modify_concurrent_update.js
@@ -120,23 +120,9 @@ selector:
   # "Cowardly refusing to run test with overridden write concern when it uses a command that can
   #  only perform w=1 writes: ..."
   - requires_eval_command
-  ##
-  # The next three tags corresponds to the special errors thrown by the error_on_fast_count.js
-  # override when it refuses to run commands that are innacurate after an unclean shutdown. Above
-  # each tag is the message that causes the tag to be warranted.
-  ##
-  # "Cowardly fail if fastcount is run with a mongod that had an unclean shutdown: ..."
-  - requires_fastcount
-  # "Cowardly fail if dbStats is run with a mongod that had an unclean shutdown: ..."
-  - requires_dbstats
-  # "Cowardly fail if collStats is run with a mongod that had an unclean shutdown: ..."
-  - requires_collstats
-  # "Cowardly fail if unbounded dataSize is run with a mongod that had an unclean shutdown: ..."
-  - requires_datasize
 
 executor:
   archive:
-    tests: true
     hooks:
       - CheckReplDBHash
       - CheckReplOplogs
@@ -150,7 +136,6 @@ executor:
         db = connect(TestData.connectionString);
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/set_read_and_write_concerns.js");
-        load("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
         load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
       global_vars:
         TestData:
@@ -171,13 +156,20 @@ executor:
       readMode: commands
   hooks:
   - class: ContinuousStepdown
-    kill: true
+    terminate: true
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
   - class: CheckReplDBHash
   - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          checkCollectionCounts: true
+          # TODO: remove after SERVER-34241
+          skipValidationNamespaces:
+          - config.transactions
   - class: CleanEveryN
     n: 20
   fixture:
@@ -200,4 +192,3 @@ executor:
       settings:
         # Speeds up failover, reduces chance DBClientRS times out retargeting the primary.
         electionTimeoutMillis: 6500
-        catchUpTimeoutMillis: 0
