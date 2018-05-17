@@ -9207,7 +9207,7 @@ buildvariants:
   - rocksdb
   run_on:
   - ubuntu1404-test
-  batchtime: 1440 # 1 day
+  batchtime: 120960 # 12 weeks
   expansions:
     build_rocksdb: true
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
