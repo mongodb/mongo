@@ -526,7 +526,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "aggregate",
                                           "authenticate",
                                           "buildInfo",
-                                          "captrunc",
                                           "clearLog",
                                           "cloneCollectionAsCapped",
                                           "collMod",
@@ -548,7 +547,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "dropDatabase",
                                           "dropIndexes",
                                           "echo",
-                                          "emptycapped",
                                           "endSessions",
                                           "explain",
                                           "features",
@@ -563,7 +561,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "getPrevError",
                                           "getShardMap",
                                           "getnonce",
-                                          "godinsert",
                                           "hostInfo",
                                           "insert",
                                           "isMaster",
@@ -606,8 +603,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "startSession",
                                           "trimMemory",
                                           "update",
-                                          "validate",
-                                          "whatsmyuri"};
+                                          "validate"};
     std::sort(whitelist.begin(), whitelist.end());
 
     mongo::BSONObj listCommandsObj = mongo::fromjson("{ listCommands: 1 }");

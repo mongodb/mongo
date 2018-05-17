@@ -216,6 +216,7 @@ env.Library(
         "rename_collection_cmd.cpp",
         "repair_cursor.cpp",
         "run_aggregate.cpp",
+        "sleep_command.cpp",
         "validate.cpp",
         "write_commands/write_commands.cpp",
     ],
