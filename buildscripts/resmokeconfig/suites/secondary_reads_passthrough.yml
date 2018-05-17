@@ -48,6 +48,10 @@ selector:
   - jstests/core/find_and_modify_concurrent_update.js
   - jstests/core/shellstartparallel.js
   - jstests/core/loadserverscripts.js
+  - jstests/core/evald.js
+  - jstests/core/fsync.js
+  # benchRun cannot be overridden to be causally consistent
+  - jstests/core/bench_test*.js
   # getMore is not causal consistent because afterClusterTime has been specified
   # by the preceding find command which establishes the cursor. Therefore,
   # getMore cannot be guaranteed to get executed after commands in between find
@@ -63,19 +67,6 @@ selector:
   - jstests/core/collation.js
 
   exclude_with_any_tags:
-  ##
-  # The next three tags correspond to the special errors thrown by the
-  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
-  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
-  # warranted.
-  ##
-  # "Cowardly refusing to override read concern of command: ..."
-  - assumes_read_concern_unchanged
-  # "Cowardly refusing to override write concern of command: ..."
-  - assumes_write_concern_unchanged
-  # "Cowardly refusing to run test with overridden write concern when it uses a command that can
-  #  only perform w=1 writes: ..."
-  - requires_eval_command
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
   # override when it refuses to replace the readPreference of a particular command. Above each tag
@@ -98,13 +89,8 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      global_vars:
-        TestData:
-          defaultReadConcernLevel: local
-          defaultWriteConcern: {w: 1}
       eval: >-
         testingReplication = true;
-        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/set_read_preference_secondary.js');
         load('jstests/libs/override_methods/enable_causal_consistency.js');
       readMode: commands
@@ -124,8 +110,9 @@ executor:
         enableTestCommands: 1
         # Allow many initial sync attempts. Initial sync may fail if the sync source does not have
         # an oplog yet because it has not conducted its own initial sync yet.
-        # We turn on the noop writer to encourage successful sync source selection.
-        numInitialSyncAttempts: 100
+        numInitialSyncAttempts: 10000000
+        # TODO SERVER-35156: Remove the following line to disable the periodic no-op
+        # writer.
         writePeriodicNoops: true
     linear_chain: true
     num_nodes: 5
