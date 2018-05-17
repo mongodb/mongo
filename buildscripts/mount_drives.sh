@@ -99,16 +99,17 @@ function mount_drive {
       echo "Looking for drive '$drive' to mount $root_dir"
       if [ -d /cygdrive/$drive ]; then
         echo "Found drive"
-        rm -rf $root_dir
+        rm -rf /$root_dir
         rm -rf /cygdrive/$system_drive/$root_dir
+        mkdir $drive:\\$root_dir
         cmd.exe /c mklink /J $system_drive:\\$root_dir $drive:\\$root_dir
-        ln -s /cygdrive/$system_drive/$root_dir /$root_dir
-        setfacl -s user::rwx,group::rwx,other::rwx $drive:\\$root_dir
+        ln -s /cygdrive/$drive/$root_dir /$root_dir
+        setfacl -s user::rwx,group::rwx,other::rwx /cygdrive/$drive/$root_dir
         for sub_dir in $sub_dirs
         do
             mkdir -p /cygdrive/$drive/$root_dir/$sub_dir
         done
-        chown -R $user_group /$root_dir
+        chown -R $user_group /cygdrive/$system_drive/$root_dir
         break
       fi
       let drive_poll_retry=drive_poll_retry+1
