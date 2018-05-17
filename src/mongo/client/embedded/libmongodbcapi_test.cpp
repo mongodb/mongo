@@ -518,6 +518,138 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
     ASSERT(outputBSON2.getIntField("nModified") == 1);
 }
 
+TEST_F(MongodbCAPITest, RunListCommands) {
+    auto client = createClient();
+
+    std::vector<std::string> whitelist = {"_hashBSONElement",
+                                          "_isSelf",
+                                          "aggregate",
+                                          "authenticate",
+                                          "buildInfo",
+                                          "captrunc",
+                                          "clearLog",
+                                          "cloneCollectionAsCapped",
+                                          "collMod",
+                                          "collStats",
+                                          "configureFailPoint",
+                                          "connPoolStats",
+                                          "connPoolSync",
+                                          "connectionStatus",
+                                          "convertToCapped",
+                                          "count",
+                                          "create",
+                                          "createIndexes",
+                                          "currentOp",
+                                          "dataSize",
+                                          "dbStats",
+                                          "delete",
+                                          "distinct",
+                                          "drop",
+                                          "dropDatabase",
+                                          "dropIndexes",
+                                          "echo",
+                                          "emptycapped",
+                                          "endSessions",
+                                          "explain",
+                                          "features",
+                                          "find",
+                                          "findAndModify",
+                                          "geoNear",
+                                          "getCmdLineOpts",
+                                          "getLastError",
+                                          "getLog",
+                                          "getMore",
+                                          "getParameter",
+                                          "getPrevError",
+                                          "getShardMap",
+                                          "getnonce",
+                                          "godinsert",
+                                          "hostInfo",
+                                          "insert",
+                                          "isMaster",
+                                          "killAllSessions",
+                                          "killAllSessionsByPattern",
+                                          "killCursors",
+                                          "killOp",
+                                          "killSessions",
+                                          "listCollections",
+                                          "listCommands",
+                                          "listDatabases",
+                                          "listIndexes",
+                                          "lockInfo",
+                                          "logRotate",
+                                          "logout",
+                                          "ping",
+                                          "planCacheClear",
+                                          "planCacheClearFilters",
+                                          "planCacheListFilters",
+                                          "planCacheListPlans",
+                                          "planCacheListQueryShapes",
+                                          "planCacheSetFilter",
+                                          "reIndex",
+                                          "reapLogicalSessionCacheNow",
+                                          "refreshLogicalSessionCacheNow",
+                                          "refreshSessions",
+                                          "refreshSessionsInternal",
+                                          "renameCollection",
+                                          "repairCursor",
+                                          "repairDatabase",
+                                          "replSetGetStatus",
+                                          "resetError",
+                                          "saslContinue",
+                                          "saslStart",
+                                          "serverStatus",
+                                          "setBatteryLevel",
+                                          "setParameter",
+                                          "shardConnPoolStats",
+                                          "sleep",
+                                          "startSession",
+                                          "trimMemory",
+                                          "update",
+                                          "validate",
+                                          "whatsmyuri"};
+    std::sort(whitelist.begin(), whitelist.end());
+
+    mongo::BSONObj listCommandsObj = mongo::fromjson("{ listCommands: 1 }");
+    auto listCommandsOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", listCommandsObj);
+    auto output = performRpc(client, listCommandsOpMsg);
+    auto commandsBSON = output["commands"];
+    std::vector<std::string> commands;
+    for (const auto& element : commandsBSON.Obj()) {
+        commands.push_back(element.fieldNameStringData().toString());
+    }
+    std::sort(commands.begin(), commands.end());
+
+    std::vector<std::string> missing;
+    std::vector<std::string> unsupported;
+    std::set_difference(whitelist.begin(),
+                        whitelist.end(),
+                        commands.begin(),
+                        commands.end(),
+                        std::back_inserter(missing));
+    std::set_difference(commands.begin(),
+                        commands.end(),
+                        whitelist.begin(),
+                        whitelist.end(),
+                        std::back_inserter(unsupported));
+
+    if (!missing.empty()) {
+        std::cout << "\nMissing commands from the embedded binary:\n";
+    }
+    for (auto&& cmd : missing) {
+        std::cout << cmd << "\n";
+    }
+    if (!unsupported.empty()) {
+        std::cout << "\nUnsupported commands in the embedded binary:\n";
+    }
+    for (auto&& cmd : unsupported) {
+        std::cout << cmd << "\n";
+    }
+
+    ASSERT(missing.empty());
+    ASSERT(unsupported.empty());
+}
+
 // This test is temporary to make sure that only one database can be created
 // This restriction may be relaxed at a later time
 TEST_F(MongodbCAPITest, CreateMultipleDBs) {
