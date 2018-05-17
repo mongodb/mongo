@@ -34,9 +34,12 @@ var authutil;
                 conn = conns[i];
                 // Bypass the implicit auth call in getDB();
                 var db = new DB(conn, dbName);
-                assert(db.auth(authParams),
-                       "Failed to authenticate " + conn + " to " + dbName + " using parameters " +
-                           tojson(authParams));
+                try {
+                    retryOnNetworkError(db._authOrThrow.bind(db, authParams));
+                } catch (ex3) {
+                    doassert("assert failed : " + "Failed to authenticate " + conn + " to " +
+                             dbName + " using parameters " + tojson(authParams) + " : " + ex3);
+                }
             }
         } catch (ex) {
             try {
@@ -60,9 +63,13 @@ var authutil;
             conn = conns[i];
             // Bypass the implicit auth call in getDB();
             var db = new DB(conn, dbName);
-            assert(!db.auth(authParams),
-                   "Unexpectedly authenticated " + conn + " to " + dbName + " using parameters " +
-                       tojson(authParams));
+            const ex = assert.throws(retryOnNetworkError,
+                                     [db._authOrThrow.bind(db, authParams)],
+                                     "Unexpectedly authenticated " + conn + " to " + dbName +
+                                         " using parameters " + tojson(authParams));
+            if (isNetworkError(ex)) {
+                throw ex;
+            }
         }
     };
 
