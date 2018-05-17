@@ -83,10 +83,12 @@ public:
                   "This storage engine does not support prepared transactions");
     }
 
-    virtual void setIgnorePrepared(bool ignore) {
-        uasserted(ErrorCodes::CommandNotSupported,
-                  "This storage engine does not support prepared transactions");
-    }
+
+    /**
+     * Sets whether or not to ignore prepared transactions if supported by this storage engine. When
+     * 'ignore' is true, allows reading data in prepared, but uncommitted transactions.
+     */
+    virtual void setIgnorePrepared(bool ignore) {}
 
     /**
      * Waits until all commits that happened before this call are durable in the journal. Returns
