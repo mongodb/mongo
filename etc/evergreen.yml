@@ -1842,7 +1842,7 @@ functions:
           user_group="$USER:$group"
           script_opts="$script_opts -u $user_group"
           data_db=/data/db
-          cmds="$sudo bash mount_drives.sh $script_opts; ls -ld $data_db $log; df; mount"
+          cmds="$sudo bash mount_drives.sh $script_opts; mount; ls -ld $data_db $log; df"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \
