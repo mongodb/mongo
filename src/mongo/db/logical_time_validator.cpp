@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/keys_collection_manager_sharding.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
@@ -204,14 +205,18 @@ void LogicalTimeValidator::resetKeyManagerCache() {
     }
 }
 
-void LogicalTimeValidator::resetKeyManager() {
-    log() << "Resetting key manager";
-    stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
+void LogicalTimeValidator::stopKeyManager() {
+    stdx::lock_guard<stdx::mutex> keyManagerLock(_mutexKeyManager);
     if (_keyManager) {
+        log() << "Stopping key manager";
         _keyManager->stopMonitoring();
-        _keyManager.reset();
+        _keyManager->clearCache();
+
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _lastSeenValidTime = SignedLogicalTime();
         _timeProofService.resetCache();
+    } else {
+        log() << "Stopping key manager: no key manager exists.";
     }
 }
 

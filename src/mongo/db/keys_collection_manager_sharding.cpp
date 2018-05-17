@@ -339,6 +339,7 @@ void KeysCollectionManagerSharding::PeriodicRunner::stop() {
         }
 
         _inShutdown = true;
+        _hasSeenKeys = false;
         _refreshNeededCV.notify_all();
     }
 
