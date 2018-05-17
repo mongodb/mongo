@@ -3174,7 +3174,6 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "build new tools"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
