@@ -121,14 +121,14 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         }
     }
 
-    _state = kCloneCompleted;
+    _state = kCloneCaughtUp;
     scopedGuard.Dismiss();
     return Status::OK();
 }
 
 Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
-    invariant(_state == kCloneCompleted);
+    invariant(_state == kCloneCaughtUp);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
 
     // Mark the shard as running a critical operation that requires recovery on crash.
@@ -281,7 +281,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         return commitStatus;
     }
 
-    _state = kCommitted;
+    _state = kCloneCompleted;
 
     _cleanup(opCtx);
 
@@ -368,9 +368,9 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         ShardingStateRecovery::endMetadataOp(opCtx);
     }
 
-    // If we're in the kCommitted state, then we need to do the last step of cleaning up
+    // If we're in the kCloneCompleted state, then we need to do the last step of cleaning up
     // now-stale data on the old primary. Otherwise, indicate that we're done.
-    if (_state != kCommitted) {
+    if (_state != kCloneCompleted) {
         _state = kDone;
     }
 

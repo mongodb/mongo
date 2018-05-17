@@ -99,7 +99,7 @@ public:
      * movePrimary is committed. Therefore, commitMovePrimaryMetadata must be called as soon as
      * possible afterwards.
      *
-     * Expected state: kCloneCompleted
+     * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
     Status enterCriticalSection(OperationContext* opCtx);
@@ -146,9 +146,9 @@ private:
     enum State {
         kCreated,
         kCloning,
-        kCloneCompleted,
+        kCloneCaughtUp,
         kCriticalSection,
-        kCommitted,
+        kCloneCompleted,
         kNeedCleanStaleData,
         kDone
     };
