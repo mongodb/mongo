@@ -110,6 +110,19 @@ TEST_F(UUIDCatalogTest, OnDropCollection) {
     ASSERT(catalog.lookupCollectionByUUID(colUUID) == nullptr);
 }
 
+TEST_F(UUIDCatalogTest, OnRenameCollection) {
+    auto oldUUID = CollectionUUID::gen();
+    NamespaceString oldNss(nss.db(), "oldcol");
+    Collection oldCol(stdx::make_unique<CollectionMock>(oldNss));
+    catalog.onCreateCollection(&opCtx, &oldCol, oldUUID);
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(oldUUID), &oldCol);
+
+    NamespaceString newNss(nss.db(), "newcol");
+    Collection newCol(stdx::make_unique<CollectionMock>(newNss));
+    catalog.onRenameCollection(&opCtx, &newCol, oldUUID);
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(oldUUID), &newCol);
+}
+
 TEST_F(UUIDCatalogTest, NonExistingNextCol) {
     ASSERT_FALSE(catalog.next(nss.db(), colUUID));
     ASSERT_FALSE(catalog.next(nss.db(), nextUUID));

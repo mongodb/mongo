@@ -89,12 +89,24 @@ public:
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
                      const BSONObj& idxDescriptor) override {}
-    repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) override;
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            bool stayTemp) override;
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     bool stayTemp) override;
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) override;
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
                     const BSONObj& applyOpCmd) override {}
@@ -136,20 +148,18 @@ public:
     void onDropCollection(OperationContext* opCtx, CollectionUUID uuid);
 
     /**
-     * Combination of onDropCollection and onCreateCollection.
-     * 'getNewCollection' is a function that returns collection to be registered when the current
-     * write unit of work is committed.
+     * This function atomically removes any existing entry for uuid from the UUID catalog and adds
+     * a new entry for uuid associated with the Collection coll. It is called by the op observer
+     * when a collection is renamed.
      */
-    using GetNewCollectionFunction = stdx::function<Collection*()>;
-    void onRenameCollection(OperationContext* opCtx,
-                            GetNewCollectionFunction getNewCollection,
-                            CollectionUUID uuid);
+    void onRenameCollection(OperationContext* opCtx, Collection* coll, CollectionUUID uuid);
 
     /**
      * Implies onDropCollection for all collections in db, but is not transactional.
      */
     void onCloseDatabase(Database* db);
 
+    Collection* replaceUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
     void registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll);
     Collection* removeUUIDCatalogEntry(CollectionUUID uuid);
 

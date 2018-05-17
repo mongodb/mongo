@@ -82,24 +82,40 @@ repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-repl::OpTime UUIDCatalogObserver::onRenameCollection(OperationContext* opCtx,
-                                                     const NamespaceString& fromCollection,
-                                                     const NamespaceString& toCollection,
-                                                     OptionalCollectionUUID uuid,
-                                                     OptionalCollectionUUID dropTargetUUID,
-                                                     bool stayTemp) {
+void UUIDCatalogObserver::onRenameCollection(OperationContext* opCtx,
+                                             const NamespaceString& fromCollection,
+                                             const NamespaceString& toCollection,
+                                             OptionalCollectionUUID uuid,
+                                             OptionalCollectionUUID dropTargetUUID,
+                                             bool stayTemp) {
 
     if (!uuid)
-        return {};
-    auto getNewCollection = [opCtx, toCollection] {
-        auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, toCollection.db());
-        auto newColl = db->getCollection(opCtx, toCollection);
-        invariant(newColl);
-        return newColl;
-    };
+        return;
+    auto db = DatabaseHolder::getDatabaseHolder().get(opCtx, toCollection.db());
+    auto newColl = db->getCollection(opCtx, toCollection);
+    invariant(newColl);
     UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    catalog.onRenameCollection(opCtx, getNewCollection, uuid.get());
+    catalog.onRenameCollection(opCtx, newColl, uuid.get());
+}
+
+repl::OpTime UUIDCatalogObserver::preRenameCollection(OperationContext* opCtx,
+                                                      const NamespaceString& fromCollection,
+                                                      const NamespaceString& toCollection,
+                                                      OptionalCollectionUUID uuid,
+                                                      OptionalCollectionUUID dropTargetUUID,
+                                                      bool stayTemp) {
     return {};
+}
+
+void UUIDCatalogObserver::postRenameCollection(OperationContext* opCtx,
+                                               const NamespaceString& fromCollection,
+                                               const NamespaceString& toCollection,
+                                               OptionalCollectionUUID uuid,
+                                               OptionalCollectionUUID dropTargetUUID,
+                                               bool stayTemp) {
+    // postRenameCollection and onRenameCollection are semantically equivalent from the perspective
+    // of the UUIDCatalogObserver.
+    onRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
 UUIDCatalog& UUIDCatalog::get(ServiceContext* svcCtx) {
@@ -124,25 +140,12 @@ void UUIDCatalog::onDropCollection(OperationContext* opCtx, CollectionUUID uuid)
 }
 
 void UUIDCatalog::onRenameCollection(OperationContext* opCtx,
-                                     GetNewCollectionFunction getNewCollection,
+                                     Collection* coll,
                                      CollectionUUID uuid) {
-    Collection* oldColl = removeUUIDCatalogEntry(uuid);
-    opCtx->recoveryUnit()->onCommit([this, getNewCollection, uuid](boost::optional<Timestamp>) {
-        // Reset current UUID entry in case some other operation updates the UUID catalog before the
-        // WUOW is committed. registerUUIDCatalogEntry() is a no-op if there's an existing UUID
-        // entry.
-        removeUUIDCatalogEntry(uuid);
-        auto newColl = getNewCollection();
-        invariant(newColl);
-        registerUUIDCatalogEntry(uuid, newColl);
-    });
-    opCtx->recoveryUnit()->onRollback([this, oldColl, uuid] {
-        // Reset current UUID entry in case some other operation updates the UUID catalog before the
-        // WUOW is rolled back. registerUUIDCatalogEntry() is a no-op if there's an existing UUID
-        // entry.
-        removeUUIDCatalogEntry(uuid);
-        registerUUIDCatalogEntry(uuid, oldColl);
-    });
+    invariant(coll);
+    Collection* oldColl = replaceUUIDCatalogEntry(uuid, coll);
+    opCtx->recoveryUnit()->onRollback(
+        [this, oldColl, uuid] { replaceUUIDCatalogEntry(uuid, oldColl); });
 }
 
 void UUIDCatalog::onCloseDatabase(Database* db) {
@@ -192,6 +195,27 @@ NamespaceString UUIDCatalog::lookupNSSByUUID(CollectionUUID uuid) const {
     return NamespaceString();
 }
 
+Collection* UUIDCatalog::replaceUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
+    stdx::lock_guard<stdx::mutex> lock(_catalogLock);
+    invariant(coll);
+
+    auto foundIt = _catalog.find(uuid);
+    invariant(foundIt != _catalog.end());
+    // Invalidate the source database's ordering, since we're deleting a UUID.
+    _orderedCollections.erase(foundIt->second->ns().db());
+
+    Collection* oldColl = foundIt->second;
+    LOG(2) << "unregistering collection " << oldColl->ns() << " with UUID " << uuid.toString();
+    _catalog.erase(foundIt);
+
+    // Invalidate the destination database's ordering, since we're adding a new UUID.
+    _orderedCollections.erase(coll->ns().db());
+
+    std::pair<CollectionUUID, Collection*> entry = std::make_pair(uuid, coll);
+    LOG(2) << "registering collection " << coll->ns() << " with UUID " << uuid.toString();
+    invariant(_catalog.insert(entry).second == true);
+    return oldColl;
+}
 void UUIDCatalog::registerUUIDCatalogEntry(CollectionUUID uuid, Collection* coll) {
     stdx::lock_guard<stdx::mutex> lock(_catalogLock);
 

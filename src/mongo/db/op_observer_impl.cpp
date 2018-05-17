@@ -766,12 +766,13 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
 }
 
-repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
-                                                const NamespaceString& fromCollection,
-                                                const NamespaceString& toCollection,
-                                                OptionalCollectionUUID uuid,
-                                                OptionalCollectionUUID dropTargetUUID,
-                                                bool stayTemp) {
+
+repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
+                                                 const NamespaceString& fromCollection,
+                                                 const NamespaceString& toCollection,
+                                                 OptionalCollectionUUID uuid,
+                                                 OptionalCollectionUUID dropTargetUUID,
+                                                 bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
 
     BSONObjBuilder builder;
@@ -796,6 +797,27 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                  kUninitializedStmtId,
                  {});
 
+    return {};
+}
+
+void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
+                                          const NamespaceString& fromCollection,
+                                          const NamespaceString& toCollection,
+                                          OptionalCollectionUUID uuid,
+                                          OptionalCollectionUUID dropTargetUUID,
+                                          bool stayTemp) {
+    const auto cmdNss = fromCollection.getCommandNS();
+
+    BSONObjBuilder builder;
+    builder.append("renameCollection", fromCollection.ns());
+    builder.append("to", toCollection.ns());
+    builder.append("stayTemp", stayTemp);
+    if (dropTargetUUID) {
+        dropTargetUUID->appendToBuilder(&builder, "dropTarget");
+    }
+
+    const auto cmdObj = builder.done();
+
     if (fromCollection.isSystemDotViews())
         DurableViewCatalog::onExternalChange(opCtx, fromCollection);
     if (toCollection.isSystemDotViews())
@@ -810,8 +832,16 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
     cache.evictNamespace(toCollection);
     opCtx->recoveryUnit()->onRollback(
         [&cache, toCollection]() { cache.evictNamespace(toCollection); });
+}
 
-    return {};
+void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
+                                        const NamespaceString& fromCollection,
+                                        const NamespaceString& toCollection,
+                                        OptionalCollectionUUID uuid,
+                                        OptionalCollectionUUID dropTargetUUID,
+                                        bool stayTemp) {
+    preRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+    postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
 void OpObserverImpl::onApplyOps(OperationContext* opCtx,

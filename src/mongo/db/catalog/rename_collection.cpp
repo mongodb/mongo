@@ -258,7 +258,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
             invariant(options.dropTarget);
             auto dropTargetUUID = targetColl->uuid();
             invariant(dropTargetUUID);
-            auto renameOpTime = opObserver->onRenameCollection(
+            auto renameOpTime = opObserver->preRenameCollection(
                 opCtx, source, target, sourceUUID, dropTargetUUID, options.stayTemp);
 
             if (!renameOpTimeFromApplyOps.isNull()) {
@@ -286,6 +286,8 @@ Status renameCollectionCommon(OperationContext* opCtx,
                 return status;
             }
 
+            opObserver->postRenameCollection(
+                opCtx, source, target, sourceUUID, dropTargetUUID, options.stayTemp);
             wunit.commit();
             return Status::OK();
         });

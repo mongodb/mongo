@@ -4,28 +4,13 @@
 
 (function() {
     "use strict";
-    const dbName = "list_databases_rename";
+    const dbName = "do_concurrent_rename";
     const collName = "collA";
+    const otherName = "collB";
     const repeatListDatabases = 20;
     const listDatabasesCmd = {"listDatabases": 1};
-
-    // To be called from startParallelShell.
-    function doRenames() {
-        const dbName = "list_databases_rename";
-        const collName = "collA";
-        const repeatRename = 200;
-        // Signal to the parent shell that the parallel shell has started.
-        assert.writeOK(db.await_data.insert({_id: "signal parent shell"}));
-        const otherName = "collB";
-        let listRenameDB = db.getSiblingDB(dbName);
-        for (let i = 0; i < repeatRename; i++) {
-            // Rename the collection back and forth.
-            assert.commandWorked(listRenameDB[collName].renameCollection(otherName));
-            assert.commandWorked(listRenameDB[otherName].renameCollection(collName));
-        }
-        // Signal to the parent shell that the renames have completed.
-        assert.writeOK(db.await_data.insert({_id: "rename has ended"}));
-    }
+    load("jstests/noPassthrough/libs/concurrent_rename.js");
+    load("jstests/libs/parallel_shell_helpers.js");
 
     const conn = MongoRunner.runMongod({});
     assert.neq(null, conn, "mongod was unable to start up");
@@ -46,7 +31,8 @@
            "expected " + tojson(cmdRes) + " to include " + dbName);
 
     jsTestLog("Start parallel shell");
-    let renameShell = startParallelShell(doRenames, conn.port);
+    let renameShell =
+        startParallelShell(funWithArgs(doRenames, dbName, collName, otherName), conn.port);
 
     // Wait until we receive confirmation that the parallel shell has started.
     assert.soon(() => conn.getDB("test").await_data.findOne({_id: "signal parent shell"}) !== null);

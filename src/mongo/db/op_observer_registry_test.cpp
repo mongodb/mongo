@@ -59,15 +59,30 @@ struct TestObserver : public OpObserverNoop {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
-    repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) {
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            bool stayTemp) {
+        preRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+        postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+    }
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     bool stayTemp) {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) {}
 };
 
 struct ThrowingObserver : public TestObserver {
@@ -156,12 +171,14 @@ TEST_F(OpObserverRegistryTest, OnDropCollectionObserverResultReturnsRightTime) {
     checkConsistentOpTime(op);
 }
 
-TEST_F(OpObserverRegistryTest, OnRenameCollectionObserverResultReturnsRightTime) {
+TEST_F(OpObserverRegistryTest, PreRenameCollectionObserverResultReturnsRightTime) {
     OperationContextNoop opCtx;
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::make_unique<OpObserverNoop>());
     auto op = [&]() -> repl::OpTime {
-        return registry.onRenameCollection(&opCtx, testNss, testNss, {}, {}, false);
+        auto opTime = registry.preRenameCollection(&opCtx, testNss, testNss, {}, {}, false);
+        registry.postRenameCollection(&opCtx, testNss, testNss, {}, {}, false);
+        return opTime;
     };
     checkConsistentOpTime(op);
 }
@@ -174,12 +191,14 @@ DEATH_TEST_F(OpObserverRegistryTest, OnDropCollectionReturnsInconsistentTime, "i
     checkInconsistentOpTime(op);
 }
 
-DEATH_TEST_F(OpObserverRegistryTest, OnRenameCollectionReturnsInconsistentTime, "invariant") {
+DEATH_TEST_F(OpObserverRegistryTest, PreRenameCollectionReturnsInconsistentTime, "invariant") {
     OperationContextNoop opCtx;
     registry.addObserver(std::move(unique1));
     registry.addObserver(std::move(unique2));
     auto op = [&]() -> repl::OpTime {
-        return registry.onRenameCollection(&opCtx, testNss, testNss, {}, {}, false);
+        auto opTime = registry.preRenameCollection(&opCtx, testNss, testNss, {}, {}, false);
+        registry.postRenameCollection(&opCtx, testNss, testNss, {}, {}, false);
+        return opTime;
     };
     checkInconsistentOpTime(op);
 }
