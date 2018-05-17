@@ -4,6 +4,7 @@
 (function() {
     "use strict";
     load("jstests/libs/feature_compatibility_version.js");
+    load("jstests/libs/parallel_shell_helpers.js");
 
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
@@ -41,9 +42,6 @@
             assert.soon(function() {
                 return rawMongoProgramOutput().match("createCollection: test.mycoll");
             });
-
-            const funWithArgs = (fn, ...args) => "(" + fn.toString() + ")(" +
-                args.map(x => tojson(x)).reduce((x, y) => x + ", " + y) + ")";
 
             awaitUpgradeFCV = startParallelShell(
                 funWithArgs(function(version) {

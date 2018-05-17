@@ -214,16 +214,42 @@ public:
 
     /**
      * This function logs an oplog entry when a 'renameCollection' command on a collection is
-     * executed.
+     * executed. It should be used specifically in instances where the optime is necessary to
+     * be obtained prior to performing the actual rename, and should only be used in conjunction
+     * with postRenameCollection.
      * Returns the optime of the oplog entry successfully written to the oplog.
      * Returns a null optime if an oplog entry was not written for this operation.
      */
-    virtual repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                            const NamespaceString& fromCollection,
-                                            const NamespaceString& toCollection,
-                                            OptionalCollectionUUID uuid,
-                                            OptionalCollectionUUID dropTargetUUID,
-                                            bool stayTemp) = 0;
+    virtual repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                             const NamespaceString& fromCollection,
+                                             const NamespaceString& toCollection,
+                                             OptionalCollectionUUID uuid,
+                                             OptionalCollectionUUID dropTargetUUID,
+                                             bool stayTemp) = 0;
+    /**
+     * This function performs all op observer handling for a 'renameCollection' command except for
+     * logging the oplog entry. It should be used specifically in instances where the optime is
+     * necessary to be obtained prior to performing the actual rename, and should only be used in
+     * conjunction with preRenameCollection.
+     */
+    virtual void postRenameCollection(OperationContext* opCtx,
+                                      const NamespaceString& fromCollection,
+                                      const NamespaceString& toCollection,
+                                      OptionalCollectionUUID uuid,
+                                      OptionalCollectionUUID dropTargetUUID,
+                                      bool stayTemp) = 0;
+    /**
+     * This function logs an oplog entry when a 'renameCollection' command on a collection is
+     * executed. It calls preRenameCollection to log the entry and postRenameCollection to do all
+     * other handling.
+     */
+    virtual void onRenameCollection(OperationContext* opCtx,
+                                    const NamespaceString& fromCollection,
+                                    const NamespaceString& toCollection,
+                                    OptionalCollectionUUID uuid,
+                                    OptionalCollectionUUID dropTargetUUID,
+                                    bool stayTemp) = 0;
+
     virtual void onApplyOps(OperationContext* opCtx,
                             const std::string& dbName,
                             const BSONObj& applyOpCmd) = 0;

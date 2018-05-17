@@ -85,12 +85,24 @@ public:
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
                      const BSONObj& indexInfo) override;
-    repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) override;
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     bool stayTemp) override;
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) override;
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            bool stayTemp) override;
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
                     const BSONObj& applyOpCmd) override;

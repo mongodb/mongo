@@ -102,14 +102,26 @@ public:
                      const std::string& indexName,
                      const BSONObj& indexInfo) override {}
 
-    repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) override {
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            bool stayTemp) override {}
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     bool stayTemp) override {
         return repl::OpTime();
     }
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) override {}
 
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,

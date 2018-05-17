@@ -94,13 +94,25 @@ public:
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid) override;
 
-    repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) override;
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            bool stayTemp) override;
 
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     bool stayTemp) override;
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) override;
     // Operations written to the oplog. These are operations for which
     // ReplicationCoordinator::isOplogDisabled() returns false.
     std::vector<std::string> oplogEntries;
@@ -167,21 +179,43 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
-repl::OpTime OpObserverMock::onRenameCollection(OperationContext* opCtx,
-                                                const NamespaceString& fromCollection,
-                                                const NamespaceString& toCollection,
-                                                OptionalCollectionUUID uuid,
-                                                OptionalCollectionUUID dropTargetUUID,
-                                                bool stayTemp) {
-    _logOp(opCtx, fromCollection, "rename");
-    OpObserver::Times::get(opCtx).reservedOpTimes.push_back(renameOpTime);
+void OpObserverMock::onRenameCollection(OperationContext* opCtx,
+                                        const NamespaceString& fromCollection,
+                                        const NamespaceString& toCollection,
+                                        OptionalCollectionUUID uuid,
+                                        OptionalCollectionUUID dropTargetUUID,
+                                        bool stayTemp) {
+    preRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     OpObserverNoop::onRenameCollection(
         opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     onRenameCollectionCalled = true;
     onRenameCollectionDropTarget = dropTargetUUID;
-    return {};
 }
 
+void OpObserverMock::postRenameCollection(OperationContext* opCtx,
+                                          const NamespaceString& fromCollection,
+                                          const NamespaceString& toCollection,
+                                          OptionalCollectionUUID uuid,
+                                          OptionalCollectionUUID dropTargetUUID,
+                                          bool stayTemp) {
+    OpObserverNoop::postRenameCollection(
+        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+    onRenameCollectionCalled = true;
+    onRenameCollectionDropTarget = dropTargetUUID;
+}
+
+repl::OpTime OpObserverMock::preRenameCollection(OperationContext* opCtx,
+                                                 const NamespaceString& fromCollection,
+                                                 const NamespaceString& toCollection,
+                                                 OptionalCollectionUUID uuid,
+                                                 OptionalCollectionUUID dropTargetUUID,
+                                                 bool stayTemp) {
+    _logOp(opCtx, fromCollection, "rename");
+    OpObserver::Times::get(opCtx).reservedOpTimes.push_back(renameOpTime);
+    OpObserverNoop::preRenameCollection(
+        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+    return {};
+}
 void OpObserverMock::_logOp(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const std::string& operationName) {
@@ -566,6 +600,10 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetDo
     ASSERT_FALSE(_collectionExists(_opCtx.get(), collC));
     // B (originally A) should exist
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
+    // collAUUID should be associated with collB's NamespaceString in the UUIDCatalog.
+    auto newCollNS = _getCollectionNssFromUUID(_opCtx.get(), collAUUID);
+    ASSERT_TRUE(newCollNS.isValid());
+    ASSERT_EQUALS(newCollNS, collB);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetExists) {
@@ -718,7 +756,7 @@ TEST_F(RenameCollectionTest,
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     ASSERT_FALSE(_opCtx->writesAreReplicated());
 
-    // OpObserver::onRenameCollection() must return a null OpTime when writes are not replicated.
+    // OpObserver::preRenameCollection() must return a null OpTime when writes are not replicated.
     _opObserver->renameOpTime = {};
 
     _createCollection(_opCtx.get(), _sourceNss);

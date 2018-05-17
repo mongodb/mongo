@@ -101,15 +101,27 @@ public:
                      const std::string& indexName,
                      const BSONObj& indexInfo) final {}
 
-    repl::OpTime onRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    OptionalCollectionUUID uuid,
-                                    OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) final {
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            bool stayTemp) final {}
+
+    repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     bool stayTemp) final {
         return repl::OpTime();
     }
-
+    void postRenameCollection(OperationContext* opCtx,
+                              const NamespaceString& fromCollection,
+                              const NamespaceString& toCollection,
+                              OptionalCollectionUUID uuid,
+                              OptionalCollectionUUID dropTargetUUID,
+                              bool stayTemp) final {}
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
                     const BSONObj& applyOpCmd) final {}
