@@ -102,10 +102,10 @@ public:
     bool shouldGossipLogicalTime();
 
     /**
-     * Reset the key manager to prevent the former members of standalone replica set to use old
-     * keys with sharded cluster.
+     * Stops the key manager and resets its state to prevent the former members of standalone
+     * replica set to use old keys with sharded cluster.
      */
-    void resetKeyManager();
+    void stopKeyManager();
 
     /**
      * Reset the key manager cache of keys.

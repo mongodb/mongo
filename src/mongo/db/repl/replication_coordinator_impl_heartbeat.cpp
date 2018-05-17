@@ -533,7 +533,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         if (isArbiter) {
             LogicalClock::get(getGlobalServiceContext())->disable();
             if (auto validator = LogicalTimeValidator::get(getGlobalServiceContext())) {
-                validator->resetKeyManager();
+                validator->stopKeyManager();
             }
         }
 

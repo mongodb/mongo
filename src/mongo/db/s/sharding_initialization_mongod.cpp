@@ -120,7 +120,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
 
     auto validator = LogicalTimeValidator::get(service);
     if (validator) {  // The keyManager may be existing if the node was a part of a standalone RS.
-        validator->resetKeyManager();
+        validator->stopKeyManager();
     }
 
     globalConnPool.addHook(new ShardingConnectionHook(false, makeEgressHooksList(service)));

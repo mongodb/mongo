@@ -564,9 +564,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     } else {
         // The node is an arbiter hence will not need logical clock for external operations.
         LogicalClock::get(getServiceContext())->disable();
-        auto validator = LogicalTimeValidator::get(getServiceContext());
-        if (validator) {
-            validator->resetKeyManager();
+        if (auto validator = LogicalTimeValidator::get(getServiceContext())) {
+            validator->stopKeyManager();
         }
     }
 
