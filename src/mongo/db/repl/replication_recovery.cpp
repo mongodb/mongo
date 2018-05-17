@@ -53,6 +53,46 @@ namespace {
 const auto kRecoveryLogLevel = logger::LogSeverity::Debug(2);
 
 /**
+ * Tracks and logs operations applied during recovery.
+ */
+class RecoveryOplogApplierStats : public OplogApplier::Observer {
+public:
+    void onBatchBegin(const OplogApplier::Operations& batch) final {
+        _numBatches++;
+        LOG_FOR_RECOVERY(kRecoveryLogLevel)
+            << "Applying operations in batch: " << _numBatches << "(" << batch.size()
+            << " operations from " << batch.front().getOpTime() << " (inclusive) to "
+            << batch.back().getOpTime()
+            << " (inclusive)). Operations applied so far: " << _numOpsApplied;
+
+        _numOpsApplied += batch.size();
+        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kRecoveryLogLevel)) {
+            std::size_t i = 0;
+            for (const auto& entry : batch) {
+                i++;
+                LOG_FOR_RECOVERY(kRecoveryLogLevel)
+                    << "Applying op " << i << " of " << batch.size() << " (in batch " << _numBatches
+                    << ") during replication recovery: " << redact(entry.raw);
+            }
+        }
+    }
+
+    void onBatchEnd(const StatusWith<OpTime>&, const OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
+    void onOperationConsumed(const BSONObj& op) final {}
+
+    void complete(const OpTime& applyThroughOpTime) const {
+        LOG_FOR_RECOVERY(kRecoveryLogLevel)
+            << "Applied " << _numOpsApplied << " operations in " << _numBatches
+            << " batches. Last operation applied with optime: " << applyThroughOpTime;
+    }
+
+private:
+    std::size_t _numBatches = 0;
+    std::size_t _numOpsApplied = 0;
+};
+
+/**
  * OplogBuffer adaptor for a DBClient query on the oplog.
  * Implements only functions used by OplogApplier::getNextApplierBatch().
  */
@@ -309,13 +349,15 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     OplogBufferLocalOplog oplogBuffer(oplogApplicationStartPoint);
     oplogBuffer.startup(opCtx);
 
+    RecoveryOplogApplierStats stats;
+
     auto writerPool = SyncTail::makeWriterPool();
     OplogApplier::Options options;
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.skipWritesToOplog = true;
     OplogApplier oplogApplier(nullptr,
                               &oplogBuffer,
-                              nullptr,
+                              &stats,
                               nullptr,
                               _consistencyMarkers,
                               _storageInterface,
@@ -328,35 +370,11 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     OpTime applyThroughOpTime;
     OplogApplier::Operations batch;
-    std::size_t numBatches = 0;
-    std::size_t numOpsApplied = 0;
     while (
         !(batch = fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits))).empty()) {
-
-        numBatches++;
-        LOG_FOR_RECOVERY(kRecoveryLogLevel)
-            << "Applying operations in batch: " << numBatches << "(" << batch.size()
-            << " operations from " << batch.front().getOpTime() << " (inclusive) to "
-            << batch.back().getOpTime()
-            << " (inclusive)). Operations applied so far: " << numOpsApplied;
-
-        numOpsApplied += batch.size();
-        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kRecoveryLogLevel)) {
-            std::size_t i = 0;
-            for (const auto& entry : batch) {
-                i++;
-                LOG_FOR_RECOVERY(kRecoveryLogLevel)
-                    << "Applying op " << i << " of " << batch.size() << " (in batch " << numBatches
-                    << ") during replication recovery: " << redact(entry.raw);
-            }
-        }
-
         applyThroughOpTime = uassertStatusOK(oplogApplier.multiApply(opCtx, std::move(batch)));
     }
-
-    LOG_FOR_RECOVERY(kRecoveryLogLevel)
-        << "Applied " << numOpsApplied << " operations in " << numBatches
-        << " batches. Last operation applied with optime: " << applyThroughOpTime;
+    stats.complete(applyThroughOpTime);
     invariant(oplogBuffer.isEmpty(),
               str::stream() << "Oplog buffer not empty after applying operations. Last operation "
                                "applied with optime: "

@@ -135,7 +135,10 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
 }
 
 StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx, Operations ops) {
-    return _syncTail->multiApply(opCtx, std::move(ops));
+    _observer->onBatchBegin(ops);
+    auto lastApplied = _syncTail->multiApply(opCtx, std::move(ops));
+    _observer->onBatchEnd(lastApplied, {});
+    return lastApplied;
 }
 
 }  // namespace repl
