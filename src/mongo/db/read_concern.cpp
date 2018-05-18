@@ -209,8 +209,12 @@ Status waitForReadConcern(OperationContext* opCtx,
     invariant(replCoord);
 
     auto session = OperationContextSession::get(opCtx);
-    // Currently speculative read concern is used only for transactions and snapshot reads.
-    const bool speculative = session && session->inSnapshotReadOrMultiDocumentTransaction();
+    // Currently speculative read concern is used only for transactions and snapshot reads. However,
+    // speculative read concern is not yet supported with atClusterTime.
+    //
+    // TODO SERVER-34620: Re-enable speculative behavior when "atClusterTime" is specified.
+    const bool speculative = session && session->inSnapshotReadOrMultiDocumentTransaction() &&
+        !readConcernArgs.getArgsAtClusterTime();
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
