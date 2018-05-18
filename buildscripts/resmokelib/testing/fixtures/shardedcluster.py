@@ -106,15 +106,11 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             mongos.await_ready()
 
         client = self.mongo_client()
-        if self.auth_options is not None:
-            auth_db = client[self.auth_options["authenticationDatabase"]]
-            auth_db.authenticate(self.auth_options["username"],
-                                 password=self.auth_options["password"],
-                                 mechanism=self.auth_options["authenticationMechanism"])
+        self._auth_to_db(client)
 
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
-            client.admin.command({"balancerStop": 1})
+            self._stop_balancer()
 
         # Turn off autosplit if it is not meant to be enabled.
         if not self.enable_autosplit:
@@ -143,6 +139,20 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             primary = self.configsvr.get_primary().mongo_client()
             primary.admin.command({"refreshLogicalSessionCacheNow": 1})
 
+    def _auth_to_db(self, client):
+        """Authenticate client for the 'authenticationDatabase'."""
+        if self.auth_options is not None:
+            auth_db = client[self.auth_options["authenticationDatabase"]]
+            auth_db.authenticate(self.auth_options["username"],
+                                 password=self.auth_options["password"],
+                                 mechanism=self.auth_options["authenticationMechanism"])
+
+    def _stop_balancer(self, timeout_ms=60000):
+        """Stop the balancer."""
+        client = self.mongo_client()
+        self._auth_to_db(client)
+        client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
+
     def _do_teardown(self):
         """Shut down the sharded cluster."""
         self.logger.info("Stopping all members of the sharded cluster...")
@@ -151,6 +161,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         if not running_at_start:
             self.logger.warning("All members of the sharded cluster were expected to be running, "
                                 "but weren't.")
+
+        if self.enable_balancer:
+            self._stop_balancer()
 
         teardown_handler = interface.FixtureTeardownHandler(self.logger)
 
