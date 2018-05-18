@@ -1,11 +1,19 @@
-test_kind: js_test
+test_kind: parallel_fsm_workload_test
 
 selector:
   roots:
-  - jstests/concurrency/*.js
+  - jstests/concurrency/fsm_workloads/**/*.js
   exclude_files:
-  # Skip the sharding tests because they're run in different suites.
-  - jstests/concurrency/fsm_all_sharded*.js
+  # These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
+  # isn't guaranteed to be true when they are run in parallel with other workloads.
+  - jstests/concurrency/fsm_workloads/list_indexes.js
+  - jstests/concurrency/fsm_workloads/update_inc_capped.js
+
+  # These workloads uses >100MB of data, which can overwhelm test hosts.
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  group_size: 10
+  group_count_multiplier: 2.5
 
 executor:
   archive:
@@ -21,6 +29,7 @@ executor:
       global_vars:
         TestData:
           skipValidationOnNamespaceNotFound: false
+  - class: CleanupConcurrencyWorkloads
   fixture:
     class: MongoDFixture
     mongod_options:

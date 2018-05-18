@@ -13,7 +13,7 @@ from ..utils import globstar
 class HookTestArchival(object):
     """Archive hooks and tests to S3."""
 
-    def __init__(self, suite, hooks, archive_instance, archive_config):
+    def __init__(self, suite, hooks, archive_instance, archive_config):  #pylint: disable=unused-argument
         """Initialize HookTestArchival."""
         self.archive_instance = archive_instance
         archive_config = utils.default_if_none(archive_config, {})
@@ -21,13 +21,14 @@ class HookTestArchival(object):
         self.on_success = archive_config.get("on_success", False)
 
         self.tests = []
+        self.archive_all = False
         if "tests" in archive_config:
             # 'tests' is either a list of tests to archive or a bool (archive all if True).
             if not isinstance(archive_config["tests"], bool):
                 for test in archive_config["tests"]:
                     self.tests += globstar.glob(test)
             elif archive_config["tests"]:
-                self.tests = suite.tests
+                self.archive_all = True
 
         self.hooks = []
         if "hooks" in archive_config:
@@ -57,12 +58,17 @@ class HookTestArchival(object):
     def _archive_test(self, logger, test, success):
         """Provide helper to archive tests."""
         test_name = test.test_name
-        test_match = False
-        for arch_test in self.tests:
-            # Ensure that the test_name is in the same format as the arch_test.
-            if os.path.normpath(test_name) == os.path.normpath(arch_test):
-                test_match = True
-                break
+
+        if self.archive_all:
+            test_match = True
+        else:
+            test_match = False
+            for arch_test in self.tests:
+                # Ensure that the test_name is in the same format as the arch_test.
+                if os.path.normpath(test_name) == os.path.normpath(arch_test):
+                    test_match = True
+                    break
+
         if not test_match or not self._should_archive(success):
             return
 

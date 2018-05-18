@@ -2,7 +2,7 @@
 
 from __future__ import absolute_import
 
-import os.path
+import hashlib
 import threading
 
 from buildscripts.resmokelib.testing.testcases import interface
@@ -18,7 +18,7 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
     _COUNTER = 0
 
     def __init__(  #pylint: disable=too-many-arguments
-            self, logger, fsm_workload, shell_executable=None, shell_options=None, same_db=False,
+            self, logger, selected_tests, shell_executable=None, shell_options=None, same_db=False,
             same_collection=False, db_name_prefix=None):
         """Initialize the FSMWorkloadTestCase with the FSM workload file."""
 
@@ -26,8 +26,12 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
         self.same_db = same_db or self.same_collection
         self.db_name_prefix = db_name_prefix
         self.dbpath_prefix = None
+        self.fsm_workload_group = self.get_workload_group(selected_tests)
+
+        test_name = self.get_workload_uid(selected_tests)
+
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "FSM workload", fsm_workload,
+            self, logger, "FSM workload", test_name,
             test_runner_file="jstests/concurrency/fsm_libs/resmoke_runner.js",
             shell_executable=shell_executable, shell_options=shell_options)
 
@@ -45,14 +49,9 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
 
-    @property
-    def fsm_workload(self):
-        """Get the test name."""
-        return self.test_name
-
     def _populate_test_data(self, test_data):
-
-        test_data["fsmWorkloads"] = self.fsm_workload
+        test_data["fsmWorkloads"] = self.fsm_workload_group
+        test_data["fsmWorkloads"] = self.fsm_workload_group
         test_data["resmokeDbPathPrefix"] = self.dbpath_prefix
 
         with FSMWorkloadTestCase._COUNTER_LOCK:
@@ -70,3 +69,37 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
             test_data["sameDB"] = True
         if not self.same_collection:
             test_data["sameCollection"] = True
+
+    @staticmethod
+    def get_workload_group(selected_tests):
+        """Generate an FSM workload group from tests selected by the selector."""
+        # Selectors for non-parallel FSM suites return the name of a workload, we
+        # put it into a list to create a workload group of size 1.
+        return [selected_tests]
+
+    @staticmethod
+    def get_workload_uid(selected_tests):
+        """Get an unique identifier for a workload group."""
+        # For non-parallel versions of the FSM framework, the workload group name is just the
+        # name of the workload.
+        return selected_tests
+
+
+class ParallelFSMWorkloadTestCase(FSMWorkloadTestCase):
+    """An FSM workload to execute."""
+
+    REGISTERED_NAME = "parallel_fsm_workload_test"
+
+    @staticmethod
+    def get_workload_group(selected_tests):
+        """Generate an FSM workload group from tests selected by the selector."""
+        # Just return the list of selected tests as the workload.
+        return selected_tests
+
+    @staticmethod
+    def get_workload_uid(selected_tests):
+        """Get an unique identifier for a workload group."""
+        uid = hashlib.md5()
+        for workload_name in sorted(selected_tests):
+            uid.update(workload_name)
+        return uid.hexdigest()

@@ -108,6 +108,8 @@ class TestTestFileExplorer(unittest.TestCase):
 class MockTestFileExplorer(object):
     """Component giving access to mock test files data."""
 
+    NUM_JS_FILES = 4  # Total number of JS files in self.files.
+
     def __init__(self):
         self.files = [
             "dir/subdir1/test11.js", "dir/subdir1/test12.js", "dir/subdir2/test21.js",
@@ -318,6 +320,12 @@ class TestSelectorConfig(unittest.TestCase):
         with self.assertRaises(ValueError):
             selector._SelectorConfig(include_tags="tag1", exclude_tags="tag2")
 
+    def test_multi_jstest_selector_config(self):
+        sc = selector._MultiJSTestSelectorConfig(roots=["test1", "test2"], group_size=1234,
+                                                 group_count_multiplier=5678)
+        self.assertEqual(sc.group_size, 1234)
+        self.assertEqual(sc.group_count_multiplier, 5678)
+
 
 class TestSelector(unittest.TestCase):
     @classmethod
@@ -375,6 +383,46 @@ class TestSelector(unittest.TestCase):
             "dir/subdir1/test11.js", "dir/subdir1/test12.js", "dir/subdir2/test21.js",
             "dir/subdir3/a/test3a1.js"
         ], excluded)
+
+
+class TestMultiJSSelector(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.selector = selector._MultiJSTestSelector(MockTestFileExplorer())
+
+    def test_multi_js_test_selector_normal(self):
+        config = selector._MultiJSTestSelectorConfig(roots=["dir/**/*.js"], group_size=3,
+                                                     group_count_multiplier=2)
+
+        selected, _ = self.selector.select(config)
+        total = 0
+
+        for group in selected[:-1]:
+            self.assertEqual(len(group), 3, "{} did not have 3 unique tests".format(group))
+            total += 3
+
+        self.assertLessEqual(
+            len(selected[-1]), 3, "Last selected group did not have 3 or fewer tests: {}".format(
+                selected[-1]))
+        total += len(selected[-1])
+
+        self.assertEqual(total, MockTestFileExplorer.NUM_JS_FILES * config.group_count_multiplier,
+                         "The total number of workloads is incorrect")
+
+    def test_multi_js_test_selector_one_group(self):
+        """Test we return only one group if the group size equals number of files"""
+        num_files = MockTestFileExplorer.NUM_JS_FILES
+        config = selector._MultiJSTestSelectorConfig(roots=["dir/**/*.js"], group_size=num_files,
+                                                     group_count_multiplier=9999999)
+        selected, _ = self.selector.select(config)
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(len(selected[0]), num_files)
+
+    def test_multi_js_test_selector_group_too_large(self):
+        config = selector._MultiJSTestSelectorConfig(roots=["dir/**/*.js"], group_size=9999999,
+                                                     group_count_multiplier=3)
+        with self.assertRaises(ValueError):
+            self.selector.select(config)
 
 
 class TestFilterTests(unittest.TestCase):
