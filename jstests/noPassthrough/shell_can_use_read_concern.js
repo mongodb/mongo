@@ -6,6 +6,9 @@
 (function() {
     "use strict";
 
+    // This test makes assertions on commands run without logical session ids.
+    TestData.disableImplicitSessions = true;
+
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();

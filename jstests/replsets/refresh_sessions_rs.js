@@ -1,6 +1,9 @@
 (function() {
     "use strict";
 
+    // This test makes assertions about the number of logical session records.
+    TestData.disableImplicitSessions = true;
+
     var refresh = {refreshLogicalSessionCacheNow: 1};
     var startSession = {startSession: 1};
 

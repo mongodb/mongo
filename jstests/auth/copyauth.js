@@ -195,6 +195,10 @@ function copydbBetweenClustersTest(configObj) {
     assert.eq(1, target.conn.getDB(baseName)[baseName].count());
     assert.eq(1, target.conn.getDB(baseName)[baseName].findOne().i);
 
+    if (configObj.isTargetUsingAuth) {
+        target.conn.getDB("admin").logout();
+    }
+
     // 4. Do any necessary cleanup
     source.stop();
     target.stop();

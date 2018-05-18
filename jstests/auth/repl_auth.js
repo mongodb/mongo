@@ -65,4 +65,8 @@ for (var x = 0; x < 20; x++) {
     assert.eq(1, explain.executionStats.nReturned);
 }
 
+admin.logout();
+fooDB0.logout();
+barDB1.logout();
+
 rsTest.stopSet();

@@ -58,7 +58,9 @@ Mongo.prototype.getDB = function(name) {
 
 Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession()) {
     var cmdObj = {listDatabases: 1};
-    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
+        cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    }
 
     var res = this.adminCommand(cmdObj);
     if (!res.ok)
@@ -75,7 +77,9 @@ Mongo.prototype.adminCommand = function(cmd) {
  */
 Mongo.prototype.getLogComponents = function(driverSession = this._getDefaultSession()) {
     var cmdObj = {getParameter: 1, logComponentVerbosity: 1};
-    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
+        cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    }
 
     var res = this.adminCommand(cmdObj);
     if (!res.ok)
@@ -106,7 +110,9 @@ Mongo.prototype.setLogLevel = function(
     }
 
     var cmdObj = {setParameter: 1, logComponentVerbosity: vDoc};
-    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
+        cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    }
 
     var res = this.adminCommand(cmdObj);
     if (!res.ok)
@@ -426,11 +432,14 @@ Mongo.prototype.startSession = function startSession(options = {}) {
 };
 
 Mongo.prototype._getDefaultSession = function getDefaultSession() {
-    // We implicitly associate a Mongo connection object with a DriverSession so that tests which
-    // call DB.prototype.getMongo() and then Mongo.prototype.getDB() to get a different DB instance
-    // are still causally consistent.
+    // We implicitly associate a Mongo connection object with a real session so all requests include
+    // a logical session id. These implicit sessions are intentionally not causally consistent. If
+    // implicit sessions have been globally disabled, a dummy session is used instead of a real one.
     if (!this.hasOwnProperty("_defaultSession")) {
-        this._defaultSession = new _DummyDriverSession(this);
+        this._defaultSession = _shouldUseImplicitSessions()
+            ? this.startSession({causalConsistency: false})
+            : new _DummyDriverSession(this);
+        this._defaultSession._isExplicit = false;
     }
     return this._defaultSession;
 };

@@ -11,6 +11,10 @@ executor:
       - ValidateCollections
   config:
     shell_options:
+      global_vars:
+        TestData:
+          # Other fuzzers test commands against sharded clusters with logical session ids.
+          disableImplicitSessions: true
       readMode: commands
   hooks:
   - class: CheckReplDBHash

@@ -420,6 +420,18 @@ selector:
   - jstests/sharding/movechunk_include.js
   # Enable when SERVER-33538 is backported.
   - jstests/sharding/mapReduce_outSharded_checkUUID.js
+  # TODO SERVER-34204: Change streams established in a session can send getMores without logical
+  # session ids. Enable when SERVER-34204 is backported to v3.6.
+  - jstests/sharding/change_stream_chunk_migration.js
+  - jstests/sharding/change_stream_enforce_max_time_ms_on_mongos.js
+  - jstests/sharding/change_stream_read_preference.js
+  - jstests/sharding/change_stream_update_lookup_collation.js
+  - jstests/sharding/change_stream_update_lookup_read_concern.js
+  - jstests/sharding/change_streams_establishment_finds_new_shards.js
+  - jstests/sharding/change_streams_shards_start_in_sync.js
+  - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
+  - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
+  - jstests/sharding/resume_change_stream_from_stale_mongos.js
 
 executor:
   config:

@@ -18,7 +18,6 @@ selector:
   - jstests/sharding/auth.js
   - jstests/sharding/shard_kill_and_pooling.js
   - jstests/sharding/bulk_shard_insert.js
-  - jstests/sharding/change_stream_update_lookup_read_concern.js
   - jstests/sharding/sharding_balance4.js
   - jstests/sharding/convert_to_and_from_sharded.js
   - jstests/sharding/shard_identity_config_update.js

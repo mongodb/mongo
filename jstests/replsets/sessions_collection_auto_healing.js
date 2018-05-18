@@ -3,6 +3,10 @@ load('jstests/libs/sessions_collection.js');
 (function() {
     "use strict";
 
+    // This test makes assertions about the number of sessions, which are not compatible with
+    // implicit sessions.
+    TestData.disableImplicitSessions = true;
+
     var replTest = new ReplSetTest({name: 'refresh', nodes: 3});
     var nodes = replTest.startSet();
 

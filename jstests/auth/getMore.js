@@ -3,6 +3,9 @@
 (function() {
     "use strict";
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     function runTest(conn) {
         let adminDB = conn.getDB("admin");
         let isMaster = adminDB.runCommand("ismaster");

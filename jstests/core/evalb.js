@@ -2,10 +2,11 @@
 // contents are logged in the profile log.
 //
 // @tags: [
+//   assumes_read_preference_unchanged,
+//   creates_and_authenticates_user,
 //   does_not_support_stepdowns,
 //   requires_eval_command,
 //   requires_non_retryable_commands,
-//   assumes_read_preference_unchanged,
 //   requires_profiling
 // ]
 

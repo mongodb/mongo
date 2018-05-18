@@ -6,6 +6,9 @@
 
 (function() {
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     function doMapReduce(connection, outputDb) {
         // clean output db and run m/r
         outputDb.numbers_out.drop();

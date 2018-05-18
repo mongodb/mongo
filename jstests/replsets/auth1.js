@@ -6,6 +6,11 @@
 load("jstests/replsets/rslib.js");
 
 (function() {
+    "use strict";
+
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     var name = "rs_auth1";
     var port = allocatePorts(5);
     var path = "jstests/libs/";

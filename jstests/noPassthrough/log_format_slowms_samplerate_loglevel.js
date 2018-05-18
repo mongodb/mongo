@@ -7,6 +7,10 @@
 (function() {
     "use strict";
 
+    // This test looks for exact matches in log output, which does not account for implicit
+    // sessions.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
     load("jstests/libs/check_log.js");        // For formatAsLogLine.
 

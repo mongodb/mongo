@@ -3,6 +3,11 @@
  * @tags: [requires_replication, requires_sharding]
  */
 
+// TODO SERVER-35447: This test logs in users on the admin database, but doesn't log them out, which
+// can fail with implicit sessions and ReplSetTest when the fixture attempts to verify data hashes
+// at shutdown by authenticating as the __system user.
+TestData.disableImplicitSessions = true;
+
 function setup_users(granter) {
     var admindb = granter.getSiblingDB("admin");
     admindb.runCommand({

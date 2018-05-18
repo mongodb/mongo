@@ -6,6 +6,9 @@
 (function() {
     'use strict';
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     function testConnection(
         conn, eventuallyConsistentConn, sleepUntilUserDataPropagated, sleepUntilUserDataRefreshed) {
         load("jstests/libs/host_ipaddr.js");

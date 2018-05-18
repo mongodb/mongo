@@ -313,7 +313,8 @@ jsTestOptions = function() {
             skipCheckDBHashes: TestData.skipCheckDBHashes || false,
             traceExceptions: TestData.hasOwnProperty("traceExceptions") ? TestData.traceExceptions
                                                                         : true,
-            transactionLifetimeLimitSeconds: TestData.transactionLifetimeLimitSeconds
+            transactionLifetimeLimitSeconds: TestData.transactionLifetimeLimitSeconds,
+            disableImplicitSessions: TestData.disableImplicitSessions || false,
         });
     }
     return _jsTestOptions;
@@ -555,6 +556,16 @@ if (typeof _shouldRetryWrites === 'undefined') {
     // We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
     // is being used from someplace other than the mongo shell (e.g. map-reduce).
     _shouldRetryWrites = function _shouldRetryWrites() {
+        return false;
+    };
+}
+
+if (typeof _shouldUseImplicitSessions === 'undefined') {
+    // We ensure the _shouldUseImplicitSessions() function is always defined, in case the JavaScript
+    // engine is being used from someplace other than the mongo shell (e.g. map-reduce). If the
+    // function was not defined, implicit sessions are disabled to prevent unnecessary sessions from
+    // being created.
+    _shouldUseImplicitSessions = function _shouldUseImplicitSessions() {
         return false;
     };
 }

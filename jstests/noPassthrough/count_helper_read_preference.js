@@ -19,7 +19,12 @@
         commandsRan.push({db: db, cmd: cmd, opts: opts});
         return {ok: 1, n: 100};
     };
-    var db = new DB(new MockMongo(), "test");
+
+    const mockMongo = new MockMongo();
+    var db = new DB(mockMongo, "test");
+
+    // Attach a dummy implicit session because the mock connection cannot create sessions.
+    db._session = new _DummyDriverSession(mockMongo);
 
     assert.eq(commandsRan.length, 0);
 
