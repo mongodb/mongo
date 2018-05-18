@@ -40,7 +40,7 @@ namespace mongo {
 
 /**
  * When constructed, this object begins a WiredTiger transaction on the provided session. The
- * transaction will be rolled back if dismissRollback is not called before the object is destructed.
+ * transaction will be rolled back if done() is not called before the object is destructed.
  */
 class WiredTigerBeginTxnBlock {
 public:
