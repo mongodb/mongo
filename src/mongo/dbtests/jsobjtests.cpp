@@ -1390,7 +1390,7 @@ public:
         oid.init(base);
 
         ASSERT_EQUALS(base.toMillisSinceEpoch() / 1000, oid.asDateT().toMillisSinceEpoch() / 1000);
-        ASSERT_EQUALS(base.toTimeT(), oid.asTimeT());
+        ASSERT_EQUALS(base.toTimeT(), static_cast<time_t>(oid.getTimestamp()));
     }
 };
 

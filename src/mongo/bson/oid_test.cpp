@@ -109,7 +109,7 @@ TEST(Basic, Deserialize) {
         0xDEu,
         0xADu,
         0xBEu,
-        0xEFu,  // timestamp is -559038737 (signed)
+        0xEFu,  // timestamp is 3735928559 (unsigned)
         0x00u,
         0x00u,
         0x00u,
@@ -122,7 +122,7 @@ TEST(Basic, Deserialize) {
 
     OID o1 = OID::from(OIDbytes);
 
-    ASSERT_EQUALS(o1.getTimestamp(), -559038737);
+    ASSERT_EQUALS(o1.getTimestamp(), 3735928559);
     OID::InstanceUnique u = o1.getInstanceUnique();
     for (std::size_t i = 0; i < OID::kInstanceUniqueSize; ++i) {
         ASSERT_EQUALS(u.bytes[i], 0x00u);
@@ -158,7 +158,7 @@ TEST(Basic, FromTerm) {
     auto oidHead = oidStr.substr(0, 8);
     auto oidTail = oidStr.substr(oidStr.length() - 1);
 
-    ASSERT_EQUALS("7fffffff", oidHead);
+    ASSERT_EQUALS("ffffffff", oidHead);
     ASSERT_EQUALS(term, std::stoi(oidTail));
 }
 }

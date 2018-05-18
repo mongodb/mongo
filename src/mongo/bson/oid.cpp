@@ -162,10 +162,6 @@ void OID::init(Date_t date, bool max) {
     std::memcpy(_view().view(kInstanceUniqueOffset), &rest, kInstanceUniqueSize + kIncrementSize);
 }
 
-time_t OID::asTimeT() const {
-    return getTimestamp();
-}
-
 std::string OID::toString() const {
     return toHexLower(_data, kOIDSize);
 }

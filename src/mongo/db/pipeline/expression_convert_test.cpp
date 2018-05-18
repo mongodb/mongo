@@ -1947,6 +1947,21 @@ TEST_F(ExpressionConvertTest, ConvertObjectIdToDate) {
               "2017-10-19T13:30:00.000Z");
 }
 
+TEST_F(ExpressionConvertTest, ConvertObjectIdToDateFuture) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document oidInput{{"path1", OID("8071be82122d3312074f0300")}};
+
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(oidInput).getDate()),
+              "2038-04-15T09:53:06.000Z");
+}
+
 TEST_F(ExpressionConvertTest, ConvertStringToInt) {
     auto expCtx = getExpCtx();
 
