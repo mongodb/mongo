@@ -89,6 +89,9 @@
     assert.commandFailedWithCode(sessionColl.update({_id: 1}, {$inc: {x: 1}}),
                                  ErrorCodes.WriteConflict);
 
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                 ErrorCodes.NoSuchTransaction);
+
     // Restart server replication to allow majority commit point to advance.
     restartServerReplication(secondary);
 
