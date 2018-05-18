@@ -3,6 +3,9 @@
 (function() {
     'use strict';
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     function runTest(mongod) {
         /**
          * Open a cursor on `db` while authenticated as `authUsers`.

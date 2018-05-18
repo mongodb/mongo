@@ -4,6 +4,10 @@
 (function() {
     "use strict";
 
+    // This test intentionally runs commands without a logical session id, which is not compatible
+    // with implicit sessions.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/libs/global_snapshot_reads_util.js");
 
     const dbName = "test";

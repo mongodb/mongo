@@ -223,6 +223,9 @@ selector:
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/views/views_all_commands.js
 
+  # Fails with implicit sessions because it will use multiple sessions on the same Mongo connection.
+  - jstests/core/dropdb.js
+
   # Committing a transaction when the server is fsync locked fails.
   - jstests/core/fsync.js
 

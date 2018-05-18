@@ -24,6 +24,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // TODO SERVER-32672: remove this flag.
 TestData.skipGossipingClusterTime = true;
 
+// TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+TestData.disableImplicitSessions = true;
+
 var options = {rs: true, rsOptions: {nodes: 2}, keyFile: "jstests/libs/key1"};
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});

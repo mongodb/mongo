@@ -20,6 +20,9 @@ selector:
   - jstests/core/**/*[aA]uth*.js
   # Commands using UUIDs are not compatible with name-based auth
   - jstests/core/commands_with_uuid.js
+  exclude_with_any_tags:
+  # TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+  - creates_and_authenticates_user
 
 executor:
   archive:

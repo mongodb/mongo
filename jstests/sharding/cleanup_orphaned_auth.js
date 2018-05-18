@@ -5,6 +5,9 @@
 (function() {
     'use strict';
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     function assertUnauthorized(res, msg) {
         if (assert._debug && msg)
             print("in assert for: " + msg);

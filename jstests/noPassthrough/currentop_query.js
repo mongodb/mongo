@@ -6,6 +6,10 @@
 (function() {
     "use strict";
 
+    // This test runs manual getMores using different connections, which will not inherit the
+    // implicit session of the cursor establishing command.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
     // Set up a 2-shard cluster. Configure 'internalQueryExecYieldIterations' on both shards such

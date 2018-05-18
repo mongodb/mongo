@@ -13,6 +13,10 @@ executor:
   config:
     shell_options:
       readMode: commands
+      global_vars:
+        TestData:
+          # Other fuzzers test commands against replica sets with logical session ids.
+          disableImplicitSessions: true
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're

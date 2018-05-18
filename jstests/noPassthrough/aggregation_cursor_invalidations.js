@@ -12,6 +12,10 @@
 (function() {
     'use strict';
 
+    // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
+    // the cursor establishing command.
+    TestData.disableImplicitSessions = true;
+
     // The DocumentSourceCursor which wraps PlanExecutors will batch results internally. We use the
     // 'internalDocumentSourceCursorBatchSizeBytes' parameter to disable this behavior so that we
     // can easily pause a pipeline in a state where it will need to request more results from the

@@ -493,7 +493,7 @@ var runTests = function(conn) {
             testFunc.test(newConn);
         } catch (x) {
             failures.push(testFunc.name);
-            jsTestLog(x);
+            jsTestLog(tojson(x));
         }
     });
 
