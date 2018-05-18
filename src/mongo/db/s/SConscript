@@ -190,6 +190,7 @@ env.Library(
         'config/sharding_catalog_manager_database_operations.cpp',
         'config/sharding_catalog_manager_shard_operations.cpp',
         'config/sharding_catalog_manager_zone_operations.cpp',
+        'config/namespace_serializer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',
