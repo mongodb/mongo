@@ -304,67 +304,98 @@ TEST(LockerImpl, CanceledDeadlockUnblocks) {
     ASSERT(locker3.unlockGlobal());
 }
 
-TEST(LockerImpl, MODE_ISLocksUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsTrue) {
-    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+TEST(LockerImpl, SharedLocksShouldTwoPhaseLockIsTrue) {
+    // Test that when setSharedLocksShouldTwoPhaseLock is true and we are in a WUOW, unlock on IS
+    // and S locks are postponed until endWriteUnitOfWork() is called. Mode IX and X locks always
+    // participate in two-phased locking, regardless of the setting.
+
+    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId resId1(RESOURCE_DATABASE, "TestDB1"_sd);
+    const ResourceId resId2(RESOURCE_DATABASE, "TestDB2"_sd);
+    const ResourceId resId3(RESOURCE_COLLECTION, "TestDB.collection3"_sd);
+    const ResourceId resId4(RESOURCE_COLLECTION, "TestDB.collection4"_sd);
 
     DefaultLockerImpl locker;
     locker.setSharedLocksShouldTwoPhaseLock(true);
-    locker.lockGlobal(MODE_IS);
 
-    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_IS));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IS));
+    ASSERT_EQ(LOCK_OK, locker.lockGlobal(MODE_IS));
+    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IS);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resId1, MODE_IS));
+    ASSERT_EQ(LOCK_OK, locker.lock(resId2, MODE_IX));
+    ASSERT_EQ(LOCK_OK, locker.lock(resId3, MODE_S));
+    ASSERT_EQ(LOCK_OK, locker.lock(resId4, MODE_X));
+    ASSERT_EQ(locker.getLockMode(resId1), MODE_IS);
+    ASSERT_EQ(locker.getLockMode(resId2), MODE_IX);
+    ASSERT_EQ(locker.getLockMode(resId3), MODE_S);
+    ASSERT_EQ(locker.getLockMode(resId4), MODE_X);
 
     locker.beginWriteUnitOfWork();
 
-    ASSERT_FALSE(locker.unlock(resId));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IS));
+    ASSERT_FALSE(locker.unlock(resId1));
+    ASSERT_FALSE(locker.unlock(resId2));
+    ASSERT_FALSE(locker.unlock(resId3));
+    ASSERT_FALSE(locker.unlock(resId4));
+    ASSERT_EQ(locker.getLockMode(resId1), MODE_IS);
+    ASSERT_EQ(locker.getLockMode(resId2), MODE_IX);
+    ASSERT_EQ(locker.getLockMode(resId3), MODE_S);
+    ASSERT_EQ(locker.getLockMode(resId4), MODE_X);
+
+    ASSERT_FALSE(locker.unlockGlobal());
+    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IS);
 
     locker.endWriteUnitOfWork();
 
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
-
-    locker.unlockGlobal();
+    ASSERT_EQ(locker.getLockMode(resId1), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resId2), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resId3), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resId4), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(globalResId), MODE_NONE);
 }
 
-TEST(LockerImpl, MODE_ISLocksDoNotUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsFalse) {
-    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+TEST(LockerImpl, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
+    // Unlock on mode IX and X locks during a WUOW should always be postponed until
+    // endWriteUnitOfWork() is called. Mode IS and S locks should unlock immediately.
+
+    const ResourceId globalResId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId resId1(RESOURCE_DATABASE, "TestDB1"_sd);
+    const ResourceId resId2(RESOURCE_DATABASE, "TestDB2"_sd);
+    const ResourceId resId3(RESOURCE_COLLECTION, "TestDB.collection3"_sd);
+    const ResourceId resId4(RESOURCE_COLLECTION, "TestDB.collection4"_sd);
 
     DefaultLockerImpl locker;
-    locker.lockGlobal(MODE_IS);
 
-    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_IS));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IS));
+    ASSERT_EQ(LOCK_OK, locker.lockGlobal(MODE_IX));
+    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IX);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resId1, MODE_IS));
+    ASSERT_EQ(LOCK_OK, locker.lock(resId2, MODE_IX));
+    ASSERT_EQ(LOCK_OK, locker.lock(resId3, MODE_S));
+    ASSERT_EQ(LOCK_OK, locker.lock(resId4, MODE_X));
+    ASSERT_EQ(locker.getLockMode(resId1), MODE_IS);
+    ASSERT_EQ(locker.getLockMode(resId2), MODE_IX);
+    ASSERT_EQ(locker.getLockMode(resId3), MODE_S);
+    ASSERT_EQ(locker.getLockMode(resId4), MODE_X);
 
     locker.beginWriteUnitOfWork();
 
-    ASSERT_TRUE(locker.unlock(resId));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
+    ASSERT_TRUE(locker.unlock(resId1));
+    ASSERT_FALSE(locker.unlock(resId2));
+    ASSERT_TRUE(locker.unlock(resId3));
+    ASSERT_FALSE(locker.unlock(resId4));
+    ASSERT_EQ(locker.getLockMode(resId1), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resId2), MODE_IX);
+    ASSERT_EQ(locker.getLockMode(resId3), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resId4), MODE_X);
+
+    ASSERT_FALSE(locker.unlockGlobal());
+    ASSERT_EQ(locker.getLockMode(globalResId), MODE_IX);
 
     locker.endWriteUnitOfWork();
 
-    locker.unlockGlobal();
-}
-
-TEST(LockerImpl, MODE_SLocksUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsTrue) {
-    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
-
-    DefaultLockerImpl locker;
-    locker.setSharedLocksShouldTwoPhaseLock(true);
-    locker.lockGlobal(MODE_IS);
-
-    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_S));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_S));
-
-    locker.beginWriteUnitOfWork();
-
-    ASSERT_FALSE(locker.unlock(resId));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_S));
-
-    locker.endWriteUnitOfWork();
-
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
-
-    locker.unlockGlobal();
+    ASSERT_EQ(locker.getLockMode(resId2), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(resId4), MODE_NONE);
+    ASSERT_EQ(locker.getLockMode(globalResId), MODE_NONE);
 }
 
 TEST(LockerImpl, OverrideLockRequestTimeout) {
@@ -436,25 +467,6 @@ TEST(LockerImpl, DoNotWaitForLockAcquisition) {
 
     ASSERT(locker1.unlockGlobal());
     ASSERT(locker2.unlockGlobal());
-}
-
-TEST(LockerImpl, MODE_SLocksDoNotUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsFalse) {
-    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
-
-    DefaultLockerImpl locker;
-    locker.lockGlobal(MODE_IS);
-
-    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_S));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_S));
-
-    locker.beginWriteUnitOfWork();
-
-    ASSERT_TRUE(locker.unlock(resId));
-    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
-
-    locker.endWriteUnitOfWork();
-
-    locker.unlockGlobal();
 }
 
 namespace {

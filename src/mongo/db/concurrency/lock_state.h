@@ -281,10 +281,16 @@ private:
     LockMode _getModeForMMAPV1FlushLock() const;
 
     /**
-     * Whether the particular lock's release should be held until the end of the operation. We delay
-     * release of exclusive locks (locks that are for write operations) in order to ensure that the
-     * data they protect is committed successfully. Shared locks will also participate in two-phase
-     * locking if '_sharedLocksShouldTwoPhaseLock' is true.
+     * Whether we should use two phase locking. Returns true if the particular lock's release should
+     * be delayed until the end of the operation.
+     *
+     * We delay release of write operation locks (X, IX) in order to ensure that the data changes
+     * they protect are committed successfully. endWriteUnitOfWork will release them afterwards.
+     * This protects other threads from seeing inconsistent in-memory state.
+     *
+     * Shared locks (S, IS) will also participate in two-phase locking if
+     * '_sharedLocksShouldTwoPhaseLock' is true. This will protect open storage engine transactions
+     * across network calls.
      */
     bool _shouldDelayUnlock(ResourceId resId, LockMode mode) const;
 

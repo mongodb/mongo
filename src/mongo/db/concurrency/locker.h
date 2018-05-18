@@ -207,7 +207,11 @@ public:
 
     /**
      * beginWriteUnitOfWork/endWriteUnitOfWork are called at the start and end of WriteUnitOfWorks.
-     * They can be used to implement two-phase locking.
+     * They can be used to implement two-phase locking. Each call to begin should be matched with an
+     * eventual call to end.
+     *
+     * endWriteUnitOfWork, if not called in a nested WUOW, will release all two-phase locking held
+     * lock resources.
      */
     virtual void beginWriteUnitOfWork() = 0;
     virtual void endWriteUnitOfWork() = 0;
@@ -436,7 +440,6 @@ public:
         return _numResourcesToUnlockAtEndUnitOfWork;
     }
 
-
 protected:
     Locker() {}
 
@@ -447,6 +450,7 @@ protected:
      * never interruptible.
      */
     int _uninterruptibleLocksRequested = 0;
+
     /**
      * The number of LockRequests to unlock at the end of this WUOW. This is used for locks
      * participating in two-phase locking.
