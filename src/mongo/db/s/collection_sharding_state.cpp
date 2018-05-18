@@ -258,18 +258,6 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     }
 }
 
-bool CollectionShardingState::collectionIsSharded(OperationContext* opCtx) {
-    auto metadata = getMetadata(opCtx).getMetadata();
-    if (metadata && (metadata->getCollVersion().isStrictlyEqualTo(ChunkVersion::UNSHARDED()))) {
-        return false;
-    }
-
-    // If 'metadata' is null, then the shard doesn't know if this collection is sharded or not. In
-    // this scenario we will assume this collection is sharded. We will know sharding state
-    // definitively once SERVER-24960 has been fixed.
-    return true;
-}
-
 // Call with collection unlocked.  Note that the CollectionShardingState object involved might not
 // exist anymore at the time of the call, or indeed anytime outside the AutoGetCollection block, so
 // anything that might alias something in it must be copied first.

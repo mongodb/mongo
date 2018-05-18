@@ -8,7 +8,6 @@ env.Library(
     target='views_mongod',
     source=[
         'durable_view_catalog.cpp',
-        'view_sharding_check.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbhelpers',

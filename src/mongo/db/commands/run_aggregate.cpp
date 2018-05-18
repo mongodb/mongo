@@ -58,12 +58,12 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
-#include "mongo/db/views/view_sharding_check.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -400,6 +400,7 @@ Status runAggregate(OperationContext* opCtx,
         if (ctx && ctx->getView() && !liteParsedPipeline.startsWithCollStats()) {
             invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
+
             // Check that the default collation of 'view' is compatible with the operation's
             // collation. The check is skipped if the request did not specify a collation.
             if (!request.getCollation().isEmpty()) {
@@ -411,27 +412,28 @@ Status runAggregate(OperationContext* opCtx,
                 }
             }
 
-            ViewShardingCheck::throwResolvedViewIfSharded(opCtx, ctx->getDb(), ctx->getView());
-
-            auto resolvedView = ctx->getDb()->getViewCatalog()->resolveView(opCtx, nss);
-            if (!resolvedView.isOK()) {
-                return resolvedView.getStatus();
-            }
+            auto resolvedView =
+                uassertStatusOK(ctx->getDb()->getViewCatalog()->resolveView(opCtx, nss));
+            uassert(std::move(resolvedView),
+                    "On sharded systems, resolved views must be executed by mongos",
+                    !ShardingState::get(opCtx)->enabled());
 
             // With the view & collation resolved, we can relinquish locks.
             ctx.reset();
 
             // Parse the resolved view into a new aggregation request.
-            auto newRequest = resolvedView.getValue().asExpandedViewAggregation(request);
+            auto newRequest = resolvedView.asExpandedViewAggregation(request);
             auto newCmd = newRequest.serializeToCommandObj().toBson();
 
             auto status = runAggregate(opCtx, origNss, newRequest, newCmd, result);
+
             {
                 // Set the namespace of the curop back to the view namespace so ctx records
                 // stats on this view namespace on destruction.
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 curOp->setNS_inlock(nss.ns());
             }
+
             return status;
         }
 

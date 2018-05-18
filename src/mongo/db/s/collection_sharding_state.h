@@ -164,12 +164,6 @@ public:
     void checkShardVersionOrThrow(OperationContext* opCtx);
 
     /**
-     * Returns whether this collection is sharded. Valid only if mongoD is primary.
-     * TODO SERVER-24960: This method may return a false positive until SERVER-24960 is fixed.
-     */
-    bool collectionIsSharded(OperationContext* opCtx);
-
-    /**
      * Tracks deletion of any documents within the range, returning when deletion is complete.
      * Throws if the collection is dropped while it sleeps.
      */

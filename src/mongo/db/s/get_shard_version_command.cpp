@@ -60,7 +60,7 @@ public:
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {
