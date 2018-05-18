@@ -602,6 +602,7 @@ _SELECTOR_REGISTRY = {
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
+    "multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),
     "py_test": (_PyTestCaseSelectorConfig, _Selector),
     "sleep_test": (_SleepTestCaseSelectorConfig, _SleepTestCaseSelector),
 }
