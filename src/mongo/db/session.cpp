@@ -110,6 +110,10 @@ const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"prepareTransaction", 1},
                                         {"update", 1}};
 
+// The command names that are allowed in a multi-document transaction only when test commands are
+// enabled.
+const StringMap<int> txnCmdForTestingWhitelist = {{"dbHash", 1}};
+
 // The commands that can be run on the 'admin' database in multi-document transactions.
 const StringMap<int> txnAdminCommands = {
     {"abortTransaction", 1}, {"commitTransaction", 1}, {"doTxn", 1}, {"prepareTransaction", 1}};
@@ -347,7 +351,9 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
 
     uassert(50767,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
-            !autocommit || txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend());
+            !autocommit || txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend() ||
+                (getTestCommandsEnabled() &&
+                 txnCmdForTestingWhitelist.find(cmdName) != txnCmdForTestingWhitelist.cend()));
 
     uassert(50844,
             str::stream() << "Cannot run command against the '" << dbName

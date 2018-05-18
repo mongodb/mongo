@@ -32,6 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <map>
 #include <string>
 
@@ -60,6 +61,17 @@ public:
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
+    }
+
+    ReadWriteType getReadWriteType() const override {
+        return ReadWriteType::kRead;
+    }
+
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const override {
+        return level == repl::ReadConcernLevel::kLocalReadConcern ||
+            level == repl::ReadConcernLevel::kSnapshotReadConcern;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -101,7 +113,14 @@ public:
 
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
-        AutoGetDb autoDb(opCtx, ns, MODE_S);
+        auto lockMode = LockMode::MODE_S;
+        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+            // However, if we are using "atClusterTime" to read from a consistent snapshot, then we
+            // only need to lock the database in intent mode to ensure that none of the collections
+            // get dropped.
+            lockMode = getLockModeForQuery(opCtx);
+        }
+        AutoGetDb autoDb(opCtx, ns, lockMode);
         Database* db = autoDb.getDb();
         std::list<std::string> colls;
         if (db) {
@@ -176,6 +195,30 @@ private:
         Collection* collection = db->getCollection(opCtx, ns);
         if (!collection)
             return "";
+
+        boost::optional<Lock::CollectionLock> collLock;
+        if (repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()) {
+            // When using "atClusterTime", we are only holding the database lock in intent mode. We
+            // need to also acquire the collection lock in intent mode to ensure reading from the
+            // consistent snapshot doesn't overlap with any catalog operations on the collection.
+            invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IS));
+            collLock.emplace(opCtx->lockState(), fullCollectionName, getLockModeForQuery(opCtx));
+
+            auto minSnapshot = collection->getMinimumVisibleSnapshot();
+            auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+            invariant(mySnapshot);
+
+            uassert(ErrorCodes::SnapshotUnavailable,
+                    str::stream() << "Unable to read from a snapshot due to pending collection"
+                                     " catalog changes; please retry the operation. Snapshot"
+                                     " timestamp is "
+                                  << mySnapshot->toString()
+                                  << ". Collection minimum timestamp is "
+                                  << minSnapshot->toString(),
+                    !minSnapshot || *mySnapshot >= *minSnapshot);
+        } else {
+            invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_S));
+        }
 
         IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 

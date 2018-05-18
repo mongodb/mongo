@@ -1104,6 +1104,12 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
     _setOldestTimestamp(oldestTimestamp, doForce);
 }
 
+namespace {
+
+MONGO_FP_DECLARE(WTPreserveSnapshotHistoryIndefinitely);
+
+}  // namespace
+
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     if (stableTimestamp.isNull()) {
         return;
@@ -1144,7 +1150,9 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     // Communicate to WiredTiger that it can clean up timestamp data earlier than the timestamp
     // provided.  No future queries will need point-in-time reads at a timestamp prior to the one
     // provided here.
-    _setOldestTimestamp(stableTimestamp);
+    if (!MONGO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
+        _setOldestTimestamp(stableTimestamp);
+    }
 }
 
 void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp, bool force) {
