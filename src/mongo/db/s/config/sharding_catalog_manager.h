@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/optime_with.h"
+#include "mongo/db/s/config/namespace_serializer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_database.h"
@@ -208,6 +209,14 @@ public:
      * Throws DatabaseDifferCase if the database already exists with a different case.
      */
     DatabaseType createDatabase(OperationContext* opCtx, const std::string& dbName);
+
+    /**
+     * Creates a ScopedLock on the database name in _namespaceSerializer. This is to prevent
+     * timeouts waiting on the dist lock if multiple threads attempt to create the same db.
+     */
+    auto serializeCreateDatabase(OperationContext* opCtx, StringData dbName) {
+        return _namespaceSerializer.lock(opCtx, dbName);
+    }
 
     /**
      * Creates the database if it does not exist, then marks its entry in config.databases as
@@ -543,6 +552,8 @@ private:
      * be removed while they are running (such as removeShardFromZone) to take this in shared mode.
      */
     Lock::ResourceMutex _kShardMembershipLock;
+
+    NamespaceSerializer _namespaceSerializer;
 };
 
 }  // namespace mongo
