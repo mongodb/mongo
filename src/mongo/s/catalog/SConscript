@@ -145,6 +145,7 @@ env.Library(
         'sharding_catalog_manager_database_operations.cpp',
         'sharding_catalog_manager_shard_operations.cpp',
         'sharding_catalog_manager_zone_operations.cpp',
+        'namespace_serializer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_raii',

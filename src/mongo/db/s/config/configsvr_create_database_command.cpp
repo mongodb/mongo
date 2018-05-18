@@ -122,6 +122,9 @@ public:
 
         // Remove the backwards compatible lock after 3.6 ships.
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
+        auto scopedLock =
+            ShardingCatalogManager::get(opCtx)->serializeCreateDatabase(opCtx, dbname);
+
         auto backwardsCompatibleDbDistLock = uassertStatusOK(
             catalogClient->getDistLockManager()->lock(opCtx,
                                                       dbname + "-movePrimary",
