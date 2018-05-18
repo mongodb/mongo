@@ -69,9 +69,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
@@ -588,10 +586,8 @@ DBClientBase* PipelineD::MongoDInterface::directClient() {
 
 bool PipelineD::MongoDInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-    // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
-    // state.
-    auto css = CollectionShardingState::get(opCtx, nss);
-    return bool(css->getMetadata(opCtx));
+    auto const css = CollectionShardingState::get(opCtx, nss);
+    return css->getMetadata(opCtx)->isSharded();
 }
 
 BSONObj PipelineD::MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -722,13 +718,11 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     // collection representing the document source to be not-sharded. We confirm sharding state
     // here to avoid taking a collection lock elsewhere for this purpose alone.
     // TODO SERVER-27616: This check is incorrect in that we don't acquire a collection cursor
-    // until after we release the lock, leaving room for a collection to be sharded inbetween.
-    // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
-    // state.
+    // until after we release the lock, leaving room for a collection to be sharded in-between.
     auto css = CollectionShardingState::get(expCtx->opCtx, expCtx->ns);
     uassert(4567,
             str::stream() << "from collection (" << expCtx->ns.ns() << ") cannot be sharded",
-            !bool(css->getMetadata(expCtx->opCtx)));
+            !css->getMetadata(expCtx->opCtx)->isSharded());
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
@@ -741,7 +735,7 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
 
 std::string PipelineD::MongoDInterface::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
-        return ShardingState::get(opCtx)->getShardName();
+        return ShardingState::get(opCtx)->shardId().toString();
     }
 
     return std::string();
@@ -781,7 +775,7 @@ std::pair<std::vector<FieldPath>, bool> PipelineD::MongoDInterface::collectDocum
 
     // Collection is not sharded or UUID mismatch implies collection has been dropped and recreated
     // as sharded.
-    if (!scm || !scm->uuidMatches(uuid)) {
+    if (!scm->isSharded() || !scm->uuidMatches(uuid)) {
         return {{"_id"}, false};
     }
 

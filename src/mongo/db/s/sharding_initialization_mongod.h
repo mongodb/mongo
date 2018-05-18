@@ -28,14 +28,90 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/type_shard_identity.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
 class ConnectionString;
 class OperationContext;
 class ServiceContext;
-class Status;
+
+/**
+ * This class serves as a bootstrap and shutdown for the sharding subsystem and also controls the
+ * persisted cluster identity. The default ShardingEnvironmentInitFunc instantiates all the sharding
+ * services, attaches them to the same service context to which it itself is attached and puts the
+ * ShardingState in the initialized state.
+ */
+class ShardingInitializationMongoD {
+    MONGO_DISALLOW_COPYING(ShardingInitializationMongoD);
+
+public:
+    using ShardingEnvironmentInitFunc = stdx::function<void(
+        OperationContext* opCtx, const ShardIdentity& shardIdentity, StringData distLockProcessId)>;
+
+    ShardingInitializationMongoD();
+    ~ShardingInitializationMongoD();
+
+    static ShardingInitializationMongoD* get(OperationContext* opCtx);
+    static ShardingInitializationMongoD* get(ServiceContext* service);
+
+    /**
+     * If started with --shardsvr, initializes sharding awareness from the shardIdentity document on
+     * disk, if there is one.
+     *
+     * If started with --shardsvr in queryableBackupMode, initializes sharding awareness from the
+     * shardIdentity document passed through the --overrideShardIdentity startup parameter.
+     *
+     * If it returns true, the '_initFunc' was called, meaning all the core classes for sharding
+     * were initialized, but no networking calls were made yet (with the exception of the duplicate
+     * ShardRegistry reload in ShardRegistry::startup() (see SERVER-26123). Outgoing networking
+     * calls to cluster members can now be made.
+     *
+     * If it returns false, this means the node is not yet sharding aware.
+     *
+     * NOTE: this function briefly takes the global lock to determine primary/secondary state.
+     */
+    bool initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
+
+    /**
+     * Initializes the sharding state of this server from the shard identity document argument and
+     * sets secondary or primary state information on the catalog cache loader.
+     *
+     * NOTE: This must be called under at least Global IX lock in order for the replica set member
+     * state to be stable (primary/secondary).
+     */
+    void initializeFromShardIdentity(OperationContext* opCtx,
+                                     const ShardIdentityType& shardIdentity);
+
+    void shutDown(OperationContext* service);
+
+    /**
+     * Updates the config server field of the shardIdentity document with the given connection
+     * string.
+     */
+    static Status updateShardIdentityConfigString(OperationContext* opCtx,
+                                                  const ConnectionString& newConnectionString);
+
+    /**
+     * For testing only. Mock the initialization method used by initializeFromConfigConnString and
+     * initializeFromShardIdentity after all checks are performed.
+     */
+    void setGlobalInitMethodForTest(ShardingEnvironmentInitFunc func) {
+        _initFunc = std::move(func);
+    }
+
+private:
+    // This mutex ensures that only one thread at a time executes the sharding
+    // initialization/teardown sequence
+    stdx::mutex _initSynchronizationMutex;
+
+    // Function for initializing the sharding environment components (i.e. everything on the Grid)
+    ShardingEnvironmentInitFunc _initFunc;
+};
 
 /**
  * Initialize the sharding components of this server. This can be used on both shard and config
@@ -43,8 +119,8 @@ class Status;
  *
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
-Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
-                                              const ConnectionString& configCS,
-                                              StringData distLockProcessId);
+void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
+                                            const ConnectionString& configCS,
+                                            StringData distLockProcessId);
 
 }  // namespace mongo

@@ -35,13 +35,11 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -254,12 +252,6 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
     LogicalTimeValidator::set(opCtx->getServiceContext(),
                               stdx::make_unique<LogicalTimeValidator>(keyManager));
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        replCoord->getMemberState().primary()) {
-        LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, true);
-    }
 
     return Status::OK();
 }

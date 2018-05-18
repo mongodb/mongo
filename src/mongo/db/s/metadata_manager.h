@@ -34,8 +34,8 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_range_deleter.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-class ScopedCollectionMetadata;
+class RangePreserver;
 
 class MetadataManager {
     MONGO_DISALLOW_COPYING(MetadataManager);
@@ -66,13 +66,8 @@ public:
      * contains the currently active metadata.  When the usageCounter goes to zero, the RAII
      * object going out of scope will call _removeMetadata.
      */
-    ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self);
-
-    /**
-     * Creates the metadata on demand for a specific point in time. The object is not tracked by
-     * the metadata manager.
-     */
-    ScopedCollectionMetadata createMetadataAt(OperationContext* opCtx, LogicalTime atCusterTime);
+    ScopedCollectionMetadata getActiveMetadata(std::shared_ptr<MetadataManager> self,
+                                               const boost::optional<LogicalTime>& atClusterTime);
 
     /**
      * Returns the number of CollectionMetadata objects being maintained on behalf of running
@@ -118,14 +113,6 @@ public:
     CleanupNotification cleanUpRange(ChunkRange const& range, Date_t whenToDelete);
 
     /**
-     * Returns a vector of ScopedCollectionMetadata objects representing metadata instances in use
-     * by running queries that overlap the argument range, suitable for identifying and invalidating
-     * those queries.
-     */
-    std::vector<ScopedCollectionMetadata> overlappingMetadata(
-        std::shared_ptr<MetadataManager> const& itself, ChunkRange const& range);
-
-    /**
      * Returns the number of ranges scheduled to be cleaned, exclusive of such ranges that might
      * still be in use by running queries.  Outside of test drivers, the actual number may vary
      * after it returns, so this is really only useful for unit tests.
@@ -149,8 +136,8 @@ public:
     boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& from) const;
 
 private:
-    // Management of the _metadata list is implemented in ScopedCollectionMetadata
-    friend class ScopedCollectionMetadata;
+    // Management of the _metadata list is implemented in RangePreserver
+    friend class RangePreserver;
 
     // For access to _rangesToClean and _managerLock under task callback
     friend boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
@@ -254,85 +241,6 @@ private:
 
     // Ranges being deleted, or scheduled to be deleted, by a background task
     CollectionRangeDeleter _rangesToClean;
-};
-
-class ScopedCollectionMetadata {
-    MONGO_DISALLOW_COPYING(ScopedCollectionMetadata);
-
-public:
-    ~ScopedCollectionMetadata() {
-        _clear();
-    }
-
-    /**
-     * Binds *this to the same CollectionMetadata as other, if any.
-     */
-    ScopedCollectionMetadata(ScopedCollectionMetadata&& other);
-    ScopedCollectionMetadata& operator=(ScopedCollectionMetadata&& other);
-
-    /**
-     * Dereferencing the ScopedCollectionMetadata dereferences the private CollectionMetadata.
-     */
-    CollectionMetadata* getMetadata() const;
-
-    CollectionMetadata* operator->() const {
-        return getMetadata();
-    }
-
-    /**
-     * True if the ScopedCollectionMetadata stores a metadata (is not empty) and the collection is
-     * sharded.
-     */
-    operator bool() const {
-        return getMetadata() != nullptr;
-    }
-
-    /**
-     * Returns just the shard key fields, if collection is sharded, and the _id field, from `doc`.
-     * Does not alter any field values (e.g. by hashing); values are copied verbatim.
-     */
-    BSONObj extractDocumentKey(BSONObj const& doc) const;
-
-private:
-    friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(
-        std::shared_ptr<MetadataManager>);
-
-    friend ScopedCollectionMetadata MetadataManager::createMetadataAt(OperationContext*,
-                                                                      LogicalTime);
-
-    friend std::vector<ScopedCollectionMetadata> MetadataManager::overlappingMetadata(
-        std::shared_ptr<MetadataManager> const&, ChunkRange const&);
-
-    /**
-     * Creates an empty ScopedCollectionMetadata, which is interpreted as if the collection is
-     * unsharded.
-     */
-    ScopedCollectionMetadata();
-
-    /**
-     * Increments the usageCounter in the specified CollectionMetadata.
-     *
-     * Must be called with manager->_managerLock held.  Arguments must be non-null.
-     */
-    ScopedCollectionMetadata(
-        WithLock,
-        std::shared_ptr<MetadataManager> metadataManager,
-        std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
-
-    /**
-     * Metadata not tracked by the manager - created on demand for a specific point in time.
-     */
-    ScopedCollectionMetadata(
-        std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
-
-    /**
-     * Disconnect from the CollectionMetadata, possibly triggering GC of unused CollectionMetadata.
-     */
-    void _clear();
-
-    std::shared_ptr<MetadataManager> _metadataManager;
-
-    std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
 };
 
 }  // namespace mongo

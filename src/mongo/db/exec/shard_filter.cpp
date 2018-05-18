@@ -35,7 +35,6 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/s/metadata_manager.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -76,7 +75,7 @@ PlanStage::StageState ShardFilterStage::doWork(WorkingSetID* out) {
         // If we're sharded make sure that we don't return data that is not owned by us,
         // including pending documents from in-progress migrations and orphaned documents from
         // aborted migrations
-        if (_metadata) {
+        if (_metadata->isSharded()) {
             ShardKeyPattern shardKeyPattern(_metadata->getKeyPattern());
             WorkingSetMember* member = _ws->get(*out);
             WorkingSetMatchableDocument matchable(member);

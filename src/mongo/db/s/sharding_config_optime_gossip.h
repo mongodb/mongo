@@ -45,5 +45,11 @@ private:
     Status _advanceConfigOptimeFromShard(ShardId shardId, const BSONObj& metadataObj) override;
 };
 
+/**
+ * Updates the ShardRegistry's stored notion of the config server optime based on the
+ * ConfigServerMetadata decoration attached to the OperationContext.
+ */
+void advanceConfigOptimeFromRequestMetadata(OperationContext* opCtx);
+
 }  // namespace rpc
 }  // namespace mongo

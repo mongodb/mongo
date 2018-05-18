@@ -167,7 +167,6 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
             (newVersion ==
                  ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36 ||
              newVersion == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40)) {
-            CollectionShardingState::resetAll(opCtx);
             Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
         }
 

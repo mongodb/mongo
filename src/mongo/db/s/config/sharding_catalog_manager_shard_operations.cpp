@@ -898,14 +898,15 @@ BSONObj ShardingCatalogManager::createShardIdentityUpsertForAddShard(OperationCo
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(BSON("_id"
                                 << "shardIdentity"
-                                << ShardIdentityType::shardName(shardName)
-                                << ShardIdentityType::clusterId(
-                                       ClusterIdentityLoader::get(opCtx)->getClusterId())));
-                entry.setU(BSON("$set" << BSON(ShardIdentityType::configsvrConnString(
-                                    repl::ReplicationCoordinator::get(opCtx)
-                                        ->getConfig()
-                                        .getConnectionString()
-                                        .toString()))));
+                                << ShardIdentity::kShardNameFieldName
+                                << shardName
+                                << ShardIdentity::kClusterIdFieldName
+                                << ClusterIdentityLoader::get(opCtx)->getClusterId()));
+                entry.setU(BSON("$set" << BSON(ShardIdentity::kConfigsvrConnectionStringFieldName
+                                               << repl::ReplicationCoordinator::get(opCtx)
+                                                      ->getConfig()
+                                                      .getConnectionString()
+                                                      .toString())));
                 entry.setUpsert(true);
                 return entry;
             }()});

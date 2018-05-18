@@ -103,7 +103,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " became unsharded",
-            metadataAfterSplit);
+            metadataAfterSplit->isSharded());
 
     auto newChunkBounds(splitKeys);
     auto startKey = chunkRange.getMin();

@@ -165,8 +165,11 @@ Status renameCollectionCommon(OperationContext* opCtx,
     }
 
     // Make sure the source collection is not sharded.
-    if (CollectionShardingState::get(opCtx, source)->getMetadata(opCtx)) {
-        return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+    {
+        auto const css = CollectionShardingState::get(opCtx, source);
+        if (css->getMetadata(opCtx)->isSharded()) {
+            return {ErrorCodes::IllegalOperation, "source namespace cannot be sharded"};
+        }
     }
 
     // Ensure that collection name does not exceed maximum length.
@@ -193,8 +196,12 @@ Status renameCollectionCommon(OperationContext* opCtx,
             invariant(source == target);
             return Status::OK();
         }
-        if (CollectionShardingState::get(opCtx, target)->getMetadata(opCtx)) {
-            return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
+
+        {
+            auto const css = CollectionShardingState::get(opCtx, target);
+            if (css->getMetadata(opCtx)->isSharded()) {
+                return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};
+            }
         }
 
         if (!options.dropTarget) {

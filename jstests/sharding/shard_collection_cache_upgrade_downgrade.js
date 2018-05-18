@@ -171,10 +171,10 @@
     checkCachedCollectionEntry(st.shard1, ns2, ns2EntryOriginal);
 
     // The shards' chunk caches should have been updated with histories removed.
-    checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryFCV36);
+    checkCachedChunksEntry(st.shard0, ns1, ns1ChunkEntryFCV40);
     checkCachedChunksEntry(st.shard0, ns2, undefined);
     checkCachedChunksEntry(st.shard1, ns1, undefined);
-    checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryFCV36);
+    checkCachedChunksEntry(st.shard1, ns2, ns2ChunkEntryFCV40);
 
     st.stop();
 })();

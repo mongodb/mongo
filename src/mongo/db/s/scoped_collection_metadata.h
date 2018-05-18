@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,41 +26,45 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
-
-#include "mongo/base/status.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/s/collection_metadata.h"
 
 namespace mongo {
-namespace rpc {
 
-void ShardingEgressMetadataHookForMongod::_saveGLEStats(const BSONObj& metadata,
-                                                        StringData hostString) {}
+/**
+ * Acts like a shared pointer and exposes sharding filtering metadata to be used by server
+ * operations. It is allowed to be referenced outside of collection lock, but all implementations
+ * must be able to outlive the object from which they were obtained.
+ */
+class ScopedCollectionMetadata {
+public:
+    class Impl {
+    public:
+        virtual ~Impl() = default;
 
-repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return repl::ReplicationCoordinator::get(_serviceContext)
-            ->getCurrentCommittedSnapshotOpTime();
-    } else {
-        // TODO uncomment as part of SERVER-22663
-        // invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-        return Grid::get(_serviceContext)->configOpTime();
+        virtual const CollectionMetadata& get() = 0;
+
+    protected:
+        Impl() = default;
+    };
+
+    ScopedCollectionMetadata(std::shared_ptr<Impl> impl) : _impl(std::move(impl)) {}
+
+    const auto& get() const {
+        return _impl->get();
     }
-}
 
-Status ShardingEgressMetadataHookForMongod::_advanceConfigOptimeFromShard(
-    ShardId shardId, const BSONObj& metadataObj) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return Status::OK();
+    const auto* operator-> () const {
+        return &get();
     }
-    return ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(shardId, metadataObj);
-}
 
-}  // namespace rpc
+    const auto& operator*() const {
+        return get();
+    }
+
+private:
+    std::shared_ptr<Impl> _impl;
+};
+
 }  // namespace mongo

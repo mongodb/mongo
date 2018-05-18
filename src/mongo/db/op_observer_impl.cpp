@@ -46,7 +46,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
@@ -402,9 +401,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         onWriteOpCompleted(opCtx, nss, session, stmtIdsWritten, lastOpTime, lastWriteDate);
     }
 
-    auto css = (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
+    auto* const css = (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         ? nullptr
-        : CollectionShardingState::get(opCtx, nss);
+        : CollectionShardingRuntime::get(opCtx, nss);
 
     size_t index = 0;
     for (auto it = first; it != last; it++, index++) {
@@ -476,7 +475,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
     if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!args.fromMigrate) {
-            auto css = CollectionShardingState::get(opCtx, args.nss);
+            auto* const css = CollectionShardingRuntime::get(opCtx, args.nss);
             shardObserveUpdateOp(
                 opCtx, css, args.updatedDoc, opTime.writeOpTime, opTime.prePostImageOpTime);
         }
@@ -500,7 +499,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    BSONObj const& doc) {
     getDeleteState(opCtx) =
-        ShardObserverDeleteState::make(opCtx, CollectionShardingState::get(opCtx, nss), doc);
+        ShardObserverDeleteState::make(opCtx, CollectionShardingRuntime::get(opCtx, nss), doc);
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
@@ -534,7 +533,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!fromMigrate) {
-            auto css = CollectionShardingState::get(opCtx, nss);
+            auto* const css = CollectionShardingRuntime::get(opCtx, nss);
             shardObserveDeleteOp(
                 opCtx, css, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
         }

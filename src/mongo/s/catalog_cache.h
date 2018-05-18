@@ -188,14 +188,6 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Retuns the routing history table for the collection instead of the chunk manager (the chunk
-     * manager is a part of CachedCollectionRoutingInfo). The chunk manager represents a specific
-     * state at some point in time, on the other hand a routing history table has the whole history.
-     */
-    std::shared_ptr<RoutingTableHistory> getCollectionRoutingTableHistoryNoRefresh(
-        const NamespaceString& nss);
-
-    /**
      * Non-blocking method that marks the current cached database entry as needing refresh if the
      * entry's databaseVersion matches 'databaseVersion'.
      *

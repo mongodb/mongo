@@ -36,7 +36,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -73,7 +73,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
     const auto currentShardVersion = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         const auto currentMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
-        if (currentMetadata) {
+        if (currentMetadata->isSharded()) {
             return currentMetadata->getShardVersion();
         }
 
@@ -148,7 +148,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // Exclusive collection lock needed since we're now changing the metadata
         AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
-        auto css = CollectionShardingState::get(opCtx, nss);
+        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
         css->refreshMetadata(opCtx, nullptr);
 
         return ChunkVersion::UNSHARDED();
@@ -159,7 +159,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
 
         // We already have newer version
-        if (metadata && metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
+        if (metadata->isSharded() &&
+            metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
             metadata->getCollVersion() >= cm->getVersion()) {
             LOG(1) << "Skipping refresh of metadata for " << nss << " "
                    << metadata->getCollVersion() << " with an older " << cm->getVersion();
@@ -170,11 +171,12 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // Exclusive collection lock needed since we're now changing the metadata
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
-    auto css = CollectionShardingState::get(opCtx, nss);
+    auto* const css = CollectionShardingRuntime::get(opCtx, nss);
+
     auto metadata = css->getMetadata(opCtx);
 
     // We already have newer version
-    if (metadata && metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
+    if (metadata->isSharded() && metadata->getCollVersion().epoch() == cm->getVersion().epoch() &&
         metadata->getCollVersion() >= cm->getVersion()) {
         LOG(1) << "Skipping refresh of metadata for " << nss << " " << metadata->getCollVersion()
                << " with an older " << cm->getVersion();
@@ -182,7 +184,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     }
 
     std::unique_ptr<CollectionMetadata> newCollectionMetadata =
-        stdx::make_unique<CollectionMetadata>(cm, shardingState->getShardName());
+        stdx::make_unique<CollectionMetadata>(cm, shardingState->shardId());
 
     css->refreshMetadata(opCtx, std::move(newCollectionMetadata));
 

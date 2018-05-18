@@ -30,12 +30,12 @@
 
 #include <vector>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
 
@@ -142,7 +142,8 @@ public:
      *
      * If stale responses are is noted, we must not have noted that we cannot target.
      */
-    virtual void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo) = 0;
+    virtual void noteStaleResponse(const ShardEndpoint& endpoint,
+                                   const StaleConfigInfo& staleInfo) = 0;
 
     /**
      * Refreshes the targeting metadata for the namespace if needed, based on previously-noted

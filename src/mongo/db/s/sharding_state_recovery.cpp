@@ -159,10 +159,11 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
         // nodes still expect to find them, so we must include them until after 4.0 ships.
         //
         // TODO SERVER-34166: Stop writing config server connection string and shard name.
+        auto const grid = Grid::get(opCtx);
         BSONObj updateObj = RecoveryDocument::createChangeObj(
-            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
-            ShardingState::get(opCtx)->getShardName(),
-            Grid::get(opCtx)->configOpTime(),
+            grid->shardRegistry()->getConfigServerConnectionString(),
+            ShardingState::get(opCtx)->shardId().toString(),
+            grid->configOpTime(),
             change);
 
         LOG(1) << "Changing sharding recovery document " << redact(updateObj);

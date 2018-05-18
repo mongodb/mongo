@@ -37,7 +37,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"

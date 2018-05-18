@@ -37,7 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
@@ -60,7 +60,7 @@ public:
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {
@@ -107,18 +107,18 @@ public:
         }
 
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        CollectionShardingState* const css = CollectionShardingState::get(opCtx, nss);
+        auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
         const auto metadata = css->getMetadata(opCtx);
-        if (metadata) {
+        if (metadata->isSharded()) {
             result.appendTimestamp("global", metadata->getShardVersion().toLong());
         } else {
-            result.appendTimestamp("global", ChunkVersion(0, 0, OID()).toLong());
+            result.appendTimestamp("global", ChunkVersion::UNSHARDED().toLong());
         }
 
         if (cmdObj["fullMetadata"].trueValue()) {
             BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
-            if (metadata) {
+            if (metadata->isSharded()) {
                 metadata->toBSONBasic(metadataBuilder);
 
                 BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));

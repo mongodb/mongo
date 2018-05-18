@@ -142,11 +142,19 @@ public:
             staleResponse.setStatus(Status::OK());
             staleResponse.setN(0);
 
+            auto epoch = OID::gen();
+
             // Report a stale version error for each write in the batch.
             int i = 0;
             for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
                 WriteErrorDetail* error = new WriteErrorDetail;
                 error->setStatus({ErrorCodes::StaleShardVersion, "mock stale error"});
+                error->setErrInfo([&] {
+                    StaleConfigInfo sci(nss, ChunkVersion(1, 0, epoch), ChunkVersion(2, 0, epoch));
+                    BSONObjBuilder builder;
+                    sci.serialize(&builder);
+                    return builder.obj();
+                }());
                 error->setIndex(i);
 
                 staleResponse.addToErrDetails(error);

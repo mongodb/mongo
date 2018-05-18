@@ -172,7 +172,7 @@ Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Nam
                     "dropCollection.start",
                     nss.ns(),
                     BSONObj(),
-                    ShardingCatalogClientImpl::kMajorityWriteConcern)
+                    ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
 
     auto shardsStatus =
@@ -353,7 +353,7 @@ Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Nam
                     "dropCollection",
                     nss.ns(),
                     BSONObj(),
-                    ShardingCatalogClientImpl::kMajorityWriteConcern)
+                    ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
 
     return Status::OK();

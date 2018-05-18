@@ -67,7 +67,7 @@ bool checkMetadataForSuccess(OperationContext* opCtx,
 
     uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " became unsharded",
-            metadataAfterMerge);
+            metadataAfterMerge->isSharded());
 
     ChunkType chunk;
     if (!metadataAfterMerge->getNextChunk(minKey, &chunk)) {
@@ -110,7 +110,7 @@ Status mergeChunks(OperationContext* opCtx,
         return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
     }();
 
-    if (!metadata) {
+    if (!metadata->isSharded()) {
         std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
                                       << " is not sharded";
 
@@ -162,7 +162,7 @@ Status mergeChunks(OperationContext* opCtx,
         std::string errmsg = stream()
             << "could not merge chunks, collection " << nss.ns() << " range starting at "
             << redact(minKey) << " and ending at " << redact(maxKey) << " does not belong to shard "
-            << shardingState->getShardName();
+            << shardingState->shardId();
 
         warning() << errmsg;
         return Status(ErrorCodes::IllegalOperation, errmsg);
@@ -178,9 +178,9 @@ Status mergeChunks(OperationContext* opCtx,
     bool minKeyInRange = rangeContains(firstDocMin, firstDocMax, minKey);
 
     if (!minKeyInRange) {
-        std::string errmsg = stream()
-            << "could not merge chunks, collection " << nss.ns() << " range starting at "
-            << redact(minKey) << " does not belong to shard " << shardingState->getShardName();
+        std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
+                                      << " range starting at " << redact(minKey)
+                                      << " does not belong to shard " << shardingState->shardId();
 
         warning() << errmsg;
         return Status(ErrorCodes::IllegalOperation, errmsg);
@@ -192,9 +192,9 @@ Status mergeChunks(OperationContext* opCtx,
     bool maxKeyInRange = lastDocMin.woCompare(maxKey) < 0 && lastDocMax.woCompare(maxKey) >= 0;
 
     if (!maxKeyInRange) {
-        std::string errmsg = stream()
-            << "could not merge chunks, collection " << nss.ns() << " range ending at "
-            << redact(maxKey) << " does not belong to shard " << shardingState->getShardName();
+        std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
+                                      << " range ending at " << redact(maxKey)
+                                      << " does not belong to shard " << shardingState->shardId();
 
         warning() << errmsg;
         return Status(ErrorCodes::IllegalOperation, errmsg);
@@ -242,7 +242,7 @@ Status mergeChunks(OperationContext* opCtx,
     // Run _configsvrCommitChunkMerge.
     //
     MergeChunkRequest request{nss,
-                              shardingState->getShardName(),
+                              shardingState->shardId().toString(),
                               shardVersion.epoch(),
                               chunkBoundaries,
                               LogicalClock::get(opCtx)->getClusterTime().asTimestamp()};

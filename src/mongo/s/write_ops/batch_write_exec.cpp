@@ -69,7 +69,9 @@ WriteErrorDetail errorFromStatus(const Status& status) {
 void noteStaleResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
     for (const auto& error : staleErrors) {
         targeter->noteStaleResponse(
-            error.endpoint, error.error.isErrInfoSet() ? error.error.getErrInfo() : BSONObj());
+            error.endpoint,
+            StaleConfigInfo::parseFromCommandError(
+                error.error.isErrInfoSet() ? error.error.getErrInfo() : BSONObj()));
     }
 }
 

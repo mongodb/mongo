@@ -44,9 +44,7 @@
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/stdx/memory.h"
@@ -136,7 +134,7 @@ bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
 const std::vector<std::unique_ptr<FieldRef>>* getImmutableFields(OperationContext* opCtx,
                                                                  const NamespaceString& ns) {
     auto metadata = CollectionShardingState::get(opCtx, ns)->getMetadata(opCtx);
-    if (metadata) {
+    if (metadata->isSharded()) {
         const std::vector<std::unique_ptr<FieldRef>>& fields = metadata->getKeyPatternFields();
         // Return shard-keys as immutable for the update system.
         return &fields;
@@ -294,7 +292,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             args.uuid = _collection->uuid();
             args.stmtId = request->getStmtId();
             args.update = logObj;
-            args.criteria = css->getMetadata(getOpCtx()).extractDocumentKey(newObj);
+            auto metadata = css->getMetadata(getOpCtx());
+            args.criteria = metadata->extractDocumentKey(newObj);
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
                     !request->isMulti() || args.criteria.hasField("_id"_sd));

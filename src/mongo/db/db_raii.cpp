@@ -290,8 +290,8 @@ OldClientContext::OldClientContext(
             case dbDelete:   // path, so no need to check them here as well
                 break;
             default:
-                auto css = CollectionShardingState::get(_opCtx, ns);
-                css->checkShardVersionOrThrow(_opCtx);
+                CollectionShardingState::get(_opCtx, NamespaceString(ns))
+                    ->checkShardVersionOrThrow(_opCtx);
                 break;
         }
     }
@@ -327,9 +327,8 @@ OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, StringData
     _autoCreateDb.emplace(opCtx, _nss.db(), MODE_IX);
     _collLock.emplace(opCtx->lockState(), _nss.ns(), MODE_IX);
 
-    // TODO (Kal): None of the places which use OldClientWriteContext seem to require versioning, so
-    // we should consider defaulting this to false
-    const bool doShardVersionCheck = true;
+    const bool doShardVersionCheck = false;
+
     _clientContext.emplace(opCtx,
                            _nss.ns(),
                            doShardVersionCheck,

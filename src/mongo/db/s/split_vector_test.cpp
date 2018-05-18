@@ -30,13 +30,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/split_vector.h"
-
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/split_vector.h"
 #include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 const NamespaceString kNss = NamespaceString("foo", "bar");
 const std::string kPattern = "_id";
@@ -45,8 +45,10 @@ class SplitVectorTest : public ShardServerTestFixture {
 public:
     void setUp() {
         ShardServerTestFixture::setUp();
+
         DBDirectClient dbclient(operationContext());
         ASSERT_TRUE(dbclient.createCollection(kNss.ns()));
+        dbclient.createIndex(kNss.ns(), BSON(kPattern << 1));
 
         // Insert 100 documents into the collection so the tests can test splitting with different
         // constraints.
@@ -67,8 +69,6 @@ private:
     // Number of bytes in each of the same-size documents we insert into the collection.
     const long long docSizeBytes = BSON(kPattern << 1).objsize();
 };
-
-namespace {
 
 TEST_F(SplitVectorTest, SplitVectorInHalf) {
     std::vector<BSONObj> splitKeys = unittest::assertGet(splitVector(operationContext(),

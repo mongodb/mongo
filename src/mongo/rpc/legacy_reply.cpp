@@ -79,12 +79,22 @@ LegacyReply::LegacyReply(const Message* message) {
     _commandReply.shareOwnershipWith(message->sharedBuffer());
 
     if (_commandReply.firstElementFieldName() == "$err"_sd) {
-        // Upconvert legacy errors.
+        // Upconvert legacy errors
+        auto codeElement = _commandReply["code"];
+        int code = codeElement.numberInt();
+        if (!code) {
+            code = ErrorCodes::UnknownError;
+        }
+
+        auto errmsg = _commandReply.firstElement().String();
+        Status status(ErrorCodes::Error(code), errmsg, _commandReply);
+
         BSONObjBuilder bob;
-        bob.appendAs(_commandReply.firstElement(), "errmsg");
         bob.append("ok", 0.0);
-        if (auto code = _commandReply["code"]) {
-            bob.append(code);
+        bob.append("code", status.code());
+        bob.append("errmsg", status.reason());
+        if (auto extraInfo = status.extraInfo()) {
+            extraInfo->serialize(&bob);
         }
         _commandReply = bob.obj();
     }

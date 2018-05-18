@@ -293,10 +293,10 @@ void ChunkSplitter::_runAutosplit(const NamespaceString& nss,
 
         // Stop if chunk's range differs from the range we were expecting to split.
         if ((0 != chunk.getMin().woCompare(min)) || (0 != chunk.getMax().woCompare(max)) ||
-            (chunk.getShardId() != ShardingState::get(opCtx.get())->getShardName())) {
+            (chunk.getShardId() != ShardingState::get(opCtx.get())->shardId())) {
             LOG(1) << "Cannot auto-split chunk with range '"
                    << redact(ChunkRange(min, max).toString()) << "' for nss '" << nss
-                   << "' on shard '" << ShardingState::get(opCtx.get())->getShardName()
+                   << "' on shard '" << ShardingState::get(opCtx.get())->shardId()
                    << "' because since scheduling auto-split the chunk has been changed to '"
                    << redact(chunk.toString()) << "'";
             return;
