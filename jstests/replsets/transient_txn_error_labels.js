@@ -4,6 +4,7 @@
     "use strict";
 
     load("jstests/libs/write_concern_util.js");
+    load("jstests/libs/parallelTester.js");  // For ScopedThread.
 
     const dbName = "test";
     const collName = "no_error_labels_outside_txn";
@@ -16,6 +17,7 @@
     const primary = rst.getPrimary();
     const secondary = rst.getSecondary();
     const testDB = primary.getDB(dbName);
+    const adminDB = testDB.getSiblingDB("admin");
     const testColl = testDB.getCollection(collName);
 
     const sessionOptions = {causalConsistency: false};
@@ -138,11 +140,44 @@
     assert(!res.hasOwnProperty("errorLabels"));
     assert.commandWorked(testDB.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
-    // The fail-point leaves the transaction open so we need to abort it explicitly.
-    // TODO: after SERVER-34795, endSession() will kill the running transactions.
+    jsTest.log("LockTimeout should be TransientTransactionError");
+    // Start a transaction to hold the DBLock in IX mode so that drop will be blocked.
     session.startTransaction();
-    assert.docEq(sessionColl.find().toArray(), [{"_id": "write-with-write-concern"}]);
+    assert.commandWorked(sessionColl.insert({_id: "lock-timeout-1"}));
+    function dropCmdFunc(testData, primaryHost, dbName, collName) {
+        // Pass the TestData into the new shell so that jsTest.authenticate() can use the correct
+        // credentials in auth test suites.
+        TestData = testData;
+        const primary = new Mongo(primaryHost);
+        return primary.getDB(dbName).runCommand({drop: collName, writeConcern: {w: "majority"}});
+    }
+    const thread = new ScopedThread(dropCmdFunc, TestData, primary.host, dbName, collName);
+    thread.start();
+    // Wait for the drop to have a pending MODE_X lock on the database.
+    assert.soon(
+        function() {
+            return adminDB
+                       .aggregate([
+                           {$currentOp: {}},
+                           {$match: {"command.drop": collName, waitingForLock: true}}
+                       ])
+                       .itcount() === 1;
+        },
+        function() {
+            return "Failed to find drop in currentOp output: " +
+                tojson(adminDB.aggregate([{$currentOp: {}}]).toArray());
+        });
+    // Start another transaction in a new session, which cannot acquire the database lock in time.
+    let sessionOther = primary.startSession(sessionOptions);
+    sessionOther.startTransaction();
+    res = sessionOther.getDatabase(dbName).getCollection(collName).insert({_id: "lock-timeout-2"});
+    assert.commandFailedWithCode(res, ErrorCodes.LockTimeout);
+    assert(res instanceof WriteCommandError);
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
+    sessionOther.abortTransaction();
     session.abortTransaction();
+    thread.join();
+    assert.commandWorked(thread.returnData());
 
     session.endSession();
 

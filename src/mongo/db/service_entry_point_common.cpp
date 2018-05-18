@@ -220,6 +220,7 @@ BSONObj getErrorLabels(const boost::optional<OperationSessionInfoFromClient>& se
     bool isTransientTransactionError = code == ErrorCodes::WriteConflict  //
         || code == ErrorCodes::SnapshotUnavailable                        //
         || code == ErrorCodes::NoSuchTransaction                          //
+        || code == ErrorCodes::LockTimeout                                //
         // Clients can retry a single commitTransaction command, but cannot retry the whole
         // transaction if commitTransaction fails due to NotMaster.
         || (isRetryable && (commandName != "commitTransaction"));
