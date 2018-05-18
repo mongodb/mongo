@@ -1,7 +1,8 @@
 // @tags: [
-//      requires_non_retryable_commands,
+//      assumes_write_concern_unchanged,
+//      creates_and_authenticates_user,
 //      requires_auth,
-//      assumes_write_concern_unchanged
+//      requires_non_retryable_commands,
 //      ]
 
 // This test is a basic sanity check of the shell helpers for manipulating user objects

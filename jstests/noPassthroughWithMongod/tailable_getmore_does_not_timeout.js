@@ -5,6 +5,10 @@
 (function() {
     "use strict";
 
+    // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
+    // the cursor establishing command.
+    TestData.disableImplicitSessions = true;
+
     const coll = db.tailable_getmore_no_timeout;
     coll.drop();
 

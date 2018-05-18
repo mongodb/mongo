@@ -12,6 +12,11 @@
 
 (function() {
     "use strict";
+
+    // This test runs manual getMores using different connections, which will not inherit the
+    // implicit session of the cursor establishing command.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/libs/fixture_helpers.js");  // For "isMongos".
 
     const st = new ShardingTest({shards: 2});

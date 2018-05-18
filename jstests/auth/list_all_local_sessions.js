@@ -5,6 +5,10 @@
     'use strict';
     load('jstests/aggregation/extras/utils.js');
 
+    // This test makes assertions about the number of sessions, which are not compatible with
+    // implicit sessions.
+    TestData.disableImplicitSessions = true;
+
     function runListAllLocalSessionsTest(mongod) {
         assert(mongod);
         const admin = mongod.getDB("admin");

@@ -6,6 +6,10 @@
 (function() {
     "use test";
 
+    // This test runs a getMore in a parallel shell, which will not inherit the implicit session of
+    // the cursor establishing command.
+    TestData.disableImplicitSessions = true;
+
     const conn = MongoRunner.runMongod({});
     assert.neq(null, conn, "mongod was unable to start up");
     const testDB = conn.getDB("test");

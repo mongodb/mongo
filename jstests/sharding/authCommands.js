@@ -4,6 +4,9 @@
 (function() {
     'use strict';
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/replsets/rslib.js");
 
     // Replica set nodes started with --shardsvr do not enable key generation until they are added

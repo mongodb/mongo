@@ -8,6 +8,9 @@
     "use strict";
     load('jstests/libs/uuid_util.js');
 
+    // Makes assertions on commands run without logical session ids.
+    TestData.disableImplicitSessions = true;
+
     const dbName = "test";
     const collName = "multi_statement_transaction_command_args";
     const testDB = db.getSiblingDB(dbName);

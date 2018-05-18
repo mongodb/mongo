@@ -10,6 +10,10 @@ load('jstests/multiVersion/libs/auth_helpers.js');
 
 (function() {
     "use strict";
+
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     var replTest = new ReplSetTest(
         {name: 'UserManagementWCSet', nodes: 3, settings: {chainingAllowed: false}});
     replTest.startSet();

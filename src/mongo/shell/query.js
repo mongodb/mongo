@@ -111,10 +111,11 @@ DBQuery.prototype._exec = function() {
             var cmdRes = this._db.runReadCommand(findCmd, null, this._options);
             this._cursor = new DBCommandCursor(this._db, cmdRes, this._batchSize);
         } else {
-            // Note that depending on how SERVER-32064 is implemented, we may need to alter this
-            // check to account for implicit sessions, so that exhaust cursors can still be used in
-            // the shell.
-            if (this._db.getSession().getSessionId() !== null) {
+            // The exhaust cursor option is disallowed under a session because it doesn't work as
+            // expected, but all requests from the shell use implicit sessions, so to allow users
+            // to continue using exhaust cursors through the shell, they are only disallowed with
+            // explicit sessions.
+            if (this._db.getSession()._isExplicit) {
                 throw new Error("Cannot run a legacy query on a session.");
             }
 
