@@ -40,6 +40,9 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -77,7 +80,12 @@ public:
                                          false,
                                          false,
                                          false,
-                                         false)) {}
+                                         false)) {
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
+    }
 
     PrefixedWiredTigerHarnessHelper(StringData extraStrings) : _dbpath("wt_test") {}
 

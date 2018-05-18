@@ -74,6 +74,11 @@ void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
     string name = lockFile.getFilespec();
     bool oldFile = lockFile.createdByUncleanShutdown();
 
+    if (doingRepair) {
+        // This logic was previously in shared option parsing code.
+        storageGlobalParams.dur = false;
+    }
+
     if (oldFile) {
         // we check this here because we want to see if we can get the lock
         // if we can't, then its probably just another mongod running
@@ -148,6 +153,11 @@ void checkForUncleanShutdown(MMAPV1Engine* storageEngine,
                              bool doingRepair,
                              const StorageEngineLockFile& lockFile) {
     // TODO - this is very bad that the code above not running here.
+
+    if (doingRepair) {
+        // This logic was previously in shared option parsing code.
+        storageGlobalParams.dur = false;
+    }
 
     // Not related to lock file, but this is where we handle unclean shutdown
     if (!storageGlobalParams.dur && dur::haveJournalFiles()) {

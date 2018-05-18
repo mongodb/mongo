@@ -1676,7 +1676,6 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     if (!_oplogCollectionName.empty()) {
         AutoGetCollection autoColl(opCtx, NamespaceString(_oplogCollectionName), MODE_IX);
         _localOplogCollection = autoColl.getCollection();
-        fassert(13347, _localOplogCollection);
     }
 }
 

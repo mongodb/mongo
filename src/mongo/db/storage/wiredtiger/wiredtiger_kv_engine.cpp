@@ -61,6 +61,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -92,23 +93,26 @@
 
 namespace mongo {
 
-namespace {
-bool shouldDowngrade(bool readOnly, bool repairMode, bool hasRecoveryTimestamp) {
+bool WiredTigerFileVersion::shouldDowngrade(bool readOnly,
+                                            bool repairMode,
+                                            bool hasRecoveryTimestamp) {
     if (readOnly) {
         // A read-only state must not have upgraded. Nor could it downgrade.
         return false;
     }
 
-    if (repairMode) {
-        // Perhaps overly conservative. Here we argue that running `--repair` shouldn't have
-        // impact on upgrade/downgrade. Alternatively, we could downgrade so long as
-        // `hasRecoveryTimestamp` is false.
-        return false;
+    const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    const auto memberState = replCoord->getMemberState();
+    if (memberState.arbiter()) {
+        return true;
     }
 
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-        // Take no action when the FCV document hasn't been read.
-        return false;
+        // If the FCV document hasn't been read, trust the WT log file version. MongoD will
+        // downgrade to the same log version it discovered on startup. If the previous instance of
+        // MongoD was running with `--nojournal`, the log version cannot be determined and
+        // `_startupVersion` is considered to be 4.0.
+        return _startupVersion == StartupVersion::IS_36 || _startupVersion == StartupVersion::IS_34;
     }
 
     if (serverGlobalParams.featureCompatibility.getVersion() !=
@@ -126,13 +130,68 @@ bool shouldDowngrade(bool readOnly, bool repairMode, bool hasRecoveryTimestamp) 
     if (hasRecoveryTimestamp) {
         // If we're not running with `--replSet`, don't allow downgrades if the node needed to run
         // replication recovery. Having a recovery timestamp implies recovery must be run, but it
-        // was not done so.
+        // was not.
         return false;
     }
 
     // If there is no `recoveryTimestamp`, then the data should be consistent with the top of
     // oplog and downgrading can proceed. This is expected for standalone datasets that use FCV.
     return true;
+}
+
+std::string WiredTigerFileVersion::getDowngradeString() {
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        invariant(_startupVersion != StartupVersion::IS_40);
+
+        switch (_startupVersion) {
+            case StartupVersion::IS_34:
+                return "compatibility=(release=2.9)";
+            case StartupVersion::IS_36:
+                return "compatibility=(release=3.0)";
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    return "compatibility=(release=3.0)";
+}
+
+namespace {
+void openWiredTiger(const std::string& path,
+                    WT_EVENT_HANDLER* eventHandler,
+                    const std::string& wtOpenConfig,
+                    WT_CONNECTION** connOut,
+                    WiredTigerFileVersion* fileVersionOut) {
+    std::string configStr = wtOpenConfig + ",compatibility=(require_min=\"3.1.0\")";
+    int ret = wiredtiger_open(path.c_str(), eventHandler, configStr.c_str(), connOut);
+    if (!ret) {
+        *fileVersionOut = {WiredTigerFileVersion::StartupVersion::IS_40};
+        return;
+    }
+
+    configStr = wtOpenConfig + ",compatibility=(require_min=\"3.0.0\")";
+    ret = wiredtiger_open(path.c_str(), eventHandler, configStr.c_str(), connOut);
+    if (!ret) {
+        *fileVersionOut = {WiredTigerFileVersion::StartupVersion::IS_36};
+        return;
+    }
+
+    // Arbiters do not replicate the FCV document. Due to arbiter FCV semantics on 3.6, shutting
+    // down a 3.6 arbiter will downgrade the data files to WT compatibility 2.9. Thus, 4.0
+    // binaries must allow starting up on 2.9 files.
+    configStr = wtOpenConfig + ",compatibility=(require_min=\"2.9.0\")";
+    ret = wiredtiger_open(path.c_str(), eventHandler, configStr.c_str(), connOut);
+    if (!ret) {
+        *fileVersionOut = {WiredTigerFileVersion::StartupVersion::IS_34};
+        return;
+    }
+
+    if (ret == EINVAL) {
+        fassertFailedNoTrace(28561);
+    }
+
+    severe() << wtRCToStatus(ret).reason();
+    fassertFailedNoTrace(28595);
 }
 }  // namespace
 
@@ -477,18 +536,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         // This setting overrides the earlier setting because it is later in the config string.
         ss << ",log=(enabled=false),";
     }
+
     string config = ss.str();
     log() << "wiredtiger_open config: " << config;
+    openWiredTiger(path, &_eventHandler, config, &_conn, &_fileVersion);
     _wtOpenConfig = config;
-    int ret = wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn);
-    // Invalid argument (EINVAL) is usually caused by invalid configuration string.
-    // We still fassert() but without a stack trace.
-    if (ret == EINVAL) {
-        fassertFailedNoTrace(28561);
-    } else if (ret != 0) {
-        Status s(wtRCToStatus(ret));
-        msgasserted(28595, s.reason());
-    }
 
     {
         char buf[(2 * 8 /*bytes in hex*/) + 1 /*nul terminator*/];
@@ -596,13 +648,13 @@ void WiredTigerKVEngine::cleanShutdown() {
         closeConfig = "leak_memory=true,";
     }
 
-    if (!shouldDowngrade(_readOnly, _inRepairMode, !_recoveryTimestamp.isNull())) {
+    if (!_fileVersion.shouldDowngrade(_readOnly, _inRepairMode, !_recoveryTimestamp.isNull())) {
         closeConfig += "use_timestamp=true,";
         invariantWTOK(_conn->close(_conn, closeConfig.c_str()));
         return;
     }
 
-    log() << "Downgrading WiredTiger datafiles to FCV 3.6";
+    log() << "Downgrading WiredTiger datafiles.";
     // Steps for downgrading:
     //
     // 1) Close WiredTiger with an "unstable" checkpoint. Then reopen WiredTiger. This has the
@@ -642,6 +694,8 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     tableCursor->close(tableCursor);
     session->close(session, nullptr);
+    LOG(1) << "Downgrade compatibility configuration: " << _fileVersion.getDowngradeString();
+    invariantWTOK(conn->reconfigure(conn, _fileVersion.getDowngradeString().c_str()));
     invariantWTOK(conn->close(conn, closeConfig.c_str()));
 }
 

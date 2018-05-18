@@ -60,6 +60,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/global_settings',
             '$BUILD_DIR/mongo/db/namespace_string',
+            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/db/repl/repl_settings',
             '$BUILD_DIR/mongo/db/server_options_core',
             '$BUILD_DIR/mongo/db/service_context',
@@ -140,7 +141,11 @@ if wiredtiger:
             'storage_wiredtiger_mock',
             '$BUILD_DIR/mongo/db/storage/recovery_unit_test_harness',
             '$BUILD_DIR/mongo/util/clock_source_mock',
-        ]
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+            '$BUILD_DIR/mongo/db/repl/replmocks',
+        ],
     )
 
     wtEnv.Library(
@@ -181,6 +186,10 @@ if wiredtiger:
             LIBDEPS=[
                 'additional_wiredtiger_record_store_tests',
             ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/mongo/db/repl/replmocks',
+            ],
         )
 
         wtEnv.CppUnitTest(
@@ -190,6 +199,10 @@ if wiredtiger:
             ],
             LIBDEPS=[
                 'additional_wiredtiger_record_store_tests',
+            ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/mongo/db/repl/replmocks',
             ],
         )
 
@@ -222,6 +235,10 @@ if wiredtiger:
                 '$BUILD_DIR/mongo/db/auth/authmocks',
                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
                 'storage_wiredtiger_mock',
+            ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/mongo/db/repl/replmocks',
             ],
         )
 

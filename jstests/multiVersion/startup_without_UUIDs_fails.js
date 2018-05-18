@@ -2,6 +2,9 @@
  * Tests that a v4.0 mongod cannot start up if any collection is missing a UUID.
  *
  * Utilizes a v3.6 binary and downgrade to FCV 3.4 to set up collections without UUIDs
+ *
+ * Also demonstrate a v4.0 mongod will shutdown to 3.4 compatible data files when started up on
+ * 3.4 data files.
  */
 
 (function() {
@@ -11,6 +14,21 @@
     resetDbpath(dbpath);
     let connection;
 
+    connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: "3.4"});
+    assert.commandWorked(connection.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+    MongoRunner.stopMongod(connection);
+
+    jsTest.log("Asserting a v4.0 binary does not startup on 3.4 data files.");
+
+    let returnCode = runMongoProgram("mongod", "--port", connection.port, "--dbpath", dbpath, "-v");
+    const needsUpgradeCode = 62;
+    assert.eq(returnCode, needsUpgradeCode);
+
+    jsTest.log("Asserting v3.4 does start up after a v4.0 binary failed.");
+
+    connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: "3.4"});
+    MongoRunner.stopMongod(connection);
+
     jsTest.log("Set up a v3.6 binary downgraded to FCV 3.4 without collection UUIDs.");
 
     connection = MongoRunner.runMongod({dbpath: dbpath, binVersion: "3.6"});
@@ -19,7 +37,7 @@
 
     jsTest.log("Attempting v4.0 --repair should fail because collections lack UUIDs.");
 
-    let returnCode =
+    returnCode =
         runMongoProgram("mongod", "--port", connection.port, "--repair", "--dbpath", dbpath);
     assert.neq(returnCode, 0);
 

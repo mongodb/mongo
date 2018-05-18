@@ -29,6 +29,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -54,7 +57,12 @@ public:
                   false,                  // .ephemeral
                   false,                  // .repair
                   false                   // .readOnly
-                  ) {}
+                  ) {
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
+    }
 
     ~WiredTigerRecoveryUnitHarnessHelper() {}
 

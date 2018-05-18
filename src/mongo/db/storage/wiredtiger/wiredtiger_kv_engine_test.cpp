@@ -32,6 +32,9 @@
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/memory.h"
@@ -46,6 +49,10 @@ public:
     WiredTigerKVHarnessHelper() : _dbpath("wt-kv-harness") {
         _engine.reset(new WiredTigerKVEngine(
             kWiredTigerEngineName, _dbpath.path(), _cs.get(), "", 1, false, false, false, false));
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
+                getGlobalServiceContext(), repl::ReplSettings())));
     }
 
     virtual ~WiredTigerKVHarnessHelper() {

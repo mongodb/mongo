@@ -54,6 +54,14 @@ class WiredTigerRecordStore;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
 
+struct WiredTigerFileVersion {
+    enum class StartupVersion { IS_34, IS_36, IS_40 };
+
+    StartupVersion _startupVersion;
+    bool shouldDowngrade(bool readOnly, bool repairMode, bool hasRecoveryTimestamp);
+    std::string getDowngradeString();
+};
+
 class WiredTigerKVEngine final : public KVEngine {
 public:
     static const int kDefaultJournalDelayMillis;
@@ -310,5 +318,6 @@ private:
 
     std::unique_ptr<WiredTigerSession> _backupSession;
     Timestamp _recoveryTimestamp;
+    WiredTigerFileVersion _fileVersion;
 };
 }

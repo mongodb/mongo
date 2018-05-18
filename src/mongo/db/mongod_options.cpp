@@ -992,17 +992,9 @@ Status storeMongodOptions(const moe::Environment& params) {
         mmapv1GlobalOptions.smallfiles = params["storage.mmapv1.smallFiles"].as<bool>();
     }
 
-    if ((params.count("storage.journal.enabled") &&
-         params["storage.journal.enabled"].as<bool>() == true) &&
-        params.count("repair")) {
-        return Status(ErrorCodes::BadValue,
-                      "Can't have journaling enabled when using --repair option.");
-    }
-
     if (params.count("repair") && params["repair"].as<bool>() == true) {
         storageGlobalParams.upgrade = 1;  // --repair implies --upgrade
         storageGlobalParams.repair = 1;
-        storageGlobalParams.dur = false;
     }
     if (params.count("upgrade") && params["upgrade"].as<bool>() == true) {
         storageGlobalParams.upgrade = 1;
