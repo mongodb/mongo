@@ -54,10 +54,19 @@ def _execute_suite(suite, logging_config):
             logger.info("Skipping %ss, no tests to run", group.test_kind)
             continue
 
+        archive = None
+        if resmokelib.config.ARCHIVE_FILE:
+            archive = resmokelib.utils.archival.Archival(
+                archival_json_file=resmokelib.config.ARCHIVE_FILE,
+                execution=resmokelib.config.EVERGREEN_EXECUTION,
+                limit_size_mb=resmokelib.config.ARCHIVE_LIMIT_MB,
+                limit_files=resmokelib.config.ARCHIVE_LIMIT_TESTS,
+                logger=logger)
         group_config = suite.get_executor_config().get(group.test_kind, {})
         executor = resmokelib.testing.executor.TestGroupExecutor(logger,
                                                                  group,
                                                                  logging_config,
+                                                                 archive_instance=archive,
                                                                  **group_config)
 
         try:
@@ -73,6 +82,9 @@ def _execute_suite(suite, logging_config):
                              group.test_kind, suite.get_name())
             suite.return_code = 2
             return False
+        finally:
+            if archive:
+                archive.exit()
 
 
 def _log_summary(logger, suites, time_taken):

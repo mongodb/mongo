@@ -483,16 +483,16 @@ functions:
     command: shell.exec
     type: test
     params:
-        working_dir: src
         script: |
           # exit immediately if virtualenv is not found
           set -o errexit
           set -o verbose
-          if [ ${build_variant} == enterprise-suse12-64 ]; then
-              virtualenv ./venv
-          else
-              virtualenv --system-site-packages ./venv
+          python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
+          if [ "Windows_NT" = "$OS" ]; then
+            python_loc=$(cygpath -w $python_loc)
           fi
+          # Set up virtualenv in ${workdir}
+          virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
 
   "run tests" :
     - command: expansions.update
@@ -520,14 +520,8 @@ functions:
           export TMPDIR="${workdir}/tmp"
           mkdir -p $TMPDIR
 
-          # check if virtualenv is set up
-          if [ -d "venv" ]; then
-            if [ "Windows_NT" = "$OS" ]; then
-              . ./venv/Scripts/activate
-            else
-              . ./venv/bin/activate
-            fi
-          fi
+          ${activate_virtualenv}
+          pip install boto3
 
           if [ -f /proc/self/coredump_filter ]; then
             # Set the shell process (and its children processes) to dump ELF headers (bit 4),
@@ -608,10 +602,18 @@ functions:
           ${lang_environment}                \
           ${san_options}                     \
           ${rlp_environment}                 \
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py  \
+          $python buildscripts/resmoke.py    \
             ${resmoke_args}                  \
             $extra_args ${test_flags}        \
             --log=buildlogger                \
+            --taskId=${task_id}              \
+            --taskName=${task_name}          \
+            --executionNumber=${execution}   \
+            --projectName=${project}         \
+            --variantName=${build_variant}   \
+            --distroId=${distro_id}          \
+            --gitRevision=${revision}        \
+            --archiveFile=archive.json       \
             --reportFile=report.json
 
 
@@ -912,9 +914,28 @@ pre:
   - command: shell.track
   - func: "kill processes"
   - func: "cleanup environment"
+  - func: "set up virtualenv"
   - command: expansions.update
     params:
        updates:
+       - key: activate_virtualenv
+         value: |
+          # check if virtualenv is set up
+          if [ -d "${workdir}/venv" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              # Need to quote the path on Windows to preserve the separator.
+              . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
+            else
+              . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
+            fi
+            if [ $? -ne 0 ]; then
+              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+            fi
+            python=python
+          else
+            python=${python|/opt/mongodbtoolchain/v2/bin/python2}
+          fi
+          echo "python set to $(which $python)"
        - key: set_sudo
          value: |
           set -o | grep errexit | grep on
@@ -985,32 +1006,6 @@ post:
         else
           echo "No OOM (Out of memory) killed processes detected"
         fi
-
-  # Gather and archive FTDC data.
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        # Using shell and tar to recurse properly to all possible diagnostic.data subdirectories.
-        # The archive.targz_pack command is not being used here because the command's glob support
-        # did not allow us to gather all directories.
-        if [ -d /data/db ]; then
-            file_list=$(cd /data/db && find . -type d -name diagnostic.data)
-            if [ -n "$file_list" ]; then
-                ${tar|tar} cvzf diagnostic-data.tgz -C /data/db $file_list
-            fi
-        fi
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/diagnostic-data.tgz
-      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/ftdc/mongo-diagnostic-data-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/x-gzip}
-      display_name: FTDC Diagnostic Data - Execution ${execution}
-      optional: true
 
   # Process and save coverage data.
   - command: shell.exec
@@ -1477,15 +1472,11 @@ tasks:
         enterprise: ${enterprise_rev}
   - command: shell.exec
   - func: "do setup"
-  - func: "set up virtualenv"
   - command: shell.exec
     params:
       working_dir: burn_in_tests_clonedir
       script: |
         set -o errexit
-        # Create a symbolic link to the venv in the src directory so activate_virtualenv can use it
-        # if it exists.
-        ln -s ../src/venv venv
         ${activate_virtualenv}
         set -o verbose
         # If this is a scheduled build, we check for changes against the last scheduled commit.
@@ -1496,7 +1487,7 @@ tasks:
         # list of dbtest suites.
         cp ../src/dbtest${exe} .
         # Capture a list of new and modified tests.
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
+        $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
         # Copy the results to the src dir.
         cp jstests/new_tests.json ../src/jstests/new_tests.json
   - func: "do multiversion setup"
@@ -1937,7 +1928,6 @@ tasks:
   name: ese_WT
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - command: shell.exec
     type: test
     params:
@@ -1946,11 +1936,7 @@ tasks:
         set -o errexit
         set -o verbose
 
-        if [ "Windows_NT" = "$OS" ]; then
-          . ./venv/Scripts/activate
-        else
-          . ./venv/bin/activate
-        fi
+        ${activate_virtualenv}
         # we should go back to using pip when it works on SLES
         easy_install --upgrade `cat src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt`
   - func: "run tests"

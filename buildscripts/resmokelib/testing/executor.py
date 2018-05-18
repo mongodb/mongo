@@ -8,6 +8,7 @@ import threading
 import time
 
 from . import fixtures
+from . import hook_test_archival as archival
 from . import hooks as _hooks
 from . import job as _job
 from . import report as _report
@@ -35,7 +36,9 @@ class TestGroupExecutor(object):
                  logging_config,
                  config=None,
                  fixture=None,
-                 hooks=None):
+                 hooks=None,
+                 archive_instance=None,
+                 archive=None):
         """
         Initializes the TestGroupExecutor with the test group to run.
         """
@@ -48,6 +51,11 @@ class TestGroupExecutor(object):
         self.fixture_config = fixture
         self.hooks_config = utils.default_if_none(hooks, [])
         self.test_config = utils.default_if_none(config, {})
+
+        self.archival = None
+        if archive_instance:
+            self.archival = archival.HookTestArchival(test_group, self.hooks_config,
+                                                      archive_instance, archive)
 
         self._test_group = test_group
 
@@ -299,7 +307,7 @@ class TestGroupExecutor(object):
                                     build_id=build_id,
                                     build_config=build_config)
 
-        return _job.Job(logger, fixture, hooks, report)
+        return _job.Job(logger, fixture, hooks, report, self.archival)
 
     def _make_test_queue(self):
         """

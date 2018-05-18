@@ -9,10 +9,13 @@ import collections
 import json
 import math
 import os
+import sys
 import tarfile
 import tempfile
 import threading
 import time
+
+_IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 
 UploadArgs = collections.namedtuple(
     "UploadArgs",
@@ -128,6 +131,10 @@ class Archival(object):
         Returns status and message, where message contains information if status is non-0.
         """
 
+        # TODO: Support archival on Windows (SERVER-33144).
+        if _IS_WINDOWS:
+            return 1, "Archival not supported on Windows"
+
         start_time = time.time()
         with self._lock:
             if not input_files:
@@ -135,10 +142,10 @@ class Archival(object):
                 message = "No input_files specified"
             elif self.limit_size_mb and self.size_mb >= self.limit_size_mb:
                 status = 1
-                message = "Files not archived, limit size {}MB reached".format(self.limit_size_mb)
+                message = "Files not archived, {}MB size limit reached".format(self.limit_size_mb)
             elif self.limit_files and self.num_files >= self.limit_files:
                 status = 1
-                message = "Files not archived, limit files {} reached".format(self.limit_files)
+                message = "Files not archived, {} file limit reached".format(self.limit_files)
             else:
                 status, message, file_size_mb = self._archive_files(
                     display_name,
@@ -203,7 +210,10 @@ class Archival(object):
                 logger.exception("Upload to S3 error %s", err)
 
             if upload_args.delete_file:
-                os.remove(upload_args.local_file)
+                try:
+                    os.remove(upload_args.local_file)
+                except Exception as err:
+                    logger.exception("Upload to S3 file removal error %s", err)
 
             remote_file = "https://s3.amazonaws.com/{}/{}".format(
                 upload_args.s3_bucket, upload_args.s3_path)
@@ -232,28 +242,27 @@ class Archival(object):
         size_mb = 0
 
         # Tar/gzip to a temporary file.
-        temp_file = tempfile.NamedTemporaryFile(suffix=".tgz", delete=False)
-        local_file = temp_file.name
+        _, temp_file = tempfile.mkstemp(suffix=".tgz")
 
         # Check if there is sufficient space for the temporary tgz file.
-        if file_list_size(input_files) > free_space(local_file):
-            os.remove(local_file)
+        if file_list_size(input_files) > free_space(temp_file):
+            os.remove(temp_file)
             return 1, "Insufficient space for {}".format(message), 0
 
         try:
-            with tarfile.open(local_file, "w:gz") as tar_handle:
+            with tarfile.open(temp_file, "w:gz") as tar_handle:
                 for input_file in input_files:
                     tar_handle.add(input_file)
         except (IOError, tarfile.TarError) as err:
-            message = str(err)
-            status = 1
+            os.remove(temp_file)
+            return 1, str(err), 0
 
-        # Round up the size of archive.
-        size_mb = int(math.ceil(float(file_list_size(local_file)) / (1024 * 1024)))
+        # Round up the size of the archive.
+        size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))
         self._upload_queue.put(UploadArgs(
             self.archival_json_file,
             display_name,
-            local_file,
+            temp_file,
             "application/x-gzip",
             s3_bucket,
             s3_path,

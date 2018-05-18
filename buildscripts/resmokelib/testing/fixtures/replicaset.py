@@ -186,6 +186,9 @@ class ReplicaSetFixture(interface.ReplFixture):
                     raise
                 time.sleep(5)  # Wait a little bit before trying again.
 
+    def get_dbpath(self):
+        return self._dbpath_prefix
+
     def await_ready(self):
         self._await_primary()
         self._await_secondaries()

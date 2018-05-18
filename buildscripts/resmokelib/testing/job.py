@@ -18,7 +18,7 @@ class Job(object):
     Runs tests from a queue.
     """
 
-    def __init__(self, logger, fixture, hooks, report):
+    def __init__(self, logger, fixture, hooks, report, archival):
         """
         Initializes the job with the specified fixture and custom
         behaviors.
@@ -28,6 +28,7 @@ class Job(object):
         self.fixture = fixture
         self.hooks = hooks
         self.report = report
+        self.archival = archival
 
     def __call__(self, queue, interrupt_flag, teardown_flag=None):
         """
@@ -98,19 +99,37 @@ class Job(object):
         self._run_hooks_before_tests(test)
 
         test(self.report)
-        if config.FAIL_FAST and not self.report.wasSuccessful():
-            self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
-            raise errors.StopExecution("%s failed" % (test.shortDescription()))
+        try:
+            if config.FAIL_FAST and not self.report.wasSuccessful():
+                self.logger.info("%s failed, so stopping..." % (test.shortDescription()))
+                raise errors.StopExecution("%s failed" % (test.shortDescription()))
 
-        if not self.fixture.is_running():
-            self.logger.error("%s marked as a failure because the fixture crashed during the test.",
-                              test.shortDescription())
-            self.report.setFailure(test, return_code=2)
-            # Always fail fast if the fixture fails.
-            raise errors.StopExecution("%s not running after %s" %
-                                       (self.fixture, test.shortDescription()))
+            if not self.fixture.is_running():
+                self.logger.error(
+                    "%s marked as a failure because the fixture crashed during the test.",
+                    test.shortDescription())
+                self.report.setFailure(test, return_code=2)
+                # Always fail fast if the fixture fails.
+                raise errors.StopExecution("%s not running after %s" %
+                                           (self.fixture, test.shortDescription()))
+
+        finally:
+            success = self.report.find_test_info(test).status == "pass"
+            self.archival.archive(self.logger, test, success)
+            if self.archival:
+                self.archival.archive(self.logger, test, success)
 
         self._run_hooks_after_tests(test)
+
+    def _run_hook(self, hook, hook_function, test):
+        """Provide helper to run hook and archival."""
+        try:
+            success = False
+            hook_function(test, self.report)
+            success = True
+        finally:
+            if self.archival:
+                self.archival.archive(self.logger, test, success, hook=hook)
 
     def _run_hooks_before_tests(self, test):
         """
@@ -122,7 +141,7 @@ class Job(object):
 
         try:
             for hook in self.hooks:
-                hook.before_test(test, self.report)
+                self._run_hook(hook, hook.before_test, test)
 
         except errors.StopExecution:
             raise
@@ -156,7 +175,7 @@ class Job(object):
         """
         try:
             for hook in self.hooks:
-                hook.after_test(test, self.report)
+                self._run_hook(hook, hook.after_test, test)
 
         except errors.StopExecution:
             raise

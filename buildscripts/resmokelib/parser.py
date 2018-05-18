@@ -18,14 +18,20 @@ from .. import resmokeconfig
 # Mapping of the attribute of the parsed arguments (dest) to its key as it appears in the options
 # YAML configuration file. Most should only be converting from snake_case to camelCase.
 DEST_TO_CONFIG = {
+    "archive_file": "archiveFile",
+    "archive_limit_mb": "archiveLimitMb",
+    "archive_limit_tests": "archiveLimitTests",
     "base_port": "basePort",
     "buildlogger_url": "buildloggerUrl",
     "continue_on_failure": "continueOnFailure",
     "dbpath_prefix": "dbpathPrefix",
     "dbtest_executable": "dbtest",
+    "distro_id": "distroId",
     "dry_run": "dryRun",
     "exclude_with_all_tags": "excludeWithAllTags",
     "exclude_with_any_tags": "excludeWithAnyTags",
+    "execution_number": "executionNumber",
+    "git_revision": "gitRevision",
     "include_with_all_tags": "includeWithAllTags",
     "include_with_any_tags": "includeWithAnyTags",
     "jobs": "jobs",
@@ -37,6 +43,7 @@ DEST_TO_CONFIG = {
     "no_journal": "nojournal",
     "num_clients_per_fixture": "numClientsPerFixture",
     "prealloc_journal": "preallocJournal",
+    "project_name": "projectName",
     "repeat": "repeat",
     "report_file": "reportFile",
     "seed": "seed",
@@ -45,6 +52,9 @@ DEST_TO_CONFIG = {
     "shuffle": "shuffle",
     "storage_engine": "storageEngine",
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
+    "task_id": "taskId",
+    "task_name": "taskName",
+    "variant_name": "variantName",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
     "wt_index_config": "wiredTigerIndexConfigString"
@@ -78,6 +88,23 @@ def parse_command_line():
 
     parser.add_option("--options", dest="options_file", metavar="OPTIONS",
                       help="A YAML file that specifies global options to resmoke.py.")
+
+    parser.add_option("--archiveFile", dest="archive_file", metavar="ARCHIVE_FILE",
+                      help=("Sets the archive file name for the Evergreen task running the tests."
+                            " The archive file is JSON format containing a list of tests that were"
+                            " successfully archived to S3. If unspecified, no data files from tests"
+                            " will be archived in S3. Tests can be designated for archival in the"
+                            " task suite configuration file."))
+
+    parser.add_option("--archiveLimitMb", type="int", dest="archive_limit_mb",
+                      metavar="ARCHIVE_LIMIT_MB",
+                      help=("Sets the limit (in MB) for archived files to S3. A value of 0"
+                            " indicates there is no limit."))
+
+    parser.add_option("--archiveLimitTests", type="int", dest="archive_limit_tests",
+                      metavar="ARCHIVE_LIMIT_TESTS",
+                      help=("Sets the maximum number of tests to archive to S3. A value"
+                            " of 0 indicates there is no limit."))
 
     parser.add_option("--basePort", dest="base_port", metavar="PORT",
                       help=("The starting port number to use for mongod and mongos processes"
@@ -209,6 +236,42 @@ def parse_command_line():
     parser.add_option("--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
                       help="Set the WiredTiger index configuration setting for all mongod's.")
 
+
+    evergreen_options = optparse.OptionGroup(
+        parser, title="Evergreen options",
+        description=("Options used to propagate information about the Evergreen task running this"
+                     " script."))
+    parser.add_option_group(evergreen_options)
+
+    evergreen_options.add_option("--buildId", dest="build_id", metavar="BUILD_ID",
+                                 help="Sets the build ID of the task.")
+
+    evergreen_options.add_option("--distroId", dest="distro_id", metavar="DISTRO_ID",
+                                 help=("Sets the identifier for the Evergreen distro running the"
+                                       " tests."))
+
+    evergreen_options.add_option("--executionNumber", type="int", dest="execution_number",
+                                 metavar="EXECUTION_NUMBER",
+                                 help=("Sets the number for the Evergreen execution running the"
+                                       " tests."))
+
+    evergreen_options.add_option("--gitRevision", dest="git_revision", metavar="GIT_REVISION",
+                                 help=("Sets the git revision for the Evergreen task running the"
+                                       " tests."))
+
+    evergreen_options.add_option("--projectName", dest="project_name", metavar="PROJECT_NAME",
+                                 help=("Sets the name of the Evergreen project running the tests."))
+
+    evergreen_options.add_option("--taskName", dest="task_name", metavar="TASK_NAME",
+                                 help="Sets the name of the Evergreen task running the tests.")
+
+    evergreen_options.add_option("--taskId", dest="task_id", metavar="TASK_ID",
+                                 help="Sets the Id of the Evergreen task running the tests.")
+
+    evergreen_options.add_option("--variantName", dest="variant_name", metavar="VARIANT_NAME",
+                                 help=("Sets the name of the Evergreen build variant running the"
+                                       " tests."))
+
     parser.set_defaults(executor_file="with_server",
                         logger_file="console",
                         dry_run="off",
@@ -237,11 +300,21 @@ def update_config_vars(values):
         if values[dest] is not None:
             config[config_var] = values[dest]
 
+    _config.ARCHIVE_FILE = config.pop("archiveFile")
+    _config.ARCHIVE_LIMIT_MB = config.pop("archiveLimitMb")
+    _config.ARCHIVE_LIMIT_TESTS = config.pop("archiveLimitTests")
     _config.BASE_PORT = int(config.pop("basePort"))
     _config.BUILDLOGGER_URL = config.pop("buildloggerUrl")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
+    _config.EVERGREEN_DISTRO_ID = config.pop("distroId")
+    _config.EVERGREEN_EXECUTION = config.pop("executionNumber")
+    _config.EVERGREEN_PROJECT_NAME = config.pop("projectName")
+    _config.EVERGREEN_REVISION = config.pop("gitRevision")
+    _config.EVERGREEN_TASK_ID = config.pop("taskId")
+    _config.EVERGREEN_TASK_NAME = config.pop("taskName")
+    _config.EVERGREEN_VARIANT_NAME = config.pop("variantName")
     _config.EXCLUDE_WITH_ALL_TAGS = config.pop("excludeWithAllTags")
     _config.EXCLUDE_WITH_ANY_TAGS = config.pop("excludeWithAnyTags")
     _config.FAIL_FAST = not config.pop("continueOnFailure")
