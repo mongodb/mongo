@@ -703,7 +703,7 @@ __curfile_create(WT_SESSION_IMPL *session,
 	 */
 	if ((WT_STREQ(cursor->value_format, "S") ||
 	    WT_STREQ(cursor->value_format, "u")) &&
-	    S2C(session)->compat_major >= WT_LOG_V2)
+	    S2C(session)->compat_major >= WT_LOG_V2_MAJOR)
 		cursor->modify = __curfile_modify;
 
 	/*

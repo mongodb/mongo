@@ -2740,6 +2740,10 @@ struct __wt_connection {
  * below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;release, compatibility release
  * version string., a string; default empty.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;require_min, required minimum compatibility
+ * version of existing data files.  Must be less than or equal to any release
+ * version set in the \c release setting.  Has no effect if creating the
+ * database., a string; default empty.}
  * @config{ ),,}
  * @config{config_base, write the base configuration file if creating the
  * database.  If \c false in the config passed directly to ::wiredtiger_open\,

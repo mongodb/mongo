@@ -1502,48 +1502,70 @@ err:	WT_TRET(__wt_close(session, &fh));
 }
 
 /*
+ * __conn_env_var --
+ *	Get an environment variable, but refuse to use it if running with
+ * additional privilege and "use_environment_priv" not configured.
+ */
+static int
+__conn_env_var(WT_SESSION_IMPL *session,
+    const char *cfg[], const char *name, const char **configp)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+
+	*configp = NULL;
+
+	/* Only use environment variables if "use_environment" is configured. */
+	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
+	if (cval.val == 0)
+		return (0);
+
+	/* Get a copy of the variable, if any. */
+	WT_RET(__wt_getenv(session, name, configp));
+	if (*configp == NULL)
+		return (0);
+
+	/*
+	 * Security stuff:
+	 *
+	 * Don't use the environment variable if the process has additional
+	 * privileges, unless "use_environment_priv" is configured.
+	 */
+	if (!__wt_has_priv())
+		return (0);
+
+	WT_ERR(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
+	if (cval.val == 0)
+		WT_ERR_MSG(session, WT_ERROR,
+		    "privileged process has %s environment variable set, "
+		    "without having \"use_environment_priv\" configured",
+		    name);
+	return (0);
+
+err:	__wt_free(session, *configp);
+	return (ret);
+}
+
+/*
  * __conn_config_env --
  *	Read configuration from an environment variable, if set.
  */
 static int
 __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 {
-	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	size_t len;
 	const char *env_config;
 
-	/* Only use the environment variable if configured. */
-	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
-	if (cval.val == 0)
+	/* Get the WIREDTIGER_CONFIG environment variable. */
+	WT_RET(__conn_env_var(session, cfg, "WIREDTIGER_CONFIG", &env_config));
+	if (env_config == NULL)
 		return (0);
-
-	ret = __wt_getenv(session, "WIREDTIGER_CONFIG", &env_config);
-	if (ret == WT_NOTFOUND)
-		return (0);
-	WT_ERR(ret);
-
-	len = strlen(env_config);
-	if (len == 0)
-		goto err;			/* Free the memory. */
-	WT_ERR(__wt_buf_set(session, cbuf, env_config, len + 1));
-
-	/*
-	 * Security stuff:
-	 *
-	 * If the "use_environment_priv" configuration string is set, use the
-	 * environment variable if the process has appropriate privileges.
-	 */
-	WT_ERR(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
-	if (cval.val == 0 && __wt_has_priv())
-		WT_ERR_MSG(session, WT_ERROR, "%s",
-		    "WIREDTIGER_CONFIG environment variable set but process "
-		    "lacks privileges to use that environment variable");
 
 	/* Check any version. */
 	WT_ERR(__conn_config_check_version(session, env_config));
 
 	/* Upgrade the configuration string. */
+	WT_ERR(__wt_buf_setstr(session, cbuf, env_config));
 	WT_ERR(__wt_config_upgrade(session, cbuf));
 
 	/* Check the configuration information. */
@@ -1565,34 +1587,21 @@ err:	__wt_free(session, env_config);
 static int
 __conn_home(WT_SESSION_IMPL *session, const char *home, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval;
-
-	/* If the application specifies a home directory, use it. */
-	if (home != NULL)
-		goto copy;
-
-	/* Only use the environment variable if configured. */
-	WT_RET(__wt_config_gets(session, cfg, "use_environment", &cval));
-	if (cval.val != 0 &&
-	    __wt_getenv(session, "WIREDTIGER_HOME", &S2C(session)->home) == 0)
-		return (0);
-
-	/* If there's no WIREDTIGER_HOME environment variable, use ".". */
-	home = ".";
-
 	/*
-	 * Security stuff:
-	 *
-	 * Unless the "use_environment_priv" configuration string is set,
-	 * fail if the process is running with special privileges.
+	 * If the application specifies a home directory, use it.
+	 * Else use the WIREDTIGER_HOME environment variable.
+	 * Else default to ".".
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "use_environment_priv", &cval));
-	if (cval.val == 0 && __wt_has_priv())
-		WT_RET_MSG(session, WT_ERROR, "%s",
-		    "WIREDTIGER_HOME environment variable set but process "
-		    "lacks privileges to use that environment variable");
+	if (home == NULL) {
+		WT_RET(__conn_env_var(
+		    session, cfg, "WIREDTIGER_HOME", &S2C(session)->home));
+		if (S2C(session)->home != NULL)
+			return (0);
 
-copy:	return (__wt_strdup(session, home, &S2C(session)->home));
+		home = ".";
+	}
+
+	return (__wt_strdup(session, home, &S2C(session)->home));
 }
 
 /*
@@ -2007,13 +2016,13 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	static const WT_NAME_FLAG stress_types[] = {
 		{ "checkpoint_slow",	WT_TIMING_STRESS_CHECKPOINT_SLOW },
-		{ "split_race_1",	WT_TIMING_STRESS_SPLIT_RACE_1 },
-		{ "split_race_2",	WT_TIMING_STRESS_SPLIT_RACE_2 },
-		{ "split_race_3",	WT_TIMING_STRESS_SPLIT_RACE_3 },
-		{ "split_race_4",	WT_TIMING_STRESS_SPLIT_RACE_4 },
-		{ "split_race_5",	WT_TIMING_STRESS_SPLIT_RACE_5 },
-		{ "split_race_6",	WT_TIMING_STRESS_SPLIT_RACE_6 },
-		{ "split_race_7",	WT_TIMING_STRESS_SPLIT_RACE_7 },
+		{ "split_1",		WT_TIMING_STRESS_SPLIT_1 },
+		{ "split_2",		WT_TIMING_STRESS_SPLIT_2 },
+		{ "split_3",		WT_TIMING_STRESS_SPLIT_3 },
+		{ "split_4",		WT_TIMING_STRESS_SPLIT_4 },
+		{ "split_5",		WT_TIMING_STRESS_SPLIT_5 },
+		{ "split_6",		WT_TIMING_STRESS_SPLIT_6 },
+		{ "split_7",		WT_TIMING_STRESS_SPLIT_7 },
 		{ NULL, 0 }
 	};
 	WT_CONFIG_ITEM cval, sval;
@@ -2439,11 +2448,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_load_extensions(session, cfg, true));
 
 	/*
-	 * Set compatibility versions early so that any subsystem sees it.
-	 */
-	WT_ERR(__wt_conn_compat_config(session, cfg));
-
-	/*
 	 * If the application didn't configure its own file system, configure
 	 * one of ours. Check to ensure we have a valid file system.
 	 */
@@ -2462,6 +2466,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Make sure no other thread of control already owns this database. */
 	WT_ERR(__conn_single(session, cfg));
+
+	/*
+	 * Set compatibility versions early so that any subsystem sees it.
+	 * Call after we own the database so that we can know if the
+	 * database is new or not.
+	 */
+	WT_ERR(__wt_conn_compat_config(session, cfg, false));
 
 	/*
 	 * Capture the config_base setting file for later use. Again, if the

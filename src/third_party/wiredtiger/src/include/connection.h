@@ -177,6 +177,9 @@ struct __wt_connection_impl {
 
 	uint16_t compat_major;		/* Compatibility major version */
 	uint16_t compat_minor;		/* Compatibility minor version */
+#define	WT_CONN_COMPAT_NONE	UINT16_MAX
+	uint16_t compat_req_major;	/* Compatibility required major */
+	uint16_t compat_req_minor;	/* Compatibility required minor */
 
 	WT_EXTENSION_API extension_api;	/* Extension API */
 
@@ -338,6 +341,7 @@ struct __wt_connection_impl {
 	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	 log_prealloc;	/* Log file pre-allocation */
+	uint16_t	 log_req_version;/* Required log version */
 	uint32_t	 txn_logsync;	/* Log sync configuration */
 
 	WT_SESSION_IMPL *meta_ckpt_session;/* Metadata checkpoint session */
@@ -443,13 +447,13 @@ struct __wt_connection_impl {
 	 */
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_TIMING_STRESS_CHECKPOINT_SLOW	0x01u
-#define	WT_TIMING_STRESS_SPLIT_RACE_1		0x02u
-#define	WT_TIMING_STRESS_SPLIT_RACE_2		0x04u
-#define	WT_TIMING_STRESS_SPLIT_RACE_3		0x08u
-#define	WT_TIMING_STRESS_SPLIT_RACE_4		0x10u
-#define	WT_TIMING_STRESS_SPLIT_RACE_5		0x20u
-#define	WT_TIMING_STRESS_SPLIT_RACE_6		0x40u
-#define	WT_TIMING_STRESS_SPLIT_RACE_7		0x80u
+#define	WT_TIMING_STRESS_SPLIT_1		0x02u
+#define	WT_TIMING_STRESS_SPLIT_2		0x04u
+#define	WT_TIMING_STRESS_SPLIT_3		0x08u
+#define	WT_TIMING_STRESS_SPLIT_4		0x10u
+#define	WT_TIMING_STRESS_SPLIT_5		0x20u
+#define	WT_TIMING_STRESS_SPLIT_6		0x40u
+#define	WT_TIMING_STRESS_SPLIT_7		0x80u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint64_t timing_stress_flags;
 

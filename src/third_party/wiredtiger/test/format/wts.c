@@ -166,10 +166,10 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	max = sizeof(g.wiredtiger_open_config);
 
 	CONFIG_APPEND(p,
-	    "create=true,"
-	    "cache_size=%" PRIu32 "MB,"
-	    "checkpoint_sync=false,"
-	    "error_prefix=\"%s\"",
+	    "create=true"
+	    ",cache_size=%" PRIu32 "MB"
+	    ",checkpoint_sync=false"
+	    ",error_prefix=\"%s\"",
 	    g.c_cache, progname);
 
 	/* In-memory configuration. */

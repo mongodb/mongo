@@ -287,7 +287,6 @@ typedef struct {
 
 	uint64_t ops;				/* total operations */
 	uint64_t commit;			/* operation counts */
-	uint64_t deadlock;
 	uint64_t insert;
 	uint64_t prepare;
 	uint64_t remove;

@@ -627,8 +627,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	 * found.  Then, move to the next page, until we reach the end of the
 	 * file.
 	 */
-	flags = WT_READ_SKIP_INTL;			/* tree walk flags */
-	LF_SET(WT_READ_NO_SPLIT);			/* don't try to split */
+	flags = WT_READ_NO_SPLIT | WT_READ_SKIP_INTL;	/* tree walk flags */
 	if (truncating)
 		LF_SET(WT_READ_TRUNCATE);
 	for (newpage = false;; newpage = true) {

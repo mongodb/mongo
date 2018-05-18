@@ -165,7 +165,12 @@ __log_wait_for_earlier_slot(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 */
 		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_unlock(session, &log->log_slot_lock);
-		__wt_cond_signal(session, conn->log_wrlsn_cond);
+		/*
+		 * This may not be initialized if we are starting at an
+		 * older log file version. So only signal if valid.
+		 */
+		if (conn->log_wrlsn_cond != NULL)
+			__wt_cond_signal(session, conn->log_wrlsn_cond);
 		if (++yield_count < WT_THOUSAND)
 			__wt_yield();
 		else
@@ -191,8 +196,12 @@ __log_fs_write(WT_SESSION_IMPL *session,
 	 * compatibility mode to an older release, we have to wait for all
 	 * writes to the previous log file to complete otherwise there could
 	 * be a hole at the end of the previous log file that we cannot detect.
+	 *
+	 * NOTE: Check for a version less than the one writing the system
+	 * record since we've had a log version change without any actual
+	 * file format changes.
 	 */
-	if (S2C(session)->log->log_version != WT_LOG_VERSION &&
+	if (S2C(session)->log->log_version < WT_LOG_VERSION_SYSTEM &&
 	    slot->slot_release_lsn.l.file < slot->slot_start_lsn.l.file) {
 		__log_wait_for_earlier_slot(session, slot);
 		WT_RET(__wt_log_force_sync(session, &slot->slot_release_lsn));
@@ -960,10 +969,21 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp,
 	 */
 	if (desc->version > WT_LOG_VERSION)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "unsupported WiredTiger file version: this build "
+		    "unsupported WiredTiger file version: this build"
 		    " only supports versions up to %d,"
 		    " and the file is version %" PRIu16,
 		    WT_LOG_VERSION, desc->version);
+
+	/*
+	 * We error if the log version is less than the required minimum.
+	 */
+	if (conn->compat_req_major != WT_CONN_COMPAT_NONE &&
+	    desc->version < conn->log_req_version)
+		WT_ERR_MSG(session, WT_ERROR,
+		    "unsupported WiredTiger file version: this build"
+		    " requires a minimum version of %" PRIu16 ","
+		    " and the file is version %" PRIu16,
+		    conn->log_req_version, desc->version);
 
 	/*
 	 * Set up the return values if the magic number is valid.
@@ -1187,7 +1207,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 * If we're running the version where we write a system record
 	 * do so now and update the alloc_lsn.
 	 */
-	if (log->log_version == WT_LOG_VERSION) {
+	if (log->log_version >= WT_LOG_VERSION_SYSTEM) {
 		WT_RET(__wt_log_system_record(session,
 		    log_fh, &logrec_lsn));
 		WT_SET_LSN(&log->alloc_lsn, log->fileid, log->first_record);
@@ -1572,8 +1592,16 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	if (firstlog == UINT32_MAX) {
 		WT_ASSERT(session, logcount == 0);
 		WT_INIT_LSN(&log->first_lsn);
-	} else
+	} else {
 		WT_SET_LSN(&log->first_lsn, firstlog, 0);
+		/*
+		 * If we have existing log files, check the last log now before
+		 * we create a new log file so that we can detect an unsupported
+		 * version before modifying the file space.
+		 */
+		WT_ERR(__log_open_verify(session,
+		    lastlog, NULL, NULL, &version));
+	}
 
 	/*
 	 * Start logging at the beginning of the next log file, no matter

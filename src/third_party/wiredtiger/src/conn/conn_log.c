@@ -105,19 +105,35 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
 	 * Set the log file format versions based on compatibility versions
 	 * set in the connection.  We must set this before we call log_open
 	 * to open or create a log file.
-	 *
-	 * Since the log version changed at a major release number we only need
-	 * to check the major number, not the minor number in the compatibility
-	 * setting.
 	 */
-	if (conn->compat_major < WT_LOG_V2) {
+	if (conn->compat_major < WT_LOG_V2_MAJOR) {
 		new_version = 1;
 		first_record = WT_LOG_END_HEADER;
 		downgrade = true;
 	} else {
-		new_version = WT_LOG_VERSION;
+		/*
+		 * Assume current version unless the minor compatibility
+		 * setting is the earlier version.
+		 */
 		first_record = WT_LOG_END_HEADER + log->allocsize;
+		new_version = WT_LOG_VERSION;
 		downgrade = false;
+		if (conn->compat_minor == WT_LOG_V2_MINOR) {
+			new_version = 2;
+			downgrade = true;
+		}
+	}
+
+	/*
+	 * Set up the minimum log version required if needed.
+	 */
+	if (conn->compat_req_major != WT_CONN_COMPAT_NONE) {
+		if (conn->compat_req_major < WT_LOG_V2_MAJOR)
+			conn->log_req_version = 1;
+		else if (conn->compat_req_minor == WT_LOG_V2_MINOR)
+			conn->log_req_version = 2;
+		else
+			conn->log_req_version = WT_LOG_VERSION;
 	}
 
 	/*

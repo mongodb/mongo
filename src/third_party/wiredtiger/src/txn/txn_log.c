@@ -393,7 +393,7 @@ __wt_txn_checkpoint_log(
 	case WT_TXN_LOG_CKPT_PREPARE:
 		txn->full_ckpt = true;
 
-		if (conn->compat_major >= WT_LOG_V2) {
+		if (conn->compat_major >= WT_LOG_V2_MAJOR) {
 			/*
 			 * Write the system log record containing a checkpoint
 			 * start operation.

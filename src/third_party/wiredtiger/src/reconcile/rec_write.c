@@ -958,15 +958,32 @@ __rec_init(WT_SESSION_IMPL *session,
 	 * uncommitted.
 	 */
 	txn_global = &S2C(session)->txn_global;
+	WT_ORDERED_READ(r->last_running, txn_global->last_running);
+
+	/*
+	 * Decide whether to skew on-page values towards newer or older
+	 * versions.  This is a heuristic attempting to minimize the number of
+	 * pages that need to be rewritten by future checkpoints.
+	 *
+	 * We usually prefer to skew to newer versions, the logic being that by
+	 * the time the next checkpoint runs, it is likely that all the updates
+	 * we choose will be stable.  However, if checkpointing with a
+	 * timestamp (indicated by a stable_timestamp being set), and the
+	 * timestamp hasn't changed since the last time this page was
+	 * reconciled, skew oldest instead.
+	 */
 	if (__wt_btree_immediately_durable(session))
 		las_skew_oldest = false;
-	else
+	else {
 		WT_ORDERED_READ(las_skew_oldest,
 		    txn_global->has_stable_timestamp);
+		if (las_skew_oldest)
+			las_skew_oldest = ref->page_las != NULL &&
+			    !__wt_txn_visible_all(session, WT_TXN_NONE,
+			    WT_TIMESTAMP_NULL(&ref->page_las->min_timestamp));
+	}
 	r->las_skew_newest = LF_ISSET(WT_REC_LOOKASIDE) &&
 	    LF_ISSET(WT_REC_VISIBLE_ALL) && !las_skew_oldest;
-
-	WT_ORDERED_READ(r->last_running, txn_global->last_running);
 
 	/*
 	 * When operating on the lookaside table, we should never try
@@ -5669,7 +5686,7 @@ build:
 
 leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 		if ((ins = WT_SKIP_FIRST(WT_ROW_INSERT(page, rip))) != NULL)
-		    WT_ERR(__rec_row_leaf_insert(session, r, ins));
+			WT_ERR(__rec_row_leaf_insert(session, r, ins));
 	}
 
 	/* Write the remnant page. */

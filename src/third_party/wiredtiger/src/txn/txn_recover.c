@@ -415,7 +415,6 @@ static int
 __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 	WT_LSN lsn;
 	uint32_t fileid, lsnfile, lsnoffset;
 
@@ -432,8 +431,8 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 		r->nfiles = fileid + 1;
 	}
 
-	WT_ERR(__wt_strdup(r->session, uri, &r->files[fileid].uri));
-	WT_ERR(
+	WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
+	WT_RET(
 	    __wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
 	/* If there is checkpoint logged for the file, apply everything. */
 	if (cval.type != WT_CONFIG_ITEM_STRUCT)
@@ -442,7 +441,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	    "(%" SCNu32 ",%" SCNu32 ")", &lsnfile, &lsnoffset) == 2)
 		WT_SET_LSN(&lsn, lsnfile, lsnoffset);
 	else
-		WT_ERR_MSG(r->session, EINVAL,
+		WT_RET_MSG(r->session, EINVAL,
 		    "Failed to parse checkpoint LSN '%.*s'",
 		    (int)cval.len, cval.str);
 	r->files[fileid].ckpt_lsn = lsn;
@@ -455,8 +454,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 	    (WT_IS_MAX_LSN(&r->max_lsn) || __wt_log_cmp(&lsn, &r->max_lsn) > 0))
 		r->max_lsn = lsn;
 
-err:	return (ret);
-
+	return (0);
 }
 
 /*

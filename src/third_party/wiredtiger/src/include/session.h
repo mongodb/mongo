@@ -212,10 +212,11 @@ struct __wt_session_impl {
 
 					/* Generations manager */
 #define	WT_GEN_CHECKPOINT	0	/* Checkpoint generation */
-#define	WT_GEN_EVICT		1	/* Eviction generation */
-#define	WT_GEN_HAZARD		2	/* Hazard pointer */
-#define	WT_GEN_SPLIT		3	/* Page splits */
-#define	WT_GENERATIONS		4	/* Total generation manager entries */
+#define	WT_GEN_COMMIT		1	/* Commit generation */
+#define	WT_GEN_EVICT		2	/* Eviction generation */
+#define	WT_GEN_HAZARD		3	/* Hazard pointer */
+#define	WT_GEN_SPLIT		4	/* Page splits */
+#define	WT_GENERATIONS		5	/* Total generation manager entries */
 	volatile uint64_t generations[WT_GENERATIONS];
 
 	/*

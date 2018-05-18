@@ -287,7 +287,7 @@ extern int __wt_logmgr_destroy(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIB
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_conn_optrack_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
