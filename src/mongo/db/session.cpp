@@ -662,6 +662,13 @@ Session::TxnResources::TxnResources(OperationContext* opCtx) {
     _locker->releaseTicket();
     _locker->unsetThreadId();
 
+    // This thread must still respect the transaction lock timeout, since it can prevent the
+    // transaction from making progress.
+    auto maxTransactionLockMillis = maxTransactionLockRequestTimeoutMillis.load();
+    if (maxTransactionLockMillis >= 0) {
+        opCtx->lockState()->setMaxLockTimeout(Milliseconds(maxTransactionLockMillis));
+    }
+
     _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
     opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

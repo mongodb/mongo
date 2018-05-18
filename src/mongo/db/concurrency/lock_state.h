@@ -122,6 +122,10 @@ public:
         _maxLockTimeout = maxTimeout;
     }
 
+    bool hasMaxLockTimeout() override {
+        return static_cast<bool>(_maxLockTimeout);
+    }
+
     void unsetMaxLockTimeout() override {
         _maxLockTimeout = boost::none;
     }

@@ -73,6 +73,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool hasMaxLockTimeout() override {
+        MONGO_UNREACHABLE;
+    }
+
     void unsetMaxLockTimeout() override {
         MONGO_UNREACHABLE;
     }

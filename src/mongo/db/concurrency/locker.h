@@ -124,6 +124,11 @@ public:
     virtual void setMaxLockTimeout(Milliseconds maxTimeout) = 0;
 
     /**
+     * Returns whether this Locker has a maximum lock timeout set.
+     */
+    virtual bool hasMaxLockTimeout() = 0;
+
+    /**
      * Clears the max lock timeout override set by setMaxLockTimeout() above.
      */
     virtual void unsetMaxLockTimeout() = 0;
