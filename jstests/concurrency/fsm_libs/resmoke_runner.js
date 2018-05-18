@@ -226,9 +226,6 @@
     }
 
     let workloads = TestData.fsmWorkloads;
-    if (!Array.isArray(workloads)) {
-        workloads = [workloads];
-    }
 
     let sessionOptions = {};
     if (TestData.runningWithCausalConsistency) {

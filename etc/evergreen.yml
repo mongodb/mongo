@@ -4807,7 +4807,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_simultaneous --storageEngine=wiredTiger
-      timeout_secs: 21600 # 6 hour timeout
 
 - <<: *task_template
   name: rlp

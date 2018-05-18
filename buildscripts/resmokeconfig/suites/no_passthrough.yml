@@ -3,7 +3,12 @@ test_kind: js_test
 selector:
   roots:
   - jstests/noPassthrough/*.js
+
+  # Self-tests for the Concurrency testing framework are run as part of this test suite.
+  - jstests/concurrency/*.js
   exclude_files:
+  # Exclude files that are not self-tests.
+  - jstests/concurrency/fsm_all*.js
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
 

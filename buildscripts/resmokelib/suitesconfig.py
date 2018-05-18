@@ -49,7 +49,7 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
             raise
 
         for testfile in suite.tests:
-            if isinstance(testfile, dict):
+            if isinstance(testfile, (dict, list)):
                 continue
             test_membership[testfile].append(suite_name)
     return test_membership

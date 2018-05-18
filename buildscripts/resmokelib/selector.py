@@ -9,7 +9,9 @@ from __future__ import absolute_import
 import collections
 import errno
 import fnmatch
+import math
 import os.path
+import random
 import subprocess
 import sys
 
@@ -433,7 +435,15 @@ class _Selector(object):
         # 5. Apply the include files last with force=True to take precedence over the tags.
         if self._tests_are_files and selector_config.include_files:
             test_list.include_files(selector_config.include_files, force=True)
-        return test_list.get_tests()
+
+        return self.sort_tests(*test_list.get_tests())
+
+    @staticmethod
+    def sort_tests(tests, excluded):
+        """Sort the tests before returning them."""
+        if config.ORDER_TESTS_BY_NAME:
+            return sorted(tests, key=str.lower), sorted(excluded, key=str.lower)
+        return tests, excluded
 
     @staticmethod
     def get_tags(test_file):  # pylint: disable=unused-argument
@@ -442,7 +452,7 @@ class _Selector(object):
 
 
 class _JSTestSelectorConfig(_SelectorConfig):
-    """_SelectorConfig subclass for js_test tests."""
+    """_SelectorConfig subclass for JavaScript tests."""
 
     def __init__(  # pylint: disable=too-many-arguments
             self, roots=None, include_files=None, exclude_files=None, include_with_any_tags=None,
@@ -455,7 +465,7 @@ class _JSTestSelectorConfig(_SelectorConfig):
 
 
 class _JSTestSelector(_Selector):
-    """_Selector subclass for js_test tests."""
+    """_Selector subclass for JavaScript tests."""
 
     def __init__(self, test_file_explorer):
         _Selector.__init__(self, test_file_explorer)
@@ -467,6 +477,74 @@ class _JSTestSelector(_Selector):
         if test_file in self._tags:
             return list(set(file_tags) | set(self._tags[test_file]))
         return file_tags
+
+
+class _MultiJSTestSelectorConfig(_JSTestSelectorConfig):
+    """_SelectorConfig subclass for selecting groups of JavaScript tests."""
+
+    def __init__(self, group_size=None, group_count_multiplier=1, **kwargs):
+        """Init function.
+
+        :param group_size: number of tests in each group.
+        :param group_count_multiplier: number of times to schedule each workload, can be a decimal.
+               E.g. 2.5 means half of the workloads get scheduled twice, and half get scheduled
+               3 times.
+        :param kwargs: arguments forwarded to the superclass.
+        """
+        _JSTestSelectorConfig.__init__(self, **kwargs)
+        self.group_size = group_size
+        self.group_count_multiplier = group_count_multiplier
+
+
+class _MultiJSTestSelector(_JSTestSelector):
+    """_Selector subclass for selecting one group of JavaScript tests at a time.
+
+    Each group can include one or more tests.
+
+    E.g. [[test1.js, test2.js], [test3.js, test4.js]].
+    """
+
+    def select(self, selector_config):
+        """Select the tests as follows.
+
+        1. Create a corpus of tests to group by concatenating shuffled lists of raw tests
+           until we exceed "total_tests" number of tests.
+        2. Slice the corpus into "group_size" lists, put these lists in "grouped_tests".
+        """
+        tests, excluded = _JSTestSelector.select(self, selector_config)
+
+        group_size = selector_config.group_size
+        multi = selector_config.group_count_multiplier
+
+        # We use the group size as a sentinel to determine if the tests are coming from
+        # the command line, in which case group_size would be undefined. For command line
+        # tests, we assume the user is trying to repro a certain issue, so we group all
+        # of the tests together.
+        if group_size is None:
+            multi = 1
+            group_size = len(tests)
+
+        grouped_tests = []
+
+        start = 0
+        corpus = tests[:]
+        random.shuffle(corpus)
+
+        num_groups = len(tests) * multi / group_size
+        while len(grouped_tests) < num_groups:
+            if start + group_size > len(corpus):
+                recycled_tests = corpus[:start]
+                random.shuffle(recycled_tests)
+                corpus = corpus[start:] + recycled_tests
+                start = 0
+            grouped_tests.append(corpus[start:start + group_size])
+            start += group_size
+        return grouped_tests, excluded
+
+    @staticmethod
+    def sort_tests(tests, excluded):
+        """There is no need to sort FSM test groups."""
+        return tests, excluded
 
 
 class _CppTestSelectorConfig(_SelectorConfig):
@@ -600,6 +678,7 @@ _SELECTOR_REGISTRY = {
     "benchmark_test": (_CppTestSelectorConfig, _CppTestSelector),
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
+    "parallel_fsm_workload_test": (_MultiJSTestSelectorConfig, _MultiJSTestSelector),
     "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
     "multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),

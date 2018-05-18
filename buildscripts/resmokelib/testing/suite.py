@@ -53,21 +53,17 @@ class Suite(object):  # pylint: disable=too-many-instance-attributes
 
     def _get_tests_for_kind(self, test_kind):
         """Return the tests to run based on the 'test_kind'-specific filtering policy."""
-        test_info = self.get_selector_config()
+        selector_config = self.get_selector_config()
 
-        # The mongos_test doesn't have to filter anything, the test_info is just the arguments to
-        # the mongos program to be used as the test case.
+        # The mongos_test doesn't have to filter anything, the selector_config is just the
+        # arguments to the mongos program to be used as the test case.
         if test_kind == "mongos_test":
-            mongos_options = test_info  # Just for easier reading.
+            mongos_options = selector_config  # Just for easier reading.
             if not isinstance(mongos_options, dict):
                 raise TypeError("Expected dictionary of arguments to mongos")
             return [mongos_options], []
 
-        tests, excluded = _selector.filter_tests(test_kind, test_info)
-        if _config.ORDER_TESTS_BY_NAME:
-            return sorted(tests, key=str.lower), sorted(excluded, key=str.lower)
-
-        return tests, excluded
+        return _selector.filter_tests(test_kind, selector_config)
 
     def get_name(self):
         """Return the name of the test suite."""
