@@ -20,7 +20,9 @@ var $config = extendWorkload($config, function($config, $super) {
             if (res.ok) {
                 assertAlways.commandWorked(res);
             } else {
-                assertAlways.commandFailedWithCode(res, ErrorCodes.Interrupted);
+                // TODO We really only expect Interrupted here, but until SERVER-32565 is resolved
+                // there are times when we might get InternalError.
+                assertAlways.contains(res.code, [ErrorCodes.Interrupted, ErrorCodes.InternalError]);
                 return;
             }
 
