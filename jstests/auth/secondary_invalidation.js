@@ -30,4 +30,7 @@ assert.doesNotThrow(function() {
     secondaryFoo.col.findOne();
 }, [], "Secondary read did not work with permissions");
 
+admin.logout();
+secondaryFoo.logout();
+
 rsTest.stopSet();

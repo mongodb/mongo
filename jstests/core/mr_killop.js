@@ -18,6 +18,21 @@ function debug(x) {
 function op(childLoop) {
     p = db.currentOp().inprog;
     debug(p);
+
+    let isMapReduce = function(op) {
+        if (!op.command) {
+            return false;
+        }
+        let cmdBody = op.command;
+        if (cmdBody.$truncated) {
+            let stringifiedCmd = cmdBody.$truncated;
+            print('str: ' + tojson(stringifiedCmd));
+            return stringifiedCmd.search('mapreduce') >= 0 &&
+                stringifiedCmd.search('jstests_mr_killop') >= 0;
+        }
+        return cmdBody.mapreduce && cmdBody.mapreduce == "jstests_mr_killop";
+    };
+
     for (var i in p) {
         var o = p[i];
         // Identify a map/reduce or where distinct operation by its collection, whether or not
@@ -28,8 +43,7 @@ function op(childLoop) {
                 return o.opid;
             }
         } else {
-            if ((o.active || o.waitingForLock) && o.command && o.command.mapreduce &&
-                o.command.mapreduce == "jstests_mr_killop") {
+            if ((o.active || o.waitingForLock) && isMapReduce(o)) {
                 return o.opid;
             }
         }

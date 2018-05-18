@@ -5,8 +5,12 @@
 (function() {
     "use strict";
 
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     let st = new ShardingTest(
         {mongos: 1, config: 1, shards: 1, keyFile: 'jstests/libs/key1', mongosWaitsForKeys: true});
+
     let adminDB = st.s.getDB('admin');
 
     assert.commandWorked(adminDB.runCommand({createUser: "admin", pwd: "admin", roles: ["root"]}));

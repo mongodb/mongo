@@ -1,6 +1,10 @@
 (function() {
     'use strict';
 
+    // This test makes assertions about the number of sessions, which are not compatible with
+    // implicit sessions.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/libs/retryable_writes_util.js");
 
     if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {

@@ -58,7 +58,9 @@ Mongo.prototype.getDB = function(name) {
 
 Mongo.prototype.getDBs = function(driverSession = this._getDefaultSession()) {
     var cmdObj = {listDatabases: 1};
-    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
+        cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    }
 
     var res = this.adminCommand(cmdObj);
     if (!res.ok)
@@ -75,7 +77,9 @@ Mongo.prototype.adminCommand = function(cmd) {
  */
 Mongo.prototype.getLogComponents = function(driverSession = this._getDefaultSession()) {
     var cmdObj = {getParameter: 1, logComponentVerbosity: 1};
-    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
+        cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    }
 
     var res = this.adminCommand(cmdObj);
     if (!res.ok)
@@ -106,7 +110,9 @@ Mongo.prototype.setLogLevel = function(
     }
 
     var cmdObj = {setParameter: 1, logComponentVerbosity: vDoc};
-    cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    if (driverSession._isExplicit || !jsTest.options().disableImplicitSessions) {
+        cmdObj = driverSession._serverSession.injectSessionId(cmdObj);
+    }
 
     var res = this.adminCommand(cmdObj);
     if (!res.ok)
@@ -257,13 +263,22 @@ connect = function(url, user, pass) {
         }
     }
 
-    // Check server version
-    var serverVersion = db.version();
-    chatty("MongoDB server version: " + serverVersion);
+    // Implicit sessions should not be used when opening a connection. In particular, the buildInfo
+    // command is erroneously marked as requiring auth in MongoDB 3.6 and therefore fails if a
+    // logical session id is included in the request.
+    const originalTestData = TestData;
+    TestData = Object.merge(originalTestData, {disableImplicitSessions: true});
+    try {
+        // Check server version
+        var serverVersion = db.version();
+        chatty("MongoDB server version: " + serverVersion);
 
-    var shellVersion = version();
-    if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
-        chatty("WARNING: shell and server versions do not match");
+        var shellVersion = version();
+        if (serverVersion.slice(0, 3) != shellVersion.slice(0, 3)) {
+            chatty("WARNING: shell and server versions do not match");
+        }
+    } finally {
+        TestData = originalTestData;
     }
 
     return db;
@@ -426,11 +441,14 @@ Mongo.prototype.startSession = function startSession(options = {}) {
 };
 
 Mongo.prototype._getDefaultSession = function getDefaultSession() {
-    // We implicitly associate a Mongo connection object with a DriverSession so that tests which
-    // call DB.prototype.getMongo() and then Mongo.prototype.getDB() to get a different DB instance
-    // are still causally consistent.
+    // We implicitly associate a Mongo connection object with a real session so all requests include
+    // a logical session id. These implicit sessions are intentionally not causally consistent. If
+    // implicit sessions have been globally disabled, a dummy session is used instead of a real one.
     if (!this.hasOwnProperty("_defaultSession")) {
-        this._defaultSession = new _DummyDriverSession(this);
+        this._defaultSession = _shouldUseImplicitSessions()
+            ? this.startSession({causalConsistency: false})
+            : new _DummyDriverSession(this);
+        this._defaultSession._isExplicit = false;
     }
     return this._defaultSession;
 };

@@ -8,6 +8,10 @@
 (function() {
     "use strict";
 
+    // This test uses authentication and runs commands without authenticating, which is not
+    // compatible with implicit sessions.
+    TestData.disableImplicitSessions = true;
+
     load("jstests/multiVersion/libs/multi_rs.js");
 
     // TODO SERVER-32672: remove this flag.
@@ -48,6 +52,7 @@
     priRSConn.auth(rUser.username, rUser.password);
     const resWithKeys = priRSConn.runCommand({isMaster: 1});
     assertContainsValidLogicalTime(resWithKeys);
+    priRSConn.logout();
 
     // Enable the failpoint, remove all keys, and restart the config servers with the failpoint
     // still enabled to guarantee there are no keys.
@@ -62,6 +67,7 @@
     });
 
     assert(adminDB.system.keys.count() == 0, "expected there to be no keys on the config server");
+    adminDB.logout();
 
     st.configRS.stopSet(null /* signal */, true /* forRestart */);
     st.configRS.startSet(
@@ -74,6 +80,7 @@
     priRSConn.auth(rUser.username, rUser.password);
     const resNoKeys = priRSConn.runCommand({isMaster: 1});
     assert.commandWorked(resNoKeys);
+    priRSConn.logout();
 
     assert.eq(resNoKeys.hasOwnProperty("$clusterTime"), false);
     assert.eq(resNoKeys.hasOwnProperty("operationTime"), false);

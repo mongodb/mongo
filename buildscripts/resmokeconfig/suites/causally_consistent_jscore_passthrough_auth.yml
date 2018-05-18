@@ -155,8 +155,21 @@ selector:
   - jstests/core/explain_upsert.js
   # The `dbstats` command builds in-memory structures that are not causally consistent.
   - jstests/core/dbstats.js
+
+  # These include operations the root user auth'd on the test database is not authorized to perform,
+  # e.g. dropping or creating system collections.
+  - jstests/core/indexes_on_indexes.js
+  - jstests/core/list_collections_no_views.js
+  - jstests/core/rename8.js
+  - jstests/core/views/duplicate_ns.js
+  - jstests/core/views/invalid_system_views.js
+  - jstests/core/views/views_creation.js
+  - jstests/core/views/views_drop.js
+  - jstests/core/views/views_rename.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
+  # TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+  - creates_and_authenticates_user
   - requires_collstats
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
@@ -167,6 +180,8 @@ selector:
   # "Cowardly refusing to run test with overridden read preference when it reads from a
   #  non-replicated collection: ..."
   - assumes_read_preference_unchanged
+  # This suite runs as the root user, but eval requires universal privileges with authentication on.
+  - requires_eval_command
 
 executor:
   archive:
@@ -190,7 +205,7 @@ executor:
           const res = db.runCommand({
               createUser: username,
               pwd: password,
-              roles: ["dbOwner"],
+              roles: [{role: "root", db: jsTest.options().authenticationDatabase}]
           });
 
           if (res.ok === 1) {
@@ -201,7 +216,8 @@ executor:
               assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
           }
 
-          db.logout();
+          // Log out as the __system user and auth as the newly created user.
+          db.getSiblingDB(jsTest.options().authenticationDatabase).logout();
           db.auth(username, password);
         })();
         load("jstests/libs/override_methods/enable_causal_consistency.js");

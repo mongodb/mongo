@@ -5,6 +5,10 @@
 (function() {
     "use strict";
 
+    // This test runs manual getMores using different connections, which will not inherit the
+    // implicit session of the cursor establishing command.
+    TestData.disableImplicitSessions = true;
+
     /**
      * @param {string} readMode - The read mode to use for the parallel shell. This allows
      * testing currentOp() output for both OP_QUERY and OP_GET_MORE queries, as well as "find" and

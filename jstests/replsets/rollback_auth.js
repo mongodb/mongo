@@ -12,6 +12,10 @@
 
 (function() {
     "use strict";
+
+    // TODO SERVER-35447: Multiple users cannot be authenticated on one connection within a session.
+    TestData.disableImplicitSessions = true;
+
     // helper function for verifying contents at the end of the test
     var checkFinalResults = function(db) {
         assert.commandWorked(db.runCommand({dbStats: 1}));
