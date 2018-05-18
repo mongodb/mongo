@@ -700,10 +700,6 @@ var {
         };
 
         this.startTransaction = function startTransaction(txnOptsObj) {
-            // If the session is already in a transaction, raise an error.
-            if (this.isInActiveTransaction()) {
-                throw new Error("Transaction already in progress on this session.");
-            }
             _txnOptions = new TransactionOptions(txnOptsObj);
             _txnState = ServerSession.TransactionStates.kActive;
             _nextStatementId = 0;
@@ -711,19 +707,11 @@ var {
         };
 
         this.commitTransaction = function commitTransaction(driverSession) {
-            // If the session has no active transaction, raise an error.
-            if (!this.isInActiveTransaction()) {
-                throw new Error("There is no active transaction to commit on this session.");
-            }
             // run commitTxn command
             return endTransaction("commitTransaction", driverSession);
         };
 
         this.abortTransaction = function abortTransaction(driverSession) {
-            // If the session has no active transaction, raise an error.
-            if (!this.isInActiveTransaction()) {
-                throw new Error("There is no active transaction to abort on this session.");
-            }
             // run abortTxn command
             return endTransaction("abortTransaction", driverSession);
         };
@@ -738,25 +726,13 @@ var {
             }
 
             let cmd = {[commandName]: 1, txnNumber: NumberLong(_txnNumber)};
-            // writeConcern should only be specified on commit or abort. If a writeConcern is
-            // not specified from the default transaction options, it will be inherited from
-            // the session.
-            if (this.client.getWriteConcern(driverSession) !== undefined) {
-                cmd.writeConcern = this.client.getWriteConcern(driverSession);
-            }
+            // writeConcern should only be specified on commit or abort
             if (_txnOptions.getTxnWriteConcern() !== undefined) {
                 cmd.writeConcern = _txnOptions.getTxnWriteConcern();
             }
-
-            // If commit or abort raises an error, the transaction's state should still change
-            // to inactive.
-            let res;
-            try {
-                // run command against the admin database.
-                res = this.client.runCommand(driverSession, "admin", cmd, 0);
-            } finally {
-                _txnState = ServerSession.TransactionStates.kInactive;
-            }
+            // run command against the admin database.
+            const res = this.client.runCommand(driverSession, "admin", cmd, 0);
+            _txnState = ServerSession.TransactionStates.kInactive;
             return res;
         };
     }
@@ -880,6 +856,7 @@ var {
                 // Intentionally ignore command result.
                 this._serverSession.abortTransaction(this);
             };
+
             this.commitTransaction_forTesting = function commitTransaction_forTesting() {
                 return this._serverSession.commitTransaction(this);
             };

@@ -84,6 +84,26 @@
     // Verify that we cannot see the document we tried to insert.
     assert.eq(null, sessionColl.findOne({_id: "insert-4"}));
 
+    //
+    // Test that calling startTransaction when a transaction is already running aborts the
+    // current transaction.
+    //
+    jsTestLog("Call startTransaction before committing or aborting the current transaction.");
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+
+    assert.commandWorked(sessionColl.insert({_id: "restart-txn-1"}));
+
+    // Try starting a new transaction without committing the previous one. This should result in
+    // the current transaction being implicitly aborted.
+    session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
+
+    assert.commandWorked(sessionColl.insert({_id: "restart-txn-2"}));
+    session.commitTransaction();
+
+    // Make sure the correct documents exist after committing the second transaction.
+    assert.eq({_id: "restart-txn-2"}, sessionColl.findOne({_id: "restart-txn-2"}));
+    assert.eq(null, sessionColl.findOne({_id: "restart-txn-1"}));
+
     jsTestLog("Bulk insert and update operations within transaction.");
 
     session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
