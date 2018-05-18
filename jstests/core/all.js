@@ -3,13 +3,13 @@ t.drop();
 
 doTest = function() {
 
-    t.save({a: [1, 2, 3]});
-    t.save({a: [1, 2, 4]});
-    t.save({a: [1, 8, 5]});
-    t.save({a: [1, 8, 6]});
-    t.save({a: [1, 9, 7]});
-    t.save({a: []});
-    t.save({});
+    assert.commandWorked(t.save({a: [1, 2, 3]}));
+    assert.commandWorked(t.save({a: [1, 2, 4]}));
+    assert.commandWorked(t.save({a: [1, 8, 5]}));
+    assert.commandWorked(t.save({a: [1, 8, 6]}));
+    assert.commandWorked(t.save({a: [1, 9, 7]}));
+    assert.commandWorked(t.save({a: []}));
+    assert.commandWorked(t.save({}));
 
     assert.eq(5, t.find({a: {$all: [1]}}).count());
     assert.eq(2, t.find({a: {$all: [1, 2]}}).count());
