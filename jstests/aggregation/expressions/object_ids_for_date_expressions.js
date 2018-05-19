@@ -60,7 +60,8 @@
         2004,  // Starting on Thursday, ending on Friday.
         2016,  // Starting on Friday, ending on Saturday.
         2000,  // Starting on Saturday, ending on Sunday (special).
-        2012   // Starting on Sunday, ending on Monday.
+        2012,  // Starting on Sunday, ending on Monday.
+        2038
     ];
 
     const day = 1;
@@ -96,5 +97,5 @@
         testOp('$millisecond', newYear);
 
     });
-    assert.eq(testOpCount, 236, 'Expected 236 tests to run');
+    assert.eq(testOpCount, 250, 'Expected 250 tests to run');
 })();
