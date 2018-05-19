@@ -44,7 +44,9 @@
 
     testOp('$dateToString', {date: new Date("1980-12-31T23:59:59Z"), format: "%V-%G"});
     testOp('$dateToString', {date: new Date("1980-12-31T23:59:59Z"), format: "%G-%V"});
-
+    // SERVER-34975 include test for date > 2038
+    testOp('$dateToString', {date: new Date("2038-04-15T09:53:06Z"), format: "%G-%V"});
+    
     const years = [
         2002,  // Starting and ending on Tuesday.
         2014,  // Starting and ending on Wednesday.
