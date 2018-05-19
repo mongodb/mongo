@@ -97,5 +97,5 @@
         testOp('$millisecond', newYear);
 
     });
-    assert.eq(testOpCount, 250, 'Expected 250 tests to run');
+    assert.eq(testOpCount, 255, 'Expected 255 tests to run');
 })();
