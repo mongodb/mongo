@@ -41,6 +41,10 @@ if env['TARGET_ARCH'] == 'x86_64' and conf.CheckCHeader('x86intrin.h'):
     conf.env.Append(CPPDEFINES=[
         "HAVE_X86INTRIN_H"
     ])
+if conf.CheckCHeader('arm_neon.h'):
+    conf.env.Append(CPPDEFINES=[
+        "HAVE_ARM_NEON_INTRIN_H"
+    ])
 env = conf.Finish();
 
 if env.TargetOSIs('windows'):
