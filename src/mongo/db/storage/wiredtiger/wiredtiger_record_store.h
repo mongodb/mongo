@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <memory>
 #include <set>
 #include <string>
 #include <wiredtiger.h>
@@ -41,6 +42,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -355,12 +357,9 @@ private:
     mutable stdx::timed_mutex _cappedDeleterMutex;
 
     AtomicInt64 _nextIdNum;
-    AtomicInt64 _dataSize;
-    AtomicInt64 _numRecords;
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL
-    int _sizeStorerCounter;
-
+    std::shared_ptr<WiredTigerSizeStorer::SizeInfo> _sizeInfo;
     WiredTigerKVEngine* _kvEngine;  // not owned.
 
     // Non-null if this record store is underlying the active oplog.

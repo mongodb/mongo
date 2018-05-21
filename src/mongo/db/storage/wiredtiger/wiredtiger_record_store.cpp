@@ -57,7 +57,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_stones.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -638,7 +637,6 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _shuttingDown(false),
       _cappedDeleteCheckCount(0),
       _sizeStorer(params.sizeStorer),
-      _sizeStorerCounter(0),
       _kvEngine(kvEngine) {
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
                                ctx, _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
@@ -690,9 +688,6 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
     }
 
     LOG(1) << "~WiredTigerRecordStore for: " << ns();
-    if (_sizeStorer) {
-        _sizeStorer->onDestroy(this);
-    }
 
     if (_oplogStones) {
         _oplogStones->kill();
@@ -707,27 +702,24 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
 void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
     // Find the largest RecordId currently in use and estimate the number of records.
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, /*forward=*/false);
+    _sizeInfo =
+        _sizeStorer ? _sizeStorer->load(_uri) : std::make_shared<WiredTigerSizeStorer::SizeInfo>();
+
     if (auto record = cursor->next()) {
         int64_t max = record->id.repr();
         _nextIdNum.store(1 + max);
 
-        if (_sizeStorer) {
-            long long numRecords;
-            long long dataSize;
-            _sizeStorer->loadFromCache(_uri, &numRecords, &dataSize);
-            _numRecords.store(numRecords);
-            _dataSize.store(dataSize);
-            _sizeStorer->onCreate(this, numRecords, dataSize);
-        } else {
+        if (!_sizeStorer) {
             LOG(1) << "Doing scan of collection " << ns() << " to get size and count info";
 
-            _numRecords.store(0);
-            _dataSize.store(0);
-
+            int64_t numRecords = 0;
+            int64_t dataSize = 0;
             do {
-                _numRecords.fetchAndAdd(1);
-                _dataSize.fetchAndAdd(record->data.size());
+                numRecords++;
+                dataSize += record->data.size();
             } while ((record = cursor->next()));
+            _sizeInfo->numRecords.store(numRecords);
+            _sizeInfo->dataSize.store(dataSize);
         }
     } else {
         // We found no records in this collection; however, there may actually be documents present
@@ -739,14 +731,15 @@ void WiredTigerRecordStore::postConstructorInit(OperationContext* opCtx) {
                             << ns() << ", ident: " << _uri;
         sizeRecoveryState(getGlobalServiceContext())
             .markCollectionAsAlwaysNeedsSizeAdjustment(ns());
-        _dataSize.store(0);
-        _numRecords.store(0);
+        _sizeInfo->dataSize.store(0);
+        _sizeInfo->numRecords.store(0);
 
         // Need to start at 1 so we are always higher than RecordId::min()
         _nextIdNum.store(1);
-        if (_sizeStorer)
-            _sizeStorer->onCreate(this, 0, 0);
     }
+
+    if (_sizeStorer)
+        _sizeStorer->store(_uri, _sizeInfo);
 
     if (WiredTigerKVEngine::initRsOplogBackgroundThread(ns())) {
         _oplogStones = std::make_shared<OplogStones>(opCtx, this);
@@ -768,11 +761,11 @@ bool WiredTigerRecordStore::inShutdown() const {
 }
 
 long long WiredTigerRecordStore::dataSize(OperationContext* opCtx) const {
-    return _dataSize.load();
+    return _sizeInfo->dataSize.load();
 }
 
 long long WiredTigerRecordStore::numRecords(OperationContext* opCtx) const {
-    return _numRecords.load();
+    return _sizeInfo->numRecords.load();
 }
 
 bool WiredTigerRecordStore::isCapped() const {
@@ -885,10 +878,10 @@ bool WiredTigerRecordStore::cappedAndNeedDelete() const {
     if (!_isCapped)
         return false;
 
-    if (_dataSize.load() >= _cappedMaxSize)
+    if (_sizeInfo->dataSize.load() >= _cappedMaxSize)
         return true;
 
-    if ((_cappedMaxDocs != -1) && (_numRecords.load() > _cappedMaxDocs))
+    if ((_cappedMaxDocs != -1) && (_sizeInfo->numRecords.load() > _cappedMaxDocs))
         return true;
 
     return false;
@@ -914,7 +907,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
         if (!lock.try_lock()) {
             // Someone else is deleting old records. Apply back-pressure if too far behind,
             // otherwise continue.
-            if ((_dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack)
+            if ((_sizeInfo->dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack)
                 return 0;
 
             // Don't wait forever: we're in a transaction, we could block eviction.
@@ -929,7 +922,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
 
             // If we already waited, let someone else do cleanup unless we are significantly
             // over the limit.
-            if ((_dataSize.load() - _cappedMaxSize) < (2 * _cappedMaxSizeSlack))
+            if ((_sizeInfo->dataSize.load() - _cappedMaxSize) < (2 * _cappedMaxSizeSlack))
                 return 0;
         }
     }
@@ -977,8 +970,8 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
 
-    int64_t dataSize = _dataSize.load();
-    int64_t numRecords = _numRecords.load();
+    int64_t dataSize = _sizeInfo->dataSize.load();
+    int64_t numRecords = _sizeInfo->numRecords.load();
 
     int64_t sizeOverCap = (dataSize > _cappedMaxSize) ? dataSize - _cappedMaxSize : 0;
     int64_t sizeSaved = 0;
@@ -1204,8 +1197,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp pers
         }
     }
 
-    LOG(1) << "Finished truncating the oplog, it now contains approximately " << _numRecords.load()
-           << " records totaling to " << _dataSize.load() << " bytes";
+    LOG(1) << "Finished truncating the oplog, it now contains approximately "
+           << _sizeInfo->numRecords.load() << " records totaling to " << _sizeInfo->dataSize.load()
+           << " bytes";
     log() << "WiredTiger record store oplog truncation finished in: " << timer.millis() << "ms";
 }
 
@@ -1660,12 +1654,12 @@ boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
 void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                                    long long numRecords,
                                                    long long dataSize) {
-    _numRecords.store(numRecords);
-    _dataSize.store(dataSize);
+    _sizeInfo->numRecords.store(numRecords);
+    _sizeInfo->dataSize.store(dataSize);
 
-    if (_sizeStorer) {
-        _sizeStorer->storeToCache(_uri, numRecords, dataSize);
-    }
+    // If we have a WiredTigerSizeStorer, but our size info is not currently cached, add it.
+    if (_sizeStorer)
+        _sizeStorer->store(_uri, _sizeInfo);
 }
 
 RecordId WiredTigerRecordStore::_nextId() {
@@ -1684,7 +1678,8 @@ public:
     NumRecordsChange(WiredTigerRecordStore* rs, int64_t diff) : _rs(rs), _diff(diff) {}
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        _rs->_numRecords.fetchAndAdd(-_diff);
+        LOG(3) << "WiredTigerRecordStore: rolling back NumRecordsChange" << -_diff;
+        _rs->_sizeInfo->numRecords.fetchAndAdd(-_diff);
     }
 
 private:
@@ -1698,8 +1693,8 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t d
     }
 
     opCtx->recoveryUnit()->registerChange(new NumRecordsChange(this, diff));
-    if (_numRecords.fetchAndAdd(diff) < 0)
-        _numRecords.store(std::max(diff, int64_t(0)));
+    if (_sizeInfo->numRecords.fetchAndAdd(diff) < 0)
+        _sizeInfo->numRecords.store(std::max(diff, int64_t(0)));
 }
 
 class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
@@ -1723,12 +1718,11 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
     if (opCtx)
         opCtx->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
 
-    if (_dataSize.fetchAndAdd(amount) < 0)
-        _dataSize.store(std::max(amount, int64_t(0)));
+    if (_sizeInfo->dataSize.fetchAndAdd(amount) < 0)
+        _sizeInfo->dataSize.store(std::max(amount, int64_t(0)));
 
-    if (_sizeStorer && _sizeStorerCounter++ % 1000 == 0) {
-        _sizeStorer->storeToCache(_uri, _numRecords.load(), _dataSize.load());
-    }
+    if (_sizeStorer)
+        _sizeStorer->store(_uri, _sizeInfo);
 }
 
 void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
