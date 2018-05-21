@@ -40,6 +40,10 @@
 namespace mongo {
 namespace {
 
+void saslSetError(sasl_conn_t* conn, const std::string& msg) {
+    sasl_seterror(conn, 0, "%s", msg.c_str());
+}
+
 SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
     if ((mech == "SCRAM-SHA-1") || (mech == "SCRAM-SHA-256")) {
         return new NativeSaslClientSession();
@@ -199,7 +203,7 @@ int saslClientGetPassword(sasl_conn_t* conn,
 
         sasl_secret_t* secret = session->getPasswordAsSecret();
         if (secret == NULL) {
-            sasl_seterror(conn, 0, "No password data provided");
+            saslSetError(conn, "No password data provided");
             return SASL_FAIL;
         }
 
@@ -208,7 +212,7 @@ int saslClientGetPassword(sasl_conn_t* conn,
     } catch (...) {
         StringBuilder sb;
         sb << "Caught unhandled exception in saslClientGetSimple: " << exceptionToStatus().reason();
-        sasl_seterror(conn, 0, sb.str().c_str());
+        saslSetError(conn, sb.str());
         return SASL_FAIL;
     }
 }

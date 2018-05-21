@@ -58,6 +58,10 @@ namespace {
 // The SSPI plugin implements the GSSAPI interface.
 char sspiPluginName[] = "GSSAPI";
 
+void saslSetError(const sasl_utils_t* utils, const std::string& msg) {
+    utils->seterror(utils->conn, 0, "%s", msg.c_str());
+}
+
 // This structure is passed through each callback to us by the sasl glue code.
 struct SspiConnContext {
     CredHandle cred;
@@ -94,7 +98,7 @@ void HandleLastError(const sasl_utils_t* utils, DWORD errCode, const char* msg) 
     }
 
     std::string buffer(mongoutils::str::stream() << "SSPI: " << msg << ": " << err);
-    utils->seterror(utils->conn, 0, "%s", buffer.c_str());
+    saslSetError(utils, buffer);
     LocalFree(err);
 }
 
@@ -111,7 +115,7 @@ int sspiClientMechNew(void* glob_context,
     int ret = cparams->utils->getcallback(
         cparams->utils->conn, SASL_CB_USER, (sasl_callback_ft*)&user_cb, &user_context);
     if (ret != SASL_OK) {
-        cparams->utils->seterror(cparams->utils->conn, 0, "getcallback user failed");
+        saslSetError(cparams->utils, "getcallback user failed");
         return ret;
     }
     const char* rawUserPlusRealm;
@@ -119,7 +123,7 @@ int sspiClientMechNew(void* glob_context,
 
     ret = user_cb(user_context, SASL_CB_USER, &rawUserPlusRealm, &rawUserPlusRealmLength);
     if (ret != SASL_OK) {
-        cparams->utils->seterror(cparams->utils->conn, 0, "user callback failed");
+        saslSetError(cparams->utils, "user callback failed");
         return ret;
     }
     std::string userPlusRealm(rawUserPlusRealm, rawUserPlusRealmLength);
@@ -127,7 +131,7 @@ int sspiClientMechNew(void* glob_context,
     // Parse out the username and realm.
     size_t atSign = userPlusRealm.find('@');
     if (atSign == std::string::npos) {
-        cparams->utils->seterror(cparams->utils->conn, 0, "no @REALM found in username");
+        saslSetError(cparams->utils, "no @REALM found in username");
         return SASL_BADPARAM;
     }
     std::string utf8Username(userPlusRealm, 0, atSign);
@@ -187,7 +191,7 @@ int sspiClientMechNew(void* glob_context,
 
     // Compose target name token. First, verify that a hostname has been provided.
     if (cparams->serverFQDN == NULL || strlen(cparams->serverFQDN) == 0) {
-        cparams->utils->seterror(cparams->utils->conn, 0, "SSPI: no serverFQDN");
+        saslSetError(cparams->utils, "SSPI: no serverFQDN");
         return SASL_FAIL;
     }
 
@@ -252,15 +256,14 @@ int sspiValidateServerSecurityLayerOffering(SspiConnContext* pcctx,
     // Validate the server's plaintext message.
     // Length (as per RFC 4752)
     if (wrapBufs[1].cbBuffer < 4) {
-        cparams->utils->seterror(cparams->utils->conn, 0, "SSPI: server message is too short");
+        saslSetError(cparams->utils, "SSPI: server message is too short");
         return SASL_FAIL;
     }
     // First bit of first byte set, indicating that the client may elect to use no
     // security layer. As a client we are uninterested in any of the other features the
     // server offers and thus we ignore the other bits.
     if (!(static_cast<char*>(wrapBufs[1].pvBuffer)[0] & 1)) {
-        cparams->utils->seterror(
-            cparams->utils->conn, 0, "SSPI: server does not support the required security layer");
+        saslSetError(cparams->utils, "SSPI: server does not support the required security layer");
         return SASL_BADAUTH;
     }
     return SASL_OK;
@@ -455,7 +458,7 @@ int sspiClientPluginInit(const sasl_utils_t* utils,
                          sasl_client_plug_t** pluglist,
                          int* plugcount) {
     if (max_version < SASL_CLIENT_PLUG_VERSION) {
-        utils->seterror(utils->conn, 0, "Wrong SSPI version");
+        saslSetError(utils, "Wrong SSPI version");
         return SASL_BADVERS;
     }
 
