@@ -145,9 +145,8 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
     if (!_needToCleanup || _indexes.empty())
         return;
 
-    // Make lock acquisition uninterruptible because onOpMessage() and WUOW.commit() could take
-    // locks.
-    UninterruptibleLockGuard(_opCtx->lockState());
+    // Make lock acquisition uninterruptible because onOpMessage() can take locks.
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
 
     while (true) {
         try {
@@ -166,8 +165,6 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
             // timestamp already set.
             if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull() &&
                 replCoord->canAcceptWritesForDatabase(_opCtx, "admin")) {
-
-                // Make lock acquisition uninterruptible because writing an op message takes a lock.
                 _opCtx->getServiceContext()->getOpObserver()->onOpMessage(
                     _opCtx,
                     BSON("msg" << std::string(str::stream() << "Failing index builds. Coll: "
