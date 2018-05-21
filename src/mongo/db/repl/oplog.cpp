@@ -111,6 +111,9 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace repl {
 namespace {
+
+MONGO_FP_DECLARE(sleepBetweenInsertOpTimeGenerationAndLogOp);
+
 /**
  * The `_localOplogCollection` pointer is always valid (or null) because an
  * operation must take the global exclusive lock to set the pointer to null when
@@ -524,6 +527,14 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         oplogLink.prevOpTime = insertStatementOplogSlot.opTime;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot.opTime);
+    }
+
+    MONGO_FAIL_POINT_BLOCK(sleepBetweenInsertOpTimeGenerationAndLogOp, customWait) {
+        const BSONObj& data = customWait.getData();
+        auto numMillis = data["waitForMillis"].numberInt();
+        log() << "Sleeping for " << numMillis << "ms after receiving " << count << " optimes from "
+              << opTimes.front() << " to " << opTimes.back();
+        sleepmillis(numMillis);
     }
 
     std::unique_ptr<DocWriter const* []> basePtrs(new DocWriter const*[count]);

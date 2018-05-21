@@ -1046,6 +1046,11 @@ void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opT
     if (opTime > _getMyLastAppliedOpTime_inlock()) {
         _setMyLastAppliedOpTime_inlock(opTime, false, consistency);
         _reportUpstream_inlock(std::move(lock));
+    } else if (consistency == DataConsistency::Consistent && _canAcceptNonLocalWrites &&
+               _rsConfig.getWriteMajority() == 1) {
+        // Single vote primaries may have a lagged stable timestamp due to paring back the stable
+        // timestamp to the all committed timestamp.
+        _setStableTimestampForStorage_inlock();
     }
 }
 
