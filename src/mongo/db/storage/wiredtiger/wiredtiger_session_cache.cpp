@@ -118,6 +118,24 @@ WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id, boo
     return c;
 }
 
+WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(WT_SESSION* session, std::string config)
+    : _session(session) {
+    invariant(!_rollback);
+    invariantWTOK(_session->begin_transaction(_session, config.c_str()));
+    _rollback = true;
+}
+
+WiredTigerBeginTxnBlock::~WiredTigerBeginTxnBlock() {
+    if (_rollback) {
+        invariant(_session->rollback_transaction(_session, nullptr) == 0);
+    }
+}
+
+void WiredTigerBeginTxnBlock::done() {
+    invariant(_rollback);
+    _rollback = false;
+}
+
 void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     invariant(_session);
     invariant(cursor);

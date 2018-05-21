@@ -150,6 +150,26 @@ private:
 };
 
 /**
+ * When constructed, this object begins a WiredTiger transaction on the provided session. The
+ * transaction will be rolled back if done is not called before the object is destructed.
+ */
+class WiredTigerBeginTxnBlock {
+public:
+    WiredTigerBeginTxnBlock(WT_SESSION* session, std::string config);
+    ~WiredTigerBeginTxnBlock();
+
+    /**
+     * End the begin transaction block. Must be called to ensure the opened transaction
+     * is not be rolled back.
+     */
+    void done();
+
+private:
+    WT_SESSION* _session;
+    bool _rollback = false;
+};
+
+/**
  *  This cache implements a shared pool of WiredTiger sessions with the goal to amortize the
  *  cost of session creation and destruction over multiple uses.
  */

@@ -53,7 +53,7 @@ void NamespaceUUIDCache::ensureNamespaceInCache(const NamespaceString& nss, Coll
     if (it == _cache.end()) {
         // Add ns, uuid pair to the cache if it does not yet exist.
         invariant(_cache.try_emplace(ns, uuid).second == true);
-        LOG(2) << "NamespaceUUIDCache: registered namespace " << nss.ns() << " with UUID " << uuid;
+        LOG(3) << "NamespaceUUIDCache: registered namespace " << nss.ns() << " with UUID " << uuid;
 
     } else if (it->second != uuid) {
         // If ns exists in the cache, make sure it does not correspond to another uuid.
