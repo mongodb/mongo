@@ -885,9 +885,12 @@ TEST(IndexBoundsBuilderTest, TranslateExprEqualToNullIsInexactFetch) {
     IndexBoundsBuilder::BoundsTightness tightness;
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
     ASSERT_EQUALS(oil.name, "a");
-    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': undefined, '': undefined}"), true, true)));
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
+                  oil.intervals[1].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
 }
 
@@ -2012,6 +2015,287 @@ TEST(IndexBoundsBuilderTest, TranslateEqualityToNonStringWithMockCollator) {
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                   oil.intervals[0].compare(Interval(fromjson("{'': 3, '': 3}"), true, true)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+}
+
+/**
+ * Asserts that 'oil' contains exactly two bounds: [[undefined, undefined], [null, null]].
+ */
+void assertBoundsRepresentEqualsNull(const OrderedIntervalList& oil) {
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': undefined, '': undefined}"), true, true)));
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[1].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
+}
+
+TEST(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildInexactBounds) {
+    BSONObj indexPattern = BSON("a" << 1);
+    IndexEntry testIndex(indexPattern);
+
+    BSONObj obj = BSON("a" << BSONNULL);
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateDottedEqualsToNullShouldBuildInexactBounds) {
+    BSONObj indexPattern = BSON("a.b" << 1);
+    IndexEntry testIndex(indexPattern);
+
+    BSONObj obj = BSON("a.b" << BSONNULL);
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a.b");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateEqualsToNullMultiKeyShouldBuildInexactBounds) {
+    BSONObj indexPattern = BSON("a" << 1);
+    IndexEntry testIndex(indexPattern);
+    testIndex.multikey = true;
+
+    BSONObj obj = BSON("a" << BSONNULL);
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildTwoIntervalsForHashedIndex) {
+    BSONObj indexPattern = BSON("a"
+                                << "hashed");
+    IndexEntry testIndex(indexPattern);
+    testIndex.type = IndexType::INDEX_HASHED;
+
+    BSONObj obj = BSON("a" << BSONNULL);
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    // We should have one for undefined, and one for null.
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    {
+        const BSONObj undefinedElementObj = BSON("" << BSONUndefined);
+        const BSONObj hashedUndefinedInterval =
+            ExpressionMapping::hash(undefinedElementObj.firstElement());
+        ASSERT_EQ(hashedUndefinedInterval.firstElement().type(), BSONType::NumberLong);
+
+        const auto& firstInterval = oil.intervals[0];
+        ASSERT_TRUE(firstInterval.startInclusive);
+        ASSERT_TRUE(firstInterval.endInclusive);
+        ASSERT_EQ(firstInterval.start.type(), BSONType::NumberLong);
+        ASSERT_EQ(firstInterval.start.numberLong(),
+                  hashedUndefinedInterval.firstElement().numberLong());
+    }
+
+    {
+        const BSONObj nullElementObj = BSON("" << BSONNULL);
+        const BSONObj hashedNullInterval = ExpressionMapping::hash(nullElementObj.firstElement());
+        ASSERT_EQ(hashedNullInterval.firstElement().type(), BSONType::NumberLong);
+
+        const auto& secondInterval = oil.intervals[1];
+        ASSERT_TRUE(secondInterval.startInclusive);
+        ASSERT_TRUE(secondInterval.endInclusive);
+        ASSERT_EQ(secondInterval.start.type(), BSONType::NumberLong);
+        ASSERT_EQ(secondInterval.start.numberLong(),
+                  hashedNullInterval.firstElement().numberLong());
+    }
+}
+
+/**
+ * Asserts that 'oil' contains exactly two bounds: [MinKey, undefined) and (null, MaxKey].
+ */
+void assertBoundsRepresentNotEqualsNull(const OrderedIntervalList& oil) {
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    {
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        bob.appendUndefined("");
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                      oil.intervals[0].compare(Interval(bob.obj(), true, false)));
+    }
+
+    {
+        BSONObjBuilder bob;
+        bob.appendNull("");
+        bob.appendMaxKey("");
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                      oil.intervals[1].compare(Interval(bob.obj(), false, true)));
+    }
+}
+
+TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsIfIndexIsNotMultiKey) {
+    BSONObj indexPattern = BSON("a" << 1);
+    IndexEntry testIndex(indexPattern);
+
+    BSONObj obj = BSON("a" << BSON("$ne" << BSONNULL));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    // Bounds should be [MinKey, undefined), (null, MaxKey].
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest,
+     TranslateNotEqualToNullShouldBuildExactBoundsIfIndexIsNotMultiKeyOnRelevantPath) {
+    BSONObj indexPattern = BSON("a" << 1 << "b" << 1);
+    IndexEntry testIndex(indexPattern);
+    testIndex.multikeyPaths = {{}, {0}};  // "a" is not multi-key, but "b" is.
+
+    BSONObj obj = BSON("a" << BSON("$ne" << BSONNULL));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    // Bounds should be [MinKey, undefined), (null, MaxKey].
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsOnReverseIndex) {
+    BSONObj indexPattern = BSON("a" << -1);
+    IndexEntry testIndex(indexPattern);
+
+    BSONObj obj = BSON("a" << BSON("$ne" << BSONNULL));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    // Bounds should be [MinKey, undefined), (null, MaxKey].
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildInexactBoundsIfIndexIsMultiKey) {
+    BSONObj indexPattern = BSON("a" << 1);
+    IndexEntry testIndex(indexPattern);
+    testIndex.multikey = true;
+
+    BSONObj matchObj = BSON("a" << BSON("$ne" << BSONNULL));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(matchObj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest,
+     TranslateDottedElemMatchValueNotEqualToNullShouldBuildExactBoundsIfIsMultiKeyOnThatPath) {
+    BSONObj indexPattern = BSON("a.b" << 1);
+    IndexEntry testIndex(indexPattern);
+    testIndex.multikeyPaths = {{1}};  // "a.b" is multikey.
+
+    BSONObj matchObj = BSON("a.b" << BSON("$elemMatch" << BSON("$ne" << BSONNULL)));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(matchObj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a.b");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest,
+     TranslateDottedFieldNotEqualToNullShouldBuildInexactBoundsIfIndexIsMultiKey) {
+    BSONObj indexPattern = BSON("a.b" << 1);
+    IndexEntry testIndex(indexPattern);
+    testIndex.multikey = true;
+
+    BSONObj matchObj = BSON("a.b" << BSON("$ne" << BSONNULL));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(matchObj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a.b");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest,
+     TranslateElemMatchValueNotEqualToNullShouldBuildInexactBoundsIfIndexIsMultiKey) {
+    BSONObj indexPattern = BSON("a" << 1);
+    IndexEntry testIndex(indexPattern);
+    testIndex.multikey = true;
+
+    BSONObj obj = BSON("a" << BSON("$elemMatch" << BSON("$ne" << BSONNULL)));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
+    BSONElement elt = obj.firstElement();
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentNotEqualsNull(oil);
+}
+
+TEST(IndexBoundsBuilderTest,
+     TranslateElemMatchValueNotEqualToNullShouldBuildInExactBoundsIfIndexIsNotMultiKey) {
+    BSONObj indexPattern = BSON("a" << 1);
+    IndexEntry testIndex(indexPattern);
+
+    BSONObj matchObj = BSON("a" << BSON("$elemMatch" << BSON("$ne" << BSONNULL)));
+    unique_ptr<MatchExpression> expr(parseMatchExpression(matchObj));
+
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(
+        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness);
+
+    ASSERT_EQUALS(oil.name, "a");
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    assertBoundsRepresentNotEqualsNull(oil);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateNotEqualToStringWithMockCollator) {

@@ -26,19 +26,19 @@ selector:
   - jstests/core/commands_with_uuid.js
   - jstests/core/explain_execution_error.js
   - jstests/core/expr.js
+  - jstests/core/find9.js
   - jstests/core/find_getmore_bsonsize.js
   - jstests/core/find_getmore_cmd.js
-  - jstests/core/find9.js
   - jstests/core/geo_allowedcomparisons.js
   - jstests/core/geo_big_polygon2.js
   - jstests/core/geonear_key.js
   - jstests/core/in.js
+  - jstests/core/index8.js # No explicit check for failed command.
   - jstests/core/index_big1.js
   - jstests/core/index_bigkeys.js
   - jstests/core/index_decimal.js
   - jstests/core/index_multiple_compatibility.js
   - jstests/core/index_partial_write_ops.js
-  - jstests/core/index8.js # No explicit check for failed command.
   - jstests/core/indexa.js # No explicit check for failed command.
   - jstests/core/indexes_multiple_commands.js
   - jstests/core/insert_long_index_key.js
@@ -47,10 +47,12 @@ selector:
   - jstests/core/mr_bigobject.js
   - jstests/core/not2.js
   - jstests/core/notablescan.js
+  - jstests/core/null_query_semantics.js
   - jstests/core/or1.js
   - jstests/core/or2.js
   - jstests/core/or3.js
   - jstests/core/orj.js
+  - jstests/core/ref.js
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
   - jstests/core/remove_undefined.js
@@ -69,7 +71,6 @@ selector:
   - jstests/core/update_modifier_pop.js
   - jstests/core/updateh.js
   - jstests/core/updatej.js
-  - jstests/core/ref.js
 
   # Consecutive writes totalling more than the size upper threshold will cause the txn to
   # abort with a TransactionTooLarge error.

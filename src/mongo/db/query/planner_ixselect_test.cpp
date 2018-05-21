@@ -1130,48 +1130,124 @@ TEST(QueryPlannerIXSelectTest, InternalExprEqCanUseSparseIndexWithComparisonToNo
     testRateIndices(
         "{a: {$_internalExprEq: 1}}", "", kSimpleCollator, indices, "a", expectedIndices);
 }
-
-TEST(QueryPlannerIXSelectTest, IndexedFieldHasMultikeyComponents) {
-    auto indexEntry = makeIndexEntry(BSON("a" << 1 << "b.c" << 1), {{}, {}});
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a"_sd, indexEntry));
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("b.c"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a" << 1 << "b" << 1), {{}, {0U}});
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a"_sd, indexEntry));
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("b"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a" << 1 << "b" << 1 << "c.d" << 1), {{}, {}, {1U}});
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a"_sd, indexEntry));
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("b"_sd, indexEntry));
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("c.d"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a.b" << 1 << "a.c" << 1), {{}, {1U}});
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a.b"_sd, indexEntry));
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a.c"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a.b" << 1 << "a.c" << 1), {{0U, 1U}, {0U}});
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a.b"_sd, indexEntry));
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a.c"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a" << 1 << "b" << 1), {{0U}, {}});
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a"_sd, indexEntry));
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("b"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a.b.c" << 1 << "d" << 1), {{1U, 2U}, {}});
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a.b.c"_sd, indexEntry));
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("d"_sd, indexEntry));
-
-    indexEntry = makeIndexEntry(BSON("a.b" << 1 << "c" << 1 << "d" << 1), {{1U}, {}, {0U}});
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("a.b"_sd, indexEntry));
-    ASSERT_FALSE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("c"_sd, indexEntry));
-    ASSERT_TRUE(QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("d"_sd, indexEntry));
+TEST(QueryPlannerIXSelectTest, NotEqualsNullCanUseIndex) {
+    IndexEntry entry{BSON("a" << 1)};
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }
 
-DEATH_TEST(QueryPlannerIXSelectTest,
-           IndexedFieldHasMultikeyComponentsPassingInvalidFieldIsFatal,
-           "Invariant failure Hit a MONGO_UNREACHABLE!") {
-    auto indexEntry = makeIndexEntry(BSON("a" << 1), {{}});
-    QueryPlannerIXSelect::indexedFieldHasMultikeyComponents("b"_sd, indexEntry);
+TEST(QueryPlannerIXSelectTest, NotEqualsNullCannotUseMultiKeyIndex) {
+    IndexEntry entry{BSON("a" << 1)};
+    entry.multikey = true;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }
 
+TEST(QueryPlannerIXSelectTest, NotEqualsNullCannotUseDottedMultiKeyIndex) {
+    IndexEntry entry{BSON("a.b" << 1)};
+    entry.multikeyPaths = {{0}};
+    std::set<size_t> expectedIndices = {};
+    testRateIndices(
+        "{'a.b': {$ne: null}}", "", kSimpleCollator, {entry}, "a.b,a.b", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, NotEqualsNullCanUseIndexWhichIsMultiKeyOnAnotherPath) {
+    IndexEntry entry{BSON("a" << 1 << "mk" << 1)};
+    entry.multikeyPaths = {{}, {0}};
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ElemMatchValueWithNotEqualsNullCanUseIndex) {
+    IndexEntry entry{BSON("a" << 1)};
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$ne: null}}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ElemMatchValueWithNotEqualsNullCanUseMultiKeyIndex) {
+    IndexEntry entry{BSON("a" << 1)};
+    entry.multikey = true;
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: {$elemMatch: {$ne: null}}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ElemMatchObjectWithNotEqualNullCanUseIndex) {
+    IndexEntry entry{BSON("a.b" << 1)};
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$elemMatch: {b: {$ne: null}}}}",
+                    "",
+                    kSimpleCollator,
+                    {entry},
+                    "a.b,a.b",
+                    expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ElemMatchObjectWithNotEqualNullCannotUseOldMultiKeyIndex) {
+    IndexEntry entry{BSON("a.b" << 1)};
+    entry.multikey = true;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$elemMatch: {b: {$ne: null}}}}",
+                    "",
+                    kSimpleCollator,
+                    {entry},
+                    "a.b,a.b",
+                    expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, ElemMatchObjectWithNotEqualNullCanUseIndexMultikeyOnPrefix) {
+    IndexEntry entry{BSON("a.b.c.d" << 1)};
+    entry.multikeyPaths = {{0U}};
+    std::set<size_t> expectedIndices = {0U};
+    const auto query = "{'a.b': {$elemMatch: {'c.d': {$ne: null}}}}";
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+
+    entry.multikeyPaths = {{1U}};
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+
+    entry.multikeyPaths = {{2U}};
+    expectedIndices = {};
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+
+    entry.multikeyPaths = {{3U}};
+    expectedIndices = {};
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest,
+     NestedElemMatchObjectWithNotEqualNullCanUseIndexMultikeyOnAnyPrefix) {
+    IndexEntry entry{BSON("a.b.c.d" << 1)};
+    entry.multikeyPaths = {{0U}};
+    std::set<size_t> expectedIndices = {0U};
+    const auto query = "{a: {$elemMatch: {b: {$elemMatch: {'c.d': {$ne: null}}}}}}";
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+
+    entry.multikeyPaths = {{1U}};
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+
+    entry.multikeyPaths = {{2U}};
+    expectedIndices = {};
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+
+    entry.multikeyPaths = {{3U}};
+    expectedIndices = {};
+    testRateIndices(query, "", kSimpleCollator, {entry}, "a.b.c.d,a.b.c.d", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedIndexShouldNotBeRelevantForNotPredicate) {
+    IndexEntry entry{BSON("a"
+                          << "hashed")};
+    entry.type = IndexType::INDEX_HASHED;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$ne: 4}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedIndexShouldNotBeRelevantForNotEqualsNullPredicate) {
+    IndexEntry entry{BSON("a"
+                          << "hashed")};
+    entry.type = IndexType::INDEX_HASHED;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
+}
 }  // namespace

@@ -103,6 +103,17 @@ struct IndexEntry {
         type = IndexNames::nameToType(IndexNames::findPluginName(keyPattern));
     }
 
+    /**
+     * Returns true if 'indexedField' has any multikey components. For example, returns true if this
+     * index has a multikey component "a", and 'indexedField' is "a.b". Illegal to call unless
+     * 'indexedField' is present in this index's key pattern.
+     *
+     * For indexes created on older versions we may not have path-level multikey information. In
+     * these cases we only have a single boolean to track whether any path in the index is multikey.
+     * If this is the case we defensively return true for any path.
+     */
+    bool pathHasMultikeyComponent(StringData indexedField) const;
+
     bool operator==(const IndexEntry& rhs) const {
         // Indexes are logically equal when names are equal.
         return this->name == rhs.name;

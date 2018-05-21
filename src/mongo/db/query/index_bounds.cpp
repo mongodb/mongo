@@ -192,25 +192,31 @@ void OrderedIntervalList::complement() {
     minBob.appendMinKey("");
     BSONObj minObj = minBob.obj();
 
-    // We complement by scanning the entire range of BSON values
-    // from MinKey to MaxKey. The value from which we must begin
-    // the next complemented interval is kept in 'curBoundary'.
+    // We complement by scanning the entire range of BSON values from MinKey to MaxKey. The value
+    // from which we must begin the next complemented interval is kept in 'curBoundary'.
     BSONElement curBoundary = minObj.firstElement();
 
-    // If 'curInclusive' is true, then 'curBoundary' is
-    // included in one of the original intervals, and hence
-    // should not be included in the complement (and vice-versa
-    // if 'curInclusive' is false).
+    // If 'curInclusive' is true, then 'curBoundary' is included in one of the original intervals,
+    // and hence should not be included in the complement (and vice-versa if 'curInclusive' is
+    // false).
     bool curInclusive = false;
 
-    // We will build up a list of intervals that represents
-    // the inversion of those in the OIL.
+    // We will build up a list of intervals that represents the inversion of those in the OIL.
     vector<Interval> newIntervals;
-    for (size_t j = 0; j < intervals.size(); ++j) {
-        Interval curInt = intervals[j];
-        if (0 != curInt.start.woCompare(curBoundary) || (!curInclusive && !curInt.startInclusive)) {
-            // Make a new interval from 'curBoundary' to
-            // the start of 'curInterval'.
+    for (const auto& curInt : intervals) {
+
+        // There is one special case worth optimizing for: we will generate two point queries for an
+        // equality-to-null predicate like {a: {$eq: null}}. The points are undefined and null, so
+        // when complementing (for {a: {$ne: null}} or similar), we know that there is nothing in
+        // between these two points, and can avoid adding that range.
+        const bool isProvablyEmptyRange =
+            (curBoundary.type() == BSONType::Undefined && curInclusive &&
+             curInt.start.type() == BSONType::jstNULL && curInt.startInclusive);
+
+        if ((0 != curInt.start.woCompare(curBoundary) ||
+             (!curInclusive && !curInt.startInclusive)) &&
+            !isProvablyEmptyRange) {
+            // Make a new interval from 'curBoundary' to the start of 'curInterval'.
             BSONObjBuilder intBob;
             intBob.append(curBoundary);
             intBob.append(curInt.start);

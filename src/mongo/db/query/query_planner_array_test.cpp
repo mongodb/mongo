@@ -2252,4 +2252,211 @@ TEST_F(QueryPlannerTest, CanExplodeMultikeyIndexScanForSortWhenSortFieldsAreNotM
         "{ixscan: {pattern: {a: 1, 'b.c': 1}, filter: null,"
         "bounds: {a: [[2,2,true,true]], 'b.c': [['MinKey','MaxKey',true,true]]}}}]}}}}");
 }
+
+TEST_F(QueryPlannerTest, ElemMatchValueNENull) {
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$elemMatch: {$ne: null}}}"));
+
+    // We can't use the index because we would exclude {a: []} which should match.
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$elemMatch: {$ne: null}}}, node: {"
+        "  ixscan: {pattern: {a:1}, bounds: {"
+        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchObjectNENull) {
+    addIndex(BSON("a.b" << 1));
+    runQuery(fromjson("{a: {$elemMatch: {b: {$ne: null}}}}"));
+
+    // We can't use the index because we would exclude {"a.b": []} which should match.
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$elemMatch: {b: {$ne: null}}}}, node: {"
+        "  ixscan: {pattern: {'a.b':1}, bounds: {"
+        "    'a.b': [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NENullOnMultikeyIndex) {
+    // true means multikey
+    addIndex(BSON("a" << 1), true);
+    runQuery(fromjson("{a: {$ne: null}}"));
+
+    // We can't use the index because we would exclude {a: []} which should match.
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchValueNENullOnMultikeyIndex) {
+    // true means multikey
+    addIndex(BSON("a" << 1), true);
+    runQuery(fromjson("{a: {$elemMatch: {$ne: null}}}"));
+
+    // We should be able to use the index because of the value $elemMatch.
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$elemMatch: {$ne: null}}}, node: {"
+        "  ixscan: {pattern: {a: 1}, bounds: {"
+        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchObjectNENullOnMultikeyIndex) {
+    // true means multikey
+    addIndex(BSON("a.b" << 1), true);
+    runQuery(fromjson("{a: {$elemMatch: {b: {$ne: null}}}}"));
+
+    // We can't use the index because we would exclude {a: [{b: []}]} which should match.
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchObjectNENullWithSuffixOfElemMatchMultiKey) {
+    MultikeyPaths multikeyPaths{{0U, 1U}};
+    addIndex(BSON("a.b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: {$ne: null}}}}"));
+
+    // We can't use the index because we would exclude {a: [{b: []}]} which should match.
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerTest, ElemMatchObjectNENullWithPrefixOfElemMatchMultiKey) {
+    MultikeyPaths multikeyPaths{{0U}};
+    addIndex(BSON("a.b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: {$elemMatch: {b: {$ne: null}}}}"));
+
+    // We should be able to use the index since only 'a' is multikey.
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$elemMatch: {b: {$ne: null}}}}, node: {"
+        "  ixscan: {pattern: {'a.b': 1}, bounds: {"
+        "    'a.b': [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullWithProjectionMultiKeyOnOtherPath) {
+    MultikeyPaths multikeyPaths{{0U}, {}};
+    addIndex(BSON("a" << 1 << "c.d" << 1), multikeyPaths);
+    runQuerySortProj(fromjson("{'a': {$gt: 'foo'}, 'c.d': {$ne: null}}"),
+                     BSONObj(),
+                     fromjson("{_id: 0, 'c.d': 1}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, 'c.d': 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'c.d': 1}, node: {"
+        "  ixscan: {filter: null, pattern: {'a': 1, 'c.d': 1}, bounds: {"
+        "    'a': [['foo',{},false,false]], "
+        "    'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
+TEST_F(QueryPlannerTest,
+       CompoundIndexBoundsElemMatchObjectEqualsNullWithProjectionMultiKeyOnOtherPath) {
+    MultikeyPaths multikeyPaths{{0U}, {}};
+    addIndex(BSON("a" << 1 << "c.d" << 1), multikeyPaths);
+    runQuerySortProj(fromjson("{'a': {$gt: 'foo'}, c: {$elemMatch: {d: {$ne: null}}}}"),
+                     BSONObj(),
+                     fromjson("{_id: 0, 'c.d': 1}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, 'c.d': 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'c.d': 1}, node: {"
+        "  fetch: {filter: {c: {$elemMatch: {d: {$ne: null}}}}, node: {"
+        "    ixscan: {filter: null, pattern: {'a': 1, 'c.d': 1}, bounds: {"
+        "      a: [['foo',{},false,false]], "
+        "      'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]"
+        "}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullMultiKey) {
+    const bool isMultiKey = true;
+    addIndex(BSON("a.b" << 1 << "c.d" << 1), isMultiKey);
+    runQuery(fromjson("{'a.b': {$gt: 'foo'}, 'c.d': {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {"
+        "  filter: {'c.d': {$ne: null}},"
+        "  node: {ixscan: {"
+        "    filter: null,"
+        "    pattern: {'a.b': 1, 'c.d': 1},"
+        "    bounds: {"
+        "      'a.b': [['foo',{},false,false]], "
+        "      'c.d':[['MinKey','MaxKey',true,true]]"
+        "    }"
+        "  }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullMultiKeyPaths) {
+    const MultikeyPaths multikeyPaths = {{}, {0}};  // 'c' is multikey.
+    addIndex(BSON("a.b" << 1 << "c.d" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': {$gt: 'foo'}, 'c.d': {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {"
+        "  filter: {'c.d': {$ne: null}},"
+        "  node: {ixscan: {"
+        "    filter: null,"
+        "    pattern: {'a.b': 1, 'c.d': 1},"
+        "    bounds: {"
+        "      'a.b': [['foo',{},false,false]], "
+        "      'c.d':[['MinKey','MaxKey',true,true]]"
+        "    }"
+        "  }}"
+        "}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullMultiKeyWithProjection) {
+    const bool isMultiKey = true;
+    addIndex(BSON("a.b" << 1 << "c.d" << 1), isMultiKey);
+    runQuerySortProj(fromjson("{'a.b': {$gt: 'foo'}, 'c.d': {$ne: null}}"),
+                     BSONObj(),
+                     fromjson("{_id: 0, 'c.d': 1}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, 'c.d': 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'c.d': 1}, node: {"
+        "fetch: {filter: {'c.d': {$ne: null}}, node: {ixscan: {filter: null, pattern: "
+        "{'a.b': 1, 'c.d': 1}, bounds: {'a.b': [['foo',{},false,false]], "
+        "'c.d':[['MinKey','MaxKey',true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsNotEqualsNullReverseIndex) {
+    addIndex(BSON("a" << 1 << "b" << -1 << "c" << 1));
+    runQuery(fromjson("{a: {$gt: 'foo'}, b: {$ne: null}, c: {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {"
+        "  filter: null,"
+        "  node: {"
+        "    ixscan: {"
+        "      filter: null, "
+        "      pattern: {a: 1, b: -1, c: 1},"
+        "      bounds: {"
+        "        a: [['foo', {}, false, false]],"
+        "        b: [['MaxKey', null, true, false], [undefined, 'MinKey', false, true]],"
+        "        c: [['MinKey', undefined, true, false], [null, 'MaxKey', false, true]]"
+        "      },"
+        "      dir: 1"
+        "    }"
+        "  }"
+        "}}");
+}
+
 }  // namespace

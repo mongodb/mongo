@@ -45,6 +45,7 @@
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -90,6 +91,31 @@ bool stringMayHaveUnescapedPipe(StringData str) {
     return false;
 }
 
+const BSONObj kUndefinedElementObj = BSON("" << BSONUndefined);
+const BSONObj kNullElementObj = BSON("" << BSONNULL);
+
+const Interval kHashedUndefinedInterval = IndexBoundsBuilder::makePointInterval(
+    ExpressionMapping::hash(kUndefinedElementObj.firstElement()));
+const Interval kHashedNullInterval =
+    IndexBoundsBuilder::makePointInterval(ExpressionMapping::hash(kNullElementObj.firstElement()));
+
+void makeNullEqualityBounds(const IndexEntry& index,
+                            bool isHashed,
+                            OrderedIntervalList* oil,
+                            IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+    // An equality to null predicate cannot be covered because the index does not distinguish
+    // between the lack of a value and the literal value null.
+    *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
+
+    // There are two values that could possibly be equal to null in an index: undefined and null.
+    oil->intervals.push_back(isHashed
+                                 ? kHashedUndefinedInterval
+                                 : IndexBoundsBuilder::makePointInterval(kUndefinedElementObj));
+    oil->intervals.push_back(isHashed ? kHashedNullInterval
+                                      : IndexBoundsBuilder::makePointInterval(kNullElementObj));
+    // Just to be sure, make sure the bounds are in the right order if the hash values are opposite.
+    IndexBoundsBuilder::unionize(oil);
+}
 }  // namespace
 
 string IndexBoundsBuilder::simpleRegex(const char* regex,
@@ -355,12 +381,23 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         translate(child, elt, index, oilOut, tightnessOut);
         oilOut->complement();
 
-        // If the index is multikey, it doesn't matter what the tightness of the child is, we must
-        // return INEXACT_FETCH. Consider a multikey index on 'a' with document {a: [1, 2, 3]} and
-        // query {a: {$ne: 3}}.  If we treated the bounds [MinKey, 3), (3, MaxKey] as exact, then we
-        // would erroneously return the document!
-        if (index.multikey) {
-            *tightnessOut = INEXACT_FETCH;
+        // Until the index distinguishes between missing values and literal null values, we cannot
+        // build exact bounds for equality predicates on the literal value null. However, we _can_
+        // build exact bounds for the inverse, for example the query {a: {$ne: null}}.
+        if (MatchExpression::EQ == child->matchType() &&
+            static_cast<ComparisonMatchExpression*>(child)->getData().type() == BSONType::jstNULL) {
+            // We don't expect to try to use a sparse index for $ne: null. While this should be
+            // correct, it is not currently supported.
+            invariant(!index.sparse);
+            *tightnessOut = IndexBoundsBuilder::EXACT;
+        }
+
+        // If the index is multikey on this path, it doesn't matter what the tightness of the child
+        // is, we must return INEXACT_FETCH. Consider a multikey index on 'a' with document
+        // {a: [1, 2, 3]} and query {a: {$ne: 3}}. If we treated the bounds [MinKey, 3), (3, MaxKey]
+        // as exact, then we would erroneously return the document!
+        if (index.pathHasMultikeyComponent(elt.fieldNameStringData())) {
+            *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
     } else if (MatchExpression::EXISTS == expr->matchType()) {
         oilOut->intervals.push_back(allValues());
@@ -862,9 +899,15 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
                                            bool isHashed,
                                            OrderedIntervalList* oil,
                                            BoundsTightness* tightnessOut) {
+    if (BSONType::jstNULL == data.type()) {
+        // An equality to null query is special. It should return both undefined and null values, so
+        // is not a point query.
+        return makeNullEqualityBounds(index, isHashed, oil, tightnessOut);
+    }
+
     // We have to copy the data out of the parse tree and stuff it into the index
     // bounds.  BSONValue will be useful here.
-    if (Array != data.type()) {
+    if (BSONType::Array != data.type()) {
         BSONObj dataObj = objFromElement(data, index.collator);
         if (isHashed) {
             dataObj = ExpressionMapping::hash(dataObj.firstElement());
@@ -873,7 +916,7 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
         verify(dataObj.isOwned());
         oil->intervals.push_back(makePointInterval(dataObj));
 
-        if (dataObj.firstElement().isNull() || isHashed) {
+        if (isHashed) {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         } else {
             *tightnessOut = IndexBoundsBuilder::EXACT;

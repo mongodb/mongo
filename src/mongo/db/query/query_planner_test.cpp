@@ -2478,8 +2478,8 @@ TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndexForEqualityToNull) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: "
-        "{filter: null, pattern: {a: 1}, bounds: {a: [[null,null,true,true]]}}}}}");
+        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: {filter: null, pattern: "
+        "{a: 1}, bounds: {a: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
 }
 
 //
@@ -2932,6 +2932,65 @@ TEST_F(QueryPlannerTest, NEOnMultikeyIndex) {
         "[3,'MaxKey',false,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, NENull) {
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, bounds: {a: "
+        "[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NENullWithSort) {
+    addIndex(BSON("a" << 1));
+    runQuerySortProj(fromjson("{a: {$ne: null}}"), BSON("a" << 1), BSONObj());
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{sort: {"
+        "  pattern: {a: 1},"
+        "  limit: 0,"
+        "  node: {"
+        "    sortKeyGen: {"
+        "      node: {"
+        "        cscan: {"
+        "          filter: {a: {$ne: null}}, "
+        "          dir: 1"
+        "        }}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
+        "bounds: {a: [['MinKey',undefined,true,false],"
+        "[null,'MaxKey',false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NENullWithProjection) {
+    addIndex(BSON("a" << 1));
+    runQuerySortProj(fromjson("{a: {$ne: null}}"), BSONObj(), BSON("_id" << 0 << "a" << 1));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {pattern: {a:1}, "
+        "bounds: {a: [['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NENullWithSortAndProjection) {
+    addIndex(BSON("a" << 1));
+    runQuerySortProj(fromjson("{a: {$ne: null}}"), BSON("a" << 1), BSON("_id" << 0 << "a" << 1));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {sort: {pattern: {a: 1}, limit: 0, node: {sortKeyGen: "
+        "{node: {cscan: {dir: 1}}}}}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {"
+        "  ixscan: {pattern: {a:1}, bounds: {"
+        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
 // In general, a negated $nin can make use of an index.
 TEST_F(QueryPlannerTest, NinUsesMultikeyIndex) {
     // true means multikey
@@ -3025,6 +3084,46 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsStringBounds) {
         "b:[['bar',{},true,false]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, CompoundIndexBoundsNotEqualsNull) {
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQuery(fromjson("{a: {$gt: 'foo'}, b: {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: "
+        "{a: 1, b: 1}, bounds: {a: [['foo',{},false,false]], "
+        "b:[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNull) {
+    addIndex(BSON("a.b" << 1 << "c.d" << 1));
+    runQuery(fromjson("{'a.b': {$gt: 'foo'}, 'c.d': {$ne: null}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: "
+        "{'a.b': 1, 'c.d': 1}, bounds: {'a.b': [['foo',{},false,false]], "
+        "'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullWithProjection) {
+    addIndex(BSON("a.b" << 1 << "c.d" << 1));
+    runQuerySortProj(fromjson("{'a.b': {$gt: 'foo'}, 'c.d': {$ne: null}}"),
+                     BSONObj(),
+                     fromjson("{_id: 0, 'c.d': 1}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, 'c.d': 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, 'c.d': 1}, node: {"
+        "  ixscan: {filter: null, pattern: {'a.b': 1, 'c.d': 1}, bounds: {"
+        "    'a.b': [['foo',{},false,false]], "
+        "    'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]"
+        "}}}}}");
+}
+
 TEST_F(QueryPlannerTest, IndexBoundsAndWithNestedOr) {
     addIndex(BSON("a" << 1));
     runQuery(fromjson("{$and: [{a: 1, $or: [{a: 2}, {a: 3}]}]}"));
@@ -3104,7 +3203,7 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsIntersectRanges) {
 // predicates (SERVER-13890).
 TEST_F(QueryPlannerTest, IndexBoundsOrOfNegations) {
     addIndex(BSON("a" << 1));
-    runQuery(fromjson("{$or: [{a: {$ne: 3}}, {a: {$ne: 4}}]}"));
+    runQuery(fromjson("{$or: [{a: {$ne: null}}, {a: {$ne: 4}}]}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
@@ -4555,6 +4654,22 @@ TEST_F(QueryPlannerTest, ContainedOrNot) {
         "true, false], [5, 'MaxKey', false, true]]}}},"
         "{ixscan: {pattern: {c: 1, a: 1}, bounds: {c: [[7, 7, true, true]], a: [['MinKey', 5, "
         "true, false], [5, 'MaxKey', false, true]]}}}"
+        "]}}}}");
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, ContainedOrNotEqualsNull) {
+    addIndex(BSON("b" << 1 << "a" << 1));
+    addIndex(BSON("c" << 1 << "a" << 1));
+
+    runQuery(fromjson("{$and: [{$nor: [{a: null}]}, {$or: [{b: 6}, {c: 7}]}]}"));
+    assertNumSolutions(2);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {or: {nodes: ["
+        "{ixscan: {pattern: {b: 1, a: 1}, bounds: {b: [[6, 6, true, true]], a: [['MinKey', "
+        "undefined, true, false], [null, 'MaxKey', false, true]]}}},"
+        "{ixscan: {pattern: {c: 1, a: 1}, bounds: {c: [[7, 7, true, true]], a: [['MinKey', "
+        "undefined, true, false], [null, 'MaxKey', false, true]]}}}"
         "]}}}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }

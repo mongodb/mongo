@@ -63,4 +63,21 @@ std::string IndexEntry::toString() const {
     return sb.str();
 }
 
+bool IndexEntry::pathHasMultikeyComponent(StringData indexedField) const {
+    if (multikeyPaths.empty()) {
+        // The index has no path-level multikeyness metadata.
+        return multikey;
+    }
+
+    size_t pos = 0;
+    for (auto&& key : keyPattern) {
+        if (key.fieldNameStringData() == indexedField) {
+            return !multikeyPaths[pos].empty();
+        }
+        ++pos;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

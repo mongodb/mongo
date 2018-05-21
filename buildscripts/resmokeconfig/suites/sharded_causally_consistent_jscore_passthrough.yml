@@ -151,7 +151,6 @@ selector:
   - jstests/core/geo_distinct.js
   - jstests/core/geo_s2ordering.js
   - jstests/core/nan.js
-  - jstests/core/null2.js
   - jstests/core/not2.js
   - jstests/core/sorta.js
   - jstests/core/sortc.js

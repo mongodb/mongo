@@ -1,7 +1,7 @@
 (function() {
     "use strict";
 
-    const coll = db.null2;
+    const coll = db.dotted_path_in_null;
     coll.drop();
 
     assert.writeOK(coll.insert({_id: 1, a: [{b: 5}]}));
@@ -16,13 +16,8 @@
         return ids;
     }
 
-    const queries = [{"a.b": null}, {"a.b": {$in: [null]}}];
-    for (let query of queries) {
-        assert.eq([2, 4], getIds(query), "Did not match the expected documents");
-    }
+    assert.eq([2, 4], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");
 
     assert.commandWorked(coll.createIndex({"a.b": 1}));
-    for (let query of queries) {
-        assert.eq([2, 4], getIds(query), "Did not match the expected documents");
-    }
+    assert.eq([2, 4], getIds({"a.b": {$in: [null]}}), "Did not match the expected documents");
 }());

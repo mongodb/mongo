@@ -33,34 +33,38 @@ function anyEq(al, ar, v) {
     if (al instanceof Array) {
         if (!(ar instanceof Array)) {
             if (v)
-                print('anyEq: ar is not an array ' + ar);
+                print('anyEq: ar is not an array ' + tojson(ar));
             return false;
         }
 
         if (!arrayEq(al, ar, v)) {
             if (v)
-                print('anyEq: arrayEq(al, ar): false; al=' + al + ' ar=' + ar);
+                print(`anyEq: arrayEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
             return false;
         }
     } else if (al instanceof Object) {
-        if (!(ar instanceof Object)) {
+        // Be sure to explicitly check for Arrays, since Arrays are considered instances of Objects,
+        // and we do not want to consider [] to be equal to {}.
+        if (!(ar instanceof Object) || (ar instanceof Array)) {
             if (v)
-                print('anyEq: ar is not an object ' + ar);
+                print('anyEq: ar is not an object ' + tojson(ar));
             return false;
         }
 
         if (!documentEq(al, ar, v)) {
             if (v)
-                print('anyEq: documentEq(al, ar): false; al=' + al + ' ar=' + ar);
+                print(`anyEq: documentEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
             return false;
         }
     } else if (al != ar) {
         if (v)
-            print('anyEq: (al != ar): false; al=' + al + ' ar=' + ar);
+            print(`anyEq: (al != ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
         return false;
     }
 
     /* if we got here, they matched */
+    if (v)
+        print(`anyEq: these are equal: ${tojson(al)} == ${tojson(ar)}`);
     return true;
 }
 
@@ -76,12 +80,12 @@ function documentEq(dl, dr, v) {
     /* make sure these are both objects */
     if (!(dl instanceof Object)) {
         if (v)
-            print('documentEq:  dl is not an object ' + dl);
+            print('documentEq:  dl is not an object ' + tojson(dl));
         return false;
     }
     if (!(dr instanceof Object)) {
         if (v)
-            print('documentEq:  dr is not an object ' + dr);
+            print('documentEq:  dr is not an object ' + tojson(dr));
         return false;
     }
 
@@ -121,6 +125,8 @@ function documentEq(dl, dr, v) {
     }
 
     /* if we got here, the two documents are an exact match */
+    if (v)
+        print(`documentEq: these are equal: ${tojson(dl)} == ${tojson(dr)}`);
     return true;
 }
 
@@ -131,19 +137,19 @@ function arrayEq(al, ar, v) {
     /* check that these are both arrays */
     if (!(al instanceof Array)) {
         if (v)
-            print('arrayEq: al is not an array: ' + al);
+            print('arrayEq: al is not an array: ' + tojson(al));
         return false;
     }
 
     if (!(ar instanceof Array)) {
         if (v)
-            print('arrayEq: ar is not an array: ' + ar);
+            print('arrayEq: ar is not an array: ' + tojson(ar));
         return false;
     }
 
     if (al.length != ar.length) {
         if (v)
-            print('arrayEq: array lengths do not match: ' + al + ', ' + ar);
+            print(`arrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
         return false;
     }
 
@@ -194,7 +200,7 @@ function resultsEq(rl, rr, v) {
 
     if (rl.length != rr.length) {
         if (v)
-            print('resultsEq:  array lengths do not match ' + rl + ', ' + rr);
+            print(`resultsEq:  array lengths do not match ${tojson(rl)}, ${tojson(rr)}`);
         return false;
     }
 
@@ -222,7 +228,7 @@ function resultsEq(rl, rr, v) {
         if (!foundIt) {
             /* if we got here, we didn't find this item */
             if (v)
-                print('resultsEq: search target missing index:  ' + i);
+                print(`resultsEq: search target missing index ${i} (${tojson(rl[i])})`);
             return false;
         }
     }
@@ -235,7 +241,7 @@ function resultsEq(rl, rr, v) {
 function orderedArrayEq(al, ar, v) {
     if (al.length != ar.length) {
         if (v)
-            print('orderedArrayEq:  array lengths do not match ' + al + ', ' + ar);
+            print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
         return false;
     }
 

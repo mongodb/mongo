@@ -122,8 +122,7 @@ bool intervalMatches(const BSONObj& testInt, const Interval trueInt) {
     appendIntervalBound(bob, low);
     appendIntervalBound(bob, high);
     Interval toCompare(bob.obj(), startInclusive, endInclusive);
-
-    return Interval::INTERVAL_EQUALS == trueInt.compare(toCompare);
+    return trueInt.equals(toCompare);
 }
 
 /**

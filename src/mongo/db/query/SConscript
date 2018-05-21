@@ -18,8 +18,6 @@ env.Library(
     target='query_planner',
     source=[
         "canonical_query.cpp",
-        "query_settings.cpp",
-        "index_entry.cpp",
         "index_tag.cpp",
         "parsed_projection.cpp",
         "plan_cache.cpp",
@@ -29,7 +27,14 @@ env.Library(
         "planner_analysis.cpp",
         "planner_ixselect.cpp",
         "query_planner.cpp",
+        "expression_index.cpp",
+        "expression_index_knobs.cpp",
+        "index_bounds.cpp",
+        "index_bounds_builder.cpp",
+        "index_entry.cpp",
+        "interval.cpp",
         "query_planner_common.cpp",
+        "query_settings.cpp",
         "query_solution.cpp",
     ],
     LIBDEPS=[
@@ -38,11 +43,11 @@ env.Library(
         "$BUILD_DIR/mongo/db/index/expression_params",
         "$BUILD_DIR/mongo/db/index_names",
         "$BUILD_DIR/mongo/db/matcher/expressions",
+        "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/server_parameters",
-        "collation/collator_interface",
         "collation/collator_factory_interface",
+        "collation/collator_interface",
         "command_request_response",
-        "index_bounds",
         "query_knobs",
     ],
 )
@@ -121,26 +126,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/db/service_context_d",
         "$BUILD_DIR/mongo/dbtests/mocklib",
-    ],
-)
-
-env.Library(
-    target="index_bounds",
-    source=[
-        "expression_index.cpp",
-        "expression_index_knobs.cpp",
-        "index_bounds.cpp",
-        "index_bounds_builder.cpp",
-        "interval.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/index/expression_params",
-        "$BUILD_DIR/mongo/db/index_names",
-        "$BUILD_DIR/mongo/db/matcher/expressions",
-        "$BUILD_DIR/mongo/db/mongohasher",
-        "$BUILD_DIR/mongo/db/server_parameters",
-        "collation/collator_interface",
     ],
 )
 
@@ -258,32 +243,15 @@ env.CppUnitTest(
 env.CppUnitTest(
     target="index_bounds_test",
     source=[
-        "index_bounds_test.cpp"
-    ],
-    LIBDEPS=[
-        "index_bounds",
-    ],
-)
-
-env.CppUnitTest(
-    target="index_bounds_builder_test",
-    source=[
-        "index_bounds_builder_test.cpp"
-    ],
-    LIBDEPS=[
-        "collation/collator_interface_mock",
-        "index_bounds",
-        "query_test_service_context",
-    ],
-)
-
-env.CppUnitTest(
-    target="interval_test",
-    source=[
+        "index_bounds_builder_test.cpp",
+        "index_bounds_test.cpp",
+        "index_entry_test.cpp",
         "interval_test.cpp"
     ],
     LIBDEPS=[
-        "index_bounds",
+        "collation/collator_interface_mock",
+        "query_planner",
+        "query_test_service_context",
     ],
 )
 
