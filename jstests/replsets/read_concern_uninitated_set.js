@@ -4,6 +4,13 @@
  */
 (function() {
     "use strict";
+    // For supportsMajorityReadConcern().
+    load("jstests/multiVersion/libs/causal_consistency_helpers.js");
+
+    if (!supportsMajorityReadConcern()) {
+        jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        return;
+    }
 
     const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
