@@ -317,9 +317,12 @@ void FreeMonProcessor::doServerRegister(
     Client* client, const FreeMonMessageWithPayload<FreeMonMessageType::RegisterServer>* msg) {
 
     // If we are asked to register now, then kick off a registration request
-    if (msg->getPayload().first == RegistrationType::RegisterOnStart) {
+    const auto regType = msg->getPayload().first;
+    if (regType == RegistrationType::RegisterOnStart) {
         enqueue(FreeMonRegisterCommandMessage::createNow(msg->getPayload().second));
-    } else if (msg->getPayload().first == RegistrationType::RegisterAfterOnTransitionToPrimary) {
+    } else {
+        invariant((regType == RegistrationType::RegisterAfterOnTransitionToPrimary) ||
+                  (regType == RegistrationType::RegisterAfterOnTransitionToPrimaryIfEnabled));
         // Check if we need to wait to become primary:
         // If the 'admin.system.version' has content, do not wait and just re-register
         // If the collection is empty, wait until we become primary
@@ -336,7 +339,7 @@ void FreeMonProcessor::doServerRegister(
         // 2. a standalone which has never been registered
         //
         if (!state.is_initialized()) {
-            _registerOnTransitionToPrimary = true;
+            _registerOnTransitionToPrimary = regType;
         } else {
             // We are standalone, if we have a registration id, then send a registration
             // notification, else wait for the user to register us
@@ -344,8 +347,6 @@ void FreeMonProcessor::doServerRegister(
                 enqueue(FreeMonRegisterCommandMessage::createNow(msg->getPayload().second));
             }
         }
-    } else {
-        MONGO_UNREACHABLE;
     }
 
     // Enqueue the first metrics gather unless we are not going to register
@@ -870,12 +871,19 @@ void FreeMonProcessor::getStatus(OperationContext* opCtx,
 }
 
 void FreeMonProcessor::doOnTransitionToPrimary(Client* client) {
-    if (_registerOnTransitionToPrimary) {
+    if (_registerOnTransitionToPrimary == RegistrationType::RegisterAfterOnTransitionToPrimary) {
         enqueue(FreeMonRegisterCommandMessage::createNow(std::vector<std::string>()));
 
-        // On transition to primary once
-        _registerOnTransitionToPrimary = false;
+    } else if (_registerOnTransitionToPrimary ==
+               RegistrationType::RegisterAfterOnTransitionToPrimaryIfEnabled) {
+        readState(client);
+        if (_state->getState() == StorageStateEnum::enabled) {
+            enqueue(FreeMonRegisterCommandMessage::createNow(std::vector<std::string>()));
+        }
     }
+
+    // On transition to primary once
+    _registerOnTransitionToPrimary = RegistrationType::DoNotRegister;
 }
 
 void FreeMonProcessor::processInMemoryStateChange(const FreeMonStorageState& originalState,

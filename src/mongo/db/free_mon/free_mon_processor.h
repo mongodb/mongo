@@ -471,7 +471,7 @@ private:
     boost::synchronized_value<boost::optional<FreeMonStorageState>> _lastReadState;
 
     // When we change to primary, do we register?
-    bool _registerOnTransitionToPrimary{false};
+    RegistrationType _registerOnTransitionToPrimary{RegistrationType::DoNotRegister};
 
     // Pending update to disk
     boost::synchronized_value<FreeMonStorageState> _state;

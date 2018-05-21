@@ -357,7 +357,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
             registrationType = RegistrationType::RegisterOnStart;
         }
     } else if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kRuntime) {
-        registrationType = RegistrationType::RegisterAfterOnTransitionToPrimary;
+        registrationType = RegistrationType::RegisterAfterOnTransitionToPrimaryIfEnabled;
     }
 
     controllerPtr->start(registrationType, globalFreeMonParams.freeMonitoringTags);
