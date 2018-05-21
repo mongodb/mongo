@@ -36,9 +36,6 @@
     assert.commandWorked(
         db.adminCommand({"setParameter": 1, transactionLifetimeLimitSeconds: 60 * 60 * 3}));
 
-    TestData.sessionId = assert.commandWorked(adminDB.runCommand({startSession: 1})).id;
-    TestData.txnNumber = 0;
-
     // Set 'internalQueryExecYieldIterations' to 2 to ensure that commands yield on the second try
     // (i.e. after they have established a snapshot but before they have returned any documents).
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 2}));
@@ -205,54 +202,43 @@
 
     // Test find.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            find: "coll",
-            filter: {x: 1},
-            readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(sessionDb.runCommand({find: "coll", filter: {x: 1}}));
+        session.commitTransaction();
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.filter": {x: 1}});
 
     // Test getMore on a find established cursor.
     testCommand(function() {
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
         const initialFindBatchSize = 2;
         const cursorId = assert
-                             .commandWorked(db.runCommand({
-                                 find: "coll",
-                                 filter: {x: 1},
-                                 batchSize: initialFindBatchSize,
-                                 readConcern: {level: "snapshot"},
-                                 lsid: TestData.sessionId,
-                                 txnNumber: NumberLong(TestData.txnNumber)
-                             }))
+                             .commandWorked(sessionDb.runCommand(
+                                 {find: "coll", filter: {x: 1}, batchSize: initialFindBatchSize}))
                              .cursor.id;
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
-        const res = assert.commandWorked(db.runCommand({
-            getMore: NumberLong(cursorId),
-            collection: "coll",
-            batchSize: TestData.numDocs,
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const res = assert.commandWorked(sessionDb.runCommand(
+            {getMore: NumberLong(cursorId), collection: "coll", batchSize: TestData.numDocs}));
+        session.commitTransaction();
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"originatingCommand.filter": {x: 1}});
 
     // Test aggregate.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            aggregate: "coll",
-            pipeline: [{$match: {x: 1}}],
-            readConcern: {level: "snapshot"},
-            cursor: {},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(
+            sessionDb.runCommand({aggregate: "coll", pipeline: [{$match: {x: 1}}], cursor: {}}));
+        session.commitTransaction();
         assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
     }, {"command.pipeline": [{$match: {x: 1}}]});
 
@@ -260,12 +246,13 @@
     // reads since this command is not supported with transaction api.
     // Test geoNear.
     testCommand(function() {
+        const sessionId = db.getMongo().startSession({causalConsistency: false}).getSessionId();
         const res = assert.commandWorked(db.runCommand({
             geoNear: "coll",
             near: [0, 0],
             readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
+            lsid: sessionId,
+            txnNumber: NumberLong(0)
         }));
         assert(res.hasOwnProperty("results"));
         assert.eq(res.results.length, TestData.numDocs, tojson(res));
@@ -274,63 +261,57 @@
     // Test getMore with an initial find batchSize of 0. Interrupt behavior of a getMore is not
     // expected to change with a change of batchSize in the originating command.
     testCommand(function() {
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "off"}));
         const initialFindBatchSize = 0;
         const cursorId = assert
-                             .commandWorked(db.runCommand({
-                                 find: "coll",
-                                 filter: {x: 1},
-                                 batchSize: initialFindBatchSize,
-                                 readConcern: {level: "snapshot"},
-                                 lsid: TestData.sessionId,
-                                 txnNumber: NumberLong(TestData.txnNumber)
-                             }))
+                             .commandWorked(sessionDb.runCommand(
+                                 {find: "coll", filter: {x: 1}, batchSize: initialFindBatchSize}))
                              .cursor.id;
         assert.commandWorked(db.adminCommand(
             {configureFailPoint: "setInterruptOnlyPlansCheckForInterruptHang", mode: "alwaysOn"}));
-        const res = assert.commandWorked(db.runCommand({
-            getMore: NumberLong(cursorId),
-            collection: "coll",
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const res = assert.commandWorked(
+            sessionDb.runCommand({getMore: NumberLong(cursorId), collection: "coll"}));
+        session.commitTransaction();
         assert.eq(
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"originatingCommand.filter": {x: 1}});
 
     // Test count.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            count: "coll",
-            query: {_id: {$ne: 0}},
-            readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res =
+            assert.commandWorked(sessionDb.runCommand({count: "coll", query: {_id: {$ne: 0}}}));
+        session.commitTransaction();
         assert.eq(res.n, 3, tojson(res));
     }, {"command.count": "coll"});
 
     // Test distinct.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            distinct: "coll",
-            key: "_id",
-            readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(sessionDb.runCommand({distinct: "coll", key: "_id"}));
+        session.commitTransaction();
         assert(res.hasOwnProperty("values"));
         assert.eq(res.values.length, 4, tojson(res));
     }, {"command.distinct": "coll"});
 
+    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
+    // reads since this command is not supported with transaction api.
     // Test group.
     testCommand(function() {
+        const sessionId = db.getMongo().startSession({causalConsistency: false}).getSessionId();
         const res = assert.commandWorked(db.runCommand({
             group: {ns: "coll", key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}},
             readConcern: {level: "snapshot"},
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
+            lsid: sessionId,
+            txnNumber: NumberLong(0)
         }));
         assert(res.hasOwnProperty("count"), tojson(res));
         assert.eq(res.count, 4);
@@ -338,24 +319,15 @@
 
     // Test update.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(sessionDb.runCommand({
             update: "coll",
             updates:
-                [{q: {}, u: {$set: {updated: true}}}, {q: {new: 1}, u: {$set: {updated: true}}}],
-            readConcern: {level: "snapshot"},
-            startTransaction: true,
-            autocommit: false,
-            stmtId: NumberInt(0),
-            lsid: TestData.sessionId,
-            txnNumber: NumberLong(TestData.txnNumber)
+                [{q: {}, u: {$set: {updated: true}}}, {q: {new: 1}, u: {$set: {updated: true}}}]
         }));
-        assert.commandWorked(db.adminCommand({
-            commitTransaction: 1,
-            autocommit: false,
-            lsid: TestData.sessionId,
-            stmtId: NumberInt(1),
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        session.commitTransaction();
         // Only update one existing doc committed before the transaction.
         assert.eq(res.n, 1, tojson(res));
         assert.eq(res.nModified, 1, tojson(res));
@@ -363,71 +335,36 @@
 
     // Test delete.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            delete: "coll",
-            deletes: [{q: {}, limit: 1}, {q: {new: 1}, limit: 1}],
-            readConcern: {level: "snapshot"},
-            startTransaction: true,
-            autocommit: false,
-            txnNumber: NumberLong(TestData.txnNumber),
-            stmtId: NumberInt(0),
-            lsid: TestData.sessionId
-        }));
-        assert.commandWorked(db.adminCommand({
-            commitTransaction: 1,
-            autocommit: false,
-            lsid: TestData.sessionId,
-            stmtId: NumberInt(1),
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(sessionDb.runCommand(
+            {delete: "coll", deletes: [{q: {}, limit: 1}, {q: {new: 1}, limit: 1}]}));
+        session.commitTransaction();
         // Only remove one existing doc committed before the transaction.
         assert.eq(res.n, 1, tojson(res));
     }, {op: "remove"}, true);
 
     // Test findAndModify.
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            findAndModify: "coll",
-            query: {new: 1},
-            update: {$set: {findAndModify: 1}},
-            readConcern: {level: "snapshot"},
-            startTransaction: true,
-            autocommit: false,
-            txnNumber: NumberLong(TestData.txnNumber),
-            stmtId: NumberInt(0),
-            lsid: TestData.sessionId,
-        }));
-        assert.commandWorked(db.adminCommand({
-            commitTransaction: 1,
-            autocommit: false,
-            lsid: TestData.sessionId,
-            stmtId: NumberInt(1),
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(sessionDb.runCommand(
+            {findAndModify: "coll", query: {new: 1}, update: {$set: {findAndModify: 1}}}));
+        session.commitTransaction();
         assert(res.hasOwnProperty("lastErrorObject"));
         assert.eq(res.lastErrorObject.n, 0, tojson(res));
         assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
     }, {"command.findAndModify": "coll"}, true);
 
     testCommand(function() {
-        const res = assert.commandWorked(db.runCommand({
-            findAndModify: "coll",
-            query: {new: 1},
-            update: {$set: {findAndModify: 1}},
-            readConcern: {level: "snapshot"},
-            startTransaction: true,
-            autocommit: false,
-            txnNumber: NumberLong(TestData.txnNumber),
-            stmtId: NumberInt(0),
-            lsid: TestData.sessionId,
-        }));
-        assert.commandWorked(db.adminCommand({
-            commitTransaction: 1,
-            autocommit: false,
-            lsid: TestData.sessionId,
-            stmtId: NumberInt(1),
-            txnNumber: NumberLong(TestData.txnNumber)
-        }));
+        const session = db.getMongo().startSession({causalConsistency: false});
+        const sessionDb = session.getDatabase("test");
+        session.startTransaction({readConcern: {level: "snapshot"}});
+        const res = assert.commandWorked(sessionDb.runCommand(
+            {findAndModify: "coll", query: {new: 1}, update: {$set: {findAndModify: 1}}}));
+        session.commitTransaction();
         assert(res.hasOwnProperty("lastErrorObject"));
         assert.eq(res.lastErrorObject.n, 0, tojson(res));
         assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
