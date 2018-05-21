@@ -1,5 +1,3 @@
-// TODO: SERVER-34388 Simplify this test by wrapping all the statements
-// in one transaction once a failing command won't abort the transaction
 // Test that causally consistent majority-committed reads will wait for the majority commit point to
 // move past 'afterClusterTime'.
 // @tags: [requires_replication]
@@ -18,7 +16,6 @@
     const session =
         rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     const primaryDB = session.getDatabase(dbName);
-    let txnNumber = 0;
 
     function testReadConcernLevel(level) {
         // Stop replication.
@@ -32,23 +29,18 @@
 
         // A committed read on the primary after the new cluster time should time out waiting for
         // the cluster time to be majority committed.
-        assert.commandFailedWithCode(primaryDB.runCommand({
-            find: collName,
-            readConcern: {level: level, afterClusterTime: clusterTime},
-            maxTimeMS: 1000,
-            txnNumber: NumberLong(txnNumber++)
-        }),
+        session.startTransaction({readConcern: {level: level, afterClusterTime: clusterTime}});
+        assert.commandFailedWithCode(primaryDB.runCommand({find: collName, maxTimeMS: 1000}),
                                      ErrorCodes.ExceededTimeLimit);
+        session.abortTransaction();
 
         // Restart replication.
         restartReplicationOnSecondaries(rst);
 
         // A committed read on the primary after the new cluster time now succeeds.
-        assert.commandWorked(primaryDB.runCommand({
-            find: collName,
-            readConcern: {level: level, afterClusterTime: clusterTime},
-            txnNumber: NumberLong(txnNumber++)
-        }));
+        session.startTransaction({readConcern: {level: level, afterClusterTime: clusterTime}});
+        assert.commandWorked(primaryDB.runCommand({find: collName}));
+        session.commitTransaction();
     }
 
     if (assert.commandWorked(primaryDB.serverStatus()).storageEngine.supportsCommittedReads) {
