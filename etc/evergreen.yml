@@ -12241,6 +12241,7 @@ buildvariants:
   - name: compile_all_run_unittests_TG
   - name: dbtest
   - name: jsCore
+  - name: jsCore_txns
   - name: watchdog_wiredtiger
 
 - name: ubuntu1604-debug-aubsan-async
