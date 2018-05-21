@@ -126,9 +126,15 @@ enum class RegistrationType {
     RegisterOnStart,
 
     /**
-    * Register after transition to becoming primary because we are in a replica set.
+    * Register after transition to becoming primary because we are in a replica set,
+    * and Free Monitoring has been explicitly enabled.
     */
     RegisterAfterOnTransitionToPrimary,
+
+    /**
+    * As above, but only if we have been runtime enabled.
+    */
+    RegisterAfterOnTransitionToPrimaryIfEnabled,
 };
 
 /**
