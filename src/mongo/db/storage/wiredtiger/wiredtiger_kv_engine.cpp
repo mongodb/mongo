@@ -576,8 +576,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         fassertNoTrace(28577, _salvageIfNeeded(_sizeStorerUri.c_str()));
     }
 
-    _sizeStorer.reset(new WiredTigerSizeStorer(_conn, _sizeStorerUri, _readOnly));
-    _sizeStorer->fillCache();
+    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
 
     Locker::setGlobalThrottling(&openReadTransaction, &openWriteTransaction);
 }
@@ -704,9 +703,8 @@ Status WiredTigerKVEngine::okToRename(OperationContext* opCtx,
                                       StringData toNS,
                                       StringData ident,
                                       const RecordStore* originalRecordStore) const {
-    _sizeStorer->storeToCache(
-        _uri(ident), originalRecordStore->numRecords(opCtx), originalRecordStore->dataSize(opCtx));
-    syncSizeInfo(true);
+    syncSizeInfo(false);
+
     return Status::OK();
 }
 
@@ -784,7 +782,7 @@ int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
     if (_ephemeral) {
         return 0;
     }
-    syncSizeInfo(true);
+    syncSizeInfo(false);
     const bool forceCheckpoint = true;
     // If there's no journal, we must take a full checkpoint.
     const bool stableCheckpoint = _durable;
@@ -822,7 +820,7 @@ void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
         return;
 
     try {
-        _sizeStorer->syncCache(sync);
+        _sizeStorer->flush(sync);
     } catch (const WriteConflictException&) {
         // ignore, we'll try again later.
     }
@@ -1341,7 +1339,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     _checkpointThread->setStableTimestamp(stableTimestamp);
     _checkpointThread->go();
 
-    _sizeStorer->fillCache();
+    _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
 
     return {stableTimestamp};
 }
