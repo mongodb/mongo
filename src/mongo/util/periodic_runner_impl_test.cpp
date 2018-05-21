@@ -97,12 +97,6 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
 
     runner().scheduleJob(std::move(job));
 
-    // Ensure nothing happens until we fastForward
-    {
-        stdx::unique_lock<stdx::mutex> lk(mutex);
-        ASSERT_EQ(count, 0);
-    }
-
     // Fast forward ten times, we should run all ten times.
     for (int i = 0; i < 10; i++) {
         clockSource().advance(interval);
