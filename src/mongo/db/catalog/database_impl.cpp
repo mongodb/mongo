@@ -63,7 +63,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/sessions_collection.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -455,7 +454,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                     return Status(ErrorCodes::IllegalOperation,
                                   "turn off profiling before dropping system.profile collection");
             } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
-                         nss == SessionsCollection::kSessionsNamespaceString ||
+                         nss == NamespaceString::kLogicalSessionsNamespace ||
                          nss == NamespaceString::kSystemKeysNamespace)) {
                 return Status(ErrorCodes::IllegalOperation,
                               str::stream() << "can't drop system collection " << fullns);

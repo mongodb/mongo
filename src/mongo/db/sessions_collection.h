@@ -47,8 +47,6 @@ class OperationContext;
 class SessionsCollection {
 
 public:
-    static const NamespaceString kSessionsNamespaceString;
-
     virtual ~SessionsCollection();
 
     /**

@@ -67,6 +67,9 @@ public:
     // represents. For example, 'shardIdentity' and 'featureCompatibilityVersion'.
     static const NamespaceString kServerConfigurationNamespace;
 
+    // Namespace for storing the logical sessions information
+    static const NamespaceString kLogicalSessionsNamespace;
+
     // Namespace for storing the transaction information for each session
     static const NamespaceString kSessionTransactionsTableNamespace;
 

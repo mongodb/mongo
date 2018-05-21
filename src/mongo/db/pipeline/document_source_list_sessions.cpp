@@ -34,7 +34,6 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
 #include "mongo/db/pipeline/document_sources_gen.h"
-#include "mongo/db/sessions_collection.h"
 
 namespace mongo {
 
@@ -50,8 +49,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << kStageName << " may only be run against "
-                          << SessionsCollection::kSessionsNamespaceString.ns(),
-            nss == SessionsCollection::kSessionsNamespaceString);
+                          << NamespaceString::kLogicalSessionsNamespace.ns(),
+            nss == NamespaceString::kLogicalSessionsNamespace);
 
     const auto& spec = listSessionsParseSpec(kStageName, elem);
     if (spec.getAllUsers()) {

@@ -231,7 +231,7 @@ public:
     bool initialize() {
         auto routingInfo =
             uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
-                _opCtx, SessionsCollection::kSessionsNamespaceString));
+                _opCtx, NamespaceString::kLogicalSessionsNamespace));
         _cm = routingInfo.cm();
         return !!_cm;
     }

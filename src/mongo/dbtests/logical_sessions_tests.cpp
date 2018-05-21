@@ -36,7 +36,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/sessions_collection.h"
 #include "mongo/db/sessions_collection_standalone.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
@@ -100,16 +99,16 @@ public:
         _opCtx.reset();
     }
 
-    SessionsCollectionStandalone* collection() {
+    SessionsCollectionStandalone* collection() const {
         return _collection.get();
     }
 
-    OperationContext* opCtx() {
+    OperationContext* opCtx() const {
         return _opCtx.get();
     }
 
-    std::string ns() {
-        return SessionsCollection::kSessionsNamespaceString.toString();
+    const std::string& ns() const {
+        return NamespaceString::kLogicalSessionsNamespace.ns();
     }
 
 private:

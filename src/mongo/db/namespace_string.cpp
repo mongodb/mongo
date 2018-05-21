@@ -52,6 +52,8 @@ constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
 
 const NamespaceString NamespaceString::kServerConfigurationNamespace(NamespaceString::kAdminDb,
                                                                      "system.version");
+const NamespaceString NamespaceString::kLogicalSessionsNamespace(NamespaceString::kConfigDb,
+                                                                 "system.sessions");
 const NamespaceString NamespaceString::kSessionTransactionsTableNamespace(
     NamespaceString::kConfigDb, "transactions");
 const NamespaceString NamespaceString::kShardConfigCollectionsNamespace(NamespaceString::kConfigDb,

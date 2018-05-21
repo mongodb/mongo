@@ -63,7 +63,7 @@ Status SessionsCollectionSharded::_checkCacheForSessionsCollection(OperationCont
 
     // If the collection doesn't exist, fail. Only the config servers generate it.
     auto res = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-        opCtx, SessionsCollection::kSessionsNamespaceString);
+        opCtx, NamespaceString::kLogicalSessionsNamespace);
     if (!res.isOK()) {
         return res.getStatus();
     }
@@ -84,7 +84,7 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
                                                   const LogicalSessionRecordSet& sessions) {
     auto send = [&](BSONObj toSend) {
         auto opMsg =
-            OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsNamespaceString.db(), toSend);
+            OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend);
         auto request = BatchedCommandRequest::parseUpdate(opMsg);
 
         BatchedCommandResponse response;
@@ -94,14 +94,14 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         return response.toStatus();
     };
 
-    return doRefresh(kSessionsNamespaceString, sessions, send);
+    return doRefresh(NamespaceString::kLogicalSessionsNamespace, sessions, send);
 }
 
 Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
                                                 const LogicalSessionIdSet& sessions) {
     auto send = [&](BSONObj toSend) {
         auto opMsg =
-            OpMsgRequest::fromDBAndBody(SessionsCollection::kSessionsNamespaceString.db(), toSend);
+            OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend);
         auto request = BatchedCommandRequest::parseDelete(opMsg);
 
         BatchedCommandResponse response;
@@ -111,7 +111,7 @@ Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         return response.toStatus();
     };
 
-    return doRemove(kSessionsNamespaceString, sessions, send);
+    return doRemove(NamespaceString::kLogicalSessionsNamespace, sessions, send);
 }
 
 StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
@@ -119,7 +119,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
 
     auto send = [&](BSONObj toSend) -> StatusWith<BSONObj> {
         auto qr = QueryRequest::makeFromFindCommand(
-            SessionsCollection::kSessionsNamespaceString, toSend, false);
+            NamespaceString::kLogicalSessionsNamespace, toSend, false);
         if (!qr.isOK()) {
             return qr.getStatus();
         }
@@ -150,12 +150,12 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
         for (const auto& obj : batch) {
             firstBatch.append(obj);
         }
-        firstBatch.done(cursorId, SessionsCollection::kSessionsNamespaceString.ns());
+        firstBatch.done(cursorId, NamespaceString::kLogicalSessionsNamespace.ns());
 
         return result.obj();
     };
 
-    return doFetch(kSessionsNamespaceString, sessions, send);
+    return doFetch(NamespaceString::kLogicalSessionsNamespace, sessions, send);
 }
 
 Status SessionsCollectionSharded::removeTransactionRecords(OperationContext* opCtx,

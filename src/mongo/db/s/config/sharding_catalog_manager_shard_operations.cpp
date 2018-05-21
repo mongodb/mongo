@@ -53,7 +53,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/sessions_collection.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -473,14 +472,14 @@ Status ShardingCatalogManager::_dropSessionsCollection(
     OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
 
     BSONObjBuilder builder;
-    builder.append("drop", SessionsCollection::kSessionsNamespaceString.coll());
+    builder.append("drop", NamespaceString::kLogicalSessionsNamespace.coll());
     {
         BSONObjBuilder wcBuilder(builder.subobjStart("writeConcern"));
         wcBuilder.append("w", "majority");
     }
 
     auto swCommandResponse = _runCommandForAddShard(
-        opCtx, targeter.get(), SessionsCollection::kSessionsNamespaceString.db(), builder.done());
+        opCtx, targeter.get(), NamespaceString::kLogicalSessionsNamespace.db(), builder.done());
     if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }

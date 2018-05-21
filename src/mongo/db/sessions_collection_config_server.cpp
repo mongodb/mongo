@@ -63,7 +63,7 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
 
     // First, shard the sessions collection to create it.
     ConfigsvrShardCollectionRequest shardCollection;
-    shardCollection.set_configsvrShardCollection(SessionsCollection::kSessionsNamespaceString);
+    shardCollection.set_configsvrShardCollection(NamespaceString::kLogicalSessionsNamespace);
     shardCollection.setKey(BSON("_id" << 1));
 
     DBDirectClient client(opCtx);
@@ -79,7 +79,7 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
 Status SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     try {
         scatterGatherOnlyVersionIfUnsharded(opCtx,
-                                            SessionsCollection::kSessionsNamespaceString,
+                                            NamespaceString::kLogicalSessionsNamespace,
                                             SessionsCollection::generateCreateIndexesCmd(),
                                             ReadPreferenceSetting::get(opCtx),
                                             Shard::RetryPolicy::kNoRetry);
