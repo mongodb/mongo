@@ -72,6 +72,7 @@ MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
 // Failpoint which causes the initial sync function to hang before copying databases.
 MONGO_FP_DECLARE(initialSyncHangBeforeCopyingDatabases);
 
+MONGO_FP_DECLARE(initialSyncHangBeforeOplogVisibility);
 
 /**
  * Truncates the oplog (removes any documents) and resets internal variables that were
@@ -343,6 +344,39 @@ Status _initialSync() {
         log() << msg;
         sleepsecs(15);
         return Status(ErrorCodes::InitialSyncFailure, msg);
+    }
+    OpTime firstLastOpTime = fassertStatusOK(40420, OpTime::parseFromOplogEntry(lastOp));
+
+    log() << "initial sync ensuring correct oplog visibility. Starting at "
+          << firstLastOpTime.toBSON();
+
+    if (MONGO_FAIL_POINT(initialSyncHangBeforeOplogVisibility)) {
+        // This log output is used in js tests so please leave it.
+        log() << "initial sync - initialSyncHangBeforeOplogVisibility fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(initialSyncHangBeforeOplogVisibility) && !inShutdown()) {
+            mongo::sleepsecs(1);
+        }
+        log() << "initial sync - initialSyncHangBeforeOplogVisibility fail point disabled.";
+    }
+
+    // We do a forward scan starting at the lastOp we just fetched to ensure that all operations
+    // with earlier OpTimes are committed. This will block until all earlier oplog entries are
+    // visible and should either throw a socket exception or return lastOp.
+    BSONObjBuilder gte;
+    gte.append("$gte", firstLastOpTime.getTimestamp());
+    BSONObjBuilder queryBob;
+    queryBob.append("ts", gte.done());
+    const BSONObj& query = queryBob.done();
+    BSONObj lastOpConfirm = r.findOne(rsOplogName.c_str(), query);
+    invariant(!lastOpConfirm.isEmpty());
+
+    OpTime lastOpConfirmTime = fassertStatusOK(40421, OpTime::parseFromOplogEntry(lastOpConfirm));
+    if (lastOpConfirmTime != firstLastOpTime) {
+        return Status(ErrorCodes::InitialSyncFailure,
+                      str::stream()
+                          << "Last op was not confirmed. last op: " << firstLastOpTime.toBSON()
+                          << ". confirmation: " << lastOpConfirmTime.toBSON());
     }
 
     log() << "initial sync drop all databases";

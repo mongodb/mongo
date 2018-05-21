@@ -25,6 +25,7 @@
 *    exception statement from all source files in the program, then also delete
 *    it in the license file.
 */
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
 
@@ -36,15 +37,19 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
 using std::vector;
+
+MONGO_FP_DECLARE(hangOnInsertObserver);
 
 void OpObserver::onCreateIndex(OperationContext* txn,
                                const std::string& ns,
@@ -63,6 +68,16 @@ void OpObserver::onInserts(OperationContext* txn,
                            vector<BSONObj>::const_iterator end,
                            bool fromMigrate) {
     repl::logOps(txn, "i", nss, begin, end, fromMigrate);
+
+    if (MONGO_FAIL_POINT(hangOnInsertObserver)) {
+        // This log output is used in js tests so please leave it.
+        log() << "op observer - hangOnInsertObserver fail point enabled. Blocking until fail point "
+                 "is disabled.";
+        while (MONGO_FAIL_POINT(hangOnInsertObserver)) {
+            mongo::sleepsecs(1);
+            txn->checkForInterrupt();
+        }
+    }
 
     const char* ns = nss.ns().c_str();
     for (auto it = begin; it != end; it++) {
