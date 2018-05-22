@@ -146,6 +146,17 @@ var ReplSetTest = function(opts) {
         return self._master || false;
     }
 
+    /**
+     * Attempt to connect to all nodes and returns a list of slaves in which the connection was
+     * successful.
+     */
+    function _determineLiveSlaves() {
+        _callIsMaster();
+        return self._slaves.filter(function(n) {
+            return self._liveNodes.indexOf(n) !== -1;
+        });
+    }
+
     function asCluster(conn, fn, keyFileParam = self.keyFile) {
         if (keyFileParam) {
             return authutil.asCluster(conn, keyFileParam, fn);
@@ -1257,6 +1268,7 @@ var ReplSetTest = function(opts) {
     // on all secondary nodes or just 'slaves', if specified.
     this.awaitReplication = function(timeout, secondaryOpTimeType, slaves) {
         timeout = timeout || self.kDefaultTimeoutMS;
+
         secondaryOpTimeType = secondaryOpTimeType || ReplSetTest.OpTimeType.LAST_APPLIED;
 
         var masterLatestOpTime;
@@ -1796,10 +1808,7 @@ var ReplSetTest = function(opts) {
             assert(success, 'dbhash mismatch between primary and secondary');
         }
 
-        _callIsMaster();
-        var liveSlaves = self._slaves.filter(function(n) {
-            return self._liveNodes.indexOf(n) !== -1;
-        });
+        var liveSlaves = _determineLiveSlaves();
         this.checkReplicaSet(checkDBHashesForReplSet,
                              liveSlaves,
                              this,
@@ -1810,7 +1819,8 @@ var ReplSetTest = function(opts) {
     };
 
     this.checkOplogs = function(msgPrefix) {
-        this.checkReplicaSet(checkOplogs, null, this, msgPrefix);
+        var liveSlaves = _determineLiveSlaves();
+        this.checkReplicaSet(checkOplogs, liveSlaves, this, msgPrefix);
     };
 
     /**
@@ -1833,7 +1843,20 @@ var ReplSetTest = function(opts) {
             this.hasNext = function() {
                 if (!this.cursor)
                     throw new Error("OplogReader is not open!");
-                return this.cursor.hasNext();
+                try {
+                    return this.cursor.hasNext();
+                } catch (err) {
+                    print("Error: hasNext threw '" + err.message + "' on " + this.mongo.host);
+                    // Occasionally, the capped collection will get truncated while we are iterating
+                    // over it. Since we are iterating over the collection in reverse, getting a
+                    // truncated item means we've reached the end of the list, so return false.
+                    if (err.code === ErrorCodes.CappedPositionLost) {
+                        this.cursor.close();
+                        return false;
+                    }
+
+                    throw err;
+                }
             };
 
             this.query = function(ts) {
@@ -1865,13 +1888,20 @@ var ReplSetTest = function(opts) {
             var rsSize = nodes.length;
             var firstReaderIndex;
             for (var i = 0; i < rsSize; i++) {
+                const node = nodes[i];
+
+                // Only look at nodes that are up.
+                if (rst.master !== node && !rst._liveNodes.includes(node)) {
+                    continue;
+                }
+
                 // Arbiters have no documents in the oplog.
-                const isArbiter = nodes[i].getDB('admin').isMaster('admin').arbiterOnly;
+                const isArbiter = node.getDB('admin').isMaster('admin').arbiterOnly;
                 if (isArbiter) {
                     continue;
                 }
 
-                readers[i] = new OplogReader(nodes[i]);
+                readers[i] = new OplogReader(node);
                 var currTS = readers[i].getFirstDoc().ts;
                 // Find the reader which has the smallestTS. This reader should have the most
                 // number of documents in the oplog.
@@ -2211,6 +2241,7 @@ var ReplSetTest = function(opts) {
             if (_callIsMaster() && this._liveNodes.length > 1) {  // skip for sets with 1 live node
                 // Auth only on live nodes because authutil.assertAuthenticate
                 // refuses to log in live connections if some secondaries are down.
+                asCluster(this._liveNodes, () => this.checkOplogs());
                 asCluster(this._liveNodes, () => this.checkReplicatedDataHashes());
             }
         }
