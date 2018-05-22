@@ -194,12 +194,12 @@
             {aggregate: 1, pipeline: [{$changeStream: {allChangesForCluster: true}}], cursor: {}}),
         ErrorCodes.QueryFeatureNotAllowed);
 
-    assert.commandFailedWithCode(testDB.runCommand({
-        aggregate: coll.getName(),
-        pipeline: [{$changeStream: {startAtOperationTime: startTime}}],
-        cursor: {}
-    }),
-                                 ErrorCodes.QueryFeatureNotAllowed);
+    // Using the 'startAtOperationTime' option should be allowed while on FCV 3.6 because mongos
+    // will send this internally once its binary version is 4.0.
+    assert.doesNotThrow(() => {
+        const cursor = coll.watch([], {startAtOperationTime: startTime});
+        cursor.close();
+    });
 
     // Test that resuming a change stream opened on FCV 4.0 should continue to work, though a
     // whole-db or whole-cluster cursor cannot be resumed.
