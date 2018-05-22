@@ -439,12 +439,6 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
 
     // New field name starting in 4.0 is 'startAtOperationTime'.
     if (startAtOperationTime) {
-        uassert(ErrorCodes::QueryFeatureNotAllowed,
-                str::stream() << "The startAtOperationTime option is not allowed in the current "
-                                 "feature compatibility version. See "
-                              << feature_compatibility_version_documentation::kCompatibilityLink
-                              << " for more information.",
-                fcv >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
         uassert(50573,
                 str::stream()
                     << "Do not specify both "
