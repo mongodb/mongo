@@ -42,8 +42,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     // The current version is in the 3.7 series. This has to be changed very time we bump
     // the major version pair, but it provides a useful test of assumptions.
-    assertBinVersionsEqual("3.7", version());
-    assertBinVersionComparesEqual("3.7", version());
+    assertBinVersionsEqual("4.1", version());
+    assertBinVersionComparesEqual("4.1", version());
 
     // "latest" is the same version as the shell, "last-stable" is not.
     assertBinVersionsEqual("latest", version());
@@ -77,6 +77,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assertBinVersionComparesEqual("3.4", "3.4.0-abcd");
     assertBinVersionComparesEqual("3.4.0", "3.4.0-abcd");
     assertBinVersionComparesHigher("3.6.0", "3.4.0-abcd");
+    assertBinVersionComparesHigher("4.0.0", "3.6.99-abcd");
     assertBinVersionComparesHigher("3.4.1", "3.4.0-abcd");
     assertBinVersionComparesLower("3.4.0-abc", "3.4.1-xyz");
 

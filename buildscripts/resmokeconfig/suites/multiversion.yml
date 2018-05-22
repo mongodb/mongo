@@ -15,6 +15,16 @@ selector:
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
 
+  # TODO: SERVER-35163
+  - jstests/multiVersion/add_invalid_shard.js
+  - jstests/multiVersion/feature_compatibility_version_lagging_secondary.js
+  - jstests/multiVersion/migration_between_mixed_FCV_mixed_version_mongods.js
+  - jstests/multiVersion/rollback_latest_to_last_stable.js
+  - jstests/multiVersion/set_feature_compatibility_version.js
+
+  # TODO: SERVER-35171
+  - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js
+
 # Multiversion tests start their own mongod's.
 executor:
   config:

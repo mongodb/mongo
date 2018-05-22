@@ -129,8 +129,7 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
             let op = in_progress.next();
             inProgressStr += tojson(op);
 
-            if (op.query && op.query.moveChunk ||  // compatibility with v3.4, remove after v3.6
-                op.command && op.command.moveChunk) {
+            if (op.command && op.command.moveChunk) {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
                 if (op.msg && op.msg.startsWith(searchString)) {
