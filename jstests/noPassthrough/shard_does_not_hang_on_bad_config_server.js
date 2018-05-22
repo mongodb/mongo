@@ -31,9 +31,10 @@
         maxChunkSizeBytes: 1024,
         maxTimeMS: 10000
     }));
-    // Cannot reach config server.
-    assert.eq(ErrorCodes.HostUnreachable, res.code);
 
+    // Cannot reach config server.
+    assert(res.code == ErrorCodes.HostUnreachable || res.code == ErrorCodes.ExceededTimeLimit,
+           'Result was: ' + tojson(res));
     MongoRunner.stopMongod(conn);
 
 })();
