@@ -320,7 +320,9 @@
         assert.commandWorked(res);
         assert.eq(1, res.applied);
 
-        coll.drop();
+        // Use majority write concern to clear the drop-pending that can cause lock conflicts with
+        // transactions.
+        coll.drop({writeConcern: {w: "majority"}});
         assert.writeOK(coll.insert({_id: 1, a: true}));
 
         if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {

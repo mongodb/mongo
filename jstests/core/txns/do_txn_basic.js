@@ -9,7 +9,9 @@
     db = session.getDatabase("test");
     var txnNumber = 0;
 
-    t.drop();
+    // Use majority write concern to clear the drop-pending that can cause lock conflicts with
+    // transactions.
+    t.drop({writeConcern: {w: "majority"}});
 
     //
     // Input validation tests

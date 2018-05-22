@@ -38,7 +38,9 @@
      * 'validator', which should enforce the existence of a field "a".
      */
     function runBypassDocumentValidationTest(validator) {
-        coll.drop();
+        // Use majority write concern to clear the drop-pending that can cause lock conflicts with
+        // transactions.
+        coll.drop({writeConcern: {w: "majority"}});
 
         // Insert documents into the collection that would not be valid before setting 'validator'.
         assert.writeOK(coll.insert({_id: 1}));

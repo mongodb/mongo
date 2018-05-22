@@ -5,7 +5,9 @@
 
     const dbName = 'test';
     const collName = 'testReadOwnMultikeyWrites';
-    db.getSiblingDB(dbName).getCollection(collName).drop();
+    // Use majority write concern to clear the drop-pending that can cause lock conflicts with
+    // transactions.
+    db.getSiblingDB(dbName).getCollection(collName).drop({writeConcern: {w: "majority"}});
 
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);

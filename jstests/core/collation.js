@@ -1978,7 +1978,11 @@
     if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
         const session = db.getMongo().startSession();
         const sessionDb = session.getDatabase(db.getName());
-        coll.drop();
+
+        // Use majority write concern to clear the drop-pending that can cause lock conflicts with
+        // transactions.
+        coll.drop({writeConcern: {w: "majority"}});
+
         assert.commandWorked(
             db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
         assert.writeOK(coll.insert({_id: "foo", x: 5, str: "bar"}));
