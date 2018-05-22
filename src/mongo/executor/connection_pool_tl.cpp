@@ -68,7 +68,6 @@ void TLTimer::cancelTimeout() {
 
 void TLConnection::indicateSuccess() {
     _status = Status::OK();
-    _lastUsed = _reactor->now();
 }
 
 void TLConnection::indicateFailure(Status status) {

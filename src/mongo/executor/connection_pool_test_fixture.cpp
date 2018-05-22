@@ -122,6 +122,7 @@ void ConnectionImpl::pushSetup(PushSetupCallback status) {
         _pushSetupQueue.pop_front();
 
         auto cb = connPtr->_setupCallback;
+        connPtr->indicateUsed();
         cb(connPtr, callback());
     }
 }
@@ -145,6 +146,7 @@ void ConnectionImpl::pushRefresh(PushRefreshCallback status) {
         _pushRefreshQueue.pop_front();
 
         auto cb = connPtr->_refreshCallback;
+        connPtr->indicateUsed();
         cb(connPtr, callback());
     }
 }
@@ -189,6 +191,7 @@ void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb) {
         _pushSetupQueue.pop_front();
 
         auto refreshCb = connPtr->_setupCallback;
+        connPtr->indicateUsed();
         refreshCb(connPtr, callback());
     }
 }
@@ -210,6 +213,7 @@ void ConnectionImpl::refresh(Milliseconds timeout, RefreshCallback cb) {
         _pushRefreshQueue.pop_front();
 
         auto refreshCb = connPtr->_refreshCallback;
+        connPtr->indicateUsed();
         refreshCb(connPtr, callback());
     }
 }
