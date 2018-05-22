@@ -592,7 +592,9 @@
                 $readPreference: {mode: 'secondary'},
                 readConcern: {'level': 'local'}
             }));
-
+            // Wait for drop of previous database to replicate before beginning profiling
+            st.rs0.awaitReplication();
+            st.rs1.awaitReplication();
             assert.commandWorked(st.rs0.getPrimary().getDB(db).setProfilingLevel(2));
             assert.commandWorked(st.rs0.getSecondary().getDB(db).setProfilingLevel(2));
             assert.commandWorked(st.rs1.getPrimary().getDB(db).setProfilingLevel(2));
