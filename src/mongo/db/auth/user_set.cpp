@@ -129,6 +129,6 @@ User* UserSet::lookupByDBName(StringData dbname) const {
 }
 
 UserNameIterator UserSet::getNames() const {
-    return UserNameIterator(new UserSetNameIteratorImpl(begin(), end()));
+    return UserNameIterator(std::make_unique<UserSetNameIteratorImpl>(begin(), end()));
 }
 }  // namespace mongo

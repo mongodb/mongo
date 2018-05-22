@@ -16,7 +16,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authmongod',
         '$BUILD_DIR/mongo/db/command_can_run_here',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/service_entry_point_common',
@@ -71,6 +70,17 @@ env.Library(
 )
 
 env.Library(
+    target="embedded_auth",
+    source=[
+        'embedded_auth_manager.cpp',
+        'embedded_auth_session.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+    ],
+)
+
+env.Library(
     target="embedded_commands",
     source=[
         'embedded_commands.cpp',
@@ -115,6 +125,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/db/storage/storage_init_d',
         '$BUILD_DIR/mongo/util/version_impl',
+        'embedded_auth',
         'embedded_commands',
         'embedded_options',
         'index_create_impl_embedded',

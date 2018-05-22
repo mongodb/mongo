@@ -240,7 +240,7 @@ const bool checkShimsViaTUHook = false;
         }                                                                                       \
                                                                                                 \
         const ::mongo::GlobalInitializerRegisterer registrationHook{                            \
-            std::string(MONGO_SHIM_EVIL_STRINGIFY_((__VA_ARGS__))),                             \
+            std::string(MONGO_SHIM_EVIL_STRINGIFY_(__VA_ARGS__)),                               \
             {},                                                                                 \
             {MONGO_SHIM_DEPENDENTS},                                                            \
             mongo::InitializerFunction(createInitializerRegistration)};                         \

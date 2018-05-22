@@ -39,7 +39,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/sharding_legacy_api'
+        '$BUILD_DIR/mongo/s/sharding_legacy_api',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
     ],
 )
 
@@ -51,7 +54,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-    ]
+    ],
 )
 
 env.Library(
@@ -64,7 +67,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/remote_command_retry_scheduler',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
-    ]
+    ],
 )
 
 env.Library(
@@ -75,7 +78,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface'
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
     ],
 )
 
@@ -88,7 +91,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'rs_local_client',
-        'shard_interface'
+        'shard_interface',
     ],
 )
 
