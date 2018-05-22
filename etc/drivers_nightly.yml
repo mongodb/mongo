@@ -122,7 +122,7 @@ functions:
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
-      key: "master"
+      key: "v4.0"
       destination: "builder_num"
 
   "setup credentials" : &setup_credentials
@@ -611,7 +611,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v4.0
 
 # Shared by all drivers projects
 - name: drivers-evergreen-tools
