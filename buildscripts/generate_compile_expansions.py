@@ -62,8 +62,8 @@ def generate_version_expansions():
             raise ValueError("Unable to parse version from stdin and no version.json provided")
 
     if version_parts[0]:
-        expansions["suffix"] = "latest"
-        expansions["src_suffix"] = "latest"
+        expansions["suffix"] = "v4.0-latest"
+        expansions["src_suffix"] = "v4.0-latest"
     else:
         expansions["suffix"] = version_line
         expansions["src_suffix"] = "r{0}".format(version_line)
