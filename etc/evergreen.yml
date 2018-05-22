@@ -384,7 +384,6 @@ variables:
   - func: "get buildnumber"
   - func: "set up credentials"
   - func: "fetch and build OpenSSL"
-  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "generate compile expansions"
   teardown_group:
   - func: "scons cache pruning"
@@ -423,7 +422,6 @@ functions:
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
         rocksdb: ${rocksdb_rev}
-        wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts" : &fetch_artifacts
     command: s3.get
@@ -718,21 +716,6 @@ functions:
             if [ "${build_openssl|}" = "true" ]; then
                 bash buildscripts/fetch_and_build_openssl.sh "${python|python}" "${openssl_make_flags|}" "${openssl_config_flags|}"
             fi
-
-  "use WiredTiger develop" :
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-        if [ "${use_wt_develop|}" = "true" ]; then
-        cd src/third_party
-        for wtdir in api dist examples ext lang src test tools ; do
-          rm -rf wiredtiger/$wtdir
-          mv wtdevelop/$wtdir wiredtiger/
-        done
-        fi
 
   "setup android toolchain" :
     command: shell.exec
@@ -3174,7 +3157,6 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
-    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
     - func: "apply compile expansions"
@@ -6700,11 +6682,6 @@ modules:
   repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
   branch: v4.0
-
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
 
 #######################################
 #            Buildvariants            #
