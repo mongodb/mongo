@@ -1624,6 +1624,8 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsS
         }
         response->append("lastHeartbeatMessage", "");
         response->append("syncingTo", "");
+        response->append("syncSourceHost", "");
+        response->append("syncSourceId", -1);
 
         response->append("infoMessage", _getHbmsg(now));
         *result = Status(ErrorCodes::InvalidReplicaSetConfig,
@@ -1651,8 +1653,13 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsS
 
             if (!_syncSource.empty() && !_iAmPrimary()) {
                 bb.append("syncingTo", _syncSource.toString());
+                bb.append("syncSourceHost", _syncSource.toString());
+                const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource);
+                bb.append("syncSourceId", member ? member->getId() : -1);
             } else {
                 bb.append("syncingTo", "");
+                bb.append("syncSourceHost", "");
+                bb.append("syncSourceId", -1);
             }
 
             if (_maintenanceModeCalls) {
@@ -1716,8 +1723,13 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsS
             const HostAndPort& syncSource = it->getSyncSource();
             if (!syncSource.empty() && !state.primary()) {
                 bb.append("syncingTo", syncSource.toString());
+                bb.append("syncSourceHost", syncSource.toString());
+                const MemberConfig* member = _rsConfig.findMemberByHostAndPort(syncSource);
+                bb.append("syncSourceId", member ? member->getId() : -1);
             } else {
                 bb.append("syncingTo", "");
+                bb.append("syncSourceHost", "");
+                bb.append("syncSourceId", -1);
             }
 
             bb.append("infoMessage", "");
@@ -1744,8 +1756,13 @@ void TopologyCoordinatorImpl::prepareStatusResponse(const ReplSetStatusArgs& rsS
     // Add sync source info
     if (!_syncSource.empty() && !myState.primary() && !myState.removed()) {
         response->append("syncingTo", _syncSource.toString());
+        response->append("syncSourceHost", _syncSource.toString());
+        const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource);
+        response->append("syncSourceId", member ? member->getId() : -1);
     } else {
         response->append("syncingTo", "");
+        response->append("syncSourceHost", "");
+        response->append("syncSourceId", -1);
     }
 
     if (_rsConfig.isConfigServer()) {
