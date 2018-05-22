@@ -1340,9 +1340,15 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
     invariant(!readConcern.getArgsOpTime());
 
+    // TODO SERVER-34620: Re-enable speculative behavior when "atClusterTime" is specified.
+    auto session = OperationContextSession::get(opCtx);
+    const bool speculative = session && session->inSnapshotReadOrMultiDocumentTransaction() &&
+        !readConcern.getArgsAtClusterTime();
+
     const bool isMajorityCommittedRead =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
-        readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern;
+        (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
+         readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern) &&
+        !speculative;
 
     return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime, deadline);
 }
