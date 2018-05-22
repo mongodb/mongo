@@ -30,18 +30,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include "replication_coordinator_embedded.h"
+#include "mongo/client/embedded/replication_coordinator_embedded.h"
 
+#include "mongo/client/embedded/not_implemented.h"
 #include "mongo/db/repl/repl_set_config.h"
 
 namespace mongo {
 namespace embedded {
 
 using namespace repl;
-
-#define UASSERT_NOT_IMPLEMENTED           \
-    uasserted(ErrorCodes::NotImplemented, \
-              str::stream() << "Not implemented for embedded: " << __FUNCTION__)
 
 ReplicationCoordinatorEmbedded::ReplicationCoordinatorEmbedded(ServiceContext* service)
     : _service(service) {}

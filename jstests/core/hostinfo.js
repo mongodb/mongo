@@ -1,3 +1,7 @@
+// @tags: [
+//     # `hostInfo` command is not available on embedded
+//     incompatible_with_embedded,
+// ]
 // SERVER-4615:  Ensure hostInfo() command returns expected results on each platform
 
 assert.commandWorked(db.hostInfo());

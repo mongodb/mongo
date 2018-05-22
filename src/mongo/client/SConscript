@@ -27,7 +27,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/dns_query',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -37,7 +37,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'clientdriver',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -48,7 +48,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'clientdriver',
         '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
-    ]
+    ],
 )
 
 env.Library(
@@ -73,7 +73,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'read_preference',
-    ]
+    ],
 )
 
 saslClientEnv = env.Clone()
@@ -115,7 +115,7 @@ saslClientEnv.Library(
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
     ],
-    SYSLIBDEPS=saslLibs
+    SYSLIBDEPS=saslLibs,
 )
 
 env.Library(
@@ -142,7 +142,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/md5',
         'authentication',
-    ]
+    ],
 )
 
 env.Library(
@@ -174,7 +174,6 @@ clientDriverEnv.Library(
         'replica_set_monitor_manager.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/query_request',
@@ -196,6 +195,7 @@ clientDriverEnv.Library(
         'read_preference',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
@@ -219,7 +219,6 @@ env.Library(
         'async_client.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
@@ -228,6 +227,7 @@ env.Library(
         'authentication',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
         '$BUILD_DIR/mongo/transport/message_compressor',
@@ -242,8 +242,10 @@ env.Library(
     ],
     LIBDEPS=[
         'clientdriver',
-        '$BUILD_DIR/mongo/db/auth/authcommon',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
+    ],
 )
 
 env.Library(
@@ -256,7 +258,7 @@ env.Library(
     LIBDEPS=[
         'clientdriver',
         '$BUILD_DIR/mongo/db/service_context',
-    ]
+    ],
 )
 
 env.Library(
@@ -268,7 +270,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/s/coreshard',
-    ]
+    ],
 )
 
 env.CppUnitTest(
@@ -281,7 +283,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
         'clientdriver',
-    ]
+    ],
 )
 
 env.CppUnitTest('dbclient_rs_test',
@@ -289,7 +291,7 @@ env.CppUnitTest('dbclient_rs_test',
                 LIBDEPS=[
                     'clientdriver',
                     '$BUILD_DIR/mongo/dbtests/mocklib',
-                ]
+                ],
 )
 
 env.CppUnitTest(

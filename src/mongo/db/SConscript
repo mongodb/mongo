@@ -418,13 +418,17 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver",
-        "$BUILD_DIR/mongo/db/auth/authservercommon",
+        "$BUILD_DIR/mongo/db/auth/auth",
         "$BUILD_DIR/mongo/rpc/command_reply",
         "$BUILD_DIR/mongo/rpc/command_request",
         "$BUILD_DIR/mongo/rpc/metadata",
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",
         "auth/authorization_manager_global",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/internal_user_auth",
+        "$BUILD_DIR/mongo/db/auth/security_key",
     ],
 )
 
@@ -794,6 +798,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_create',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
     ],
 )
@@ -1254,11 +1259,13 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/remote_command_targeter',
-        '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'dbdirectclient',
         'sessions_collection',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/internal_user_auth',
     ],
 )
 
