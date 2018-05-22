@@ -110,6 +110,15 @@ StatusWith<Shard::CommandResponse> ShardLocal::_runCommand(OperationContext* opC
     return _rsLocalClient.runCommandOnce(opCtx, dbName, cmdObj);
 }
 
+StatusWith<Shard::QueryResponse> ShardLocal::_runExhaustiveCursorCommand(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    Milliseconds maxTimeMSOverride,
+    const BSONObj& cmdObj) {
+    MONGO_UNREACHABLE;
+}
+
 StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,

@@ -35,7 +35,6 @@
 #include <list>
 #include <vector>
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/concurrency/notification.h"
@@ -316,10 +316,10 @@ BSONObj MigrationDestinationManager::getMigrationStatusReport() {
     }
 }
 
-Status MigrationDestinationManager::start(const NamespaceString& nss,
+Status MigrationDestinationManager::start(OperationContext* opCtx,
+                                          const NamespaceString& nss,
                                           ScopedReceiveChunk scopedReceiveChunk,
                                           const MigrationSessionId& sessionId,
-                                          const ConnectionString& fromShardConnString,
                                           const ShardId& fromShard,
                                           const ShardId& toShard,
                                           const BSONObj& min,
@@ -336,8 +336,10 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
     _errmsg = "";
 
     _nss = nss;
-    _fromShardConnString = fromShardConnString;
     _fromShard = fromShard;
+    _fromShardConnString =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard))
+            ->getConnString();
     _toShard = toShard;
     _min = min;
     _max = max;
@@ -363,10 +365,9 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
     _sessionMigration =
         stdx::make_unique<SessionCatalogMigrationDestination>(fromShard, *_sessionId);
 
-    _migrateThreadHandle =
-        stdx::thread([this, min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern]() {
-            _migrateThread(min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern);
-        });
+    _migrateThreadHandle = stdx::thread([this, min, max, shardKeyPattern, epoch, writeConcern]() {
+        _migrateThread(min, max, shardKeyPattern, epoch, writeConcern);
+    });
 
     return Status::OK();
 }
@@ -498,7 +499,6 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
 void MigrationDestinationManager::_migrateThread(BSONObj min,
                                                  BSONObj max,
                                                  BSONObj shardKeyPattern,
-                                                 ConnectionString fromShardConnString,
                                                  OID epoch,
                                                  WriteConcernOptions writeConcern) {
     Client::initThread("migrateThread");
@@ -510,8 +510,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
     }
 
     try {
-        _migrateDriver(
-            opCtx.get(), min, max, shardKeyPattern, fromShardConnString, epoch, writeConcern);
+        _migrateDriver(opCtx.get(), min, max, shardKeyPattern, epoch, writeConcern);
     } catch (...) {
         _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
     }
@@ -530,7 +529,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                                                  const BSONObj& min,
                                                  const BSONObj& max,
                                                  const BSONObj& shardKeyPattern,
-                                                 const ConnectionString& fromShardConnString,
                                                  const OID& epoch,
                                                  const WriteConcernOptions& writeConcern) {
     invariant(isActive());
@@ -542,7 +540,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
     auto const serviceContext = opCtx->getServiceContext();
 
     log() << "Starting receiving end of migration of chunk " << redact(min) << " -> " << redact(max)
-          << " for collection " << _nss.ns() << " from " << fromShardConnString << " at epoch "
+          << " for collection " << _nss.ns() << " from " << _fromShard << " at epoch "
           << epoch.toString() << " with session id " << *_sessionId;
 
     MoveTimingHelper timing(
@@ -557,10 +555,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
     invariant(initialState == READY);
 
-    ScopedDbConnection conn(fromShardConnString);
-
-    // Just tests the connection
-    conn->getLastError();
+    auto fromShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, _fromShard));
 
     DisableDocumentValidation validationDisabler(opCtx);
 
@@ -574,8 +570,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         invariant(!opCtx->lockState()->isLocked());
 
         // Get indexes by calling listIndexes against the donor.
-        auto indexes = conn->getIndexSpecs(_nss.ns());
-        for (auto&& spec : indexes) {
+        auto indexes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            _nss.db().toString(),
+            BSON("listIndexes" << _nss.coll().toString()),
+            Milliseconds(-1)));
+
+        for (auto&& spec : indexes.docs) {
             donorIndexSpecs.push_back(spec);
             if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
                 if (indexNameElem.type() == BSONType::String &&
@@ -586,9 +588,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         }
 
         // Get collection options by calling listCollections against the donor.
-        std::list<BSONObj> infos =
-            conn->getCollectionInfos(_nss.db().toString(), BSON("name" << _nss.coll()));
+        auto infosRes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            _nss.db().toString(),
+            BSON("listCollections" << 1 << "filter" << BSON("name" << _nss.coll())),
+            Milliseconds(-1)));
 
+        auto infos = infosRes.docs;
         if (infos.size() != 1) {
             _setStateFailWarn(str::stream()
                               << "expected listCollections against the donor shard for "
@@ -816,16 +823,18 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         };
 
         auto fetchBatchFn = [&](OperationContext* opCtx) {
-            BSONObj res;
-            if (!conn->runCommand("admin",
-                                  migrateCloneRequest,
-                                  res)) {  // gets array of objects to copy, in disk order
-                conn.done();
-                const std::string errMsg = str::stream() << "_migrateClone failed: "
-                                                         << redact(res.toString());
-                uasserted(50747, errMsg);
-            }
-            return res;
+            auto res = uassertStatusOKWithContext(
+                fromShard->runCommand(opCtx,
+                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                      "admin",
+                                      migrateCloneRequest,
+                                      Shard::RetryPolicy::kIdempotent),
+                "_migrateClone failed: ");
+
+            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
+                                       "_migrateClone failed: ");
+
+            return res.response;
         };
 
         cloneDocumentsFromDonor(opCtx, insertBatchFn, fetchBatchFn);
@@ -851,18 +860,24 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         setState(CATCHUP);
 
         while (true) {
-            BSONObj res;
-            if (!conn->runCommand("admin", xferModsRequest, res)) {
-                _setStateFail(str::stream() << "_transferMods failed: " << redact(res));
-                conn.done();
-                return;
-            }
+            auto res = uassertStatusOKWithContext(
+                fromShard->runCommand(opCtx,
+                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                      "admin",
+                                      xferModsRequest,
+                                      Shard::RetryPolicy::kIdempotent),
+                "_transferMods failed: ");
 
-            if (res["size"].number() == 0) {
+            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
+                                       "_transferMods failed: ");
+
+            const auto& mods = res.response;
+
+            if (mods["size"].number() == 0) {
                 break;
             }
 
-            _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, res, &lastOpApplied);
+            _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, mods, &lastOpApplied);
 
             const int maxIterations = 3600 * 50;
 
@@ -887,7 +902,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
             if (i == maxIterations) {
                 _setStateFail("secondary can't keep up with migrate");
-                conn.done();
                 return;
             }
         }
@@ -926,16 +940,21 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 transferAfterCommit = true;
             }
 
-            BSONObj res;
-            if (!conn->runCommand("admin", xferModsRequest, res)) {
-                _setStateFail(str::stream() << "_transferMods failed in STEADY state: "
-                                            << redact(res));
-                conn.done();
-                return;
-            }
+            auto res = uassertStatusOKWithContext(
+                fromShard->runCommand(opCtx,
+                                      ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                      "admin",
+                                      xferModsRequest,
+                                      Shard::RetryPolicy::kIdempotent),
+                "_transferMods failed in STEADY STATE: ");
 
-            if (res["size"].number() > 0 &&
-                _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, res, &lastOpApplied)) {
+            uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(res),
+                                       "_transferMods failed in STEADY STATE: ");
+
+            auto mods = res.response;
+
+            if (mods["size"].number() > 0 &&
+                _applyMigrateOp(opCtx, _nss, min, max, shardKeyPattern, mods, &lastOpApplied)) {
                 continue;
             }
 
@@ -977,8 +996,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
     timing.done(6);
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep6);
-
-    conn.done();
 }
 
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,

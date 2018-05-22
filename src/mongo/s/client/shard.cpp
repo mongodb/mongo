@@ -178,6 +178,25 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     MONGO_UNREACHABLE;
 }
 
+StatusWith<Shard::QueryResponse> Shard::runExhaustiveCursorCommand(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    Milliseconds maxTimeMSOverride) {
+    for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
+        auto result =
+            _runExhaustiveCursorCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
+
+        if (retry < kOnErrorNumRetries &&
+            isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {
+            continue;
+        }
+        return result;
+    }
+    MONGO_UNREACHABLE;
+}
+
 BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* opCtx,
                                                    const Milliseconds maxTimeMS,
                                                    const BatchedCommandRequest& batchRequest,

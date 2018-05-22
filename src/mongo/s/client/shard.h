@@ -198,6 +198,16 @@ public:
         RetryPolicy retryPolicy);
 
     /**
+    * Runs a cursor command, exhausts the cursor, and pulls all data into memory. Performs retries
+    * if the command fails in accordance with the kIdempotent RetryPolicy.
+    */
+    StatusWith<QueryResponse> runExhaustiveCursorCommand(OperationContext* opCtx,
+                                                         const ReadPreferenceSetting& readPref,
+                                                         const std::string& dbName,
+                                                         const BSONObj& cmdObj,
+                                                         Milliseconds maxTimeMSOverride);
+
+    /**
      * Runs a write command against a shard. This is separate from runCommand, because write
      * commands return errors in a different format than regular commands do, so checking for
      * retriable errors must be done differently.
@@ -279,6 +289,13 @@ private:
                                                     const std::string& dbname,
                                                     Milliseconds maxTimeMSOverride,
                                                     const BSONObj& cmdObj) = 0;
+
+    virtual StatusWith<QueryResponse> _runExhaustiveCursorCommand(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const std::string& dbName,
+        Milliseconds maxTimeMSOverride,
+        const BSONObj& cmdObj) = 0;
 
     virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
