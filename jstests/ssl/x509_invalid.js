@@ -10,10 +10,10 @@
     const SELF_SIGNED_CERT = 'jstests/libs/client-self-signed.pem';
 
     function testClient(conn, cert, name, shouldSucceed) {
-        let auth = {mechanism: 'MONGODB-X509'};
-        if (name !== null) {
-            auth.name = name;
-        }
+        const auth = {
+            mechanism: 'MONGODB-X509',
+            user: name
+        };
         const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
         clearRawMongoProgramOutput();
         const exitCode = runMongoProgram('mongo',
@@ -44,8 +44,6 @@
 
         testClient(conn, CLIENT_CERT, CLIENT_NAME, true);
         testClient(conn, SELF_SIGNED_CERT, CLIENT_NAME, false);
-        testClient(conn, CLIENT_CERT, null, true);
-        testClient(conn, SELF_SIGNED_CERT, null, false);
     }
 
     // Standalone.
