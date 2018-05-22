@@ -10,6 +10,7 @@ import pymongo.errors
 
 from . import dbhash
 from . import interface
+from . import oplog
 from . import validate
 from ..fixtures import interface as fixture
 from ..fixtures import replicaset
@@ -134,6 +135,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         self._kill_secondaries()
         self._check_secondaries_and_restart_fixture()
 
+        # The CheckReplOplogs hook checks that the local.oplog.rs matches on the primary and
+        # the secondaries.
+        self._check_repl_oplog(self._test_report)
+
         # The CheckReplDBHash hook waits until all operations have replicated to and have been
         # applied on the secondaries, so we run the ValidateCollections hook after it to ensure
         # we're validating the entire contents of the collection.
@@ -222,6 +227,13 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         dbhash_test_case.before_test(self, test_report)
         dbhash_test_case.after_test(self, test_report)
         dbhash_test_case.after_suite(test_report)
+
+    def _check_repl_oplog(self, test_report):
+        oplog_test_case = oplog.CheckReplOplogs(self._hook.logger, self.fixture)
+        oplog_test_case.before_suite(test_report)
+        oplog_test_case.before_test(self, test_report)
+        oplog_test_case.after_test(self, test_report)
+        oplog_test_case.after_suite(test_report)
 
     def _restart_and_clear_fixture(self):
         # We restart the fixture after setting 'preserve_dbpath' back to its original value in order
