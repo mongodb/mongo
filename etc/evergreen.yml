@@ -493,7 +493,7 @@ functions:
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v4.0"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
@@ -6694,12 +6694,12 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v4.0
 
 - name: rocksdb
   repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v4.0
 
 - name: wtdevelop
   repo: git@github.com:wiredtiger/wiredtiger.git
@@ -6994,19 +6994,6 @@ buildvariants:
   - name: slow1
   - name: tool
   - name: write_concern_majority_passthrough
-
-- <<: *linux-64-debug-template
-  name: linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 1440 # 1 day
-  modules:
-  - wtdevelop
-  expansions:
-    use_wt_develop: true
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --enable-free-mon=off
-    use_scons_cache: true
-    build_mongoreplay: true
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -8373,32 +8360,6 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   # Do not add more tasks to this list.
-
-- <<: *enterprise-windows-64-2k8-template
-  name: enterprise-windows-64-2k8-wtdevelop
-  display_name: "~ Enterprise Windows 2008R2 WiredTiger develop"
-  batchtime: 1440 # 1 day
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    test_flags: --excludeWithAnyTags=requires_mmapv1
-    use_wt_develop: true
-    platform_decompress: unzip
-    exe: ".exe"
-    msi_target: msi
-    content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
-    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
-    # spawning a large number of linker processes.
-    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
-    python: python
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    ext: zip
-    use_scons_cache: true
-    gorootvars: 'PATH="/cygdrive/c/go1.8/go/bin:/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:$PATH" GOROOT="c:/go1.8/go" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
-    tooltags: "-tags 'ssl sasl'"
-    build_mongoreplay: false
 
 - <<: *enterprise-windows-64-2k8-template
   name: enterprise-windows-64-2k8-openssl
