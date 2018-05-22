@@ -94,6 +94,13 @@ private:
                                                    Milliseconds maxTimeMSOverride,
                                                    const BSONObj& cmdObj) final;
 
+    StatusWith<Shard::QueryResponse> _runExhaustiveCursorCommand(
+        OperationContext* opCtx,
+        const ReadPreferenceSetting& readPref,
+        const std::string& dbName,
+        Milliseconds maxTimeMSOverride,
+        const BSONObj& cmdObj) final;
+
     StatusWith<QueryResponse> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
         const ReadPreferenceSetting& readPref,

@@ -121,18 +121,18 @@ public:
         auto scopedReceiveChunk(uassertStatusOK(
             ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(nss, chunkRange, fromShard)));
 
-        uassertStatusOK(MigrationDestinationManager::get(opCtx)->start(
-            nss,
-            std::move(scopedReceiveChunk),
-            migrationSessionId,
-            statusWithFromShardConnectionString.getValue(),
-            fromShard,
-            toShard,
-            chunkRange.getMin(),
-            chunkRange.getMax(),
-            shardKeyPattern,
-            shardVersion.epoch(),
-            writeConcern));
+        uassertStatusOK(
+            MigrationDestinationManager::get(opCtx)->start(opCtx,
+                                                           nss,
+                                                           std::move(scopedReceiveChunk),
+                                                           migrationSessionId,
+                                                           fromShard,
+                                                           toShard,
+                                                           chunkRange.getMin(),
+                                                           chunkRange.getMax(),
+                                                           shardKeyPattern,
+                                                           shardVersion.epoch(),
+                                                           writeConcern));
 
         result.appendBool("started", true);
         return true;

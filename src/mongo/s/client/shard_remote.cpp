@@ -239,21 +239,13 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
                                   std::move(writeConcernStatus));
 }
 
-StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
+StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     OperationContext* opCtx,
     const ReadPreferenceSetting& readPref,
-    const repl::ReadConcernLevel& readConcernLevel,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& sort,
-    boost::optional<long long> limit) {
-    invariant(isConfig());
-    auto const grid = Grid::get(opCtx);
-
-    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
-    readPrefWithMinOpTime.minOpTime = grid->configOpTime();
-
-    const auto host = _targeter->findHost(opCtx, readPrefWithMinOpTime);
+    const string& dbName,
+    Milliseconds maxTimeMSOverride,
+    const BSONObj& cmdObj) {
+    const auto host = _targeter->findHost(opCtx, readPref);
     if (!host.isOK()) {
         return host.getStatus();
     }
@@ -261,7 +253,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     QueryResponse response;
 
     // If for some reason the callback never gets invoked, we will return this status in response.
-    Status status = Status(ErrorCodes::InternalError, "Internal error running find command");
+    Status status =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
 
     auto fetcherCallback = [&status, &response](const Fetcher::QueryResponseStatus& dataStatus,
                                                 Fetcher::NextAction* nextAction,
@@ -302,6 +295,52 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         getMoreBob->append("collection", data.nss.coll());
     };
 
+    const Milliseconds requestTimeout =
+        std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+
+    Fetcher fetcher(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                    host.getValue(),
+                    dbName,
+                    cmdObj,
+                    fetcherCallback,
+                    _appendMetadataForCommand(opCtx, readPref),
+                    requestTimeout, /* command network timeout */
+                    requestTimeout /* getMore network timeout */);
+
+    Status scheduleStatus = fetcher.schedule();
+    if (!scheduleStatus.isOK()) {
+        return scheduleStatus;
+    }
+
+    fetcher.join();
+
+    updateReplSetMonitor(host.getValue(), status);
+
+    if (!status.isOK()) {
+        if (ErrorCodes::isExceededTimeLimitError(status.code())) {
+            LOG(0) << "Operation timed out " << causedBy(status);
+        }
+        return status;
+    }
+
+    return response;
+}
+
+
+StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const repl::ReadConcernLevel& readConcernLevel,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<long long> limit) {
+    invariant(isConfig());
+    auto const grid = Grid::get(opCtx);
+
+    ReadPreferenceSetting readPrefWithMinOpTime(readPref);
+    readPrefWithMinOpTime.minOpTime = grid->configOpTime();
+
     BSONObj readConcernObj;
     {
         invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
@@ -331,31 +370,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         qr.asFindCommand(&findCmdBuilder);
     }
 
-    Fetcher fetcher(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                    host.getValue(),
-                    nss.db().toString(),
-                    findCmdBuilder.done(),
-                    fetcherCallback,
-                    _appendMetadataForCommand(opCtx, readPrefWithMinOpTime),
-                    maxTimeMS /* find network timeout */,
-                    maxTimeMS /* getMore network timeout */);
-    Status scheduleStatus = fetcher.schedule();
-    if (!scheduleStatus.isOK()) {
-        return scheduleStatus;
-    }
-
-    fetcher.join();
-
-    updateReplSetMonitor(host.getValue(), status);
-
-    if (!status.isOK()) {
-        if (ErrorCodes::isExceededTimeLimitError(status.code())) {
-            LOG(0) << "Operation timed out " << causedBy(status);
-        }
-        return status;
-    }
-
-    return response;
+    return _runExhaustiveCursorCommand(
+        opCtx, readPrefWithMinOpTime, nss.db().toString(), maxTimeMS, findCmdBuilder.done());
 }
 
 Status ShardRemote::createIndexOnConfig(OperationContext* opCtx,

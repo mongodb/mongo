@@ -99,10 +99,10 @@ public:
     /**
      * Returns OK if migration started successfully.
      */
-    Status start(const NamespaceString& nss,
+    Status start(OperationContext* opCtx,
+                 const NamespaceString& nss,
                  ScopedReceiveChunk scopedReceiveChunk,
                  const MigrationSessionId& sessionId,
-                 const ConnectionString& fromShardConnString,
                  const ShardId& fromShard,
                  const ShardId& toShard,
                  const BSONObj& min,
@@ -147,7 +147,6 @@ private:
     void _migrateThread(BSONObj min,
                         BSONObj max,
                         BSONObj shardKeyPattern,
-                        ConnectionString fromShardConnString,
                         OID epoch,
                         WriteConcernOptions writeConcern);
 
@@ -155,7 +154,6 @@ private:
                         const BSONObj& min,
                         const BSONObj& max,
                         const BSONObj& shardKeyPattern,
-                        const ConnectionString& fromShardConnString,
                         const OID& epoch,
                         const WriteConcernOptions& writeConcern);
 
