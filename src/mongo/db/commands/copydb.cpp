@@ -26,6 +26,7 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -51,7 +53,8 @@ using namespace mongo;
 using std::string;
 using std::stringstream;
 
-/* Usage:
+/* The copydb command is deprecated. See http://dochub.mongodb.org/core/copydb-clone-deprecation.
+ * Usage:
  * admindb.$cmd.findOne( { copydb: 1, fromhost: <connection string>, fromdb: <db>,
  *                         todb: <db>[, username: <username>, nonce: <nonce>, key: <key>] } );
  *
@@ -122,6 +125,11 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
+        const char* deprecationWarning =
+            "Support for the copydb command has been deprecated. See "
+            "http://dochub.mongodb.org/core/copydb-clone-deprecation";
+        warning() << deprecationWarning;
+        result.append("note", deprecationWarning);
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);

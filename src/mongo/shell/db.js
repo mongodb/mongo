@@ -480,6 +480,8 @@ var DB;
      * See also: db.copyDatabase()
      */
     DB.prototype.cloneDatabase = function(from) {
+        print(
+            "WARNING: db.cloneDatabase is deprecated. See http://dochub.mongodb.org/core/copydb-clone-deprecation");
         assert(isString(from) && from.length);
         return this._dbCommand({clone: from});
     };
@@ -531,6 +533,8 @@ var DB;
     */
     DB.prototype.copyDatabase = function(
         fromdb, todb, fromhost, username, password, mechanism, slaveOk) {
+        print(
+            "WARNING: db.copyDatabase is deprecated. See http://dochub.mongodb.org/core/copydb-clone-deprecation");
         assert(isString(fromdb) && fromdb.length);
         assert(isString(todb) && todb.length);
         fromhost = fromhost || "";
@@ -592,9 +596,9 @@ var DB;
         print(
             "\tdb.aggregate([pipeline], {options}) - performs a collectionless aggregation on this database; returns a cursor");
         print("\tdb.auth(username, password)");
-        print("\tdb.cloneDatabase(fromhost)");
+        print("\tdb.cloneDatabase(fromhost) - deprecated");
         print("\tdb.commandHelp(name) returns the help for the command");
-        print("\tdb.copyDatabase(fromdb, todb, fromhost)");
+        print("\tdb.copyDatabase(fromdb, todb, fromhost) - deprecated");
         print("\tdb.createCollection(name, {size: ..., capped: ..., max: ...})");
         print("\tdb.createView(name, viewOn, [{$operator: {...}}, ...], {viewOptions})");
         print("\tdb.createUser(userDocument)");
