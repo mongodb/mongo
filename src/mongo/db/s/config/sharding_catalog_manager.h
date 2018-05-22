@@ -297,6 +297,14 @@ public:
                           const NamespaceString& ns,
                           const CollectionOptions& options);
 
+    /**
+     * Creates a ScopedLock on the collection name in _namespaceSerializer. This is to prevent
+     * timeouts waiting on the dist lock if multiple threads attempt to create the same collection.
+     */
+    auto serializeCreateCollection(OperationContext* opCtx, const NamespaceString& ns) {
+        return _namespaceSerializer.lock(opCtx, ns.ns());
+    }
+
     //
     // Shard Operations
     //
