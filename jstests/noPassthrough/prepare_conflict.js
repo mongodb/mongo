@@ -30,27 +30,36 @@
     // failpoint, then aborts when the failpoint is unset.
     // The update operation increments 'x' by one on the document 'doc'.
     function doUpdateTransactionPrepare(conn, query, update, txn) {
-        // Create the session.
-        let command = "var session = db.getMongo().startSession({causalConsistency: false});" +
-            "var sessionDB = session.getDatabase('test');";
-        // Update, but don't autocommit
-        command += "assert.commandWorked(sessionDB.runCommand({" + "update: '" + collName + "'," +
-            "updates: [{q: " + JSON.stringify(query) + ", u: " + JSON.stringify(update) + "}]," +
-            "txnNumber: NumberLong(" + txn + ")," + "readConcern: {level: 'snapshot'}," +
-            "autocommit: false," + "startTransaction: true" + "}));";
-        // Run prepare, which blocks until the failpoint is unset.
-        command += "assert.commandWorked(sessionDB.adminCommand(" +
-            "{prepareTransaction: 1, txnNumber: NumberLong(" + txn + "), autocommit: false}))";
+        TestData.collName = collName;
+        TestData.query = query;
+        TestData.update = update;
+        TestData.txnNumber = txn;
+        let shellFn = function() {
+            // Create the session.
+            var session = db.getMongo().startSession({causalConsistency: false});
+            var sessionDB = session.getDatabase('test');
+            // Update, but don't autocommit
+            assert.commandWorked(sessionDB.runCommand({
+                update: TestData.collName,
+                updates: [{q: TestData.query, u: TestData.update}],
+                txnNumber: NumberLong(TestData.txnNumber),
+                readConcern: {level: 'snapshot'},
+                autocommit: false,
+                startTransaction: true
+            }));
+            // Run prepare, which blocks until the failpoint is unset.
+            assert.commandWorked(sessionDB.adminCommand({
+                prepareTransaction: 1,
+                txnNumber: NumberLong(TestData.txnNumber),
+                autocommit: false
+            }));
+        };
 
-        return startParallelShell(command, conn.port);
+        return startParallelShell(shellFn, conn.port);
     }
 
     // Read until a prepare conflict is encountered
     function waitForPrepareConflict(conn, filter) {
-        // Enable the profiler to log slow queries. We expect a find to hang until the prepare
-        // conflict is resolved.
-        testDB.runCommand({profile: 1, level: 1, slowms: 100});
-
         assert.soon(function() {
             let res = testDB.runCommand({find: collName, filter: filter, maxTimeMS: 1000});
 
@@ -80,6 +89,10 @@
     const doc1 = {_id: 1, x: 1};
     assert.writeOK(testColl.insert(doc1));
 
+    // Enable the profiler to log slow queries. We expect a 'find' to hang until the prepare
+    // conflict is resolved.
+    testDB.runCommand({profile: 1, level: 1, slowms: 100});
+
     // Enable the failpoint to pause after running prepare.
     assert.commandWorked(testDB.adminCommand(
         {configureFailPoint: 'pauseAfterTransactionPrepare', mode: 'alwaysOn'}));
@@ -93,9 +106,10 @@
 
     // At this point, we can guarantee all subsequent reads will conflict. Do a read in a parallel
     // shell, disable the failpoint, then ensure the read succeeded with the old document.
-    let findAwait = startParallelShell("var it = db.getSiblingDB('test').runCommand({find: '" +
-                                           collName + "', filter: {_id: 1}});",
-                                       replSet.getPrimary().port);
+    TestData.collName = collName;
+    let findAwait = startParallelShell(function() {
+        var it = db.getSiblingDB('test').runCommand({find: TestData.collName, filter: {_id: 1}});
+    }, replSet.getPrimary().port);
 
     // Disable the failpoint to let the transaction proceed.
     assert.commandWorked(
