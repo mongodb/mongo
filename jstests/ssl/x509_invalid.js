@@ -12,7 +12,7 @@
     function testClient(conn, cert, name, shouldSucceed) {
         let auth = {mechanism: 'MONGODB-X509'};
         if (name !== null) {
-            auth.name = name;
+            auth.user = name;
         }
         const script = 'assert(db.getSiblingDB(\'$external\').auth(' + tojson(auth) + '));';
         clearRawMongoProgramOutput();
