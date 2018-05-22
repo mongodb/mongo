@@ -24,7 +24,11 @@
     /**
      * Waits for the provided latch to reach 0 and then does a single w:majority insert.
      */
-    const majorityInsert = function(num, host, dbName, collName, latch) {
+    const majorityInsert = function(testData, num, host, dbName, collName, latch) {
+        // Pass the TestData into the new thread so that the thread can inherit the auth
+        // credentials in the auth passthrough suites.
+        TestData = testData;
+
         const m = new Mongo(host);
         latch.countDown();
         while (latch.getCount() > 0) {
@@ -53,7 +57,8 @@
     const t = [];
     const counter = new CountDownLatch(numThreads + 1);
     for (let i = 0; i < numThreads; ++i) {
-        t[i] = new ScopedThread(majorityInsert, i, coll.getMongo().host, dbName, collName, counter);
+        t[i] = new ScopedThread(
+            majorityInsert, TestData, i, coll.getMongo().host, dbName, collName, counter);
         t[i].start();
     }
 
