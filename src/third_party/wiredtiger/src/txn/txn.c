@@ -882,9 +882,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			if (ref->page_del->update_list == NULL)
 				break;
 
-			for (;;) {
+			for (;; __wt_yield()) {
 				previous_state = ref->state;
-				if (__wt_atomic_casv32(
+				if (previous_state != WT_REF_LOCKED &&
+				    __wt_atomic_casv32(
 				    &ref->state, previous_state, WT_REF_LOCKED))
 					break;
 			}
@@ -1296,17 +1297,31 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_release_resources --
+ *	Release resources for a session's transaction data.
+ */
+void
+__wt_txn_release_resources(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+
+	WT_ASSERT(session, txn->mod_count == 0);
+	__wt_free(session, txn->mod);
+	txn->mod_alloc = 0;
+	txn->mod_count = 0;
+}
+
+/*
  * __wt_txn_destroy --
  *	Destroy a session's transaction data.
  */
 void
 __wt_txn_destroy(WT_SESSION_IMPL *session)
 {
-	WT_TXN *txn;
-
-	txn = &session->txn;
-	__wt_free(session, txn->mod);
-	__wt_free(session, txn->snapshot);
+	__wt_txn_release_resources(session);
+	__wt_free(session, session->txn.snapshot);
 }
 
 /*

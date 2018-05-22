@@ -1051,7 +1051,6 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 static int
 __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 {
-	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
@@ -1077,13 +1076,9 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 		WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
 		WT_ERR(__debug_item_key(ds, "K", key->data, key->size));
 
-		if ((cell = __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
-			WT_ERR(ds->f(ds, "\tV {}\n"));
-		else {
-			__wt_cell_unpack(cell, unpack);
-			WT_ERR(__debug_cell_data(
-			    ds, page, WT_PAGE_ROW_LEAF, "V", unpack));
-		}
+		__wt_row_leaf_value_cell(page, rip, NULL, unpack);
+		WT_ERR(__debug_cell_data(
+		    ds, page, WT_PAGE_ROW_LEAF, "V", unpack));
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
 			WT_ERR(__debug_update(ds, upd, false));

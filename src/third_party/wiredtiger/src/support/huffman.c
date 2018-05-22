@@ -520,11 +520,7 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 
 	*(void **)retp = huffman;
 
-	if (0) {
-err:		if (ret == 0)
-			ret = WT_ERROR;
-	}
-	__wt_free(session, indexed_freqs);
+err:	__wt_free(session, indexed_freqs);
 	if (leaves != NULL)
 		node_queue_close(session, leaves);
 	if (combined_nodes != NULL)

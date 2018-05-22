@@ -264,6 +264,9 @@ typedef struct {
 #define	ISOLATION_SNAPSHOT		4
 	u_int c_isolation_flag;			/* Isolation flag value */
 
+	uint32_t intl_page_max;			/* Maximum page sizes */
+	uint32_t leaf_page_max;
+
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */
 

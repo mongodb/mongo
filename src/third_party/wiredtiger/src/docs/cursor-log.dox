@@ -7,6 +7,8 @@ that have been configured for logging using the \c log configuration for
 ::wiredtiger_open.  In databases with log files, a log cursor provides
 access to the log records.  Although log cursors are read-only,
 applications may store records in the log using WT_SESSION::log_printf.
+While the log cursor is open automatic log file archiving, even if
+enabled, will not reclaim any log files.
 
 Each physical WiredTiger log record represents one or more operations
 in the database.  When a log record represents more than a single
@@ -88,7 +90,7 @@ common transaction ID, and operation counters starting at 1 and ending
 at 5.  The final return from the log cursor will again have a unique log
 ID, a unique transaction ID, and an operation counter of 0.
 
-Here's a more complete example of walking the file file and displaying
+Here's a more complete example of walking the log and displaying
 the results:
 
 @snippet ex_log.c log cursor walk

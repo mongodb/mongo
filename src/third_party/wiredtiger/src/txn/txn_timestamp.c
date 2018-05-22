@@ -780,17 +780,10 @@ __wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 		txn_global = &S2C(session)->txn_global;
 		WT_RET(__wt_txn_parse_timestamp(session, "read", &ts, &cval));
 
-		/*
-		 * Read timestamps imply / require snapshot isolation.
-		 *
-		 * If we already have a snapshot, it may be too early
-		 * to match the timestamp.  Get a new one.
-		 */
+		/* Read timestamps imply / require snapshot isolation. */
 		if (!F_ISSET(txn, WT_TXN_RUNNING))
 			txn->isolation = WT_ISO_SNAPSHOT;
-		else if (txn->isolation == WT_ISO_SNAPSHOT)
-			__wt_txn_get_snapshot(session);
-		else
+		else if (txn->isolation != WT_ISO_SNAPSHOT)
 			WT_RET_MSG(session, EINVAL, "setting a read_timestamp"
 			    " requires a transaction running at snapshot"
 			    " isolation");
@@ -853,6 +846,15 @@ __wt_txn_parse_read_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
 			    "timestamp %s : Rounded to oldest timestamp %s",
 			    hex_timestamp[0], hex_timestamp[1]);
 		}
+
+		/*
+		 * If we already have a snapshot, it may be too early to match
+		 * the timestamp (including the one we just read, if rounding
+		 * to oldest).  Get a new one.
+		 */
+		if (F_ISSET(txn, WT_TXN_RUNNING))
+			__wt_txn_get_snapshot(session);
+
 #else
 		WT_UNUSED(txn);
 		WT_RET_MSG(session, EINVAL, "read_timestamp requires a "

@@ -2034,16 +2034,15 @@ err:		WT_TRET(__wt_page_release(session, ref, 0));
  * referenced.
  */
 static int
-__slvg_row_ovfl_single(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL *cell)
+__slvg_row_ovfl_single(
+    WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL_UNPACK *unpack)
 {
-	WT_CELL_UNPACK unpack;
 	WT_TRACK *ovfl;
 	uint32_t i;
 
-	/* Unpack the cell, and check if it's an overflow record. */
-	__wt_cell_unpack(cell, &unpack);
-	if (unpack.type != WT_CELL_KEY_OVFL &&
-	    unpack.type != WT_CELL_VALUE_OVFL)
+	/* Check if it's an overflow record. */
+	if (unpack->type != WT_CELL_KEY_OVFL &&
+	    unpack->type != WT_CELL_VALUE_OVFL)
 		return (0);
 
 	/*
@@ -2052,8 +2051,8 @@ __slvg_row_ovfl_single(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL *cell)
 	 */
 	for (i = 0; i < trk->trk_ovfl_cnt; ++i) {
 		ovfl = trk->ss->ovfl[trk->trk_ovfl_slot[i]];
-		if (unpack.size == ovfl->trk_addr_size &&
-		    memcmp(unpack.data, ovfl->trk_addr, unpack.size) == 0)
+		if (unpack->size == ovfl->trk_addr_size &&
+		    memcmp(unpack->data, ovfl->trk_addr, unpack->size) == 0)
 			return (__slvg_ovfl_ref(session, ovfl, true));
 	}
 
@@ -2070,6 +2069,7 @@ __slvg_row_ovfl(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *page, uint32_t start, uint32_t stop)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
 	WT_ROW *rip;
 	void *copy;
 
@@ -2081,11 +2081,12 @@ __slvg_row_ovfl(WT_SESSION_IMPL *session,
 		copy = WT_ROW_KEY_COPY(rip);
 		(void)__wt_row_leaf_key_info(
 		    page, copy, NULL, &cell, NULL, NULL);
-		if (cell != NULL)
-			WT_RET(__slvg_row_ovfl_single(session, trk, cell));
-		cell = __wt_row_leaf_value_cell(page, rip, NULL);
-		if (cell != NULL)
-			WT_RET(__slvg_row_ovfl_single(session, trk, cell));
+		if (cell != NULL) {
+			__wt_cell_unpack(cell, &unpack);
+			WT_RET(__slvg_row_ovfl_single(session, trk, &unpack));
+		}
+		__wt_row_leaf_value_cell(page, rip, NULL, &unpack);
+		WT_RET(__slvg_row_ovfl_single(session, trk, &unpack));
 	}
 	return (0);
 }
