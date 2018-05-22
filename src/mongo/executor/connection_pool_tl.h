@@ -87,12 +87,12 @@ public:
 
     void indicateSuccess() override;
     void indicateFailure(Status status) override;
+    void indicateUsed() override;
     const HostAndPort& getHostAndPort() const override;
     bool isHealthy() override;
     AsyncDBClient* client();
 
 private:
-    void indicateUsed() override;
     Date_t getLastUsed() const override;
     const Status& getStatus() const override;
 

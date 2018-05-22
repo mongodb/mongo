@@ -344,6 +344,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::_onAcquireConn(
             } else if (!swr.getValue().isOK()) {
                 state->conn->indicateFailure(swr.getValue().status);
             } else {
+                state->conn->indicateUsed();
                 state->conn->indicateSuccess();
             }
 

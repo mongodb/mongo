@@ -245,6 +245,17 @@ public:
     virtual void indicateFailure(Status status) = 0;
 
     /**
+     * This method updates a 'liveness' timestamp to avoid unnecessarily refreshing
+     * the connection.
+     *
+     * This method should be invoked whenever we perform an operation on the connection that must
+     * have done work.  I.e. actual networking was performed.  If a connection was checked out, then
+     * back in without use, one would expect an indicateSuccess without an indicateUsed.  Only if we
+     * checked it out and did work would we call indicateUsed.
+     */
+    virtual void indicateUsed() = 0;
+
+    /**
      * The HostAndPort for the connection. This should be the same as the
      * HostAndPort passed to DependentTypeFactoryInterface::makeConnection.
      */
@@ -264,12 +275,6 @@ protected:
     using RefreshCallback = stdx::function<void(ConnectionInterface*, Status)>;
 
 private:
-    /**
-     * This method updates a 'liveness' timestamp to avoid unnecessarily refreshing
-     * the connection.
-     */
-    virtual void indicateUsed() = 0;
-
     /**
      * Returns the last used time point for the connection
      */
