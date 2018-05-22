@@ -136,7 +136,13 @@ var {
             "parallelCollectionScan",
         ]);
 
-        function canUseReadConcern(cmdObj) {
+        function canUseReadConcern(driverSession, cmdObj) {
+            // Always attach the readConcern to the first statement of the transaction, whether it
+            // is a read or a write.
+            if (driverSession._serverSession.isInActiveTransaction()) {
+                return driverSession._serverSession.isFirstStatement();
+            }
+
             let cmdName = Object.keys(cmdObj)[0];
 
             // If the command is in a wrapped form, then we look for the actual command name inside
@@ -242,12 +248,6 @@ var {
                 }
             }
 
-            // If startTransaction was called on the session, attach txn number and readConcern.
-            // TODO: SERVER-34170 guard this code with a wire version check.
-            if (driverSession._serverSession.isInActiveTransaction()) {
-                cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
-            }
-
             // TODO SERVER-31868: A user should get back an error if they attempt to advance the
             // DriverSession's operationTime manually when talking to a stand-alone mongod. Removing
             // the `(client.isReplicaSetMember() || client.isMongos())` condition will also involve
@@ -257,12 +257,7 @@ var {
                 (client.isReplicaSetMember() || client.isMongos()) &&
                 (driverSession.getOptions().isCausalConsistency() ||
                  client.isCausalConsistency()) &&
-                canUseReadConcern(cmdObj) &&
-                (!driverSession._serverSession.isInActiveTransaction() ||
-                 driverSession._serverSession.isFirstStatement())) {
-                // When we are in a transaction, we must only attach an afterClusterTime to the
-                // first statement because readConcern is not allowed in subsequent statements.
-
+                canUseReadConcern(driverSession, cmdObj)) {
                 // `driverSession.getOperationTime()` is the smallest time needed for performing a
                 // causally consistent read using the current session. Note that
                 // `client.getClusterTime()` is no smaller than the operation time and would
@@ -271,6 +266,12 @@ var {
                 if (operationTime !== undefined) {
                     cmdObj = injectAfterClusterTime(cmdObj, driverSession.getOperationTime());
                 }
+            }
+
+            // If startTransaction was called on the session, attach txn number and readConcern.
+            // TODO: SERVER-34170 guard this code with a wire version check.
+            if (driverSession._serverSession.isInActiveTransaction()) {
+                cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
             }
 
             // Retryable writes code should execute only we are not in an active transaction.
@@ -677,7 +678,8 @@ var {
                 cmdObjUnwrapped.startTransaction = true;
                 if (_txnOptions.getTxnReadConcern() !== undefined) {
                     // Override the readConcern with the one specified during startTransaction.
-                    cmdObjUnwrapped.readConcern = _txnOptions.getTxnReadConcern();
+                    cmdObjUnwrapped.readConcern = Object.assign(
+                        {}, cmdObjUnwrapped.readConcern, _txnOptions.getTxnReadConcern());
                 }
             }
 
