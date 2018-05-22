@@ -1,5 +1,5 @@
-// Test that causally consistent majority-committed reads will wait for the majority commit point to
-// move past 'afterClusterTime'.
+// Test that causally consistent majority-committed read-only transactions will wait for the
+// majority commit point to move past 'afterClusterTime' before they can commit.
 // @tags: [requires_replication]
 (function() {
     "use strict";
@@ -17,6 +17,8 @@
         rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     const primaryDB = session.getDatabase(dbName);
 
+    let txnNumber = 0;
+
     function testReadConcernLevel(level) {
         // Stop replication.
         stopReplicationOnSecondaries(rst);
@@ -27,20 +29,42 @@
         assert(res.opTime.hasOwnProperty("ts"), tojson(res));
         const clusterTime = res.opTime.ts;
 
-        // A committed read on the primary after the new cluster time should time out waiting for
-        // the cluster time to be majority committed.
-        session.startTransaction({readConcern: {level: level, afterClusterTime: clusterTime}});
-        assert.commandFailedWithCode(primaryDB.runCommand({find: collName, maxTimeMS: 1000}),
+        // A majority-committed read-only transaction on the primary after the new cluster time
+        // should time out at commit time waiting for the cluster time to be majority committed.
+        assert.commandWorked(primaryDB.runCommand({
+            find: collName,
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false,
+            readConcern: {level: level, afterClusterTime: clusterTime}
+        }));
+        assert.commandFailedWithCode(primaryDB.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"},
+            maxTimeMS: 1000
+        }),
                                      ErrorCodes.ExceededTimeLimit);
-        session.abortTransaction();
 
         // Restart replication.
         restartReplicationOnSecondaries(rst);
 
-        // A committed read on the primary after the new cluster time now succeeds.
-        session.startTransaction({readConcern: {level: level, afterClusterTime: clusterTime}});
-        assert.commandWorked(primaryDB.runCommand({find: collName}));
-        session.commitTransaction();
+        // A majority-committed read-only transaction on the primary after the new cluster time now
+        // succeeds.
+        assert.commandWorked(primaryDB.runCommand({
+            find: collName,
+            txnNumber: NumberLong(++txnNumber),
+            startTransaction: true,
+            autocommit: false,
+            readConcern: {level: level, afterClusterTime: clusterTime}
+        }));
+        assert.commandWorked(primaryDB.adminCommand({
+            commitTransaction: 1,
+            txnNumber: NumberLong(txnNumber),
+            autocommit: false,
+            writeConcern: {w: "majority"}
+        }));
     }
 
     if (assert.commandWorked(primaryDB.serverStatus()).storageEngine.supportsCommittedReads) {
