@@ -692,10 +692,9 @@ DBCollection.prototype.dropIndexes = function() {
     throw _getErrorWithCode(res, "error dropping indexes : " + tojson(res));
 };
 
-DBCollection.prototype.drop = function() {
-    if (arguments.length > 0)
-        throw Error("drop takes no argument");
-    var ret = this._db.runCommand({drop: this.getName()});
+DBCollection.prototype.drop = function(options = {}) {
+    const cmdObj = Object.assign({drop: this.getName()}, options);
+    ret = this._db.runCommand(cmdObj);
     if (!ret.ok) {
         if (ret.errmsg == "ns not found")
             return false;
