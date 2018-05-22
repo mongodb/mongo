@@ -26,6 +26,7 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/log.h"
 
 namespace {
 
@@ -47,7 +49,8 @@ using std::set;
 using std::string;
 using std::stringstream;
 
-/* Usage:
+/* The clone command is deprecated. See http://dochub.mongodb.org/core/copydb-clone-deprecation.
+   Usage:
    mydb.$cmd.findOne( { clone: "fromhost" } );
    Note: doesn't work with authentication enabled, except as internal operation or for
    old-style users for backwards compatibility.
@@ -90,6 +93,11 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
+        const char* deprecationWarning =
+            "Support for the clone command has been deprecated. See "
+            "http://dochub.mongodb.org/core/copydb-clone-deprecation";
+        warning() << deprecationWarning;
+        result.append("note", deprecationWarning);
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj)) {
             maybeDisableValidation.emplace(opCtx);
