@@ -12,9 +12,10 @@ TestData.skipCheckDBHashes = true;
 (function() {
     "use strict";
 
-    load("jstests/replsets/rslib.js");
     load("jstests/libs/feature_compatibility_version.js");
     load("jstests/libs/get_index_helpers.js");
+    load("jstests/libs/write_concern_util.js");
+    load("jstests/replsets/rslib.js");
 
     let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
     resetDbpath(dbpath);
@@ -214,7 +215,11 @@ TestData.skipCheckDBHashes = true;
 
     // Test that a 'lastStable' secondary can no longer replicate from the primary after the FCV is
     // upgraded to 'latestFCV'.
+    // Note: the 'lastStable' secondary must stop replicating during the upgrade to ensure it has no
+    // chance of seeing the 'upgrading to latest' message in the oplog, whereupon it would crash.
+    stopServerReplication(secondary);
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    restartServerReplication(secondary);
     checkFCV(secondaryAdminDB, lastStableFCV);
     assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
     assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(),
