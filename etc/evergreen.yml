@@ -4188,6 +4188,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: causally_consistent_jscore_txns_passthrough
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=causally_consistent_jscore_txns_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets_jscore_passthrough
   depends_on:
   - name: jsCore
@@ -6780,6 +6789,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -6927,6 +6937,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: mongosTest
   - name: noPassthrough
@@ -7056,6 +7067,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7144,6 +7156,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7258,6 +7271,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7342,6 +7356,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7475,6 +7490,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7574,6 +7590,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7659,6 +7676,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7740,6 +7758,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7828,6 +7847,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -7914,6 +7934,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8019,6 +8040,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: mongosTest
   - name: noPassthrough
@@ -8168,6 +8190,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8536,6 +8559,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8615,6 +8639,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: aggregation_fuzzer
   - name: jstestfuzz
@@ -8774,6 +8799,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -8850,6 +8876,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: replica_sets
   - name: tool
@@ -8887,6 +8914,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -9463,6 +9491,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: aggregation_fuzzer
   - name: jstestfuzz
@@ -10008,6 +10037,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -10099,6 +10129,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10210,6 +10241,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10297,6 +10329,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10413,6 +10446,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10521,6 +10555,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10627,6 +10662,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: noPassthroughWithMongod
   - name: noPassthrough
@@ -10703,6 +10739,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10780,6 +10817,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10883,6 +10921,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -10967,6 +11006,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -11060,6 +11100,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -11137,6 +11178,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -11204,6 +11246,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -11283,6 +11326,7 @@ buildvariants:
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -11353,6 +11397,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
@@ -11471,6 +11516,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jstestfuzz_concurrent_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: aggregation_fuzzer
@@ -11878,6 +11924,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -11970,6 +12017,7 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -12117,6 +12165,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: mongosTest
   - name: multiversion_auth
@@ -12297,6 +12346,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: jsonSchema
   - name: mongosTest
   - name: multiversion_auth
@@ -12374,6 +12424,7 @@ buildvariants:
   - name: dbtest
   - name: jsCore
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: watchdog_wiredtiger
 
 - name: ubuntu1604-debug-aubsan-async
@@ -12440,6 +12491,7 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion

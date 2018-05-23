@@ -20,6 +20,8 @@
     assert.commandWorked(sessionColl.insert({_id: "delete-doc"}));
     assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-1"}));
     assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-2"}));
+    assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-3"}));
+    assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-4"}));
     assert.commandWorked(sessionColl.insert({_id: "read-doc"}));
     assert.commandWorked(sessionColl.insert({_id: "update-doc"}));
     assert.commandWorked(sessionColl.insert({_id: "multi-update-doc-1"}));
@@ -56,6 +58,20 @@
     assert.eq(profileObj.op, "remove", tojson(profileObj));
     assert.eq(profileObj.ndeleted, 2, tojson(profileObj));
 
+    jsTestLog("Test batch delete.");
+    assert.commandWorked(sessionDB.runCommand({
+        delete: collName,
+        deletes: [
+            {q: {_id: "multi-delete-doc-3"}, limit: 1},
+            {q: {_id: "multi-delete-doc-4"}, limit: 1}
+        ]
+    }));
+    // We see the profile entry from the second delete.
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
+    assert.eq(profileObj.op, "remove", tojson(profileObj));
+    assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
+
     jsTestLog("Test distinct.");
     assert.eq(["read-doc"], sessionColl.distinct("_id", {_id: "read-doc"}));
     profileObj = getLatestProfilerEntry(testDB);
@@ -81,6 +97,27 @@
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
 
+    jsTestLog("Test geoSearch.");
+    assert.commandWorked(
+        sessionDB.runCommand({geoSearch: collName, near: [0, 0], maxDistance: 1, search: {a: 1}}));
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq(profileObj.op, "command", tojson(profileObj));
+    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
+    assert.eq(profileObj.command.geoSearch, sessionColl.getName(), tojson(profileObj));
+
+    jsTestLog("Test getMore.");
+    let res = assert.commandWorked(
+        sessionDB.runCommand({find: collName, filter: {_id: "read-doc"}, batchSize: 0}));
+    assert(res.hasOwnProperty("cursor"), tojson(res));
+    assert(res.cursor.hasOwnProperty("id"), tojson(res));
+    let cursorId = res.cursor.id;
+    res = assert.commandWorked(sessionDB.runCommand({getMore: cursorId, collection: collName}));
+    assert.eq([{_id: "read-doc"}], res.cursor.nextBatch, tojson(res));
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
+    assert.eq(profileObj.op, "getmore", tojson(profileObj));
+    assert.eq(profileObj.nreturned, 1, tojson(profileObj));
+
     jsTestLog("Test insert.");
     assert.commandWorked(sessionColl.insert({_id: "insert-doc"}));
     profileObj = getLatestProfilerEntry(testDB);
@@ -104,6 +141,21 @@
     assert.eq(profileObj.op, "update", tojson(profileObj));
     assert.eq(profileObj.nMatched, 2, tojson(profileObj));
     assert.eq(profileObj.nModified, 2, tojson(profileObj));
+
+    jsTestLog("Test batch update.");
+    assert.commandWorked(sessionDB.runCommand({
+        update: collName,
+        updates: [
+            {q: {_id: "multi-update-doc-1"}, u: {$set: {batch_updated: true}}},
+            {q: {_id: "multi-update-doc-2"}, u: {$set: {batch_updated: true}}}
+        ]
+    }));
+    // We see the profile entry from the second update.
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
+    assert.eq(profileObj.op, "update", tojson(profileObj));
+    assert.eq(profileObj.nMatched, 1, tojson(profileObj));
+    assert.eq(profileObj.nModified, 1, tojson(profileObj));
 
     jsTestLog("Committing transaction.");
     session.commitTransaction();
@@ -193,95 +245,5 @@
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
-    session.endSession();
-
-    jsTestLog("Test commands that cannot use shell helpers.");
-    assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-1"}));
-    assert.commandWorked(
-        sessionColl.insert({_id: "multi-delete-doc-2"}, {writeConcern: {w: "majority"}}));
-
-    session = testDB.getMongo().startSession(sessionOptions);
-    sessionDB = session.getDatabase(dbName);
-    sessionColl = sessionDB[collName];
-
-    jsTestLog("Test geoSearch.");
-    assert.commandWorked(sessionDB.runCommand({
-        geoSearch: collName,
-        near: [0, 0],
-        maxDistance: 1,
-        search: {a: 1},
-        readConcern: {level: "snapshot"},
-        startTransaction: true,
-        autocommit: false,
-        txnNumber: NumberLong(0),
-        stmtId: NumberInt(0)
-    }));
-    profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.op, "command", tojson(profileObj));
-    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
-    assert.eq(profileObj.command.geoSearch, sessionColl.getName(), tojson(profileObj));
-
-    jsTestLog("Test getMore.");
-    let res = assert.commandWorked(sessionDB.runCommand({
-        find: collName,
-        filter: {_id: "read-doc"},
-        batchSize: 0,
-        autocommit: false,
-        txnNumber: NumberLong(0),
-        stmtId: NumberInt(1)
-    }));
-    assert(res.hasOwnProperty("cursor"), tojson(res));
-    assert(res.cursor.hasOwnProperty("id"), tojson(res));
-    let cursorId = res.cursor.id;
-    res = assert.commandWorked(sessionDB.runCommand({
-        getMore: cursorId,
-        collection: collName,
-        autocommit: false,
-        txnNumber: NumberLong(0),
-        stmtId: NumberInt(2)
-    }));
-    assert.eq([{_id: "read-doc"}], res.cursor.nextBatch, tojson(res));
-    profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
-    assert.eq(profileObj.op, "getmore", tojson(profileObj));
-    assert.eq(profileObj.nreturned, 1, tojson(profileObj));
-
-    jsTestLog("Test batch delete.");
-    assert.commandWorked(sessionDB.runCommand({
-        delete: collName,
-        deletes: [
-            {q: {_id: "multi-delete-doc-1"}, limit: 1},
-            {q: {_id: "multi-delete-doc-2"}, limit: 1}
-        ],
-        autocommit: false,
-        txnNumber: NumberLong(0),
-        stmtId: NumberInt(3)
-    }));
-    // We see the profile entry from the second delete.
-    profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
-    assert.eq(profileObj.op, "remove", tojson(profileObj));
-    assert.eq(profileObj.ndeleted, 1, tojson(profileObj));
-
-    jsTestLog("Test batch update.");
-    assert.commandWorked(sessionDB.runCommand({
-        update: collName,
-        updates: [
-            {q: {_id: "multi-update-doc-1"}, u: {$set: {batch_updated: true}}},
-            {q: {_id: "multi-update-doc-2"}, u: {$set: {batch_updated: true}}}
-        ],
-        autocommit: false,
-        txnNumber: NumberLong(0),
-        stmtId: NumberInt(5)
-    }));
-    // We see the profile entry from the second update.
-    profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
-    assert.eq(profileObj.op, "update", tojson(profileObj));
-    assert.eq(profileObj.nMatched, 1, tojson(profileObj));
-    assert.eq(profileObj.nModified, 1, tojson(profileObj));
-
-    assert.commandWorked(sessionDB.adminCommand(
-        {commitTransaction: 1, autocommit: false, txnNumber: NumberLong(0), stmtId: NumberInt(7)}));
     session.endSession();
 }());

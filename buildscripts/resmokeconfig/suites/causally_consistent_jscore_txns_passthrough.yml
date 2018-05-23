@@ -1,0 +1,37 @@
+# This suite tests the core transactions functionality with causal consistency enabled on the
+# session. The purpose of this passthrough is to ensure that enabling causal consistency has no
+# effect on core transactions functionality.
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/txns/**/*.js
+  exclude_files:
+  # The following tests are excluded because they do not use the transactions shell helpers.
+  - jstests/core/txns/non_transactional_operations_on_session_with_transaction.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        var testingReplication = true; 
+        load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      readMode: commands
+  hooks:
+  # We don't execute dbHash or oplog consistency checks since there is only a single replica set
+  # node.
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+    # Use a 1-node replica set.
+    num_nodes: 1
