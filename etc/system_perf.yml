@@ -59,6 +59,109 @@ post:
           fi
 
 functions:
+  "compile mongodb":
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          MONGO_VERSION=$(git describe)
+          # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
+          # that githash to version string.
+          if [ "${wtdevelop|}" = "-wtdevelop" ]; then
+            WT_VERSION=$(cd src/third_party/wtdevelop; git describe | cut -c 9-)
+            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
+          fi
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src/src/mongo/gotools
+        script: |
+          set -o verbose
+          set -o errexit
+          # make sure newlines in the scripts are handled correctly by windows
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
+          sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
+          sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
+          . ./${set_tools_gopath|set_gopath.sh}
+          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
+          if [ "${build_mongoreplay}" = "true" ]; then
+            build_tools="$build_tools mongoreplay"
+          fi
+          for i in $build_tools; do
+            ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
+            "../../mongo-tools/$i${exe|}" --version
+          done
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
+          mkdir -p mongodb/bin
+          mkdir -p mongodb/jstests/hooks
+          mv mongo${extension|} mongodb/bin
+          mv mongod${extension|} mongodb/bin
+          mv mongos${extension|} mongodb/bin
+          mv src/mongo-tools/* mongodb/bin
+          if [ -d jstests/hooks ]
+          then
+            echo "Fetching JS test DB correctness checks from directory jstests"
+            cp -a jstests/* mongodb/jstests
+
+            echo "Now adding our own special run_validate_collections.js wrapper"
+            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
+
+            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
+            print("NOTE: run_validate_collections.js will skip the oplog!");
+            TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
+            load('jstests/hooks/run_validate_collections.actual.js');
+          EOF
+          fi
+          tar czf mongodb${wtdevelop|}.tar.gz mongodb
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb${wtdevelop|}.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongodb${wtdevelop|}.tar.gz
+
+  # NOTE: Unlike evergreen.yml, there's no conditional here. If called, this is never a noop!
+  "use WiredTiger develop" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+        cd src/third_party
+        for wtdir in api dist examples ext lang src test tools ; do
+          rm -rf wiredtiger/$wtdir
+          mv wtdevelop/$wtdir wiredtiger/
+        done
+
   "prepare environment":
     - command: shell.exec
       params:
@@ -84,7 +187,7 @@ functions:
           storageEngine: ${storageEngine}
           test_control: ${test}
           production: true
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongodb${wtdevelop|}-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
           EOF
@@ -227,93 +330,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
-          # If this is a patch build, we add the patch version id to the version string so we know
-          # this build was a patch, and which evergreen task it came from
-          if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-          fi
-
-          # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-    # Then we load the generated version data into the agent so we can use it in task definitions
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
-    - command: shell.exec
-      params:
-        working_dir: src/src/mongo/gotools
-        script: |
-          set -o verbose
-          set -o errexit
-          # make sure newlines in the scripts are handled correctly by windows
-          if [ "Windows_NT" = "$OS" ]; then
-            set -o igncr
-          fi;
-          sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
-          sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
-          . ./${set_tools_gopath|set_gopath.sh}
-          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
-          if [ "${build_mongoreplay}" = "true" ]; then
-            build_tools="$build_tools mongoreplay"
-          fi
-          for i in $build_tools; do
-            ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
-            "../../mongo-tools/$i${exe|}" --version
-          done
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
-          mkdir -p mongodb/bin
-          mkdir -p mongodb/jstests/hooks
-          mv mongo${extension|} mongodb/bin
-          mv mongod${extension|} mongodb/bin
-          mv mongos${extension|} mongodb/bin
-          mv src/mongo-tools/* mongodb/bin
-          if [ -d jstests/hooks ]
-          then
-            echo "Fetching JS test DB correctness checks from directory jstests"
-            cp -a jstests/* mongodb/jstests
-
-            echo "Now adding our own special run_validate_collections.js wrapper"
-            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
-
-            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
-            print("NOTE: run_validate_collections.js will skip the oplog!");
-            TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
-            load('jstests/hooks/run_validate_collections.actual.js');
-          EOF
-          fi
-          tar cf mongodb.tar mongodb
-          gzip mongodb.tar
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb.tar.gz
-        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: mongodb.tar.gz
+    - func: "compile mongodb"
 
 - name: industry_benchmarks_WT
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   priority: 5
   commands:
     - func: "prepare environment"
@@ -328,9 +347,6 @@ tasks:
         # script_flags: --ycsb-throughput-analysis reports
 
 - name: industry_benchmarks_secondary_reads_WT
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   priority: 5
   commands:
     - func: "prepare environment"
@@ -345,9 +361,6 @@ tasks:
 
 - name: industry_benchmarks_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -361,9 +374,6 @@ tasks:
 
 - name: industry_benchmarks_wmajority_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -377,9 +387,6 @@ tasks:
 
 - name: industry_benchmarks_wmajority_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -393,10 +400,6 @@ tasks:
 
 - name: crud_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
@@ -408,9 +411,6 @@ tasks:
 
 - name: mixed_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -422,9 +422,6 @@ tasks:
 
 - name: misc_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -436,9 +433,6 @@ tasks:
 
 - name: map_reduce_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -450,9 +444,6 @@ tasks:
 
 - name: smoke_test
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -464,9 +455,6 @@ tasks:
 
 - name: crud_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -478,9 +466,6 @@ tasks:
 
 - name: mixed_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -492,10 +477,6 @@ tasks:
 
 - name: misc_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
@@ -507,9 +488,6 @@ tasks:
 
 - name: map_reduce_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -521,9 +499,6 @@ tasks:
 
 - name: secondary_reads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -535,9 +510,6 @@ tasks:
 
 - name: retryable_writes_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -549,9 +521,6 @@ tasks:
 
 - name: bestbuy_agg_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -563,9 +532,6 @@ tasks:
 
 - name: bestbuy_query_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -577,9 +543,6 @@ tasks:
 
 - name: bestbuy_agg_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -591,9 +554,6 @@ tasks:
 
 - name: bestbuy_query_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -605,9 +565,6 @@ tasks:
 
 - name: non_sharded_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -619,9 +576,6 @@ tasks:
 
 - name: non_sharded_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -633,9 +587,6 @@ tasks:
 
 - name: mongos_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -647,10 +598,6 @@ tasks:
 
 - name: mongos_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
-  exec_timeout_secs: 32400 # 9 hours
   commands:
     - func: "prepare environment"
       vars:
@@ -662,9 +609,6 @@ tasks:
 
 - name: move_chunk_workloads_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -676,9 +620,6 @@ tasks:
 
 - name: move_chunk_workloads_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -690,9 +631,6 @@ tasks:
 
 - name: secondary_performance_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -706,9 +644,6 @@ tasks:
 
 - name: secondary_performance_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -722,9 +657,6 @@ tasks:
 
 - name: initialsync_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -736,9 +668,6 @@ tasks:
 
 - name: initialsync_MMAPv1
   priority: 5
-  depends_on:
-    - name: compile
-      variant : linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -750,9 +679,6 @@ tasks:
 
 - name: initialsync-logkeeper_WT
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   exec_timeout_secs: 216000 # 2.5 days
   commands:
     - func: "prepare environment"
@@ -765,9 +691,6 @@ tasks:
 
 - name: change_streams_throughput
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -779,9 +702,6 @@ tasks:
 
 - name: change_streams_latency
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -793,9 +713,6 @@ tasks:
 
 - name: change_streams_multi_mongos
   priority: 5
-  depends_on:
-    - name: compile
-      variant: linux-standalone
   commands:
     - func: "prepare environment"
       vars:
@@ -824,10 +741,33 @@ modules:
 
 
 #######################################
+#         Buildvariants               #
+#######################################
+buildvariants:
+
+# We are explicitly tracking the rhel70 variant compile options from evergreen.yml.  If we can get
+# proper artifacts directly from that project, we should do that and remove these tasks.
+- name: compile-rhel70
+  display_name: Compile on rhel70
+  batchtime: 1440 # 24 hours
+  modules:
+    - wtdevelop
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    platform: linux
+    project: &project dsi
+    tooltags: ""
+    use_scons_cache: true
+  run_on:
+      - "rhel70"
+  tasks:
+    - name: compile
+
+
+#######################################
 #         Linux Buildvariants         #
 #######################################
-
-buildvariants:
 - name: linux-1-node-replSet
   display_name: Linux 1-Node ReplSet
   batchtime: 1440 # 24 hours
@@ -838,9 +778,12 @@ buildvariants:
     setup: single-replica
     cluster: single
     platform: linux
-    project: &project dsi
+    project: *project
   run_on:
       - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
@@ -868,16 +811,15 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     setup: standalone
     cluster: single
     platform: linux
-    use_scons_cache: true
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    tooltags: ""
     project: *project
   run_on:
       - "rhel70-perf-single"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
     - name: compile
       distros:
@@ -911,6 +853,9 @@ buildvariants:
     project: *project
   run_on:
       - "rhel70-perf-shard"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
     - name: industry_benchmarks_WT
     - name: crud_workloads_WT
@@ -949,6 +894,9 @@ buildvariants:
     project: *project
   run_on:
       - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
     - name: industry_benchmarks_WT
     - name: industry_benchmarks_secondary_reads_WT
@@ -988,6 +936,9 @@ buildvariants:
     project: *project
   run_on:
       - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
     - name: initialsync_WT
     - name: initialsync_MMAPv1
@@ -1003,5 +954,8 @@ buildvariants:
     project: *project
   run_on:
       - "rhel70-perf-initialsync-logkeeper"
+  depends_on:
+      - name: compile
+        variant: compile-rhel70
   tasks:
     - name: initialsync-logkeeper_WT
