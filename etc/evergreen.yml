@@ -598,7 +598,7 @@ functions:
 
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
-          pip install boto3
+          pip install boto3==1.5.27
 
           if [ -f /proc/self/coredump_filter ]; then
             # Set the shell process (and its children processes) to dump ELF headers (bit 4),
