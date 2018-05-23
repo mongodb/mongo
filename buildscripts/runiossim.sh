@@ -25,23 +25,30 @@ shift
 
 cleanup() {
     echo "Shutting down simulator"
-    xcrun simctl shutdown $_SimId
+    xcrun simctl shutdown $_SimId || true
 
     echo "Erasing simulator"
-    xcrun simctl erase $_SimId
+    xcrun simctl erase $_SimId || true
 
     echo "Deleting simulator"
-    xcrun simctl delete $_SimId
+    xcrun simctl delete $_SimId || true
+
+    echo "Exiting with status $1"
+    exit $1
 }
 
 echo "Creating simulator"
 _SimId=$(xcrun simctl create mongodb-simulator-$DEVICE.$RUNTIME "com.apple.CoreSimulator.SimDeviceType.$DEVICE" "com.apple.CoreSimulator.SimRuntime.$RUNTIME")
 echo "Simulator created with ID $_SimId"
 
-trap cleanup EXIT
+trap 'cleanup $?' INT TERM EXIT
 
 echo "Booting simulator"
 xcrun simctl boot $_SimId
 
 echo "Spawning test program in simulator"
 xcrun simctl spawn $_SimId "$TEST" "$@"
+
+# Do not add additional statements after the above spawn without
+# forwarding its exit status or you will cause failing tests to appear
+# to succeed.

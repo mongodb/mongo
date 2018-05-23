@@ -20,28 +20,46 @@ shift
 
 EMULATOR_PID=''
 cleanup() {
-    kill $EMULATOR_PID
-    wait $EMULATOR_PID
-    $ANDROID_SDK/tools/bin/avdmanager delete avd -n android_avd
+    echo "Cleanup handler invoked"
+
+    if [ -z "$EMULATOR_PID" ]; then
+        echo "No EMULATOR_PID found; not killing"
+    else
+        echo "Killing emulator"
+        kill $EMULATOR_PID || true
+
+        echo "Waiting for emulator to shut down"
+        wait $EMULATOR_PID || true
+    fi
+
+    echo "Deleting the virtual device"
+    $ANDROID_SDK/tools/bin/avdmanager delete avd -n android_avd || true
+
+    echo "Exiting with status $1"
+    exit $1
 }
 
-trap cleanup EXIT
-
-# create a virtual device
+echo "Creating Android virtual device"
 echo no | $ANDROID_SDK/tools/bin/avdmanager create avd --force -k "system-images;android-24;google_apis;$ANDROID_SYSTEM_IMAGE_ARCH" --name android_avd --abi google_apis/$ANDROID_SYSTEM_IMAGE_ARCH -p android_avd
 
-# start the device on the emulator
+trap 'cleanup $?' INT TERM EXIT
+
+echo "Starting the virtual device on the emulator"
 $ANDROID_SDK/emulator/emulator @android_avd -no-window -no-audio &
 EMULATOR_PID=$!
 
-#wait for the adb service to be ready for commands
+echo "Waiting for the adb service to be ready for commands"
 $ANDROID_SDK/platform-tools/adb wait-for-device
 
-#have the adb service become root
+echo "Making the adb service become root"
 $ANDROID_SDK/platform-tools/adb root
 
-#move the test to the device
+echo "Copying the test to the virtual device"
 $ANDROID_SDK/platform-tools/adb push $DIRECTORY /data
 
-#run the device
+echo "Running the test on the virtual device"
 $ANDROID_SDK/platform-tools/adb shell /data/$(basename $DIRECTORY)/$TEST_PATH_IN_DIRECTORY "$@"
+
+# Do not add additional statements after the above adb invocation without
+# forwarding its exit status or you will cause failing tests to appear
+# to succeed.
