@@ -42,6 +42,10 @@ class BSONObj;
 class Collection;
 class OperationContext;
 
+// After completing a batch of document deletions, the time in millis to wait before commencing the
+// next batch of deletions.
+extern AtomicInt32 rangeDeleterBatchDelayMS;
+
 class CollectionRangeDeleter {
     MONGO_DISALLOW_COPYING(CollectionRangeDeleter);
 

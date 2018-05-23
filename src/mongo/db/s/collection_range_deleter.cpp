@@ -50,6 +50,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
@@ -58,6 +59,15 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_EXPORT_SERVER_PARAMETER(rangeDeleterBatchDelayMS, int, 20)
+    ->withValidator([](const int& newVal) {
+        if (newVal < 0) {
+            return Status(ErrorCodes::BadValue, "rangeDeleterBatchDelayMS must not be negative");
+        }
+        return Status::OK();
+    });
+
 namespace {
 
 using Deletion = CollectionRangeDeleter::Deletion;
@@ -264,7 +274,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                    << redact(self->_orphans.front().range.toString()) << " next.";
         }
 
-        return Date_t{};
+        return Date_t::now() + stdx::chrono::milliseconds{rangeDeleterBatchDelayMS.load()};
     }
 
     invariant(range);
@@ -272,7 +282,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     invariant(wrote.getValue() > 0);
 
     notification.abandon();
-    return Date_t{};
+    return Date_t::now() + stdx::chrono::milliseconds{rangeDeleterBatchDelayMS.load()};
 }
 
 StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
@@ -321,16 +331,16 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         saver.emplace("moveChunk", nss.ns(), "cleaning");
     }
 
+    auto halfOpen = BoundInclusion::kIncludeStartKeyOnly;
+    auto manual = PlanExecutor::YIELD_MANUAL;
+    auto forward = InternalPlanner::FORWARD;
+    auto fetch = InternalPlanner::IXSCAN_FETCH;
+
+    auto exec = InternalPlanner::indexScan(
+        opCtx, collection, descriptor, min, max, halfOpen, manual, forward, fetch);
+
     int numDeleted = 0;
     do {
-        auto halfOpen = BoundInclusion::kIncludeStartKeyOnly;
-        auto manual = PlanExecutor::YIELD_MANUAL;
-        auto forward = InternalPlanner::FORWARD;
-        auto fetch = InternalPlanner::IXSCAN_FETCH;
-
-        auto exec = InternalPlanner::indexScan(
-            opCtx, collection, descriptor, min, max, halfOpen, manual, forward, fetch);
-
         RecordId rloc;
         BSONObj obj;
         PlanExecutor::ExecState state = exec->getNext(&obj, &rloc);
@@ -346,6 +356,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         }
         invariant(PlanExecutor::ADVANCED == state);
 
+        exec->saveState();
         writeConflictRetry(opCtx, "delete range", nss.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
             if (saver) {
@@ -354,6 +365,15 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
             collection->deleteDocument(opCtx, kUninitializedStmtId, rloc, nullptr, true);
             wuow.commit();
         });
+        auto restoreStateStatus = exec->restoreState();
+        if (!restoreStateStatus.isOK()) {
+            warning() << "error restoring cursor state while trying to delete " << redact(min)
+                      << " to " << redact(max) << " in " << nss
+                      << ", stats: " << Explain::getWinningPlanStats(exec.get()) << ": "
+                      << redact(restoreStateStatus);
+            break;
+        }
+
     } while (++numDeleted < maxToDelete);
 
     return numDeleted;

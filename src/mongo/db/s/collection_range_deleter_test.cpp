@@ -291,7 +291,6 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // catch range3, [3..4) only
     auto next1 = next(rangeDeleter, 100);
     ASSERT_TRUE(next1);
-    ASSERT_EQUALS(*next1, Date_t{});
 
     // no op log entry for immediate deletions
     ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
@@ -307,7 +306,6 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // this will find the [3..4) range empty, so pop the range and notify
     auto next2 = next(rangeDeleter, 100);
     ASSERT_TRUE(next2);
-    ASSERT_EQUALS(*next2, Date_t{});
 
     // still no op log entry, because not delayed
     ASSERT_EQUALS(0ULL, dbclient.count(kAdminSysVer.ns(), BSON(kShardKey << "startRangeDeletion")));
@@ -325,7 +323,6 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // However, the time to delete them is now, so the range is moved to the regular queue.
     auto next3 = next(rangeDeleter, 100);
     ASSERT_TRUE(next3);
-    ASSERT_EQUALS(*next3, Date_t{});
 
     ASSERT_FALSE(notifn1.ready());  // no trigger yet
     ASSERT_FALSE(notifn2.ready());  // no trigger yet
@@ -344,7 +341,6 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // this will find the [0..3) range empty, so pop the range and notify
     auto next4 = next(rangeDeleter, 100);
     ASSERT_TRUE(next4);
-    ASSERT_EQUALS(*next4, Date_t{});
 
     ASSERT_TRUE(notifn1.ready());
     ASSERT_OK(notifn1.waitStatus(operationContext()));
@@ -364,7 +360,6 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // delete the remaining documents
     auto next5 = next(rangeDeleter, 100);
     ASSERT_TRUE(next5);
-    ASSERT_EQUALS(*next5, Date_t{});
 
     ASSERT_FALSE(notifn2.ready());
 
@@ -382,7 +377,6 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     // discover there are no more, pop range 2
     auto next6 = next(rangeDeleter, 100);
     ASSERT_TRUE(next6);
-    ASSERT_EQUALS(*next6, Date_t{});
 
     ASSERT_TRUE(notifn2.ready());
     ASSERT_OK(notifn2.waitStatus(operationContext()));
