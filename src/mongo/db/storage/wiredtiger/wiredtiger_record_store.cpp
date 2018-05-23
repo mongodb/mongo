@@ -779,6 +779,8 @@ int64_t WiredTigerRecordStore::cappedMaxSize() const {
 int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {
+    dassert(opCtx->lockState()->isReadLocked());
+
     if (_isEphemeral) {
         return dataSize(opCtx);
     }
@@ -808,6 +810,8 @@ RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const
 }
 
 RecordData WiredTigerRecordStore::dataFor(OperationContext* opCtx, const RecordId& id) const {
+    dassert(opCtx->lockState()->isReadLocked());
+
     // ownership passes to the shared_array created below
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* c = curwrap.get();
@@ -822,6 +826,8 @@ RecordData WiredTigerRecordStore::dataFor(OperationContext* opCtx, const RecordI
 bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
                                        const RecordId& id,
                                        RecordData* out) const {
+    dassert(opCtx->lockState()->isReadLocked());
+
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* c = curwrap.get();
     invariant(c);
@@ -836,6 +842,8 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& id) {
+    dassert(opCtx->lockState()->isWriteLocked());
+
     // Deletes should never occur on a capped collection because truncation uses
     // WT_SESSION::truncate().
     invariant(!isCapped());
@@ -1156,6 +1164,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              Record* records,
                                              const Timestamp* timestamps,
                                              size_t nRecords) {
+    dassert(opCtx->lockState()->isWriteLocked());
+
     // We are kind of cheating on capped collections since we write all of them at once ....
     // Simplest way out would be to just block vector writes for everything except oplog ?
     int64_t totalLength = 0;
@@ -1264,6 +1274,8 @@ Status WiredTigerRecordStore::insertRecordsWithDocWriter(OperationContext* opCtx
                                                          const Timestamp* timestamps,
                                                          size_t nDocs,
                                                          RecordId* idsOut) {
+    dassert(opCtx->lockState()->isReadLocked());
+
     std::unique_ptr<Record[]> records(new Record[nDocs]);
 
     // First get all the sizes so we can allocate a single buffer for all documents. Eventually it
@@ -1305,6 +1317,8 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                                            int len,
                                            bool enforceQuota,
                                            UpdateNotifier* notifier) {
+    dassert(opCtx->lockState()->isWriteLocked());
+
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
@@ -1415,6 +1429,8 @@ Status WiredTigerRecordStore::compact(OperationContext* opCtx,
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats) {
+    dassert(opCtx->lockState()->isWriteLocked());
+
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
@@ -1430,6 +1446,8 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output) {
+    dassert(opCtx->lockState()->isReadLocked());
+
     if (!_isEphemeral && level == kValidateFull) {
         int err = WiredTigerUtil::verifyTable(opCtx, _uri, &results->errors);
         if (err == EBUSY) {
@@ -1559,6 +1577,8 @@ void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationCon
 
 boost::optional<RecordId> WiredTigerRecordStore::oplogStartHack(
     OperationContext* opCtx, const RecordId& startingPosition) const {
+    dassert(opCtx->lockState()->isReadLocked());
+
     if (!_isOplog)
         return boost::none;
 
@@ -1955,6 +1975,8 @@ void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, RecordId id) const
 
 std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
     OperationContext* opCtx, bool forward) const {
+    dassert(opCtx->lockState()->isReadLocked());
+
     if (_isOplog && forward) {
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
         // If we already have a snapshot we don't know what it can see, unless we know no one
@@ -2006,6 +2028,8 @@ PrefixedWiredTigerRecordStore::PrefixedWiredTigerRecordStore(WiredTigerKVEngine*
 
 std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
     OperationContext* opCtx, bool forward) const {
+    dassert(opCtx->lockState()->isReadLocked());
+
     if (_isOplog && forward) {
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
         // If we already have a snapshot we don't know what it can see, unless we know no one
