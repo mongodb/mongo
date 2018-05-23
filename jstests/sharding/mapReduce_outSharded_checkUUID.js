@@ -10,8 +10,7 @@
         assert.eq(out.counts.output, output, "output count is wrong");
     };
 
-    var st = new ShardingTest(
-        {shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+    var st = new ShardingTest({shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1}});
 
     var admin = st.s0.getDB('admin');
 
@@ -59,7 +58,7 @@
     assert.commandWorked(admin.runCommand(
         {moveChunk: "mrShard.mergeSharded", find: {"_id": 2000}, to: st.shard0.shardName}));
     assert.writeOK(st.s.getCollection("mrShard.mergeSharded").insert({_id: 1000}));
-    assert.writeOK(st.s.getCollection("mrShard.mergeSharded".toString()).insert({_id: 2001}));
+    assert.writeOK(st.s.getCollection("mrShard.mergeSharded").insert({_id: 2001}));
     origUUID = getUUIDFromConfigCollections(st.s, "mrShard.mergeSharded");
 
     out = db.srcSharded.mapReduce(map, reduce, {out: {merge: "mergeSharded", sharded: true}});
@@ -78,7 +77,7 @@
     assert.commandWorked(admin.runCommand(
         {moveChunk: "mrShard.replaceSharded", find: {"_id": 2000}, to: st.shard0.shardName}));
     assert.writeOK(st.s.getCollection("mrShard.replaceSharded").insert({_id: 1000}));
-    assert.writeOK(st.s.getCollection("mrShard.replaceSharded".toString()).insert({_id: 2001}));
+    assert.writeOK(st.s.getCollection("mrShard.replaceSharded").insert({_id: 2001}));
     origUUID = getUUIDFromConfigCollections(st.s, "mrShard.replaceSharded");
 
     out = db.srcSharded.mapReduce(map, reduce, {out: {replace: "replaceSharded", sharded: true}});
