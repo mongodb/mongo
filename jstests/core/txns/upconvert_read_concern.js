@@ -13,7 +13,6 @@
 
     assert.commandWorked(
         testDB.createCollection(testColl.getName(), {writeConcern: {w: "majority"}}));
-    let txnNumber = 0;
 
     const sessionOptions = {causalConsistency: false};
     const session = db.getMongo().startSession(sessionOptions);
@@ -22,17 +21,10 @@
     function testUpconvertReadConcern(readConcern) {
         jsTest.log("Test that the following readConcern is upconverted: " + tojson(readConcern));
         assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
-        txnNumber++;
-        let stmtId = 0;
 
         // Start a new transaction with the given readConcern.
-        let command = {
-            find: collName,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            startTransaction: true,
-            autocommit: false
-        };
+        session.startTransaction();
+        let command = {find: collName};
         if (readConcern) {
             Object.extend(command, {readConcern: readConcern});
         }
@@ -42,21 +34,11 @@
         assert.commandWorked(testColl.insert({_id: 0}, {writeConcern: {w: "majority"}}));
 
         // Test that the transaction does not see the new document (it has snapshot isolation).
-        let res = assert.commandWorked(sessionDb.runCommand({
-            find: collName,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            autocommit: false
-        }));
+        let res = assert.commandWorked(sessionDb.runCommand({find: collName}));
         assert.eq(res.cursor.firstBatch.length, 0, tojson(res));
 
         // Commit the transaction.
-        assert.commandWorked(sessionDb.adminCommand({
-            commitTransaction: 1,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            autocommit: false
-        }));
+        assert.commandWorked(session.commitTransaction_forTesting());
     }
 
     testUpconvertReadConcern(null);
@@ -67,27 +49,17 @@
 
     function testCannotUpconvertReadConcern(readConcern) {
         jsTest.log("Test that the following readConcern cannot be upconverted: " + readConcern);
-        txnNumber++;
-        let stmtId = 0;
 
         // Start a new transaction with the given readConcern.
-        assert.commandFailedWithCode(sessionDb.runCommand({
-            find: collName,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            startTransaction: true,
-            autocommit: false,
-            readConcern: readConcern
-        }),
-                                     ErrorCodes.InvalidOptions);
+        session.startTransaction();
+        assert.commandFailedWithCode(
+            sessionDb.runCommand({find: collName, readConcern: readConcern}),
+            ErrorCodes.InvalidOptions);
 
         // No more operations are allowed in the transaction.
-        assert.commandFailedWithCode(sessionDb.runCommand({
-            find: collName,
-            txnNumber: NumberLong(txnNumber),
-            stmtId: NumberInt(stmtId++),
-            autocommit: false
-        }),
+        assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
+                                     ErrorCodes.NoSuchTransaction);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
     }
 
@@ -97,58 +69,30 @@
     jsTest.log("Test starting a transaction with an invalid readConcern");
 
     // Start a new transaction with the given readConcern.
-    txnNumber++;
-    let stmtId = 0;
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        startTransaction: true,
-        autocommit: false,
-        readConcern: {level: "bad"}
-    }),
-                                 ErrorCodes.FailedToParse);
+    session.startTransaction();
+    assert.commandFailedWithCode(
+        sessionDb.runCommand({find: collName, readConcern: {level: "bad"}}),
+        ErrorCodes.FailedToParse);
 
     // No more operations are allowed in the transaction.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false
-    }),
+    assert.commandFailedWithCode(sessionDb.runCommand({find: collName}),
+                                 ErrorCodes.NoSuchTransaction);
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 
     jsTest.log("Test specifying readConcern on the second statement in a transaction");
 
     // Start a new transaction with snapshot readConcern.
-    txnNumber++;
-    stmtId = 0;
-    assert.commandWorked(sessionDb.runCommand({
-        find: collName,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        startTransaction: true,
-        autocommit: false,
-        readConcern: {level: "snapshot"}
-    }));
+    session.startTransaction();
+    assert.commandWorked(sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}));
 
     // The second statement cannot specify a readConcern.
-    assert.commandFailedWithCode(sessionDb.runCommand({
-        find: collName,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false,
-        readConcern: {level: "snapshot"}
-    }),
-                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        sessionDb.runCommand({find: collName, readConcern: {level: "snapshot"}}),
+        ErrorCodes.InvalidOptions);
 
     // The transaction is still active and can be committed.
-    assert.commandWorked(sessionDb.adminCommand({
-        commitTransaction: 1,
-        txnNumber: NumberLong(txnNumber),
-        stmtId: NumberInt(stmtId++),
-        autocommit: false
-    }));
+    assert.commandWorked(session.commitTransaction_forTesting());
 
     session.endSession();
 }());

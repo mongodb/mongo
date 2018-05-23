@@ -205,10 +205,18 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
 Status waitForReadConcern(OperationContext* opCtx,
                           const repl::ReadConcernArgs& readConcernArgs,
                           bool allowAfterClusterTime) {
+    // If we are in a direct client within a transaction, then we may be holding locks, so it is
+    // illegal to wait for read concern. This is fine, since the outer operation should have handled
+    // waiting for read concern.
+    auto session = OperationContextSession::get(opCtx);
+    if (opCtx->getClient()->isInDirectClient() && session &&
+        session->inMultiDocumentTransaction()) {
+        return Status::OK();
+    }
+
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord);
 
-    auto session = OperationContextSession::get(opCtx);
     // Currently speculative read concern is used only for transactions and snapshot reads. However,
     // speculative read concern is not yet supported with atClusterTime.
     //
