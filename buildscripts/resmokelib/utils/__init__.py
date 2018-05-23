@@ -11,6 +11,8 @@ import sys
 
 import yaml
 
+from . import archival
+
 
 @contextlib.contextmanager
 def open_or_use_stdout(filename):

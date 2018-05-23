@@ -8,6 +8,7 @@ import threading
 import time
 
 from . import fixtures
+from . import hook_test_archival as archival
 from . import hooks as _hooks
 from . import job as _job
 from . import report as _report
@@ -34,7 +35,9 @@ class TestSuiteExecutor(object):
                  suite,
                  config=None,
                  fixture=None,
-                 hooks=None):
+                 hooks=None,
+                 archive_instance=None,
+                 archive=None):
         """
         Initializes the TestSuiteExecutor with the test suite to run.
         """
@@ -49,6 +52,11 @@ class TestSuiteExecutor(object):
 
         self.hooks_config = utils.default_if_none(hooks, [])
         self.test_config = utils.default_if_none(config, {})
+
+        self.archival = None
+        if archive_instance:
+            self.archival = archival.HookTestArchival(
+                suite, self.hooks_config, archive_instance, archive)
 
         self._suite = suite
 
@@ -269,7 +277,7 @@ class TestSuiteExecutor(object):
 
         report = _report.TestReport(job_logger, self._suite.options)
 
-        return _job.Job(job_logger, fixture, hooks, report, self._suite.options)
+        return _job.Job(job_logger, fixture, hooks, report, self.archival, self._suite.options)
 
     def _make_test_queue(self):
         """

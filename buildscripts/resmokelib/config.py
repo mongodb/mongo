@@ -41,6 +41,9 @@ DEFAULT_DBPATH_PREFIX = os.path.normpath("/data/db")
 
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
+    "archive_file": None,
+    "archive_limit_mb": 5000,
+    "archive_limit_tests": 10,
     "base_port": 20000,
     "buildlogger_url": "https://logkeeper.mongodb.org",
     "continue_on_failure": False,
@@ -184,6 +187,15 @@ SuiteOptions.ALL_INHERITED = SuiteOptions(**dict(zip(SuiteOptions._fields,
 # Variables that are set by the user at the command line or with --options.
 ##
 
+# The name of the archive JSON file used to associate S3 archives to an Evergreen task.
+ARCHIVE_FILE = None
+
+# The limit size of all archive files for an Evergreen task.
+ARCHIVE_LIMIT_MB = None
+
+# The limit number of tests to archive for an Evergreen task.
+ARCHIVE_LIMIT_TESTS = None
+
 # The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
 # mongo shell.
 BASE_PORT = None
@@ -205,8 +217,17 @@ DRY_RUN = None
 # The identifier for the Evergreen distro that resmoke.py is being run on.
 EVERGREEN_DISTRO_ID = None
 
+# The number of the Evergreen execution that resmoke.py is being run on.
+EVERGREEN_EXECUTION = None
+
 # If true, then resmoke.py is being run as part of a patch build in Evergreen.
 EVERGREEN_PATCH_BUILD = None
+
+# The name of the Evergreen project that resmoke.py is being run on.
+EVERGREEN_PROJECT_NAME = None
+
+# The git revision of the Evergreen task that resmoke.py is being run on.
+EVERGREEN_REVISION = None
 
 # The identifier for the Evergreen task that resmoke.py is being run under. If set, then the
 # Evergreen task id value will be transmitted to logkeeper when creating builds and tests.
@@ -328,6 +349,9 @@ BENCHMARK_REPETITIONS = None
 ##
 # Internally used configuration options that aren't exposed to the user
 ##
+
+# S3 Bucket to upload archive files.
+ARCHIVE_BUCKET = "mongodatafiles"
 
 # Benchmark options set internally by resmoke.py
 BENCHMARK_OUT_FORMAT = "json"

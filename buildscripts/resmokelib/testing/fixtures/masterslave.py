@@ -61,6 +61,9 @@ class MasterSlaveFixture(interface.ReplFixture):
             self.slave = self._new_mongod_slave()
         self.slave.setup()
 
+    def get_dbpath(self):
+         return self._dbpath_prefix
+
     def await_ready(self):
         self.master.await_ready()
         self.slave.await_ready()

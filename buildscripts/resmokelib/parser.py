@@ -38,6 +38,23 @@ def parse_command_line():
                             " located in the resmokeconfig/suites/ directory, then the basename"
                             " without the .yml extension can be specified, e.g. 'console'."))
 
+    parser.add_option("--archiveFile", dest="archive_file", metavar="ARCHIVE_FILE",
+                      help=("Sets the archive file name for the Evergreen task running the tests."
+                            " The archive file is JSON format containing a list of tests that were"
+                            " successfully archived to S3. If unspecified, no data files from tests"
+                            " will be archived in S3. Tests can be designated for archival in the"
+                            " task suite configuration file."))
+
+    parser.add_option("--archiveLimitMb", type="int", dest="archive_limit_mb",
+                      metavar="ARCHIVE_LIMIT_MB",
+                      help=("Sets the limit (in MB) for archived files to S3. A value of 0"
+                            " indicates there is no limit."))
+
+    parser.add_option("--archiveLimitTests", type="int", dest="archive_limit_tests",
+                      metavar="ARCHIVE_LIMIT_TESTS",
+                      help=("Sets the maximum number of tests to archive to S3. A value"
+                            " of 0 indicates there is no limit."))
+
     parser.add_option("--basePort", dest="base_port", metavar="PORT",
                       help=("The starting port number to use for mongod and mongos processes"
                             " spawned by resmoke.py or the tests themselves. Each fixture and Job"
@@ -216,9 +233,22 @@ def parse_command_line():
                                  help=("Set the identifier for the Evergreen distro running the"
                                        " tests."))
 
+    evergreen_options.add_option("--executionNumber", type="int", dest="execution_number",
+                                 metavar="EXECUTION_NUMBER",
+                                 help=("Sets the number for the Evergreen execution running the"
+                                       " tests."))
+
+    evergreen_options.add_option("--gitRevision", dest="git_revision", metavar="GIT_REVISION",
+                                 help=("Sets the git revision for the Evergreen task running the"
+                                       " tests."))
+
     evergreen_options.add_option("--patchBuild", action="store_true", dest="patch_build",
                                  help=("Indicate that the Evergreen task running the tests is a"
                                        " patch build."))
+
+    evergreen_options.add_option("--projectName", dest="project_name", metavar="PROJECT_NAME",
+                                 help=("Sets the name of the Evergreen project running the tests."
+                                       ))
 
     evergreen_options.add_option("--taskName", dest="task_name", metavar="TASK_NAME",
                                  help="Set the name of the Evergreen task running the tests.")
@@ -308,6 +338,9 @@ def update_config_vars(values):
         if cmdline_vars[cmdline_key] is not None:
             config[cmdline_key] = cmdline_vars[cmdline_key]
 
+    _config.ARCHIVE_FILE = config.pop("archive_file")
+    _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
+    _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
