@@ -147,6 +147,10 @@ selector:
   - assumes_against_mongod_not_mongos
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: load("jstests/libs/override_methods/enable_causal_consistency.js")

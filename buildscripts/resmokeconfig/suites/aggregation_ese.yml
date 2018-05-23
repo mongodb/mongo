@@ -15,6 +15,9 @@ selector:
   - jstests/aggregation/*[aA]uth*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

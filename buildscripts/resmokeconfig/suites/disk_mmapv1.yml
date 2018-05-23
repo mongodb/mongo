@@ -11,6 +11,9 @@ selector:
   - jstests/disk/repair4.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

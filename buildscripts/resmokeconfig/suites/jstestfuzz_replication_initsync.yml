@@ -5,6 +5,9 @@ selector:
   - jstestfuzz/out/*.js
 
 executor:
+  archive:
+    hooks:
+      - BackgroundInitialSync
   config:
     shell_options:
       readMode: commands

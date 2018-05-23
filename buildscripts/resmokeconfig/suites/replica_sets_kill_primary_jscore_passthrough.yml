@@ -128,6 +128,11 @@ selector:
   - requires_datasize
 
 executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       # TODO SERVER-33229: Remove override of startParallelShell

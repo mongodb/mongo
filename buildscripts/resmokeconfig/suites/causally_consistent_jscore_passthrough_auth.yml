@@ -168,6 +168,10 @@ selector:
   - assumes_against_mongod_not_mongos
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

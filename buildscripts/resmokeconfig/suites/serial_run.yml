@@ -5,6 +5,9 @@ selector:
   - jstests/serial_run/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

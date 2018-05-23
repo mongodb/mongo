@@ -5,6 +5,10 @@ selector:
   - jstestfuzz/out/*.js
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

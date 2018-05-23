@@ -23,6 +23,10 @@ selector:
   - requires_eval_command
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

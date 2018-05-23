@@ -5,6 +5,9 @@ selector:
   - jstests/disk/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

@@ -11,6 +11,11 @@ selector:
   - jstests/core/capped_update.js
 
 executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: "testingReplication = true;"

@@ -15,6 +15,11 @@ selector:
   - requires_fcv36
 
 executor:
+  archive:
+    hooks:
+      - CheckReplOplogs
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: >-

@@ -9,6 +9,9 @@ selector:
   - jstests/aggregation/variables/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands
