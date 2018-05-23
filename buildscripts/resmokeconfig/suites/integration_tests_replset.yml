@@ -4,6 +4,11 @@ selector:
 
 executor:
   cpp_integration_test:
+    archive:
+      hooks:
+        - CheckReplOplogs
+        - CheckReplDBHash
+        - ValidateCollections
     config: {}
     hooks:
     # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

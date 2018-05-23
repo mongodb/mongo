@@ -12,6 +12,9 @@ selector:
 run_hook_interval: &run_hook_interval 20
 executor:
   js_test:
+    archive:
+      hooks:
+        - IntermediateInitialSync
     config:
       shell_options:
         eval: "testingReplication = true;"

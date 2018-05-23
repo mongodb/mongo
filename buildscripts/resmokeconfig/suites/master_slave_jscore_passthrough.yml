@@ -10,6 +10,10 @@ selector:
 
 executor:
   js_test:
+    archive:
+      hooks:
+        - CheckReplDBHash
+        - ValidateCollections
     config:
       shell_options:
         eval: "testingReplication = true;"

@@ -7,6 +7,9 @@ selector:
     - jstests/httpinterface/httpinterface.js
 executor:
   js_test:
+    archive:
+      hooks:
+        - ValidateCollections
     hooks:
     - class: ValidateCollections
     fixture:

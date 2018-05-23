@@ -12,6 +12,9 @@ selector:
 
 executor:
   js_test:
+    archive:
+      hooks:
+        - ValidateCollections
     config:
       shell_options:
         readMode: commands

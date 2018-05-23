@@ -6,6 +6,10 @@ selector:
 
 executor:
   cpp_integration_test:
+    archive:
+      hooks:
+        - CheckReplDBHash
+        - ValidateCollections
     config: {}
     hooks:
     - class: CheckReplDBHash
