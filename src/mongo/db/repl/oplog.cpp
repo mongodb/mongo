@@ -711,18 +711,13 @@ std::pair<OptionalCollectionUUID, NamespaceString> parseCollModUUIDAndNss(Operat
     }
     CollectionUUID uuid = uassertStatusOK(UUID::parse(ui));
     auto& catalog = UUIDCatalog::get(opCtx);
-    if (catalog.lookupCollectionByUUID(uuid)) {
-        return std::pair<OptionalCollectionUUID, NamespaceString>(uuid,
-                                                                  catalog.lookupNSSByUUID(uuid));
-    } else {
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Failed to apply operation due to missing collection (" << uuid
-                              << "): "
-                              << redact(cmd.toString()),
-                cmd.nFields() == 1);
-        // If cmd is an empty collMod, i.e., nFields is 1, this is a UUID upgrade collMod.
-        return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, parseNs(ns, cmd));
-    }
+    const auto nsByUUID = catalog.lookupNSSByUUID(uuid);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Failed to apply operation due to missing collection (" << uuid
+                          << "): "
+                          << redact(cmd.toString()),
+            !nsByUUID.isEmpty());
+    return std::pair<OptionalCollectionUUID, NamespaceString>(uuid, nsByUUID);
 }
 
 NamespaceString parseUUID(OperationContext* opCtx, const BSONElement& ui) {
