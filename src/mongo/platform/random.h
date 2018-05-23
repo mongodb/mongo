@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 
 namespace mongo {
@@ -69,14 +70,36 @@ public:
     }
 
     /**
-     * @return a number between 0 and max
-     *
-     * This makes PseudoRandom instances passable as the third argument to std::random_shuffle
+     * This returns an object that adapts PseudoRandom such that it
+     * can be used as the third argument to std::shuffle. Note that
+     * the lifetime of the returned object must be a subset of the
+     * lifetime of the PseudoRandom object.
      */
-    intptr_t operator()(intptr_t max) {
-        if (sizeof(intptr_t) == 4)
-            return static_cast<intptr_t>(nextInt32(static_cast<int32_t>(max)));
-        return static_cast<intptr_t>(nextInt64(static_cast<int64_t>(max)));
+    auto urbg() {
+
+        class URBG {
+        public:
+            explicit URBG(PseudoRandom* impl) : _impl(impl) {}
+
+            using result_type = uint64_t;
+
+            static constexpr result_type min() {
+                return std::numeric_limits<result_type>::min();
+            }
+
+            static constexpr result_type max() {
+                return std::numeric_limits<result_type>::max();
+            }
+
+            result_type operator()() {
+                return _impl->nextInt64();
+            }
+
+        private:
+            PseudoRandom* _impl;
+        };
+
+        return URBG(this);
     }
 
 private:

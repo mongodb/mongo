@@ -667,8 +667,8 @@ ScanStatePtr Refresher::startNewScan(const SetState* set) {
     }
 
     // shuffle the queue, but keep "up" nodes at the front
-    std::random_shuffle(scan->hostsToScan.begin(), scan->hostsToScan.begin() + upNodes, set->rand);
-    std::random_shuffle(scan->hostsToScan.begin() + upNodes, scan->hostsToScan.end(), set->rand);
+    std::shuffle(scan->hostsToScan.begin(), scan->hostsToScan.begin() + upNodes, set->rand.urbg());
+    std::shuffle(scan->hostsToScan.begin() + upNodes, scan->hostsToScan.end(), set->rand.urbg());
 
     if (!set->lastSeenMaster.empty()) {
         // move lastSeenMaster to front of queue
@@ -1297,6 +1297,6 @@ void ScanState::enqueAllUntriedHosts(const Container& container, PseudoRandom& r
             hostsToScan.push_back(*it);
         }
     }
-    std::random_shuffle(hostsToScan.begin(), hostsToScan.end(), rand);
+    std::shuffle(hostsToScan.begin(), hostsToScan.end(), rand.urbg());
 }
 }

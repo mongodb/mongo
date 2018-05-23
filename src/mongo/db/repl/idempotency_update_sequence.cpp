@@ -276,7 +276,7 @@ UpdateSequenceGenerator::UpdateSequenceGenerator(UpdateSequenceGeneratorConfig c
     auto path = "";
     _generatePaths(config, path);
     // Creates the same shuffle each time, but we don't care. We want to mess up the DFS ordering.
-    std::random_shuffle(this->_paths.begin(), this->_paths.end(), this->_random);
+    std::shuffle(this->_paths.begin(), this->_paths.end(), this->_random.urbg());
 }
 
 }  // namespace mongo

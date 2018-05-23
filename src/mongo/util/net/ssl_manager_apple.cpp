@@ -215,47 +215,63 @@ bool isUnixDomainSocket(const std::string& hostname) {
 
 namespace detail {
 template <typename T>
-struct CFTypeMap {};
+struct CFTypeMap;
+
 template <>
 struct CFTypeMap<::CFStringRef> {
-    static constexpr StringData typeName = "string"_sd;
+    static constexpr StringData typeName() {
+        return "string"_sd;
+    }
+
     static ::CFTypeID type() {
         return ::CFStringGetTypeID();
     }
 };
-constexpr StringData CFTypeMap<::CFStringRef>::typeName;
+
 template <>
 struct CFTypeMap<::CFDataRef> {
-    static constexpr StringData typeName = "data"_sd;
+    static constexpr StringData typeName() {
+        return "data"_sd;
+    }
+
     static ::CFTypeID type() {
         return ::CFDataGetTypeID();
     }
 };
-constexpr StringData CFTypeMap<::CFDataRef>::typeName;
+
 template <>
 struct CFTypeMap<::CFNumberRef> {
-    static constexpr StringData typeName = "number"_sd;
+    static constexpr StringData typeName() {
+        return "number"_sd;
+    }
+
     static ::CFTypeID type() {
         return ::CFNumberGetTypeID();
     }
 };
-constexpr StringData CFTypeMap<::CFNumberRef>::typeName;
+
 template <>
 struct CFTypeMap<::CFArrayRef> {
-    static constexpr StringData typeName = "array"_sd;
+    static constexpr StringData typeName() {
+        return "array"_sd;
+    }
+
     static ::CFTypeID type() {
         return ::CFArrayGetTypeID();
     }
 };
-constexpr StringData CFTypeMap<::CFArrayRef>::typeName;
+
 template <>
 struct CFTypeMap<::CFDictionaryRef> {
-    static constexpr StringData typeName = "dictionary"_sd;
+    static constexpr StringData typeName() {
+        return "dictionary"_sd;
+    }
+
     static ::CFTypeID type() {
         return ::CFDictionaryGetTypeID();
     }
 };
-constexpr StringData CFTypeMap<::CFDictionaryRef>::typeName;
+
 }  // namespace detail
 
 template <typename T>
@@ -274,7 +290,7 @@ StatusWith<T> extractDictionaryValue(::CFDictionaryRef dict, ::CFStringRef key) 
         return badValue("Missing value");
     }
     if (::CFGetTypeID(val) != detail::CFTypeMap<T>::type()) {
-        return badValue(str::stream() << "Value is not a " << detail::CFTypeMap<T>::typeName);
+        return badValue(str::stream() << "Value is not a " << detail::CFTypeMap<T>::typeName());
     }
     return reinterpret_cast<T>(val);
 }
