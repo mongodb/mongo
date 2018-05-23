@@ -427,7 +427,7 @@ public:
      * for special purpose threads, such as FTDC.
      */
     void setShouldAcquireTicket(bool newValue) {
-        invariant(!isLocked());
+        invariant(!isLocked() || isNoop());
         _shouldAcquireTicket = newValue;
     }
     bool shouldAcquireTicket() const {

@@ -27,14 +27,12 @@
  */
 #pragma once
 
-#include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/db/concurrency/locker_noop.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/util/progress_meter.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo {
 
@@ -57,7 +55,7 @@ public:
     OperationContextNoop(Client* client, unsigned int opId) : OperationContext(client, opId) {
         setRecoveryUnit(new RecoveryUnitNoop(),
                         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        setLockState(stdx::make_unique<LockerNoop>());
+        setLockState(std::make_unique<LockerNoop>());
     }
 };
 

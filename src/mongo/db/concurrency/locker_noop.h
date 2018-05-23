@@ -205,15 +205,17 @@ public:
     }
 
     virtual bool isLocked() const {
+        // This is necessary because replication makes decisions based on the answer to this, and
+        // we wrote unit tests to test the behavior specifically when this returns "false".
         return false;
     }
 
     virtual bool isWriteLocked() const {
-        return false;
+        return true;
     }
 
     virtual bool isReadLocked() const {
-        MONGO_UNREACHABLE;
+        return true;
     }
 
     virtual bool hasLockPending() const {
