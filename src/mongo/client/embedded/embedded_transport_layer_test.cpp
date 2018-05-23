@@ -221,7 +221,6 @@ int main(int argc, char** argv, char** envp) {
     }
 
     mongoc_cleanup();
-
     globalTempDir.reset();
     mongo::quickExit(result);
 }
