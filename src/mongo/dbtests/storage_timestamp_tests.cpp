@@ -1666,6 +1666,7 @@ public:
  * timestamping `dropDatabase` side-effects no longer applies. The purpose of this test is to
  * exercise the `KVStorageEngine::dropDatabase` method.
  */
+template <bool SimulatePrimary>
 class KVDropDatabase : public StorageTimestampTest {
 public:
     void run() {
@@ -1741,12 +1742,23 @@ public:
         // The namespace has changed, but the ident still exists as-is after the rename.
         assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
 
-        ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+        const Timestamp dropTime = _clock->reserveTicks(1).asTimestamp();
+        if (SimulatePrimary) {
+            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+        } else {
+            repl::UnreplicatedWritesBlock uwb(_opCtx);
+            TimestampBlock ts(_opCtx, dropTime);
+            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+        }
 
         // Assert that the idents do not exist.
         assertIdentsMissingAtTimestamp(
             kvCatalog, sysProfileIdent, sysProfileIndexIdent, Timestamp::max());
         assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, Timestamp::max());
+
+        // dropDatabase must not timestamp the final write. The collection and index should seem
+        // to have never existed.
+        assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, syncTime);
     }
 };
 
@@ -2198,7 +2210,9 @@ public:
         add<SetMinValidInitialSyncFlag>();
         add<SetMinValidToAtLeast>();
         add<SetMinValidAppliedThrough>();
-        add<KVDropDatabase>();
+        // KVDropDatabase<SimulatePrimary>
+        add<KVDropDatabase<false>>();
+        add<KVDropDatabase<true>>();
         // TimestampIndexBuilds<SimulatePrimary>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
