@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
@@ -101,7 +102,15 @@ Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> beforeYieldingFn
         ON_BLOCK_EXIT([this]() { resetTimer(); });
         OperationContext* opCtx = _planYielding->getOpCtx();
         invariant(opCtx);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(setInterruptOnlyPlansCheckForInterruptHang);
+        // If the 'setInterruptOnlyPlansCheckForInterruptHang' fail point is enabled, set the 'msg'
+        // field of this operation's CurOp to signal that we've hit this point.
+        if (MONGO_FAIL_POINT(setInterruptOnlyPlansCheckForInterruptHang)) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &setInterruptOnlyPlansCheckForInterruptHang,
+                opCtx,
+                "setInterruptOnlyPlansCheckForInterruptHang");
+        }
+
         return opCtx->checkForInterruptNoAssert();
     }
 

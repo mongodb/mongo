@@ -42,14 +42,26 @@
 
     function waitForOpId(curOpFilter) {
         let opId;
+        // Wait until we know the failpoint 'setInterruptOnlyPlansCheckForInterruptHang' has been
+        // reached.
         assert.soon(
             function() {
-                const res = adminDB
-                                .aggregate([
-                                    {$currentOp: {}},
-                                    {$match: {$and: [{ns: coll.getFullName()}, curOpFilter]}}
-                                ])
-                                .toArray();
+                const res =
+                    adminDB
+                        .aggregate([
+                            {$currentOp: {}},
+                            {
+                              $match: {
+                                  $and: [
+                                      {ns: coll.getFullName()},
+                                      curOpFilter,
+                                      {"msg": "setInterruptOnlyPlansCheckForInterruptHang"}
+                                  ]
+                              }
+                            }
+                        ])
+                        .toArray();
+
                 if (res.length === 1) {
                     opId = res[0].opid;
                     return true;
