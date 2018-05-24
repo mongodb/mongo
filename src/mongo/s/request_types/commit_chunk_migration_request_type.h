@@ -97,6 +97,7 @@ struct CommitChunkMigrationRequest {
     // The chunk being moved.
     ChunkType _migratedChunk;
 
+    // TODO: SERVER-35209 Remove after v4.0, kept around for backwards compatibility.
     // A chunk on the shard moved from, if any remain.
     boost::optional<ChunkType> _controlChunk;
 

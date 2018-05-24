@@ -135,7 +135,6 @@ public:
             opCtx,
             nss,
             commitRequest.getMigratedChunk(),
-            commitRequest.getControlChunk(),
             commitRequest.getCollectionEpoch(),
             commitRequest.getFromShard(),
             commitRequest.getToShard(),

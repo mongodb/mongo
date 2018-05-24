@@ -190,7 +190,6 @@ public:
     StatusWith<BSONObj> commitChunkMigration(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const ChunkType& migratedChunk,
-                                             const boost::optional<ChunkType>& controlChunk,
                                              const OID& collectionEpoch,
                                              const ShardId& fromShard,
                                              const ShardId& toShard,
