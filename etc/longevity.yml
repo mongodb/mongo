@@ -174,19 +174,7 @@ functions:
           cat perf.json | egrep "name|ops_per_sec"
 
   "analyze":
-    - command: json.get_history
-      params:
-        task: ${task_name}
-        file: "work/history.json"
-        name: "perf"
-    - command: json.get_history
-      params:
-        tags: true
-        task: ${task_name}
-        file: "work/tags.json"
-        name: "perf"
     - command: shell.exec
-      # post_run_check.py and longevity_override.json for DSI tests are part of dsi repo
       type : test
       params:
         working_dir: work
@@ -196,7 +184,7 @@ functions:
           TAG="3.2.1-Baseline"
           PROJECT="mongo-longevity"
           OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/longevity_override.json"
-          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
 
 tasks:
 - name: compile
