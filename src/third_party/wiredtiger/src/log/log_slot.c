@@ -297,7 +297,7 @@ __log_slot_switch_internal(
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	uint32_t joined;
-	bool release;
+	bool free_slot, release;
 
 	log = S2C(session)->log;
 	release = false;
@@ -355,6 +355,18 @@ __log_slot_switch_internal(
 	 */
 	WT_RET(__log_slot_new(session));
 	F_CLR(myslot, WT_MYSLOT_CLOSE);
+	if (F_ISSET(myslot, WT_MYSLOT_NEEDS_RELEASE)) {
+		/*
+		 * The release here must be done while holding the slot lock.
+		 * The reason is that a forced slot switch needs to be sure
+		 * that any earlier slot switches have completed, including
+		 * writing out the buffer contents of earlier slots.
+		 */
+		WT_RET(__wt_log_release(session, slot, &free_slot));
+		F_CLR(myslot, WT_MYSLOT_NEEDS_RELEASE);
+		if (free_slot)
+			__wt_log_slot_free(session, slot);
+	}
 	return (ret);
 }
 
@@ -368,7 +380,6 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_LOG *log;
-	bool free_slot;
 
 	log = S2C(session)->log;
 
@@ -387,18 +398,7 @@ __wt_log_slot_switch(WT_SESSION_IMPL *session,
 		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __log_slot_switch_internal(
 		    session, myslot, forced, did_work));
-		/*
-		 * If we need to release the slot we can do it now, after
-		 * we release the lock.
-		 */
-		if (ret == 0 &&
-		    F_ISSET(myslot, WT_MYSLOT_NEEDS_RELEASE)) {
-			WT_RET(__wt_log_release(
-			    session, myslot->slot, &free_slot));
-			F_CLR(myslot, WT_MYSLOT_NEEDS_RELEASE);
-			if (free_slot)
-				__wt_log_slot_free(session, myslot->slot);
-		} else if (ret == EBUSY) {
+		if (ret == EBUSY) {
 			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
 			__wt_yield();
 		}
