@@ -135,10 +135,6 @@ const StringMap<int> sessionCheckoutWhitelist = {{"abortTransaction", 1},
                                                  {"refreshLogicalSessionCacheNow", 1},
                                                  {"update", 1}};
 
-// The command names that are ignored by the 'failCommand' failpoint.
-const StringMap<int> failCommandIgnoreList = {
-    {"buildInfo", 1}, {"configureFailPoint", 1}, {"isMaster", 1}, {"ping", 1}};
-
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
                                       CurOp* curop,
@@ -562,7 +558,25 @@ bool runCommandImpl(OperationContext* opCtx,
  */
 void evaluateFailCommandFailPoint(OperationContext* opCtx, StringData commandName) {
     MONGO_FAIL_POINT_BLOCK_IF(failCommand, data, [&](const BSONObj& data) {
-        return failCommandIgnoreList.find(commandName) == failCommandIgnoreList.cend();
+        BSONElement failCommandsList;
+        auto status = bsonExtractTypedField(data, "failCommands", Array, &failCommandsList);
+        if (!status.isOK()) {
+            return false;
+        }
+
+        if (commandName == "configureFailPoint"_sd) {
+            return false;
+        }
+
+        for (auto&& failCommand : failCommandsList.Obj()) {
+            if (failCommand.type() == BSONType::String) {
+                if (failCommand.valueStringData() == commandName) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }) {
         bool closeConnection;
         if (bsonExtractBooleanField(data.getData(), "closeConnection", &closeConnection).isOK() &&

@@ -68,7 +68,7 @@
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.WriteConflict}
+        data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["insert"]}
     }));
     session.startTransaction();
     jsTest.log("WriteCommandError should have error labels inside transactions.");
@@ -92,7 +92,7 @@
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.WriteConflict}
+        data: {errorCode: ErrorCodes.WriteConflict, failCommands: ["commitTransaction"]}
     }));
     res = session.commitTransaction_forTesting();
     assert.commandFailedWithCode(res, ErrorCodes.WriteConflict);
@@ -105,7 +105,7 @@
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.NotMaster}
+        data: {errorCode: ErrorCodes.NotMaster, failCommands: ["commitTransaction"]}
     }));
     res = session.commitTransaction_forTesting();
     assert.commandFailedWithCode(res, ErrorCodes.NotMaster);
@@ -117,7 +117,7 @@
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.ShutdownInProgress}
+        data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["insert"]}
     }));
     res = sessionColl.insert({_id: "commitTransaction-fail-point"});
     assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
@@ -133,7 +133,7 @@
     assert.commandWorked(testDB.adminCommand({
         configureFailPoint: "failCommand",
         mode: "alwaysOn",
-        data: {errorCode: ErrorCodes.ShutdownInProgress}
+        data: {errorCode: ErrorCodes.ShutdownInProgress, failCommands: ["commitTransaction"]}
     }));
     res = session.commitTransaction_forTesting();
     assert.commandFailedWithCode(res, ErrorCodes.ShutdownInProgress);
