@@ -478,7 +478,8 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
                     StringData stringValue((*valuesIt).begin(), (*valuesIt).end());
                     uint64_t value;
                     if (parseNumberFromString(stringValue, &value).isOK()) {
-                        builder->appendNumber(prefix.toString() + key.toString(), static_cast<long long>(value));
+                        builder->appendNumber(prefix.toString() + key.toString(),
+                                              static_cast<long long>(value));
                         foundKeys = true;
                     }
                 }
