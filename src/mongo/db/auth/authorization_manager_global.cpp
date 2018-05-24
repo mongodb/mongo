@@ -93,10 +93,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(startupAuthSchemaValidation, bool, true);
 
 GlobalInitializerRegisterer authorizationManagerInitializer(
     "CreateAuthorizationManager",
-    {MONGO_SHIM_DEPENDENCY(AuthorizationManager::create),
-     "OIDGeneration",
-     "EndStartupOptionStorage",
-     "ServiceContext"},
+    {"OIDGeneration", "EndStartupOptionStorage", "ServiceContext"},
     [](InitializerContext* context) {
         auto authzManager = AuthorizationManager::create();
         authzManager->setAuthEnabled(serverGlobalParams.authState ==
