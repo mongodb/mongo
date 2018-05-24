@@ -895,13 +895,11 @@ public:
      * general error handler for the entire chain.
      */
     template <typename Func,  // Status -> T or Status -> StatusWith<T>
-              typename RawResult = NormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<!isFuture<RawResult>>>
+              typename Result = RawNormalizedCallResult<Func, Status>,
+              typename = std::enable_if_t<!isFuture<Result>>>
         Future<T> onError(Func&& func) && noexcept {
         static_assert(
-            std::is_same<RawResult, T>::value || std::is_same<RawResult, StatusWith<T>>::value ||
-                (std::is_same<T, FakeVoid>::value &&
-                 (std::is_same<RawResult, void>::value || std::is_same<RawResult, Status>::value)),
+            std::is_same<Result, T>::value,
             "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
 
         return generalImpl(
@@ -927,13 +925,13 @@ public:
      * Same as above onError() but for case where func returns a Future that needs to be unwrapped.
      */
     template <typename Func,  // Status -> Future<T>
-              typename RawResult = NormalizedCallResult<Func, Status>,
-              typename = std::enable_if_t<isFuture<RawResult>>,
+              typename Result = RawNormalizedCallResult<Func, Status>,
+              typename = std::enable_if_t<isFuture<Result>>,
               typename = void>
         Future<T> onError(Func&& func) && noexcept {
         static_assert(
-            std::is_same<RawResult, Future<T>>::value ||
-                (std::is_same<T, FakeVoid>::value && std::is_same<RawResult, Future<void>>::value),
+            std::is_same<Result, Future<T>>::value ||
+                (std::is_same<T, FakeVoid>::value && std::is_same<Result, Future<void>>::value),
             "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
 
         return generalImpl(
@@ -961,6 +959,31 @@ public:
                     }
                 });
             });
+    }
+
+    /**
+     * Same as the other two onErrors but only calls the callback if the code matches the template
+     * parameter. Otherwise lets the error propagate unchanged.
+     */
+    template <ErrorCodes::Error code, typename Func>
+        Future<T> onError(Func&& func) && noexcept {
+        using Result = RawNormalizedCallResult<Func, Status>;
+        static_assert(
+            std::is_same<Result, T>::value || std::is_same<Result, Future<T>>::value ||
+                (std::is_same<T, FakeVoid>::value && std::is_same<Result, Future<void>>::value),
+            "func passed to Future<T>::onError must return T, StatusWith<T>, or Future<T>");
+
+        if (immediate || (isReady() && shared->status.isOK()))
+            return std::move(*this);  // Avoid copy/moving func if we know we won't call it.
+
+        // TODO in C++17 with constexpr if this can be done cleaner and more efficiently by not
+        // throwing.
+        return std::move(*this).onError([func =
+                                             std::forward<Func>(func)](Status && status) mutable {
+            if (status != code)
+                uassertStatusOK(status);
+            return throwingCall(func, std::move(status));
+        });
     }
 
     /**
@@ -1222,6 +1245,11 @@ public:
     template <typename Func>  // Status -> T or StatusWith<T> or Future<T>
         Future<void> onError(Func&& func) && noexcept {
         return std::move(inner).onError(std::forward<Func>(func));
+    }
+
+    template <ErrorCodes::Error code, typename Func>  // Status -> T or StatusWith<T> or Future<T>
+        Future<void> onError(Func&& func) && noexcept {
+        return std::move(inner).onError<code>(std::forward<Func>(func));
     }
 
     template <typename Func>  // () -> void

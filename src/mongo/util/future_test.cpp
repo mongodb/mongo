@@ -513,6 +513,64 @@ TEST(Future, Fail_onErrorFutureAsync) {
     });
 }
 
+TEST(Future, Success_onErrorCode) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            ASSERT_EQ(std::move(fut)
+                                          .onError<ErrorCodes::InternalError>([](Status) {
+                                              FAIL("onError<code>() callback was called");
+                                              return 0;
+                                          })
+                                          .then([](int i) { return i + 2; })
+                                          .get(),
+                                      3);
+                        });
+}
+
+TEST(Future, Fail_onErrorCodeMatch) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        auto res =
+            std::move(fut)
+                .onError([](Status s) {
+                    ASSERT_EQ(s, failStatus);
+                    return StatusWith<int>(ErrorCodes::InternalError, "");
+                })
+                .onError<ErrorCodes::InternalError>([](Status&&) { return StatusWith<int>(3); })
+                .getNoThrow();
+        ASSERT_EQ(res, 3);
+    });
+}
+
+TEST(Future, Fail_onErrorCodeMatchFuture) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        auto res = std::move(fut)
+                       .onError([](Status s) {
+                           ASSERT_EQ(s, failStatus);
+                           return StatusWith<int>(ErrorCodes::InternalError, "");
+                       })
+                       .onError<ErrorCodes::InternalError>([](Status&&) { return Future<int>(3); })
+                       .getNoThrow();
+        ASSERT_EQ(res, 3);
+    });
+}
+
+TEST(Future, Fail_onErrorCodeMismatch) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onError<ErrorCodes::InternalError>([](Status s) -> int {
+                          FAIL("Why was this called?") << s;
+                          MONGO_UNREACHABLE;
+                      })
+                      .onError([](Status s) {
+                          ASSERT_EQ(s, failStatus);
+                          return 3;
+                      })
+                      .getNoThrow(),
+                  3);
+    });
+}
+
+
 TEST(Future, Success_tap) {
     FUTURE_SUCCESS_TEST([] { return 1; },
                         [](Future<int>&& fut) {
@@ -904,6 +962,7 @@ TEST(Future_Void, Fail_onErrorSimple) {
                   3);
     });
 }
+
 TEST(Future_Void, Fail_onErrorError_throw) {
     FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
         auto fut2 = std::move(fut).onError([](Status s) {
@@ -962,6 +1021,66 @@ TEST(Future_Void, Fail_onErrorFutureAsync) {
                       })
                       .then([] { return 3; })
                       .get(),
+                  3);
+    });
+}
+
+TEST(Future_Void, Success_onErrorCode) {
+    FUTURE_SUCCESS_TEST([] {},
+                        [](Future<void>&& fut) {
+                            ASSERT_EQ(std::move(fut)
+                                          .onError<ErrorCodes::InternalError>([](Status) {
+                                              FAIL("onError<code>() callback was called");
+                                          })
+                                          .then([] { return 3; })
+                                          .get(),
+                                      3);
+                        });
+}
+
+TEST(Future_Void, Fail_onErrorCodeMatch) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        bool called = false;
+        auto res = std::move(fut)
+                       .onError([](Status s) {
+                           ASSERT_EQ(s, failStatus);
+                           return Status(ErrorCodes::InternalError, "");
+                       })
+                       .onError<ErrorCodes::InternalError>([&](Status&&) { called = true; })
+                       .then([] { return 3; })
+                       .getNoThrow();
+        ASSERT_EQ(res, 3);
+        ASSERT(called);
+    });
+}
+
+TEST(Future_Void, Fail_onErrorCodeMatchFuture) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        bool called = false;
+        auto res = std::move(fut)
+                       .onError([](Status s) {
+                           ASSERT_EQ(s, failStatus);
+                           return Status(ErrorCodes::InternalError, "");
+                       })
+                       .onError<ErrorCodes::InternalError>([&](Status&&) {
+                           called = true;
+                           return Future<void>::makeReady();
+                       })
+                       .then([] { return 3; })
+                       .getNoThrow();
+        ASSERT_EQ(res, 3);
+        ASSERT(called);
+    });
+}
+
+TEST(Future_Void, Fail_onErrorCodeMismatch) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        ASSERT_EQ(std::move(fut)
+                      .onError<ErrorCodes::InternalError>(
+                          [](Status s) { FAIL("Why was this called?") << s; })
+                      .onError([](Status s) { ASSERT_EQ(s, failStatus); })
+                      .then([] { return 3; })
+                      .getNoThrow(),
                   3);
     });
 }
