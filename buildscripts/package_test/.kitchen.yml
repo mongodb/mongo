@@ -29,11 +29,6 @@ platforms:
       image_id: ami-c481fad3
     transport:
       username: ec2-user
-  - name: debian71
-    driver:
-      image_id: ami-4b124a22
-    transport:
-      username: admin
   - name: debian81
     driver:
       image_id: ami-896d85e2

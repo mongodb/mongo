@@ -524,7 +524,7 @@ class TestUpdateTags(unittest.TestCase):
                                 num_pass=3,
                                 num_fail=0,
                                 variant="linux-alt",
-                                distro="debian7"),
+                                distro="debian8"),
         ])
 
         update_test_lifecycle.validate_config(config)
