@@ -88,7 +88,6 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
 
     // use crefs to verify it will take consts:
     ChunkType const& chunk0cref = chunk0;
-    ChunkType const& chunk1cref = chunk1;
 
     Timestamp validAfter{101, 0};
 
@@ -96,7 +95,6 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0cref,
-                                                                chunk1cref,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -167,7 +165,6 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                boost::none,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -229,7 +226,6 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                boost::none,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -291,7 +287,6 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                boost::none,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -343,7 +338,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                chunk1,
                                                                 OID::gen(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -397,7 +391,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                chunk1,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -449,7 +442,6 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                chunk1,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
@@ -458,7 +450,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     ASSERT_EQ(40165, resultBSON.getStatus().code());
 }
 
-TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
+TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks) {
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -477,6 +469,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
+    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -487,27 +480,53 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
     ChunkType chunk1;
     chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
-    chunk1.setShard(shard0.getName());
+    chunk1.setShard(shard1.getName());
 
     chunk1.setMin(chunkMax);
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk0}).transitional_ignore();
+    Timestamp ctrlChunkValidAfter = Timestamp(50, 0);
+    chunk1.setHistory({ChunkHistory(ctrlChunkValidAfter, shard1.getName())});
 
-    Timestamp validAfter{1};
+    setupChunks({chunk0, chunk1}).transitional_ignore();
 
+    Timestamp validAfter{101, 0};
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
                                                                 chunk0.getNS(),
                                                                 chunk0,
-                                                                chunk1,
                                                                 origVersion.epoch(),
                                                                 ShardId(shard0.getName()),
                                                                 ShardId(shard1.getName()),
                                                                 validAfter);
 
-    ASSERT_EQ(40165, resultBSON.getStatus().code());
+    ASSERT_OK(resultBSON.getStatus());
+
+    // Verify the versions returned match expected values.
+    BSONObj versions = resultBSON.getValue();
+    auto mver = ChunkVersion::parseFromBSONWithFieldForCommands(versions, "migratedChunkVersion");
+    ASSERT_OK(mver.getStatus());
+    ASSERT_EQ(ChunkVersion(origMajorVersion + 1, 0, origVersion.epoch()), mver.getValue());
+
+    ASSERT_TRUE(versions["controlChunkVersion"].eoo());
+
+    // Verify the chunks ended up in the right shards, and versions match the values returned.
+    auto chunkDoc0 = uassertStatusOK(getChunkDoc(operationContext(), chunkMin));
+    ASSERT_EQ(shard1.getName(), chunkDoc0.getShard().toString());
+    ASSERT_EQ(mver.getValue(), chunkDoc0.getVersion());
+
+    // The migrated chunk's history should be updated.
+    ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
+    ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
+
+    auto chunkDoc1 = uassertStatusOK(getChunkDoc(operationContext(), chunkMax));
+    ASSERT_EQ(shard1.getName(), chunkDoc1.getShard().toString());
+    ASSERT_EQ(chunk1.getVersion(), chunkDoc1.getVersion());
+
+    // The control chunk's history should be unchanged.
+    ASSERT_EQ(1UL, chunkDoc1.getHistory().size());
+    ASSERT_EQ(ctrlChunkValidAfter, chunkDoc1.getHistory().front().getValidAfter());
 }
 
 }  // namespace

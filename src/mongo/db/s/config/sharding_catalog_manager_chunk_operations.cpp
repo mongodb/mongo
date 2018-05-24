@@ -237,6 +237,36 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
     return BSON("applyOps" << updates.arr());
 }
 
+/**
+ * Returns a chunk different from the one being migrated or 'none' if one doesn't exist.
+ */
+boost::optional<ChunkType> getControlChunkForMigrate(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     const ChunkType& migratedChunk,
+                                                     const ShardId& fromShard) {
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    BSONObjBuilder queryBuilder;
+    queryBuilder << ChunkType::ns(nss.ns());
+    queryBuilder << ChunkType::shard(fromShard.toString());
+    queryBuilder << ChunkType::min(BSON("$ne" << migratedChunk.getMin()));
+
+    auto status =
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ChunkType::ConfigNS,
+                                            queryBuilder.obj(),
+                                            {},
+                                            1);
+    auto response = uassertStatusOK(status);
+    if (response.docs.empty()) {
+        return boost::none;
+    }
+
+    return uassertStatusOK(ChunkType::fromConfigBSON(response.docs.front()));
+}
+
 }  // namespace
 
 Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
@@ -576,7 +606,6 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkType& migratedChunk,
-    const boost::optional<ChunkType>& controlChunk,
     const OID& collectionEpoch,
     const ShardId& fromShard,
     const ShardId& toShard,
@@ -652,21 +681,14 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                               << ")."};
     }
 
-    // Check that migratedChunk and controlChunk are where they should be, on fromShard.
-
+    // Check that migratedChunk is where it should be, on fromShard.
     auto migratedOnShard =
         checkChunkIsOnShard(opCtx, nss, migratedChunk.getMin(), migratedChunk.getMax(), fromShard);
     if (!migratedOnShard.isOK()) {
         return migratedOnShard;
     }
 
-    if (controlChunk) {
-        auto controlOnShard = checkChunkIsOnShard(
-            opCtx, nss, controlChunk->getMin(), controlChunk->getMax(), fromShard);
-        if (!controlOnShard.isOK()) {
-            return controlOnShard;
-        }
-    }
+    auto controlChunk = getControlChunkForMigrate(opCtx, nss, migratedChunk, fromShard);
 
     // Find the chunk history.
     const auto origChunk = _findChunkOnConfig(opCtx, nss, migratedChunk.getMin());
