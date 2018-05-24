@@ -284,34 +284,6 @@ functions:
          file: "work/perf.json"
 
   "analyze":
-    - command: json.get_history
-      params:
-        task: ${task_name}
-        file: "work/history.json"
-        name: "perf"
-    - command: json.get_history
-      params:
-        tags: true
-        task: ${task_name}
-        file: "work/tags.json"
-        name: "perf"
-    - command: shell.exec
-      # generate dashboard data
-      type : test
-      params:
-        working_dir: work
-        silent: true
-        script: |
-          set -o errexit
-          TAGS="3.4.14-Baseline 3.2.17-Baseline 3.6.0-Baseline 3.6.1-Baseline"
-          OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/system_perf_override.json"
-          python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $TAGS --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
-    - command: "json.send"
-      params:
-         name: "dashboard"
-         file: "work/dashboard.json"
-    - command: shell.exec
-      # post_run_check.py and override.json for DSI tests are part of dsi repo
       type : test
       params:
         working_dir: work
@@ -320,7 +292,7 @@ functions:
           set -o verbose
           TAG="3.4.14-Baseline"
           OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/system_perf_override.json"
-          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file perf.json --rev ${revision} --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
 
 #######################################
 #               Tasks                 #
