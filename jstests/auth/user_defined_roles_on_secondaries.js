@@ -189,6 +189,17 @@
               }
             },
             {
+              op: "i",
+              ns: "admin.system.roles",
+              o: {
+                  _id: "db1.t3",
+                  role: "t3",
+                  db: "db1",
+                  roles: [{role: "t1", db: "db1"}, {role: "t2", db: "db1"}],
+                  privileges: []
+              }
+            },
+            {
               op: "u",
               ns: "admin.system.roles",
               o: {$set: {roles: [{role: "readWrite", db: "db1"}]}},
@@ -206,6 +217,16 @@
         var role = node.getDB("db1").getRole("t2");
         assert.eq(1, role.roles.length, tojson(node));
         assertListContainsRole(role.roles, {role: "readWrite", db: "db1"}, node);
+    });
+
+    // Verify that irrelevant index creation doesn't impair graph resolution
+    assert.commandWorked(rstest.getPrimary().getDB("admin").col.save({data: 5}));
+    assert.commandWorked(rstest.getPrimary().getDB("admin").runCommand(
+        {createIndexes: "col", indexes: [{key: {data: 1}, name: "testIndex"}]}));
+    rstest.awaitReplication();
+    rstest.nodes.forEach(function(node) {
+        var role = node.getDB("db1").getRole("t3");
+        assert.eq(4, role.inheritedRoles.length, tojson(node));
     });
 
     rstest.stopSet();
