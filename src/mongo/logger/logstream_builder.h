@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -217,6 +218,16 @@ public:
     }
     LogstreamBuilder& operator<<(std::ios_base& (*manip)(std::ios_base&)) {
         stream() << manip;
+        return *this;
+    }
+
+    template <typename OptionalType>
+    LogstreamBuilder& operator<<(const boost::optional<OptionalType>& optional) {
+        if (optional) {
+            (*this << *optional);
+        } else {
+            (*this << "(nothing)");
+        }
         return *this;
     }
 
