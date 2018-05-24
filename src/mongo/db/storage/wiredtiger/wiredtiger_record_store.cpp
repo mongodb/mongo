@@ -94,6 +94,18 @@ MONGO_FP_DECLARE(WTWriteConflictExceptionForReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
+// For a capped collection, the number of documents that can be removed directly, rather than via a
+// truncate.  The value has been determined somewhat by experimentation, but there's no clear win
+// for all situations.  Setting it to a lower number makes individual remove calls happen, rather
+// than truncate, only when small numbers of documents are inserted at a time. Making it larger
+// makes larger chunks of documents inserted at time follow the remove path in preference to the
+// truncate path.  Using direct removes is more likely to be a benefit when inserts are spread over
+// many capped collections, since avoiding a truncate avoids having to get a second cursor, which
+// may not be already cached in the current session. The benefit becomes less pronounced if the
+// capped collections are more actively used, or are used in small number of sessions, as multiple
+// cursors will be available in the needed session caches.
+static int kCappedDocumentRemoveLimit = 3;
+
 class WiredTigerRecordStore::OplogStones::InsertChange final : public RecoveryUnit::Change {
 public:
     InsertChange(OplogStones* oplogStones,
@@ -924,6 +936,34 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
     return cappedDeleteAsNeeded_inlock(opCtx, justInserted);
 }
 
+void WiredTigerRecordStore::_positionAtFirstRecordId(OperationContext* opCtx,
+                                                     WT_CURSOR* cursor,
+                                                     const RecordId& firstRecordId,
+                                                     bool forTruncate) const {
+    // Use the previous first RecordId, if available, to navigate to the current first
+    // RecordId. The straightforward algorithm of resetting the cursor and advancing to the first
+    // element will be slow for capped collections since there may be many tombstones to traverse
+    // at the beginning of the table.
+    if (!firstRecordId.isNull()) {
+        setKey(cursor, firstRecordId);
+        // Truncate does not require its cursor to be explicitly positioned.
+        if (!forTruncate) {
+            int cmp = 0;
+            int ret = wiredTigerPrepareConflictRetry(
+                opCtx, [&] { return cursor->search_near(cursor, &cmp); });
+            invariantWTOK(ret);
+
+            // This is (or was) the first recordId, so it should never be the case that we have a
+            // RecordId before that.
+            invariant(cmp >= 0);
+        }
+    } else {
+        invariantWTOK(WT_READ_CHECK(cursor->reset(cursor)));
+        int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
+        invariantWTOK(ret);
+    }
+}
+
 int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opCtx,
                                                            const RecordId& justInserted) {
     // we do this in a side transaction in case it aborts
@@ -953,7 +993,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
         RecordId newestIdToDelete;
         int ret = 0;
         bool positioned = false;  // Mark if the cursor is on the first key
-        int64_t savedFirstKey = 0;
+        RecordId savedFirstKey;
 
         // If we know where the first record is, go to it
         if (_cappedFirstRecord != RecordId()) {
@@ -962,7 +1002,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
                                                  [&] { return truncateEnd->search(truncateEnd); });
             if (ret == 0) {
                 positioned = true;
-                savedFirstKey = _cappedFirstRecord.repr();
+                savedFirstKey = _cappedFirstRecord;
             }
         }
 
@@ -1016,22 +1056,35 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* opC
             }
             invariantWTOK(truncateEnd->prev(truncateEnd));  // put the cursor back where it was
 
-            WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
-            WT_CURSOR* truncateStart = startWrap.get();
+            // Consider a direct removal, without the overhead of opening a second cursor, if we
+            // are removing a small number of records.  In the oplog case, always use truncate
+            // since we typically have a second oplog cursor cached.
+            if (docsRemoved <= kCappedDocumentRemoveLimit) {
+                RecordId firstRecordId = savedFirstKey;
+                int toRemove = docsRemoved;
 
-            if (savedFirstKey != 0) {
-                // If we know where the start point is, set it for the truncate
-                setKey(truncateStart, RecordId(savedFirstKey));
+                // Remember the key that was removed between calls to remove, that saves time in
+                // navigating to the next record.
+                while (toRemove > 0) {
+                    _positionAtFirstRecordId(opCtx, truncateEnd, firstRecordId, false);
+                    if (--toRemove > 0) {
+                        firstRecordId = getKey(truncateEnd);
+                    }
+                    invariantWTOK(truncateEnd->remove(truncateEnd));
+                }
+                ret = 0;
             } else {
-                // Position at the first record.  This is equivalent to
-                // providing a NULL argument to WT_SESSION->truncate, but
-                // in that case, truncate will need to open its own cursor.
-                // Since we already have a cursor, we can use it here to
-                // make the whole operation faster.
-                ret = WT_READ_CHECK(truncateStart->next(truncateStart));
-                invariantWTOK(ret);
+                WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
+                WT_CURSOR* truncateStart = startWrap.get();
+
+                // Position the start cursor at the first record, even if we don't have a saved
+                // first key.  This is equivalent to using a NULL cursor argument to
+                // WT_SESSION->truncate, but in that case, truncate will need to open its own
+                // cursor.  Since we already have a cursor, we can use it here to make the whole
+                // operation faster.
+                _positionAtFirstRecordId(opCtx, truncateStart, savedFirstKey, true);
+                ret = session->truncate(session, nullptr, truncateStart, truncateEnd, nullptr);
             }
-            ret = session->truncate(session, NULL, truncateStart, truncateEnd, NULL);
 
             if (ret == ENOENT || ret == WT_NOTFOUND) {
                 // TODO we should remove this case once SERVER-17141 is resolved

@@ -299,6 +299,16 @@ private:
     RecordData _getData(const WiredTigerCursor& cursor) const;
 
     /**
+     * Position the cursor at the first key. The previously known first key is
+     * provided, as well as an indicator that this is being positioned for
+     * use by a truncate call.
+     */
+    void _positionAtFirstRecordId(OperationContext* opCtx,
+                                  WT_CURSOR* cursor,
+                                  const RecordId& firstKey,
+                                  bool forTruncate) const;
+
+    /**
      * Adjusts the record count and data size metadata for this record store, respectively. These
      * functions consult the SizeRecoveryState to determine whether or not to actually change the
      * size metadata if the server is undergoing recovery.
