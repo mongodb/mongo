@@ -200,6 +200,25 @@ TEST_F(DatabaseTest, DropCollectionReturnsOKIfCollectionDoesNotExist) {
     ASSERT_EQUALS(repl::OpTime(), repl::ReplClientInfo::forClient(&cc()).getLastOp());
 }
 
+TEST_F(DatabaseTest, DropCollectionShouldDropSpecificSystemCollections) {
+    // The following system collections should drop successfully.
+    auto systemNss = NamespaceString("system.js"); 
+    _testDropCollection(_opCtx.get(), systemNss, true);
+
+    systemNss = NamespaceString("system.views");
+    _testDropCollection(_opCtx.get(), systemNss, true);
+
+
+    systemNss = NamespaceString("system.healthlog");
+    _testDropCollection(_opCtx.get(), systemNss, true);
+
+    systemNss = NamespaceString("config.system.sessions");
+    _testDropCollection(_opCtx.get(), systemNss, true);
+
+    systemNss = NamespaceString("system.keys");
+    _testDropCollection(_opCtx.get(), systemNss, true);
+}
+
 TEST_F(DatabaseTest, DropCollectionDropsCollectionButDoesNotLogOperationIfWritesAreNotReplicated) {
     repl::UnreplicatedWritesBlock uwb(_opCtx.get());
     ASSERT_FALSE(_opCtx->writesAreReplicated());
