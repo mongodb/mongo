@@ -103,6 +103,7 @@ env.Library(
         "index_catalog.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -112,6 +113,7 @@ env.Library(
         "index_catalog_entry.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -158,9 +160,10 @@ env.CppUnitTest(
 env.Library(
     target='database_holder',
     source=[
-        "database_holder.cpp",
+        'database_holder.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -170,6 +173,7 @@ env.Library(
         'collection_info_cache.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -179,6 +183,7 @@ env.Library(
         'index_create.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
