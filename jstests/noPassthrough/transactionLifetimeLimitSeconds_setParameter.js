@@ -4,6 +4,9 @@
 (function() {
     'use strict';
 
+    // transactionLifetimeLimitSeconds is set to be higher than its default value in test suites.
+    delete TestData.transactionLifetimeLimitSeconds;
+
     /**
      * Takes a server connection 'conn' and server parameter 'field' and calls getParameter on the
      * connection to retrieve the current setting of that server parameter.
