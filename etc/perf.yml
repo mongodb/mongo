@@ -492,29 +492,6 @@ buildvariants:
   - name: misc
   - name: singleThreaded
 
-- name: linux-mmap-standalone
-  display_name: Standalone Linux MMAPv1
-  batchtime: 90 # 1.5 hours
-  expansions:
-    mongod_exec_wrapper: *exec_wrapper
-    perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth --networkMessageCompressors=noop"
-    project: *project
-  run_on:
-  - "centos6-perf"
-  tasks:
-  - name: aggregation
-  - name: agg-query-comparison
-  - name: query
-  - name: views-aggregation
-  - name: views-query
-  - name: where
-  - name: update
-  - name: insert
-  - name: geo
-  - name: misc
-  - name: singleThreaded
-
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory
   batchtime: 90 # 1.5 hours
@@ -522,22 +499,6 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --inMemoryEngineConfigString 'eviction=(threads_min=1),' --inMemorySizeGB 60 --auth --oplogSize 30000 --networkMessageCompressors=noop"
-    project: *project
-  run_on:
-  - "centos6-perf"
-  tasks:
-  - name: update
-  - name: insert
-  - name: misc
-  - name: singleThreaded
-
-- name: linux-mmap-repl
-  display_name: 1-Node ReplSet Linux MMAPv1
-  batchtime: 90 # 1.5 hours
-  expansions:
-    mongod_exec_wrapper: *exec_wrapper
-    perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth --oplogSize 100000 --networkMessageCompressors=noop"
     project: *project
   run_on:
   - "centos6-perf"
