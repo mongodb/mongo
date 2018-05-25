@@ -29,13 +29,6 @@
         return;
     }
 
-    // Increase the timeout for the transaction reaper. This will make the test easier to debug if
-    // it hangs.
-    // TODO SERVER-34595: This should no longer be necessary once the transaction reaper timeout
-    // is increased for all noPassthrough tests.
-    assert.commandWorked(
-        db.adminCommand({"setParameter": 1, transactionLifetimeLimitSeconds: 60 * 60 * 3}));
-
     // Set 'internalQueryExecYieldIterations' to 2 to ensure that commands yield on the second try
     // (i.e. after they have established a snapshot but before they have returned any documents).
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 2}));

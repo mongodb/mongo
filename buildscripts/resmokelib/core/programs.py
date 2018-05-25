@@ -201,6 +201,14 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
         mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
         test_data["setParametersMongos"] = _format_test_data_set_parameters(mongos_set_parameters)
 
+    # There's a periodic background thread that checks for and aborts expired transactions.
+    # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
+    # and being aborted by the background thread. It defaults to 60 seconds, which is too short to
+    # be reliable for our tests. Setting it to 3 hours, so that it is longer than the 2 hours we
+    # allow JS tests to run before timing them out.
+    if "transactionLifetimeLimitSeconds" not in test_data:
+        test_data["transactionLifetimeLimitSeconds"] = 3 * 60 * 60
+
     if "eval_prepend" in kwargs:
         eval_sb.append(str(kwargs.pop("eval_prepend")))
 

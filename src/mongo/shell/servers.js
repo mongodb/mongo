@@ -1071,6 +1071,14 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         .length > 0);
         }
 
+        function argArrayContainsSetParameterValue(value) {
+            assert(value.endsWith("="),
+                   "Expected value argument to be of the form <parameterName>=");
+            return argArray.some(function(el) {
+                return typeof el === "string" && el.startsWith(value);
+            });
+        }
+
         // programName includes the version, e.g., mongod-3.2.
         // baseProgramName is the program name without any version information, e.g., mongod.
         let programName = argArray[0];
@@ -1095,15 +1103,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 }
             }
             if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
-                var hasAuthMechs = false;
-                for (var i in argArray) {
-                    if (typeof argArray[i] === 'string' &&
-                        argArray[i].indexOf('authenticationMechanisms') != -1) {
-                        hasAuthMechs = true;
-                        break;
-                    }
-                }
-                if (!hasAuthMechs) {
+                if (!argArrayContainsSetParameterValue('authenticationMechanisms=')) {
                     argArray.push(
                         ...['--setParameter',
                             "authenticationMechanisms=" + jsTest.options().authMechanism]);
@@ -1114,8 +1114,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             }
 
             // New options in 3.5.x
-            if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
-                                    parseInt(programVersion.split(".")[1]) >= 5)) {
+            if (!programMajorMinorVersion || programMajorMinorVersion >= 305) {
                 if (jsTest.options().serviceExecutor) {
                     if (!argArrayContains("--serviceExecutor")) {
                         argArray.push(...["--serviceExecutor", jsTest.options().serviceExecutor]);
@@ -1154,15 +1153,22 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
 
-                // TODO: Make this unconditional in 3.8.
-                if (!programMajorMinorVersion || programMajorMinorVersion > 304) {
-                    let hasParam = false;
-                    for (let arg of argArray) {
-                        if (typeof arg === 'string' && arg.startsWith('orphanCleanupDelaySecs=')) {
-                            hasParam = true;
+                // New mongod-specific options in 4.0.x
+                if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
+                    if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {
+                        if (!argArrayContainsSetParameterValue(
+                                "transactionLifetimeLimitSeconds=")) {
+                            argArray.push(
+                                ...["--setParameter",
+                                    "transactionLifetimeLimitSeconds=" +
+                                        jsTest.options().transactionLifetimeLimitSeconds]);
                         }
                     }
-                    if (!hasParam) {
+                }
+
+                // TODO: Make this unconditional in 3.8.
+                if (!programMajorMinorVersion || programMajorMinorVersion > 304) {
+                    if (!argArrayContainsSetParameterValue('orphanCleanupDelaySecs=')) {
                         argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
                     }
                 }

@@ -313,6 +313,7 @@ jsTestOptions = function() {
             skipCheckDBHashes: TestData.skipCheckDBHashes || false,
             traceExceptions: TestData.hasOwnProperty("traceExceptions") ? TestData.traceExceptions
                                                                         : true,
+            transactionLifetimeLimitSeconds: TestData.transactionLifetimeLimitSeconds
         });
     }
     return _jsTestOptions;

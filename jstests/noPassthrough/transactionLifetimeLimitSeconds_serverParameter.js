@@ -6,6 +6,9 @@
 
     load("jstests/noPassthrough/libs/server_parameter_helpers.js");
 
+    // transactionLifetimeLimitSeconds is set to be higher than its default value in test suites.
+    delete TestData.transactionLifetimeLimitSeconds;
+
     testNumericServerParameter("transactionLifetimeLimitSeconds",
                                true /*isStartupParameter*/,
                                true /*isRuntimeParameter*/,
