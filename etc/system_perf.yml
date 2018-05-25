@@ -334,6 +334,18 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: tpcc
+  priority: 5
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "tpcc"
+        authentication: disabled
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: industry_benchmarks
   priority: 5
   commands:
@@ -681,6 +693,7 @@ buildvariants:
     - name: change_streams_latency
     - name: snapshot_reads
     - name: linkbench
+    - name: tpcc
 
 - name: linux-standalone
   display_name: Linux Standalone
