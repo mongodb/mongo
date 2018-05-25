@@ -58,8 +58,8 @@
         assert.commandWorked(writeDB.runCommand({
             createIndexes: collName,
             indexes: [
-                {key: {y: 1}, name: "less_selective", background: true},
-                {key: {z: 1}, name: "least_selective", background: true}
+                {key: {y: 1}, name: "less_selective", background: false},
+                {key: {z: 1}, name: "least_selective", background: false}
             ],
             writeConcern: {w: "majority"}
         }));
