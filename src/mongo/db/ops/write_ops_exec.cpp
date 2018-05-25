@@ -422,10 +422,16 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             return true;
         }
     } catch (const DBException&) {
-        collection.reset();
 
-        // Ignore this failure and behave as-if we never tried to do the combined batch insert.
-        // The loop below will handle reporting any non-transient errors.
+        // If we cannot abandon the current snapshot, we give up and rethrow the exception.
+        // No WCE retrying is attempted.  This code path is intended for snapshot read concern.
+        if (opCtx->lockState()->inAWriteUnitOfWork()) {
+            throw;
+        }
+
+        // Otherwise, ignore this failure and behave as-if we never tried to do the combined batch
+        // insert.  The loop below will handle reporting any non-transient errors.
+        collection.reset();
     }
 
     // Try to insert the batch one-at-a-time. This path is executed both for singular batches, and
