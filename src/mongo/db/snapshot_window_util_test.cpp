@@ -64,6 +64,9 @@ TEST_F(SnapshotWindowTest, DecreaseAndIncreaseSnapshotWindow) {
     auto engine = getServiceContext()->getStorageEngine();
     invariant(engine);
 
+    snapshotWindowParams.maxTargetSnapshotHistoryWindowInSeconds.store(100);
+    snapshotWindowParams.targetSnapshotHistoryWindowInSeconds.store(100);
+
     // Lower the time enforced between function calls to speed up testing.
     // Dec must match Inc b/c increaseTargetWindowSize can call into decreaseTargetWindowSize.
     snapshotWindowParams.minMillisBetweenSnapshotWindowInc.store(100);

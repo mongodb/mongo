@@ -47,7 +47,7 @@ struct SnapshotWindowParams {
     //
     // Note that the window size can become greater than this if an ongoing operation is holding an
     // older snapshot open.
-    AtomicInt32 maxTargetSnapshotHistoryWindowInSeconds{100};
+    AtomicInt32 maxTargetSnapshotHistoryWindowInSeconds{0};
 
     // targetSnapshotHistoryWindowInSeconds (not a server parameter, range 0+).
     //
