@@ -169,9 +169,15 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(OperationContext
     auto replicationProcess = ReplicationProcess::get(opCtx);
     auto consistencyMarkers = replicationProcess->getConsistencyMarkers();
     auto storageInterface = StorageInterface::get(opCtx);
-    SyncTail syncTail(
-        observer, consistencyMarkers, storageInterface, repl::multiInitialSyncApply, writerPool);
-    syncTail.setHostname(source.toString());
+    OplogApplier::Options options;
+    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+    options.missingDocumentSourceForInitialSync = source;
+    SyncTail syncTail(observer,
+                      consistencyMarkers,
+                      storageInterface,
+                      repl::multiInitialSyncApply,
+                      writerPool,
+                      options);
     return syncTail.multiApply(opCtx, std::move(ops));
 }
 

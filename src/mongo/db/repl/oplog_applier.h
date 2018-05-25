@@ -44,6 +44,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {
@@ -64,6 +65,10 @@ public:
         bool allowNamespaceNotFoundErrorsOnCrudOps = false;
         bool relaxUniqueIndexConstraints = false;
         bool skipWritesToOplog = false;
+
+        // For initial sync only. If an update fails, the missing document is fetched from
+        // this sync source to insert into the local collection.
+        boost::optional<HostAndPort> missingDocumentSourceForInitialSync;
     };
 
     /**

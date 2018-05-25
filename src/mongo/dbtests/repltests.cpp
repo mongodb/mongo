@@ -1384,8 +1384,11 @@ public:
 
         // this should fail because we can't connect
         try {
-            SyncTail badSource(nullptr, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-            badSource.setHostname("localhost:123");
+            OplogApplier::Options options;
+            options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+            options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
+            SyncTail badSource(
+                nullptr, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr, options);
 
             OldClientContext ctx(&_opCtx, ns());
             badSource.getMissingDoc(&_opCtx, oplogEntry);

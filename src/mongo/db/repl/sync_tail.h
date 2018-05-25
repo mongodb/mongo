@@ -230,6 +230,9 @@ public:
 
     /**
      * Fetch a single document referenced in the operation from the sync source.
+     *
+     * The sync source is specified at construction in
+     * OplogApplier::Options::missingDocumentSourceForInitialSync.
      */
     virtual BSONObj getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry);
 
@@ -240,8 +243,6 @@ public:
      */
     virtual bool fetchAndInsertMissingDocument(OperationContext* opCtx,
                                                const OplogEntry& oplogEntry);
-
-    void setHostname(const std::string& hostname);
 
     /**
      * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then
@@ -265,8 +266,6 @@ private:
     void _consume(OperationContext* opCtx, OplogBuffer* oplogBuffer);
 
     class OpQueueBatcher;
-
-    std::string _hostname;
 
     OplogApplier::Observer* const _observer;
     ReplicationConsistencyMarkers* const _consistencyMarkers;
