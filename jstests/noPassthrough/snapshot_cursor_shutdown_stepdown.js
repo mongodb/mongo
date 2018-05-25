@@ -77,20 +77,9 @@
 
         // Perform a getMore using the previous transaction's open cursorId. We expect to receive
         // CursorNotFound if the cursor was properly closed on step down.
-        assert.commandWorked(sessionDB.runCommand({
-            find: collName,
-            readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(1),
-            startTransaction: true,
-            autocommit: false
-        }));
-        assert.commandFailedWithCode(sessionDB.runCommand({
-            getMore: cursorId,
-            collection: collName,
-            txnNumber: NumberLong(1),
-            autocommit: false
-        }),
-                                     ErrorCodes.CursorNotFound);
+        assert.commandFailedWithCode(
+            sessionDB.runCommand({getMore: cursorId, collection: collName}),
+            ErrorCodes.CursorNotFound);
         rst.stopSet();
     }
 
