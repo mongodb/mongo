@@ -1,3 +1,4 @@
 # powertest
 boto3 == 1.5.27
 psutil == 5.4.3
+pymongo ==  3.6.1

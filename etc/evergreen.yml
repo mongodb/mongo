@@ -128,7 +128,6 @@ variables:
   aws_key_remote: ${powercycle_aws_key}
   aws_secret_remote: ${powercycle_aws_secret}
 
-# TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
 - &powercycle_ec2_instance
   aws_ec2_yml: aws_ec2.yml
   expire_hours: "3"
@@ -144,7 +143,6 @@ variables:
   ssh_key_id: ${powercycle_ssh_key_id}
   standard_port: "20000"
   virtualenv_dir: venv_powercycle
-  virtualenv_requirements: psutil
   windows_crash_cmd: \"notmyfault/notmyfaultc64.exe -accepteula crash 1\"
   windows_crash_dl: https://download.sysinternals.com/files/NotMyFault.zip
   windows_crash_dir: notmyfault
@@ -1461,18 +1459,6 @@ functions:
 
   "run powercycle test" :
     - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          set -o errexit
-
-          if [ ! -z "${virtualenv_requirements}" ]; then
-            ${activate_virtualenv}
-            pip install -r pytests/requirements.txt
-          fi
-
-    - command: shell.exec
       type: test
       params:
         working_dir: src
@@ -1898,8 +1884,8 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          # Copy buildscripts and mongoDB executables to the remote host.
-          file_param="--file buildscripts"
+          # Copy buildscripts, pytests and mongoDB executables to the remote host.
+          file_param="--file buildscripts --file pytests"
           mongo_executables="mongo mongod mongos"
           for executable in $mongo_executables
           do
@@ -1924,14 +1910,12 @@ functions:
           set -o errexit
           # Set up virtualenv on remote.
           cmds="python_loc=\$(which \${python|/opt/mongodbtoolchain/v2/bin/python2})"
-          cmds="$cmds; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=\$(cygpath -w \$python_loc); fi"
+          cmds="$cmds; remote_dir=${remote_dir|.}"
+          cmds="$cmds; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=\$(cygpath -w \$python_loc); remote_dir=\$(cygpath -w \$remote_dir); fi"
           cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
           cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
           cmds="$cmds; . \$activate"
-          # Install python modules on remote, if required.
-          if [ ! -z "${virtualenv_requirements}" ]; then
-            cmds="$cmds; pip install ${virtualenv_requirements}"
-          fi
+          cmds="$cmds; pip install -r \$remote_dir/pytests/requirements.txt"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${activate_virtualenv}
           $python buildscripts/remote_operations.py          \

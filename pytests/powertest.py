@@ -1503,7 +1503,8 @@ def mongo_validate_collections(mongo):
     invalid_colls = []
     ebusy_colls = []
     for db_name in mongo.database_names():
-        for coll_name in mongo[db_name].collection_names():
+        for coll in mongo[db_name].list_collections(filter={"type": "collection"}):
+            coll_name = coll["name"]
             res = mongo[db_name].command({"validate": coll_name, "full": True})
             LOGGER.info("Validating %s %s: %s", db_name, coll_name, res)
             ebusy = "EBUSY" in res["errors"] or "EBUSY" in res["warnings"]
