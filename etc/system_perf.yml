@@ -339,7 +339,6 @@ tasks:
   commands:
     - func: "prepare environment"
       vars:
-        storageEngine: "wiredTiger"
         test: "tpcc"
         authentication: disabled
     - func: "deploy cluster"
