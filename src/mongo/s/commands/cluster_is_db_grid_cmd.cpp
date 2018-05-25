@@ -38,9 +38,6 @@ class IsDbGridCmd : public BasicCommand {
 public:
     IsDbGridCmd() : BasicCommand("isdbgrid") {}
 
-    bool requiresAuth() const override {
-        return false;
-    }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

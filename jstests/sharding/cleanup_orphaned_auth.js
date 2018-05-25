@@ -9,8 +9,7 @@
         if (assert._debug && msg)
             print("in assert for: " + msg);
 
-        if (res.ok == 0 && (res.errmsg.startsWith('not authorized') ||
-                            res.errmsg.match(/requires authentication/)))
+        if (res.ok == 0 && res.errmsg.startsWith('not authorized'))
             return;
 
         var finalMsg = "command worked when it should have been unauthorized: " + tojson(res);

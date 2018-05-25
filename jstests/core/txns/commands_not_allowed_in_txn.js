@@ -85,8 +85,7 @@
     }
 
     //
-    // Test commands that check out the session but are not allowed in multi-document
-    // transactions.
+    // Test commands that check out the session but are not allowed in multi-document transactions.
     //
 
     const sessionCommands = [
@@ -99,6 +98,7 @@
         {group: {ns: collName, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}}},
         {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
         {parallelCollectionScan: collName, numCursors: 1},
+        {refreshLogicalSessionCacheNow: 1}
     ];
 
     sessionCommands.forEach(testCommand);

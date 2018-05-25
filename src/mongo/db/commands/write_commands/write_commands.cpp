@@ -237,7 +237,7 @@ private:
                 throw;
             }
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::auditLogAuthEvent(opCtx, this, *_request, ErrorCodes::Unauthorized);
+            CommandHelpers::logAuthViolation(opCtx, this, *_request, ErrorCodes::Unauthorized);
             throw;
         }
     }

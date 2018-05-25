@@ -42,16 +42,13 @@ public:
         return AllowedOnSecondary::kAlways;
     }
 
+
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
     std::string help() const override {
         return "{whatsmyuri:1}";
-    }
-
-    bool requiresAuth() const override {
-        return false;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

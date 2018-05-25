@@ -216,30 +216,12 @@ struct CommandHelpers {
      */
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 
-    static void auditLogAuthEvent(OperationContext* opCtx,
-                                  const CommandInvocation* invocation,
-                                  const OpMsgRequest& request,
-                                  ErrorCodes::Error err);
-    /**
-     * Overload taking a Command instead of CommandInvocation. It has to punt on the logged
-     * namespace, giving only the request's $db. Since the Command hasn't parsed the request body,
-     * we can't know the collection part of that namespace, so we leave it blank in the audit log.
-     */
-    static void auditLogAuthEvent(OperationContext* opCtx,
-                                  const Command* command,
-                                  const OpMsgRequest& request,
-                                  ErrorCodes::Error err);
+    static void logAuthViolation(OperationContext* opCtx,
+                                 const CommandInvocation* invocation,
+                                 const OpMsgRequest& request,
+                                 ErrorCodes::Error err);
 
     static void uassertNoDocumentSequences(StringData commandName, const OpMsgRequest& request);
-
-    /**
-     * Should be called before trying to Command::parse a request. Throws 'Unauthorized',
-     * and emits an audit log entry, as an early failure if the calling client can't invoke that
-     * Command. Returns true if no more auth checks should be performed.
-     */
-    static bool uassertShouldAttemptParse(OperationContext* opCtx,
-                                          const Command* command,
-                                          const OpMsgRequest& request);
 
     static constexpr StringData kHelpFieldName = "help"_sd;
 };
@@ -551,6 +533,8 @@ private:
      * Throws unless `opCtx`'s client is authorized to `run()` this.
      */
     virtual void doCheckAuthorization(OperationContext* opCtx) const = 0;
+
+    void _checkAuthorizationImpl(OperationContext* opCtx, const OpMsgRequest& request) const;
 
     const Command* const _definition;
 };

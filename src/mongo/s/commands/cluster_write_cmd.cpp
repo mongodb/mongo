@@ -308,7 +308,7 @@ private:
             bool ok = runImpl(opCtx, *_request, _batchedRequest, bob);
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::auditLogAuthEvent(opCtx, this, *_request, ErrorCodes::Unauthorized);
+            CommandHelpers::logAuthViolation(opCtx, this, *_request, ErrorCodes::Unauthorized);
             throw;
         }
     }

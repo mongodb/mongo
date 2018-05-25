@@ -72,11 +72,9 @@
     {
         var session = conn.startSession();
 
-        assert.commandWorked(session.getDatabase("admin").runCommand({usersInfo: 1}),
-                             "do something to tickle the session");
         assert.commandWorked(session.getDatabase("admin").runCommand(refresh), "failed to refresh");
         assert.eq(
-            config.system.sessions.count(), 1, "usersInfo should have written 1 session record");
+            config.system.sessions.count(), 1, "refresh should have written 1 session record");
 
         session.endSession();
         assert.commandWorked(admin.runCommand(refresh), "failed to refresh");
