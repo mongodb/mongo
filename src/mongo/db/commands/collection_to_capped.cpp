@@ -174,7 +174,7 @@ public:
                    string& errmsg,
                    BSONObjBuilder& result) {
         const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
-        double size = jsobj.getField("size").number();
+        long long size = jsobj.getField("size").safeNumberLong();
 
         if (size == 0) {
             errmsg = "invalid command spec";
