@@ -185,9 +185,6 @@ if (${ canYield }) {
             }
         });
 
-    assertCommandPropogatesPlanExecutorKillReason(
-        {group: {ns: collName, key: "_id", $reduce: function(curr, result) {}, initial: {}}});
-
     assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {}});
 
     assertCommandPropogatesPlanExecutorKillReason(

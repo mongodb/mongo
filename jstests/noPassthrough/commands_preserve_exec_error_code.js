@@ -36,15 +36,6 @@
     assertFailsWithInternalError(() => coll.updateOne({_id: 1}, {$set: {x: 2}}));
     assertFailsWithInternalError(() => coll.deleteOne({_id: 1}));
     assertFailsWithInternalError(() => coll.count({_id: 1}));
-    assertFailsWithInternalError(() => coll.group({
-                                               key: "_id",
-                                               cond: {},
-                                               reduce: () => {
-                                                   result.total += 1;
-                                               },
-                                               initial: {total: 0}
-                                           })
-                                           .itcount());
     assertFailsWithInternalError(() => coll.aggregate([]).itcount());
     assertCmdFailsWithInternalError({distinct: coll.getName(), key: "_id"});
     assertCmdFailsWithInternalError({geoNear: coll.getName(), near: [0, 0]});

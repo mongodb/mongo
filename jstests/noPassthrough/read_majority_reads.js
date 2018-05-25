@@ -5,7 +5,6 @@
  *  - find command
  *  - aggregation
  *  - distinct
- *  - group
  *  - count
  *  - parallelCollectionScan
  *  - geoNear
@@ -127,26 +126,6 @@
                 assert.commandWorked(res);
                 assert.eq(res.results.length, 1, tojson(res));
                 return res.results[0].state;
-            },
-            expectedBefore: 'before',
-            expectedAfter: 'after',
-        },
-        group: {
-            run: function(coll) {
-                var res = coll.runCommand({
-                    'group': {
-                        ns: coll.getName(),
-                        key: {_id: 1},
-                        initial: {},
-                        $reduce: function(curr, result) {
-                            result.state = curr.state;
-                        },
-                    },
-                    readConcern: {level: 'majority'},
-                });
-                assert.commandWorked(res);
-                assert.eq(res.retval.length, 1, tojson(res));
-                return res.retval[0].state;
             },
             expectedBefore: 'before',
             expectedAfter: 'after',
@@ -276,13 +255,6 @@
         var db = shardingTest.getDB("throughMongos");
         var collection = db.shardedCollection;
         shardingTest.adminCommand({shardCollection: collection.getFullName(), key: {_id: 1}});
-
-        // The group command isn't supported on sharded collections. It also uses a weird syntax so
-        // code to check that it isn't supported can't be reused with other commands.
-        assert.eq(collection.runCommand({'group': {ns: collection.getName()}}).code,
-                  ErrorCodes.IllegalOperation);
-        delete nonCursorTestCases.group;
-
         runTests(collection, mongod);
     })();
 

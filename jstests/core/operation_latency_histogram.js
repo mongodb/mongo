@@ -2,14 +2,13 @@
 //
 // This test attempts to perform write operations and get latency statistics using the $collStats
 // stage. The former operation must be routed to the primary in a replica set, whereas the latter
-// may be routed to a secondary.
+// may be routed to a secondary. Additionally, it is incompatible with the mobile storage engine
+// because it uses parallelCollectionScan.
 //
 // @tags: [
 //     assumes_read_preference_unchanged,
 //     requires_collstats,
-//
-//     # group uses javascript
-//     requires_scripting,
+//     incompatible_with_embedded,
 // ]
 
 (function() {
@@ -113,12 +112,9 @@
     }
     lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, numRecords, 0, 0);
 
-    // Group
-    testColl.group({initial: {}, reduce: function() {}, key: {a: 1}});
-    lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 1, 0, 0);
-
     // ParallelCollectionScan
-    testDB.runCommand({parallelCollectionScan: testColl.getName(), numCursors: 5});
+    assert.commandWorked(
+        testDB.runCommand({parallelCollectionScan: testColl.getName(), numCursors: 1}));
     lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 1);
 
     // FindAndModify

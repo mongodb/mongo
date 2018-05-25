@@ -84,7 +84,6 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getPlanCache() get query plan cache associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
-    print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
     print("\tdb." + shortName + ".insert(obj)");
     print(
         "\tdb." + shortName +
@@ -1054,16 +1053,6 @@ DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     const cmdObj = this._makeCommand("aggregate", {pipeline: pipeline});
 
     return this._db._runAggregate(cmdObj, aggregateOptions);
-};
-
-DBCollection.prototype.group = function(params) {
-    params.ns = this._shortName;
-    return this._db.group(params);
-};
-
-DBCollection.prototype.groupcmd = function(params) {
-    params.ns = this._shortName;
-    return this._db.groupcmd(params);
 };
 
 MapReduceResult = function(db, o) {

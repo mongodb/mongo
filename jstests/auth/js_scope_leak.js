@@ -5,7 +5,7 @@
 //          auth user 'a' -> auth user 'b'
 //          auth user 'b' -> logout
 //
-//       These transitions are tested for dbEval, $where, MapReduce and $group
+//       These transitions are tested for dbEval, $where and MapReduce.
 
 var conn = MongoRunner.runMongod({smallfiles: ""});
 var test = conn.getDB("test");
@@ -109,41 +109,5 @@ function testMapReduce() {
 }
 testMapReduce();
 testMapReduce();
-
-function testGroup() {
-    var setGlobalInGroup = function(string) {
-        return test.foo.group({
-            key: 'a',
-            reduce: Function('doc1', 'agg', 'someGlobal = "' + string + '"'),
-            initial: {}
-        });
-    };
-    var getGlobalFromGroup = function(string) {
-        return test.foo.group({
-            key: 'a',
-            reduce: Function('doc1', 'agg', 'assert(' + missingOrEquals(string) + ')'),
-            initial: {}
-        });
-    };
-
-    // set the global variable 'someGlobal' before authenticating
-    setGlobalInGroup('noUsers');
-
-    // test new user auth causes scope to be cleared
-    test.auth('a', 'a');
-    assert.doesNotThrow(getGlobalFromGroup, ['a'], "Group: Auth user 'a'");
-
-    // test auth as another user causes scope to be cleared
-    setGlobalInGroup('a');
-    test.auth('b', 'b');
-    assert.doesNotThrow(getGlobalFromGroup, ['a&b'], "Group: Auth user 'b'");
-
-    // test user logout causes scope to be cleared
-    setGlobalInGroup('a&b');
-    test.logout();
-    assert.doesNotThrow(getGlobalFromGroup, ['noUsers'], "Group: Log out");
-}
-testGroup();
-testGroup();
 
 MongoRunner.stopMongod(conn);

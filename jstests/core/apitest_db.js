@@ -21,7 +21,6 @@ assert(db.createCollection, "createCollection");
 assert(db.getProfilingLevel, "getProfilingLevel");
 assert(db.setProfilingLevel, "setProfilingLevel");
 assert(db.dbEval, "dbEval");
-assert(db.group, "group");
 
 dd("c");
 

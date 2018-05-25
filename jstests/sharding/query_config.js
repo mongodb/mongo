@@ -233,22 +233,6 @@
         // Distinct query.
         assert.eq(configDB.chunks.distinct("shard").sort(), [shard1, shard2]);
 
-        // Group query.
-        result = configDB.chunks.group({
-            key: {shard: 1},
-            cond: {ns: testColl.getFullName()},
-            reduce: function(curr, res) {
-                res.chunks++;
-            },
-            initial: {chunks: 0},
-            finalize: function(res) {
-                res._id = res.shard;
-            }
-        });
-        assert.eq(
-            sortArrayById(result),
-            [{shard: shard1, chunks: 2, _id: shard1}, {shard: shard2, chunks: 3, _id: shard2}]);
-
         // Map reduce query.
         var mapFunction = function() {
             if (this.ns == "test2.testColl") {
@@ -342,20 +326,6 @@
 
         // Distinct query.
         assert.eq(userColl.distinct("g").sort(), [1, 2, 3]);
-
-        // Group query.
-        result = userColl.group({
-            key: {g: 1},
-            reduce: function(curr, res) {
-                res.prod *= curr.c;
-            },
-            initial: {prod: 1},
-            finalize: function(res) {
-                res._id = res.g;
-            }
-        });
-        assert.eq(sortArrayById(result),
-                  [{g: 1, prod: 20, _id: 1}, {g: 2, prod: 288, _id: 2}, {g: 3, prod: 22, _id: 3}]);
 
         // Map reduce query.
         var mapFunction = function() {

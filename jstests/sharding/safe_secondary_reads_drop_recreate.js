@@ -199,20 +199,6 @@
         grantPrivilegesToRole: {skip: "primary only"},
         grantRolesToRole: {skip: "primary only"},
         grantRolesToUser: {skip: "primary only"},
-        group: {
-            setUp: function(mongosConn) {
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1, y: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 1, y: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 2, y: 1}));
-                assert.writeOK(mongosConn.getCollection(nss).insert({x: 2, y: 1}));
-            },
-            command: {group: {ns: coll, key: {x: 1}}},
-            checkResults: function(res) {
-                // Expect the command to fail, since it cannot run on sharded collections.
-                assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation, tojson(res));
-            },
-            behavior: "unshardedOnly"
-        },
         handshake: {skip: "does not return user data"},
         hostInfo: {skip: "does not return user data"},
         insert: {skip: "primary only"},

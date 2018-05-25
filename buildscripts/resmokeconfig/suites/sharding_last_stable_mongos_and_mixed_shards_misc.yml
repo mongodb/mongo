@@ -150,7 +150,6 @@ selector:
   - jstests/sharding/parallel.js
   - jstests/sharding/diffservers1.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
-  - jstests/sharding/group_slaveok.js
   - jstests/sharding/shard_existing_coll_chunk_count.js
   - jstests/sharding/explain_read_pref.js
   - jstests/sharding/auto_rebalance_parallel.js

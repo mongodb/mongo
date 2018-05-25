@@ -309,28 +309,6 @@
                 }
             ];
 
-            // The 'group' command cannot be run on a sharded collection.
-            if (!FixtureHelpers.isMongos(coll.getDB())) {
-                testList.push({
-                    test: function(db) {
-                        assert.eq(db.currentop_query.group({
-                            key: {a: 1},
-                            cond: {a: 1, $comment: "currentop_query"},
-                            reduce: function() {},
-                            initial: {},
-                            collation: {locale: "fr"}
-                        }),
-                                  [{"a": 1}]);
-                    },
-                    command: "group",
-                    planSummary: "COLLSCAN",
-                    currentOpFilter: {
-                        "command.group.cond.$comment": "currentop_query",
-                        "command.group.collation": {locale: "fr"}
-                    }
-                });
-            }
-
             testList.forEach(confirmCurrentOpContents);
 
             //

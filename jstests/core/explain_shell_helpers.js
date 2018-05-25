@@ -260,13 +260,6 @@ assert.eq(getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN").indexName, "c
 assert.commandWorked(t.dropIndex({c: 1}));
 
 //
-// .group()
-//
-
-explain = t.explain().group({key: "a", initial: {}, reduce: function() {}});
-assert.commandWorked(explain);
-
-//
 // .distinct()
 //
 
@@ -437,11 +430,6 @@ assert.throws(function() {
 // Can't add fourth arg when using document-style specification of update options.
 assert.throws(function() {
     t.explain().update({a: 3}, {$set: {b: 4}}, {multi: true}, true);
-});
-
-// Missing "initial" for explaining a group.
-assert.throws(function() {
-    t.explain().group({key: "a", reduce: function() {}});
 });
 
 // Can't specify both remove and update in a findAndModify

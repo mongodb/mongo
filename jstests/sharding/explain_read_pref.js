@@ -82,10 +82,6 @@ var testAllModes = function(conn, isMongos) {
             explain = testDB.user.explain().distinct("_id");
             assertCorrectTargeting(explain, isMongos, secExpected);
 
-            // .explain().group()
-            explain = testDB.user.explain().group(
-                {key: {_id: 1}, reduce: function(curr, result) {}, initial: {}});
-            assertCorrectTargeting(explain, isMongos, secExpected);
         } finally {
             // Restore old read pref.
             testDB.getMongo().setReadPref(oldReadPrefMode, oldReadPrefTagSet);

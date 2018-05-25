@@ -317,9 +317,6 @@
         grantPrivilegesToRole: {skip: "tested in auth/commands_user_defined_roles.js"},
         grantRolesToRole: {skip: isUnrelated},
         grantRolesToUser: {skip: isUnrelated},
-        group: {
-            command: {group: {ns: "test.view", key: "x", $reduce: function() {}, initial: {}}},
-        },
         handshake: {skip: isUnrelated},
         hostInfo: {skip: isUnrelated},
         insert: {command: {insert: "view", documents: [{x: 1}]}, expectFailure: true},

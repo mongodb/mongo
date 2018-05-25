@@ -255,14 +255,6 @@
         grantPrivilegesToRole: {skip: "always targets the config server"},
         grantRolesToRole: {skip: "always targets the config server"},
         grantRolesToUser: {skip: "always targets the config server"},
-        group: {
-            sendsDbVersion: false,
-            sendsShardVersion: true,
-            command: {
-                group:
-                    {ns: collName, key: {x: 1}, $reduce: function(curr, result) {}, initial: {}}
-            },
-        },
         hostInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
         insert: {
             sendsDbVersion: false,

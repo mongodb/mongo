@@ -90,10 +90,6 @@
     }
     lastHistogram = checkHistogramDiff(numRecords, 0, 0);
 
-    // Group
-    testColl.group({initial: {}, reduce: function() {}, key: {a: 1}});
-    lastHistogram = checkHistogramDiff(1, 0, 0);
-
     // ParallelCollectionScan
     testDB.runCommand({parallelCollectionScan: testColl.getName(), numCursors: 5});
     lastHistogram = checkHistogramDiff(0, 0, 1);

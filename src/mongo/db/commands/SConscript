@@ -275,7 +275,6 @@ env.Library(
         "do_txn_cmd.cpp",
         "driverHelpers.cpp",
         "eval.cpp",
-        "group_cmd.cpp",
         "haystack.cpp",
         "mr.cpp",
         "oplog_application_checks.cpp",

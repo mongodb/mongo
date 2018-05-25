@@ -73,44 +73,6 @@
     }
     assert.eq(3, collUnsharded.count({b: 1}));
 
-    explain = db.runCommand({
-        explain: {
-            group: {
-                ns: collUnsharded.getName(),
-                key: "a",
-                cond: "b",
-                $reduce: function(curr, result) {},
-                initial: {}
-            }
-        },
-        verbosity: "allPlansExecution"
-    });
-
-    // Basic validation: a group command can only be passed through to an unsharded collection,
-    // so we should confirm that the mongos stage is always SINGLE_SHARD.
-    printjson(explain);
-    assert.commandWorked(explain);
-    assert("queryPlanner" in explain);
-    assert("executionStats" in explain);
-    assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
-
-    // The same group should fail over the sharded collection, because group is only supported
-    // if it is passed through to an unsharded collection.
-    explain = db.runCommand({
-        explain: {
-            group: {
-                ns: collSharded.getName(),
-                key: "a",
-                cond: "b",
-                $reduce: function(curr, result) {},
-                initial: {}
-            }
-        },
-        verbosity: "allPlansExecution"
-    });
-    printjson(explain);
-    assert.commandFailed(explain);
-
     // -------
 
     // Explain a delete operation and verify that it hits all shards without the shard key

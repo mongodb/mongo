@@ -172,53 +172,6 @@
     var res = s.admin.runCommand({shardcollection: "test.foo5", key: {num: 1}});
     assert(!res.ok, "shard capped: " + tojson(res));
 
-    // ----- group ----
-
-    db.foo6.save({a: 1});
-    db.foo6.save({a: 3});
-    db.foo6.save({a: 3});
-    db.foo6.ensureIndex({a: 1});
-    s.sync();
-    printjson(db.foo6.getIndexes());
-
-    assert.eq(2,
-              db.foo6
-                  .group({
-                      key: {a: 1},
-                      initial: {count: 0},
-                      reduce: function(z, prev) {
-                          prev.count++;
-                      }
-                  })
-                  .length);
-
-    assert.eq(3, db.foo6.find().count());
-    assert(s.admin.runCommand({shardcollection: "test.foo6", key: {a: 1}}).ok);
-    assert.eq(3, db.foo6.find().count());
-
-    s.adminCommand({split: "test.foo6", middle: {a: 2}});
-
-    // movechunk commands are wrapped in assert.soon
-    // Sometimes the TO-side shard isn't immediately ready, this
-    // causes problems on slow hosts.
-    // Remove when SERVER-10232 is fixed
-
-    assert.soon(function() {
-        var cmdRes = s.admin.runCommand(
-            {movechunk: "test.foo6", find: {a: 3}, to: s.getOther(s.getPrimaryShard("test")).name});
-        return cmdRes.ok;
-    }, 'move chunk test.foo6', 60000, 1000);
-
-    assert.throws(function() {
-        db.foo6.group({
-            key: {a: 1},
-            initial: {count: 0},
-            reduce: function(z, prev) {
-                prev.count++;
-            }
-        });
-    });
-
     // ---- can't shard non-empty collection without index -----
 
     assert.writeOK(db.foo8.save({a: 1}));

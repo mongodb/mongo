@@ -337,29 +337,6 @@
             }
         ];
 
-        // The 'group' command cannot be run on a sharded collection.
-        if (!isMongos) {
-            testList.push({
-                test: function(db) {
-                    assert.eq(db.test.group({
-                        key: {a: 1},
-                        cond: {a: 1, $comment: logFormatTestComment},
-                        reduce: function() {},
-                        initial: {},
-                        collation: {locale: "fr"}
-                    }),
-                              [{"a": 1}]);
-                },
-                logFields: {
-                    command: "group",
-                    key: {a: 1},
-                    planSummary: "COLLSCAN",
-                    cond: {a: 1, $comment: logFormatTestComment},
-                    collation: {locale: "fr"}
-                }
-            });
-        }
-
         // Confirm log contains collation for find command.
         if (readWriteMode === "commands") {
             testList.push({

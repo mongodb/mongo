@@ -14,7 +14,7 @@ selector:
   - jstests/sharding/aggregation_currentop.js
   - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
-  # Count/write/aggregate/group commands against the config shard do not support retries yet
+  # Count/write/aggregate commands against the config shard do not support retries yet
   - jstests/sharding/addshard1.js
   - jstests/sharding/addshard2.js
   - jstests/sharding/autosplit.js

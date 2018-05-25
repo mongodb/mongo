@@ -158,10 +158,6 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
 
     // Test other commands that can be sent to secondary.
     cmdTest({count: 'user'}, true, formatProfileQuery({count: 'user'}));
-    cmdTest({group: {key: {x: true}, '$reduce': function(a, b) {}, ns: 'mrIn', initial: {x: 0}}},
-            true,
-            formatProfileQuery({'group.ns': 'mrIn'}));
-
     cmdTest({collStats: 'user'}, true, formatProfileQuery({count: 'user'}));
     cmdTest({dbStats: 1}, true, formatProfileQuery({dbStats: 1}));
 

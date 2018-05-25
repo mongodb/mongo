@@ -27,8 +27,6 @@
 
     // Test that commands that should not work on sharded collections work on unsharded
     // collections.
-    assert.commandWorked(staleMongos.runCommand(
-        {group: {ns: coll1, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}}}));
     assert.commandWorked(staleMongos.runCommand({convertToCapped: coll2, size: 64 * 1024}));
 
     // Attempt to shard the collections. coll1 should be able to be sharded, whereas coll2 should
@@ -38,15 +36,6 @@
 
     // Test that commands that should not be runnable on sharded collection do not work on sharded
     // collections, using both fresh mongos and stale mongos instances.
-    assert.commandFailedWithCode(
-        freshMongos.runCommand(
-            {group: {ns: coll1, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}}}),
-        ErrorCodes.IllegalOperation);
-    assert.commandFailedWithCode(
-        staleMongos.runCommand(
-            {group: {ns: coll1, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}}}),
-        ErrorCodes.IllegalOperation);
-
     assert.commandFailedWithCode(freshMongos.runCommand({convertToCapped: coll1, size: 64 * 1024}),
                                  ErrorCodes.IllegalOperation);
     assert.commandFailedWithCode(staleMongos.runCommand({convertToCapped: coll1, size: 32 * 1024}),

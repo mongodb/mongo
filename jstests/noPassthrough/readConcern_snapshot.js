@@ -150,24 +150,14 @@
 
     // TODO: SERVER-34113 Remove this test when we completely remove snapshot
     // reads since this command is not supported with transaction api.
-    // readConcern 'snapshot' is supported by group.
+    // readConcern 'snapshot' is supported by geoNear.
     session = rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
-    let txnNumber = 0;
-    assert.commandWorked(sessionDb.runCommand({
-        group: {ns: collName, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
-    }));
-
-    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
-    // reads since this command is not supported with transaction api.
-    // readConcern 'snapshot' is supported by geoNear.
     assert.commandWorked(sessionDb.runCommand({
         geoNear: collName,
         near: [0, 0],
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
+        txnNumber: NumberLong(0),
     }));
 
     session.endSession();

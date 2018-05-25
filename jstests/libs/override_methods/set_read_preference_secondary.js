@@ -16,7 +16,6 @@
         "find",
         "geoNear",
         "geoSearch",
-        "group",
         "mapReduce",
         "mapreduce",
         "parallelCollectionScan",

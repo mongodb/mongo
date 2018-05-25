@@ -140,7 +140,6 @@ selector:
   - jstests/replsets/index_delete.js
   - jstests/replsets/last_op_visible.js
   - jstests/replsets/sized_zero_capped.js
-  - jstests/replsets/groupAndMapReduce.js
   - jstests/replsets/initial_sync_document_validation.js
   - jstests/replsets/read_committed_on_secondary.js
   - jstests/replsets/apply_ops_lastop.js

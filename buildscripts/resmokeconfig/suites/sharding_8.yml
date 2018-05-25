@@ -19,7 +19,6 @@ selector:
   - jstests/sharding/balancer_window.js
   - jstests/sharding/change_streams_primary_shard_unaware.js
   - jstests/sharding/diffservers1.js
-  - jstests/sharding/group_slaveok.js
   - jstests/sharding/write_cmd_auto_split.js
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js

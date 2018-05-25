@@ -43,8 +43,6 @@ namespace mongo {
 class Collection;
 class CountRequest;
 
-struct GroupRequest;
-
 /**
  * Filter indexes retrieved from index catalog by
  * allowed indices in query settings.
@@ -180,16 +178,4 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OperationContext* opCtx, OpDebug* opDebug, Collection* collection, ParsedUpdate* parsedUpdate);
-
-/**
- * Get a PlanExecutor for a group operation.
- *
- * If the query is valid and an executor could be created, returns a StatusWith with the
- * PlanExecutor.
- *
- * If an executor could not be created, returns a Status indicating why.
- */
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorGroup(
-    OperationContext* opCtx, Collection* collection, const GroupRequest& request);
-
 }  // namespace mongo

@@ -20,7 +20,6 @@ selector:
   - jstests/sharding/names.js
   - jstests/sharding/cursor_timeout.js
   - jstests/sharding/mongos_validate_writes.js
-  - jstests/sharding/group_slaveok.js
   - jstests/sharding/mrShardedOutput.js
   - jstests/sharding/max_time_ms_sharded.js
   - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js

@@ -46,16 +46,13 @@
     assert.lt(
         5, mongos.getDB("config").chunks.find({ns: "test.stuff"}).count(), "not enough chunks");
 
-    assert.soon(function() {
-        var res = mongos.getDB("config").chunks.group({
-            cond: {ns: "test.stuff"},
-            key: {shard: 1},
-            reduce: function(doc, out) {
-                out.nChunks++;
-            },
-            initial: {nChunks: 0}
-        });
-
+    assert.soon(() => {
+        let res =
+            mongos.getDB("config")
+                .chunks
+                .aggregate(
+                    [{$match: {ns: "test.stuff"}}, {$group: {_id: "$shard", nChunks: {$sum: 1}}}])
+                .toArray();
         printjson(res);
         return res.length > 1 && Math.abs(res[0].nChunks - res[1].nChunks) <= 3;
 

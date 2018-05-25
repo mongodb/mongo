@@ -97,7 +97,6 @@
         {"$eval": "function() {return 1;}"},
         {filemd5: 1, root: "fs"},
         {geoNear: collName, near: [0, 0]},
-        {group: {ns: collName, key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}}},
         {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
         {parallelCollectionScan: collName, numCursors: 1},
         {refreshLogicalSessionCacheNow: 1}

@@ -48,7 +48,6 @@ selector:
   - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
   # uses >100MB of data, which can overwhelm test hosts
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
 
   # compact can only be run against a standalone mongod
@@ -72,10 +71,6 @@ selector:
   # can cause OOM kills on test hosts
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
-  # the group command cannot be issued against a sharded cluster
-  - jstests/concurrency/fsm_workloads/group.js
-  - jstests/concurrency/fsm_workloads/group_cond.js
-  - jstests/concurrency/fsm_workloads/group_killop.js
   # eval doesn't work with sharded collections
   - jstests/concurrency/fsm_workloads/indexed_insert_eval.js
   - jstests/concurrency/fsm_workloads/indexed_insert_eval_nolock.js

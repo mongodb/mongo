@@ -46,34 +46,6 @@ doTest = function(signal) {
         var one = slave.getDB("foo").foo.findOne();
         printjson(one);
 
-        //        stats = slave.getDB("foo").adminCommand({replSetGetStatus:1});
-        //        printjson(stats);
-
-        print("Calling group() with slaveOk=true, must succeed");
-        slave.slaveOk = true;
-        count = slave.getDB("foo").foo.group({
-            initial: {n: 0},
-            reduce: function(obj, out) {
-                out.n++;
-            }
-        });
-        printjson(count);
-        assert.eq(len, count[0].n, "slave group count wrong: " + slave);
-
-        print("Calling group() with slaveOk=false, must fail");
-        slave.slaveOk = false;
-        try {
-            count = slave.getDB("foo").foo.group({
-                initial: {n: 0},
-                reduce: function(obj, out) {
-                    out.n++;
-                }
-            });
-            assert(false, "group() succeeded with slaveOk=false");
-        } catch (e) {
-            print("Received exception: " + e);
-        }
-
         print("Calling inline mr() with slaveOk=true, must succeed");
         slave.slaveOk = true;
         map = function() {

@@ -71,12 +71,6 @@
     assertFailsWithInvalidNamespacesForField(
         "distinct", {distinct: "", key: "a"}, isNotFullyQualified, isNotAdminCommand);
 
-    // Test group fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField("group.ns",
-                                             {group: {ns: "", $reduce: () => {}, initial: {}}},
-                                             isNotFullyQualified,
-                                             isNotAdminCommand);
-
     // Test mapReduce fails with an invalid input collection name.
     assertFailsWithInvalidNamespacesForField("mapreduce",
                                              {
@@ -361,13 +355,6 @@
                                              {explain: {distinct: "", key: "a"}},
                                              isNotFullyQualified,
                                              isNotAdminCommand);
-
-    // Test explain of group fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField(
-        "explain.group.ns",
-        {explain: {group: {ns: "", $reduce: () => {}, initial: {}}}},
-        isNotFullyQualified,
-        isNotAdminCommand);
 
     // Test explain of find fails with an invalid collection name.
     assertFailsWithInvalidNamespacesForField(

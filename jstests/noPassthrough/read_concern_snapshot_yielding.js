@@ -303,21 +303,6 @@
         assert.eq(res.values.length, 4, tojson(res));
     }, {"command.distinct": "coll"});
 
-    // TODO: SERVER-34113 Remove this test when we completely remove snapshot
-    // reads since this command is not supported with transaction api.
-    // Test group.
-    testCommand(function() {
-        const sessionId = db.getMongo().startSession({causalConsistency: false}).getSessionId();
-        const res = assert.commandWorked(db.runCommand({
-            group: {ns: "coll", key: {_id: 1}, $reduce: function(curr, result) {}, initial: {}},
-            readConcern: {level: "snapshot"},
-            lsid: sessionId,
-            txnNumber: NumberLong(0)
-        }));
-        assert(res.hasOwnProperty("count"), tojson(res));
-        assert.eq(res.count, 4);
-    }, {"command.group.ns": "coll"});
-
     // Test update.
     testCommand(function() {
         const session = db.getMongo().startSession({causalConsistency: false});

@@ -261,7 +261,6 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_findandmodify.js",
             parallelFilesDir + "/profile_geonear.js",
             parallelFilesDir + "/profile_getmore.js",
-            parallelFilesDir + "/profile_group.js",
             parallelFilesDir + "/profile_insert.js",
             parallelFilesDir + "/profile_list_collections.js",
             parallelFilesDir + "/profile_list_indexes.js",

@@ -1,7 +1,4 @@
-// Cannot implicitly shard accessed collections because of unsupported group operator on sharded
-// collection.
 // @tags: [
-//   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_non_retryable_writes,
@@ -67,10 +64,6 @@
 
     assert.eq([1, 2], Array.sort(coll.distinct('a', {$or: [{a: 2}, {b: 3}]})));
 
-    assert.eq(
-        [{a: 2}, {a: null}, {a: 1}],
-        coll.group(
-            {key: {a: 1}, cond: {$or: [{a: 2}, {b: 3}]}, reduce: function(x, y) {}, initial: {}}));
     assert.eq(5,
               coll.mapReduce(
                       function() {

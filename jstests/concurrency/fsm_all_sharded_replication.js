@@ -56,10 +56,8 @@ var blacklist = [
     'findAndModify_update_grow.js',             // can cause OOM kills on test hosts
     'findAndModify_update_queue.js',            // findAndModify requires a shard key
     'findAndModify_update_queue_unindexed.js',  // findAndModify requires a shard key
-    'group.js',                // the group command cannot be issued against a sharded cluster
-    'group_cond.js',           // the group command cannot be issued against a sharded cluster
-    'indexed_insert_eval.js',  // eval doesn't work with sharded collections
-    'indexed_insert_eval_nolock.js',  // eval doesn't work with sharded collections
+    'indexed_insert_eval.js',                   // eval doesn't work with sharded collections
+    'indexed_insert_eval_nolock.js',            // eval doesn't work with sharded collections
 
     'plan_cache_drop_database.js',  // cannot ensureIndex after dropDatabase without sharding first
     'remove_single_document.js',    // our .remove(query, {justOne: true}) calls lack shard keys

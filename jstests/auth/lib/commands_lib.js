@@ -4087,38 +4087,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "group",
-          command: {
-              group: {
-                  ns: "x",
-                  key: {groupby: 1},
-                  initial: {total: 0},
-                  $reduce: function(curr, result) {
-                      result.total += curr.n;
-                  }
-              }
-          },
-          setup: function(db) {
-              db.x.insert({groupby: 1, n: 5});
-              db.x.insert({groupby: 1, n: 6});
-          },
-          teardown: function(db) {
-              db.x.drop();
-          },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: roles_read,
-                privileges: [{resource: {db: firstDbName, collection: "x"}, actions: ["find"]}]
-              },
-              {
-                runOnDb: secondDbName,
-                roles: roles_readAny,
-                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
-              }
-          ]
-        },
-        {
           testname: "hostInfo",
           command: {hostInfo: 1},
           testcases: [

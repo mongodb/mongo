@@ -39,18 +39,6 @@
         var stats = slave.getDB("foo").adminCommand({replSetGetStatus: 1});
         assert.eq(stats.myState, 3, "Slave should be in recovering state.");
 
-        print("group should fail in recovering state...");
-        slave.slaveOk = true;
-        assert.commandFailed(slave.getDB("foo").foo.runCommand({
-            group: {
-                ns: "foo",
-                initial: {n: 0},
-                $reduce: function(obj, out) {
-                    out.n++;
-                }
-            }
-        }));
-
         print("count should fail in recovering state...");
         slave.slaveOk = true;
         assert.commandFailed(slave.getDB("foo").runCommand({count: "foo"}));

@@ -927,7 +927,6 @@ env.Library(
         'exec/eof.cpp',
         'exec/fetch.cpp',
         'exec/geo_near.cpp',
-        'exec/group.cpp',
         'exec/idhack.cpp',
         'exec/index_iterator.cpp',
         'exec/index_scan.cpp',

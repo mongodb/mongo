@@ -144,22 +144,6 @@
     assert.eq(countB, getUsageCount("b_1_c_1"));
 
     //
-    // Confirm index stats tick on group().
-    //
-    res = db.runCommand({
-        group: {
-            ns: colName,
-            key: {b: 1, c: 1},
-            cond: {b: {$gt: 0}},
-            $reduce: function(curr, result) {},
-            initial: {}
-        }
-    });
-    assert.commandWorked(res);
-    countB++;
-    assert.eq(countB, getUsageCount("b_1_c_1"));
-
-    //
     // Confirm index stats tick on aggregate w/ match.
     //
     res = db.runCommand({aggregate: colName, pipeline: [{$match: {b: 1}}], cursor: {}});

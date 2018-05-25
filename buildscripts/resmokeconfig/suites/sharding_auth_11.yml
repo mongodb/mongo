@@ -25,7 +25,6 @@ selector:
   - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/features2.js
   - jstests/sharding/shard_insert_getlasterror_w2.js
-  - jstests/sharding/group_slaveok.js
   - jstests/sharding/names.js
   - jstests/sharding/cursor_timeout.js
   - jstests/sharding/mongos_validate_writes.js

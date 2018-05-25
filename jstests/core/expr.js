@@ -201,44 +201,6 @@
     }));
 
     //
-    // $expr in group.
-    //
-
-    // The group command is not permitted in sharded collections.
-    if (!isMongos) {
-        coll.drop();
-        assert.writeOK(coll.insert({a: 0}));
-        assert.eq([{a: 0, count: 1}], coll.group({
-            cond: {$expr: {$eq: ["$a", 0]}},
-            key: {a: 1},
-            initial: {count: 0},
-            reduce: function(curr, result) {
-                result.count += 1;
-            }
-        }));
-        assert.throws(function() {
-            coll.group({
-                cond: {$expr: {$eq: ["$a", "$$unbound"]}},
-                key: {a: 1},
-                initial: {count: 0},
-                reduce: function(curr, result) {
-                    result.count += 1;
-                }
-            });
-        });
-        assert.throws(function() {
-            coll.group({
-                cond: {$expr: {$divide: [1, "$a"]}},
-                key: {a: 1},
-                initial: {count: 0},
-                reduce: function(curr, result) {
-                    result.count += 1;
-                }
-            });
-        });
-    }
-
-    //
     // $expr in mapReduce.
     //
 

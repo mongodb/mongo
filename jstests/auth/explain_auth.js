@@ -13,14 +13,13 @@ var coll = db.explain_auth_coll;
 assert.writeOK(coll.insert({_id: 1, a: 1}));
 
 /**
- * Runs explains of find, count, group, remove, and update. Checks that they either succeed or
- * fail with "not authorized".
+ * Runs explains of find, count, remove, and update. Checks that they either succeed or fail with
+ * "not authorized".
  *
  * Takes as input a document 'authSpec' with the following format:
  *   {
  *      find: <bool>,
  *      count: <bool>,
- *      group: <bool>,
  *      remove: <bool>,
  *      update: <bool>
  *   }
@@ -46,11 +45,6 @@ function testExplainAuth(authSpec) {
     // .count()
     cmdResult = db.runCommand({explain: {count: coll.getName()}});
     assertCmdResult(cmdResult, authSpec.count);
-
-    // .group()
-    cmdResult = db.runCommand(
-        {explain: {group: {ns: coll.getName(), key: "a", $reduce: function() {}, initial: {}}}});
-    assertCmdResult(cmdResult, authSpec.group);
 
     // .remove()
     cmdResult =
@@ -93,15 +87,15 @@ admin.logout();
 
 // The "find" action allows explain of read operations.
 db.auth("findOnly", "pwd");
-testExplainAuth({find: true, count: true, group: true, remove: false, update: false});
+testExplainAuth({find: true, count: true, remove: false, update: false});
 db.logout();
 
 db.auth("updateOnly", "pwd");
-testExplainAuth({find: false, count: false, group: false, remove: false, update: true});
+testExplainAuth({find: false, count: false, remove: false, update: true});
 db.logout();
 
 db.auth("removeOnly", "pwd");
-testExplainAuth({find: false, count: false, group: false, remove: true, update: false});
+testExplainAuth({find: false, count: false, remove: true, update: false});
 db.logout();
 
 MongoRunner.stopMongod(conn, null, {user: "adminUser", pwd: "pwd"});

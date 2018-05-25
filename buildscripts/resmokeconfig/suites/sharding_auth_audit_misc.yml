@@ -164,7 +164,6 @@ selector:
   - jstests/sharding/shard2.js
   - jstests/sharding/prefix_shard_key.js
   - jstests/sharding/features2.js
-  - jstests/sharding/group_slaveok.js
   - jstests/sharding/cursor_timeout.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/empty_doc_results.js

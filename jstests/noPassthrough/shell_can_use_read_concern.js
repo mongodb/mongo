@@ -223,35 +223,6 @@
         });
 
         //
-        // Tests for the "group" command.
-        //
-
-        testCommandCanBeCausallyConsistent(function() {
-            const res = assert.commandWorked(db.runCommand({
-                group: {
-                    ns: coll.getName(),
-                    key: {x: 1},
-                    $reduce: function(curr, result) {
-                        ++result.total;
-                    },
-                    initial: {total: 0}
-                }
-            }));
-            assert.eq([{x: null, total: 5}], res.retval, tojson(res));
-        });
-
-        testCommandCanBeCausallyConsistent(function() {
-            const res = coll.group({
-                key: {x: 1},
-                $reduce: function(curr, result) {
-                    ++result.total;
-                },
-                initial: {total: 0}
-            });
-            assert.eq([{x: null, total: 5}], res);
-        });
-
-        //
         // Tests for the "geoNear" command.
         //
 

@@ -28,7 +28,6 @@
         "find",
         "geoNear",
         "geoSearch",
-        "group",
         "parallelCollectionScan",
     ]);
 
