@@ -156,6 +156,9 @@ public:
     /* the last time point we have already synced up to (in the remote/master's oplog). */
     Timestamp syncedTo;
 
+    // If true that means we have already processed at least one op off the current oplog cursor.
+    bool tailing = false;
+
     int nClonedThisPass;
 
     typedef std::vector<std::shared_ptr<ReplSource>> SourceVector;

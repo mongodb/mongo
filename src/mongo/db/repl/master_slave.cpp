@@ -879,7 +879,6 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
     std::string ns = std::string("local.oplog.$") + sourceName();
     LOG(2) << "sync_pullOpLog " << ns << " syncedTo:" << syncedTo << '\n';
 
-    bool tailing = true;
     oplogReader.tailCheck();
 
     bool initial = syncedTo.isNull();
@@ -925,9 +924,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
         // e.g. queryObj = { ts: { $gte: syncedTo } }
 
         oplogReader.tailingQuery(ns.c_str(), queryObj);
-        tailing = false;
-    } else {
-        LOG(2) << "tailing=true\n";
+        tailing = false;  // This will be our first batch with the new cursor.
     }
 
     if (!oplogReader.haveCursor()) {
@@ -1023,6 +1020,9 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
         } else {
             /* t == syncedTo, so the first op was applied previously or it is the first op of
              * initial query and need not be applied. */
+            // Now that we've applied the first op off the cursor, we can set tailing to true.
+            LOG(2) << "tailing=true\n";
+            tailing = true;
         }
     }
 
