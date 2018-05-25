@@ -54,6 +54,7 @@ TestData.skipCheckDBHashes = true;
     var farFutureTS = new Timestamp(
         Math.floor(new Date().getTime() / 1000) + (60 * 60 * 24 * 5 /* in five days*/), 0);
     var rsgs = assert.commandWorked(mLocal.adminCommand("replSetGetStatus"));
+    jsTestLog("Using replSetGetStatus to set minValid: " + tojson(rsgs));
     var primaryOpTime = rsgs.members
                             .filter(function(member) {
                                 return member.self;
@@ -64,9 +65,12 @@ TestData.skipCheckDBHashes = true;
     // We do an update in case there is a minvalid document on the primary already.
     // If the doc doesn't exist then upsert:true will create it, and the writeConcern ensures
     // that update returns details of the write, like whether an update or insert was performed.
+    const minValidUpdate = {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime};
+    jsTestLog("Current minvalid is " + tojson(mMinvalid.findOne()));
+    jsTestLog("Updating minValid to: " + tojson(minValidUpdate));
     printjson(assert.writeOK(mMinvalid.update(
         {},
-        {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime},
+        minValidUpdate,
         {upsert: true, writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}})));
 
     jsTest.log('Restarting primary ' + master.host +
