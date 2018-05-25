@@ -101,7 +101,8 @@ private:
             auto bob = result->getBodyBuilder();
             _innerInvocation->explain(opCtx, _verbosity, &bob);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandHelpers::logAuthViolation(opCtx, this, *_outerRequest, ErrorCodes::Unauthorized);
+            CommandHelpers::auditLogAuthEvent(
+                opCtx, this, *_outerRequest, ErrorCodes::Unauthorized);
             throw;
         }
     }

@@ -300,6 +300,7 @@ void runCommand(OperationContext* opCtx,
         return;
     }
 
+    CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
     // Transactions are disallowed in sharded clusters in MongoDB 4.0.
     uassert(50841,
             "Multi-document transactions cannot be run in a sharded cluster.",
