@@ -213,12 +213,18 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
                       getStorageInterface(),
                       SyncTail::MultiSyncApplyFunc(),
                       nullptr);
-    MultiApplier::OperationPtrs opsPtrs;
+    // Apply each operation in a batch of one because 'ops' may contain a mix of commands and CRUD
+    // operations provided by idempotency tests.
     for (auto& op : ops) {
+        MultiApplier::OperationPtrs opsPtrs;
         opsPtrs.push_back(&op);
+        WorkerMultikeyPathInfo pathInfo;
+        auto status = multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
+        if (!status.isOK()) {
+            return status;
+        }
     }
-    WorkerMultikeyPathInfo pathInfo;
-    return multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
+    return Status::OK();
 }
 
 
