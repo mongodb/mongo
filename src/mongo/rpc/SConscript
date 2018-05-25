@@ -245,7 +245,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/is_mongos',
-        '$BUILD_DIR/mongo/transport/transport_layer',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         '$BUILD_DIR/mongo/util/net/network',
         "$BUILD_DIR/mongo/util/processinfo",

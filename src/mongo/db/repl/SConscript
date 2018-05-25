@@ -25,6 +25,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/op_observer',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -1603,6 +1604,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
     ],
 )

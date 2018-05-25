@@ -209,6 +209,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'server_options',
     ],
 )
 
@@ -390,6 +391,7 @@ env.Clone().InjectModule("enterprise").Library(
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/mongo/util/net/network',
         # The dependency on net/ssl_manager is a temporary crutch that should go away once the
         # networking library has separate options
         '$BUILD_DIR/mongo/util/net/ssl_manager',
@@ -771,6 +773,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
     ],
