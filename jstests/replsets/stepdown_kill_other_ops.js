@@ -29,13 +29,14 @@
     // from completing if it failed to kill all running operations.
     jsTestLog("Running eval() to grab global write lock");
     var evalCmd = function() {
-        db.eval(function() {
-            for (var i = 0; i < 60; i++) {
+        var res = db.eval(function() {
+            for (var i = 0; i < 60 * 10; i++) {  // Run for 10 minutes if not interrupted.
                 // Sleep in 1 second intervals so the javascript engine will notice when
                 // it's killed
                 sleep(1000);
             }
         });
+        print("$eval completed without error. This shouldn't happen! Result: " + tojson(res));
     };
     var evalRunner = startParallelShell(evalCmd, primary.port);
 
