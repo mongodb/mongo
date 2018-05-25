@@ -62,6 +62,7 @@ public:
     virtual ~CommandInterface() = default;
     virtual void redactForLogging(mutablebson::Document* cmdObj) const = 0;
     virtual NamespaceString ns() const = 0;
+    virtual bool redactArgs() const = 0;
 };
 
 /**

@@ -100,32 +100,6 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
     return false;
 }
 
-void auditLogAuthEventImpl(OperationContext* opCtx,
-                           const Command* command,
-                           const NamespaceString& nss,
-                           const OpMsgRequest& request,
-                           ErrorCodes::Error err) {
-    class Hook final : public audit::CommandInterface {
-    public:
-        explicit Hook(const Command* command, const NamespaceString* nss)
-            : _command(command), _nss(nss) {}
-
-        void redactForLogging(mutablebson::Document* cmdObj) const override {
-            _command->redactForLogging(cmdObj);
-        }
-
-        NamespaceString ns() const override {
-            return *_nss;
-        }
-
-    private:
-        const Command* _command;
-        const NamespaceString* _nss;
-    };
-
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(command, &nss), err);
-}
-
 }  // namespace
 
 
@@ -157,14 +131,32 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                                        const CommandInvocation* invocation,
                                        const OpMsgRequest& request,
                                        ErrorCodes::Error err) {
-    auditLogAuthEventImpl(opCtx, invocation->definition(), invocation->ns(), request, err);
-}
+    class Hook final : public audit::CommandInterface {
+    public:
+        explicit Hook(const CommandInvocation* invocation, const NamespaceString* nss)
+            : _invocation(invocation), _nss(nss) {}
 
-void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
-                                       const Command* command,
-                                       const OpMsgRequest& request,
-                                       ErrorCodes::Error err) {
-    auditLogAuthEventImpl(opCtx, command, NamespaceString(request.getDatabase()), request, err);
+        void redactForLogging(mutablebson::Document* cmdObj) const override {
+            if (_invocation) {
+                _invocation->definition()->redactForLogging(cmdObj);
+            }
+        }
+
+        NamespaceString ns() const override {
+            return *_nss;
+        }
+
+        bool redactArgs() const override {
+            return !_invocation;
+        }
+
+    private:
+        const CommandInvocation* _invocation;
+        const NamespaceString* _nss;
+    };
+
+    NamespaceString nss = invocation ? invocation->ns() : NamespaceString(request.getDatabase());
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation, &nss), err);
 }
 
 void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
@@ -380,7 +372,7 @@ bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
     try {
         return checkAuthorizationImplPreParse(opCtx, command, request);
     } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
-        CommandHelpers::auditLogAuthEvent(opCtx, command, request, e.code());
+        CommandHelpers::auditLogAuthEvent(opCtx, nullptr, request, e.code());
         throw;
     }
 }

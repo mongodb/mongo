@@ -216,17 +216,13 @@ struct CommandHelpers {
      */
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 
-    static void auditLogAuthEvent(OperationContext* opCtx,
-                                  const CommandInvocation* invocation,
-                                  const OpMsgRequest& request,
-                                  ErrorCodes::Error err);
     /**
-     * Overload taking a Command instead of CommandInvocation. It has to punt on the logged
+     * If '!invocation', we're logging about a Command pre-parse. It has to punt on the logged
      * namespace, giving only the request's $db. Since the Command hasn't parsed the request body,
      * we can't know the collection part of that namespace, so we leave it blank in the audit log.
      */
     static void auditLogAuthEvent(OperationContext* opCtx,
-                                  const Command* command,
+                                  const CommandInvocation* invocation,
                                   const OpMsgRequest& request,
                                   ErrorCodes::Error err);
 
