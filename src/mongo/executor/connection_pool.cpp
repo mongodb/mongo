@@ -497,11 +497,9 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     }
 
     const auto expiration = _parent->_factory->now() + timeout;
+    auto pf = makePromiseFuture<ConnectionHandle>();
 
-    Promise<ConnectionHandle> promise;
-    auto future = promise.getFuture();
-
-    _requests.push_back(make_pair(expiration, promise.share()));
+    _requests.push_back(make_pair(expiration, pf.promise.share()));
     std::push_heap(begin(_requests), end(_requests), RequestComparator{});
 
     updateStateInLock();
@@ -509,7 +507,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     spawnConnections(lk);
     fulfillRequests(lk);
 
-    return future;
+    return std::move(pf.future);
 }
 
 void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr,

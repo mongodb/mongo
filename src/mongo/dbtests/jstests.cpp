@@ -959,16 +959,13 @@ public:
     void run() {
         std::shared_ptr<Scope> scope(getGlobalScriptEngine()->newScope());
 
-        Promise<void> sleepPromise{};
-        auto sleepFuture = sleepPromise.getFuture();
-
-        Promise<void> awakenedPromise{};
-        auto awakenedFuture = awakenedPromise.getFuture();
+        auto sleep = makePromiseFuture<void>();
+        auto awakened = makePromiseFuture<void>();
 
         // Spawn a thread which attempts to sleep indefinitely.
         stdx::thread([
-            preSleep = std::move(sleepPromise),
-            onAwake = std::move(awakenedPromise),
+            preSleep = std::move(sleep.promise),
+            onAwake = std::move(awakened.promise),
             scope
         ]() mutable {
             preSleep.emplaceValue();
@@ -989,7 +986,7 @@ public:
         }).detach();
 
         // Wait until just before the sleep begins.
-        sleepFuture.get();
+        sleep.future.get();
 
         // Attempt to wait until Javascript enters the sleep.
         // It's OK if we kill the function prematurely, before it begins sleeping. Either cause of
@@ -1000,7 +997,7 @@ public:
         scope->kill();
 
         // Wait for the error.
-        auto result = awakenedFuture.getNoThrow();
+        auto result = awakened.future.getNoThrow();
         ASSERT_EQ(ErrorCodes::Interrupted, result);
     }
 };

@@ -73,10 +73,9 @@ void completePromise(Promise<void>* promise, Func&& func) {
 
 template <typename Func, typename Result = std::result_of_t<Func && ()>>
 Future<Result> async(Func&& func) {
-    Promise<Result> promise;
-    auto fut = promise.getFuture();
+    auto pf = makePromiseFuture<Result>();
 
-    stdx::thread([ promise = std::move(promise), func = std::forward<Func>(func) ]() mutable {
+    stdx::thread([ promise = std::move(pf.promise), func = std::forward<Func>(func) ]() mutable {
 #if !__has_feature(thread_sanitizer)
         // TSAN works better without this sleep, but it is useful for testing correctness.
         sleepmillis(100);  // Try to wait until after the Future has been handled.
@@ -88,7 +87,7 @@ Future<Result> async(Func&& func) {
         }
     }).detach();
 
-    return fut;
+    return std::move(pf.future);
 }
 
 const auto failStatus = Status(ErrorCodes::Error(50728), "expected failure");

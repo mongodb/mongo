@@ -170,7 +170,6 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
     }
 
     auto state = std::make_shared<CommandState>(request, cbHandle);
-    state->mergedFuture = state->promise.getFuture();
     {
         stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
         _inProgress.insert({state->cbHandle, state});

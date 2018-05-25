@@ -153,18 +153,17 @@ public:
         const TaskExecutor::CallbackHandle& cbHandle,
         RemoteCommandRequest& request,
         const transport::BatonHandle& baton = nullptr) {
-        Promise<TaskExecutor::ResponseStatus> promise;
-        auto future = promise.getFuture();
+        auto pf = makePromiseFuture<TaskExecutor::ResponseStatus>();
 
         auto status =
             startCommand(cbHandle,
                          request,
-                         [sp = promise.share()](const TaskExecutor::ResponseStatus& rs) mutable {
+                         [sp = pf.promise.share()](const TaskExecutor::ResponseStatus& rs) mutable {
                              sp.emplaceValue(rs);
                          },
                          baton);
 
-        return future;
+        return std::move(pf.future);
     }
 
     /**

@@ -120,20 +120,17 @@ public:
     ~FreeMonCurlHttpClient() final = default;
 
     Future<std::vector<uint8_t>> postAsync(StringData url, const BSONObj obj) final {
-
-        Promise<std::vector<uint8_t>> promise;
-        auto future = promise.getFuture();
-        auto shared_promise = promise.share();
-
+        auto pf = makePromiseFuture<std::vector<uint8_t>>();
         std::string urlString(url.toString());
 
-        auto status = _executor->scheduleWork([shared_promise, urlString, obj](
-            const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-            doPost(shared_promise, urlString, obj);
-        });
+        auto status =
+            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, obj ](
+                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+                doPost(shared_promise, urlString, obj);
+            });
 
         uassertStatusOK(status);
-        return future;
+        return std::move(pf.future);
     }
 
 private:

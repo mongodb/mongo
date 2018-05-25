@@ -309,12 +309,10 @@ TEST_F(NetworkInterfaceTest, SetAlarm) {
     // set a first alarm, to execute after "expiration"
     Date_t expiration = net().now() + Milliseconds(100);
     auto makeTimerFuture = [&] {
-        Promise<Date_t> promise;
-        auto future = promise.getFuture();
-
+        auto pf = makePromiseFuture<Date_t>();
         return std::make_pair(
-            [ this, promise = promise.share() ]() mutable { promise.emplaceValue(net().now()); },
-            std::move(future));
+            [ this, promise = pf.promise.share() ]() mutable { promise.emplaceValue(net().now()); },
+            std::move(pf.future));
     };
 
     auto futurePair = makeTimerFuture();
