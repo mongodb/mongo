@@ -45,6 +45,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/command_generic_argument.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -68,6 +69,62 @@ const WriteConcernOptions kMajorityWriteConcern(
     // supported by the mongod.
     WriteConcernOptions::SyncMode::UNSET,
     Seconds(60));
+
+// Returns true if found to be authorized, false if undecided. Throws if unauthorized.
+bool checkAuthorizationImplPreParse(OperationContext* opCtx,
+                                    const Command* command,
+                                    const OpMsgRequest& request) {
+    auto client = opCtx->getClient();
+    if (client->isInDirectClient())
+        return true;
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << command->getName() << " may only be run against the admin database.",
+            !command->adminOnly() || request.getDatabase() == NamespaceString::kAdminDb);
+
+    auto authzSession = AuthorizationSession::get(client);
+    if (!authzSession->getAuthorizationManager().isAuthEnabled()) {
+        // Running without auth, so everything should be allowed except remotely invoked
+        // commands that have the 'localHostOnlyIfNoAuth' restriction.
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << command->getName()
+                              << " must run from localhost when running db without auth",
+                !command->adminOnly() || !command->localHostOnlyIfNoAuth() ||
+                    client->getIsLocalHostConnection());
+        return true;  // Blanket authorization: don't need to check anything else.
+    }
+    if (authzSession->isUsingLocalhostBypass())
+        return false;  // Still can't decide on auth because of the localhost bypass.
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "command " << command->getName() << " requires authentication",
+            !command->requiresAuth() || authzSession->isAuthenticated());
+    return false;
+}
+
+void auditLogAuthEventImpl(OperationContext* opCtx,
+                           const Command* command,
+                           const NamespaceString& nss,
+                           const OpMsgRequest& request,
+                           ErrorCodes::Error err) {
+    class Hook final : public audit::CommandInterface {
+    public:
+        explicit Hook(const Command* command, const NamespaceString* nss)
+            : _command(command), _nss(nss) {}
+
+        void redactForLogging(mutablebson::Document* cmdObj) const override {
+            _command->redactForLogging(cmdObj);
+        }
+
+        NamespaceString ns() const override {
+            return *_nss;
+        }
+
+    private:
+        const Command* _command;
+        const NamespaceString* _nss;
+    };
+
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(command, &nss), err);
+}
 
 }  // namespace
 
@@ -96,26 +153,18 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
     return BSONObj(bb.release());
 }
 
-void CommandHelpers::logAuthViolation(OperationContext* opCtx,
-                                      const CommandInvocation* invocation,
-                                      const OpMsgRequest& request,
-                                      ErrorCodes::Error err) {
-    struct Hook final : public audit::CommandInterface {
-    public:
-        explicit Hook(const CommandInvocation* invocation) : _invocation{invocation} {}
+void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
+                                       const CommandInvocation* invocation,
+                                       const OpMsgRequest& request,
+                                       ErrorCodes::Error err) {
+    auditLogAuthEventImpl(opCtx, invocation->definition(), invocation->ns(), request, err);
+}
 
-        void redactForLogging(mutablebson::Document* cmdObj) const override {
-            _invocation->definition()->redactForLogging(cmdObj);
-        }
-
-        NamespaceString ns() const override {
-            return _invocation->ns();
-        }
-
-    private:
-        const CommandInvocation* _invocation;
-    };
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, Hook(invocation), err);
+void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
+                                       const Command* command,
+                                       const OpMsgRequest& request,
+                                       ErrorCodes::Error err) {
+    auditLogAuthEventImpl(opCtx, command, NamespaceString(request.getDatabase()), request, err);
 }
 
 void CommandHelpers::uassertNoDocumentSequences(StringData commandName,
@@ -325,6 +374,17 @@ bool CommandHelpers::isHelpRequest(const BSONElement& helpElem) {
     return !helpElem.eoo() && helpElem.trueValue();
 }
 
+bool CommandHelpers::uassertShouldAttemptParse(OperationContext* opCtx,
+                                               const Command* command,
+                                               const OpMsgRequest& request) {
+    try {
+        return checkAuthorizationImplPreParse(opCtx, command, request);
+    } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
+        CommandHelpers::auditLogAuthEvent(opCtx, command, request, e.code());
+        throw;
+    }
+}
+
 constexpr StringData CommandHelpers::kHelpFieldName;
 
 //////////////////////////////////////////////////////////////
@@ -352,14 +412,31 @@ CommandInvocation::~CommandInvocation() = default;
 
 void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                                            const OpMsgRequest& request) const {
+    // Always send an authorization event to audit log, even if OK.
+    // Not using a scope guard because auditLogAuthEvent could conceivably throw.
     try {
-        _checkAuthorizationImpl(opCtx, request);
-        CommandHelpers::logAuthViolation(opCtx, this, request, ErrorCodes::OK);
+        const Command* c = definition();
+        if (checkAuthorizationImplPreParse(opCtx, c, request)) {
+            // Blanket authorization: don't need to check anything else.
+        } else {
+            try {
+                doCheckAuthorization(opCtx);
+            } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
+                namespace mmb = mutablebson;
+                mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
+                c->redactForLogging(&cmdToLog);
+                auto dbname = request.getDatabase();
+                uasserted(ErrorCodes::Unauthorized,
+                          str::stream() << "not authorized on " << dbname << " to execute command "
+                                        << redact(cmdToLog.getObject()));
+            }
+        }
     } catch (const DBException& e) {
         log(LogComponent::kAccessControl) << e.toStatus();
-        CommandHelpers::logAuthViolation(opCtx, this, request, e.code());
+        CommandHelpers::auditLogAuthEvent(opCtx, this, request, e.code());
         throw;
     }
+    CommandHelpers::auditLogAuthEvent(opCtx, this, request, ErrorCodes::OK);
 }
 
 //////////////////////////////////////////////////////////////
@@ -380,7 +457,7 @@ private:
             bool ok = _command->run(opCtx, _dbName, _request->body, bob);
             CommandHelpers::appendSimpleCommandStatus(bob, ok);
         } catch (const ExceptionFor<ErrorCodes::Unauthorized>& e) {
-            CommandHelpers::logAuthViolation(opCtx, this, *_request, e.code());
+            CommandHelpers::auditLogAuthEvent(opCtx, this, *_request, e.code());
             throw;
         }
     }
@@ -457,36 +534,6 @@ Status BasicCommand::checkAuthForCommand(Client* client,
     if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
         return Status::OK();
     return Status(ErrorCodes::Unauthorized, "unauthorized");
-}
-
-void CommandInvocation::_checkAuthorizationImpl(OperationContext* opCtx,
-                                                const OpMsgRequest& request) const {
-    const Command* c = definition();
-    auto client = opCtx->getClient();
-    auto dbname = request.getDatabase();
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << c->getName() << " may only be run against the admin database.",
-            !c->adminOnly() || dbname == NamespaceString::kAdminDb);
-    if (!AuthorizationSession::get(client)->getAuthorizationManager().isAuthEnabled()) {
-        // Running without auth, so everything should be allowed except remotely invoked commands
-        // that have the 'localHostOnlyIfNoAuth' restriction.
-        uassert(ErrorCodes::Unauthorized,
-                str::stream() << c->getName()
-                              << " must run from localhost when running db without auth",
-                !c->adminOnly() || !c->localHostOnlyIfNoAuth() ||
-                    client->getIsLocalHostConnection());
-        return;  // Blanket authorization: don't need to check anything else.
-    }
-    try {
-        doCheckAuthorization(opCtx);
-    } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-        namespace mmb = mutablebson;
-        mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
-        c->redactForLogging(&cmdToLog);
-        uasserted(ErrorCodes::Unauthorized,
-                  str::stream() << "not authorized on " << dbname << " to execute command "
-                                << redact(cmdToLog.getObject()));
-    }
 }
 
 void Command::generateHelpResponse(OperationContext* opCtx,

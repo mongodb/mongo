@@ -85,7 +85,8 @@
     }
 
     //
-    // Test commands that check out the session but are not allowed in multi-document transactions.
+    // Test commands that check out the session but are not allowed in multi-document
+    // transactions.
     //
 
     const sessionCommands = [
@@ -99,7 +100,6 @@
         {geoNear: collName, near: [0, 0]},
         {mapReduce: collName, map: function() {}, reduce: function(key, vals) {}, out: "out"},
         {parallelCollectionScan: collName, numCursors: 1},
-        {refreshLogicalSessionCacheNow: 1}
     ];
 
     sessionCommands.forEach(testCommand);

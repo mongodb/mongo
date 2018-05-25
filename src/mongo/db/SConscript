@@ -547,6 +547,7 @@ env.Library(
         'audit',
         'command_generic_argument',
         'commands/server_status_core',
+        'commands/test_commands_enabled',
         'namespace_string',
     ],
 )
