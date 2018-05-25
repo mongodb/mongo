@@ -942,6 +942,7 @@ buildvariants:
     platform: linux
     project: *project
     authentication: enabled
+    storageEngine: "mmapv1"
   run_on:
       - "rhel70-perf-replset"
   depends_on:
@@ -969,6 +970,7 @@ buildvariants:
     cluster: replica
     platform: linux
     project: *project
+    storageEngine: "mmapv1"
   run_on:
       - "rhel70-perf-replset"
   depends_on:
