@@ -67,10 +67,10 @@ NamespaceSerializer::ScopedLock NamespaceSerializer::lock(OperationContext* opCt
     if (iter == _inProgressMap.end()) {
         _inProgressMap.try_emplace(nss, std::make_shared<NSLock>());
     } else {
-        auto& nsLock = iter->second;
+        auto nsLock = iter->second;
         nsLock->numWaiting++;
         opCtx->waitForConditionOrInterrupt(
-            nsLock->cvLocked, lock, [&nsLock]() { return !nsLock->isInProgress; });
+            nsLock->cvLocked, lock, [nsLock]() { return !nsLock->isInProgress; });
         nsLock->isInProgress = true;
     }
 
