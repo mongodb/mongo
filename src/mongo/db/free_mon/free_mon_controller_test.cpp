@@ -242,29 +242,21 @@ public:
 
         _registers.addAndFetch(1);
 
-        Promise<FreeMonRegistrationResponse> promise;
-        auto future = promise.getFuture();
+        auto pf = makePromiseFuture<FreeMonRegistrationResponse>();
         if (_options.doSync) {
-            promise.setFrom(doRegister(req));
+            pf.promise.setFrom(doRegister(req));
         } else {
-            auto shared_promise = promise.share();
+            auto swSchedule =
+                _threadPool->scheduleWork([ sharedPromise = pf.promise.share(), req, this ](
+                    const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
 
-            auto swSchedule = _threadPool->scheduleWork([shared_promise, req, this](
-                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-
-                auto swResp = doRegister(req);
-                if (!swResp.isOK()) {
-                    shared_promise.setError(swResp.getStatus());
-                } else {
-                    shared_promise.emplaceValue(swResp.getValue());
-                }
-
-            });
+                    sharedPromise.setWith([&] { return doRegister(req); });
+                });
 
             ASSERT_OK(swSchedule.getStatus());
         }
 
-        return future;
+        return std::move(pf.future);
     }
 
     StatusWith<FreeMonRegistrationResponse> doRegister(const FreeMonRegistrationRequest& req) {
@@ -297,29 +289,21 @@ public:
 
         _metrics.addAndFetch(1);
 
-        Promise<FreeMonMetricsResponse> promise;
-        auto future = promise.getFuture();
+        auto pf = makePromiseFuture<FreeMonMetricsResponse>();
         if (_options.doSync) {
-            promise.setFrom(doMetrics(req));
+            pf.promise.setFrom(doMetrics(req));
         } else {
-            auto shared_promise = promise.share();
+            auto swSchedule =
+                _threadPool->scheduleWork([ sharedPromise = pf.promise.share(), req, this ](
+                    const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
 
-            auto swSchedule = _threadPool->scheduleWork([shared_promise, req, this](
-                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-
-                auto swResp = doMetrics(req);
-                if (!swResp.isOK()) {
-                    shared_promise.setError(swResp.getStatus());
-                } else {
-                    shared_promise.emplaceValue(swResp.getValue());
-                }
-
-            });
+                    sharedPromise.setWith([&] { return doMetrics(req); });
+                });
 
             ASSERT_OK(swSchedule.getStatus());
         }
 
-        return future;
+        return std::move(pf.future);
     }
 
     StatusWith<FreeMonMetricsResponse> doMetrics(const FreeMonMetricsRequest& req) {

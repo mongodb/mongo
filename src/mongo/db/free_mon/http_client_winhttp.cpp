@@ -135,16 +135,14 @@ public:
     Future<std::vector<uint8_t>> postAsync(StringData url, const BSONObj obj) final {
         auto urlString = url.toString();
 
-        Promise<std::vector<uint8_t>> promise;
-        auto future = promise.getFuture();
-        auto shared_promise = promise.share();
+        auto pf = makePromiseFuture<std::vector<uint8_t>>();
+        uassertStatusOK(
+            _executor->scheduleWork([ shared_promise = pf.promise.share(), urlString, obj ](
+                const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
+                doPost(shared_promise, urlString, obj);
+            }));
 
-        uassertStatusOK(_executor->scheduleWork([shared_promise, urlString, obj](
-            const executor::TaskExecutor::CallbackArgs& cbArgs) mutable {
-            doPost(shared_promise, urlString, obj);
-        }));
-
-        return future;
+        return std::move(pf.future);
     }
 
 private:

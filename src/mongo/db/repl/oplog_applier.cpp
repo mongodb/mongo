@@ -61,9 +61,9 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
 }
 
 Future<void> OplogApplier::startup() {
-    auto future = _promise.getFuture();
+    auto pf = makePromiseFuture<void>();
     auto callback =
-        [ this, promise = _promise.share() ](const CallbackArgs& args) mutable noexcept {
+        [ this, promise = pf.promise.share() ](const CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         log() << "Starting oplog application";
         _syncTail->oplogApplication(_oplogBuffer, _replCoord);
@@ -71,7 +71,7 @@ Future<void> OplogApplier::startup() {
         promise.setWith([] {});
     };
     invariant(_executor->scheduleWork(callback).getStatus());
-    return future;
+    return std::move(pf.future);
 }
 
 void OplogApplier::shutdown() {

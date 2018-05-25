@@ -176,9 +176,6 @@ private:
 
     // Used to run oplog application loop.
     std::unique_ptr<SyncTail> _syncTail;
-
-    // Used to generate Future to allow callers to wait for oplog application shutdown.
-    Promise<void> _promise;
 };
 
 /**

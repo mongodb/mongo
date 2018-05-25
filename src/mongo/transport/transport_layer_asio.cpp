@@ -116,9 +116,9 @@ private:
         stdx::lock_guard<stdx::mutex> lk(_timerState->mutex);
         auto id = ++_timerState->generation;
         invariant(!_timerState->finalPromise);
-        _timerState->finalPromise = std::make_unique<Promise<void>>();
-        auto future = _timerState->finalPromise->getFuture();
-        return std::make_pair(std::move(future), id);
+        auto pf = makePromiseFuture<void>();
+        _timerState->finalPromise = std::make_unique<Promise<void>>(std::move(pf.promise));
+        return std::make_pair(std::move(pf.future), id);
     }
 
     template <typename ArmTimerCb>

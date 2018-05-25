@@ -346,25 +346,24 @@ Status AsyncRequestsSender::RemoteData::resolveShardIdToHostAndPort(
         // If it's going to take a while to target, we spin up a background thread to do our
         // targeting, while running the baton on the calling thread.  This allows us to make forward
         // progress on previous requests.
-        Promise<HostAndPort> promise;
-        auto future = promise.getFuture();
+        auto pf = makePromiseFuture<HostAndPort>();
 
         ars->_batonRequests++;
         stdx::thread bgChecker([&] {
-            promise.setWith(
+            pf.promise.setWith(
                 [&] { return targeter->findHostWithMaxWait(readPref, deadline - clock->now()); });
 
             ars->_baton->schedule([ars] { ars->_batonRequests--; });
         });
         const auto guard = MakeGuard([&] { bgChecker.join(); });
 
-        while (!future.isReady()) {
+        while (!pf.future.isReady()) {
             if (!ars->_baton->run(nullptr, deadline)) {
                 break;
             }
         }
 
-        return future.getNoThrow();
+        return pf.future.getNoThrow();
     }();
 
     if (!findHostStatus.isOK()) {

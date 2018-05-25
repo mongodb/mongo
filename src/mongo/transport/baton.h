@@ -70,14 +70,13 @@ public:
      */
     template <typename Callback>
     Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
-        Promise<FutureContinuationResult<Callback>> promise;
-        auto future = promise.getFuture();
+        auto pf = makePromiseFuture<FutureContinuationResult<Callback>>();
 
-        schedule([ cb = std::forward<Callback>(cb), sp = promise.share() ]() mutable {
+        schedule([ cb = std::forward<Callback>(cb), sp = pf.promise.share() ]() mutable {
             sp.setWith(std::move(cb));
         });
 
-        return future;
+        return std::move(pf.future);
     }
 
     /**

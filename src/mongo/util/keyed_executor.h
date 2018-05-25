@@ -226,13 +226,9 @@ private:
 
     Future<void> _onCleared(WithLock, Deque& deque) {
         invariant(deque.size());
-
-        Promise<void> promise;
-        Future<void> future = promise.getFuture();
-
-        deque.back().push_back(promise.share());
-
-        return future;
+        auto pf = makePromiseFuture<void>();
+        deque.back().push_back(pf.promise.share());
+        return std::move(pf.future);
     }
 
     stdx::mutex _mutex;

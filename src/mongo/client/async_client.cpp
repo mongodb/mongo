@@ -139,10 +139,8 @@ Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     }
 #endif
 
-    Promise<void> retPromise;
-    auto ret = retPromise.getFuture();
-
-    auto authCompleteCb = [promise = retPromise.share()](auth::AuthResponse response) mutable {
+    auto pf = makePromiseFuture<void>();
+    auto authCompleteCb = [promise = pf.promise.share()](auth::AuthResponse response) mutable {
         if (response.isOK()) {
             promise.emplaceValue();
         } else {
@@ -166,7 +164,7 @@ Future<void> AsyncDBClient::authenticate(const BSONObj& params) {
     auth::authenticateClient(
         params, remote(), clientName, std::move(doAuthCb), std::move(authCompleteCb));
 
-    return ret;
+    return std::move(pf.future);
 }
 
 Future<void> AsyncDBClient::initWireVersion(const std::string& appName,

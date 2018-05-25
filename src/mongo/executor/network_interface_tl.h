@@ -104,7 +104,7 @@ private:
 
         AtomicBool done;
         Promise<RemoteCommandResponse> promise;
-        Future<RemoteCommandResponse> mergedFuture;
+        Future<RemoteCommandResponse> mergedFuture = promise.getFuture();
     };
 
     void _eraseInUseConn(const TaskExecutor::CallbackHandle& handle);

@@ -126,15 +126,13 @@ public:
 
     Future<void> addSession(Session& session, Type type) override {
         auto fd = checked_cast<ASIOSession&>(session).getSocket().native_handle();
+        auto pf = makePromiseFuture<void>();
 
-        Promise<void> promise;
-        auto out = promise.getFuture();
-
-        _safeExecute([ fd, type, sp = promise.share(), this ] {
+        _safeExecute([ fd, type, sp = pf.promise.share(), this ] {
             _sessions[fd] = TransportSession{type, sp};
         });
 
-        return out;
+        return std::move(pf.future);
     }
 
     Future<void> waitFor(const ReactorTimer& timer, Milliseconds timeout) override {
@@ -142,10 +140,8 @@ public:
     }
 
     Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) override {
-        Promise<void> promise;
-        auto out = promise.getFuture();
-
-        _safeExecute([ timerPtr = &timer, expiration, sp = promise.share(), this ] {
+        auto pf = makePromiseFuture<void>();
+        _safeExecute([ timerPtr = &timer, expiration, sp = pf.promise.share(), this ] {
             auto pair = _timers.insert({
                 timerPtr, expiration, sp,
             });
@@ -153,7 +149,7 @@ public:
             _timersById[pair.first->id] = pair.first;
         });
 
-        return out;
+        return std::move(pf.future);
     }
 
     bool cancelSession(Session& session) override {

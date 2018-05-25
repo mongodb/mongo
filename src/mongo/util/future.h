@@ -493,8 +493,8 @@ using future_details::Future;
  *
  * Only one thread can use a given Promise at a time. It is legal to have different threads setting
  * the value/error and extracting the Future, but it is the user's responsibility to ensure that
- * those calls are strictly synchronized. This is usually easiest to achieve by extracting the
- * Future, then passing a SharedPromise to the completing threads.
+ * those calls are strictly synchronized. This is usually easiest to achieve by calling
+ * makePromiseFuture<T>() then passing a SharedPromise to the completing threads.
  *
  * If the result is ready when producing the Future, it is more efficient to use
  * makeReadyFutureWith() or Future<T>::makeReady() than to use a Promise<T>.
@@ -576,6 +576,9 @@ public:
      */
     SharedPromise<T> share() noexcept;
 
+    /**
+     * Prefer using makePromiseFuture<T>() over constructing a promise and calling this method.
+     */
     Future<T> getFuture() noexcept;
 
 private:
@@ -1293,11 +1296,6 @@ private:
     Future<FakeVoid> inner;
 };
 
-template <typename T>
-    Future<void> Future<T>::ignoreValue() && noexcept {
-    return std::move(*this).then([](auto&&) {});
-}
-
 /**
  * Makes a ready Future with the return value of a nullary function. This has the same semantics as
  * Promise::setWith, and has the same reasons to prefer it over Future<T>::makeReady(). Also, it
@@ -1306,6 +1304,19 @@ template <typename T>
 template <typename Func>
 auto makeReadyFutureWith(Func&& func) {
     return Future<void>::makeReady().then(std::forward<Func>(func));
+}
+
+/**
+ * Returns a bound Promise and Future in a struct with friendly names (promise and future) that also
+ * works well with C++17 structured bindings.
+ */
+template <typename T>
+inline auto makePromiseFuture() {
+    struct PromiseAndFuture {
+        Promise<T> promise;
+        Future<T> future = promise.getFuture();
+    };
+    return PromiseAndFuture();
 }
 
 /**
@@ -1369,6 +1380,11 @@ template <typename T>
 template <typename Func>
 inline void Promise<T>::setWith(Func&& func) noexcept {
     setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
+}
+
+template <typename T>
+    Future<void> Future<T>::ignoreValue() && noexcept {
+    return std::move(*this).then([](auto&&) {});
 }
 
 }  // namespace mongo

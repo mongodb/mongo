@@ -410,9 +410,9 @@ struct AsyncResult {
     using return_type = Future<RealResult>;
 
     explicit AsyncResult(completion_handler_type& handler) {
-        Promise<RealResult> promise;
-        fut = promise.getFuture();
-        handler.promise = promise.share();
+        auto pf = makePromiseFuture<RealResult>();
+        fut = std::move(pf.future);
+        handler.promise = pf.promise.share();
     }
 
     auto get() {

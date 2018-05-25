@@ -162,14 +162,12 @@ public:
 
     template <typename Callback>
     Future<FutureContinuationResult<Callback>> execute(Callback&& cb) {
-        Promise<FutureContinuationResult<Callback>> promise;
-        auto future = promise.getFuture();
-
-        schedule(kPost, [ cb = std::forward<Callback>(cb), sp = promise.share() ]() mutable {
+        auto pf = makePromiseFuture<FutureContinuationResult<Callback>>();
+        schedule(kPost, [ cb = std::forward<Callback>(cb), sp = pf.promise.share() ]() mutable {
             sp.setWith(cb);
         });
 
-        return future;
+        return std::move(pf.future);
     }
 
     virtual bool onReactorThread() const = 0;

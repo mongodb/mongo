@@ -2001,14 +2001,14 @@ public:
 
         // Returns true when the batch has started, meaning the applier is holding the PBWM lock.
         // Will return false if the lock was not held.
-        Promise<bool> batchInProgressPromise;
+        auto batchInProgress = makePromiseFuture<bool>();
         // Attempt to read when in the middle of a batch.
         stdx::packaged_task<bool()> task([&] {
             Client::initThread(getThreadName());
             auto readOp = cc().makeOperationContext();
 
             // Wait for the batch to start or fail.
-            if (!batchInProgressPromise.getFuture().get()) {
+            if (!batchInProgress.future.get()) {
                 return false;
             }
             AutoGetCollectionForRead autoColl(readOp.get(), ns);
@@ -2019,7 +2019,7 @@ public:
         stdx::thread taskThread{std::move(task)};
 
         auto joinGuard = MakeGuard([&] {
-            batchInProgressPromise.emplaceValue(false);
+            batchInProgress.promise.emplaceValue(false);
             taskThread.join();
         });
 
@@ -2042,7 +2042,7 @@ public:
             }
 
             // Signals the reader to acquire a collection read lock.
-            batchInProgressPromise.emplaceValue(true);
+            batchInProgress.promise.emplaceValue(true);
 
             // Block while holding the PBWM lock until the reader is done.
             if (!taskFuture.get()) {
