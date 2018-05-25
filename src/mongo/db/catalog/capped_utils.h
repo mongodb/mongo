@@ -45,11 +45,13 @@ Status cloneCollectionAsCapped(OperationContext* opCtx,
                                Database* db,
                                const std::string& shortFrom,
                                const std::string& shortTo,
-                               double size,
+                               long long size,
                                bool temp);
 
 /**
  * Converts the collection "collectionName" to a capped collection with a size of "size".
  */
-Status convertToCapped(OperationContext* opCtx, const NamespaceString& collectionName, double size);
+Status convertToCapped(OperationContext* opCtx,
+                       const NamespaceString& collectionName,
+                       long long size);
 }  // namespace mongo
