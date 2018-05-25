@@ -30,12 +30,20 @@
 
 #include "mongo/db/commands/current_op_common.h"
 
+#include <boost/container/flat_set.hpp>
 #include <string>
 
 #include "mongo/db/command_generic_argument.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
+namespace {
+static constexpr auto kAll = "$all"_sd;
+static constexpr auto kOwnOps = "$ownOps"_sd;
+static constexpr auto kTruncateOps = "$truncateOps"_sd;
+static const boost::container::flat_set<StringData> kCurOpCmdParams = {kAll, kOwnOps, kTruncateOps};
+}  // namespace
 
 bool CurrentOpCommandBase::run(OperationContext* opCtx,
                                const std::string& dbName,
@@ -51,9 +59,15 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     BSONObjBuilder currentOpBuilder;
     BSONObjBuilder currentOpSpecBuilder(currentOpBuilder.subobjStart("$currentOp"));
 
-    currentOpSpecBuilder.append("idleConnections", cmdObj["$all"].trueValue());
-    currentOpSpecBuilder.append("allUsers", !cmdObj["$ownOps"].trueValue());
-    currentOpSpecBuilder.append("truncateOps", true);
+    // If test commands are enabled, then we allow the currentOp commands to specify whether or not
+    // to truncate long operations via the '$truncateOps' parameter. Otherwise, we always truncate
+    // operations to match the behaviour of the legacy currentOp command.
+    const bool truncateOps =
+        !getTestCommandsEnabled() || !cmdObj[kTruncateOps] || cmdObj[kTruncateOps].trueValue();
+
+    currentOpSpecBuilder.append("idleConnections", cmdObj[kAll].trueValue());
+    currentOpSpecBuilder.append("allUsers", !cmdObj[kOwnOps].trueValue());
+    currentOpSpecBuilder.append("truncateOps", truncateOps);
     currentOpSpecBuilder.doneFast();
 
     pipeline.push_back(currentOpBuilder.obj());
@@ -66,8 +80,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     for (const auto& elt : cmdObj) {
         const auto fieldName = elt.fieldNameStringData();
 
-        if (0 == idx++ || fieldName == "$all" || fieldName == "$ownOps" ||
-            isGenericArgument(fieldName)) {
+        if (0 == idx++ || kCurOpCmdParams.count(fieldName) || isGenericArgument(fieldName)) {
             continue;
         }
 

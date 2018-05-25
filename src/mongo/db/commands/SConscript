@@ -349,11 +349,14 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/service_context',
-    ]
+        'test_commands_enabled'
+    ],
 )
 
 env.Library(
