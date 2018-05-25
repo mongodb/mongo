@@ -28,8 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/net/ssl_manager.h"
-
 #include "mongo/base/init.h"
 
 namespace mongo {

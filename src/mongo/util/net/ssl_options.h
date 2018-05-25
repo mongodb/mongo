@@ -107,6 +107,13 @@ struct SSLParams {
 
 extern SSLParams sslGlobalParams;
 
+/**
+* The global SSL configuration. This should be accessed only after global initialization has
+* completed. If it must be accessed in an initializer, the initializer should have
+* "EndStartupOptionStorage" as a prerequisite.
+*/
+const SSLParams& getSSLGlobalParams();
+
 Status addSSLServerOptions(mongo::optionenvironment::OptionSection* options);
 
 Status addSSLClientOptions(mongo::optionenvironment::OptionSection* options);

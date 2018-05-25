@@ -196,14 +196,6 @@ SSLManagerInterface* getSSLManager();
 extern bool isSSLServer;
 
 /**
- * The global SSL configuration. This should be accessed only after global initialization has
- * completed. If it must be accessed in an initializer, the initializer should have
- * "EndStartupOptionStorage" as a prerequisite.
- */
-const SSLParams& getSSLGlobalParams();
-
-
-/**
  * Returns true if the `nameToMatch` is a valid match against the `certHostName` requirement from an
  * x.509 certificate.  Matches a remote host name to an x.509 host name, including wildcards.
  */

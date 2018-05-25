@@ -128,6 +128,8 @@ Status storeDisabledProtocols(const std::string& disabledProtocols,
 }
 }  // nameapace
 
+SSLParams sslGlobalParams;
+
 Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
                                 StringData name,
                                 StringData value) {

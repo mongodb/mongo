@@ -46,15 +46,11 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
 
 namespace {
-
-const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
-    transport::Session::declareDecoration<SSLPeerInfo>();
 
 /**
  * Configurable via --setParameter disableNonSSLConnectionLogging=true. If false (default)
@@ -71,17 +67,6 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
                                      "opensslDiffieHellmanParameters",
                                      &sslGlobalParams.sslPEMTempDHParam);
 }  // namespace
-
-
-SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
-    return peerInfoForSession(session.get());
-}
-
-SSLParams sslGlobalParams;
-
-const SSLParams& getSSLGlobalParams() {
-    return sslGlobalParams;
-}
 
 class OpenSSLCipherConfigParameter
     : public ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> {
