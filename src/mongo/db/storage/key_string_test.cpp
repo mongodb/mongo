@@ -1248,6 +1248,22 @@ TEST_F(KeyStringTest, InvalidDecimalZero) {
         50846);
 }
 
+TEST_F(KeyStringTest, InvalidDecimalContinuation) {
+    auto elem = Decimal128("1.797693134862315708145274237317043E308");
+    const KeyString ks(KeyString::Version::V1, BSON("" << elem), ALL_ASCENDING);
+
+    uint8_t* ksBuffer = (uint8_t*)ks.getBuffer();
+    ksBuffer[2] = 239;
+
+    uint8_t* typeBits = (uint8_t*)ks.getTypeBits().getBuffer();
+    typeBits[1] = 231;
+
+    ASSERT_THROWS_CODE(
+        KeyString::toBsonSafe((char*)ksBuffer, ks.getSize(), ALL_ASCENDING, ks.getTypeBits()),
+        AssertionException,
+        50850);
+}
+
 TEST_F(KeyStringTest, RandomizedInputsForToBsonSafe) {
     std::mt19937 gen(newSeed());
     std::uniform_int_distribution<> randomByte(std::numeric_limits<unsigned char>::min(),

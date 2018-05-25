@@ -1121,6 +1121,9 @@ Decimal128 readDecimalContinuation(BufReader* reader, bool inverted, Decimal128 
     uint32_t flags = Decimal128::kNoFlag;
     uint64_t continuation = endian::bigToNative(readType<uint64_t>(reader, inverted));
     num = num.normalize();
+    uassert(50850,
+            "Invalid decimal continuation.",
+            Decimal128::isValid(num.isNegative(), num.getBiasedExponent(), 0, continuation));
     num = num.add(Decimal128(num.isNegative(), num.getBiasedExponent(), 0, continuation), &flags);
     uassert(50815,
             "Unexpected inexact flag set after Decimal addition.",
