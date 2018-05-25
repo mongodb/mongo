@@ -284,6 +284,7 @@ functions:
          file: "work/perf.json"
 
   "analyze":
+    - command: shell.exec
       type : test
       params:
         working_dir: work
