@@ -3251,6 +3251,22 @@ def doConfigure(myenv):
             conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
             break
  
+    def CheckMongoCMinVersion(context):
+        compile_test_body = textwrap.dedent("""
+        #include <mongoc.h>
+
+        #if !MONGOC_CHECK_VERSION(1,10,0)
+        #error
+        #endif
+        """)
+
+        context.Message("Checking if mongoc version is 1.10.0 or newer...")
+        result = context.TryCompile(compile_test_body, ".cpp")
+        context.Result(result)
+        return result
+
+    conf.AddTest('CheckMongoCMinVersion', CheckMongoCMinVersion)
+
     mongoc_mode = get_option('use-system-mongo-c')
     conf.env['MONGO_HAVE_LIBMONGOC'] = False
     if mongoc_mode != 'off':
@@ -3262,6 +3278,8 @@ def doConfigure(myenv):
                 autoadd=False )
         if not conf.env['MONGO_HAVE_LIBMONGOC'] and mongoc_mode == 'on':
             myenv.ConfError("Failed to find the required C driver headers")
+        if conf.env['MONGO_HAVE_LIBMONGOC'] and not conf.CheckMongoCMinVersion():
+            myenv.ConfError("Version of mongoc is too old. Version 1.10+ required")
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)

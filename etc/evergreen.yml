@@ -1079,26 +1079,17 @@ functions:
         WORKDIR=${workdir}
 
         if [ "${build_cdriver|}" = "true" ]; then
-        CDRIVER_VERSION=1.9.2
+        CDRIVER_VERSION=1.10.1
         rm -rf mongo-c-driver-$CDRIVER_VERSION
         rm -rf mongo-c-driver
         curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
         tar xzf mongo-c-driver-$CDRIVER_VERSION.tar.gz
         mv mongo-c-driver-$CDRIVER_VERSION mongo-c-driver
         cd mongo-c-driver
-        # remove this patch once SERVER-33101 is released
-        patch -p1 < ../src/buildscripts/mongoc-stat.c.diff
-        # remove this once CDRIVER-2631 and CDRIVER-2630 are released
-        patch -p1 < ../src/buildscripts/mongo-c-driver_CMakeLists.txt.diff
 
         trap "cat CMakeFiles/CMakeOutput.log" EXIT
         export ${compile_env|}
-        (
-            cd src/libbson
-            ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DCMAKE_PREFIX_PATH=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${libbson_cmake_flags}
-            make install VERBOSE=1
-        )
-        ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DCMAKE_PREFIX_PATH=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
+        ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_ZLIB=OFF -DENABLE_SSL=OFF -DENABLE_SASL=OFF -DENABLE_TESTS=OFF -DENABLE_SRV=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF ${cdriver_cmake_flags}
         make install VERBOSE=1
         mv $WORKDIR/src/build/mongo-embedded-sdk-$VERSION-tmp $WORKDIR/src/build/mongo-embedded-sdk-$VERSION
         fi
@@ -9269,18 +9260,6 @@ buildvariants:
       --variables-files=etc/scons/xcode_macos.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_SYSTEM_NAME=Darwin
-        -DCMAKE_SYSTEM_PROCESSOR=x86_64
-        -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk macosx --show-sdk-path)"
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
-        -DCMAKE_LINKER_FLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path) -mmacosx-version-min=10.10"
-        -DCMAKE_INSTALL_NAME_DIR=@rpath
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
@@ -9315,17 +9294,6 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_SYSTEM_NAME=Darwin
-        -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch arm64 -isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2"
-        -DCMAKE_INSTALL_NAME_DIR=@rpath
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
@@ -9360,17 +9328,6 @@ buildvariants:
       --variables-files=etc/scons/xcode_ios_sim.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_SYSTEM_NAME=Darwin
-        -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk iphonesimulator --show-sdk-path)"
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"
-        -DCMAKE_INSTALL_NAME_DIR=@rpath
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
@@ -9407,17 +9364,6 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_SYSTEM_NAME=Darwin
-        -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk appletvos --show-sdk-path)"
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch arm64 -isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-isysroot $(xcrun --sdk appletvos --show-sdk-path) -mtvos-version-min=10.2"
-        -DCMAKE_INSTALL_NAME_DIR=@rpath
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
@@ -9451,17 +9397,6 @@ buildvariants:
       --variables-files=etc/scons/xcode_tvos_sim.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_SYSTEM_NAME=Darwin
-        -DCMAKE_FIND_ROOT_PATH="$(xcrun --sdk appletvsimulator --show-sdk-path)"
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_C_FLAGS="-arch x86_64 -isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
-        -DCMAKE_LINKER_FLAGS="-isysroot $(xcrun --sdk appletvsimulator --show-sdk-path) -mtvos-version-min=10.2"
-        -DCMAKE_INSTALL_NAME_DIR=@rpath
     cdriver_cmake_flags: >-
         -DTHREADS_PTHREAD_ARG=2
         -DCMAKE_SYSTEM_NAME=Darwin
@@ -9498,10 +9433,6 @@ buildvariants:
       --allocator=system
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags:
-        -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v2/bin/gcc
-        -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v2/bin/g++
-        -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
     cdriver_cmake_flags:
         -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v2/bin/gcc
         -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v2/bin/g++
@@ -9532,17 +9463,6 @@ buildvariants:
       --use-system-mongo-c=on
       LIBS=clang_rt.builtins-arm-android
       LIBPATH="$(dirname $($(dirname $(pwd))/android_toolchain/bin/clang -print-file-name=libclang_rt.builtins-arm-android.a)) \$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DANDROID_NATIVE_API_LEVEL=24
-        -DANDROID_ABI=armeabi-v7a
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH=$WORKDIR/android_toolchain
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
     cdriver_cmake_flags: >-
         -DANDROID_NATIVE_API_LEVEL=24
         -DANDROID_ABI=armeabi-v7a
@@ -9582,17 +9502,6 @@ buildvariants:
       --variables-files=etc/scons/android_toolchain.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DANDROID_NATIVE_API_LEVEL=24
-        -DANDROID_ABI=arm64-v8a
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH=$WORKDIR/android_toolchain
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
     cdriver_cmake_flags: >-
         -DANDROID_NATIVE_API_LEVEL=24
         -DANDROID_ABI=arm64-v8a
@@ -9632,17 +9541,6 @@ buildvariants:
       --variables-files=etc/scons/android_toolchain.vars
       --use-system-mongo-c=on
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    libbson_cmake_flags: >-
-        -DANDROID_NATIVE_API_LEVEL=24
-        -DANDROID_ABI=x86_64
-        -DTHREADS_PTHREAD_ARG=2
-        -DCMAKE_TOOLCHAIN_FILE=$WORKDIR/android_sdk/ndk-bundle/build/cmake/android.toolchain.cmake
-        -DCMAKE_FIND_ROOT_PATH=$WORKDIR/android_toolchain
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY
-        -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER
-        -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
-        -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
     cdriver_cmake_flags: >-
         -DANDROID_NATIVE_API_LEVEL=24
         -DANDROID_ABI=x86_64
