@@ -171,8 +171,8 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
 }
 
 void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
-                                                 Timestamp oplogApplicationStartPoint,
-                                                 Timestamp topOfOplog) {
+                                                 const Timestamp& oplogApplicationStartPoint,
+                                                 const Timestamp& topOfOplog) {
     invariant(!oplogApplicationStartPoint.isNull());
     invariant(!topOfOplog.isNull());
 
@@ -221,6 +221,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     // Apply remaining ops one at at time, but don't log them because they are already logged.
     UnreplicatedWritesBlock uwb(opCtx);
 
+    OpTime appliedThrough;
     while (cursor->more()) {
         auto entry = cursor->nextSafe();
         fassertStatusOK(40294,
@@ -238,8 +239,13 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
                         opCtx, txnTableOplog->toBSON(), OplogApplication::Mode::kRecovering));
         }
 
-        _consistencyMarkers->setAppliedThrough(
-            opCtx, fassertStatusOK(40295, OpTime::parseFromOplogEntry(entry)));
+        appliedThrough = fassertStatusOK(40295, OpTime::parseFromOplogEntry(entry));
+        _consistencyMarkers->setAppliedThrough(opCtx, appliedThrough);
+    }
+    if (appliedThrough.getTimestamp() != topOfOplog) {
+        severe() << "Did not apply to top of oplog. Applied through: " << appliedThrough.toString()
+                 << ". Top of oplog: " << topOfOplog.toString();
+        MONGO_UNREACHABLE;
     }
 }
 

@@ -70,8 +70,8 @@ private:
      * (inclusive). This fasserts if oplogApplicationStartPoint is not in the oplog.
      */
     void _applyToEndOfOplog(OperationContext* opCtx,
-                            Timestamp oplogApplicationStartPoint,
-                            Timestamp topOfOplog);
+                            const Timestamp& oplogApplicationStartPoint,
+                            const Timestamp& topOfOplog);
 
     /**
      * Gets the last applied OpTime from the end of the oplog. Returns CollectionIsEmpty if there is
