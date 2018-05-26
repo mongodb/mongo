@@ -27,7 +27,7 @@
  */
 
 
-#include "mongo/client/embedded/libmongodbcapi.h"
+#include "mongo/embedded/capi.h"
 
 #include <memory>
 #include <set>
@@ -51,56 +51,56 @@
 
 namespace moe = mongo::optionenvironment;
 
-libmongodbcapi_lib* global_lib_handle;
+mongo_embedded_v1_lib* global_lib_handle;
 
 namespace {
 
 std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
 
 struct StatusDestructor {
-    void operator()(libmongodbcapi_status* const p) const noexcept {
+    void operator()(mongo_embedded_v1_status* const p) const noexcept {
         if (p)
-            libmongodbcapi_status_destroy(p);
+            mongo_embedded_v1_status_destroy(p);
     }
 };
 
-using CapiStatusPtr = std::unique_ptr<libmongodbcapi_status, StatusDestructor>;
+using CapiStatusPtr = std::unique_ptr<mongo_embedded_v1_status, StatusDestructor>;
 
 CapiStatusPtr makeStatusPtr() {
-    return CapiStatusPtr{libmongodbcapi_status_create()};
+    return CapiStatusPtr{mongo_embedded_v1_status_create()};
 }
 
 struct ClientDestructor {
-    void operator()(libmongodbcapi_client* const p) const noexcept {
+    void operator()(mongo_embedded_v1_client* const p) const noexcept {
         if (!p)
             return;
 
         auto status = makeStatusPtr();
-        if (libmongodbcapi_client_destroy(p, status.get()) != LIBMONGODB_CAPI_SUCCESS) {
+        if (mongo_embedded_v1_client_destroy(p, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
             std::cerr << "libmongodb_capi_client_destroy failed." << std::endl;
             if (status) {
-                std::cerr << "Error code: " << libmongodbcapi_status_get_error(status.get())
+                std::cerr << "Error code: " << mongo_embedded_v1_status_get_error(status.get())
                           << std::endl;
                 std::cerr << "Error message: "
-                          << libmongodbcapi_status_get_explanation(status.get()) << std::endl;
+                          << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
             }
         }
     }
 };
 
-using MongoDBCAPIClientPtr = std::unique_ptr<libmongodbcapi_client, ClientDestructor>;
+using MongoDBCAPIClientPtr = std::unique_ptr<mongo_embedded_v1_client, ClientDestructor>;
 
 class MongodbCAPITest : public mongo::unittest::Test {
 protected:
     void setUp() {
-        status = libmongodbcapi_status_create();
+        status = mongo_embedded_v1_status_create();
         ASSERT(status != nullptr);
 
         if (!globalTempDir) {
             globalTempDir = std::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
 
-        libmongodbcapi_init_params params;
+        mongo_embedded_v1_init_params params;
         params.log_flags = 0;
         params.log_callback = nullptr;
         params.log_user_data = nullptr;
@@ -118,28 +118,28 @@ protected:
 
         params.yaml_config = yaml.c_str();
 
-        lib = libmongodbcapi_lib_init(&params, status);
-        ASSERT(lib != nullptr) << libmongodbcapi_status_get_explanation(status);
+        lib = mongo_embedded_v1_lib_init(&params, status);
+        ASSERT(lib != nullptr) << mongo_embedded_v1_status_get_explanation(status);
 
-        db = libmongodbcapi_instance_create(lib, yaml.c_str(), status);
-        ASSERT(db != nullptr) << libmongodbcapi_status_get_explanation(status);
+        db = mongo_embedded_v1_instance_create(lib, yaml.c_str(), status);
+        ASSERT(db != nullptr) << mongo_embedded_v1_status_get_explanation(status);
     }
 
     void tearDown() {
-        ASSERT_EQUALS(libmongodbcapi_instance_destroy(db, status), LIBMONGODB_CAPI_SUCCESS)
-            << libmongodbcapi_status_get_explanation(status);
-        ASSERT_EQUALS(libmongodbcapi_lib_fini(lib, status), LIBMONGODB_CAPI_SUCCESS)
-            << libmongodbcapi_status_get_explanation(status);
-        libmongodbcapi_status_destroy(status);
+        ASSERT_EQUALS(mongo_embedded_v1_instance_destroy(db, status), MONGO_EMBEDDED_V1_SUCCESS)
+            << mongo_embedded_v1_status_get_explanation(status);
+        ASSERT_EQUALS(mongo_embedded_v1_lib_fini(lib, status), MONGO_EMBEDDED_V1_SUCCESS)
+            << mongo_embedded_v1_status_get_explanation(status);
+        mongo_embedded_v1_status_destroy(status);
     }
 
-    libmongodbcapi_instance* getDB() const {
+    mongo_embedded_v1_instance* getDB() const {
         return db;
     }
 
     MongoDBCAPIClientPtr createClient() const {
-        MongoDBCAPIClientPtr client(libmongodbcapi_client_create(db, status));
-        ASSERT(client.get() != nullptr) << libmongodbcapi_status_get_explanation(status);
+        MongoDBCAPIClientPtr client(mongo_embedded_v1_client_create(db, status));
+        ASSERT(client.get() != nullptr) << mongo_embedded_v1_status_get_explanation(status);
         return client;
     }
 
@@ -158,9 +158,9 @@ protected:
         size_t outputSize;
 
         // call the wire protocol
-        int err = libmongodbcapi_client_invoke(
+        int err = mongo_embedded_v1_client_invoke(
             client.get(), inputMessage.buf(), inputMessage.size(), &output, &outputSize, status);
-        ASSERT_EQUALS(err, LIBMONGODB_CAPI_SUCCESS);
+        ASSERT_EQUALS(err, MONGO_EMBEDDED_V1_SUCCESS);
 
         // convert the shared buffer to a mongo::message and ensure that it is valid
         auto outputMessage = messageFromBuffer(output, outputSize);
@@ -175,9 +175,9 @@ protected:
 
 
 protected:
-    libmongodbcapi_lib* lib;
-    libmongodbcapi_instance* db;
-    libmongodbcapi_status* status;
+    mongo_embedded_v1_lib* lib;
+    mongo_embedded_v1_instance* db;
+    mongo_embedded_v1_status* status;
 };
 
 TEST_F(MongodbCAPITest, CreateAndDestroyDB) {
@@ -191,7 +191,7 @@ TEST_F(MongodbCAPITest, CreateAndDestroyDBAndClient) {
 // This test is to make sure that destroying the db will fail if there's remaining clients left.
 TEST_F(MongodbCAPITest, DoNotDestroyClient) {
     auto client = createClient();
-    ASSERT(libmongodbcapi_instance_destroy(getDB(), nullptr) != LIBMONGODB_CAPI_SUCCESS);
+    ASSERT(mongo_embedded_v1_instance_destroy(getDB(), nullptr) != MONGO_EMBEDDED_V1_SUCCESS);
 }
 
 TEST_F(MongodbCAPITest, CreateMultipleClients) {
@@ -626,9 +626,10 @@ TEST_F(MongodbCAPITest, RunListCommands) {
 TEST_F(MongodbCAPITest, CreateMultipleDBs) {
     auto status = makeStatusPtr();
     ASSERT(status.get());
-    libmongodbcapi_instance* db2 = libmongodbcapi_instance_create(lib, nullptr, status.get());
+    mongo_embedded_v1_instance* db2 = mongo_embedded_v1_instance_create(lib, nullptr, status.get());
     ASSERT(db2 == nullptr);
-    ASSERT_EQUALS(libmongodbcapi_status_get_error(status.get()), LIBMONGODB_CAPI_ERROR_DB_MAX_OPEN);
+    ASSERT_EQUALS(mongo_embedded_v1_status_get_error(status.get()),
+                  MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN);
 }
 }  // namespace
 
@@ -665,27 +666,27 @@ int main(const int argc, const char* const* const argv) {
     mongo::setTestCommandsEnabled(true);
 
     // Check so we can initialize the library without providing init params
-    libmongodbcapi_lib* lib = libmongodbcapi_lib_init(nullptr, status.get());
+    mongo_embedded_v1_lib* lib = mongo_embedded_v1_lib_init(nullptr, status.get());
     if (lib == nullptr) {
-        std::cerr << "libmongodbcapi_init() failed with "
-                  << libmongodbcapi_status_get_error(status.get()) << ": "
-                  << libmongodbcapi_status_get_explanation(status.get()) << std::endl;
+        std::cerr << "mongo_embedded_v1_init() failed with "
+                  << mongo_embedded_v1_status_get_error(status.get()) << ": "
+                  << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
         return EXIT_FAILURE;
     }
 
-    if (libmongodbcapi_lib_fini(lib, status.get()) != LIBMONGODB_CAPI_SUCCESS) {
-        std::cerr << "libmongodbcapi_fini() failed with "
-                  << libmongodbcapi_status_get_error(status.get()) << ": "
-                  << libmongodbcapi_status_get_explanation(status.get()) << std::endl;
+    if (mongo_embedded_v1_lib_fini(lib, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
+        std::cerr << "mongo_embedded_v1_fini() failed with "
+                  << mongo_embedded_v1_status_get_error(status.get()) << ": "
+                  << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
         return EXIT_FAILURE;
     }
 
     // Initialize the library with a log callback and test so we receive at least one callback
     // during the lifetime of the test
-    libmongodbcapi_init_params params{};
+    mongo_embedded_v1_init_params params{};
 
     bool receivedCallback = false;
-    params.log_flags = LIBMONGODB_CAPI_LOG_STDOUT | LIBMONGODB_CAPI_LOG_CALLBACK;
+    params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT | MONGO_EMBEDDED_V1_LOG_CALLBACK;
     params.log_callback = [](void* user_data,
                              const char* message,
                              const char* component,
@@ -697,17 +698,17 @@ int main(const int argc, const char* const* const argv) {
     };
     params.log_user_data = &receivedCallback;
 
-    lib = libmongodbcapi_lib_init(&params, nullptr);
+    lib = mongo_embedded_v1_lib_init(&params, nullptr);
     if (lib == nullptr) {
-        std::cerr << "libmongodbcapi_init() failed with "
-                  << libmongodbcapi_status_get_error(status.get()) << ": "
-                  << libmongodbcapi_status_get_explanation(status.get()) << std::endl;
+        std::cerr << "mongo_embedded_v1_init() failed with "
+                  << mongo_embedded_v1_status_get_error(status.get()) << ": "
+                  << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
     }
 
-    if (libmongodbcapi_lib_fini(lib, nullptr) != LIBMONGODB_CAPI_SUCCESS) {
-        std::cerr << "libmongodbcapi_fini() failed with "
-                  << libmongodbcapi_status_get_error(status.get()) << ": "
-                  << libmongodbcapi_status_get_explanation(status.get()) << std::endl;
+    if (mongo_embedded_v1_lib_fini(lib, nullptr) != MONGO_EMBEDDED_V1_SUCCESS) {
+        std::cerr << "mongo_embedded_v1_fini() failed with "
+                  << mongo_embedded_v1_status_get_error(status.get()) << ": "
+                  << mongo_embedded_v1_status_get_explanation(status.get()) << std::endl;
     }
 
     if (!receivedCallback) {

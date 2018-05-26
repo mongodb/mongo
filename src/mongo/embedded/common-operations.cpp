@@ -28,12 +28,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/client/embedded/common-operations.h"
+#include "mongo/embedded/common-operations.h"
 
 #include <mongoc.h>
 #include <stdio.h>
 
-#include "mongo/client/embedded/embedded_transport_layer.h"
+#include "mongo/embedded/mongoc_client.h"
 #include "mongo/util/log.h"
 
 /**

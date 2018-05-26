@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/embedded/service_entry_point_embedded.h"
+#include "mongo/embedded/service_entry_point_embedded.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/mutable/document.h"

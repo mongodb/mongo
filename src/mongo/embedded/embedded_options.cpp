@@ -28,7 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
 
-#include "mongo/client/embedded/embedded_options.h"
+#include "mongo/embedded/embedded_options.h"
 
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"

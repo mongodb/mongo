@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/client/embedded/embedded_options.h"
+#include "mongo/embedded/embedded_options.h"
 
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"

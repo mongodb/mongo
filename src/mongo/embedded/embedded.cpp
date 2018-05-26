@@ -30,12 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/embedded/embedded.h"
+#include "mongo/embedded/embedded.h"
 
 #include "mongo/base/initializer.h"
-#include "mongo/client/embedded/replication_coordinator_embedded.h"
-#include "mongo/client/embedded/service_context_embedded.h"
-#include "mongo/client/embedded/service_entry_point_embedded.h"
 #include "mongo/config.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/health_log.h"
@@ -59,6 +56,9 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/ttl.h"
+#include "mongo/embedded/replication_coordinator_embedded.h"
+#include "mongo/embedded/service_context_embedded.h"
+#include "mongo/embedded/service_entry_point_embedded.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/util/background.h"

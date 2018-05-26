@@ -31,9 +31,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
-#include "mongo/client/embedded/embedded.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/embedded/embedded.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/exit.h"

@@ -25,23 +25,25 @@
  *    delete this exception statement from all source files in the program,
  *    then also delete it in the license file.
  */
+#ifndef HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
+#define HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
 
-#include <bson.h>
+#include <mongo/embedded/capi.h>
 #include <mongoc.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct libmongodbcapi_instance;
-
 /**
  * Creates a client with the correct stream intiator set
  * @param db must be a valid db handle created by libmongodbcapi
  * @returns a mongoc client or `NULL` on error
  */
-mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_instance* db);
+mongoc_client_t* mongo_embedded_v1_mongoc_client_create(mongo_embedded_v1_instance* instance);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
+
+#endif  // HEADERUUID_8CAAB40D_AC65_46CF_9FA9_B48825C825DC_DEFINED
