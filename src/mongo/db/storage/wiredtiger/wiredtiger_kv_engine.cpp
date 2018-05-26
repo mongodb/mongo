@@ -1205,9 +1205,7 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     }
 
     // Forward the oldest timestamp so that WiredTiger can clean up earlier timestamp data.
-    if (!MONGO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
-        setOldestTimestampFromStable();
-    }
+    setOldestTimestampFromStable();
 }
 
 void WiredTigerKVEngine::setOldestTimestampFromStable() {
@@ -1244,6 +1242,10 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp) {
 }
 
 void WiredTigerKVEngine::_setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
+    if (MONGO_FAIL_POINT(WTPreserveSnapshotHistoryIndefinitely)) {
+        return;
+    }
+
     char oldestTSConfigString["force=true,oldest_timestamp=,commit_timestamp="_sd.size() +
                               (2 * 8 * 2) /* 2 timestamps of 16 hexadecimal digits each */ +
                               1 /* trailing null */];

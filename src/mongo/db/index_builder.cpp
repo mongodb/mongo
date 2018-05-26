@@ -60,7 +60,7 @@ namespace {
  * implies the caller will look at the logical clock to choose a time to use.
  */
 bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) {
-    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr")) {
+    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr.")) {
         return false;
     }
 

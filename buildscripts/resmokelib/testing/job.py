@@ -95,7 +95,12 @@ class Job(object):
 
         test(self.report)
         try:
-            if self.suite_options.fail_fast and not self.report.wasSuccessful():
+            # We are intentionally only checking the individual 'test' status and not calling
+            # report.wasSuccessful() here. It is possible that a thread running in the background as
+            # part of a hook has added a failed test case to 'self.report'. Checking the individual
+            # 'test' status ensures self._run_hooks_after_tests() is called if it is a hook's test
+            # case that has failed and not 'test' that has failed.
+            if self.suite_options.fail_fast and self.report.find_test_info(test).status != "pass":
                 self.logger.info("%s failed, so stopping..." % (test.short_description()))
                 raise errors.StopExecution("%s failed" % (test.short_description()))
 

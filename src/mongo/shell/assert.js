@@ -6,10 +6,12 @@ doassert = function(msg, obj) {
     if (typeof(msg) == "object")
         msg = tojson(msg);
 
-    if (typeof(msg) == "string" && msg.indexOf("assert") == 0)
-        print(msg);
-    else
-        print("assert: " + msg);
+    if (jsTest.options().traceExceptions) {
+        if (typeof(msg) == "string" && msg.indexOf("assert") == 0)
+            print(msg);
+        else
+            print("assert: " + msg);
+    }
 
     var ex;
     if (obj) {
@@ -17,7 +19,9 @@ doassert = function(msg, obj) {
     } else {
         ex = Error(msg);
     }
-    print(ex.stack);
+    if (jsTest.options().traceExceptions) {
+        print(ex.stack);
+    }
     throw ex;
 };
 

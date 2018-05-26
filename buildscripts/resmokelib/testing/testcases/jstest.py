@@ -224,7 +224,7 @@ class JSTestCase(interface.ProcessTestCase):
                         self.logger.error(
                             "Encountered an error inside thread %d running jstest %s.", thread_id,
                             self.basename(), exc_info=thread.exc_info)
-                    raise thread.exc_info
+                    raise thread.exc_info[1]
 
     def run_test(self):
         """Execute the test."""
