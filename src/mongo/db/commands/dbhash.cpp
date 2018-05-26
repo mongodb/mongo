@@ -142,6 +142,8 @@ public:
                                                                "system.version",
                                                                "system.views"};
 
+        BSONArrayBuilder cappedCollections;
+        BSONObjBuilder collectionsByUUID;
 
         BSONObjBuilder bb(result.subobjStart("collections"));
         for (const auto& collectionName : colls) {
@@ -159,6 +161,11 @@ public:
             if (collNss.isSystem() && !isReplicatedSystemColl)
                 continue;
 
+            if (collNss.coll().startsWith("tmp.mr.")) {
+                // We skip any incremental map reduce collections as they also aren't replicated.
+                continue;
+            }
+
             if (desiredCollections.size() > 0 &&
                 desiredCollections.count(collNss.coll().toString()) == 0)
                 continue;
@@ -167,6 +174,16 @@ public:
             if (collNss.isDropPendingNamespace())
                 continue;
 
+            if (Collection* collection = db->getCollection(opCtx, collectionName)) {
+                if (collection->isCapped()) {
+                    cappedCollections.append(collNss.coll());
+                }
+
+                if (OptionalCollectionUUID uuid = collection->uuid()) {
+                    uuid->appendToBuilder(&collectionsByUUID, collNss.coll());
+                }
+            }
+
             // Compute the hash for this collection.
             std::string hash = _hashCollection(opCtx, db, collNss.toString());
 
@@ -174,6 +191,9 @@ public:
             md5_append(&globalState, (const md5_byte_t*)hash.c_str(), hash.size());
         }
         bb.done();
+
+        result.append("capped", BSONArray(cappedCollections.done()));
+        result.append("uuids", collectionsByUUID.done());
 
         md5digest d;
         md5_finish(&globalState, d);

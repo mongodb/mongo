@@ -78,7 +78,7 @@ class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
             self.return_code = 1
             self.logger.exception("{0} failed".format(self.description))
             test_report.addFailure(self, sys.exc_info())
-            raise errors.TestFailure(err)
+            raise errors.TestFailure(err.args[0])
         except:
             self.return_code = 2
             test_report.addFailure(self, sys.exc_info())

@@ -24,10 +24,16 @@ function reconnect(db) {
 function _getErrorWithCode(codeOrObj, message) {
     var e = new Error(message);
     if (codeOrObj != undefined) {
-        if (codeOrObj.writeError) {
-            e.code = codeOrObj.writeError.code;
-        } else if (codeOrObj.code) {
-            e.code = codeOrObj.code;
+        if (codeOrObj.writeError || codeOrObj.code) {
+            if (codeOrObj.writeError) {
+                e.code = codeOrObj.writeError.code;
+            } else if (codeOrObj.code) {
+                e.code = codeOrObj.code;
+            }
+
+            if (codeOrObj.hasOwnProperty("errorLabels")) {
+                e.errorLabels = codeOrObj.errorLabels;
+            }
         } else {
             // At this point assume codeOrObj is a number type
             e.code = codeOrObj;
@@ -305,6 +311,8 @@ jsTestOptions = function() {
             logRetryAttempts: TestData.logRetryAttempts || false,
             connectionString: TestData.connectionString || "",
             skipCheckDBHashes: TestData.skipCheckDBHashes || false,
+            traceExceptions: TestData.hasOwnProperty("traceExceptions") ? TestData.traceExceptions
+                                                                        : true,
         });
     }
     return _jsTestOptions;
