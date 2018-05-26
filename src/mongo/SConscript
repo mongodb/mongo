@@ -26,6 +26,7 @@ env.SConscript(
         'crypto',
         'db',
         'dbtests',
+        'embedded',
         'executor',
         'idl',
         'installer',

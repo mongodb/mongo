@@ -28,12 +28,12 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/client/embedded/functions_for_test.h"
+#include "mongo/embedded/functions_for_test.h"
 
 #include <mongoc.h>
 #include <stdio.h>
 
-#include "mongo/client/embedded/embedded_transport_layer.h"
+#include "mongo/embedded/mongoc_client.h"
 #include "mongo/util/log.h"
 
 /**

@@ -1,0 +1,185 @@
+# -*- mode: python; -*-
+
+Import("env")
+Import("get_option")
+
+env = env.Clone()
+
+yamlEnv = env.Clone()
+yamlEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
+
+env.Library(
+    target='embedded',
+    source=[
+        'embedded.cpp',
+        'embedded_auth_manager.cpp',
+        'embedded_auth_session.cpp',
+        'embedded_commands.cpp',
+        'embedded_ismaster.cpp',
+        'embedded_options.cpp',
+        'embedded_options_init.cpp',
+        'embedded_options_parser_init.cpp',
+        'index_create_impl_embedded.cpp',
+        'replication_coordinator_embedded.cpp',
+        'service_context_embedded.cpp',
+        'service_entry_point_embedded.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/catalog/catalog_impl',
+        '$BUILD_DIR/mongo/db/command_can_run_here',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/fsync_locked',
+        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
+        '$BUILD_DIR/mongo/db/commands/standalone',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/op_observer_d',
+        '$BUILD_DIR/mongo/db/repair_database_and_check_version',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/repl_set_status_commands',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_entry_point_common',
+        '$BUILD_DIR/mongo/db/storage/mobile/storage_mobile',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
+        '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+        '$BUILD_DIR/mongo/db/storage/storage_init_d',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/mongo/util/version_impl',
+    ]
+)
+
+env.Library(
+    target='mongo_embedded_capi',
+    source=[
+        'capi.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        'embedded',
+    ],
+    INSTALL_ALIAS=[
+        'mobile-dev',
+    ],
+)
+
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'include/mongo/embedded-v1/mongo/embedded',
+        source=['capi.h'],
+        INSTALL_ALIAS=[
+            'mobile-dev',
+        ],
+    )
+
+capiTest = yamlEnv.Program(
+    target='mongo_embedded_capi_test',
+    source=[
+        'capi_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/rpc/protocol',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'mongo_embedded_capi',
+    ],
+    INSTALL_ALIAS=[
+        'mobile-test',
+    ],
+)
+
+env.RegisterUnitTest(capiTest[0])
+
+mongoe = yamlEnv.Program(
+    target='mongoe',
+    source=[
+        'mongoe_main.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/shell_protocol',
+        '$BUILD_DIR/mongo/db/mongod_options',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/transport/transport_layer_manager',
+        '$BUILD_DIR/mongo/util/signal_handlers',
+        'embedded',
+    ],
+    INSTALL_ALIAS=[
+        'mobile-test',
+    ],
+)
+
+hygienic = get_option('install-mode') == 'hygienic'
+
+if not hygienic:
+    env.Install('#/', mongoe)
+
+if not env['MONGO_HAVE_LIBMONGOC']:
+    Return()
+
+env.Library(
+    target='mongo_embedded_mongoc_client',
+    source=[
+        'mongoc_client.cpp',
+    ],
+    LIBDEPS=[
+        'mongo_embedded_capi',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_zlib',
+    ],
+    SYSLIBDEPS=[
+        'mongoc-1.0',
+        'bson-1.0',
+    ],
+    INSTALL_ALIAS=[
+        'mobile-dev',
+    ],
+)
+
+if get_option('install-mode') == 'hygienic':
+    env.AutoInstall(
+        'include/mongo/embedded-v1/mongo/embedded',
+        source=['mongoc_client.h'],
+        INSTALL_ALIAS=[
+            'mobile-dev',
+        ],
+    )
+
+clientTest = yamlEnv.Program(
+    target='mongo_embedded_mongoc_client_test',
+    source=[
+        'mongo_embedded_mongoc_client_test.cpp',
+        'functions_for_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'mongo_embedded_mongoc_client',
+    ],
+    INSTALL_ALIAS=[
+        'mobile-test',
+    ],
+)
+
+env.RegisterUnitTest(clientTest[0]);

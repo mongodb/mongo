@@ -30,10 +30,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/embedded/replication_coordinator_embedded.h"
+#include "mongo/embedded/replication_coordinator_embedded.h"
 
-#include "mongo/client/embedded/not_implemented.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/embedded/not_implemented.h"
 
 namespace mongo {
 namespace embedded {

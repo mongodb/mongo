@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/client/embedded/embedded_transport_layer.h"
+#include "mongo/embedded/mongoc_client.h"
 
 #include <cstdlib>
 #include <deque>
@@ -37,7 +37,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/client/embedded/libmongodbcapi.h"
+#include "mongo/embedded/capi.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/shared_buffer.h"
 
@@ -50,7 +50,7 @@ struct FreeDeleter {
 };
 
 struct mongoc_stream_embedded_t : mongoc_stream_t {
-    libmongodbcapi_client* clientHandle;
+    mongo_embedded_v1_client* clientHandle;
     mongo::DataRangeCursor inputBuf = mongo::DataRangeCursor(nullptr, nullptr);
     std::unique_ptr<char, FreeDeleter> hiddenBuf;
     mongo::ConstDataRangeCursor outputBuf = mongo::ConstDataRangeCursor(nullptr, nullptr);
@@ -67,7 +67,7 @@ namespace {
 struct FreeAndDestroy {
     void operator()(mongoc_stream_t* x) {
         auto stream = static_cast<mongoc_stream_embedded_t*>(x);
-        libmongodbcapi_client_destroy(stream->clientHandle, nullptr);
+        mongo_embedded_v1_client_destroy(stream->clientHandle, nullptr);
         stream->~mongoc_stream_embedded_t();
         free(stream);
     }
@@ -134,13 +134,13 @@ extern "C" ssize_t mongoc_stream_embedded_writev(mongoc_stream_t* s,
         // if we found a complete message, send it
         if (stream->input_length_to_go == 0) {
             auto input_len = (size_t)(stream->inputBuf.data() - stream->hiddenBuf.get());
-            int retVal = libmongodbcapi_client_invoke(stream->clientHandle,
-                                                      stream->hiddenBuf.get(),
-                                                      input_len,
-                                                      &(stream->libmongo_output),
-                                                      &(stream->libmongo_output_size),
-                                                      nullptr);
-            if (retVal != LIBMONGODB_CAPI_SUCCESS) {
+            int retVal = mongo_embedded_v1_client_invoke(stream->clientHandle,
+                                                         stream->hiddenBuf.get(),
+                                                         input_len,
+                                                         &(stream->libmongo_output),
+                                                         &(stream->libmongo_output_size),
+                                                         nullptr);
+            if (retVal != MONGO_EMBEDDED_V1_SUCCESS) {
                 return -1;
             }
 
@@ -221,8 +221,8 @@ extern "C" mongoc_stream_t* embedded_stream_initiator(const mongoc_uri_t* uri,
     stream_buf.release();  // This must be here so we don't have double ownership
     stream->state = RPCState::WaitingForMessageLength;
     // Set up connections to database
-    stream->clientHandle =
-        libmongodbcapi_client_create(static_cast<libmongodbcapi_instance*>(user_data), nullptr);
+    stream->clientHandle = mongo_embedded_v1_client_create(
+        static_cast<mongo_embedded_v1_instance*>(user_data), nullptr);
 
     // Connect the functions to the stream
     // type is not relevant for us. Has to be set for the C Driver, but it has to do with picking
@@ -248,7 +248,8 @@ struct ClientDeleter {
     }
 };
 
-extern "C" mongoc_client_t* embedded_mongoc_client_new(libmongodbcapi_instance* db) try {
+extern "C" mongoc_client_t* mongo_embedded_v1_mongoc_client_create(
+    mongo_embedded_v1_instance* db) try {
     if (!db) {
         errno = EINVAL;
         return nullptr;
