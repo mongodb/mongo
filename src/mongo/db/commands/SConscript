@@ -191,7 +191,6 @@ env.Library(
 env.Library(
     target="standalone",
     source=[
-        "collection_to_capped.cpp",
         "count_cmd.cpp",
         "create_indexes.cpp",
         "current_op.cpp",
@@ -265,6 +264,7 @@ env.Library(
         "apply_ops_cmd.cpp",
         "clone.cpp",
         "clone_collection.cpp",
+        "collection_to_capped.cpp",
         "compact.cpp",
         "copydb.cpp",
         "copydb_start_commands.cpp",
