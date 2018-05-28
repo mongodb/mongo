@@ -336,3 +336,6 @@ union __wt_rand_state {
 			continue;					\
 		}
 #define	WT_TAILQ_SAFE_REMOVE_END }
+
+/* Sleep time to uncover race conditions during timing stress test. */
+#define	TIMING_STRESS_TEST_SLEEP	(100 * WT_THOUSAND)

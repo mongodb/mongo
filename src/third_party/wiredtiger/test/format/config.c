@@ -42,6 +42,7 @@ static void	   config_in_memory_reset(void);
 static int	   config_is_perm(const char *);
 static void	   config_isolation(void);
 static void	   config_lrt(void);
+static void	   config_lsm_reset(void);
 static void	   config_map_checkpoint(const char *, u_int *);
 static void	   config_map_checksum(const char *, u_int *);
 static void	   config_map_compression(const char *, u_int *);
@@ -93,19 +94,32 @@ config_setup(void)
 	}
 	config_map_file_type(g.c_file_type, &g.type);
 
+	config_single("data_source=table", 0);
 	if (!config_is_perm("data_source"))
-		switch (mmrand(NULL, 1, 3)) {
-		case 1:
+		switch (mmrand(NULL, 1, 5)) {
+		case 1:						/* 20% */
 			config_single("data_source=file", 0);
 			break;
-		case 2:
-			config_single("data_source=table", 0);
+		case 2:						/* 20% */
+			/*
+			 * LSM requires a row-store and backing disk.
+			 *
+			 * Configuring truncation or timestamps results in LSM
+			 * cache problems, don't configure LSM if those set.
+			 *
+			 * XXX
+			 * Remove the timestamp test when WT-4067 resolved.
+			 */
+			if (g.type != ROW || g.c_in_memory)
+				break;
+			if (config_is_perm(
+			    "transaction_timestamps") && g.c_txn_timestamps)
+				break;
+			if (config_is_perm("truncate") && g.c_truncate)
+				break;
+			config_single("data_source=lsm", 0);
 			break;
-		case 3:
-			if (g.c_in_memory || g.type != ROW)
-				config_single("data_source=table", 0);
-			else
-				config_single("data_source=lsm", 0);
+		case 3: case 4: case 5:				/* 60% */
 			break;
 		}
 
@@ -184,20 +198,13 @@ config_setup(void)
 	config_prepare();
 	config_cache();
 
-	/*
-	 * Turn off truncate for LSM runs (some configurations with truncate
-	 * always results in a timeout).
-	 */
-	if (!config_is_perm("truncate") && DATASOURCE("lsm"))
-			config_single("truncate=off", 0);
-
-	/* Give Helium configuration a final review. */
+	/* Give Helium, in-memory and LSM configurations a final review. */
 	if (DATASOURCE("helium"))
 		config_helium_reset();
-
-	/* Give in-memory configuration a final review. */
 	if (g.c_in_memory != 0)
 		config_in_memory_reset();
+	if (DATASOURCE("lsm"))
+		config_lsm_reset();
 
 	/*
 	 * Key/value minimum/maximum are related, correct unless specified by
@@ -590,6 +597,28 @@ config_in_memory_reset(void)
 		if (g.c_cache < cache)
 			g.c_cache = cache;
 	}
+}
+
+/*
+ * config_lsm_reset --
+ *	LSM configuration review.
+ */
+static void
+config_lsm_reset(void)
+{
+	/*
+	 * Turn off truncate for LSM runs (some configurations with truncate
+	 * always result in a timeout).
+	 */
+	if (!config_is_perm("truncate"))
+		config_single("truncate=off", 0);
+
+	/*
+	 * LSM doesn't currently play nicely with timestamps, don't choose the
+	 * pair unless forced to. Remove this code with WT-4067.
+	 */
+	if (!config_is_perm("transaction_timestamps"))
+		config_single("transaction_timestamps=off", 0);
 }
 
 /*

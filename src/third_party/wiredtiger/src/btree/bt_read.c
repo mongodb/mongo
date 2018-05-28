@@ -810,7 +810,7 @@ skip_evict:		/*
 			if (cache_work)
 				continue;
 		}
-		__wt_state_yield_sleep(&yield_cnt, &sleep_usecs);
+		__wt_spin_backoff(&yield_cnt, &sleep_usecs);
 		WT_STAT_CONN_INCRV(session, page_sleep, sleep_usecs);
 	}
 }

@@ -713,7 +713,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR_MSG(session, EINVAL, "commit_timestamp requires a "
 		    "version of WiredTiger built with timestamp support");
 #endif
-	} else if (F_ISSET(txn, WT_TXN_PREPARE))
+	}
+	if (F_ISSET(txn, WT_TXN_PREPARE) &&
+	    !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT))
 		WT_ERR_MSG(session, EINVAL,
 		    "commit_timestamp is required for a prepared transaction");
 

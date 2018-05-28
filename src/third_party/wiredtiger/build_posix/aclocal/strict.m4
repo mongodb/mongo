@@ -36,43 +36,63 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wwrite-strings"
 
 	# Non-fatal informational warnings.
+	# We don't turn on the unsafe-loop-optimizations warning after gcc7,
+	# it's too noisy to tolerate. Regardless, don't fail even when it's
+	# configured.
 	w="$w -Wno-error=unsafe-loop-optimizations"
 
 	# GCC 4.7
 	#	WiredTiger uses anonymous structures/unions, a C11 extension,
 	#	turn off those warnings.
-	# GCC 6.X
-	#	Additional warning messages.
+	gcc5=0
+	gcc6=0
+	gcc7=0
+	gcc8=0
 	case "$1" in
 	[*4.7.[0-9]*])					# gcc4.7
 		w="$w -Wno-c11-extensions"
 		w="$w -Wunsafe-loop-optimizations";;
+	[*5.[0-9].[0-9]*])				# gcc5.X
+		w="$w -Wunsafe-loop-optimizations"
+		gcc5=1;;
 	[*6.[0-9].[0-9]*])				# gcc6.X
-		w="$w -Wduplicated-cond"
+		w="$w -Wunsafe-loop-optimizations"
+		gcc5=1
+		gcc6=1;;
+	[*7.[0-9].[0-9]*])				# gcc7.X
+		gcc5=1
+		gcc6=1
+		gcc7=1;;
+	[*8.[0-9].[0-9]*])				# gcc8.X
+		gcc5=1
+		gcc6=1
+		gcc7=1
+		gcc8=1;;
+	esac
+
+	if test $gcc5 -eq 1; then
 		w="$w -Wformat-signedness"
 		w="$w -Wjump-misses-init"
-		w="$w -Wlogical-op"
 		w="$w -Wredundant-decls"
-		w="$w -Wunsafe-loop-optimizations"
-		w="$w -Wunused-const-variable=2"
 		w="$w -Wunused-macros"
-		w="$w -Wvariadic-macros";;
-	[*7.[0-9].[0-9]*])				# gcc7.X
+		w="$w -Wvariadic-macros"
+	fi
+	if test $gcc6 -eq 1; then
+		w="$w -Wduplicated-cond"
+		w="$w -Wlogical-op"
+		w="$w -Wunused-const-variable=2"
+	fi
+	if test $gcc7 -eq 1; then
 		w="$w -Walloca"
 		w="$w -Walloc-zero"
 		w="$w -Wduplicated-branches"
-		w="$w -Wduplicated-cond"
 		w="$w -Wformat-overflow=2"
-		w="$w -Wformat-signedness"
 		w="$w -Wformat-truncation=2"
-		w="$w -Wjump-misses-init"
-		w="$w -Wlogical-op"
-		w="$w -Wredundant-decls"
 		w="$w -Wrestrict"
-		w="$w -Wunused-const-variable=2"
-		w="$w -Wunused-macros"
-		w="$w -Wvariadic-macros";;
-	esac
+	fi
+	if test $gcc8 -eq 1; then
+		w="$w -Wmultistatement-macros"
+	fi
 
 	wt_cv_strict_warnings="$w"
 ])

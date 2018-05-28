@@ -19,6 +19,24 @@
 	WT_SESSION_NO_RECONCILE)
 
 /*
+ * __las_timing_stress --
+ *	Optionally add delay to simulate the race conditions in lookaside
+ * sweep for debug purposes.
+ */
+static void
+__las_timing_stress(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	/* Only sleep when lookaside sweep race flag is set. */
+	if (FLD_ISSET(conn->timing_stress_flags,
+	    WT_TIMING_STRESS_LOOKASIDE_SWEEP))
+		__wt_sleep(0, TIMING_STRESS_TEST_SLEEP);
+}
+
+/*
  * __las_set_isolation --
  *	Switch to read-uncommitted.
  */
@@ -1019,6 +1037,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	 */
 	__wt_writelock(session, &cache->las_sweepwalk_lock);
 	locked = true;
+
+	/* Encourage a race */
+	__las_timing_stress(session);
 
 	/*
 	 * When continuing a sweep, position the cursor using the key from the

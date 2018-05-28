@@ -70,7 +70,7 @@ __ref_index_slot(WT_SESSION_IMPL *session,
 		 * before retrying, and if we've yielded enough times, start
 		 * sleeping so we don't burn CPU to no purpose.
 		 */
-		__wt_state_yield_sleep(&yield_count, &sleep_usecs);
+		__wt_spin_backoff(&yield_count, &sleep_usecs);
 		WT_STAT_CONN_INCRV(session, page_index_slot_ref_blocked,
 		    sleep_usecs);
 	}
@@ -476,7 +476,7 @@ restart:	/*
 				 * enough times, start sleeping so we don't burn
 				 * CPU to no purpose.
 				 */
-				__wt_state_yield_sleep(
+				__wt_spin_backoff(
 				    &yield_count, &sleep_usecs);
 
 				/*
