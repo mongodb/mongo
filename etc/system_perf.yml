@@ -84,53 +84,29 @@ functions:
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
     - command: shell.exec
       params:
-        working_dir: src/src/mongo/gotools
-        script: |
-          set -o verbose
-          set -o errexit
-          # make sure newlines in the scripts are handled correctly by windows
-          if [ "Windows_NT" = "$OS" ]; then
-            set -o igncr
-          fi;
-          sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
-          sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
-          . ./${set_tools_gopath|set_gopath.sh}
-          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
-          if [ "${build_mongoreplay}" = "true" ]; then
-            build_tools="$build_tools mongoreplay"
-          fi
-          for i in $build_tools; do
-            ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
-            "../../mongo-tools/$i${exe|}" --version
-          done
-    - command: shell.exec
-      params:
         working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} --use-new-tools mongod${extension} mongos${extension} MONGO_VERSION=${version}
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
           mkdir -p mongodb/jstests/hooks
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
-          mv src/mongo-tools/* mongodb/bin
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests"
             cp -a jstests/* mongodb/jstests
-
             echo "Now adding our own special run_validate_collections.js wrapper"
             mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
-
             cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
             print("NOTE: run_validate_collections.js will skip the oplog!");
             TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
