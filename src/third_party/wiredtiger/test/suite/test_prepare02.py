@@ -99,7 +99,7 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
             lambda:self.session.prepare_transaction("prepare_timestamp=2a"), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction(
-                "commit_timestamp=2a"), msg)
+                "read_timestamp=2a"), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.checkpoint(), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -113,6 +113,14 @@ class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
         c1 = self.session.open_cursor("table:mytable", None)
         self.session.prepare_transaction("prepare_timestamp=2a")
         self.session.commit_transaction("commit_timestamp=2b")
+
+        # Setting commit timestamp via timestamp_transaction after
+        # prepare is also permitted.
+        self.session.begin_transaction()
+        c1 = self.session.open_cursor("table:mytable", None)
+        self.session.prepare_transaction("prepare_timestamp=2a")
+        self.session.timestamp_transaction("commit_timestamp=2b")
+        self.session.commit_transaction()
 
         # Rollback after prepare is permitted.
         self.session.begin_transaction()

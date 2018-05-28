@@ -443,7 +443,7 @@ static void
 __cursor_restart(
     WT_SESSION_IMPL *session, uint64_t *yield_count, uint64_t *sleep_usecs)
 {
-	__wt_state_yield_sleep(yield_count, sleep_usecs);
+	__wt_spin_backoff(yield_count, sleep_usecs);
 
 	WT_STAT_CONN_INCR(session, cursor_restart);
 	WT_STAT_DATA_INCR(session, cursor_restart);

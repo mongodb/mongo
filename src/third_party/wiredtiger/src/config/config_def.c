@@ -187,9 +187,9 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 	    NULL, NULL,
 	    confchk_WT_CONNECTION_reconfigure_statistics_log_subconfigs, 5 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
-	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
-	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"lookaside_sweep_race\","
+	    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+	    "\"split_6\",\"split_7\"]",
 	    NULL, 0 },
 	{ "verbose", "list",
 	    NULL, "choices=[\"api\",\"block\",\"checkpoint\","
@@ -876,9 +876,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
-	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
-	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"lookaside_sweep_race\","
+	    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+	    "\"split_6\",\"split_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -979,9 +979,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
-	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
-	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"lookaside_sweep_race\","
+	    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+	    "\"split_6\",\"split_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -1079,9 +1079,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
-	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
-	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"lookaside_sweep_race\","
+	    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+	    "\"split_6\",\"split_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,
@@ -1177,9 +1177,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    NULL, NULL,
 	    confchk_wiredtiger_open_statistics_log_subconfigs, 6 },
 	{ "timing_stress_for_test", "list",
-	    NULL, "choices=[\"checkpoint_slow\",\"split_race_1\","
-	    "\"split_race_2\",\"split_race_3\",\"split_race_4\","
-	    "\"split_race_5\",\"split_race_6\",\"split_race_7\"]",
+	    NULL, "choices=[\"checkpoint_slow\",\"lookaside_sweep_race\","
+	    "\"split_1\",\"split_2\",\"split_3\",\"split_4\",\"split_5\","
+	    "\"split_6\",\"split_7\"]",
 	    NULL, 0 },
 	{ "transaction_sync", "category",
 	    NULL, NULL,

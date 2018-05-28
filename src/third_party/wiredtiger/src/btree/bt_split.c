@@ -567,7 +567,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 
 	/* Encourage a race */
 	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_1, 100 * WT_THOUSAND);
+	    session, WT_TIMING_STRESS_SPLIT_1, TIMING_STRESS_TEST_SLEEP);
 
 	/*
 	 * Confirm the root page's index hasn't moved, then update it, which
@@ -579,7 +579,7 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 
 	/* Encourage a race */
 	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_2, 100 * WT_THOUSAND);
+	    session, WT_TIMING_STRESS_SPLIT_2, TIMING_STRESS_TEST_SLEEP);
 
 	/*
 	 * Get a generation for this split, mark the root page.  This must be
@@ -773,7 +773,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	/* Encourage a race */
 	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_3, 100 * WT_THOUSAND);
+	    session, WT_TIMING_STRESS_SPLIT_3, TIMING_STRESS_TEST_SLEEP);
 
 	/*
 	 * Confirm the parent page's index hasn't moved then update it, which
@@ -785,7 +785,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	/* Encourage a race */
 	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_4, 100 * WT_THOUSAND);
+	    session, WT_TIMING_STRESS_SPLIT_4, TIMING_STRESS_TEST_SLEEP);
 
 	/*
 	 * Get a generation for this split, mark the page.  This must be after
@@ -1126,7 +1126,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 
 	/* Encourage a race */
 	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_5, 100 * WT_THOUSAND);
+	    session, WT_TIMING_STRESS_SPLIT_5, TIMING_STRESS_TEST_SLEEP);
 
 	/* Split into the parent. */
 	WT_ERR(__split_parent(session, page_ref, alloc_index->index,
@@ -1141,7 +1141,7 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 
 	/* Encourage a race */
 	__page_split_timing_stress(
-	    session, WT_TIMING_STRESS_SPLIT_6, 100 * WT_THOUSAND);
+	    session, WT_TIMING_STRESS_SPLIT_6, TIMING_STRESS_TEST_SLEEP);
 
 	/*
 	 * Get a generation for this split, mark the parent page.  This must be
