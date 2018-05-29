@@ -207,7 +207,7 @@ env.CppUnitTest(
         'reply_builder_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         'rpc',
     ],
 )
@@ -269,7 +269,7 @@ env.CppIntegrationTest(
     ],
     LIBDEPS=[
         'protocol',
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

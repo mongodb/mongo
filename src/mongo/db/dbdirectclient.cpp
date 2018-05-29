@@ -117,7 +117,7 @@ double DBDirectClient::getSoTimeout() const {
 }
 
 bool DBDirectClient::lazySupported() const {
-    return true;
+    return false;
 }
 
 void DBDirectClient::setOpCtx(OperationContext* opCtx) {

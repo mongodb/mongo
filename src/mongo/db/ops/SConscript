@@ -58,7 +58,7 @@ env.CppIntegrationTest(
     target='write_ops_document_stream_integration_test',
     source='write_ops_document_stream_integration_test.cpp',
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )

@@ -810,6 +810,9 @@ public:
     virtual rpc::UniqueReply parseCommandReplyMessage(const std::string& host,
                                                       const Message& replyMsg);
 
+    // This is only for DBClientCursor.
+    static void (*withConnection_do_not_use)(std::string host, std::function<void(DBClientBase*)>);
+
 protected:
     /** if the result of a command is ok*/
     bool isOk(const BSONObj&);
