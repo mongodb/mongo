@@ -46,7 +46,7 @@ env.Library(
         'mock/mock_replica_set.cpp'
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages'
     ],
 )

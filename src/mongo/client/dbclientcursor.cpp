@@ -216,27 +216,21 @@ void DBClientCursor::requestMore() {
         verify(nToReturn > 0);
     }
 
-    ON_BLOCK_EXIT([ this, origClient = _client ] { _client = origClient; });
-    boost::optional<ScopedDbConnection> connHolder;
-    if (!_client) {
-        invariant(_scopedHost.size());
-        connHolder.emplace(_scopedHost);
-        _client = connHolder->get();
-    }
+    auto doRequestMore = [&] {
+        Message toSend = _assembleGetMore();
+        Message response;
+        _client->call(toSend, response);
+        dataReceived(response);
+    };
+    if (_client)
+        return doRequestMore();
 
-    Message toSend = _assembleGetMore();
-    Message response;
-    _client->call(toSend, response);
-
-    // If call() succeeds, the connection is clean so we can return it to the pool, even if
-    // dataReceived() throws because the command reported failure. However, we can't return it yet,
-    // because dataReceived() needs to get the metadata reader from the connection.
-    ON_BLOCK_EXIT([&] {
-        if (connHolder)
-            connHolder->done();
+    invariant(_scopedHost.size());
+    DBClientBase::withConnection_do_not_use(_scopedHost, [&](DBClientBase* conn) {
+        ON_BLOCK_EXIT([&, origClient = _client ] { _client = origClient; });
+        _client = conn;
+        doRequestMore();
     });
-
-    dataReceived(response);
 }
 
 /** with QueryOption_Exhaust, the server just blasts data at us (marked at end with cursorid==0). */
@@ -525,7 +519,7 @@ DBClientCursor::~DBClientCursor() {
 void DBClientCursor::kill() {
     DESTRUCTOR_GUARD({
         if (cursorId && _ownCursor && !globalInShutdownDeprecated()) {
-            auto killCursor = [&](auto& conn) {
+            auto killCursor = [&](auto&& conn) {
                 if (_useFindCommand) {
                     conn->killCursor(ns, cursorId);
                 } else {
@@ -539,9 +533,8 @@ void DBClientCursor::kill() {
             } else {
                 // Use a side connection to send the kill cursor request.
                 verify(_scopedHost.size() || (_client && _connectionHasPendingReplies));
-                ScopedDbConnection conn(_client ? _client->getServerAddress() : _scopedHost);
-                killCursor(conn);
-                conn.done();
+                DBClientBase::withConnection_do_not_use(
+                    _client ? _client->getServerAddress() : _scopedHost, killCursor);
             }
         }
     });

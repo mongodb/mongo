@@ -310,7 +310,7 @@ pipelineeEnv.Library(
         'tee_buffer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/curop',

@@ -76,7 +76,7 @@ env.Library(
         'rs_local_client.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
     ],
@@ -88,7 +88,7 @@ env.Library(
         'shard_local.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'rs_local_client',
         'shard_interface',
