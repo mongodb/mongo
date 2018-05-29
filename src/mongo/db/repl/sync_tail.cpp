@@ -1312,7 +1312,11 @@ Status multiInitialSyncApply(OperationContext* opCtx,
     DisableDocumentValidation validationDisabler(opCtx);
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
 
+    ApplierHelpers::stableSortByNamespace(ops);
+
     const auto oplogApplicationMode = OplogApplication::Mode::kInitialSync;
+
+    ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
 
     {  // Ensure that the MultikeyPathTracker stops tracking paths.
         ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
@@ -1321,6 +1325,15 @@ Status multiInitialSyncApply(OperationContext* opCtx,
         for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
             const auto& entry = **it;
 
+            // If we are successful in grouping and applying inserts, advance the current iterator
+            // past the end of the inserted group of entries.
+            auto groupResult = insertGroup.groupAndApplyInserts(it);
+            if (groupResult.isOK()) {
+                it = groupResult.getValue();
+                continue;
+            }
+
+            // If we didn't create a group, try to apply the op individually.
             try {
                 const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
                 if (!status.isOK()) {
