@@ -83,11 +83,12 @@ var {
         };
     }
 
-    function SessionAwareClient(client) {
-        const kWireVersionSupportingCausalConsistency = 6;
-        const kWireVersionSupportingLogicalSession = 6;
-        const kWireVersionSupportingRetryableWrites = 6;
+    const kWireVersionSupportingCausalConsistency = 6;
+    const kWireVersionSupportingLogicalSession = 6;
+    const kWireVersionSupportingRetryableWrites = 6;
+    const kWireVersionSupportingMultiDocumentTransactions = 7;
 
+    function SessionAwareClient(client) {
         this.getReadPreference = function getReadPreference(driverSession) {
             const sessionOptions = driverSession.getOptions();
             if (sessionOptions.getReadPreference() !== undefined) {
@@ -269,8 +270,14 @@ var {
             }
 
             // If startTransaction was called on the session, attach txn number and readConcern.
-            // TODO: SERVER-34170 guard this code with a wire version check.
             if (driverSession._serverSession.isInActiveTransaction()) {
+                // If we reconnect to a 3.6 server in the middle of a transaction, we
+                // catch it here.
+                if (!serverSupports(kWireVersionSupportingMultiDocumentTransactions)) {
+                    driverSession._serverSession._abortTransactionOnClientOnly();
+                    throw new Error(
+                        "Transactions are only supported on server versions 4.0 and greater.");
+                }
                 cmdObj = driverSession._serverSession.assignTxnInfo(cmdObj);
             }
 
@@ -706,6 +713,14 @@ var {
             if (this.isInActiveTransaction()) {
                 throw new Error("Transaction already in progress on this session.");
             }
+            function serverSupports(wireVersion) {
+                return client.getMinWireVersion() <= wireVersion &&
+                    wireVersion <= client.getMaxWireVersion();
+            }
+            if (!serverSupports(kWireVersionSupportingMultiDocumentTransactions)) {
+                throw new Error(
+                    "Transactions are only supported on server versions 4.0 and greater.");
+            }
             _txnOptions = new TransactionOptions(txnOptsObj);
             _txnState = ServerSession.TransactionStates.kActive;
             _nextStatementId = 0;
@@ -728,6 +743,12 @@ var {
             }
             // run abortTxn command
             return endTransaction("abortTransaction", driverSession);
+        };
+
+        // This is used to abort transactions if we've reconnected to a non-transaction-supporting
+        // server.
+        this._abortTransactionOnClientOnly = function _abortTransactionOnClientOnly() {
+            _txnState = ServerSession.TransactionStates.kInactive;
         };
 
         const endTransaction = (commandName, driverSession) => {
