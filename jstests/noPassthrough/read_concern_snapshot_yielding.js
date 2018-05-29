@@ -292,17 +292,6 @@
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"originatingCommand.filter": {x: 1}});
 
-    // Test count.
-    testCommand(function() {
-        const session = db.getMongo().startSession({causalConsistency: false});
-        const sessionDb = session.getDatabase("test");
-        session.startTransaction({readConcern: {level: "snapshot"}});
-        const res =
-            assert.commandWorked(sessionDb.runCommand({count: "coll", query: {_id: {$ne: 0}}}));
-        session.commitTransaction();
-        assert.eq(res.n, 3, tojson(res));
-    }, {"command.count": "coll"});
-
     // Test distinct.
     testCommand(function() {
         const session = db.getMongo().startSession({causalConsistency: false});

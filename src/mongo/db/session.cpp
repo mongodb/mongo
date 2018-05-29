@@ -96,7 +96,6 @@ namespace {
 const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
                                         {"aggregate", 1},
                                         {"commitTransaction", 1},
-                                        {"count", 1},
                                         {"delete", 1},
                                         {"distinct", 1},
                                         {"doTxn", 1},
@@ -348,6 +347,11 @@ void Session::beginOrContinueTxn(OperationContext* opCtx,
     }
 
     invariant(!opCtx->lockState()->isLocked());
+
+    uassert(50851,
+            "Cannot run 'count' in a multi-document transaction. Please see "
+            "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
+            !autocommit || cmdName != "count"_sd);
 
     uassert(50767,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",

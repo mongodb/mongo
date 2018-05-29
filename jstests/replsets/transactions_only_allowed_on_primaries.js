@@ -75,7 +75,6 @@
     // Test read commands that are supported in transactions.
     let readCommands = [
         {find: collName},
-        {count: collName},
         {aggregate: collName, pipeline: [{$project: {_id: 1}}], cursor: {}},
         {distinct: collName, key: "_id"},
         {geoSearch: collName, near: [0, 0]}

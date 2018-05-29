@@ -41,13 +41,6 @@
     assert.eq(profileObj.command.aggregate, sessionColl.getName(), tojson(profileObj));
     assert.eq(profileObj.nreturned, 1, tojson(profileObj));
 
-    jsTestLog("Test count.");
-    assert.eq(1, sessionColl.count({_id: "read-doc"}));
-    profileObj = getLatestProfilerEntry(testDB);
-    assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
-    assert.eq(profileObj.op, "command", tojson(profileObj));
-    assert.eq(profileObj.command.count, sessionColl.getName(), tojson(profileObj));
-
     jsTestLog("Test delete.");
     assert.commandWorked(sessionColl.deleteOne({_id: "delete-doc"}));
     profileObj = getLatestProfilerEntry(testDB);
