@@ -967,14 +967,15 @@ functions:
 
           python_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})
           python3_loc=$(which ${python|/opt/mongodbtoolchain/v2/bin/python3})
+          virtualenv_loc=$(which ${virtualenv|virtualenv})
           if [ "Windows_NT" = "$OS" ]; then
             python_loc=$(cygpath -w $python_loc)
             python3_loc=$(cygpath -w c:/python/Python36/python.exe)
           fi
           # Set up virtualenv in ${workdir}
-          virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
+          "$virtualenv_loc" --python "$python_loc" --system-site-packages "${workdir}/venv"
           # Add virtualenv for python3 in ${workdir}
-          virtualenv --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
+          "$virtualenv_loc" --python "$python3_loc" --system-site-packages "${workdir}/venv_3"
 
   "run tests" :
     - *determine_task_timeout
@@ -7657,6 +7658,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
+    virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
   display_tasks:
   - *unittests
   tasks:
@@ -7733,6 +7735,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl'"
     build_mongoreplay: true
+    virtualenv: /opt/mongodbtoolchain/v2/bin/virtualenv
   display_tasks:
   - *unittests
   tasks:
