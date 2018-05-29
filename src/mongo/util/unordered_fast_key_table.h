@@ -348,7 +348,7 @@ public:
     const_iterator find(const K_L& key) const {
         if (empty())
             return end();  // Don't waste time hashing.
-        return find(HashedKey(key));
+        return const_iterator(&_area, _area.find(HashedKey(key), nullptr));
     }
 
     const_iterator find(const HashedKey& key) const {
@@ -360,13 +360,25 @@ public:
     iterator find(const K_L& key) {
         if (empty())
             return end();  // Don't waste time hashing.
-        return find(HashedKey(key));
+        return iterator(&_area, _area.find(HashedKey(key), nullptr));
     }
 
     iterator find(const HashedKey& key) {
         if (empty())
             return end();
         return iterator(&_area, _area.find(key, nullptr));
+    }
+
+    size_t count(const K_L& key) const {
+        if (empty())
+            return 0;  // Don't waste time hashing.
+        return _area.find(HashedKey(key), nullptr) != -1;
+    }
+
+    size_t count(const HashedKey& key) const {
+        if (empty())
+            return 0;
+        return _area.find(key, nullptr) != -1;
     }
 
     const_iterator begin() const {
