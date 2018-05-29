@@ -82,7 +82,7 @@ using std::stringstream;
 unsigned long long FileAllocator::_uniqueNumber = 0;
 static SimpleMutex _uniqueNumberMutex;
 
-MONGO_FP_DECLARE(allocateDiskFull);
+MONGO_FAIL_POINT_DEFINE(allocateDiskFull);
 
 /**
  * Aliases for Win32 CRT functions

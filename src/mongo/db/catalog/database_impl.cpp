@@ -89,7 +89,7 @@ MONGO_REGISTER_SHIM(Database::makeImpl)
 }
 
 namespace {
-MONGO_FP_DECLARE(hangBeforeLoggingCreateCollection);
+MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 }  // namespace
 
 using std::endl;

@@ -112,7 +112,7 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace repl {
 namespace {
 
-MONGO_FP_DECLARE(sleepBetweenInsertOpTimeGenerationAndLogOp);
+MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
 /**
  * The `_localOplogCollection` pointer is always valid (or null) because an

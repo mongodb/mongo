@@ -64,7 +64,7 @@ namespace {
 
 // Causes the server to hang when it attempts to assign UUIDs to the provided database (or all
 // databases if none are provided).
-MONGO_FP_DECLARE(hangBeforeDatabaseUpgrade);
+MONGO_FAIL_POINT_DEFINE(hangBeforeDatabaseUpgrade);
 
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;

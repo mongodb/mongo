@@ -55,7 +55,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FP_DECLARE(migrationCommitVersionError);
+MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 
 /**
  * Append min, max and version information from chunk to the buffer for logChange purposes.

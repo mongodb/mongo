@@ -60,7 +60,7 @@ namespace {
 // When the skipIndexCreateFieldNameValidation failpoint is enabled, validation for index field
 // names will be disabled. This will allow for creation of indexes with invalid field names in their
 // specification.
-MONGO_FP_DECLARE(skipIndexCreateFieldNameValidation);
+MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
 static const std::set<StringData> allowedFieldNames = {
     IndexDescriptor::k2dIndexMaxFieldName,

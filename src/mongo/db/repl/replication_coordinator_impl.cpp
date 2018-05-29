@@ -89,8 +89,8 @@
 namespace mongo {
 namespace repl {
 
-MONGO_FP_DECLARE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
-MONGO_FP_DECLARE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
+MONGO_FAIL_POINT_DEFINE(stepdownHangBeforePerformingPostMemberStateUpdateActions);
+MONGO_FAIL_POINT_DEFINE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
@@ -3419,7 +3419,7 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
     return _uncommittedSnapshotsSize.load();
 }
 
-MONGO_FP_DECLARE(disableSnapshotting);
+MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 bool ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     const OpTime& newCommittedSnapshot) {

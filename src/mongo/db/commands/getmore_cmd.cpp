@@ -66,9 +66,9 @@ namespace mongo {
 
 namespace {
 
-MONGO_FP_DECLARE(rsStopGetMoreCmd);
+MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
 
-MONGO_FP_DECLARE(waitWithPinnedCursorDuringGetMoreBatch);
+MONGO_FAIL_POINT_DEFINE(waitWithPinnedCursorDuringGetMoreBatch);
 
 /**
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after

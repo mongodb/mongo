@@ -55,19 +55,19 @@ class BSONObj;
 class QueryRequest;
 
 // Failpoint for making find hang.
-MONGO_FP_FORWARD_DECLARE(waitInFindBeforeMakingBatch);
+MONGO_FAIL_POINT_DECLARE(waitInFindBeforeMakingBatch);
 
 // Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
 // tests.
-MONGO_FP_FORWARD_DECLARE(disableAwaitDataForGetMoreCmd);
+MONGO_FAIL_POINT_DECLARE(disableAwaitDataForGetMoreCmd);
 
 // Enabling this fail point will cause the getMore command to busy wait after pinning the cursor
 // but before we have started building the batch, until the fail point is disabled.
-MONGO_FP_FORWARD_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
+MONGO_FAIL_POINT_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
 
 // Enabling this failpoint will cause the getMore to wait just before it unpins its cursor after it
 // has completed building the current batch.
-MONGO_FP_FORWARD_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
+MONGO_FAIL_POINT_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 
 /**
  * Suite of find/getMore related functions used in both the mongod and mongos query paths.

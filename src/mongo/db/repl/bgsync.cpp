@@ -141,7 +141,7 @@ size_t getSize(const BSONObj& o) {
 }  // namespace
 
 // Failpoint which causes rollback to hang before starting.
-MONGO_FP_DECLARE(rollbackHangBeforeStart);
+MONGO_FAIL_POINT_DEFINE(rollbackHangBeforeStart);
 
 // The count of items in the buffer
 static Counter64 bufferCountGauge;

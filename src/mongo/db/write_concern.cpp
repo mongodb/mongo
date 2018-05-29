@@ -60,7 +60,7 @@ static Counter64 gleWtimeouts;
 static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                               &gleWtimeouts);
 
-MONGO_FP_DECLARE(hangBeforeWaitingForWriteConcern);
+MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 
 bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
     return cmdObj.hasField(WriteConcernOptions::kWriteConcernField);

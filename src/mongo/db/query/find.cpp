@@ -72,7 +72,7 @@ using std::unique_ptr;
 using stdx::make_unique;
 
 // Failpoint for checking whether we've received a getmore.
-MONGO_FP_DECLARE(failReceivedGetmore);
+MONGO_FAIL_POINT_DEFINE(failReceivedGetmore);
 
 bool shouldSaveCursor(OperationContext* opCtx,
                       const Collection* collection,

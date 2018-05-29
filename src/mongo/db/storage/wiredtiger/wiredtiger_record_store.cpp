@@ -89,8 +89,8 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 }
 }  // namespace
 
-MONGO_FP_DECLARE(WTWriteConflictException);
-MONGO_FP_DECLARE(WTWriteConflictExceptionForReads);
+MONGO_FAIL_POINT_DEFINE(WTWriteConflictException);
+MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 

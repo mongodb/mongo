@@ -51,7 +51,7 @@
 namespace mongo {
 namespace transport {
 
-MONGO_FP_DECLARE(transportLayerASIOshortOpportunisticReadWrite);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
 
 template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {

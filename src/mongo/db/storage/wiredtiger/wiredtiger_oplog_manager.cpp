@@ -47,7 +47,7 @@ namespace {
 const uint64_t kMinimumTimestamp = 1;
 }  // namespace
 
-MONGO_FP_DECLARE(WTPausePrimaryOplogDurabilityLoop);
+MONGO_FAIL_POINT_DEFINE(WTPausePrimaryOplogDurabilityLoop);
 
 void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const std::string& uri,

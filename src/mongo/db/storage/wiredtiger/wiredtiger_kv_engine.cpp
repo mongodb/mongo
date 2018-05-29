@@ -1156,7 +1156,7 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
 
 namespace {
 
-MONGO_FP_DECLARE(WTPreserveSnapshotHistoryIndefinitely);
+MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 
 }  // namespace
 

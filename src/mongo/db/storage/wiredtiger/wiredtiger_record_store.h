@@ -515,11 +515,11 @@ private:
 
 
 // WT failpoint to throw write conflict exceptions randomly
-MONGO_FP_FORWARD_DECLARE(WTWriteConflictException);
-MONGO_FP_FORWARD_DECLARE(WTWriteConflictExceptionForReads);
+MONGO_FAIL_POINT_DECLARE(WTWriteConflictException);
+MONGO_FAIL_POINT_DECLARE(WTWriteConflictExceptionForReads);
 
 // Prevents oplog writes from being considered durable on the primary. Once activated, new writes
 // will not be considered durable until deactivated. It is unspecified whether writes that commit
 // before activation will become visible while active.
-MONGO_FP_FORWARD_DECLARE(WTPausePrimaryOplogDurabilityLoop);
+MONGO_FAIL_POINT_DECLARE(WTPausePrimaryOplogDurabilityLoop);
 }

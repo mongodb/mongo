@@ -63,7 +63,7 @@ Milliseconds kMaxRefreshWaitTime(10 * 60 * 1000);
 
 // Prevents the refresher thread from waiting longer than the given number of milliseconds, even on
 // a successful refresh.
-MONGO_FP_DECLARE(maxKeyRefreshWaitTimeOverrideMS);
+MONGO_FAIL_POINT_DEFINE(maxKeyRefreshWaitTimeOverrideMS);
 
 /**
  * Returns the amount of time to wait until the monitoring thread should attempt to refresh again.

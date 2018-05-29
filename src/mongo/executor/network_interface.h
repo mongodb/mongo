@@ -44,8 +44,8 @@ class BSONObjBuilder;
 
 namespace executor {
 
-MONGO_FP_FORWARD_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
-MONGO_FP_FORWARD_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
+MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
+MONGO_FAIL_POINT_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
 
 /**
  * Interface to networking for use by TaskExecutor implementations.

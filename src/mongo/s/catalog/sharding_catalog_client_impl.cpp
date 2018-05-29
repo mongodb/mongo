@@ -74,7 +74,7 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(failApplyChunkOps);
+MONGO_FAIL_POINT_DEFINE(failApplyChunkOps);
 
 using repl::OpTime;
 using std::set;

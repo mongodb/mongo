@@ -47,8 +47,8 @@ namespace repl {
 // two separate files, rs_rollback and rs_rollback_no_uuid. However, after
 // MongoDB 3.8 is released, we no longer need to maintain rs_rollback_no_uuid
 // code and these forward declares can be removed. See SERVER-29766.
-MONGO_FP_FORWARD_DECLARE(rollbackHangBeforeFinish);
-MONGO_FP_FORWARD_DECLARE(rollbackHangThenFailAfterWritingMinValid);
+MONGO_FAIL_POINT_DECLARE(rollbackHangBeforeFinish);
+MONGO_FAIL_POINT_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
 class RollBackLocalOperations {
     MONGO_DISALLOW_COPYING(RollBackLocalOperations);

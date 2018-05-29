@@ -52,7 +52,7 @@ namespace mongo {
 namespace repl {
 
 // Failpoint which causes the initial sync function to hang before running listCollections.
-MONGO_FP_DECLARE(initialSyncHangBeforeListCollections);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeListCollections);
 
 namespace {
 
@@ -77,7 +77,7 @@ MONGO_EXPORT_SERVER_PARAMETER(maxNumInitialSyncCollectionClonerCursors, int, 1);
 
 // Failpoint which causes initial sync to hang right after listCollections, but before cloning
 // any colelctions in the 'database' database.
-MONGO_FP_DECLARE(initialSyncHangAfterListCollections);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterListCollections);
 
 /**
  * Default listCollections predicate.

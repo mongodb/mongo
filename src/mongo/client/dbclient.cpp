@@ -95,7 +95,7 @@ using executor::RemoteCommandResponse;
 
 namespace {
 
-MONGO_FP_DECLARE(turnOffDBClientIncompatibleWithUpgradedServerCheck);
+MONGO_FAIL_POINT_DEFINE(turnOffDBClientIncompatibleWithUpgradedServerCheck);
 
 #ifdef MONGO_CONFIG_SSL
 static SimpleMutex s_mtx;

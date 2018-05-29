@@ -71,7 +71,7 @@ namespace repl {
 
 namespace {
 
-MONGO_FP_DECLARE(impersonateFullyUpgradedFutureVersion);
+MONGO_FAIL_POINT_DEFINE(impersonateFullyUpgradedFutureVersion);
 
 }  // namespace
 

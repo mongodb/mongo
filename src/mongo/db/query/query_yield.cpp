@@ -39,8 +39,8 @@
 namespace mongo {
 
 namespace {
-MONGO_FP_DECLARE(setYieldAllLocksHang);
-MONGO_FP_DECLARE(setYieldAllLocksWait);
+MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
+MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
 }  // namespace
 
 // static

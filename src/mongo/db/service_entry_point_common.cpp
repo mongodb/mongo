@@ -94,10 +94,10 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(failCommand);
-MONGO_FP_DECLARE(rsStopGetMore);
-MONGO_FP_DECLARE(respondWithNotPrimaryInCommandDispatch);
-MONGO_FP_DECLARE(skipCheckingForNotMasterInCommandDispatch);
+MONGO_FAIL_POINT_DEFINE(failCommand);
+MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
+MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
+MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
 
 namespace {
 using logger::LogComponent;

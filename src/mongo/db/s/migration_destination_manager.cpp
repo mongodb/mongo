@@ -197,15 +197,15 @@ BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSes
 
 // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread which
 // receives a chunk migration from the donor.
-MONGO_FP_DECLARE(migrateThreadHangAtStep1);
-MONGO_FP_DECLARE(migrateThreadHangAtStep2);
-MONGO_FP_DECLARE(migrateThreadHangAtStep3);
-MONGO_FP_DECLARE(migrateThreadHangAtStep4);
-MONGO_FP_DECLARE(migrateThreadHangAtStep5);
-MONGO_FP_DECLARE(migrateThreadHangAtStep6);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep1);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep2);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
 
-MONGO_FP_DECLARE(failMigrationLeaveOrphans);
-MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeOperation);
+MONGO_FAIL_POINT_DEFINE(failMigrationLeaveOrphans);
+MONGO_FAIL_POINT_DEFINE(failMigrationReceivedOutOfRangeOperation);
 
 }  // namespace
 

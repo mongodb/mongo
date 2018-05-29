@@ -286,11 +286,11 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
 // failBeforeCommitExceptionCode (int, default = not specified): If set, the specified exception
 //      code will be thrown, which will cause the write to not commit; if not specified, the write
 //      will be allowed to commit.
-MONGO_FP_DECLARE(onPrimaryTransactionalWrite);
+MONGO_FAIL_POINT_DEFINE(onPrimaryTransactionalWrite);
 
 // Failpoint which will pause an operation just after allocating a point-in-time storage engine
 // transaction.
-MONGO_FP_DECLARE(hangAfterPreallocateSnapshot);
+MONGO_FAIL_POINT_DEFINE(hangAfterPreallocateSnapshot);
 }  // namespace
 
 const BSONObj Session::kDeadEndSentinel(BSON("$incompleteOplogHistory" << 1));

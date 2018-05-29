@@ -49,7 +49,7 @@ using std::endl;
 using std::string;
 using std::stringstream;
 
-MONGO_FP_DECLARE(validateCmdCollectionNotValid);
+MONGO_FAIL_POINT_DEFINE(validateCmdCollectionNotValid);
 
 namespace {
 

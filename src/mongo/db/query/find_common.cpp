@@ -37,13 +37,13 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(waitInFindBeforeMakingBatch);
+MONGO_FAIL_POINT_DEFINE(waitInFindBeforeMakingBatch);
 
-MONGO_FP_DECLARE(disableAwaitDataForGetMoreCmd);
+MONGO_FAIL_POINT_DEFINE(disableAwaitDataForGetMoreCmd);
 
-MONGO_FP_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
+MONGO_FAIL_POINT_DEFINE(waitAfterPinningCursorBeforeGetMoreBatch);
 
-MONGO_FP_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
+MONGO_FAIL_POINT_DEFINE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 
 const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();

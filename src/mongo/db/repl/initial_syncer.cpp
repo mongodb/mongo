@@ -72,23 +72,23 @@ namespace mongo {
 namespace repl {
 
 // Failpoint for initial sync
-MONGO_FP_DECLARE(failInitialSyncWithBadHost);
+MONGO_FAIL_POINT_DEFINE(failInitialSyncWithBadHost);
 
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
-MONGO_FP_DECLARE(failInitSyncWithBufferedEntriesLeft);
+MONGO_FAIL_POINT_DEFINE(failInitSyncWithBufferedEntriesLeft);
 
 // Failpoint which causes the initial sync function to hang before copying databases.
-MONGO_FP_DECLARE(initialSyncHangBeforeCopyingDatabases);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCopyingDatabases);
 
 // Failpoint which causes the initial sync function to hang before finishing.
-MONGO_FP_DECLARE(initialSyncHangBeforeFinish);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeFinish);
 
 // Failpoint which causes the initial sync function to hang before calling shouldRetry on a failed
 // operation.
-MONGO_FP_DECLARE(initialSyncHangBeforeGettingMissingDocument);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeGettingMissingDocument);
 
 // Failpoint which stops the applier.
-MONGO_FP_DECLARE(rsSyncApplyStop);
+MONGO_FAIL_POINT_DEFINE(rsSyncApplyStop);
 
 namespace {
 using namespace executor;

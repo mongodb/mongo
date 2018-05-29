@@ -75,7 +75,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FP_DECLARE(WTEmulateOutOfOrderNextIndexKey);
+MONGO_FAIL_POINT_DEFINE(WTEmulateOutOfOrderNextIndexKey);
 
 using std::string;
 using std::vector;

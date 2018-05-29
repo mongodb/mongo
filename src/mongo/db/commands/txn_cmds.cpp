@@ -93,7 +93,7 @@ public:
 
 } commitTxn;
 
-MONGO_FP_DECLARE(pauseAfterTransactionPrepare);
+MONGO_FAIL_POINT_DEFINE(pauseAfterTransactionPrepare);
 
 // TODO: This is a stub for testing storage prepare functionality.
 class CmdPrepareTxn : public BasicCommand {

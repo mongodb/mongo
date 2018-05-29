@@ -77,7 +77,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-MONGO_FP_DECLARE(throwSockExcep);
+MONGO_FAIL_POINT_DEFINE(throwSockExcep);
 
 namespace {
 

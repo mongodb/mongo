@@ -65,8 +65,8 @@ namespace repl {
 
 namespace {
 
-MONGO_FP_DECLARE(blockHeartbeatStepdown);
-MONGO_FP_DECLARE(blockHeartbeatReconfigFinish);
+MONGO_FAIL_POINT_DEFINE(blockHeartbeatStepdown);
+MONGO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
 
 }  // namespace
 

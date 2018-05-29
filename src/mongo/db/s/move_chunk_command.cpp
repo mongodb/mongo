@@ -65,13 +65,13 @@ void uassertStatusOKWithWarning(const Status& status) {
 }
 
 // Tests can pause and resume moveChunk's progress at each step by enabling/disabling each failpoint
-MONGO_FP_DECLARE(moveChunkHangAtStep1);
-MONGO_FP_DECLARE(moveChunkHangAtStep2);
-MONGO_FP_DECLARE(moveChunkHangAtStep3);
-MONGO_FP_DECLARE(moveChunkHangAtStep4);
-MONGO_FP_DECLARE(moveChunkHangAtStep5);
-MONGO_FP_DECLARE(moveChunkHangAtStep6);
-MONGO_FP_DECLARE(moveChunkHangAtStep7);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep1);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep2);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
+MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep7);
 
 class MoveChunkCommand : public BasicCommand {
 public:

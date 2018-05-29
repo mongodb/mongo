@@ -51,7 +51,7 @@ namespace {
 // transaction is not prepared. This should always be enabled if WTPrepareConflictForReads is
 // used, which fails randomly. If this is not enabled, no prepare conflicts will be resolved,
 // because the recovery unit may not ever actually be in a prepared state.
-MONGO_FP_DECLARE(WTAlwaysNotifyPrepareConflictWaiters);
+MONGO_FAIL_POINT_DEFINE(WTAlwaysNotifyPrepareConflictWaiters);
 
 // SnapshotIds need to be globally unique, as they are used in a WorkingSetMember to
 // determine if documents changed, but a different recovery unit may be used across a getMore,

@@ -119,7 +119,7 @@ const char meCollectionName[] = "local.me";
 const auto meDatabaseName = localDbName;
 const char tsFieldName[] = "ts";
 
-MONGO_FP_DECLARE(dropPendingCollectionReaperHang);
+MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 
 // Set this to specify maximum number of times the oplog fetcher will consecutively restart the
 // oplog tailing query on non-cancellation errors.

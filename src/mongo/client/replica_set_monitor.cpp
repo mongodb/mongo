@@ -63,7 +63,7 @@ using std::string;
 using std::vector;
 
 // Failpoint for disabling AsyncConfigChangeHook calls on updated RS nodes.
-MONGO_FP_DECLARE(failAsyncConfigChangeHook);
+MONGO_FAIL_POINT_DEFINE(failAsyncConfigChangeHook);
 
 namespace {
 

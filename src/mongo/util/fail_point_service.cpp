@@ -34,7 +34,7 @@ namespace mongo {
 
 using std::unique_ptr;
 
-MONGO_FP_DECLARE(dummy);  // used by tests in jstests/fail_point
+MONGO_FAIL_POINT_DEFINE(dummy);  // used by tests in jstests/fail_point
 
 unique_ptr<FailPointRegistry> _fpRegistry(nullptr);
 

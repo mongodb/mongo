@@ -53,7 +53,7 @@ namespace mongo {
 namespace executor {
 
 namespace {
-MONGO_FP_DECLARE(scheduleIntoPoolSpinsUntilThreadPoolShutsDown);
+MONGO_FAIL_POINT_DEFINE(scheduleIntoPoolSpinsUntilThreadPoolShutsDown);
 }
 
 class ThreadPoolTaskExecutor::CallbackState : public TaskExecutor::CallbackState {

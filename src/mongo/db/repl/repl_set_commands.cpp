@@ -649,7 +649,7 @@ bool isHeartbeatRequestV1(const BSONObj& cmdObj) {
 
 }  // namespace
 
-MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
+MONGO_FAIL_POINT_DEFINE(rsDelayHeartbeatResponse);
 
 /* { replSetHeartbeat : <setname> } */
 class CmdReplSetHeartbeat : public ReplSetCommand {
