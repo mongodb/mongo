@@ -12,6 +12,11 @@
     const primary = rst.getPrimary();
     const db = primary.getDB("test");
 
+    if (!db.serverStatus().storageEngine.supportsSnapshotReadConcern) {
+        rst.stopSet();
+        return;
+    }
+
     const session = primary.startSession({causalConsistency: false});
     const sessionDB = session.getDatabase(db.getName());
 
