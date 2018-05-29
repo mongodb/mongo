@@ -162,5 +162,40 @@
     }));
     assert.commandWorked(conn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
 
+    // Test with success and writeConcernError.
+    assert.commandWorked(conn.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            failCommands: ['insert', 'find'],
+        }
+    }));
+    // Commands that don't support writeConcern don't tick counter.
+    assert.commandWorked(testDB.runCommand({find: "c"}));
+    // Unlisted commands don't tick counter.
+    assert.commandWorked(testDB.runCommand({update: "c", updates: [{q: {}, u: {}, upsert: true}]}));
+    var res = testDB.runCommand({insert: "c", documents: [{}]});
+    assert.commandWorkedIgnoringWriteConcernErrors(res);
+    assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
+    assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]}));  // Works again.
+    assert.commandWorked(conn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+
+    // Test with natural failure and writeConcernError.
+    assert.commandWorked(testDB.runCommand({insert: "c", documents: [{_id: 'dup'}]}));
+    assert.commandWorked(conn.adminCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            writeConcernError: {code: 12345, errmsg: "hello"},
+            failCommands: ['insert'],
+        }
+    }));
+    var res = testDB.runCommand({insert: "c", documents: [{_id: 'dup'}]});
+    assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+    assert.eq(res.writeConcernError, {code: 12345, errmsg: "hello"});
+    assert.commandWorked(testDB.runCommand({insert: "c", documents: [{}]}));  // Works again.
+    assert.commandWorked(conn.adminCommand({configureFailPoint: "failCommand", mode: "off"}));
+
     MongoRunner.stopMongod(conn);
 }());
