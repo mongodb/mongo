@@ -91,7 +91,7 @@ AtomicInt32 SyncTail::replBatchLimitOperations{50 * 1000};
 
 namespace {
 
-MONGO_FP_DECLARE(pauseBatchApplicationBeforeCompletion);
+MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
 
 /**
  * This variable determines the number of writer threads SyncTail will have. It can be overridden

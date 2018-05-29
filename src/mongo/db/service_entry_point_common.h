@@ -39,12 +39,12 @@
 
 namespace mongo {
 
-MONGO_FP_FORWARD_DECLARE(rsStopGetMore);
-MONGO_FP_FORWARD_DECLARE(respondWithNotPrimaryInCommandDispatch);
+MONGO_FAIL_POINT_DECLARE(rsStopGetMore);
+MONGO_FAIL_POINT_DECLARE(respondWithNotPrimaryInCommandDispatch);
 
 // When active, we won't check if we are master in command dispatch. Activate this if you want to
 // test failing during command execution.
-MONGO_FP_FORWARD_DECLARE(skipCheckingForNotMasterInCommandDispatch);
+MONGO_FAIL_POINT_DECLARE(skipCheckingForNotMasterInCommandDispatch);
 
 /**
  * Helpers for writing ServiceEntryPointImpl implementations from a reusable core.

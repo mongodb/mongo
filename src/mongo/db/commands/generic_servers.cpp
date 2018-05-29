@@ -138,7 +138,7 @@ public:
 
 } hostInfoCmd;
 
-MONGO_FP_DECLARE(crashOnShutdown);
+MONGO_FAIL_POINT_DEFINE(crashOnShutdown);
 int* volatile illegalAddress;  // NOLINT - used for fail point only
 
 class CmdGetCmdLineOpts : public BasicCommand {

@@ -66,10 +66,10 @@ using std::unique_ptr;
 using std::string;
 using std::endl;
 
-MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
-MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
-MONGO_FP_DECLARE(hangAfterStartingIndexBuildUnlocked);
-MONGO_FP_DECLARE(slowBackgroundIndexBuild);
+MONGO_FAIL_POINT_DEFINE(crashAfterStartingIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
+MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
+MONGO_FAIL_POINT_DEFINE(slowBackgroundIndexBuild);
 
 AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
 

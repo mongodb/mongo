@@ -41,7 +41,7 @@ namespace mongo {
 
 namespace {
 
-MONGO_FP_DECLARE(disableKeyGeneration);
+MONGO_FAIL_POINT_DEFINE(disableKeyGeneration);
 
 /**
  * Inserts a new key to the keys collection.

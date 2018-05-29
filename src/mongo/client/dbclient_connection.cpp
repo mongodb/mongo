@@ -85,7 +85,7 @@ using std::string;
 
 namespace {
 
-MONGO_FP_DECLARE(turnOffDBClientIncompatibleWithUpgradedServerCheck);
+MONGO_FAIL_POINT_DEFINE(turnOffDBClientIncompatibleWithUpgradedServerCheck);
 
 /**
  * RAII class to force usage of OP_QUERY on a connection.

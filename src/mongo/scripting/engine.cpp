@@ -56,7 +56,7 @@ AtomicInt64 Scope::_lastVersion(1);
 
 namespace {
 
-MONGO_FP_DECLARE(mr_killop_test_fp);
+MONGO_FAIL_POINT_DEFINE(mr_killop_test_fp);
 // 2 GB is the largest support Javascript file size.
 const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
 

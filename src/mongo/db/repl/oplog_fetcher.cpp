@@ -48,7 +48,7 @@ namespace repl {
 
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
-MONGO_FP_DECLARE(stopReplProducer);
+MONGO_FAIL_POINT_DEFINE(stopReplProducer);
 
 namespace {
 

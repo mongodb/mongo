@@ -67,7 +67,7 @@ using std::stringstream;
 // recordNeedsFetch().
 static const int kNeedsFetchFailFreq = 2;
 static Counter64 needsFetchFailCounter;
-MONGO_FP_DECLARE(recordNeedsFetchFail);
+MONGO_FAIL_POINT_DEFINE(recordNeedsFetchFail);
 
 // Used to make sure the compiler doesn't get too smart on us when we're
 // trying to touch records.

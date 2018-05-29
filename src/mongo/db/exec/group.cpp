@@ -42,7 +42,7 @@
 namespace mongo {
 
 // Forces a hang in the javascript execution while initializing the group stage.
-MONGO_FP_DECLARE(hangInGroupReduceJs);
+MONGO_FAIL_POINT_DEFINE(hangInGroupReduceJs);
 
 using std::unique_ptr;
 using std::vector;

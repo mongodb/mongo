@@ -41,8 +41,8 @@ const unsigned int NetworkInterface::kMessagingPortKeepOpen;
 NetworkInterface::NetworkInterface() {}
 NetworkInterface::~NetworkInterface() {}
 
-MONGO_FP_DECLARE(networkInterfaceDiscardCommandsBeforeAcquireConn);
-MONGO_FP_DECLARE(networkInterfaceDiscardCommandsAfterAcquireConn);
+MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsBeforeAcquireConn);
+MONGO_FAIL_POINT_DEFINE(networkInterfaceDiscardCommandsAfterAcquireConn);
 
 }  // namespace executor
 }  // namespace mongo

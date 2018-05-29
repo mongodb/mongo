@@ -53,7 +53,7 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(setDistLockTimeout);
+MONGO_FAIL_POINT_DEFINE(setDistLockTimeout);
 
 using std::string;
 using std::unique_ptr;

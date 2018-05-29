@@ -29,11 +29,10 @@
 #pragma once
 
 #include "mongo/base/init.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_registry.h"
 
 namespace mongo {
-
-class FailPoint;
 
 /**
  * @return the global fail point registry.
@@ -41,22 +40,22 @@ class FailPoint;
 FailPointRegistry* getGlobalFailPointRegistry();
 
 /**
- * Convenience macro for declaring a fail point. Must be used in global scope and never in a
- * block with limited scope (ie, inside functions, loops, etc.).
+ * Convenience macro for defining a fail point. Must be used at namespace scope.
+ * Note: that means never at local scope (inside functions) or class scope.
  *
  * NOTE: Never use in header files, only sources.
  */
-#define MONGO_FP_DECLARE(fp)                                                          \
-    FailPoint fp;                                                                     \
+#define MONGO_FAIL_POINT_DEFINE(fp)                                                   \
+    ::mongo::FailPoint fp;                                                            \
     MONGO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFailPointsRegistered")) \
     (::mongo::InitializerContext * context) {                                         \
-        return getGlobalFailPointRegistry()->addFailPoint(#fp, &fp);                  \
+        return ::mongo::getGlobalFailPointRegistry()->addFailPoint(#fp, &fp);         \
     }
 
 /**
- * Convenience macro for defining a fail point in a header scope.
+ * Convenience macro for declaring a fail point in a header.
  */
-#define MONGO_FP_FORWARD_DECLARE(fp) extern FailPoint fp;
+#define MONGO_FAIL_POINT_DECLARE(fp) extern ::mongo::FailPoint fp;
 
 /**
  * Convenience class for enabling a failpoint and disabling it as this goes out of scope.

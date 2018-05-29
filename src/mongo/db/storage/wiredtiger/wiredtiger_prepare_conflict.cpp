@@ -39,7 +39,7 @@
 namespace mongo {
 
 // When set, simulates WT_PREPARE_CONFLICT returned from WiredTiger API calls.
-MONGO_FP_DECLARE(WTPrepareConflictForReads);
+MONGO_FAIL_POINT_DEFINE(WTPrepareConflictForReads);
 
 void wiredTigerPrepareConflictLog(int attempts) {
     LOG(1) << "Caught WT_PREPARE_CONFLICT, attempt " << attempts

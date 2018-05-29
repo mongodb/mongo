@@ -126,10 +126,10 @@ Status checkCollectionEpochMatches(const ScopedCollectionMetadata& metadata, OID
 
 }  // namespace
 
-MONGO_FP_DECLARE(doNotRefreshRecipientAfterCommit);
-MONGO_FP_DECLARE(failMigrationCommit);
-MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
-MONGO_FP_DECLARE(migrationCommitNetworkError);
+MONGO_FAIL_POINT_DEFINE(doNotRefreshRecipientAfterCommit);
+MONGO_FAIL_POINT_DEFINE(failMigrationCommit);
+MONGO_FAIL_POINT_DEFINE(hangBeforeLeavingCriticalSection);
+MONGO_FAIL_POINT_DEFINE(migrationCommitNetworkError);
 
 MigrationSourceManager* MigrationSourceManager::get(CollectionShardingState& css) {
     return msmForCss(css);

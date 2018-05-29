@@ -53,13 +53,13 @@ namespace {
 // created with a valid non-zero max time will also fail immediately.
 //
 // This fail point cannot be used with the maxTimeNeverTimeOut fail point.
-MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
+MONGO_FAIL_POINT_DEFINE(maxTimeAlwaysTimeOut);
 
 // Enabling the maxTimeNeverTimeOut fail point will cause the server to never time out any
 // query, command, or getmore operation, regardless of whether a max time is set.
 //
 // This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
-MONGO_FP_DECLARE(maxTimeNeverTimeOut);
+MONGO_FAIL_POINT_DEFINE(maxTimeNeverTimeOut);
 
 // Enabling the checkForInterruptFail fail point will start a game of random chance on the
 // connection specified in the fail point data, generating an interrupt with a given fixed
@@ -73,7 +73,7 @@ MONGO_FP_DECLARE(maxTimeNeverTimeOut);
 // name 'threadName' will generate a kill on the current operation with probability p(.01),
 // including interrupt points of nested operations. "chance" must be a double between 0 and 1,
 // inclusive.
-MONGO_FP_DECLARE(checkForInterruptFail);
+MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 }  // namespace
 

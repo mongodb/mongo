@@ -38,7 +38,7 @@
 namespace mongo {
 
 // When set, returns simulates returning WT_PREPARE_CONFLICT on WT cursor read operations.
-MONGO_FP_FORWARD_DECLARE(WTPrepareConflictForReads);
+MONGO_FAIL_POINT_DECLARE(WTPrepareConflictForReads);
 
 /**
  * Logs a message with the number of prepare conflict retry attempts.

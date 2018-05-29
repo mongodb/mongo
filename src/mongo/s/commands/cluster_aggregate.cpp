@@ -74,7 +74,7 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(clusterAggregateHangBeforeEstablishingShardCursors);
+MONGO_FAIL_POINT_DEFINE(clusterAggregateHangBeforeEstablishingShardCursors);
 
 namespace {
 // Given a document representing an aggregation command such as

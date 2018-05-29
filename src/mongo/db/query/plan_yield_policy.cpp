@@ -44,7 +44,7 @@
 namespace mongo {
 
 namespace {
-MONGO_FP_DECLARE(setInterruptOnlyPlansCheckForInterruptHang);
+MONGO_FAIL_POINT_DEFINE(setInterruptOnlyPlansCheckForInterruptHang);
 }  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)

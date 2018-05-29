@@ -81,7 +81,7 @@ using std::vector;
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);
-MONGO_FP_DECLARE(movePrimaryFailPoint);
+MONGO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
 
 BSONElement getErrField(const BSONObj& o);
 

@@ -63,7 +63,7 @@
 namespace mongo {
 namespace repl {
 
-MONGO_FP_DECLARE(forceSyncSourceCandidate);
+MONGO_FAIL_POINT_DEFINE(forceSyncSourceCandidate);
 
 const Seconds TopologyCoordinator::VoteLease::leaseTime = Seconds(30);
 
@@ -74,7 +74,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(priorityTakeoverFreshnessWindowSeconds, in
 // If this fail point is enabled, TopologyCoordinator::shouldChangeSyncSource() will ignore
 // the option TopologyCoordinator::Options::maxSyncSourceLagSecs. The sync source will not be
 // re-evaluated if it lags behind another node by more than 'maxSyncSourceLagSecs' seconds.
-MONGO_FP_DECLARE(disableMaxSyncSourceLagSecs);
+MONGO_FAIL_POINT_DEFINE(disableMaxSyncSourceLagSecs);
 
 constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 

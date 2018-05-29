@@ -283,7 +283,7 @@ void execCommandClient(OperationContext* opCtx,
     }
 }
 
-MONGO_FP_DECLARE(doNotRefreshShardsOnRetargettingError);
+MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);
 
 void runCommand(OperationContext* opCtx,
                 const OpMsgRequest& request,

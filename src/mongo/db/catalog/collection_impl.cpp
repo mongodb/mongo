@@ -101,7 +101,7 @@ MONGO_REGISTER_SHIM(Collection::parseValidationAction)
 
 namespace {
 // Used below to fail during inserts.
-MONGO_FP_DECLARE(failCollectionInserts);
+MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 
 // Uses the collator factory to convert the BSON representation of a collator to a
 // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be

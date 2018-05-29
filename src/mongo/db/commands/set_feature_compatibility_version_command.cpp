@@ -56,8 +56,8 @@ namespace mongo {
 
 namespace {
 
-MONGO_FP_DECLARE(featureCompatibilityDowngrade);
-MONGO_FP_DECLARE(featureCompatibilityUpgrade);
+MONGO_FAIL_POINT_DEFINE(featureCompatibilityDowngrade);
+MONGO_FAIL_POINT_DEFINE(featureCompatibilityUpgrade);
 /**
  * Sets the minimum allowed version for the cluster. If it is 3.4, then the node should not use 3.6
  * features.

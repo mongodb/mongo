@@ -72,19 +72,19 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncCollectionFindAttempts, int, 3);
 
 // Failpoint which causes initial sync to hang before establishing its cursor to clone the
 // 'namespace' collection.
-MONGO_FP_DECLARE(initialSyncHangBeforeCollectionClone);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCollectionClone);
 
 // Failpoint which causes initial sync to hang when it has cloned 'numDocsToClone' documents to
 // collection 'namespace'.
-MONGO_FP_DECLARE(initialSyncHangDuringCollectionClone);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangDuringCollectionClone);
 
 // Failpoint which causes initial sync to hang after handling the next batch of results from the
 // 'AsyncResultsMerger', optionally limited to a specific collection.
-MONGO_FP_DECLARE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
 
 // Failpoint which causes initial sync to hang before establishing the cursors (but after
 // listIndexes), optionally limited to a specific collection.
-MONGO_FP_DECLARE(initialSyncHangCollectionClonerBeforeEstablishingCursor);
+MONGO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerBeforeEstablishingCursor);
 
 BSONObj makeCommandWithUUIDorCollectionName(StringData command,
                                             OptionalCollectionUUID uuid,

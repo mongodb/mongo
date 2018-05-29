@@ -62,7 +62,7 @@ constexpr StringData DoTxn::kPreconditionFieldName;
 namespace {
 
 // If enabled, causes loop in _doTxn() to hang after applying current operation.
-MONGO_FP_DECLARE(doTxnPauseBetweenOperations);
+MONGO_FAIL_POINT_DEFINE(doTxnPauseBetweenOperations);
 
 /**
  * Return true iff the doTxnCmd can be executed in a single WriteUnitOfWork.

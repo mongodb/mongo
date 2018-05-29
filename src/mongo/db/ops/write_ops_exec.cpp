@@ -82,10 +82,10 @@ namespace mongo {
 // single type of operation are static functions defined above their caller.
 namespace {
 
-MONGO_FP_DECLARE(failAllInserts);
-MONGO_FP_DECLARE(failAllUpdates);
-MONGO_FP_DECLARE(failAllRemoves);
-MONGO_FP_DECLARE(hangDuringBatchInsert);
+MONGO_FAIL_POINT_DEFINE(failAllInserts);
+MONGO_FAIL_POINT_DEFINE(failAllUpdates);
+MONGO_FAIL_POINT_DEFINE(failAllRemoves);
+MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
     if (containsRetry) {

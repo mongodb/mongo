@@ -44,7 +44,7 @@
 namespace mongo {
 namespace repl {
 
-MONGO_FP_FORWARD_DECLARE(stopReplProducer);
+MONGO_FAIL_POINT_DECLARE(stopReplProducer);
 
 /**
  * The oplog fetcher, once started, reads operations from a remote oplog using a tailable cursor.

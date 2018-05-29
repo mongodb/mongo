@@ -51,7 +51,7 @@
 
 namespace mongo {
 
-MONGO_FP_DECLARE(dropDatabaseHangAfterLastCollectionDrop);
+MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterLastCollectionDrop);
 
 namespace {
 

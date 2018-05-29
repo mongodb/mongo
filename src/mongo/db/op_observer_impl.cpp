@@ -59,7 +59,7 @@ namespace mongo {
 using repl::OplogEntry;
 namespace {
 
-MONGO_FP_DECLARE(failCollectionUpdates);
+MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 
 const auto getDeleteState = OperationContext::declareDecoration<ShardObserverDeleteState>();
 

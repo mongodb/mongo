@@ -49,7 +49,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FP_DECLARE(setDropCollDistLockWait);
+MONGO_FAIL_POINT_DEFINE(setDropCollDistLockWait);
 
 /**
  * Internal sharding command run on config servers to drop a collection from a database.

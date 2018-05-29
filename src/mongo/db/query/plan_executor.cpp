@@ -73,7 +73,7 @@ struct CappedInsertNotifierData {
 
 namespace {
 
-MONGO_FP_DECLARE(planExecutorAlwaysFails);
+MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
 
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
