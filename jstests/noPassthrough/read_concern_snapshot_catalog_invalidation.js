@@ -79,8 +79,6 @@
 
     testCommand({aggregate: kCollName, pipeline: [], cursor: {}},
                 {"command.aggregate": kCollName, "command.readConcern.level": "snapshot"});
-    testCommand({count: kCollName, filter: {x: 1}},
-                {"command.count": kCollName, "command.readConcern.level": "snapshot"});
     testCommand({delete: kCollName, deletes: [{q: {x: 1}, limit: 1}]},
                 {"command.delete": kCollName, "command.readConcern.level": "snapshot"});
     testCommand({distinct: kCollName, key: "x"},

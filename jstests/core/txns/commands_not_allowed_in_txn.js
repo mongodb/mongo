@@ -50,7 +50,7 @@
             startTransaction: true,
             autocommit: false
         })),
-                                     [50767, 50768]);
+                                     [50767, 50768, 50851]);
         assert.commandFailedWithCode(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),
@@ -75,7 +75,7 @@
                 {},
                 command,
                 {txnNumber: NumberLong(txnNumber), stmtId: NumberInt(1), autocommit: false})),
-            [50767, 50768]);
+            [50767, 50768, 50851]);
         assert.commandWorked(sessionDb.adminCommand({
             commitTransaction: 1,
             txnNumber: NumberLong(txnNumber),
@@ -89,6 +89,8 @@
     //
 
     const sessionCommands = [
+        {count: collName},
+        {count: collName, query: {a: 1}},
         {applyOps: [{op: "u", ns: testColl.getFullName(), o2: {_id: 0}, o: {$set: {a: 5}}}]},
         {explain: {find: collName}},
         {eval: "function() {return 1;}"},

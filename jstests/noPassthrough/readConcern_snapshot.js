@@ -134,9 +134,6 @@
     // readConcern 'snapshot' is supported by aggregate.
     assert.commandWorked(sessionDb.runCommand({aggregate: collName, pipeline: [], cursor: {}}));
 
-    // readConcern 'snapshot' is supported by count.
-    assert.commandWorked(sessionDb.runCommand({count: collName}));
-
     // readConcern 'snapshot' is supported by distinct.
     assert.commandWorked(sessionDb.runCommand({distinct: collName, key: "x"}));
 

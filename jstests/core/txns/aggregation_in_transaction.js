@@ -67,6 +67,23 @@
     assert.docEq(cursor.next(), lookupDoc);
     assert(!cursor.hasNext());
 
+    jsTestLog("Testing $count within a transaction.");
+
+    let countRes = coll.aggregate([{$count: "count"}]).toArray();
+    assert.eq(countRes.length, 1, tojson(countRes));
+    assert.eq(countRes[0].count, 1, tojson(countRes));
+
+    assert.commandWorked(coll.insert({a: 2}));
+    countRes = coll.aggregate([{$count: "count"}]).toArray();
+    assert.eq(countRes.length, 1, tojson(countRes));
+    assert.eq(countRes[0].count, 2, tojson(countRes));
+
+    assert.commandWorked(
+        db.getSiblingDB(testDB.getName()).getCollection(coll.getName()).insert({a: 3}));
+    countRes = coll.aggregate([{$count: "count"}]).toArray();
+    assert.eq(countRes.length, 1, tojson(countRes));
+    assert.eq(countRes[0].count, 2, tojson(countRes));
+
     session.commitTransaction();
     jsTestLog("Transaction committed.");
 

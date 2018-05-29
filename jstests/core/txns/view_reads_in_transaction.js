@@ -42,7 +42,7 @@
     assert.docEq(testDoc, cursor.next());
     assert(!cursor.hasNext());
 
-    assert.eq(view.count({_id: {$exists: 1}}), 1);
+    assert.eq(view.find({_id: {$exists: 1}}).itcount(), 1);
 
     assert.eq(view.distinct("_id"), ["kyle"]);
 
