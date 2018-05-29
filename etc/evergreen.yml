@@ -7087,6 +7087,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7140,11 +7142,17 @@ buildvariants:
   - name: parallel
   - name: concurrency
   - name: concurrency_replication
-  # TODO: SERVER-35057 Disable temporarily since the test suite cannot finish in
-  # 6 hours right now.
-  # - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication_with_balancer
+    distros:
+    - rhel62-large
   - name: concurrency_simultaneous
 
 - &linux-64-debug-template
@@ -7452,6 +7460,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - ubuntu1404-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7567,6 +7577,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - ubuntu1604-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7785,6 +7797,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - linux-64-amzn-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8056,6 +8070,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - amazon2-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8800,10 +8816,10 @@ buildvariants:
   - name: auth_audit
   - name: dbtest
   - name: concurrency
-    distros:
-    - windows-64-vs2015-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - windows-64-vs2015-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8875,6 +8891,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - windows-64-vs2015-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -9740,6 +9758,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -10536,6 +10556,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11296,6 +11318,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - suse12-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11428,6 +11452,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - debian81-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11574,6 +11600,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - debian92-build
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11804,6 +11832,8 @@ buildvariants:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -12131,6 +12161,8 @@ buildvariants:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -12628,6 +12660,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -12778,6 +12812,8 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
