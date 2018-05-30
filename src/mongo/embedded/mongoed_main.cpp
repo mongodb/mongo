@@ -34,6 +34,8 @@
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
+#include "mongo/embedded/service_entry_point_embedded.h"
+#include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/exit.h"
@@ -47,6 +49,20 @@
 
 namespace mongo {
 namespace {
+
+class ServiceEntryPointMongoe : public ServiceEntryPointImpl {
+public:
+    explicit ServiceEntryPointMongoe(ServiceContext* svcCtx)
+        : ServiceEntryPointImpl(svcCtx),
+          _sepEmbedded(std::make_unique<ServiceEntryPointEmbedded>()) {}
+
+    DbResponse handleRequest(OperationContext* opCtx, const Message& request) final {
+        return _sepEmbedded->handleRequest(opCtx, request);
+    }
+
+private:
+    std::unique_ptr<ServiceEntryPointEmbedded> _sepEmbedded;
+};
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SignalProcessingStartup, ("ThreadNameInitializer"))
 (InitializerContext*) {
@@ -99,6 +115,10 @@ int mongoedMain(int argc, char* argv[], char** envp) {
         // Add embedded specific options that's not available in mongod here.
         YAML::Emitter yaml;
         serviceContext = embedded::initialize(yaml.c_str());
+
+        // Override the ServiceEntryPoint with one that can support transport layers.
+        serviceContext->setServiceEntryPoint(
+            std::make_unique<ServiceEntryPointMongoe>(serviceContext));
 
         auto tl =
             transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);

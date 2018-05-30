@@ -29,19 +29,25 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/transport/service_entry_point.h"
 
 namespace mongo {
 
 /**
  * The entry point into mongod. Just a wrapper around assembleResponse.
  */
-class ServiceEntryPointEmbedded final : public ServiceEntryPointImpl {
+class ServiceEntryPointEmbedded final : public ServiceEntryPoint {
     MONGO_DISALLOW_COPYING(ServiceEntryPointEmbedded);
 
 public:
-    using ServiceEntryPointImpl::ServiceEntryPointImpl;
+    ServiceEntryPointEmbedded() = default;
     DbResponse handleRequest(OperationContext* opCtx, const Message& request) override;
+
+    void startSession(transport::SessionHandle session) override;
+    void endAllSessions(transport::Session::TagMask tags) override;
+    bool shutdown(Milliseconds timeout) override;
+    Stats sessionStats() const override;
+    size_t numOpenSessions() const override;
 
 private:
     class Hooks;

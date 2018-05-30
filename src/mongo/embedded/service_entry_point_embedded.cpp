@@ -32,51 +32,8 @@
 
 #include "mongo/embedded/service_entry_point_embedded.h"
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/impersonation_session.h"
-#include "mongo/db/client.h"
-#include "mongo/db/command_can_run_here.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/curop_metrics.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/initialize_operation_session_info.h"
-#include "mongo/db/introspect.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_helpers.h"
-#include "mongo/db/logical_time_validator.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/read_concern.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_entry_point_common.h"
-#include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/message.h"
-#include "mongo/rpc/metadata.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
-#include "mongo/rpc/metadata/logical_time_metadata.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
-#include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/embedded/not_implemented.h"
 
 namespace mongo {
 
@@ -104,6 +61,24 @@ public:
 
 DbResponse ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx, const Message& m) {
     return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
+}
+
+void ServiceEntryPointEmbedded::startSession(transport::SessionHandle session) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+void ServiceEntryPointEmbedded::endAllSessions(transport::Session::TagMask tags) {}
+
+bool ServiceEntryPointEmbedded::shutdown(Milliseconds timeout) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+ServiceEntryPoint::Stats ServiceEntryPointEmbedded::sessionStats() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
+size_t ServiceEntryPointEmbedded::numOpenSessions() const {
+    UASSERT_NOT_IMPLEMENTED;
 }
 
 }  // namespace mongo
