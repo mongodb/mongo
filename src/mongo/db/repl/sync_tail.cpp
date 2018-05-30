@@ -1245,11 +1245,13 @@ Status multiSyncApply(OperationContext* opCtx,
 
     ApplierHelpers::stableSortByNamespace(ops);
 
-    // This function is only called in steady state replication and recovering.
     // Assume we are recovering if oplog writes are disabled in the options.
+    // Assume we are in initial sync if we have a host for fetching missing documents.
     const auto oplogApplicationMode = st->getOptions().skipWritesToOplog
         ? OplogApplication::Mode::kRecovering
-        : OplogApplication::Mode::kSecondary;
+        : (st->getOptions().missingDocumentSourceForInitialSync
+               ? OplogApplication::Mode::kInitialSync
+               : OplogApplication::Mode::kSecondary);
 
     ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
 
@@ -1273,6 +1275,17 @@ Status multiSyncApply(OperationContext* opCtx,
                 const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
 
                 if (!status.isOK()) {
+                    // In initial sync, update operations can cause documents to be missed during
+                    // collection cloning. As a result, it is possible that a document that we
+                    // need to update is not present locally. In that case we fetch the document
+                    // from the sync source.
+                    if (status == ErrorCodes::UpdateOperationFailed &&
+                        st->getOptions().missingDocumentSourceForInitialSync) {
+                        // We might need to fetch the missing docs from the sync source.
+                        st->fetchAndInsertMissingDocument(opCtx, entry);
+                        continue;
+                    }
+
                     severe() << "Error applying operation (" << redact(entry.toBSON())
                              << "): " << causedBy(redact(status));
                     return status;
@@ -1307,71 +1320,11 @@ Status multiInitialSyncApply(OperationContext* opCtx,
                              SyncTail* st,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     invariant(st);
+    invariant(!st->getOptions().skipWritesToOplog);
+    invariant(st->getOptions().allowNamespaceNotFoundErrorsOnCrudOps);
+    invariant(st->getOptions().missingDocumentSourceForInitialSync);
 
-    UnreplicatedWritesBlock uwb(opCtx);
-    DisableDocumentValidation validationDisabler(opCtx);
-    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
-
-    ApplierHelpers::stableSortByNamespace(ops);
-
-    const auto oplogApplicationMode = OplogApplication::Mode::kInitialSync;
-
-    ApplierHelpers::InsertGroup insertGroup(ops, opCtx, oplogApplicationMode);
-
-    {  // Ensure that the MultikeyPathTracker stops tracking paths.
-        ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
-        MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
-
-        for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
-            const auto& entry = **it;
-
-            // If we are successful in grouping and applying inserts, advance the current iterator
-            // past the end of the inserted group of entries.
-            auto groupResult = insertGroup.groupAndApplyInserts(it);
-            if (groupResult.isOK()) {
-                it = groupResult.getValue();
-                continue;
-            }
-
-            // If we didn't create a group, try to apply the op individually.
-            try {
-                const Status status = SyncTail::syncApply(opCtx, entry.raw, oplogApplicationMode);
-                if (!status.isOK()) {
-                    // In initial sync, update operations can cause documents to be missed during
-                    // collection cloning. As a result, it is possible that a document that we
-                    // need to update is not present locally. In that case we fetch the document
-                    // from the sync source.
-                    if (status != ErrorCodes::UpdateOperationFailed) {
-                        error() << "Error applying operation: " << redact(status) << " ("
-                                << redact(entry.toBSON()) << ")";
-                        return status;
-                    }
-
-                    // We might need to fetch the missing docs from the sync source.
-                    st->fetchAndInsertMissingDocument(opCtx, entry);
-                }
-            } catch (const DBException& e) {
-                // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
-                // dropped before initial sync ends anyways and we should ignore it.
-                if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType()) {
-                    continue;
-                }
-
-                severe() << "writer worker caught exception: " << causedBy(redact(e))
-                         << " on: " << redact(entry.toBSON());
-                return e.toStatus();
-            }
-        }
-    }
-
-    invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
-    invariant(workerMultikeyPathInfo->empty());
-    auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
-    if (!newPaths.empty()) {
-        workerMultikeyPathInfo->swap(newPaths);
-    }
-
-    return Status::OK();
+    return multiSyncApply(opCtx, ops, st, workerMultikeyPathInfo);
 }
 
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {

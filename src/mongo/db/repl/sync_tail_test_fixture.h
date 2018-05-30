@@ -98,6 +98,12 @@ public:
 };
 
 class SyncTailTest : public ServiceContextMongoDTest {
+public:
+    /**
+     * Creates OplogApplier::Options for initial sync.
+     */
+    static OplogApplier::Options makeInitialSyncOptions();
+
 protected:
     void _testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
                                      const BSONObj& op,

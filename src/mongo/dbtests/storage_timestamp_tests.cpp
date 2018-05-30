@@ -1436,11 +1436,15 @@ public:
 
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
+        repl::OplogApplier::Options options;
+        options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+        options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
         repl::SyncTail syncTail(nullptr,
                                 _consistencyMarkers,
                                 storageInterface,
                                 repl::multiInitialSyncApply,
-                                writerPool.get());
+                                writerPool.get(),
+                                options);
         auto lastTime = unittest::assertGet(syncTail.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 

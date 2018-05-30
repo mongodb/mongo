@@ -128,7 +128,12 @@ public:
 };
 
 SyncTailWithLocalDocumentFetcher::SyncTailWithLocalDocumentFetcher(const BSONObj& document)
-    : SyncTail(this, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr),
+    : SyncTail(this,     // observer
+               nullptr,  // consistency markers
+               nullptr,  // storage interface
+               SyncTail::MultiSyncApplyFunc(),
+               nullptr,  // writer pool
+               SyncTailTest::makeInitialSyncOptions()),
       _document(document) {}
 
 BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const OplogEntry&) {
@@ -136,7 +141,12 @@ BSONObj SyncTailWithLocalDocumentFetcher::getMissingDoc(OperationContext*, const
 }
 
 SyncTailWithOperationContextChecker::SyncTailWithOperationContextChecker()
-    : SyncTail(nullptr, nullptr, nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {}
+    : SyncTail(nullptr,  // observer
+               nullptr,  // consistency markers
+               nullptr,  // storage interface
+               SyncTail::MultiSyncApplyFunc(),
+               nullptr,  // writer pool
+               SyncTailTest::makeInitialSyncOptions()) {}
 
 bool SyncTailWithOperationContextChecker::fetchAndInsertMissingDocument(OperationContext* opCtx,
                                                                         const OplogEntry&) {
@@ -633,7 +643,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMake
 
     auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
 
-    SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr);
+    SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr, makeInitialSyncOptions());
     MultiApplier::OperationPtrs ops = {&op};
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
                   multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, nullptr));
