@@ -7,6 +7,7 @@ selector:
   # Exercises an internal detail of mongos<->mongod communication. Not expected to work on mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
   # TODO SERVER-35280: Update change stream tests to handle drops of sharded collections and databases.
+  - jstests/change_streams/metadata_notifications.js
   - jstests/change_streams/whole_cluster.js
   - jstests/change_streams/whole_cluster_metadata_notifications.js
   - jstests/change_streams/whole_cluster_resumability.js

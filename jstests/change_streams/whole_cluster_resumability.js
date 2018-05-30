@@ -4,6 +4,7 @@
 
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
     load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     // Create two databases, with one collection in each.
     const testDBs = [db.getSiblingDB(jsTestName()), db.getSiblingDB(jsTestName() + "_other")];
@@ -55,8 +56,75 @@
     });
     assert.docEq(cst.getOneChange(resumeCursor), thirdInsertChangeDoc);
 
+    // Rename the collection and obtain a resume token from the 'rename' notification. Skip this
+    // test when running on a sharded collection, since these cannot be renamed.
+    if (!FixtureHelpers.isSharded(db1Coll)) {
+        assertDropAndRecreateCollection(db1Coll.getDB(), db1Coll.getName());
+        const renameColl = db1Coll.getDB().getCollection("rename_coll");
+        assertDropCollection(renameColl.getDB(), renameColl.getName());
+
+        resumeCursor = cst.startWatchingChanges({
+            collection: 1,
+            pipeline: [{$changeStream: {allChangesForCluster: true}}],
+            aggregateOptions: {cursor: {batchSize: 0}}
+        });
+        assert.writeOK(db1Coll.renameCollection(renameColl.getName()));
+
+        const renameChanges = cst.assertNextChangesEqual({
+            cursor: resumeCursor,
+            expectedChanges: [
+                {
+                  operationType: "rename",
+                  ns: {db: db1Coll.getDB().getName(), coll: db1Coll.getName()},
+                  to: {db: renameColl.getDB().getName(), coll: renameColl.getName()}
+                },
+            ]
+        });
+        const resumeTokenRename = renameChanges[0]._id;
+
+        // Insert into the renamed collection.
+        assert.writeOK(renameColl.insert({_id: "after rename"}));
+
+        // Resume from the rename notification using 'resumeAfter' and verify that the change stream
+        // returns the next insert.
+        let expectedInsert = {
+            operationType: "insert",
+            ns: {db: renameColl.getDB().getName(), coll: renameColl.getName()},
+            fullDocument: {_id: "after rename"},
+            documentKey: {_id: "after rename"}
+        };
+        resumeCursor = cst.startWatchingChanges({
+            collection: 1,
+            pipeline:
+                [{$changeStream: {resumeAfter: resumeTokenRename, allChangesForCluster: true}}],
+            aggregateOptions: {cursor: {batchSize: 0}}
+        });
+        cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+
+        // Resume from the rename notification using 'startAfter' and verify that the change stream
+        // returns the next insert.
+        expectedInsert = {
+            operationType: "insert",
+            ns: {db: renameColl.getDB().getName(), coll: renameColl.getName()},
+            fullDocument: {_id: "after rename"},
+            documentKey: {_id: "after rename"}
+        };
+        resumeCursor = cst.startWatchingChanges({
+            collection: 1,
+            pipeline:
+                [{$changeStream: {startAfter: resumeTokenRename, allChangesForCluster: true}}],
+            aggregateOptions: {cursor: {batchSize: 0}}
+        });
+        cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
+
+        // Rename back to the original collection for reliability of the collection drops when
+        // dropping the database.
+        assert.writeOK(renameColl.renameCollection(db1Coll.getName()));
+    }
+
     // Dropping a database should generate a 'drop' notification for the collection followed by a
     // 'dropDatabase' notification.
+    resumeCursor = cst.startWatchingAllChangesForCluster();
     assert.commandWorked(testDBs[0].dropDatabase());
     const dropDbChanges = cst.assertNextChangesEqual({
         cursor: resumeCursor,
@@ -65,37 +133,33 @@
             {operationType: "dropDatabase", ns: {db: testDBs[0].getName()}}
         ]
     });
+    const resumeTokenDbDrop = dropDbChanges[1]._id;
 
-    // Recreate the database and verify that the change stream picks up another insert.
-    assert.writeOK(db1Coll.insert({_id: 5}));
+    // Recreate the collection and insert a document.
+    assert.writeOK(db1Coll.insert({_id: "after recreate"}));
 
-    let change = cst.getOneChange(resumeCursor);
-    assert.eq(change.operationType, "insert", tojson(change));
-    assert.eq(change.ns, {db: testDBs[0].getName(), coll: db1Coll.getName()}, tojson(change));
-    assert.eq(change.fullDocument, {_id: 5}, tojson(change));
+    let expectedInsert = {
+        operationType: "insert",
+        ns: {db: testDBs[0].getName(), coll: db1Coll.getName()},
+        fullDocument: {_id: "after recreate"},
+        documentKey: {_id: "after recreate"}
+    };
 
-    // Resume the change stream from the 'drop' entry.
+    // Resume from the database drop using 'resumeAfter', and verify the change stream picks up
+    // the insert.
     resumeCursor = cst.startWatchingChanges({
-        pipeline:
-            [{$changeStream: {resumeAfter: dropDbChanges[0]._id, allChangesForCluster: true}}],
         collection: 1,
-        aggregateOptions: {cursor: {batchSize: 0}},
+        pipeline: [{$changeStream: {resumeAfter: resumeTokenDbDrop, allChangesForCluster: true}}]
     });
-    change = cst.getOneChange(resumeCursor);
-    assert.eq(change.operationType, "dropDatabase", tojson(change));
-    assert.eq(change.ns, {db: testDBs[0].getName()}, tojson(change));
+    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
 
-    // Resume the change stream from the 'dropDatabase' entry.
+    // Resume from the database drop using 'startAfter', and verify the change stream picks up the
+    // insert.
     resumeCursor = cst.startWatchingChanges({
-        pipeline:
-            [{$changeStream: {resumeAfter: dropDbChanges[1]._id, allChangesForCluster: true}}],
         collection: 1,
-        aggregateOptions: {cursor: {batchSize: 0}},
+        pipeline: [{$changeStream: {startAfter: resumeTokenDbDrop, allChangesForCluster: true}}]
     });
-    change = cst.getOneChange(resumeCursor);
-    assert.eq(change.operationType, "insert", tojson(change));
-    assert.eq(change.ns, {db: testDBs[0].getName(), coll: db1Coll.getName()}, tojson(change));
-    assert.eq(change.fullDocument, {_id: 5}, tojson(change));
+    cst.assertNextChangesEqual({cursor: resumeCursor, expectedChanges: expectedInsert});
 
     cst.cleanUp();
 })();

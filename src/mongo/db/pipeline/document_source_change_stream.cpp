@@ -337,8 +337,14 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
         *startFromOut = replCoord->getMyLastAppliedOpTime().getTimestamp();
     }
 
-    if (auto resumeAfter = spec.getResumeAfter()) {
-        ResumeToken token = resumeAfter.get();
+    auto resumeAfter = spec.getResumeAfter();
+    auto startAfter = spec.getStartAfter();
+    if (resumeAfter || startAfter) {
+        uassert(50865,
+                "Do not specify both 'resumeAfter' and 'startAfter' in a $changeStream stage",
+                !startAfter || !resumeAfter);
+
+        ResumeToken token = resumeAfter ? resumeAfter.get() : startAfter.get();
         ResumeTokenData tokenData = token.getData();
 
         // Verify that the requested resume attempt is possible based on the stream type, resume
@@ -356,7 +362,6 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
     }
 
     auto startAtOperationTime = spec.getStartAtOperationTime();
-
 
     if (startAtOperationTime) {
         uassert(40674,

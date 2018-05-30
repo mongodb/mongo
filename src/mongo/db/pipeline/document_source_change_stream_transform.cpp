@@ -386,7 +386,8 @@ Value DocumentSourceChangeStreamTransform::serialize(
     if (pExpCtx->inMongos &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
         changeStreamOptions[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName]
-            .missing()) {
+            .missing() &&
+        changeStreamOptions[DocumentSourceChangeStreamSpec::kStartAfterFieldName].missing()) {
         MutableDocument newChangeStreamOptions(changeStreamOptions);
 
         // Use the current cluster time plus 1 tick since the oplog query will include all

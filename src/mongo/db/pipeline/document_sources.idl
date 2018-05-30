@@ -78,6 +78,14 @@ structs:
               optional: true
               description: An object representing the point at which we should resume reporting
                            changes from.
+          
+          startAfter:
+              cpp_name: startAfter
+              type: resumeToken
+              optional: true
+              description: An object representing the point at which we should start reporting
+                           changes from. This is allowed to be a token from an invalidating command.
+
           startAtOperationTime:
               cpp_name: startAtOperationTime
               type: timestamp
