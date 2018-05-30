@@ -225,21 +225,6 @@
         autocommit: false
     }));
 
-    jsTestLog("Check that group accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        group: {
-            ns: collName,
-            key: {a: 1},
-            $reduce: function(curr, result) {
-                result.total += 1;
-            },
-            initial: {total: 0}
-        },
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0)
-    }));
-
     jsTestLog("Check that insert accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
