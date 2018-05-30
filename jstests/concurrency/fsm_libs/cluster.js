@@ -161,13 +161,14 @@ var Cluster = function(options) {
                "Both 'masterSlave' and 'sharded.enabled' cannot" + "be true");
     }
 
-    function makeReplSetTestConfig(numReplSetNodes) {
+    function makeReplSetTestConfig(numReplSetNodes, firstNodeOnlyVote=true) {
         const REPL_SET_VOTING_LIMIT = 7;
+        var firstNodeNotVoting = firstNodeOnlyVote ? 1 : REPL_SET_VOTING_LIMIT;
         // Workaround for SERVER-26893 to specify when numReplSetNodes > REPL_SET_VOTING_LIMIT.
         var rstConfig = [];
         for (var i = 0; i < numReplSetNodes; i++) {
             rstConfig[i] = {};
-            if (i >= REPL_SET_VOTING_LIMIT) {
+            if (i >= firstNodeNotVoting) {
                 rstConfig[i].rsConfig = {priority: 0, votes: 0};
             }
         }
