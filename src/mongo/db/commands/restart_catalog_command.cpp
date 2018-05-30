@@ -108,7 +108,7 @@ public:
                 opCtx, NamespaceString::kRsOplogNamespace.db());
             invariant(db, "failed to reopen database after early exit from restartCatalog");
 
-            auto oplog = db->getCollection(opCtx, NamespaceString::kRsOplogNamespace.coll());
+            auto oplog = db->getCollection(opCtx, NamespaceString::kRsOplogNamespace);
             invariant(oplog, "failed to get oplog after early exit from restartCatalog");
             repl::establishOplogCollectionForLogging(opCtx, oplog);
         });
