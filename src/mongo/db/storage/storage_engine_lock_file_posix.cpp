@@ -116,7 +116,9 @@ StorageEngineLockFile::StorageEngineLockFile(const std::string& dbpath)
                        boost::filesystem::file_size(_filespec) > 0),
       _lockFileHandle(new LockFileHandle()) {}
 
-StorageEngineLockFile::~StorageEngineLockFile() {}
+StorageEngineLockFile::~StorageEngineLockFile() {
+    close();
+}
 
 std::string StorageEngineLockFile::getFilespec() const {
     return _filespec;
@@ -160,14 +162,7 @@ Status StorageEngineLockFile::open() {
                                     << _dbpath
                                     << " directory");
     }
-#if !defined(__sun)
     int ret = ::flock(lockFile, LOCK_EX | LOCK_NB);
-#else
-    struct flock fileLockInfo = {0};
-    fileLockInfo.l_type = F_WRLCK;
-    fileLockInfo.l_whence = SEEK_SET;
-    int ret = ::fcntl(lockFile, F_SETLK, &fileLockInfo);
-#endif  // !defined(__sun)
     if (ret != 0) {
         int errorcode = errno;
         ::close(lockFile);
@@ -187,6 +182,7 @@ void StorageEngineLockFile::close() {
     if (!_lockFileHandle->isValid()) {
         return;
     }
+    ::flock(_lockFileHandle->_fd, LOCK_UN);
     ::close(_lockFileHandle->_fd);
     _lockFileHandle->clear();
 }
@@ -256,14 +252,7 @@ void StorageEngineLockFile::clearPidAndUnlock() {
         int errorcode = errno;
         log() << "couldn't remove fs lock " << errnoWithDescription(errorcode);
     }
-#if !defined(__sun)
-    ::flock(_lockFileHandle->_fd, LOCK_UN);
-#else
-    struct flock fileLockInfo = {0};
-    fileLockInfo.l_type = F_UNLCK;
-    fileLockInfo.l_whence = SEEK_SET;
-    ::fcntl(_lockFileHandle->_fd, F_SETLK, &fileLockInfo);
-#endif  // !defined(__sun)
+    close();
 }
 
 }  // namespace mongo
