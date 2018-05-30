@@ -11817,15 +11817,12 @@ buildvariants:
   - name: write_concern_majority_passthrough
   - name: secondary_reads_passthrough
 
-- name: enterprise-rhel-62-64-bit-mobile
-  display_name: Enterprise RHEL 6.2 (mobile)
-  modules:
-  - enterprise
+- name: rhel-62-64-bit-mobile
+  display_name: RHEL 6.2 (mobile)
   run_on:
   - rhel62-small
   batchtime: 1440 # 1 day
-  expansions: &enterprise-rhel-62-64-bit-mobile-expansions
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+  expansions: &rhel-62-64-bit-mobile-expansions
     # Transactions are only supported on replica sets, and replication is not supported by the
     # mobile storage engine.
     test_flags: >-
@@ -11835,15 +11832,12 @@ buildvariants:
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --mobile-se=on
-      --ssl
-      --use-basis-tech-rosette-linguistics-platform=on
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include"
       MONGO_DISTMOD=rhel62
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     scons_cache_scope: shared
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
     additional_targets: mongoed
   display_tasks:
@@ -11855,9 +11849,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
-  - name: audit
   - name: auth
-  - name: auth_audit
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
@@ -11881,16 +11873,11 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  - name: rlp
-  - name: sasl
   - name: serial_run
   - name: session_jscore_passthrough
-  - name: snmp
 
 - name: ubuntu1604-arm64-mobile
   display_name: "Ubuntu 16.04 arm64 (mobile)"
-  modules:
-  - enterprise
   run_on:
   - ubuntu1604-arm64-large
   batchtime: 1440 # 1 day
@@ -11902,7 +11889,6 @@ buildvariants:
     compile_flags: >-
         -j$(grep -c ^processor /proc/cpuinfo)
         --mobile-se=on
-        --ssl
         --release
         --variables-files=etc/scons/mongodbtoolchain_gcc.vars
         CCFLAGS="-march=armv8-a+crc -mtune=generic"
@@ -11910,7 +11896,7 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     max_jobs: 8 # Avoid starting too many mongod's on ARM test servers
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
+    tooltags: -gccgoflags "$(pkg-config --libs)"
     build_mongoreplay: true
     additional_targets: mongoed
   display_tasks:
@@ -11920,9 +11906,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
-  - name: audit
   - name: auth
-  - name: auth_audit
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
@@ -11944,23 +11928,20 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  - name: sasl
   - name: serial_run
   - name: session_jscore_passthrough
 
-- name: enterprise-rhel-62-64-bit-required-mobile
-  display_name: "! Enterprise RHEL 6.2 (mobile)"
-  modules:
-  - enterprise
+- name: rhel-62-64-bit-required-mobile
+  display_name: "! RHEL 6.2 (mobile)"
   run_on:
   - rhel62-small
   expansions:
-    <<: *enterprise-rhel-62-64-bit-mobile-expansions
-    burn_in_tests_build_variant: enterprise-rhel-62-64-bit-mobile
+    <<: *rhel-62-64-bit-mobile-expansions
+    burn_in_tests_build_variant: rhel-62-64-bit-mobile
   tasks:
   # This build variant exists specifically to test that newly added or modified JavaScript tests are
   # correctly tagged with "requires_replication" and "requires_sharding" prior to the changes being
-  # pushed. It uses the task list from the enterprise-rhel-62-64-bit-mobile build variant to
+  # pushed. It uses the task list from the rhel-62-64-bit-mobile build variant to
   # determine the resmoke.py YAML suite configurations to run the tests under. Do not add more tasks
   # to this list.
   - name: compile_TG
@@ -11971,10 +11952,8 @@ buildvariants:
   - name: burn_in_tests
   - name: jsCore_mobile
 
-- name: enterprise-osx-1010-mobile
-  display_name: Enterprise macOS 10.10 (mobile)
-  modules:
-  - enterprise
+- name: osx-1010-mobile
+  display_name: macOS 10.10 (mobile)
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -11982,12 +11961,12 @@ buildvariants:
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: osx
-    push_arch: x86_64-enterprise
+    push_arch: x86_64
     # Transactions are only supported on replica sets, and replication is not supported by the
     # mobile storage engine.
     test_flags: >-
       --storageEngine=mobile
-      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions,requires_ssl_mongo_tools
+      --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_replication,requires_sharding,uses_transactions
       --excludeWithAnyTags=SERVER-32709,SERVER-32869,SERVER-32993,SERVER-32997
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: >-
@@ -11995,13 +11974,11 @@ buildvariants:
       --libc++
       --mobile-se=on
       --release
-      --ssl
       CCFLAGS="-mmacosx-version-min=10.10"
       CPPPATH=/opt/mongodbtoolchain/v2/include
       LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
-    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
     additional_targets: mongoed
   display_tasks:
@@ -12011,9 +11988,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
-  - name: audit
   - name: auth
-  - name: auth_audit
   - name: dbtest
   # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
   # - name: concurrency
@@ -12035,7 +12010,6 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  - name: sasl
   - name: serial_run
   - name: session_jscore_passthrough
 
