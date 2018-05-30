@@ -788,7 +788,8 @@ functions:
         set -o verbose
 
         if [ "${scons_cache_scope}" = "shared" ]; then
-            sudo umount /efs || umount /efs || true
+            ${set_sudo}
+            $sudo umount /efs || true
         fi
 
   "build cdriver" :
@@ -1217,7 +1218,8 @@ functions:
               echo "Shared cache is already mounted"
             else
               echo "Shared cache - mounting file system"
-              sudo mount /efs || mount /efs
+              ${set_sudo}
+              $sudo mount /efs
             fi
             set -o errexit
           fi
