@@ -469,4 +469,5 @@ def _tags_from_list(tags_list):
     if tags_list is not None:
         for tag in tags_list:
             tags.extend([t for t in tag.split(",") if t != ""])
-    return tags
+        return tags
+    return None
