@@ -269,7 +269,7 @@ def main():  # pylint: disable=too-many-locals,too-many-statements
                 extract_files = [
                     executable_name("dbtest"),
                     executable_name("mongobridge"),
-                    executable_name("mongoe"),
+                    executable_name("mongoed"),
                     "build/integration_tests.txt",
                 ]
                 with tarfile.open(filename, "r:gz") as tar:
