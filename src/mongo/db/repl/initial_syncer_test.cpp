@@ -3598,8 +3598,8 @@ TEST_F(
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
-    // Override DataReplicatorExternalState::_multiInitialSyncApply() so that it will also fetch a
-    // missing document.
+    // Override DataReplicatorExternalState::_multiApply() so that it will also fetch a missing
+    // document.
     // This forces InitialSyncer to evaluate its end timestamp for applying operations after each
     // batch.
     bool fetchCountIncremented = false;

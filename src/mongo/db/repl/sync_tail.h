@@ -288,19 +288,14 @@ private:
     bool _inShutdown = false;
 };
 
-// These free functions are used by the thread pool workers to write ops to the db.
-// They consume the passed in OperationPtrs and callers should not make any assumptions about the
-// state of the container after calling. However, these functions cannot modify the pointed-to
+// This free function is used by the thread pool workers to write ops to the db.
+// This consumes the passed in OperationPtrs and callers should not make any assumptions about the
+// state of the container after calling. However, this function cannot modify the pointed-to
 // operations because the OperationPtrs container contains const pointers.
 Status multiSyncApply(OperationContext* opCtx,
                       MultiApplier::OperationPtrs* ops,
                       SyncTail* st,
                       WorkerMultikeyPathInfo* workerMultikeyPathInfo);
-
-Status multiInitialSyncApply(OperationContext* opCtx,
-                             MultiApplier::OperationPtrs* ops,
-                             SyncTail* st,
-                             WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 }  // namespace repl
 }  // namespace mongo

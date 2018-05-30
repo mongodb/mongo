@@ -637,18 +637,6 @@ TEST_F(SyncTailTest, MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
                   multiSyncApply(_opCtx.get(), &ops, &syncTail, nullptr));
 }
 
-TEST_F(SyncTailTest, MultiInitialSyncApplyFailsWhenCollectionCreationTriesToMakeUUID) {
-    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_STARTUP2));
-    NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());
-
-    auto op = makeCreateCollectionOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss);
-
-    SyncTail syncTail(nullptr, nullptr, nullptr, {}, nullptr, makeInitialSyncOptions());
-    MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
-                  multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, nullptr));
-}
-
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
     bool onInsertsCalled = false;
@@ -1004,19 +992,7 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
     ASSERT_EQUALS(1U, numFailedGroupedInserts);
 }
 
-TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
-    SyncTailWithOperationContextChecker syncTail;
-    NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, {});
-    auto op = makeUpdateDocumentOplogEntry(
-        {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
-    MultiApplier::OperationPtrs ops = {&op};
-    WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
-    ASSERT(syncTail.called);
-}
-
-TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
+TEST_F(SyncTailTest, MultiSyncApplyIgnoresUpdateOperationIfDocumentIsMissingFromSyncSource) {
     BSONObj emptyDoc;
     SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
     NamespaceString nss("test.t");
@@ -1032,7 +1008,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
@@ -1042,7 +1018,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyIgnoresUpdateOperationIfDocumentIsMiss
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 }
 
-TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
+TEST_F(SyncTailTest, MultiSyncApplySkipsDocumentOnNamespaceNotFoundDuringInitialSync) {
     BSONObj emptyDoc;
     SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
@@ -1056,7 +1032,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
@@ -1066,7 +1042,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
-TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound) {
+TEST_F(SyncTailTest, MultiSyncApplySkipsIndexCreationOnNamespaceNotFoundDuringInitialSync) {
     BSONObj emptyDoc;
     SyncTailWithLocalDocumentFetcher syncTail(emptyDoc);
     NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
@@ -1082,7 +1058,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
     AtomicUInt32 fetchCount(0);
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
     ASSERT_EQUALS(syncTail.numFetched, 0U);
 
     OplogInterfaceLocal collectionReader(_opCtx.get(), nss.ns());
@@ -1095,8 +1071,7 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsIndexCreationOnNamespaceNotFound)
     ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), badNss).getCollection());
 }
 
-TEST_F(SyncTailTest,
-       MultiInitialSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFromSyncSource) {
+TEST_F(SyncTailTest, MultiSyncApplyFetchesMissingDocumentIfDocumentIsAvailableFromSyncSource) {
     SyncTailWithLocalDocumentFetcher syncTail(BSON("_id" << 0 << "x" << 1));
     NamespaceString nss("test.t");
     createCollection(_opCtx.get(), nss, {});
@@ -1105,7 +1080,7 @@ TEST_F(SyncTailTest,
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
     MultiApplier::OperationPtrs ops = {&op};
     WorkerMultikeyPathInfo pathInfo;
-    ASSERT_OK(multiInitialSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
+    ASSERT_OK(multiSyncApply(_opCtx.get(), &ops, &syncTail, &pathInfo));
     ASSERT_EQUALS(syncTail.numFetched, 1U);
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold

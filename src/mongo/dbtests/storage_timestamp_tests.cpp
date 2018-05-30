@@ -53,6 +53,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -107,6 +108,14 @@ BSONCollectionCatalogEntry::IndexMetaData getIndexMetaData(
     invariant(idxOffset > -1);
     return collMetaData.indexes[idxOffset];
 }
+
+class DoNothingOplogApplierObserver : public repl::OplogApplier::Observer {
+public:
+    void onBatchBegin(const repl::OplogApplier::Operations&) final {}
+    void onBatchEnd(const StatusWith<repl::OpTime>&, const repl::OplogApplier::Operations&) final {}
+    void onMissingDocumentsFetchedAndInserted(const std::vector<FetchInfo>&) final {}
+    void onOperationConsumed(const BSONObj&) final {}
+};
 
 class StorageTimestampTest {
 public:
@@ -1329,11 +1338,18 @@ public:
                       << doc2));
         std::vector<repl::OplogEntry> ops = {op0, op1, op2};
 
+        DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
-        repl::SyncTail syncTail(
-            nullptr, _consistencyMarkers, storageInterface, repl::multiSyncApply, writerPool.get());
-        ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(syncTail.multiApply(_opCtx, ops)));
+        repl::OplogApplier oplogApplier(nullptr,
+                                        nullptr,
+                                        &observer,
+                                        nullptr,
+                                        _consistencyMarkers,
+                                        storageInterface,
+                                        {},
+                                        writerPool.get());
+        ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
         assertMultikeyPaths(
@@ -1434,18 +1450,21 @@ public:
         // after bulk index builds.
         std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
 
+        DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::SyncTail::makeWriterPool();
         repl::OplogApplier::Options options;
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
         options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
-        repl::SyncTail syncTail(nullptr,
-                                _consistencyMarkers,
-                                storageInterface,
-                                repl::multiInitialSyncApply,
-                                writerPool.get(),
-                                options);
-        auto lastTime = unittest::assertGet(syncTail.multiApply(_opCtx, ops));
+        repl::OplogApplier oplogApplier(nullptr,
+                                        nullptr,
+                                        &observer,
+                                        nullptr,
+                                        _consistencyMarkers,
+                                        storageInterface,
+                                        options,
+                                        writerPool.get());
+        auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);

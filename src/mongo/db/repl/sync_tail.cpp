@@ -1315,18 +1315,6 @@ Status multiSyncApply(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status multiInitialSyncApply(OperationContext* opCtx,
-                             MultiApplier::OperationPtrs* ops,
-                             SyncTail* st,
-                             WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    invariant(st);
-    invariant(!st->getOptions().skipWritesToOplog);
-    invariant(st->getOptions().allowNamespaceNotFoundErrorsOnCrudOps);
-    invariant(st->getOptions().missingDocumentSourceForInitialSync);
-
-    return multiSyncApply(opCtx, ops, st, workerMultikeyPathInfo);
-}
-
 StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     invariant(!ops.empty());
 

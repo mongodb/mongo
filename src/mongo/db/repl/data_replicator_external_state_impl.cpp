@@ -172,13 +172,15 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(OperationContext
     OplogApplier::Options options;
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.missingDocumentSourceForInitialSync = source;
-    SyncTail syncTail(observer,
-                      consistencyMarkers,
-                      storageInterface,
-                      repl::multiInitialSyncApply,
-                      writerPool,
-                      options);
-    return syncTail.multiApply(opCtx, std::move(ops));
+    OplogApplier oplogApplier(getTaskExecutor(),
+                              nullptr,  // oplog buffer
+                              observer,
+                              _replicationCoordinator,
+                              consistencyMarkers,
+                              storageInterface,
+                              options,
+                              writerPool);
+    return oplogApplier.multiApply(opCtx, std::move(ops));
 }
 
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {

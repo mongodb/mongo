@@ -229,7 +229,7 @@ Status SyncTailTest::runOpsInitialSync(std::vector<OplogEntry> ops) {
         MultiApplier::OperationPtrs opsPtrs;
         opsPtrs.push_back(&op);
         WorkerMultikeyPathInfo pathInfo;
-        auto status = multiInitialSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
+        auto status = multiSyncApply(_opCtx.get(), &opsPtrs, &syncTail, &pathInfo);
         if (!status.isOK()) {
             return status;
         }

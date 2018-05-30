@@ -436,7 +436,7 @@ private:
     /**
      * Callback for third '_lastOplogEntryFetcher' callback. This is scheduled after MultiApplier
      * completed successfully and missing documents were fetched from the sync source while
-     * DataReplicatorExternalState::_multiInitialSyncApply() was processing operations.
+     * DataReplicatorExternalState::_multiApply() was processing operations.
      * This callback will update InitialSyncState::stopTimestamp on success.
      */
     void _lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments(

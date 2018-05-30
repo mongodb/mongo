@@ -132,8 +132,7 @@ private:
                                            const HostAndPort& source,
                                            ThreadPool* writerPool) = 0;
 
-    // Provides InitialSyncer with access to _multiApply, _multiSyncApply and
-    // _multiInitialSyncApply.
+    // Provides InitialSyncer with access to multiApply and multiSyncApply.
     friend class InitialSyncer;
 };
 
