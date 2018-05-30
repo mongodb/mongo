@@ -60,7 +60,8 @@
 namespace mongo {
 namespace unittest {
 
-DeathTestImpl::DeathTestImpl(std::unique_ptr<Test> test) : _test(std::move(test)) {}
+DeathTestImpl::DeathTestImpl(stdx::function<std::unique_ptr<Test>()> makeTest)
+    : _makeTest(std::move(makeTest)) {}
 
 void DeathTestImpl::_doTest() {
 #if defined(_WIN32)
@@ -121,7 +122,8 @@ void DeathTestImpl::_doTest() {
     checkSyscall(setrlimit(RLIMIT_CORE, &kNoCoreDump));
 
     try {
-        _test->run();
+        auto test = _makeTest();
+        test->run();
     } catch (const TestAssertionFailureException& tafe) {
         log() << "Caught test exception while expecting death: " << tafe;
         // To fail the test, we must exit with a successful error code, because the parent process
