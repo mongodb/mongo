@@ -82,7 +82,7 @@ public:
 
         virtual Status doneInserting(std::set<RecordId>* dupsOut = NULL) = 0;
 
-        virtual void commit() = 0;
+        virtual void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) = 0;
 
         virtual void abortWithoutCleanup() = 0;
 
@@ -235,10 +235,12 @@ public:
      * Should be called inside of a WriteUnitOfWork. If the index building is to be logOp'd,
      * logOp() should be called from the same unit of work as commit().
      *
+     * `onCreateFn` will be called on each index before writes that mark the index as "ready".
+     *
      * Requires holding an exclusive database lock.
      */
-    inline void commit() {
-        return this->_impl().commit();
+    inline void commit(stdx::function<void(const BSONObj& spec)> onCreateFn = nullptr) {
+        return this->_impl().commit(onCreateFn);
     }
 
     /**

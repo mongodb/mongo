@@ -166,7 +166,7 @@ public:
      *
      * Requires holding an exclusive database lock.
      */
-    void commit() override;
+    void commit(stdx::function<void(const BSONObj& spec)> onCreateFn) override;
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses

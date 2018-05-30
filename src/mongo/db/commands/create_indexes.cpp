@@ -387,12 +387,10 @@ public:
         writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
 
-            indexer.commit();
-
-            for (auto&& infoObj : indexInfoObjs) {
-                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    opCtx, ns, collection->uuid(), infoObj, false);
-            }
+            indexer.commit([opCtx, &ns, collection](const BSONObj& spec) {
+                opCtx->getServiceContext()->getOpObserver()->onCreateIndex(
+                    opCtx, ns, collection->uuid(), spec, false);
+            });
 
             wunit.commit();
         });

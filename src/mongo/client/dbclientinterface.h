@@ -637,7 +637,13 @@ public:
      *  @param descriptor Configuration object describing the index to create. The
      *  descriptor must describe at least one key and index type.
      */
-    virtual void createIndex(StringData ns, const IndexSpec& descriptor);
+    virtual void createIndex(StringData ns, const IndexSpec& descriptor) {
+        std::vector<const IndexSpec*> toBuild;
+        toBuild.push_back(&descriptor);
+        createIndexes(ns, toBuild);
+    }
+
+    virtual void createIndexes(StringData ns, const std::vector<const IndexSpec*>& descriptor);
 
     virtual std::list<BSONObj> getIndexSpecs(const std::string& ns, int options = 0);
 
