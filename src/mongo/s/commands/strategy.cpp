@@ -550,7 +550,8 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
         {
             // Block scope ccPin so that it releases our checked out cursor
             // prior to the killCursor invocation below.
-            auto ccPin = manager->checkOutCursor(*nss, cursorId, opCtx);
+            auto ccPin = manager->checkOutCursor(
+                *nss, cursorId, opCtx, ClusterCursorManager::kNoCheckSession);
             if (!ccPin.isOK()) {
                 LOG(3) << "Unable to check out cursor for killCursor.  Namespace: '" << *nss
                        << "', cursor id: " << cursorId << ".";
