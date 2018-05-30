@@ -126,6 +126,8 @@ mongoe = yamlEnv.Program(
     ],
 )
 
+env.Alias('all', mongoe) # This ensures it compiles and links, but doesn't copy it anywhere.
+
 hygienic = get_option('install-mode') == 'hygienic'
 
 if not hygienic:
