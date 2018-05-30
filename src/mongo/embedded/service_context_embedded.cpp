@@ -54,7 +54,7 @@ namespace mongo {
 namespace {
 ServiceContextRegistrar serviceContextCreator([]() {
     auto service = std::make_unique<ServiceContextMongoEmbedded>();
-    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>(service.get()));
+    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());
     service->setTickSource(std::make_unique<SystemTickSource>());
     service->setFastClockSource(std::make_unique<SystemClockSource>());
     service->setPreciseClockSource(std::make_unique<SystemClockSource>());

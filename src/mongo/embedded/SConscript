@@ -54,7 +54,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/mongo/util/version_impl',
     ]
@@ -117,6 +116,7 @@ mongoed = yamlEnv.Program(
         '$BUILD_DIR/mongo/db/mongod_options',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/repl/repl_set_status_commands',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
         '$BUILD_DIR/mongo/util/signal_handlers',
         'embedded',

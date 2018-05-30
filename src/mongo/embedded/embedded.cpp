@@ -212,9 +212,6 @@ ServiceContext* initialize(const char* yaml_config) {
 
     createLockFile(serviceContext);
 
-    serviceContext->setServiceEntryPoint(
-        std::make_unique<ServiceEntryPointEmbedded>(serviceContext));
-
     initializeStorageEngine(serviceContext);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
