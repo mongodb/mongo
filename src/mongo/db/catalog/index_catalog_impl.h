@@ -305,8 +305,12 @@ public:
             return _entry;
         }
 
-        const std::string& getIndexName() {
+        const std::string& getIndexName() const {
             return _indexName;
+        }
+
+        const BSONObj& getSpec() const {
+            return _spec;
         }
 
     private:

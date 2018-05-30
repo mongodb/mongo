@@ -1383,14 +1383,14 @@ string DBClientBase::genIndexName(const BSONObj& keys) {
     return ss.str();
 }
 
-void DBClientBase::createIndex(StringData ns, const IndexSpec& descriptor) {
-    const BSONObj descriptorObj = descriptor.toBSON();
-
+void DBClientBase::createIndexes(StringData ns, const std::vector<const IndexSpec*>& descriptors) {
     BSONObjBuilder command;
     command.append("createIndexes", nsToCollectionSubstring(ns));
     {
         BSONArrayBuilder indexes(command.subarrayStart("indexes"));
-        indexes.append(descriptorObj);
+        for (const auto& desc : descriptors) {
+            indexes.append(desc->toBSON());
+        }
     }
     const BSONObj commandObj = command.done();
 
