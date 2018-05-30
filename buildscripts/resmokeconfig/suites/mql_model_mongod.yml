@@ -1,0 +1,25 @@
+test_kind: mql_model_mongod_test
+
+selector:
+  roots:
+  - mql-model/test/**/*.json
+  exclude_files:
+  - mql-model/test/find/*.json
+  - mql-model/test/data/*.json
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      readMode: commands
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
