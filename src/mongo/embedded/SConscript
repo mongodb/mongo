@@ -107,10 +107,10 @@ capiTest = yamlEnv.Program(
 
 env.RegisterUnitTest(capiTest[0])
 
-mongoe = yamlEnv.Program(
-    target='mongoe',
+mongoed = yamlEnv.Program(
+    target='mongoed',
     source=[
-        'mongoe_main.cpp',
+        'mongoed_main.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/shell_protocol',
@@ -126,12 +126,12 @@ mongoe = yamlEnv.Program(
     ],
 )
 
-env.Alias('all', mongoe) # This ensures it compiles and links, but doesn't copy it anywhere.
+env.Alias('all', mongoed) # This ensures it compiles and links, but doesn't copy it anywhere.
 
 hygienic = get_option('install-mode') == 'hygienic'
 
 if not hygienic:
-    env.Install('#/', mongoe)
+    env.Install('#/', mongoed)
 
 if not env['MONGO_HAVE_LIBMONGOC']:
     Return()

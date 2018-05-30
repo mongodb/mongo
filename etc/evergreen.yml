@@ -2944,7 +2944,7 @@ tasks:
           - "./test*"
           - "./dbtest*"
           - "./mongobridge*"
-          - "./mongoe*"
+          - "./mongoed*"
           - "buildscripts/**"
           - "*Example"
           - "*Test"
@@ -4123,7 +4123,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --mongod=./mongoe --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,SERVER-32997
+      resmoke_args: --suites=core --mongod=./mongoed --excludeWithAnyTags=requires_scripting,requires_auth,requires_sharding,does_not_support_stepdowns,requires_eval_command,requires_background_index,incompatible_with_embedded,incompatible_with_embedded_todo_investigate,requires_replication,SERVER-32997
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -11602,7 +11602,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: true
-    additional_targets: mongoe
+    additional_targets: mongoed
   display_tasks:
   - *unittests
   tasks:
@@ -11669,7 +11669,7 @@ buildvariants:
     gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
     build_mongoreplay: true
-    additional_targets: mongoe
+    additional_targets: mongoed
   display_tasks:
   - *unittests
   tasks:
@@ -11760,7 +11760,7 @@ buildvariants:
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     build_mongoreplay: true
-    additional_targets: mongoe
+    additional_targets: mongoed
   display_tasks:
   - *unittests
   tasks:
