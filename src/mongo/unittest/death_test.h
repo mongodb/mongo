@@ -92,12 +92,12 @@ class DeathTestImpl : public Test {
     MONGO_DISALLOW_COPYING(DeathTestImpl);
 
 protected:
-    DeathTestImpl(std::unique_ptr<Test> test);
+    explicit DeathTestImpl(stdx::function<std::unique_ptr<Test>()> makeTest);
 
 private:
-    void _doTest() override;
+    void _doTest() final;
     virtual std::string getPattern() = 0;
-    std::unique_ptr<Test> _test;
+    const stdx::function<std::unique_ptr<Test>()> _makeTest;
 };
 
 template <typename T>
@@ -106,7 +106,8 @@ public:
     static const std::string pattern;
 
     template <typename... Args>
-    DeathTest(Args&&... args) : DeathTestImpl(stdx::make_unique<T>(std::forward<Args>(args)...)) {}
+    DeathTest(Args&&... args)
+        : DeathTestImpl([args...]() { return stdx::make_unique<T>(args...); }) {}
 
 private:
     std::string getPattern() override {
