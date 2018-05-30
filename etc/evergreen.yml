@@ -3302,7 +3302,7 @@ tasks:
         content_type: ${content_type|application/x-gzip}
         display_name: Source tarball
         # We only need to upload the source tarball from one of the build variants
-        # because it should be the same everywhere, so just use linux-64/windows-64-2k8.
+        # because it should be the same everywhere, so just use linux-64/windows-64-2k8-ssl.
         build_variants: [ linux-64, windows-64-2k8-ssl ]
     # For patch builds that bypass compile, we upload links to pre-existing tarballs, except for the
     # artifacts.tgz.
@@ -8299,13 +8299,9 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
     exe: ".exe"
-    push_path: win32
-    push_bucket: downloads.mongodb.org
-    push_name: win32-debug
-    push_arch: x86_64-2008plus
     content_type: application/zip
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
+    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2012plus
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -8766,10 +8762,6 @@ buildvariants:
   expansions:
     platform_decompress: unzip
     exe: ".exe"
-    push_path: win32
-    push_bucket: downloads.10gen.com
-    push_name: win32
-    push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
@@ -8802,10 +8794,6 @@ buildvariants:
   expansions:
     platform_decompress: unzip
     exe: ".exe"
-    push_path: win32
-    push_bucket: downloads.10gen.com
-    push_name: win32
-    push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
@@ -8865,7 +8853,7 @@ buildvariants:
   - name: sslSpecial
 
 - name: windows-64-2k8-ssl
-  display_name: SSL Windows 2008R2
+  display_name: Windows 2008R2
   run_on:
   - windows-64-vs2015-small
   batchtime: 1440 # 1 day
@@ -8876,11 +8864,11 @@ buildvariants:
     push_path: win32
     push_bucket: downloads.mongodb.org
     push_name: win32
-    push_arch: x86_64-2008plus-ssl
+    push_arch: x86_64-2012plus
     multiversion_platform: windows_x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -8995,7 +8983,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2008plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2012plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
     # spawning a large number of linker processes.
     num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
@@ -9020,8 +9008,8 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-- name: osx-1010-ssl
-  display_name: SSL OS X 10.10
+- name: osx-1010
+  display_name: macOS 10.10
   run_on:
   - macos-1012
   batchtime: 1440 # 1 day
@@ -9029,11 +9017,11 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1,requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.mongodb.org
-    push_name: osx-ssl
+    push_name: macos
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
-    multiversion_platform: osx-ssl
+    multiversion_platform: macos
     num_jobs_available: 1
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl openssl_pre_1.0'"
@@ -9133,15 +9121,11 @@ buildvariants:
     - rhel70-small
 
 - name: osx-1010-debug
-  display_name: "* OS X 10.10 DEBUG"
+  display_name: "* macOS 10.10 DEBUG"
   run_on:
   - macos-1012
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1
-    push_path: osx
-    push_bucket: downloads.mongodb.org
-    push_name: osx-debug
-    push_arch: x86_64
     num_jobs_available: 1
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
@@ -9167,7 +9151,7 @@ buildvariants:
   - name: tool
 
 - name: enterprise-osx-1010
-  display_name: Enterprise OS X 10.10
+  display_name: Enterprise macOS 10.10
   modules:
   - enterprise
   run_on:
@@ -9177,7 +9161,7 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1,requires_ssl_mongo_tools
     push_path: osx
     push_bucket: downloads.10gen.com
-    push_name: osx
+    push_name: macos
     push_arch: x86_64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
@@ -9215,7 +9199,7 @@ buildvariants:
     - rhel70-small
 
 - name: enterprise-osx-1010-openssl
-  display_name: ~ Enterprise OS X 10.10 OpenSSL
+  display_name: ~ Enterprise macOS 10.10 OpenSSL
   modules:
   - enterprise
   run_on:
@@ -11989,7 +11973,7 @@ buildvariants:
   - name: jsCore_mobile
 
 - name: enterprise-osx-1010-mobile
-  display_name: Enterprise OS X 10.10 (mobile)
+  display_name: Enterprise macOS 10.10 (mobile)
   modules:
   - enterprise
   run_on:
@@ -13080,7 +13064,7 @@ buildvariants:
   - name: update_fuzzer_replication
 
 - name: enterprise-osx-1010-mmapv1
-  display_name: Enterprise OS X 10.10 MMAPv1
+  display_name: Enterprise macOS 10.10 MMAPv1
   modules:
   - enterprise
   run_on:
