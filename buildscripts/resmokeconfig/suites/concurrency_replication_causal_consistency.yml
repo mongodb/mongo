@@ -12,12 +12,6 @@ selector:
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
   # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-  # TODO: SERVER-35057
-  - jstests/concurrency/fsm_workloads/auth_create_role.js
-  - jstests/concurrency/fsm_workloads/auth_create_user.js
-  - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
-  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
-  - jstests/concurrency/fsm_workloads/yield*.js
   # TODO: SERVER-35130
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
   # Background index build is not causally consistent because the optime

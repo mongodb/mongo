@@ -1128,6 +1128,9 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     // advanced to avoid races.
     _externalState->updateLocalSnapshot(opTime);
 
+    // Notify the oplog waiters after updating the local snapshot.
+    signalOplogWaiters();
+
     // Add the new applied optime to the list of stable optime candidates and then set the last
     // stable optime. Stable optimes are used to determine the last optime that it is safe to revert
     // the database to, in the event of a rollback via the 'recover to timestamp' method. If we are
