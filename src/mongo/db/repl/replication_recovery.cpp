@@ -367,7 +367,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
                               writerPool.get());
 
     OplogApplier::BatchLimits batchLimits;
-    batchLimits.bytes = SyncTail::calculateBatchLimitBytes(opCtx, _storageInterface);
+    batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(opCtx, _storageInterface);
     batchLimits.ops = OplogApplier::getBatchLimitOperations();
 
     OpTime applyThroughOpTime;

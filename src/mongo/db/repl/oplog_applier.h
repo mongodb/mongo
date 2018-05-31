@@ -108,6 +108,14 @@ public:
     static std::size_t getBatchLimitOperations();
 
     /**
+     * Calculates batch limit size (in bytes) using the maximum capped collection size of the oplog
+     * size.
+     * Batches are limited to 10% of the oplog.
+     */
+    static std::size_t calculateBatchLimitBytes(OperationContext* opCtx,
+                                                StorageInterface* storageInterface);
+
+    /**
      * Constructs this OplogApplier with specific options.
      * Obtains batches of operations from the OplogBuffer to apply.
      * Reports oplog application progress using the Observer.

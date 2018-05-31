@@ -33,6 +33,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -94,6 +95,15 @@ std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
 // static
 std::size_t OplogApplier::getBatchLimitOperations() {
     return std::size_t(replBatchLimitOperations.load());
+}
+
+// static
+std::size_t OplogApplier::calculateBatchLimitBytes(OperationContext* opCtx,
+                                                   StorageInterface* storageInterface) {
+    auto oplogMaxSizeResult =
+        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
+    auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
+    return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
 }
 
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,

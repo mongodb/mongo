@@ -229,14 +229,6 @@ NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op)
 
 }  // namespace
 
-std::size_t SyncTail::calculateBatchLimitBytes(OperationContext* opCtx,
-                                               StorageInterface* storageInterface) {
-    auto oplogMaxSizeResult =
-        storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
-    auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
-    return std::min(oplogMaxSize / 10, std::size_t(OplogApplier::replBatchLimitBytes));
-}
-
 // static
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
@@ -717,8 +709,8 @@ private:
         Client::initThread("ReplBatcher");
 
         BatchLimits batchLimits;
-        batchLimits.bytes =
-            calculateBatchLimitBytes(cc().makeOperationContext().get(), _storageInterface);
+        batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(
+            cc().makeOperationContext().get(), _storageInterface);
 
         while (true) {
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
