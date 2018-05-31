@@ -28,58 +28,84 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/service_liason_mongos.h"
+#include "mongo/db/service_liaison_mongod.h"
 
+#include "mongo/db/client.h"
+#include "mongo/db/cursor_manager.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 
-LogicalSessionIdSet ServiceLiasonMongos::getActiveOpSessions() const {
+LogicalSessionIdSet ServiceLiaisonMongod::getActiveOpSessions() const {
     LogicalSessionIdSet activeSessions;
 
     invariant(hasGlobalServiceContext());
 
-    // Append any in-use session ids from the global cluster cursor managers.
-    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
-    cursorManager->appendActiveSessions(&activeSessions);
+    // Walk through the service context and append lsids for all currently-running ops.
+    for (ServiceContext::LockedClientsCursor cursor(getGlobalServiceContext());
+         Client* client = cursor.next();) {
 
+        stdx::lock_guard<Client> lk(*client);
+        auto clientOpCtx = client->getOperationContext();
+
+        // Ignore clients without currently-running operations
+        if (!clientOpCtx)
+            continue;
+
+        // Append this op ctx's session to our list, if it has one
+        auto lsid = clientOpCtx->getLogicalSessionId();
+        if (lsid) {
+            activeSessions.insert(*lsid);
+        }
+    }
     return activeSessions;
 }
 
-LogicalSessionIdSet ServiceLiasonMongos::getOpenCursorSessions() const {
-    LogicalSessionIdSet openCursorSessions;
+LogicalSessionIdSet ServiceLiaisonMongod::getOpenCursorSessions() const {
+    LogicalSessionIdSet cursorSessions;
+    // Append any in-use session ids from the global and collection-level cursor managers
+    boost::optional<ServiceContext::UniqueOperationContext> uniqueCtx;
+    auto client = Client::getCurrent();
 
-    return openCursorSessions;
+    auto* const opCtx = [&client, &uniqueCtx] {
+        if (client->getOperationContext()) {
+            return client->getOperationContext();
+        }
+
+        uniqueCtx.emplace(client->makeOperationContext());
+        return uniqueCtx->get();
+    }();
+
+    CursorManager::appendAllActiveSessions(opCtx, &cursorSessions);
+    return cursorSessions;
 }
 
-void ServiceLiasonMongos::scheduleJob(PeriodicRunner::PeriodicJob job) {
+void ServiceLiaisonMongod::scheduleJob(PeriodicRunner::PeriodicJob job) {
     invariant(hasGlobalServiceContext());
     getGlobalServiceContext()->getPeriodicRunner()->scheduleJob(std::move(job));
 }
 
-void ServiceLiasonMongos::join() {
+void ServiceLiaisonMongod::join() {
     invariant(hasGlobalServiceContext());
     getGlobalServiceContext()->getPeriodicRunner()->shutdown();
 }
 
-Date_t ServiceLiasonMongos::now() const {
+Date_t ServiceLiaisonMongod::now() const {
     invariant(hasGlobalServiceContext());
     return getGlobalServiceContext()->getFastClockSource()->now();
 }
 
-ServiceContext* ServiceLiasonMongos::_context() {
+ServiceContext* ServiceLiaisonMongod::_context() {
     return getGlobalServiceContext();
 }
 
-std::pair<Status, int> ServiceLiasonMongos::killCursorsWithMatchingSessions(
+std::pair<Status, int> ServiceLiaisonMongod::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
-    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
-    return cursorManager->killCursorsWithMatchingSessions(opCtx, matcher);
+    return CursorManager::getGlobalCursorManager()->killCursorsWithMatchingSessions(opCtx, matcher);
 }
 
 }  // namespace mongo

@@ -34,18 +34,18 @@
 
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/service_liason_mongos.h"
+#include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/sessions_collection_sharded.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheS() {
-    auto liason = stdx::make_unique<ServiceLiasonMongos>();
+    auto liaison = stdx::make_unique<ServiceLiaisonMongos>();
     auto sessionsColl = stdx::make_unique<SessionsCollectionSharded>();
 
     return stdx::make_unique<LogicalSessionCacheImpl>(
-        std::move(liason), std::move(sessionsColl), nullptr, LogicalSessionCacheImpl::Options{});
+        std::move(liaison), std::move(sessionsColl), nullptr, LogicalSessionCacheImpl::Options{});
 }
 
 }  // namespace mongo

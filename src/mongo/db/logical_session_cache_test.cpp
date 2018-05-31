@@ -41,7 +41,7 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_liason_mock.h"
+#include "mongo/db/service_liaison_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -59,13 +59,13 @@ using SessionList = std::list<LogicalSessionId>;
 using unittest::EnsureFCV;
 
 /**
- * Test fixture that sets up a session cache attached to a mock service liason
+ * Test fixture that sets up a session cache attached to a mock service liaison
  * and mock sessions collection implementation.
  */
 class LogicalSessionCacheTest : public unittest::Test {
 public:
     LogicalSessionCacheTest()
-        : _service(std::make_shared<MockServiceLiasonImpl>()),
+        : _service(std::make_shared<MockServiceLiaisonImpl>()),
           _sessions(std::make_shared<MockSessionsCollectionImpl>()) {}
 
     void setUp() override {
@@ -76,7 +76,7 @@ public:
         _client = client.get();
         Client::setCurrent(std::move(client));
 
-        auto mockService = stdx::make_unique<MockServiceLiason>(_service);
+        auto mockService = stdx::make_unique<MockServiceLiaison>(_service);
         auto mockSessions = stdx::make_unique<MockSessionsCollection>(_sessions);
         _cache = stdx::make_unique<LogicalSessionCacheImpl>(
             std::move(mockService), std::move(mockSessions), nullptr);
@@ -101,7 +101,7 @@ public:
         return _cache;
     }
 
-    std::shared_ptr<MockServiceLiasonImpl> service() {
+    std::shared_ptr<MockServiceLiaisonImpl> service() {
         return _service;
     }
 
@@ -129,7 +129,7 @@ private:
     ServiceContextNoop serviceContext;
     ServiceContext::UniqueOperationContext _opCtx;
 
-    std::shared_ptr<MockServiceLiasonImpl> _service;
+    std::shared_ptr<MockServiceLiaisonImpl> _service;
     std::shared_ptr<MockSessionsCollectionImpl> _sessions;
 
     std::unique_ptr<LogicalSessionCache> _cache;

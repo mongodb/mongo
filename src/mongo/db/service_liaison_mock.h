@@ -30,7 +30,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_liason.h"
+#include "mongo/db/service_liaison.h"
 #include "mongo/executor/async_timer_mock.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -41,9 +41,9 @@
 namespace mongo {
 
 /**
- * To allow us to move a MockServiceLiason into the session cache while
- * maintaining a hold on it from within our unit tests, the MockServiceLiason
- * will have an internal pointer to a MockServiceLiasonImpl object that the
+ * To allow us to move a MockServiceLiaison into the session cache while
+ * maintaining a hold on it from within our unit tests, the MockServiceLiaison
+ * will have an internal pointer to a MockServiceLiaisonImpl object that the
  * test creates and controls.
  *
  * This class maintains an internal _activeSessions list that may be modified
@@ -52,13 +52,13 @@ namespace mongo {
  * be the epoch + the amount of minutes this object has been fast-forwarded over
  * course of its life.
  *
- * This service liason starts up its internal periodic runner on construction.
+ * This service liaison starts up its internal periodic runner on construction.
  */
-class MockServiceLiasonImpl {
+class MockServiceLiaisonImpl {
 public:
-    MockServiceLiasonImpl();
+    MockServiceLiaisonImpl();
 
-    // Forwarding methods from the MockServiceLiason
+    // Forwarding methods from the MockServiceLiaison
     LogicalSessionIdSet getActiveOpSessions() const;
     LogicalSessionIdSet getOpenCursorSessions() const;
     Date_t now() const;
@@ -93,11 +93,11 @@ private:
 };
 
 /**
- * A mock service liason for testing the logical session cache.
+ * A mock service liaison for testing the logical session cache.
  */
-class MockServiceLiason : public ServiceLiason {
+class MockServiceLiaison : public ServiceLiaison {
 public:
-    explicit MockServiceLiason(std::shared_ptr<MockServiceLiasonImpl> impl)
+    explicit MockServiceLiaison(std::shared_ptr<MockServiceLiaisonImpl> impl)
         : _impl(std::move(impl)) {}
 
     LogicalSessionIdSet getActiveOpSessions() const override {
@@ -131,7 +131,7 @@ protected:
     }
 
 private:
-    std::shared_ptr<MockServiceLiasonImpl> _impl;
+    std::shared_ptr<MockServiceLiaisonImpl> _impl;
     std::unique_ptr<ServiceContextNoop> _serviceContext;
 };
 

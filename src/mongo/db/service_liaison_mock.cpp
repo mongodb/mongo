@@ -30,85 +30,85 @@
 
 #include <algorithm>
 
-#include "mongo/db/service_liason_mock.h"
+#include "mongo/db/service_liaison_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/periodic_runner_factory.h"
 
 namespace mongo {
 
-MockServiceLiasonImpl::MockServiceLiasonImpl() {
+MockServiceLiaisonImpl::MockServiceLiaisonImpl() {
     _timerFactory = stdx::make_unique<executor::AsyncTimerFactoryMock>();
     _runner = makePeriodicRunner(getGlobalServiceContext());
     _runner->startup();
 }
 
-LogicalSessionIdSet MockServiceLiasonImpl::getActiveOpSessions() const {
+LogicalSessionIdSet MockServiceLiaisonImpl::getActiveOpSessions() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _activeSessions;
 }
 
-LogicalSessionIdSet MockServiceLiasonImpl::getOpenCursorSessions() const {
+LogicalSessionIdSet MockServiceLiaisonImpl::getOpenCursorSessions() const {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _cursorSessions;
 }
 
-void MockServiceLiasonImpl::join() {
+void MockServiceLiaisonImpl::join() {
     _runner->shutdown();
 }
 
-Date_t MockServiceLiasonImpl::now() const {
+Date_t MockServiceLiaisonImpl::now() const {
     return _timerFactory->now();
 }
 
-void MockServiceLiasonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
+void MockServiceLiaisonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
     // The cache should be refreshed from tests by calling refreshNow().
     return;
 }
 
 
-void MockServiceLiasonImpl::addCursorSession(LogicalSessionId lsid) {
+void MockServiceLiaisonImpl::addCursorSession(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.insert(std::move(lsid));
 }
 
-void MockServiceLiasonImpl::removeCursorSession(LogicalSessionId lsid) {
+void MockServiceLiaisonImpl::removeCursorSession(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.erase(lsid);
 }
 
-void MockServiceLiasonImpl::clearCursorSession() {
+void MockServiceLiaisonImpl::clearCursorSession() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.clear();
 }
 
-void MockServiceLiasonImpl::add(LogicalSessionId lsid) {
+void MockServiceLiaisonImpl::add(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _cursorSessions.insert(std::move(lsid));
 }
 
-void MockServiceLiasonImpl::remove(LogicalSessionId lsid) {
+void MockServiceLiaisonImpl::remove(LogicalSessionId lsid) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _activeSessions.erase(lsid);
 }
 
-void MockServiceLiasonImpl::clear() {
+void MockServiceLiaisonImpl::clear() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     _activeSessions.clear();
 }
 
-void MockServiceLiasonImpl::fastForward(Milliseconds time) {
+void MockServiceLiaisonImpl::fastForward(Milliseconds time) {
     _timerFactory->fastForward(time);
 }
 
-int MockServiceLiasonImpl::jobs() {
+int MockServiceLiaisonImpl::jobs() {
     return _timerFactory->jobs();
 }
 
-const KillAllSessionsByPattern* MockServiceLiasonImpl::matchKilled(const LogicalSessionId& lsid) {
+const KillAllSessionsByPattern* MockServiceLiaisonImpl::matchKilled(const LogicalSessionId& lsid) {
     return _matcher->match(lsid);
 }
 
-std::pair<Status, int> MockServiceLiasonImpl::killCursorsWithMatchingSessions(
+std::pair<Status, int> MockServiceLiaisonImpl::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
 
     _matcher = matcher;

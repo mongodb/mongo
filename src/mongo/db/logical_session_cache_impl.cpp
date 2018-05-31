@@ -55,7 +55,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(disableLogicalSessionCacheRefresh, bool, f
 constexpr Minutes LogicalSessionCacheImpl::kLogicalSessionDefaultRefresh;
 
 LogicalSessionCacheImpl::LogicalSessionCacheImpl(
-    std::unique_ptr<ServiceLiason> service,
+    std::unique_ptr<ServiceLiaison> service,
     std::shared_ptr<SessionsCollection> collection,
     std::shared_ptr<TransactionReaper> transactionReaper,
     Options options)

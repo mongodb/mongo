@@ -52,7 +52,7 @@
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/db/service_liason_mock.h"
+#include "mongo/db/service_liaison_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -98,13 +98,13 @@ public:
         AuthorizationSession::set(client.get(), std::move(localauthzSession));
         authzManager->setAuthEnabled(true);
 
-        auto localServiceLiason =
-            std::make_unique<MockServiceLiason>(std::make_shared<MockServiceLiasonImpl>());
+        auto localServiceLiaison =
+            std::make_unique<MockServiceLiaison>(std::make_shared<MockServiceLiaisonImpl>());
         auto localSessionsCollection = stdx::make_unique<MockSessionsCollection>(
             std::make_shared<MockSessionsCollectionImpl>());
 
         auto localLogicalSessionCache = std::make_unique<LogicalSessionCacheImpl>(
-            std::move(localServiceLiason), std::move(localSessionsCollection), nullptr);
+            std::move(localServiceLiaison), std::move(localSessionsCollection), nullptr);
 
         LogicalSessionCache::set(&serviceContext, std::move(localLogicalSessionCache));
     }

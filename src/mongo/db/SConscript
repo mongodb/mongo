@@ -1146,9 +1146,9 @@ env.Library(
 )
 
 env.Library(
-    target='service_liason',
+    target='service_liaison',
     source=[
-        'service_liason.cpp',
+        'service_liaison.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/sha1_block',
@@ -1176,28 +1176,28 @@ envWithAsio.CppUnitTest(
         'logical_session_cache_impl',
         'logical_session_id',
         'logical_session_id_helpers',
-        'service_liason_mock',
+        'service_liaison_mock',
         'sessions_collection_mock',
     ],
 )
 
 envWithAsio.Library(
-    target='service_liason_mock',
+    target='service_liaison_mock',
     source=[
-        'service_liason_mock.cpp',
+        'service_liaison_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/async_timer_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'kill_sessions',
-        'service_liason',
+        'service_liaison',
     ],
 )
 
 envWithAsio.Library(
-    target='service_liason_mongod',
+    target='service_liaison_mongod',
     source=[
-        'service_liason_mongod.cpp',
+        'service_liaison_mongod.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
@@ -1205,14 +1205,14 @@ envWithAsio.Library(
         '$BUILD_DIR/mongo/util/periodic_runner',
         'query_exec',
         'service_context',
-        'service_liason',
+        'service_liaison',
     ],
 )
 
 env.Library(
-    target='service_liason_mongos',
+    target='service_liaison_mongos',
     source=[
-        'service_liason_mongos.cpp',
+        'service_liaison_mongos.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
@@ -1221,7 +1221,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         'service_context',
-        'service_liason',
+        'service_liaison',
     ],
 )
 
@@ -1341,7 +1341,7 @@ env.Library(
         'logical_session_id_helpers',
         'sessions_collection',
         'server_parameters',
-        'service_liason',
+        'service_liaison',
         'kill_sessions',
     ],
     LIBDEPS_PRIVATE=[
@@ -1381,7 +1381,7 @@ envWithAsio.CppUnitTest(
         'logical_session_id_helpers',
         'logical_session_cache',
         'logical_session_cache_impl',
-        'service_liason_mock',
+        'service_liaison_mock',
         'sessions_collection_mock',
     ],
 )
@@ -1394,7 +1394,7 @@ envWithAsio.Library(
     LIBDEPS=[
         'logical_session_cache',
         'logical_session_cache_impl',
-        'service_liason_mongod',
+        'service_liaison_mongod',
         'sessions_collection_config_server',
         'sessions_collection_rs',
         'sessions_collection_sharded',
@@ -1413,7 +1413,7 @@ envWithAsio.Library(
     LIBDEPS=[
         'logical_session_cache',
         'logical_session_cache_impl',
-        'service_liason_mongos',
+        'service_liaison_mongos',
         'sessions_collection_sharded',
     ],
 )
