@@ -152,7 +152,7 @@ StatusWith<OplogApplier::Operations> DataReplicatorExternalStateImpl::getNextApp
     OplogApplier oplogApplier(
         nullptr, oplogBuffer, nullptr, nullptr, nullptr, nullptr, {}, nullptr);
     OplogApplier::BatchLimits batchLimits;
-    batchLimits.bytes = SyncTail::replBatchLimitBytes;
+    batchLimits.bytes = OplogApplier::replBatchLimitBytes;
     batchLimits.ops = OplogApplier::getBatchLimitOperations();
     return oplogApplier.getNextApplierBatch(opCtx, batchLimits);
 }
