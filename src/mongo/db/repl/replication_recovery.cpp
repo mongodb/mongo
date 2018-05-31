@@ -50,7 +50,8 @@ namespace repl {
 
 namespace {
 
-const auto kRecoveryLogLevel = logger::LogSeverity::Debug(2);
+const auto kRecoveryBatchLogLevel = logger::LogSeverity::Debug(2);
+const auto kRecoveryOperationLogLevel = logger::LogSeverity::Debug(3);
 
 /**
  * Tracks and logs operations applied during recovery.
@@ -59,18 +60,19 @@ class RecoveryOplogApplierStats : public OplogApplier::Observer {
 public:
     void onBatchBegin(const OplogApplier::Operations& batch) final {
         _numBatches++;
-        LOG_FOR_RECOVERY(kRecoveryLogLevel)
+        LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
             << "Applying operations in batch: " << _numBatches << "(" << batch.size()
             << " operations from " << batch.front().getOpTime() << " (inclusive) to "
             << batch.back().getOpTime()
             << " (inclusive)). Operations applied so far: " << _numOpsApplied;
 
         _numOpsApplied += batch.size();
-        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery, kRecoveryLogLevel)) {
+        if (shouldLog(::mongo::logger::LogComponent::kStorageRecovery,
+                      kRecoveryOperationLogLevel)) {
             std::size_t i = 0;
             for (const auto& entry : batch) {
                 i++;
-                LOG_FOR_RECOVERY(kRecoveryLogLevel)
+                LOG_FOR_RECOVERY(kRecoveryOperationLogLevel)
                     << "Applying op " << i << " of " << batch.size() << " (in batch " << _numBatches
                     << ") during replication recovery: " << redact(entry.raw);
             }
@@ -82,7 +84,7 @@ public:
     void onOperationConsumed(const BSONObj& op) final {}
 
     void complete(const OpTime& applyThroughOpTime) const {
-        LOG_FOR_RECOVERY(kRecoveryLogLevel)
+        LOG_FOR_RECOVERY(kRecoveryBatchLogLevel)
             << "Applied " << _numOpsApplied << " operations in " << _numBatches
             << " batches. Last operation applied with optime: " << applyThroughOpTime;
     }
