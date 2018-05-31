@@ -82,14 +82,19 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
         process_kwargs = self.shell_options.get("process_kwargs", {}).copy()
 
-        if "KRB5_CONFIG" in process_kwargs and "KRB5CCNAME" not in process_kwargs:
+        if process_kwargs \
+            and "env_vars" in process_kwargs \
+            and "KRB5_CONFIG" in process_kwargs["env_vars"] \
+            and "KRB5CCNAME" not in process_kwargs["env_vars"]:
             # Use a job-specific credential cache for JavaScript tests involving Kerberos.
             krb5_dir = os.path.join(data_dir, "krb5")
+
             try:
                 os.makedirs(krb5_dir)
             except os.error:
                 pass
-            process_kwargs["KRB5CCNAME"] = "DIR:" + os.path.join(krb5_dir, ".")
+
+            process_kwargs["env_vars"]["KRB5CCNAME"] = "DIR:" + krb5_dir
 
         self.shell_options["process_kwargs"] = process_kwargs
 
