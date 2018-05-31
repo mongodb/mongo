@@ -65,6 +65,8 @@ constexpr Seconds kDefaultMetricsGatherInterval(1);
 constexpr auto kReportingIntervalMinutesMin = 1;
 constexpr auto kReportingIntervalMinutesMax = 60 * 60 * 24;
 
+constexpr auto kMetricsRequestArrayElement = "data"_sd;
+
 int64_t randomJitter(PseudoRandom& random, int64_t min, int64_t max) {
     dassert(max > min);
     return (std::abs(random.nextInt64()) % (max - min)) + min;
@@ -710,15 +712,20 @@ void FreeMonProcessor::doMetricsCollect(Client* client) {
 }
 
 std::string compressMetrics(MetricsBuffer& buffer) {
-    BSONArrayBuilder payload;
+    BSONObjBuilder builder;
 
-    for (const auto& obj : buffer) {
-        payload.append(obj);
+    {
+        BSONArrayBuilder arrayBuilder(builder.subarrayStart(kMetricsRequestArrayElement));
+
+        for (const auto& obj : buffer) {
+            arrayBuilder.append(obj);
+        }
     }
-    auto arr = payload.arr();
+
+    BSONObj obj = builder.done();
 
     std::string outBuffer;
-    snappy::Compress(arr.objdata(), arr.objsize(), &outBuffer);
+    snappy::Compress(obj.objdata(), obj.objsize(), &outBuffer);
 
     return outBuffer;
 }
