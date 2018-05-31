@@ -96,7 +96,6 @@
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
@@ -115,24 +114,29 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
 /**
- * The `_localOplogCollection` pointer is always valid (or null) because an
- * operation must take the global exclusive lock to set the pointer to null when
- * the Collection instance is destroyed. See `oplogCheckCloseDatabase`.
+ * This structure contains per-service-context state related to the oplog.
  */
-Collection* _localOplogCollection = nullptr;
+struct LocalOplogInfo {
+    MONGO_DISALLOW_COPYING(LocalOplogInfo);
+    LocalOplogInfo() = default;
 
-PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
+    // Name of the oplog collection.
+    std::string oplogName;
 
-// Synchronizes the section where a new Timestamp is generated and when it is registered in the
-// storage engine.
-stdx::mutex newOpMutex;
-stdx::condition_variable newTimestampNotifier;
-// Remembers that last timestamp generated for creating new oplog entries or last timestamp of
-// oplog entry applied as a secondary. This should only be used for the snapshot thread. Must hold
-// the newOpMutex when accessing this variable.
-Timestamp lastSetTimestamp;
+    // The "oplog" pointer is always valid (or null) because an operation must take the global
+    // exclusive lock to set the pointer to null when the Collection instance is destroyed. See
+    // "oplogCheckCloseDatabase".
+    Collection* oplog = nullptr;
 
-static std::string _oplogCollectionName;
+    // Synchronizes the section where a new Timestamp is generated and when it is registered in the
+    // storage engine.
+    stdx::mutex newOpMutex;
+
+    // Used to generate "h" fields in pv0. Synchronized by newOpMutex.
+    PseudoRandom hashGenerator{std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64()};
+};
+
+const auto localOplogInfo = ServiceContext::declareDecoration<LocalOplogInfo>();
 
 // so we can fail the same way
 void checkOplogInsert(Status result) {
@@ -144,6 +148,7 @@ void _getNextOpTimes(OperationContext* opCtx,
                      std::size_t count,
                      OplogSlot* slotsOut,
                      bool persist = true) {
+    auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
     auto replCoord = ReplicationCoordinator::get(opCtx);
     long long term = OpTime::kUninitializedTerm;
 
@@ -156,11 +161,9 @@ void _getNextOpTimes(OperationContext* opCtx,
 
     // Allow the storage engine to start the transaction outside the critical section.
     opCtx->recoveryUnit()->preallocateSnapshot();
-    stdx::lock_guard<stdx::mutex> lk(newOpMutex);
+    stdx::lock_guard<stdx::mutex> lk(oplogInfo.newOpMutex);
 
     auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
-    lastSetTimestamp = ts;
-    newTimestampNotifier.notify_all();
     const bool orderedCommit = false;
 
     if (persist) {
@@ -169,7 +172,7 @@ void _getNextOpTimes(OperationContext* opCtx,
 
     for (std::size_t i = 0; i < count; i++) {
         slotsOut[i].opTime = {Timestamp(ts.asULL() + i), term};
-        slotsOut[i].hash = hashGenerator.nextInt64();
+        slotsOut[i].hash = oplogInfo.hashGenerator.nextInt64();
     }
 }
 
@@ -216,7 +219,7 @@ private:
 void setOplogCollectionName(ServiceContext* service) {
     switch (ReplicationCoordinator::get(service)->getReplicationMode()) {
         case ReplicationCoordinator::modeReplSet:
-            _oplogCollectionName = NamespaceString::kRsOplogNamespace.ns();
+            localOplogInfo(service).oplogName = NamespaceString::kRsOplogNamespace.ns();
             break;
         case ReplicationCoordinator::modeNone:
             // leave empty.
@@ -437,9 +440,10 @@ OpTime logOp(OperationContext* opCtx,
         return {};
     }
 
+    const auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
     Lock::DBLock lk(opCtx, NamespaceString::kLocalDb, MODE_IX);
-    Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
-    auto const oplog = _localOplogCollection;
+    Lock::CollectionLock lock(opCtx->lockState(), oplogInfo.oplogName, MODE_IX);
+    auto const oplog = oplogInfo.oplog;
 
     OplogSlot slot;
     WriteUnitOfWork wuow(opCtx);
@@ -487,9 +491,10 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     const size_t count = end - begin;
     std::vector<OplogDocWriter> writers;
     writers.reserve(count);
-    Collection* oplog = _localOplogCollection;
+    const auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
     Lock::DBLock lk(opCtx, "local", MODE_IX);
-    Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
+    Lock::CollectionLock lock(opCtx->lockState(), oplogInfo.oplogName, MODE_IX);
+    auto oplog = oplogInfo.oplog;
 
     WriteUnitOfWork wuow(opCtx);
 
@@ -656,24 +661,26 @@ void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName
 void createOplog(OperationContext* opCtx) {
     const auto isReplSet = ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
         ReplicationCoordinator::modeReplSet;
-    createOplog(opCtx, _oplogCollectionName, isReplSet);
+    createOplog(opCtx, localOplogInfo(opCtx->getServiceContext()).oplogName, isReplSet);
 }
 
 OplogSlot getNextOpTime(OperationContext* opCtx) {
     // The local oplog collection pointer must already be established by this point.
     // We can't establish it here because that would require locking the local database, which would
     // be a lock order violation.
-    invariant(_localOplogCollection);
+    auto oplog = localOplogInfo(opCtx->getServiceContext()).oplog;
+    invariant(oplog);
     OplogSlot os;
-    _getNextOpTimes(opCtx, _localOplogCollection, 1, &os);
+    _getNextOpTimes(opCtx, oplog, 1, &os);
     return os;
 }
 
 OplogSlot getNextOpTimeNoPersistForTesting(OperationContext* opCtx) {
-    invariant(_localOplogCollection);
+    auto oplog = localOplogInfo(opCtx->getServiceContext()).oplog;
+    invariant(oplog);
     OplogSlot os;
     bool persist = false;  // Don't update the storage engine with the allocated OpTime.
-    _getNextOpTimes(opCtx, _localOplogCollection, 1, &os, persist);
+    _getNextOpTimes(opCtx, oplog, 1, &os, persist);
     return os;
 }
 
@@ -681,10 +688,11 @@ std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count
     // The local oplog collection pointer must already be established by this point.
     // We can't establish it here because that would require locking the local database, which would
     // be a lock order violation.
-    invariant(_localOplogCollection);
+    auto oplog = localOplogInfo(opCtx->getServiceContext()).oplog;
+    invariant(oplog);
     std::vector<OplogSlot> oplogSlots(count);
     auto oplogSlot = oplogSlots.begin();
-    _getNextOpTimes(opCtx, _localOplogCollection, count, &(*oplogSlot));
+    _getNextOpTimes(opCtx, oplog, count, &(*oplogSlot));
     return oplogSlots;
 }
 
@@ -1652,10 +1660,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
 }
 
 void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
-    stdx::lock_guard<stdx::mutex> lk(newOpMutex);
+    stdx::lock_guard<stdx::mutex> lk(localOplogInfo(service).newOpMutex);
     LogicalClock::get(service)->setClusterTimeFromTrustedSource(LogicalTime(newTime));
-    lastSetTimestamp = newTime;
-    newTimestampNotifier.notify_all();
 }
 
 void initTimestampFromOplog(OperationContext* opCtx, const std::string& oplogNS) {
@@ -1673,27 +1679,29 @@ void initTimestampFromOplog(OperationContext* opCtx, const std::string& oplogNS)
 void oplogCheckCloseDatabase(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isW());
     if (db->name() == "local") {
-        _localOplogCollection = nullptr;
+        localOplogInfo(opCtx->getServiceContext()).oplog = nullptr;
     }
 }
 
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
-    if (!_oplogCollectionName.empty()) {
-        AutoGetCollection autoColl(opCtx, NamespaceString(_oplogCollectionName), MODE_IX);
-        _localOplogCollection = autoColl.getCollection();
+    auto& oplogInfo = localOplogInfo(opCtx->getServiceContext());
+    if (!oplogInfo.oplogName.empty()) {
+        AutoGetCollection autoColl(opCtx, NamespaceString(oplogInfo.oplogName), MODE_IX);
+        oplogInfo.oplog = autoColl.getCollection();
     }
 }
 
 void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* oplog) {
     invariant(opCtx->lockState()->isW());
     invariant(oplog);
-    _localOplogCollection = oplog;
+    localOplogInfo(opCtx->getServiceContext()).oplog = oplog;
 }
 
 void signalOplogWaiters() {
-    if (_localOplogCollection) {
-        _localOplogCollection->notifyCappedWaitersIfNeeded();
+    auto oplog = localOplogInfo(getGlobalServiceContext()).oplog;
+    if (oplog) {
+        oplog->notifyCappedWaitersIfNeeded();
     }
 }
 
