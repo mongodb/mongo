@@ -143,10 +143,8 @@ BSONArray decompressMetrics(ConstDataRange cdr) {
     ConstDataRange raw(outBuffer.data(), outBuffer.data() + outBuffer.size());
     auto swObj = raw.read<Validated<BSONObj>>();
     ASSERT_OK(swObj.getStatus());
-    auto obj = swObj.getValue().val;
-    ASSERT(obj.couldBeArray());
 
-    return BSONArray(obj.getOwned());
+    return BSONArray(swObj.getValue().val["data"].Obj().getOwned());
 }
 
 /**
