@@ -35,7 +35,7 @@
 #include "mongo/db/logical_session_cache_factory_mongod.h"
 
 #include "mongo/db/logical_session_cache_impl.h"
-#include "mongo/db/service_liason_mongod.h"
+#include "mongo/db/service_liaison_mongod.h"
 #include "mongo/db/sessions_collection_config_server.h"
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/db/sessions_collection_sharded.h"
@@ -67,7 +67,7 @@ std::shared_ptr<SessionsCollection> makeSessionsCollection(LogicalSessionCacheSe
 
 std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(ServiceContext* svc,
                                                               LogicalSessionCacheServer state) {
-    auto liason = stdx::make_unique<ServiceLiasonMongod>();
+    auto liaison = stdx::make_unique<ServiceLiaisonMongod>();
 
     // Set up the logical session cache
     auto sessionsColl = makeSessionsCollection(state);
@@ -83,7 +83,7 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(ServiceContext* sv
         }
     }();
 
-    return stdx::make_unique<LogicalSessionCacheImpl>(std::move(liason),
+    return stdx::make_unique<LogicalSessionCacheImpl>(std::move(liaison),
                                                       std::move(sessionsColl),
                                                       std::move(reaper),
                                                       LogicalSessionCacheImpl::Options{});

@@ -30,14 +30,14 @@
 
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_liason.h"
+#include "mongo/db/service_liaison.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 /**
- * This is the service liason to mongod for the logical session cache.
+ * This is the service liaison to mongos for the logical session cache.
  *
  * This class will return active sessions for cursors stored in the
  * global cursor manager and cursors in per-collection managers. This
@@ -45,10 +45,10 @@ namespace mongo {
  * currently-running operations on this server.
  *
  * Job scheduling on this class will be handled behind the scenes by a
- * periodic runner for this mongod. The time will be returned from the
+ * periodic runner for this mongos. The time will be returned from the
  * system clock.
  */
-class ServiceLiasonMongod : public ServiceLiason {
+class ServiceLiaisonMongos : public ServiceLiaison {
 public:
     LogicalSessionIdSet getActiveOpSessions() const override;
     LogicalSessionIdSet getOpenCursorSessions() const override;
