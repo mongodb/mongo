@@ -117,9 +117,9 @@ class Process(object):
         if sys.platform == "win32" and _JOB_OBJECT is not None:
             creation_flags |= win32process.CREATE_BREAKAWAY_FROM_JOB
 
-        # Use unbuffered I/O pipes to avoid adding delay between when the subprocess writes output
-        # and when the LoggerPipe thread reads it.
-        buffer_size = 0
+        # Tests fail if a process takes too long to startup and listen to a socket. Use buffered
+        # I/O pipes to give the process some leeway.
+        buffer_size = 1024 * 1024
 
         # Close file descriptors in the child process before executing the program. This prevents
         # file descriptors that were inherited due to multiple calls to fork() -- either within one

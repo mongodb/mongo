@@ -18,4 +18,4 @@ executor:
               heartbeats: 2
               rollback: 2
             storage:
-              recovery: 2
+              recovery: 3
