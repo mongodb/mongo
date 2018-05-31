@@ -424,7 +424,7 @@ public:
             unittest::log()
                 << "Throwing DBException on DBClientCursorForTest::query(). Failures left: "
                 << _initFailuresLeft;
-            uasserted(226530, "Simulated network error");
+            uasserted(50852, "Simulated network error");
             MONGO_UNREACHABLE;
         }
 
