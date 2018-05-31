@@ -54,6 +54,16 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replWriterThreadCount, int, 16)
         return Status::OK();
     });
 
+MONGO_EXPORT_SERVER_PARAMETER(replBatchLimitOperations, int, 50 * 1000)
+    ->withValidator([](const int& newVal) {
+        if (newVal < 1 || newVal > (1000 * 1000)) {
+            return Status(ErrorCodes::BadValue,
+                          "replBatchLimitOperations must be between 1 and 1 million, inclusive");
+        }
+
+        return Status::OK();
+    });
+
 }  // namespace
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -79,6 +89,11 @@ std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
     auto pool = stdx::make_unique<ThreadPool>(options);
     pool->startup();
     return pool;
+}
+
+// static
+std::size_t OplogApplier::getBatchLimitOperations() {
+    return std::size_t(replBatchLimitOperations.load());
 }
 
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,

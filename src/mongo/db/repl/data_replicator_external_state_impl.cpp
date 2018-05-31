@@ -153,7 +153,7 @@ StatusWith<OplogApplier::Operations> DataReplicatorExternalStateImpl::getNextApp
         nullptr, oplogBuffer, nullptr, nullptr, nullptr, nullptr, {}, nullptr);
     OplogApplier::BatchLimits batchLimits;
     batchLimits.bytes = SyncTail::replBatchLimitBytes;
-    batchLimits.ops = std::size_t(SyncTail::replBatchLimitOperations.load());
+    batchLimits.ops = OplogApplier::getBatchLimitOperations();
     return oplogApplier.getNextApplierBatch(opCtx, batchLimits);
 }
 

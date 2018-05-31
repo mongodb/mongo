@@ -98,6 +98,11 @@ public:
     static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
 
     /**
+     * Returns maximum number of operations in each batch that can be applied using multiApply().
+     */
+    static std::size_t getBatchLimitOperations();
+
+    /**
      * Constructs this OplogApplier with specific options.
      * Obtains batches of operations from the OplogBuffer to apply.
      * Reports oplog application progress using the Observer.

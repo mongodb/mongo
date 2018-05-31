@@ -71,11 +71,6 @@ public:
                               WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
-     * Maximum number of operations in each batch that can be applied using multiApply().
-     */
-    static AtomicInt32 replBatchLimitOperations;
-
-    /**
      * Lower bound of batch limit size (in bytes) returned by calculateBatchLimitBytes().
      */
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;

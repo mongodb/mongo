@@ -67,7 +67,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/session_update_tracker.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
@@ -86,30 +85,9 @@ using std::endl;
 
 namespace repl {
 
-AtomicInt32 SyncTail::replBatchLimitOperations{50 * 1000};
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
-
-class ExportedBatchLimitOperationsParameter
-    : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
-public:
-    ExportedBatchLimitOperationsParameter()
-        : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(),
-              "replBatchLimitOperations",
-              &SyncTail::replBatchLimitOperations) {}
-
-    virtual Status validate(const int& potentialNewValue) {
-        if (potentialNewValue < 1 || potentialNewValue > (1000 * 1000)) {
-            return Status(ErrorCodes::BadValue,
-                          "replBatchLimitOperations must be between 1 and 1 million, inclusive");
-        }
-
-        return Status::OK();
-    }
-} exportedBatchLimitOperationsParam;
 
 // The oplog entries applied
 Counter64 opsAppliedStats;
@@ -746,7 +724,7 @@ private:
             batchLimits.slaveDelayLatestTimestamp = _calculateSlaveDelayLatestTimestamp();
 
             // Check this once per batch since users can change it at runtime.
-            batchLimits.ops = replBatchLimitOperations.load();
+            batchLimits.ops = OplogApplier::getBatchLimitOperations();
 
             OpQueue ops(batchLimits.ops);
             // tryPopAndWaitForMore adds to ops and returns true when we need to end a batch early.
