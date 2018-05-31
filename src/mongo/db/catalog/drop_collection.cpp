@@ -82,7 +82,9 @@ Status dropCollection(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        result.append("ns", collectionName.ns());
+        if (!result.hasField("ns")) {
+            result.append("ns", collectionName.ns());
+        }
 
         if (coll) {
             invariant(!view);
