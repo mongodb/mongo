@@ -40,11 +40,22 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/stats/counters',
+        '$BUILD_DIR/mongo/util/processinfo',
+        'server_status_core',
+    ],
+)
+
+env.Library(
+    target='server_status_servers',
+    source=[
+        'server_status_servers.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/service_executor',
-        '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
-        '$BUILD_DIR/mongo/util/processinfo',
+        'server_status',
         'server_status_core',
     ],
 )
@@ -95,8 +106,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/logger/parse_log_component_settings',
     ],
 )
@@ -132,6 +143,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/kill_sessions',
+        '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/logical_session_id',

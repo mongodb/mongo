@@ -90,7 +90,7 @@ Status addOptions(optionenvironment::OptionSection* options) {
 
 Status canonicalizeOptions(optionenvironment::Environment* params) {
 
-    Status ret = canonicalizeServerOptions(params);
+    Status ret = canonicalizeBaseOptions(params);
     if (!ret.isOK()) {
         return ret;
     }
@@ -99,6 +99,11 @@ Status canonicalizeOptions(optionenvironment::Environment* params) {
 }
 
 Status storeOptions(const moe::Environment& params) {
+    Status ret = storeBaseOptions(params);
+    if (!ret.isOK()) {
+        return ret;
+    }
+
     if (params.count("storage.engine")) {
         storageGlobalParams.engine = params["storage.engine"].as<std::string>();
         storageGlobalParams.engineSetByUser = true;
@@ -106,13 +111,6 @@ Status storeOptions(const moe::Environment& params) {
 
     if (params.count("storage.dbPath")) {
         storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();
-        if (params.count("processManagement.fork") && storageGlobalParams.dbpath[0] != '/') {
-            // we need to change dbpath if we fork since we change
-            // cwd to "/"
-            // fork only exists on *nix
-            // so '/' is safe
-            storageGlobalParams.dbpath = serverGlobalParams.cwd + "/" + storageGlobalParams.dbpath;
-        }
     }
 #ifdef _WIN32
     if (storageGlobalParams.dbpath.size() > 1 &&
@@ -122,26 +120,6 @@ Status storeOptions(const moe::Environment& params) {
             storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size() - 1);
     }
 #endif
-
-    if (!params.count("net.port")) {
-        if (params.count("sharding.clusterRole")) {
-            std::string clusterRole = params["sharding.clusterRole"].as<std::string>();
-            if (clusterRole == "configsvr") {
-                serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
-            } else if (clusterRole == "shardsvr") {
-                serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
-            } else {
-                StringBuilder sb;
-                sb << "Bad value for sharding.clusterRole: " << clusterRole
-                   << ".  Supported modes are: (configsvr|shardsvr)";
-                return Status(ErrorCodes::BadValue, sb.str());
-            }
-        }
-    } else {
-        if (serverGlobalParams.port < 0 || serverGlobalParams.port > 65535) {
-            return Status(ErrorCodes::BadValue, "bad --port number");
-        }
-    }
 
 #ifdef _WIN32
     // If dbPath is a default value, prepend with drive name so log entries are explicit

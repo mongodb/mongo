@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -42,26 +42,28 @@ class Environment;
 namespace moe = mongo::optionenvironment;
 
 /**
- * Base server options that are available in all applications, standalone and embedded.
- *
- * Included by addGeneralServerOptions, don't call both.
+ * General server options for most standalone applications. Includes addBaseServerOptions.
  */
-Status addBaseServerOptions(moe::OptionSection* options);
+Status addGeneralServerOptions(moe::OptionSection* options);
+
+Status addWindowsServerOptions(moe::OptionSection* options);
+
+Status addSSLServerOptions(moe::OptionSection* options);
 
 /**
-* Handle custom validation of base options that can not currently be done by using
-* Constraints in the Environment.  See the "validate" function in the Environment class for
-* more details.
-*/
-Status validateBaseOptions(const moe::Environment& params);
+ * Handle custom validation of server options that can not currently be done by using
+ * Constraints in the Environment.  See the "validate" function in the Environment class for
+ * more details.
+ */
+Status validateServerOptions(const moe::Environment& params);
 
 /**
-* Canonicalize base options for the given environment.
-*
-* For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
-* merged into "net.wireObjectCheck".
-*/
-Status canonicalizeBaseOptions(moe::Environment* params);
+ * Canonicalize server options for the given environment.
+ *
+ * For example, the options "objcheck", "noobjcheck", and "net.wireObjectCheck" should all be
+ * merged into "net.wireObjectCheck".
+ */
+Status canonicalizeServerOptions(moe::Environment* params);
 
 /**
  * Sets up the global server state necessary to be able to store the server options, based on how
@@ -70,14 +72,15 @@ Status canonicalizeBaseOptions(moe::Environment* params);
  * For example, saves the current working directory in serverGlobalParams.cwd so that relative paths
  * in server options can be interpreted correctly.
  */
-Status setupBaseOptions(const std::vector<std::string>& args);
+Status setupServerOptions(const std::vector<std::string>& args);
 
 /**
-* Store the given parsed params in global server state.
-*
-* For example, sets the serverGlobalParams.quiet variable based on the systemLog.quiet config
-* parameter.
-*/
-Status storeBaseOptions(const moe::Environment& params);
+ * Store the given parsed params in global server state.
+ *
+ * For example, sets the serverGlobalParams.port variable based on the net.port config parameter.
+ */
+Status storeServerOptions(const moe::Environment& params);
+
+void printCommandLineOpts();
 
 }  // namespace mongo
