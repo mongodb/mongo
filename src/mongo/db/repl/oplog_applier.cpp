@@ -32,13 +32,54 @@
 
 #include "mongo/db/repl/oplog_applier.h"
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
+namespace {
+
+/**
+ * This server parameter determines the number of writer threads OplogApplier will have.
+ */
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(replWriterThreadCount, int, 16)
+    ->withValidator([](const int& newVal) {
+        if (newVal < 1 || newVal > 256) {
+            return Status(ErrorCodes::BadValue, "replWriterThreadCount must be between 1 and 256");
+        }
+
+        return Status::OK();
+    });
+
+}  // namespace
+
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+
+// static
+std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool() {
+    return makeWriterPool(replWriterThreadCount);
+}
+
+// static
+std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
+    ThreadPool::Options options;
+    options.threadNamePrefix = "repl writer worker ";
+    options.poolName = "repl writer worker Pool";
+    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
+    options.onCreateThread = [](const std::string&) {
+        // Only do this once per thread
+        if (!Client::getCurrent()) {
+            Client::initThreadIfNotAlready();
+            AuthorizationSession::get(cc())->grantInternalAuthorization();
+        }
+    };
+    auto pool = stdx::make_unique<ThreadPool>(options);
+    pool->startup();
+    return pool;
+}
 
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,

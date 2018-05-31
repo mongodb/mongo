@@ -388,7 +388,7 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
 }
 
 DEATH_TEST_F(SyncTailTest, MultiApplyAbortsWhenNoOperationsAreGiven, "!ops.empty()") {
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     SyncTail syncTail(nullptr,
                       getConsistencyMarkers(),
                       getStorageInterface(),
@@ -402,7 +402,7 @@ bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,
                                           StorageInterface* const storageInterface,
                                           const NamespaceString& nss,
                                           const CollectionOptions& options) {
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     MultiApplier::Operations operationsApplied;
     auto applyOperationFn = [&operationsApplied](OperationContext* opCtx,
                                                  MultiApplier::OperationPtrs* operationsToApply,
@@ -455,7 +455,7 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     // the number of threads in the pool.
     NamespaceString nss1("test.t0");
     NamespaceString nss2("test.t1");
-    auto writerPool = SyncTail::makeWriterPool(2);
+    auto writerPool = OplogApplier::makeWriterPool(2);
 
     stdx::mutex mutex;
     std::vector<MultiApplier::Operations> operationsApplied;
@@ -1613,7 +1613,7 @@ TEST_F(SyncTailTxnTableTest, SimpleWriteWithTxn) {
                                    sessionInfo,
                                    date);
 
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp}));
@@ -1644,7 +1644,7 @@ TEST_F(SyncTailTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable) {
                                    {},
                                    Date_t::now());
 
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp}));
@@ -1689,7 +1689,7 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectDeleteToTxnTa
                                     sessionInfo,
                                     date);
 
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp, insertOp2}));
@@ -1721,7 +1721,7 @@ TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectUpdateToTxnTa
                                    {},
                                    Date_t::now());
 
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, updateOp}));
@@ -1768,7 +1768,7 @@ TEST_F(SyncTailTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     auto opNoTxn = makeInsertDocumentOplogEntryWithSessionInfo(
         {Timestamp(Seconds(7), 0), 1LL}, ns3, BSON("_id" << 0), info);
 
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     SyncTail syncTail(
         nullptr, getConsistencyMarkers(), getStorageInterface(), multiSyncApply, writerPool.get());
     ASSERT_OK(syncTail.multiApply(

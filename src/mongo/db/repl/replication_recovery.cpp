@@ -353,7 +353,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     RecoveryOplogApplierStats stats;
 
-    auto writerPool = SyncTail::makeWriterPool();
+    auto writerPool = OplogApplier::makeWriterPool();
     OplogApplier::Options options;
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.skipWritesToOplog = true;

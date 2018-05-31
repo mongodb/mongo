@@ -318,7 +318,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     _taskExecutor = makeTaskExecutor(_service, "replication");
     _taskExecutor->startup();
 
-    _writerPool = SyncTail::makeWriterPool();
+    _writerPool = OplogApplier::makeWriterPool();
 
     _startedThreads = true;
 }

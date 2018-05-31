@@ -39,7 +39,6 @@
 #include "mongo/base/counter.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -92,29 +91,6 @@ AtomicInt32 SyncTail::replBatchLimitOperations{50 * 1000};
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseBatchApplicationBeforeCompletion);
-
-/**
- * This variable determines the number of writer threads SyncTail will have. It can be overridden
- * using the "replWriterThreadCount" server parameter.
- */
-int replWriterThreadCount = 16;
-
-class ExportedWriterThreadCountParameter
-    : public ExportedServerParameter<int, ServerParameterType::kStartupOnly> {
-public:
-    ExportedWriterThreadCountParameter()
-        : ExportedServerParameter<int, ServerParameterType::kStartupOnly>(
-              ServerParameterSet::getGlobal(), "replWriterThreadCount", &replWriterThreadCount) {}
-
-    virtual Status validate(const int& potentialNewValue) {
-        if (potentialNewValue < 1 || potentialNewValue > 256) {
-            return Status(ErrorCodes::BadValue, "replWriterThreadCount must be between 1 and 256");
-        }
-
-        return Status::OK();
-    }
-
-} exportedWriterThreadCountParam;
 
 class ExportedBatchLimitOperationsParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
@@ -281,27 +257,6 @@ std::size_t SyncTail::calculateBatchLimitBytes(OperationContext* opCtx,
         storageInterface->getOplogMaxSize(opCtx, NamespaceString::kRsOplogNamespace);
     auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
     return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
-}
-
-std::unique_ptr<ThreadPool> SyncTail::makeWriterPool() {
-    return makeWriterPool(replWriterThreadCount);
-}
-
-std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
-    ThreadPool::Options options;
-    options.threadNamePrefix = "repl writer worker ";
-    options.poolName = "repl writer worker Pool";
-    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
-    options.onCreateThread = [](const std::string&) {
-        // Only do this once per thread
-        if (!Client::getCurrent()) {
-            Client::initThreadIfNotAlready();
-            AuthorizationSession::get(cc())->grantInternalAuthorization();
-        }
-    };
-    auto pool = stdx::make_unique<ThreadPool>(options);
-    pool->startup();
-    return pool;
 }
 
 // static

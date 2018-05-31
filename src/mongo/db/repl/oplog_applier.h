@@ -92,6 +92,12 @@ public:
     using Operations = std::vector<OplogEntry>;
 
     /**
+     * Creates thread pool for writer tasks.
+     */
+    static std::unique_ptr<ThreadPool> makeWriterPool();
+    static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
+
+    /**
      * Constructs this OplogApplier with specific options.
      * Obtains batches of operations from the OplogBuffer to apply.
      * Reports oplog application progress using the Observer.

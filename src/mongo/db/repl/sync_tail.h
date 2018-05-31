@@ -89,12 +89,6 @@ public:
                                                 StorageInterface* storageInterface);
 
     /**
-     * Creates thread pool for writer tasks.
-     */
-    static std::unique_ptr<ThreadPool> makeWriterPool();
-    static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
-
-    /**
      * Applies the operation that is in param o.
      * Functions for applying operations/commands and increment server status counters may
      * be overridden for testing.

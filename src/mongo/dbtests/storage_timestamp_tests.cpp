@@ -1340,7 +1340,7 @@ public:
 
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
-        auto writerPool = repl::SyncTail::makeWriterPool();
+        auto writerPool = repl::OplogApplier::makeWriterPool();
         repl::OplogApplier oplogApplier(nullptr,
                                         nullptr,
                                         &observer,
@@ -1452,7 +1452,7 @@ public:
 
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
-        auto writerPool = repl::SyncTail::makeWriterPool();
+        auto writerPool = repl::OplogApplier::makeWriterPool();
         repl::OplogApplier::Options options;
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
         options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
@@ -2204,7 +2204,7 @@ public:
 
         // Apply the operation.
         auto storageInterface = repl::StorageInterface::get(_opCtx);
-        auto writerPool = repl::SyncTail::makeWriterPool(1);
+        auto writerPool = repl::OplogApplier::makeWriterPool(1);
         repl::SyncTail syncTail(
             nullptr, _consistencyMarkers, storageInterface, applyOperationFn, writerPool.get());
         auto lastOpTime = unittest::assertGet(syncTail.multiApply(_opCtx, {insertOp}));
