@@ -45,9 +45,9 @@ class ServiceContext;
  *
  * Mongod and mongos implement their own classes to fulfill this interface.
  */
-class ServiceLiason {
+class ServiceLiaison {
 public:
-    virtual ~ServiceLiason();
+    virtual ~ServiceLiaison();
 
     /**
      * Return a list of sessions that are currently being used to run operations
@@ -63,14 +63,14 @@ public:
     /**
      * Schedule a job to be run at regular intervals until the server shuts down.
      *
-     * The ServiceLiason should start its background runner on construction, and
+     * The ServiceLiaison should start its background runner on construction, and
      * should continue fielding job requests through scheduleJob until join() is
      * called.
      */
     virtual void scheduleJob(PeriodicRunner::PeriodicJob job) = 0;
 
     /**
-     * Stops the service liason from running any more jobs scheduled
+     * Stops the service liaison from running any more jobs scheduled
      * through scheduleJob. This method may block and wait for background threads to
      * join. Implementations should make it safe for this method to be called
      * multiple times, or concurrently by different threads.

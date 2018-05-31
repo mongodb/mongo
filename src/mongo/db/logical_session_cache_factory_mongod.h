@@ -31,7 +31,7 @@
 #include <memory>
 
 #include "mongo/db/logical_session_cache.h"
-#include "mongo/db/service_liason.h"
+#include "mongo/db/service_liaison.h"
 
 namespace mongo {
 
