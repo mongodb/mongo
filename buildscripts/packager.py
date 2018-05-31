@@ -41,7 +41,7 @@ import tempfile
 import time
 
 # The MongoDB names for the architectures we support.
-ARCH_CHOICES = ["x86_64", "arm64"]
+ARCH_CHOICES = ["x86_64", "arm64", "s390x"]
 
 # Made up names for the flavors of distribution we package for.
 DISTROS = ["suse", "debian", "redhat", "ubuntu", "amazon", "amazon2"]
@@ -329,7 +329,7 @@ class Distro(object):
         if re.search("(suse)", self.dname):
             return ["suse11", "suse12"]
         elif re.search("(redhat|fedora|centos)", self.dname):
-            return ["rhel70", "rhel71", "rhel72", "rhel62", "rhel55"]
+            return ["rhel70", "rhel71", "rhel72", "rhel62", "rhel55", "rhel67"]
         elif self.dname in ['amazon', 'amazon2']:
             return [self.dname]
         elif self.dname == 'ubuntu':
@@ -625,7 +625,7 @@ def make_deb_repo(repo, distro, build_os):
 Label: mongodb
 Suite: %s
 Codename: %s/mongodb-org
-Architectures: amd64 arm64
+Architectures: amd64 arm64 s390x
 Components: %s
 Description: MongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())

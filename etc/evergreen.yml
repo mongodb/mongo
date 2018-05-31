@@ -10702,6 +10702,39 @@ buildvariants:
     distros:
     - rhel62-large
 
+- name: rhel-67-s390x
+  display_name: SSL RHEL 6.7 s390x
+  run_on:
+  - rhel67-zseries-test
+  batchtime: 1440 # 1 day
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: s390x
+    packager_distro: rhel67
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: s390x-rhel67
+    repo_edition: org
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    build_mongoreplay: true
+    tooltags: "-tags ssl"
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - rhel67-zseries-build
+  - name: jsCore
+  - name: ssl
+  - name: push
+    distros:
+    - rhel62-large
+
 ###########################################
 #          Ubuntu buildvariants           #
 ###########################################
