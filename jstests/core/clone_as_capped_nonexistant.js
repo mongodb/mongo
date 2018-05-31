@@ -1,4 +1,11 @@
-// @tags: [requires_non_retryable_commands]
+/**
+ * @tags: [
+ *  requires_non_retryable_commands,
+ *
+ *  # capped collections is not available on embedded
+ *  incompatible_with_embedded,
+ * ]
+ */
 
 (function() {
     "use strict";

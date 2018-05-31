@@ -1,4 +1,12 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount]
+/**
+ * @tags: [
+ *  requires_non_retryable_commands,
+ *  requires_fastcount,
+ *
+ *  # capped collections is not available on embedded
+ *  incompatible_with_embedded,
+ * ]
+ */
 
 // test cloneCollectionAsCapped
 
