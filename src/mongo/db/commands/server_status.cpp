@@ -1,5 +1,3 @@
-// server_status.cpp
-
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
@@ -32,30 +30,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/config.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_internal.h"
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
-#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -226,28 +209,6 @@ namespace {
 
 // some universal sections
 
-class Connections : public ServerStatusSection {
-public:
-    Connections() : ServerStatusSection("connections") {}
-    virtual bool includeByDefault() const {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        BSONObjBuilder bb;
-
-        auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
-        invariant(serviceEntryPoint);
-
-        auto stats = serviceEntryPoint->sessionStats();
-        bb.append("current", static_cast<int>(stats.numOpenSessions));
-        bb.append("available", static_cast<int>(stats.numAvailableSessions));
-        bb.append("totalCreated", static_cast<int>(stats.numCreatedSessions));
-        return bb.obj();
-    }
-
-} connections;
-
 class ExtraInfo : public ServerStatusSection {
 public:
     ExtraInfo() : ServerStatusSection("extra_info") {}
@@ -287,46 +248,6 @@ public:
 
 } asserts;
 
-
-class Network : public ServerStatusSection {
-public:
-    Network() : ServerStatusSection("network") {}
-    virtual bool includeByDefault() const {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        BSONObjBuilder b;
-        networkCounter.append(b);
-        appendMessageCompressionStats(&b);
-        auto executor = opCtx->getServiceContext()->getServiceExecutor();
-        if (executor)
-            executor->appendStats(&b);
-
-        return b.obj();
-    }
-
-} network;
-
-#ifdef MONGO_CONFIG_SSL
-class Security : public ServerStatusSection {
-public:
-    Security() : ServerStatusSection("security") {}
-    virtual bool includeByDefault() const {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        BSONObj result;
-        if (getSSLManager()) {
-            result = getSSLManager()->getSSLConfiguration().getServerStatusBSON();
-        }
-
-        return result;
-    }
-} security;
-#endif
-
 class MemBase : public ServerStatusMetric {
 public:
     MemBase() : ServerStatusMetric(".mem.bits") {}
@@ -347,22 +268,6 @@ public:
     }
 } memBase;
 
-class AdvisoryHostFQDNs final : public ServerStatusSection {
-public:
-    AdvisoryHostFQDNs() : ServerStatusSection("advisoryHostFQDNs") {}
-
-    bool includeByDefault() const override {
-        return false;
-    }
-
-    void appendSection(OperationContext* opCtx,
-                       const BSONElement& configElement,
-                       BSONObjBuilder* out) const override {
-        out->append(
-            "advisoryHostFQDNs",
-            getHostFQDNs(getHostNameCached(), HostnameCanonicalizationMode::kForwardAndReverse));
-    }
-} advisoryHostFQDNs;
 }  // namespace
 
 }  // namespace mongo

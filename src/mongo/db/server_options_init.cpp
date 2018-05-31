@@ -27,7 +27,7 @@
  */
 
 #include "mongo/base/init.h"
-#include "mongo/db/server_options_helpers.h"
+#include "mongo/db/server_options_server_helpers.h"
 
 namespace mongo {
 

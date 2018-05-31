@@ -43,7 +43,7 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_options_helpers.h"
+#include "mongo/db/server_options_server_helpers.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

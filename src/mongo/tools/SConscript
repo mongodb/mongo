@@ -16,6 +16,7 @@ mongobridge = env.Program(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/service_executor',
         '$BUILD_DIR/mongo/transport/transport_layer',
