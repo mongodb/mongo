@@ -277,6 +277,8 @@ CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
 }
 
 CurOp::~CurOp() {
+    if (parent() != nullptr)
+        parent()->yielded(_numYields);
     invariant(this == _stack->pop());
 }
 

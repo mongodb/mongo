@@ -460,8 +460,8 @@ public:
     CurOp* parent() const {
         return _parent;
     }
-    void yielded() {
-        _numYields++;
+    void yielded(int numYields = 1) {
+        _numYields += numYields;
     }  // Should be _inlock()?
 
     /**

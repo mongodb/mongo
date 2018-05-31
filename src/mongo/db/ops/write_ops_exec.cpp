@@ -41,6 +41,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update.h"
@@ -85,6 +86,9 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(failAllInserts);
 MONGO_FAIL_POINT_DEFINE(failAllUpdates);
 MONGO_FAIL_POINT_DEFINE(failAllRemoves);
+MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpFinishes);
+MONGO_FAIL_POINT_DEFINE(hangBeforeChildRemoveOpIsPopped);
+MONGO_FAIL_POINT_DEFINE(hangAfterAllChildRemoveOpsArePopped);
 MONGO_FAIL_POINT_DEFINE(hangDuringBatchInsert);
 
 void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
@@ -860,7 +864,17 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp.setCommand_inlock(cmd);
         }
-        ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp); });
+        ON_BLOCK_EXIT([&] {
+            if (MONGO_FAIL_POINT(hangBeforeChildRemoveOpFinishes)) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeChildRemoveOpFinishes, opCtx, "hangBeforeChildRemoveOpFinishes");
+            }
+            finishCurOp(opCtx, &curOp);
+            if (MONGO_FAIL_POINT(hangBeforeChildRemoveOpIsPopped)) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeChildRemoveOpIsPopped, opCtx, "hangBeforeChildRemoveOpIsPopped");
+            }
+        });
         try {
             lastOpFixer.startingOp();
             out.results.emplace_back(
@@ -872,6 +886,11 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
             if (!canContinue)
                 break;
         }
+    }
+
+    if (MONGO_FAIL_POINT(hangAfterAllChildRemoveOpsArePopped)) {
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &hangAfterAllChildRemoveOpsArePopped, opCtx, "hangAfterAllChildRemoveOpsArePopped");
     }
 
     return out;
