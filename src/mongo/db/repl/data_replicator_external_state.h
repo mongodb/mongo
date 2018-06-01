@@ -36,6 +36,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -106,6 +107,17 @@ public:
      */
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
         OperationContext* opCtx) const = 0;
+
+    /**
+     * Creates an OplogApplier using the provided options.
+     */
+    virtual std::unique_ptr<OplogApplier> makeOplogApplier(
+        OplogBuffer* oplogBuffer,
+        OplogApplier::Observer* observer,
+        ReplicationConsistencyMarkers* consistencyMarkers,
+        StorageInterface* storageInterface,
+        const OplogApplier::Options& options,
+        ThreadPool* writerPool) = 0;
 
     /**
      * Returns a new batch of operations to apply.

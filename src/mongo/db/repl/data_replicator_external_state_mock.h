@@ -56,6 +56,14 @@ public:
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* opCtx) const override;
 
+    std::unique_ptr<OplogApplier> makeOplogApplier(
+        OplogBuffer* oplogBuffer,
+        OplogApplier::Observer* observer,
+        ReplicationConsistencyMarkers* consistencyMarkers,
+        StorageInterface* storageInterface,
+        const OplogApplier::Options& options,
+        ThreadPool* writerPool) final;
+
     StatusWith<OplogApplier::Operations> getNextApplierBatch(OperationContext* opCtx,
                                                              OplogBuffer* oplogBuffer) final;
 

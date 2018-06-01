@@ -36,6 +36,33 @@
 namespace mongo {
 namespace repl {
 
+namespace {
+
+class OplogApplierMock : public OplogApplier {
+    MONGO_DISALLOW_COPYING(OplogApplierMock);
+
+public:
+    OplogApplierMock(executor::TaskExecutor* executor,
+                     OplogBuffer* oplogBuffer,
+                     Observer* observer,
+                     DataReplicatorExternalStateMock* externalState)
+        : OplogApplier(executor, oplogBuffer, observer),
+          _observer(observer),
+          _externalState(externalState) {}
+
+private:
+    void _run(OplogBuffer* oplogBuffer) final {}
+    void _shutdown() final {}
+    StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) final {
+        return _externalState->multiApplyFn(opCtx, ops, _observer);
+    }
+
+    OplogApplier::Observer* const _observer;
+    DataReplicatorExternalStateMock* const _externalState;
+};
+
+}  // namespace
+
 DataReplicatorExternalStateMock::DataReplicatorExternalStateMock()
     : multiApplyFn([](OperationContext*,
                       const MultiApplier::Operations& ops,
@@ -79,6 +106,16 @@ bool DataReplicatorExternalStateMock::shouldStopFetching(
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer(
     OperationContext* opCtx) const {
     return stdx::make_unique<OplogBufferBlockingQueue>();
+}
+
+std::unique_ptr<OplogApplier> DataReplicatorExternalStateMock::makeOplogApplier(
+    OplogBuffer* oplogBuffer,
+    OplogApplier::Observer* observer,
+    ReplicationConsistencyMarkers*,
+    StorageInterface*,
+    const OplogApplier::Options&,
+    ThreadPool*) {
+    return std::make_unique<OplogApplierMock>(getTaskExecutor(), oplogBuffer, observer, this);
 }
 
 StatusWith<OplogApplier::Operations> DataReplicatorExternalStateMock::getNextApplierBatch(

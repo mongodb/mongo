@@ -37,7 +37,6 @@
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_buffer_proxy.h"
-#include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_process.h"
@@ -145,6 +144,23 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
     } else {
         return stdx::make_unique<OplogBufferBlockingQueue>();
     }
+}
+
+std::unique_ptr<OplogApplier> DataReplicatorExternalStateImpl::makeOplogApplier(
+    OplogBuffer* oplogBuffer,
+    OplogApplier::Observer* observer,
+    ReplicationConsistencyMarkers* consistencyMarkers,
+    StorageInterface* storageInterface,
+    const OplogApplier::Options& options,
+    ThreadPool* writerPool) {
+    return std::make_unique<OplogApplierImpl>(getTaskExecutor(),
+                                              oplogBuffer,
+                                              observer,
+                                              _replicationCoordinator,
+                                              consistencyMarkers,
+                                              storageInterface,
+                                              options,
+                                              writerPool);
 }
 
 StatusWith<OplogApplier::Operations> DataReplicatorExternalStateImpl::getNextApplierBatch(

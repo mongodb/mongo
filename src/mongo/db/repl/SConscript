@@ -1183,6 +1183,8 @@ env.CppUnitTest(
     target='oplog_fetcher_test',
     source='oplog_fetcher_test.cpp',
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
         'oplog_fetcher',
         'data_replicator_external_state_mock',
         'abstract_oplog_fetcher_test_fixture',
@@ -1479,6 +1481,7 @@ env.Library(
         'data_replicator_external_state_mock.cpp',
     ],
     LIBDEPS=[
+        'oplog_application_interface',
         'oplog_buffer_blocking_queue',
         'oplog_entry',
         'optime',
