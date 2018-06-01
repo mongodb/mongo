@@ -62,12 +62,12 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/noop_writer.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -219,14 +219,15 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 
     log() << "Starting replication applier thread";
     invariant(!_oplogApplier);
-    _oplogApplier = stdx::make_unique<OplogApplier>(_oplogApplierTaskExecutor.get(),
-                                                    _oplogBuffer.get(),
-                                                    _bgSync.get(),
-                                                    replCoord,
-                                                    _replicationProcess->getConsistencyMarkers(),
-                                                    _storageInterface,
-                                                    OplogApplier::Options(),
-                                                    _writerPool.get());
+    _oplogApplier =
+        stdx::make_unique<OplogApplierImpl>(_oplogApplierTaskExecutor.get(),
+                                            _oplogBuffer.get(),
+                                            _bgSync.get(),
+                                            replCoord,
+                                            _replicationProcess->getConsistencyMarkers(),
+                                            _storageInterface,
+                                            OplogApplier::Options(),
+                                            _writerPool.get());
     _oplogApplierShutdownFuture = _oplogApplier->startup();
 
     log() << "Starting replication reporter thread";

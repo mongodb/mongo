@@ -631,10 +631,25 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_application_interface',
+    source=[
+        'oplog_applier.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/server_parameters',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'oplog_entry',
+    ],
+)
+
+env.Library(
     target='oplog_application',
     source=[
         'applier_helpers.cpp',
-        'oplog_applier.cpp',
+        'oplog_applier_impl.cpp',
         'session_update_tracker.cpp',
         'sync_tail.cpp',
     ],
@@ -652,6 +667,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         'initial_syncer',
         'oplog',
+        'oplog_application_interface',
         'oplog_entry',
         'oplogreader',
         'repl_coordinator_interface',

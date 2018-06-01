@@ -108,23 +108,8 @@ std::size_t OplogApplier::calculateBatchLimitBytes(OperationContext* opCtx,
 
 OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            OplogBuffer* oplogBuffer,
-                           Observer* observer,
-                           ReplicationCoordinator* replCoord,
-                           ReplicationConsistencyMarkers* consistencyMarkers,
-                           StorageInterface* storageInterface,
-                           const OplogApplier::Options& options,
-                           ThreadPool* writerPool)
-    : _executor(executor),
-      _oplogBuffer(oplogBuffer),
-      _observer(observer),
-      _replCoord(replCoord),
-      _consistencyMarkers(consistencyMarkers),
-      _storageInterface(storageInterface),
-      _options(options),
-      _syncTail(std::make_unique<SyncTail>(
-          _observer, _consistencyMarkers, _storageInterface, multiSyncApply, writerPool, options)) {
-    invariant(!options.relaxUniqueIndexConstraints);
-}
+                           Observer* observer)
+    : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer) {}
 
 Future<void> OplogApplier::startup() {
     auto pf = makePromiseFuture<void>();
@@ -132,7 +117,7 @@ Future<void> OplogApplier::startup() {
         [ this, promise = pf.promise.share() ](const CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         log() << "Starting oplog application";
-        _syncTail->oplogApplication(_oplogBuffer, _replCoord);
+        _run(_oplogBuffer);
         log() << "Finished oplog application";
         promise.setWith([] {});
     };
@@ -141,7 +126,7 @@ Future<void> OplogApplier::startup() {
 }
 
 void OplogApplier::shutdown() {
-    _syncTail->shutdown();
+    _shutdown();
 }
 
 /**
@@ -202,7 +187,7 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
 
 StatusWith<OpTime> OplogApplier::multiApply(OperationContext* opCtx, Operations ops) {
     _observer->onBatchBegin(ops);
-    auto lastApplied = _syncTail->multiApply(opCtx, std::move(ops));
+    auto lastApplied = _multiApply(opCtx, std::move(ops));
     _observer->onBatchEnd(lastApplied, {});
     return lastApplied;
 }

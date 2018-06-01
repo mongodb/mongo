@@ -33,6 +33,7 @@
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_buffer_proxy.h"
@@ -41,7 +42,6 @@
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 
@@ -149,7 +149,7 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeInitialSyncOpl
 
 StatusWith<OplogApplier::Operations> DataReplicatorExternalStateImpl::getNextApplierBatch(
     OperationContext* opCtx, OplogBuffer* oplogBuffer) {
-    OplogApplier oplogApplier(
+    OplogApplierImpl oplogApplier(
         nullptr, oplogBuffer, nullptr, nullptr, nullptr, nullptr, {}, nullptr);
     OplogApplier::BatchLimits batchLimits;
     batchLimits.bytes = OplogApplier::replBatchLimitBytes;
@@ -172,14 +172,14 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(OperationContext
     OplogApplier::Options options;
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.missingDocumentSourceForInitialSync = source;
-    OplogApplier oplogApplier(getTaskExecutor(),
-                              nullptr,  // oplog buffer
-                              observer,
-                              _replicationCoordinator,
-                              consistencyMarkers,
-                              storageInterface,
-                              options,
-                              writerPool);
+    OplogApplierImpl oplogApplier(getTaskExecutor(),
+                                  nullptr,  // oplog buffer
+                                  observer,
+                                  _replicationCoordinator,
+                                  consistencyMarkers,
+                                  storageInterface,
+                                  options,
+                                  writerPool);
     return oplogApplier.multiApply(opCtx, std::move(ops));
 }
 

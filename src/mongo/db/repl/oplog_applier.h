@@ -35,11 +35,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/replication_consistency_markers.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -49,13 +46,13 @@
 namespace mongo {
 namespace repl {
 
-class SyncTail;
-
 /**
  * Applies oplog entries.
  * Reads from an OplogBuffer batches of operations that may be applied in parallel.
  */
 class OplogApplier {
+    MONGO_DISALLOW_COPYING(OplogApplier);
+
 public:
     /**
      * Used to configure behavior of this OplogApplier.
@@ -120,14 +117,9 @@ public:
      * Obtains batches of operations from the OplogBuffer to apply.
      * Reports oplog application progress using the Observer.
      */
-    OplogApplier(executor::TaskExecutor* executor,
-                 OplogBuffer* oplogBuffer,
-                 Observer* observer,
-                 ReplicationCoordinator* replCoord,
-                 ReplicationConsistencyMarkers* consistencyMarkers,
-                 StorageInterface* storageInterface,
-                 const Options& options,
-                 ThreadPool* writerPool);
+    OplogApplier(executor::TaskExecutor* executor, OplogBuffer* oplogBuffer, Observer* observer);
+
+    virtual ~OplogApplier() = default;
 
     /**
      * Starts this OplogApplier.
@@ -169,13 +161,31 @@ public:
      * to at least the last optime of the batch. If 'minValid' is already greater than or equal
      * to the last optime of this batch, it will not be updated.
      *
-     * Passthrough function for SyncTail::multiApply().
-     *
      * TODO: remove when enqueue() is implemented.
      */
     StatusWith<OpTime> multiApply(OperationContext* opCtx, Operations ops);
 
 private:
+    /**
+     * Called from startup() to run oplog application loop.
+     * Currently applicable to steady state replication only.
+     * Implemented in subclasses but not visible otherwise.
+     */
+    virtual void _run(OplogBuffer* oplogBuffer) = 0;
+
+    /**
+     * Called from shutdown to signals oplog application loop to stop running.
+     * Currently applicable to steady state replication only.
+     * Implemented in subclasses but not visible otherwise.
+     */
+    virtual void _shutdown() = 0;
+
+    /**
+     * Called from multiApply() to apply a batch of operations in parallel.
+     * Implemented in subclasses but not visible otherwise.
+     */
+    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx, Operations ops) = 0;
+
     // Used to schedule task for oplog application loop.
     // Not owned by us.
     executor::TaskExecutor* const _executor;
@@ -185,21 +195,6 @@ private:
 
     // Not owned by us.
     Observer* const _observer;
-
-    // Not owned by us.
-    ReplicationCoordinator* const _replCoord;
-
-    // Not owned by us.
-    ReplicationConsistencyMarkers* const _consistencyMarkers;
-
-    // Not owned by us.
-    StorageInterface* const _storageInterface;
-
-    // Used to configure OplogApplier behavior.
-    const Options _options;
-
-    // Used to run oplog application loop.
-    std::unique_ptr<SyncTail> _syncTail;
 };
 
 /**

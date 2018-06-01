@@ -37,10 +37,10 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
 #include "mongo/util/log.h"
@@ -357,14 +357,14 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     OplogApplier::Options options;
     options.allowNamespaceNotFoundErrorsOnCrudOps = true;
     options.skipWritesToOplog = true;
-    OplogApplier oplogApplier(nullptr,
-                              &oplogBuffer,
-                              &stats,
-                              nullptr,
-                              _consistencyMarkers,
-                              _storageInterface,
-                              options,
-                              writerPool.get());
+    OplogApplierImpl oplogApplier(nullptr,
+                                  &oplogBuffer,
+                                  &stats,
+                                  nullptr,
+                                  _consistencyMarkers,
+                                  _storageInterface,
+                                  options,
+                                  writerPool.get());
 
     OplogApplier::BatchLimits batchLimits;
     batchLimits.bytes = OplogApplier::calculateBatchLimitBytes(opCtx, _storageInterface);

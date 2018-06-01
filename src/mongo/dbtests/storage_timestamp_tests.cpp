@@ -54,6 +54,7 @@
 #include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -1341,14 +1342,15 @@ public:
         DoNothingOplogApplierObserver observer;
         auto storageInterface = repl::StorageInterface::get(_opCtx);
         auto writerPool = repl::OplogApplier::makeWriterPool();
-        repl::OplogApplier oplogApplier(nullptr,
-                                        nullptr,
-                                        &observer,
-                                        nullptr,
-                                        _consistencyMarkers,
-                                        storageInterface,
-                                        {},
-                                        writerPool.get());
+        repl::OplogApplierImpl oplogApplier(
+            nullptr,  // task executor. not required for multiApply().
+            nullptr,  // oplog buffer. not required for multiApply().
+            &observer,
+            nullptr,  // replication coordinator. not required for multiApply().
+            _consistencyMarkers,
+            storageInterface,
+            {},
+            writerPool.get());
         ASSERT_EQUALS(op2.getOpTime(), unittest::assertGet(oplogApplier.multiApply(_opCtx, ops)));
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
@@ -1456,14 +1458,15 @@ public:
         repl::OplogApplier::Options options;
         options.allowNamespaceNotFoundErrorsOnCrudOps = true;
         options.missingDocumentSourceForInitialSync = HostAndPort("localhost", 123);
-        repl::OplogApplier oplogApplier(nullptr,
-                                        nullptr,
-                                        &observer,
-                                        nullptr,
-                                        _consistencyMarkers,
-                                        storageInterface,
-                                        options,
-                                        writerPool.get());
+        repl::OplogApplierImpl oplogApplier(
+            nullptr,  // task executor. not required for multiApply().
+            nullptr,  // oplog buffer. not required for multiApply().
+            &observer,
+            nullptr,  // replication coordinator. not required for multiApply().
+            _consistencyMarkers,
+            storageInterface,
+            options,
+            writerPool.get());
         auto lastTime = unittest::assertGet(oplogApplier.multiApply(_opCtx, ops));
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
