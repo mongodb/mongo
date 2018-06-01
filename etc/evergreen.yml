@@ -392,6 +392,262 @@ variables:
   timeout:
   - func: "run hang analyzer"
 
+# Use this template for enterprise Windows testing coverage on non-pushing
+# variants
+- &enterprise-windows-64-2k8-nopush-template
+  name: enterprise-windows-64-2k8-nopush-template
+  run_on:
+  - windows-64-vs2015-small
+  modules:
+  - enterprise
+  display_tasks:
+  - *replica_sets_auth
+  - *replica_sets_ese
+  - *sharding_auth
+  - *sharding_auth_audit
+  - *sharding_ese
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    requires:
+    - name: burn_in_tests
+    distros:
+    - windows-64-vs2015-large
+  - name: compile_benchmarks
+    distros:
+    - windows-64-vs2015-large
+  - name: burn_in_tests
+  - name: audit
+  - name: auth_audit
+  - name: benchmarks_orphaned
+  - name: benchmarks_sharding
+  - name: buildscripts_test
+  - name: dbtest
+  - name: ese
+  - name: external_auth
+  - name: jsCore
+  - name: jsCore_ese
+  - name: jsCore_decimal
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: replica_sets_auth_0
+  - name: replica_sets_auth_1
+  - name: replica_sets_auth_2
+  - name: replica_sets_auth_3
+  - name: replica_sets_auth_4
+  - name: replica_sets_auth_5
+  - name: replica_sets_auth_6
+  - name: replica_sets_auth_misc
+  - name: replica_sets_ese_0
+  - name: replica_sets_ese_1
+  - name: replica_sets_ese_2
+  - name: replica_sets_ese_3
+  - name: replica_sets_ese_4
+  - name: replica_sets_ese_5
+  - name: replica_sets_ese_6
+  - name: replica_sets_ese_misc
+  - name: sasl
+  - name: sharding_auth_0
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_1
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_2
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_3
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_4
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_5
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_6
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_7
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_8
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_9
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_10
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_11
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_12
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_13
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_14
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_15
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_16
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_17
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_18
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_19
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_misc
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_0
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_1
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_2
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_3
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_4
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_5
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_6
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_7
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_8
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_9
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_10
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_11
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_12
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_13
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_14
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_15
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_16
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_17
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_18
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_auth_audit_misc
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_0
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_1
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_2
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_3
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_4
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_5
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_6
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_7
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_8
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_9
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_10
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_11
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_12
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_13
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_14
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_15
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_16
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_17
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_18
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_19
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_20
+    distros:
+    - windows-64-vs2015-large
+  - name: sharding_ese_misc
+    distros:
+    - windows-64-vs2015-large
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+
 
 #######################################
 #            Functions                #
@@ -8133,8 +8389,7 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
 
-- &enterprise-windows-64-2k8-template
-  name: enterprise-windows-64-2k8
+- name: enterprise-windows-64-2k8
   display_name: "! Enterprise Windows 2008R2"
   modules:
   - enterprise
@@ -8414,18 +8669,8 @@ buildvariants:
     distros:
     - rhel70-small
 
-- <<: *enterprise-windows-64-2k8-template
-  name: enterprise-windows-64-2k8-compile-all
-  display_name: "* Enterprise Windows 2008R2 compile_all"
-  display_tasks:
-  - *unittests
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - windows-64-vs2015-large
-  # Do not add more tasks to this list.
 
-- <<: *enterprise-windows-64-2k8-template
+- <<: *enterprise-windows-64-2k8-nopush-template
   name: enterprise-windows-64-2k8-wtdevelop
   display_name: "~ Enterprise Windows 2008R2 WiredTiger develop"
   batchtime: 1440 # 1 day
@@ -8451,12 +8696,23 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     build_mongoreplay: false
 
-- <<: *enterprise-windows-64-2k8-template
+- <<: *enterprise-windows-64-2k8-nopush-template
+  name: enterprise-windows-64-2k8-compile-all
+  display_name: "* Enterprise Windows 2008R2 compile_all"
+  run_on:
+  - windows-64-vs2015-small
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - windows-64-vs2015-large
+  # Do not add more tasks to this list.
+
+- <<: *enterprise-windows-64-2k8-nopush-template
   name: enterprise-windows-64-2k8-openssl
   display_name: "~ Enterprise Windows 2008R2 OpenSSL"
   batchtime: 1440 # 1 day
-  modules:
-  - enterprise
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1
     platform_decompress: unzip
@@ -8884,8 +9140,7 @@ buildvariants:
   - name: replica_sets
   - name: tool
 
-- &enterprise-osx-1010-template
-  name: enterprise-osx-1010
+- name: enterprise-osx-1010
   display_name: Enterprise OS X 10.10
   modules:
   - enterprise
@@ -8933,9 +9188,13 @@ buildvariants:
     distros:
     - rhel70-small
 
-- <<: *enterprise-osx-1010-template
-  name: enterprise-osx-1010-openssl
-  display_name: Enterprise OS X 10.10 OpenSSL
+- name: enterprise-osx-1010-openssl
+  display_name: ~ Enterprise OS X 10.10 OpenSSL
+  modules:
+  - enterprise
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
   expansions:
     test_flags: --excludeWithAnyTags=requires_mmapv1,requires_ssl_mongo_tools
     push_path: osx
@@ -8953,6 +9212,29 @@ buildvariants:
     build_openssl: true
     openssl_config_flags: "-mmacosx-version-min=10.10"
     openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+  - name: audit
+  - name: auth_audit
+  - name: dbtest
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: replica_sets_auth
+  - name: sasl
+  - name: ssl
+  - name: sslSpecial
 
 
 ###########################################
