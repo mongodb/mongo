@@ -52,6 +52,9 @@ selector:
   - jstests/sharding/movePrimary1.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
+  # Can be un-blacklisted once the version of 4.0 used for 'last-stable' includes SERVER-34338's
+  # backport.
+  - jstests/sharding/explainFind_stale_mongos.js
   # Requires fix to SERVER-31689
   - jstests/sharding/aggregation_currentop.js
   #### End "Enable when 4.0 becomes last stable"
