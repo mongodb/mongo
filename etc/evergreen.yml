@@ -6898,6 +6898,7 @@ tasks:
     type: test
     params:
       working_dir: src
+      silent: true
       script: |
         set -o errexit
 
@@ -6908,7 +6909,7 @@ tasks:
         export GIT_SSH_COMMAND="ssh -i ~/.ssh/test_lifecycle.pem"
 
         # Create the jira credentials configuration file
-        cat > ~/.jira.yml <<END_OF_CREDS
+        cat > .jira.yml <<END_OF_CREDS
         server: "https://jira.mongodb.org"
         access_token: "${testlifecycle_jira_access_token}"
         access_token_secret: "${testlifecycle_jira_access_token_secret}"
@@ -6934,7 +6935,7 @@ tasks:
             --referencesFile "references.yml"                           \
             --gitUserName "Test Lifecycle"                              \
             --gitUserEmail "build+testlifecycle@mongodb.com"            \
-            --jiraConfig ~/.jira.yml
+            --jiraConfig .jira.yml
 
 
 #######################################
