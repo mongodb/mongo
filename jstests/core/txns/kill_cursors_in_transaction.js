@@ -6,6 +6,7 @@
     const dbName = "test";
     const collName = "kill_cursors_in_transaction";
     const testDB = db.getSiblingDB(dbName);
+    const adminDB = db.getSiblingDB("admin");
     const session = db.getMongo().startSession({causalConsistency: false});
     const sessionDb = session.getDatabase(dbName);
     const sessionColl = sessionDb[collName];
@@ -50,10 +51,19 @@
     });
 
     // Wait for the drop to have a pending MODE_X lock on the database.
-    assert.soon(function() {
-        return testDB.runCommand({find: collName, maxTimeMS: 100}).code ===
-            ErrorCodes.ExceededTimeLimit;
-    });
+    assert.soon(
+        function() {
+            return adminDB
+                       .aggregate([
+                           {$currentOp: {}},
+                           {$match: {"command.drop": collName, waitingForLock: true}}
+                       ])
+                       .itcount() === 1;
+        },
+        function() {
+            return "Failed to find drop in currentOp output: " +
+                tojson(adminDB.aggregate([{$currentOp: {}}]));
+        });
 
     // killCursors does not block behind the pending MODE_X lock.
     assert.commandWorked(sessionDb.runCommand({killCursors: collName, cursors: [res.cursor.id]}));
