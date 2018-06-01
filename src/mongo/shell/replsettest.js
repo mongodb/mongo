@@ -644,6 +644,51 @@ var ReplSetTest = function(opts) {
         }, "Awaiting nodes to agree that all ops are applied across replica set", timeout);
     };
 
+    this._findHighestPriorityNodes = function(config) {
+        let highestPriority = 0;
+        let highPriorityNodes = [];
+        for (let i = 0; i < config.members.length; i++) {
+            const member = config.members[i];
+            if (member.priority > highestPriority) {
+                highestPriority = member.priority;
+                highPriorityNodes = [this.nodes[i]];
+            } else if (member.priority === highestPriority) {
+                highPriorityNodes.push(this.nodes[i]);
+            }
+        }
+        return highPriorityNodes;
+    };
+
+    /**
+     * Blocks until the node with the highest priority is the primary.  If there are multiple
+     * nodes tied for highest priority, waits until one of them is the primary.
+     */
+    this.awaitHighestPriorityNodeIsPrimary = function(timeout) {
+        timeout = timeout || self.kDefaultTimeoutMS;
+
+        // First figure out the set of highest priority nodes.
+        const config = asCluster(this.nodes, () => self.getReplSetConfigFromNode());
+        const highPriorityNodes = this._findHighestPriorityNodes(config);
+
+        // Now wait for the primary to be one of the highest priority nodes.
+        assert.soon(
+            function() {
+                return highPriorityNodes.includes(self.getPrimary());
+            },
+            function() {
+                return "Expected primary to be one of: " + tojson(highPriorityNodes) +
+                    ", but found primary to be: " + tojson(self.getPrimary());
+            },
+            timeout);
+
+        // Finally wait for all nodes to agree on the primary.
+        this.awaitNodesAgreeOnPrimary(timeout);
+        const primary = this.getPrimary();
+        assert(highPriorityNodes.includes(primary),
+               "Primary switched away from highest priority node.  Found primary: " +
+                   tojson(primary) + ", but expected one of: " + tojson(highPriorityNodes));
+    };
+
     /**
      * Blocks until all nodes agree on who the primary is.
      * If 'expectedPrimaryNodeId' is provided, ensure that every node is seeing this node as the
@@ -945,6 +990,19 @@ var ReplSetTest = function(opts) {
             jsTest.authenticateNodes(this.nodes);
         }
         this.awaitSecondaryNodes();
+        try {
+            this.awaitHighestPriorityNodeIsPrimary();
+        } catch (e) {
+            // Due to SERVER-14017, the call to awaitHighestPriorityNodeIsPrimary() may fail
+            // in certain configurations due to being unauthorized.  In that case we proceed
+            // even though we aren't guaranteed that the highest priority node is the one that
+            // became primary.
+            // TODO(SERVER-14017): Unconditionally expect awaitHighestPriorityNodeIsPrimary to pass.
+            assert.eq(ErrorCodes.Unauthorized, e.code, tojson(e));
+            print("Running awaitHighestPriorityNodeIsPrimary() during ReplSetTest initialization " +
+                  "failed with Unauthorized error, proceeding even though we aren't guaranteed " +
+                  "that the highest priority node is primary");
+        }
 
         let shouldWaitForKeys = true;
         if (self.waitForKeys != undefined) {
