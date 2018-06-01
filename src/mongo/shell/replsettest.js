@@ -2038,7 +2038,9 @@ var ReplSetTest = function(opts) {
                 print("Collection stats: " + tojson(coll.stats()));
 
                 // TODO (SERVER-34976): Remove this block and enable fastcount checks.
-                return;
+                if (!coll.isCapped()) {
+                    return;
+                }
 
                 // TODO (SERVER-34977): Remove this block and enable capped collection fastcount
                 // checks.
