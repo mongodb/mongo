@@ -924,6 +924,30 @@ functions:
         https_validate_certificates = False
         EOF
 
+  "call BF Suggestion service":
+    command: shell.exec
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        report_file="report.json"
+        # Check if the report file exists and has failures.
+        if [ -f $report_file ] && grep -Eq "\"failures\": [1-9]" $report_file; then
+          # Calling the BF Suggestion server endpoint to start feature extraction.
+          payload="{\"task_id\": \"${task_id}\", \"execution\": ${execution}}"
+          echo "Sending task info to the BF suggestion service"
+          # The --user option is passed through stdin to avoid showing in process list.
+          user_option="--user ${bfsuggestion_user}:${bfsuggestion_password}"
+          curl --header "Content-Type: application/json" \
+               --data "$payload" \
+               --max-time 10 \
+               --silent \
+               --show-error \
+               --config - \
+               https://bfsuggestion.corp.mongodb.com/tasks <<< $user_option
+          echo "Request to BF Suggestion service status: $?"
+        fi
+
   "upload debugsymbols" : &upload_debugsymbols
     command: s3.put
     params:
@@ -3080,6 +3104,7 @@ post:
   - func: "attach report"
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
+  - func: "call BF Suggestion service"
   - func: "kill processes"
   - func: "save local client logs"
   - func: "save code coverage data"
