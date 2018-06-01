@@ -136,6 +136,10 @@ void OplogApplier::enqueue(const Operations& operations) {}
 
 StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
     OperationContext* opCtx, const BatchLimits& batchLimits) {
+    if (batchLimits.ops == 0) {
+        return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
+    }
+
     std::uint32_t totalBytes = 0;
     Operations ops;
     BSONObj op;
@@ -171,7 +175,9 @@ StatusWith<OplogApplier::Operations> OplogApplier::getNextApplierBatch(
         if (ops.size() >= batchLimits.ops) {
             return std::move(ops);
         }
-        if (totalBytes + entry.getRawObjSizeBytes() >= batchLimits.bytes) {
+
+        // Never return an empty batch if there are operations left.
+        if ((totalBytes + entry.getRawObjSizeBytes() >= batchLimits.bytes) && (ops.size() > 0)) {
             return std::move(ops);
         }
 

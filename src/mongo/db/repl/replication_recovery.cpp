@@ -329,8 +329,8 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
 }
 
 void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
-                                                 Timestamp oplogApplicationStartPoint,
-                                                 Timestamp topOfOplog) {
+                                                 const Timestamp& oplogApplicationStartPoint,
+                                                 const Timestamp& topOfOplog) {
     invariant(!oplogApplicationStartPoint.isNull());
     invariant(!topOfOplog.isNull());
 
@@ -381,6 +381,11 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
               str::stream() << "Oplog buffer not empty after applying operations. Last operation "
                                "applied with optime: "
                             << applyThroughOpTime.toBSON());
+    invariant(applyThroughOpTime.getTimestamp() == topOfOplog,
+              str::stream() << "Did not apply to top of oplog. Applied through: "
+                            << applyThroughOpTime.toString()
+                            << ". Top of oplog: "
+                            << topOfOplog.toString());
     oplogBuffer.shutdown(opCtx);
 
     // We may crash before setting appliedThrough. If we have a stable checkpoint, we will recover
