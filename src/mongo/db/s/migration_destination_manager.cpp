@@ -486,7 +486,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
         {
             stdx::lock_guard<stdx::mutex> sl(_mutex);
             _state = FAIL;
-            _errmsg = exceptionToStatus().toString();
+            _errmsg = redact(exceptionToStatus().toString());
         }
 
         error() << "migrate failed: " << redact(exceptionToStatus()) << migrateLog;
@@ -1011,9 +1011,9 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* txn,
             BSONObj localDoc;
             if (willOverrideLocalId(
                     txn, ns, min, max, shardKeyPattern, cx.db(), updatedDoc, &localDoc)) {
-                string errMsg = str::stream() << "cannot migrate chunk, local document " << localDoc
-                                              << " has same _id as reloaded remote document "
-                                              << updatedDoc;
+                string errMsg = str::stream()
+                    << "cannot migrate chunk, local document " << redact(localDoc)
+                    << " has same _id as reloaded remote document " << redact(updatedDoc);
 
                 warning() << errMsg;
 
@@ -1046,8 +1046,8 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* txn,
         return false;
     }
 
-    log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> "
-          << max << migrateLog;
+    log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << redact(min)
+          << " -> " << redact(max) << migrateLog;
 
     return true;
 }
@@ -1069,9 +1069,9 @@ Status MigrationDestinationManager::_notePending(OperationContext* txn,
         return {ErrorCodes::StaleShardVersion,
                 str::stream() << "could not note chunk "
                               << "["
-                              << min
+                              << redact(min)
                               << ","
-                              << max
+                              << redact(max)
                               << ")"
                               << " as pending because the epoch for "
                               << nss.ns()
