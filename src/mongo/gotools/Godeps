@@ -1,4 +1,4 @@
-gopkg.in/mgo.v2                         bb6c39e69bb0cf5be3dcabfce2613da30f42fad5    github.com/10gen/mgo
+gopkg.in/mgo.v2                         913983c541c4a010f8cbe5505dc8dc992a4e8370    github.com/10gen/mgo
 gopkg.in/tomb.v2                        14b3d72120e8d10ea6e6b7f87f7175734b1faab8
 github.com/jtolds/gls                   8ddce2a84170772b95dd5d576c48d517b22cac63
 github.com/jacobsa/oglematchers         3ecefc49db07722beca986d9bb71ddd026b133f0

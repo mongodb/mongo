@@ -136,7 +136,7 @@ function configAuth(addr) {
     } else {
         db.addUser("reader", "rapadura", true)
     }
-    if (v > [3, 6] && addr == "127.0.0.1:40002") {
+    if (v > [3, 7] && addr == "127.0.0.1:40002") {
         // username IX is used for SCRAM-SHA-256 so we can test saslprep on it
         db.createUser({user:"IX", pwd:"IX", mechanisms: ["SCRAM-SHA-256"], roles: ["readAnyDatabase"]})
         db.createUser({user:"\u2168", pwd:"\u2163", mechanisms: ["SCRAM-SHA-256"], roles: ["readAnyDatabase"]})

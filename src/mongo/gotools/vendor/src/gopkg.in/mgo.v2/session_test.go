@@ -957,6 +957,9 @@ func (s *S) TestCreateCollectionCapped(c *C) {
 }
 
 func (s *S) TestCreateCollectionNoIndex(c *C) {
+	if s.versionAtLeast(3, 7) {
+		c.Skip("autoIndexId removed in MongoDB 3.7+")
+	}
 	session, err := mgo.Dial("localhost:40001")
 	c.Assert(err, IsNil)
 	defer session.Close()
@@ -977,6 +980,9 @@ func (s *S) TestCreateCollectionNoIndex(c *C) {
 }
 
 func (s *S) TestCreateCollectionForceIndex(c *C) {
+	if s.versionAtLeast(3, 7) {
+		c.Skip("autoIndexId removed in MongoDB 3.7+")
+	}
 	session, err := mgo.Dial("localhost:40001")
 	c.Assert(err, IsNil)
 	defer session.Close()
@@ -3129,7 +3135,7 @@ func (s *S) TestEnsureIndex(c *C) {
 	defer session.Close()
 
 	coll := session.DB("mydb").C("mycoll")
-// 	idxs := session.DB("mydb").C("system.indexes")
+	// 	idxs := session.DB("mydb").C("system.indexes")
 
 	for _, test := range indexTests {
 		if !s.versionAtLeast(2, 4) && test.expected["textIndexVersion"] != nil {
@@ -3148,23 +3154,22 @@ func (s *S) TestEnsureIndex(c *C) {
 			expectedName, _ = test.expected["name"].(string)
 		}
 
-		
-// 		obtained := M{}
-// 		err = idxs.Find(M{"name": expectedName}).One(obtained)
-// 		c.Assert(err, IsNil) // XXX ERR HERE
-// 
-// 		delete(obtained, "v")
-// 
-// 		if s.versionAtLeast(2, 7) {
-// 			// Was deprecated in 2.6, and not being reported by 2.7+.
-// 			delete(test.expected, "dropDups")
-// 			test.index.DropDups = false
-// 		}
-// 		if s.versionAtLeast(3, 2) && test.expected["textIndexVersion"] != nil {
-// 			test.expected["textIndexVersion"] = 3
-// 		}
-// 
-// 		c.Assert(obtained, DeepEquals, test.expected)
+		// 		obtained := M{}
+		// 		err = idxs.Find(M{"name": expectedName}).One(obtained)
+		// 		c.Assert(err, IsNil) // XXX ERR HERE
+		//
+		// 		delete(obtained, "v")
+		//
+		// 		if s.versionAtLeast(2, 7) {
+		// 			// Was deprecated in 2.6, and not being reported by 2.7+.
+		// 			delete(test.expected, "dropDups")
+		// 			test.index.DropDups = false
+		// 		}
+		// 		if s.versionAtLeast(3, 2) && test.expected["textIndexVersion"] != nil {
+		// 			test.expected["textIndexVersion"] = 3
+		// 		}
+		//
+		// 		c.Assert(obtained, DeepEquals, test.expected)
 
 		// The result of Indexes must match closely what was used to create the index.
 		indexes, err := coll.Indexes()
@@ -3270,7 +3275,6 @@ func (s *S) TestEnsureIndexKey(c *C) {
 
 	err = coll.EnsureIndexKey("a", "-b")
 	c.Assert(err, IsNil)
-
 
 	result1, err := findIndexByName(coll, "a_1")
 	c.Assert(err, IsNil)

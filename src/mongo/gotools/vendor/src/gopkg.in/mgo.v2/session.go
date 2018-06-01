@@ -4068,7 +4068,13 @@ func (iter *Iter) getMore() {
 	} else {
 		op = &iter.op
 	}
-	if err := socket.Query(op); err != nil {
+	// We unlock the iterator around socket.Query because it will call the
+	// replyFunc if the socket is dead, which would deadlock if the iterator
+	// were still locked.
+	iter.m.Unlock()
+	err = socket.Query(op)
+	iter.m.Lock()
+	if err != nil {
 		iter.docsToReceive--
 		iter.err = err
 	}
