@@ -142,6 +142,11 @@
     assertAfterClusterTimeReadSucceeds(st.rs0.getPrimary().getDB("test"), "foo");
     assertAfterClusterTimeReadSucceeds(st.rs1.getPrimary().getDB("test"), "foo");
 
+    // Test that restarted mongoses are able to connect after FCV update.
+    st.restartMongoses();
+    assertAfterClusterTimeReadSucceeds(st.s0.getDB("test"), "foo");
+    assertAfterClusterTimeReadSucceeds(st.s1.getDB("test"), "foo");
+
     // Causally consistent requests are correctly processed.
     let res = assert.commandWorked(
         st.s.getDB("test").runCommand({insert: "foo", documents: [{_id: 2, x: 2}]}));
