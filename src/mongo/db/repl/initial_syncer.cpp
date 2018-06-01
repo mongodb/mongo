@@ -198,7 +198,8 @@ InitialSyncer::InitialSyncer(
       _writerPool(writerPool),
       _storage(storage),
       _replicationProcess(replicationProcess),
-      _onCompletion(onCompletion) {
+      _onCompletion(onCompletion),
+      _observer(std::make_unique<InitialSyncApplyObserver>(&_fetchCount)) {
     uassert(ErrorCodes::BadValue, "task executor cannot be null", _exec);
     uassert(ErrorCodes::BadValue, "invalid storage interface", _storage);
     uassert(ErrorCodes::BadValue, "invalid replication process", _replicationProcess);
@@ -460,6 +461,8 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     // has to run outside lock.
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
+    _oplogApplier = {};
+
     LOG(2) << "Resetting sync source so a new one can be chosen for this initial sync attempt.";
     _syncSource = HostAndPort();
 
@@ -558,8 +561,17 @@ void InitialSyncer::_chooseSyncSourceCallback(
         return;
     }
 
-    // Schedule rollback ID checker.
     _syncSource = syncSource.getValue();
+
+    // Create oplog applier.
+    auto consistencyMarkers = _replicationProcess->getConsistencyMarkers();
+    OplogApplier::Options options;
+    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
+    options.missingDocumentSourceForInitialSync = _syncSource;
+    _oplogApplier = _dataReplicatorExternalState->makeOplogApplier(
+        _oplogBuffer.get(), _observer.get(), consistencyMarkers, _storage, options, _writerPool);
+
+    // Schedule rollback ID checker.
     _rollbackChecker = stdx::make_unique<RollbackChecker>(_exec, _syncSource);
     auto scheduleResult = _rollbackChecker->reset([=](const RollbackChecker::Result& result) {
         return _rollbackCheckerResetCallback(result, onCompletionGuard);
@@ -965,11 +977,9 @@ void InitialSyncer::_getNextApplierBatchCallback(
     const auto& ops = batchResult.getValue();
     if (!ops.empty()) {
         _fetchCount.store(0);
-        MultiApplier::MultiApplyFn applyBatchOfOperationsFn =
-            [ =, source = _syncSource ](OperationContext * opCtx, MultiApplier::Operations ops) {
-            InitialSyncApplyObserver observer(&_fetchCount);
-            return _dataReplicatorExternalState->_multiApply(
-                opCtx, ops, &observer, source, _writerPool);
+        MultiApplier::MultiApplyFn applyBatchOfOperationsFn = [this](OperationContext* opCtx,
+                                                                     MultiApplier::Operations ops) {
+            return _oplogApplier->multiApply(opCtx, std::move(ops));
         };
         const auto& lastEntry = ops.back();
         OpTimeWithHash lastApplied(lastEntry.getHash(), lastEntry.getOpTime());
@@ -1459,10 +1469,12 @@ StatusWith<Operations> InitialSyncer::_getNextApplierBatch_inlock() {
         return Operations();
     }
 
-    // Access common batching logic in OplogApplier using passthrough function in
-    // DataReplicatorExternalState.
+    // Obtain next batch of operations from OplogApplier.
     auto opCtx = makeOpCtx();
-    return _dataReplicatorExternalState->getNextApplierBatch(opCtx.get(), _oplogBuffer.get());
+    OplogApplier::BatchLimits batchLimits;
+    batchLimits.bytes = OplogApplier::replBatchLimitBytes;
+    batchLimits.ops = OplogApplier::getBatchLimitOperations();
+    return _oplogApplier->getNextApplierBatch(opCtx.get(), batchLimits);
 }
 
 StatusWith<HostAndPort> InitialSyncer::_chooseSyncSource_inlock() {

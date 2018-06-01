@@ -42,6 +42,7 @@
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
@@ -609,6 +610,8 @@ private:
     OpTimeWithHash _lastFetched;                          // (MX)
     OpTimeWithHash _lastApplied;                          // (MX)
     std::unique_ptr<OplogBuffer> _oplogBuffer;            // (M)
+    std::unique_ptr<OplogApplier::Observer> _observer;    // (S)
+    std::unique_ptr<OplogApplier> _oplogApplier;          // (M)
 
     // Used to signal changes in _state.
     mutable stdx::condition_variable _stateCondition;

@@ -1502,6 +1502,7 @@ env.Library(
         'database_cloner',
         'databases_cloner',
         'multiapplier',
+        'oplog_application_interface',
         'oplog_buffer_blocking_queue',
         'oplog_entry',
         'oplog_fetcher',
