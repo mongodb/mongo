@@ -163,40 +163,8 @@ std::unique_ptr<OplogApplier> DataReplicatorExternalStateImpl::makeOplogApplier(
                                               writerPool);
 }
 
-StatusWith<OplogApplier::Operations> DataReplicatorExternalStateImpl::getNextApplierBatch(
-    OperationContext* opCtx, OplogBuffer* oplogBuffer) {
-    OplogApplierImpl oplogApplier(
-        nullptr, oplogBuffer, nullptr, nullptr, nullptr, nullptr, {}, nullptr);
-    OplogApplier::BatchLimits batchLimits;
-    batchLimits.bytes = OplogApplier::replBatchLimitBytes;
-    batchLimits.ops = OplogApplier::getBatchLimitOperations();
-    return oplogApplier.getNextApplierBatch(opCtx, batchLimits);
-}
-
 StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {
     return _replicationCoordinator->getConfig();
-}
-
-StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(OperationContext* opCtx,
-                                                                MultiApplier::Operations ops,
-                                                                OplogApplier::Observer* observer,
-                                                                const HostAndPort& source,
-                                                                ThreadPool* writerPool) {
-    auto replicationProcess = ReplicationProcess::get(opCtx);
-    auto consistencyMarkers = replicationProcess->getConsistencyMarkers();
-    auto storageInterface = StorageInterface::get(opCtx);
-    OplogApplier::Options options;
-    options.allowNamespaceNotFoundErrorsOnCrudOps = true;
-    options.missingDocumentSourceForInitialSync = source;
-    OplogApplierImpl oplogApplier(getTaskExecutor(),
-                                  nullptr,  // oplog buffer
-                                  observer,
-                                  _replicationCoordinator,
-                                  consistencyMarkers,
-                                  storageInterface,
-                                  options,
-                                  writerPool);
-    return oplogApplier.multiApply(opCtx, std::move(ops));
 }
 
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {

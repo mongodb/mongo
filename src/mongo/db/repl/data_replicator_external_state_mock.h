@@ -64,9 +64,6 @@ public:
         const OplogApplier::Options& options,
         ThreadPool* writerPool) final;
 
-    StatusWith<OplogApplier::Operations> getNextApplierBatch(OperationContext* opCtx,
-                                                             OplogBuffer* oplogBuffer) final;
-
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
     // Task executor. Not owned by us.
@@ -95,13 +92,6 @@ public:
     MultiApplyFn multiApplyFn;
 
     StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();
-
-private:
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
-                                   MultiApplier::Operations ops,
-                                   OplogApplier::Observer* observer,
-                                   const HostAndPort& source,
-                                   ThreadPool* writerPool) override;
 };
 
 

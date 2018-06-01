@@ -118,33 +118,8 @@ std::unique_ptr<OplogApplier> DataReplicatorExternalStateMock::makeOplogApplier(
     return std::make_unique<OplogApplierMock>(getTaskExecutor(), oplogBuffer, observer, this);
 }
 
-StatusWith<OplogApplier::Operations> DataReplicatorExternalStateMock::getNextApplierBatch(
-    OperationContext* opCtx, OplogBuffer* oplogBuffer) {
-    OplogApplier::Operations ops;
-    OplogBuffer::Value op;
-    // For testing only. Return a single batch containing all of the operations in the oplog buffer.
-    while (oplogBuffer->tryPop(opCtx, &op)) {
-        OplogEntry entry(op);
-        // The "InitialSyncerPassesThroughGetNextApplierBatchInLockError" test case expects
-        // ErrorCodes::BadValue on an unexpected oplog entry version.
-        if (entry.getVersion() != OplogEntry::kOplogVersion) {
-            return {ErrorCodes::BadValue, ""};
-        }
-        ops.push_back(entry);
-    }
-    return std::move(ops);
-}
-
 StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
     return replSetConfigResult;
-}
-
-StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(OperationContext* opCtx,
-                                                                MultiApplier::Operations ops,
-                                                                OplogApplier::Observer* observer,
-                                                                const HostAndPort& source,
-                                                                ThreadPool* writerPool) {
-    return multiApplyFn(opCtx, std::move(ops), observer);
 }
 
 }  // namespace repl

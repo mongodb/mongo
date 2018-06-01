@@ -74,17 +74,7 @@ public:
         const OplogApplier::Options& options,
         ThreadPool* writerPool) final;
 
-    StatusWith<OplogApplier::Operations> getNextApplierBatch(OperationContext* opCtx,
-                                                             OplogBuffer* oplogBuffer) final;
-
     StatusWith<ReplSetConfig> getCurrentConfig() const override;
-
-private:
-    StatusWith<OpTime> _multiApply(OperationContext* opCtx,
-                                   MultiApplier::Operations ops,
-                                   OplogApplier::Observer* observer,
-                                   const HostAndPort& source,
-                                   ThreadPool* writerPool) override;
 
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;

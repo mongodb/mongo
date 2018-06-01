@@ -120,32 +120,9 @@ public:
         ThreadPool* writerPool) = 0;
 
     /**
-     * Returns a new batch of operations to apply.
-     *
-     * This function is a passthrough for OplogApplier::getNextApplierBatch()
-     */
-    virtual StatusWith<OplogApplier::Operations> getNextApplierBatch(OperationContext* opCtx,
-                                                                     OplogBuffer* oplogBuffer) = 0;
-
-    /**
      * Returns the current replica set config if there is one, or an error why there isn't.
      */
     virtual StatusWith<ReplSetConfig> getCurrentConfig() const = 0;
-
-private:
-    /**
-     * Applies the operations described in the oplog entries contained in "ops".
-     *
-     * Used exclusively by the InitialSyncer to construct a MultiApplier.
-     */
-    virtual StatusWith<OpTime> _multiApply(OperationContext* opCtx,
-                                           MultiApplier::Operations ops,
-                                           OplogApplier::Observer* observer,
-                                           const HostAndPort& source,
-                                           ThreadPool* writerPool) = 0;
-
-    // Provides InitialSyncer with access to multiApply and multiSyncApply.
-    friend class InitialSyncer;
 };
 
 }  // namespace repl
