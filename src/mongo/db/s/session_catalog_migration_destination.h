@@ -91,7 +91,7 @@ public:
     /**
      * Forces this into an error state which will also stop session transfer thread.
      */
-    void forceFail(std::string& errMsg);
+    void forceFail(StringData errMsg);
 
     /**
      * Returns the current state.

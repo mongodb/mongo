@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
@@ -78,13 +79,6 @@ public:
 
     State getState() const;
     void setState(State newState);
-
-    /**
-     * These log the argument msg; then, under lock, move msg to _errmsg and set the state to FAIL.
-     * The setStateWailWarn version logs with "warning() << msg".
-     */
-    void setStateFail(std::string msg);
-    void setStateFailWarn(std::string msg);
 
     /**
      * Checks whether the MigrationDestinationManager is currently handling a migration.
@@ -140,6 +134,13 @@ public:
     Status startCommit(const MigrationSessionId& sessionId);
 
 private:
+    /**
+     * These log the argument msg; then, under lock, move msg to _errmsg and set the state to FAIL.
+     * The setStateWailWarn version logs with "warning() << msg".
+     */
+    void _setStateFail(StringData msg);
+    void _setStateFailWarn(StringData msg);
+
     /**
      * Thread which drives the migration apply process on the recipient side.
      */

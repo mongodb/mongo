@@ -480,7 +480,7 @@ SessionCatalogMigrationDestination::State SessionCatalogMigrationDestination::ge
     return _state;
 }
 
-void SessionCatalogMigrationDestination::forceFail(std::string& errMsg) {
+void SessionCatalogMigrationDestination::forceFail(StringData errMsg) {
     _errorOccurred(errMsg);
 }
 
