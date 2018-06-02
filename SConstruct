@@ -3368,7 +3368,7 @@ if get_option('install-mode') == 'hygienic':
         )
     elif env['PLATFORM'] == 'darwin':
         env.AppendUnique(
-            PROGLINKFLAGS=[
+            LINKFLAGS=[
                 '-Wl,-rpath,@loader_path/../lib'
             ],
             SHLINKFLAGS=[
