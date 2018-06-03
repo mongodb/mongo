@@ -625,6 +625,18 @@ TEST(PipelineOptimizationTest, MatchShouldDuplicateItselfBeforeRedact) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, LimitAfterUnwindWithPreserveNullAndEmptyArraysShouldBeCopiedBeforeUnwind) {
+    string inputPipe =
+        "[{$unwind: {path: '$a.b.c', preserveNullAndEmptyArrays: true}}, "
+        "{$limit: 3}]";
+    string outputPipe =
+        "[{$limit: 3}, "
+        "{$unwind: {path: '$a.b.c', preserveNullAndEmptyArrays: true}}, "
+        "{$limit: 3}]";
+    string serializedPipe = "[{$limit: 3}, {$unwind: {path: '$a.b.c', preserveNullAndEmptyArrays:true}}, {$limit: 3}]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, MatchShouldSwapWithUnwind) {
     string inputPipe =
         "[{$unwind: '$a.b.c'}, "

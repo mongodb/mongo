@@ -100,6 +100,7 @@ private:
     // If set, the $unwind stage will include the array index in the specified path, overwriting any
     // existing value, setting to null when the value was a non-array or empty array.
     const boost::optional<FieldPath> _indexPath;
+    bool _hasSwappedLimit = false;
 
     // Iteration state.
     class Unwinder;

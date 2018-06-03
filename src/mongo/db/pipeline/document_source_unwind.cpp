@@ -49,11 +49,12 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     invariant(*itr == this);
 
     auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
-    if (_preserveNullAndEmptyArrays && nextLimit) {
-        container->insert(itr, nextLimit);
+    if (_preserveNullAndEmptyArrays && nextLimit && !_hasSwappedLimit) {
+        container->insert(itr, DocumentSourceLimit::create(pExpCtx, nextLimit->getLimit()));
+        _hasSwappedLimit = true;
     }
-
-    return std::prev(itr);
+    
+    return std::prev(std::prev(itr));
 }
 /** Helper class to unwind array from a single document. */
 class DocumentSourceUnwind::Unwinder {
