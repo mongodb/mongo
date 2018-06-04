@@ -128,18 +128,71 @@ std::string x509OidToShortName(const std::string& name) {
 }
 #else
 // On Apple/Windows we have to provide our own mapping.
+// Generate the 2.5.4.* portions of this list from OpenSSL sources with:
+// grep -E '^X509 ' "$OPENSSL/crypto/objects/objects.txt" | tr -d '\t' |
+//   sed -e 's/^X509 *\([0-9]\+\) *\(: *\)\+\([[:alnum:]]\+\).*/{"2.5.4.\1", "\3"},/g'
 std::string x509OidToShortName(const std::string& name) {
-    static const std::map<std::string, std::string> kX509OidToShortNameMappings = {
+    static const StringMap<std::string> kX509OidToShortNameMappings = {
         {"0.9.2342.19200300.100.1.1", "UID"},
         {"0.9.2342.19200300.100.1.25", "DC"},
         {"1.2.840.113549.1.9.1", "emailAddress"},
+        {"2.5.29.17", "subjectAltName"},
+
+        // X509 OIDs Generated from objects.txt
         {"2.5.4.3", "CN"},
+        {"2.5.4.4", "SN"},
+        {"2.5.4.5", "serialNumber"},
         {"2.5.4.6", "C"},
         {"2.5.4.7", "L"},
         {"2.5.4.8", "ST"},
-        {"2.5.4.9", "STREET"},
+        {"2.5.4.9", "street"},
         {"2.5.4.10", "O"},
         {"2.5.4.11", "OU"},
+        {"2.5.4.12", "title"},
+        {"2.5.4.13", "description"},
+        {"2.5.4.14", "searchGuide"},
+        {"2.5.4.15", "businessCategory"},
+        {"2.5.4.16", "postalAddress"},
+        {"2.5.4.17", "postalCode"},
+        {"2.5.4.18", "postOfficeBox"},
+        {"2.5.4.19", "physicalDeliveryOfficeName"},
+        {"2.5.4.20", "telephoneNumber"},
+        {"2.5.4.21", "telexNumber"},
+        {"2.5.4.22", "teletexTerminalIdentifier"},
+        {"2.5.4.23", "facsimileTelephoneNumber"},
+        {"2.5.4.24", "x121Address"},
+        {"2.5.4.25", "internationaliSDNNumber"},
+        {"2.5.4.26", "registeredAddress"},
+        {"2.5.4.27", "destinationIndicator"},
+        {"2.5.4.28", "preferredDeliveryMethod"},
+        {"2.5.4.29", "presentationAddress"},
+        {"2.5.4.30", "supportedApplicationContext"},
+        {"2.5.4.31", "member"},
+        {"2.5.4.32", "owner"},
+        {"2.5.4.33", "roleOccupant"},
+        {"2.5.4.34", "seeAlso"},
+        {"2.5.4.35", "userPassword"},
+        {"2.5.4.36", "userCertificate"},
+        {"2.5.4.37", "cACertificate"},
+        {"2.5.4.38", "authorityRevocationList"},
+        {"2.5.4.39", "certificateRevocationList"},
+        {"2.5.4.40", "crossCertificatePair"},
+        {"2.5.4.41", "name"},
+        {"2.5.4.42", "GN"},
+        {"2.5.4.43", "initials"},
+        {"2.5.4.44", "generationQualifier"},
+        {"2.5.4.45", "x500UniqueIdentifier"},
+        {"2.5.4.46", "dnQualifier"},
+        {"2.5.4.47", "enhancedSearchGuide"},
+        {"2.5.4.48", "protocolInformation"},
+        {"2.5.4.49", "distinguishedName"},
+        {"2.5.4.50", "uniqueMember"},
+        {"2.5.4.51", "houseIdentifier"},
+        {"2.5.4.52", "supportedAlgorithms"},
+        {"2.5.4.53", "deltaRevocationList"},
+        {"2.5.4.54", "dmdName"},
+        {"2.5.4.65", "pseudonym"},
+        {"2.5.4.72", "role"},
     };
 
     auto it = kX509OidToShortNameMappings.find(name);

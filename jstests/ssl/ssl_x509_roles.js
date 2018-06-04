@@ -76,26 +76,6 @@ load('jstests/ssl/libs/ssl_helpers.js');
 
         // runMongoProgram returns 0 on success
         assert.eq(0, email, "Connection attempt failed");
-
-        // We test the "title" OID is represented as an OID on Apple and Windows
-        // rather then try to make Apple and Windows support every possible OID.
-        requireSSLProvider(['apple', 'windows'], function() {
-
-            const title = runMongoProgram("mongo",
-                                          "--host",
-                                          "localhost",
-                                          "--port",
-                                          port,
-                                          "--ssl",
-                                          "--sslCAFile",
-                                          CA_CERT,
-                                          "--sslPEMKeyFile",
-                                          CLIENT_TITLE_CERT,
-                                          "jstests/ssl/libs/ssl_x509_role_auth_title.js");
-
-            // runMongoProgram returns 0 on success
-            assert.eq(0, title, "Connection attempt failed");
-        });
     }
 
     const x509_options = {sslMode: "requireSSL", sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT};
