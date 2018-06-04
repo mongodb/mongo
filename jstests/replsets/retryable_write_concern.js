@@ -1,5 +1,7 @@
 /**
  * Tests for making sure that retried writes will wait properly for writeConcern.
+ *
+ * @tags: [uses_transactions]
  */
 (function() {
 
@@ -25,15 +27,27 @@
         assert.eq(true, errInfo.wtimeout, tojson(result));
     };
 
-    let runTest = function(priConn, secConn, cmd) {
+    /**
+     * Tests that a retryable write properly waits for writeConcern on retry. Takes an optional
+     * 'setupFunc' that sets up the database state. 'setupFunc' accepts a connection to the
+     * primary.
+     */
+    let runTest = function(priConn, secConn, cmd, dbName, setupFunc) {
+        dbName = dbName || "test";
+        jsTestLog(`Testing ${tojson(cmd)} on ${dbName}.`);
+
         // Send a dummy write to this connection so it will have the Client object initialized.
         let secondPriConn = new Mongo(priConn.host);
-        let testDB2 = secondPriConn.getDB('test');
+        let testDB2 = secondPriConn.getDB(dbName);
         assert.writeOK(testDB2.dummy.insert({x: 1}, {writeConcern: {w: kNodes}}));
+
+        if (setupFunc) {
+            setupFunc(priConn);
+        }
 
         stopServerReplication(secConn);
 
-        let testDB = priConn.getDB('test');
+        let testDB = priConn.getDB(dbName);
         checkWriteConcernTimedOut(testDB.runCommand(cmd));
         checkWriteConcernTimedOut(testDB2.runCommand(cmd));
 
@@ -88,6 +102,30 @@
         txnNumber: NumberLong(37),
         writeConcern: {w: 'majority', wtimeout: 200},
     });
+
+    runTest(priConn,
+            secConn,
+            {
+              commitTransaction: 1,
+              lsid: {id: lsid},
+              txnNumber: NumberLong(38),
+              autocommit: false,
+              writeConcern: {w: 'majority', wtimeout: 200},
+            },
+            'admin',
+            function(conn) {
+                assert.commandWorked(conn.getDB('test').runCommand({
+                    insert: 'user',
+                    documents: [{_id: 80}, {_id: 90}],
+                    ordered: false,
+                    lsid: {id: lsid},
+                    txnNumber: NumberLong(38),
+                    readConcern: {level: 'snapshot'},
+                    autocommit: false,
+                    startTransaction: true
+                }));
+
+            });
 
     replTest.stopSet();
 })();
