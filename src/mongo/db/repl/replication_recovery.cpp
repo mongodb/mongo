@@ -44,6 +44,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
@@ -419,6 +420,7 @@ StatusWith<OpTime> ReplicationRecoveryImpl::_getTopOfOplog(OperationContext* opC
 
 void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                                                Timestamp truncateTimestamp) {
+    Timer timer;
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
@@ -455,6 +457,8 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                 invariant(!oldestIDToDelete.isNull());
                 oplogCollection->cappedTruncateAfter(opCtx, oldestIDToDelete, /*inclusive=*/true);
             }
+            log() << "Replication recovery oplog truncation finished in: " << timer.millis()
+                  << "ms";
             return;
         }
 
