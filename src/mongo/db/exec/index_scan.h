@@ -46,8 +46,7 @@ class IndexDescriptor;
 class WorkingSet;
 
 struct IndexScanParams {
-    IndexScanParams()
-        : descriptor(NULL), direction(1), doNotDedup(false), maxScan(0), addKeyMetadata(false) {}
+    IndexScanParams() : descriptor(NULL), direction(1), doNotDedup(false), addKeyMetadata(false) {}
 
     const IndexDescriptor* descriptor;
 
@@ -56,9 +55,6 @@ struct IndexScanParams {
     int direction;
 
     bool doNotDedup;
-
-    // How many keys will we look at?
-    size_t maxScan;
 
     // Do we want to add the key as metadata?
     bool addKeyMetadata;

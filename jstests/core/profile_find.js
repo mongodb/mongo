@@ -132,10 +132,6 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq(profileObj.command.comment, "a comment", tojson(profileObj));
 
-    assert.eq(coll.find().maxScan(3000).itcount(), 1);
-    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
-    assert.eq(profileObj.command.maxScan, 3000, tojson(profileObj));
-
     var maxTimeMS = 100000;
     assert.eq(coll.find().maxTimeMS(maxTimeMS).itcount(), 1);
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);

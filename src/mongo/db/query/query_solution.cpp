@@ -221,10 +221,7 @@ QuerySolutionNode* TextNode::clone() const {
 //
 
 CollectionScanNode::CollectionScanNode()
-    : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
-      tailable(false),
-      direction(1),
-      maxScan(0) {}
+    : _sort(SimpleBSONObjComparator::kInstance.makeBSONObjSet()), tailable(false), direction(1) {}
 
 void CollectionScanNode::appendToString(mongoutils::str::stream* ss, int indent) const {
     addIndent(ss, indent);
@@ -246,7 +243,6 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     copy->name = this->name;
     copy->tailable = this->tailable;
     copy->direction = this->direction;
-    copy->maxScan = this->maxScan;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
 
@@ -518,7 +514,6 @@ IndexScanNode::IndexScanNode(IndexEntry index)
     : _sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()),
       index(std::move(index)),
       direction(1),
-      maxScan(0),
       addKeyMetadata(false),
       queryCollator(nullptr) {}
 
@@ -784,7 +779,6 @@ QuerySolutionNode* IndexScanNode::clone() const {
 
     copy->_sorts = this->_sorts;
     copy->direction = this->direction;
-    copy->maxScan = this->maxScan;
     copy->addKeyMetadata = this->addKeyMetadata;
     copy->bounds = this->bounds;
     copy->queryCollator = this->queryCollator;
@@ -808,8 +802,8 @@ bool filtersAreEquivalent(const MatchExpression* lhs, const MatchExpression* rhs
 
 bool IndexScanNode::operator==(const IndexScanNode& other) const {
     return filtersAreEquivalent(filter.get(), other.filter.get()) && index == other.index &&
-        direction == other.direction && maxScan == other.maxScan &&
-        addKeyMetadata == other.addKeyMetadata && bounds == other.bounds;
+        direction == other.direction && addKeyMetadata == other.addKeyMetadata &&
+        bounds == other.bounds;
 }
 
 //

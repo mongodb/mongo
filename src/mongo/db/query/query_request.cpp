@@ -89,7 +89,6 @@ const char kBatchSizeField[] = "batchSize";
 const char kNToReturnField[] = "ntoreturn";
 const char kSingleBatchField[] = "singleBatch";
 const char kCommentField[] = "comment";
-const char kMaxScanField[] = "maxScan";
 const char kMaxField[] = "max";
 const char kMinField[] = "min";
 const char kReturnKeyField[] = "returnKey";
@@ -265,15 +264,6 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
             }
 
             qr->_comment = el.str();
-        } else if (fieldName == kMaxScanField) {
-            if (!el.isNumber()) {
-                str::stream ss;
-                ss << "Failed to parse: " << cmdObj.toString() << ". "
-                   << "'maxScan' field must be numeric.";
-                return Status(ErrorCodes::FailedToParse, ss);
-            }
-
-            qr->_maxScan = el.numberInt();
         } else if (fieldName == cmdOptionMaxTimeMS) {
             StatusWith<int> maxTimeMS = parseMaxTimeMS(el);
             if (!maxTimeMS.isOK()) {
@@ -470,10 +460,6 @@ void QueryRequest::asFindCommand(BSONObjBuilder* cmdBuilder) const {
         cmdBuilder->append(kCommentField, _comment);
     }
 
-    if (_maxScan > 0) {
-        cmdBuilder->append(kMaxScanField, _maxScan);
-    }
-
     if (_maxTimeMS > 0) {
         cmdBuilder->append(cmdOptionMaxTimeMS, _maxTimeMS);
     }
@@ -609,12 +595,6 @@ Status QueryRequest::validate() const {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "NToReturn value must be non-negative, but received: "
                                     << *_ntoreturn);
-    }
-
-    if (_maxScan < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "MaxScan value must be non-negative, but received: "
-                                    << _maxScan);
     }
 
     if (_maxTimeMS < 0) {
@@ -879,9 +859,6 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
                     _returnKey = true;
                     addReturnKeyMetaProj();
                 }
-            } else if (str::equals("maxScan", name)) {
-                // Won't throw.
-                _maxScan = e.numberInt();
             } else if (str::equals("showDiskLoc", name)) {
                 // Won't throw.
                 if (e.trueValue()) {
@@ -972,10 +949,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (!_max.isEmpty()) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kMaxField << " not supported in aggregation."};
-    }
-    if (_maxScan != 0) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kMaxScanField << " not supported in aggregation."};
     }
     if (_returnKey) {
         return {ErrorCodes::InvalidPipelineOperator,

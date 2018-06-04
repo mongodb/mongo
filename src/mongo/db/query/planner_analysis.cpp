@@ -216,7 +216,6 @@ void explodeScan(const IndexScanNode* isn,
         // Copy boring fields into new child.
         IndexScanNode* child = new IndexScanNode(isn->index);
         child->direction = isn->direction;
-        child->maxScan = isn->maxScan;
         child->addKeyMetadata = isn->addKeyMetadata;
         child->queryCollator = isn->queryCollator;
 

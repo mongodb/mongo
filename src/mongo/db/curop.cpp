@@ -59,15 +59,7 @@ namespace {
 // OP_QUERY find. The $orderby field is omitted because "orderby" (no dollar sign) is also allowed,
 // and this requires special handling.
 const std::vector<const char*> kDollarQueryModifiers = {
-    "$hint",
-    "$comment",
-    "$maxScan",
-    "$max",
-    "$min",
-    "$returnKey",
-    "$showDiskLoc",
-    "$snapshot",
-    "$maxTimeMS",
+    "$hint", "$comment", "$max", "$min", "$returnKey", "$showDiskLoc", "$snapshot", "$maxTimeMS",
 };
 
 }  // namespace

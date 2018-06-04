@@ -150,7 +150,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->name = query.ns();
     csn->filter = query.root()->shallowClone();
     csn->tailable = tailable;
-    csn->maxScan = query.getQueryRequest().getMaxScan();
     csn->shouldTrackLatestOplogTimestamp =
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
     csn->shouldWaitForOplogVisibility =
@@ -246,7 +245,6 @@ QuerySolutionNode* QueryPlannerAccess::makeLeafNode(
         // because expr might be inside an array operator that provides a path prefix.
         IndexScanNode* isn = new IndexScanNode(index);
         isn->bounds.fields.resize(index.keyPattern.nFields());
-        isn->maxScan = query.getQueryRequest().getMaxScan();
         isn->addKeyMetadata = query.getQueryRequest().returnKey();
         isn->queryCollator = query.getCollator();
 
@@ -1273,7 +1271,6 @@ QuerySolutionNode* QueryPlannerAccess::scanWholeIndex(const IndexEntry& index,
 
     // Build an ixscan over the id index, use it, and return it.
     unique_ptr<IndexScanNode> isn = make_unique<IndexScanNode>(index);
-    isn->maxScan = query.getQueryRequest().getMaxScan();
     isn->addKeyMetadata = query.getQueryRequest().returnKey();
     isn->queryCollator = query.getCollator();
 
@@ -1409,7 +1406,6 @@ QuerySolutionNode* QueryPlannerAccess::makeIndexScan(const IndexEntry& index,
     // Build an ixscan over the id index, use it, and return it.
     IndexScanNode* isn = new IndexScanNode(index);
     isn->direction = 1;
-    isn->maxScan = query.getQueryRequest().getMaxScan();
     isn->addKeyMetadata = query.getQueryRequest().returnKey();
     isn->bounds.isSimpleRange = true;
     isn->bounds.startKey = startKey;

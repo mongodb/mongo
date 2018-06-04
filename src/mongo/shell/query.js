@@ -40,7 +40,6 @@ DBQuery.prototype.help = function() {
         "\t.explain(<verbosity>) - accepted verbosities are {'queryPlanner', 'executionStats', 'allPlansExecution'}");
     print("\t.min({...})");
     print("\t.max({...})");
-    print("\t.maxScan(<n>)");
     print("\t.maxTimeMS(<n>)");
     print("\t.comment(<comment>)");
     print("\t.tailable(<isAwaitData>)");
@@ -195,10 +194,6 @@ DBQuery.prototype._convertToCommand = function(canAttachReadPref) {
 
     if ("$comment" in this._query) {
         cmd["comment"] = this._query.$comment;
-    }
-
-    if ("$maxScan" in this._query) {
-        cmd["maxScan"] = this._query.$maxScan;
     }
 
     if ("$maxTimeMS" in this._query) {
@@ -524,10 +519,6 @@ DBQuery.prototype.returnKey = function() {
     return this._addSpecial("$returnKey", true);
 };
 
-DBQuery.prototype.maxScan = function(n) {
-    return this._addSpecial("$maxScan", n);
-};
-
 DBQuery.prototype.pretty = function() {
     this._prettyShell = true;
     return this;
@@ -654,7 +645,7 @@ DBQuery.prototype.modifiers = function(document) {
 
     for (var name in document) {
         if (name[0] != '$') {
-            throw new Error('All modifiers must start with a $ such as $maxScan or $returnKey');
+            throw new Error('All modifiers must start with a $ such as $returnKey');
         }
     }
 

@@ -89,10 +89,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         return PlanStage::DEAD;
     }
 
-    if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
-        _commonStats.isEOF = true;
-    }
-
     if (_commonStats.isEOF) {
         return PlanStage::IS_EOF;
     }

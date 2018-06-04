@@ -81,7 +81,6 @@ PlanStage* buildStages(OperationContext* opCtx,
             params.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
             params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
                                                      : CollectionScanParams::BACKWARD;
-            params.maxScan = csn->maxScan;
             params.shouldWaitForOplogVisibility = csn->shouldWaitForOplogVisibility;
             return new CollectionScan(opCtx, params, ws, csn->filter.get());
         }
@@ -101,7 +100,6 @@ PlanStage* buildStages(OperationContext* opCtx,
 
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
-            params.maxScan = ixn->maxScan;
             params.addKeyMetadata = ixn->addKeyMetadata;
             return new IndexScan(opCtx, params, ws, ixn->filter.get());
         }

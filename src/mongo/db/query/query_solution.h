@@ -303,9 +303,6 @@ struct CollectionScanNode : public QuerySolutionNode {
 
     int direction;
 
-    // maxScan option to .find() limits how many docs we look at.
-    int maxScan;
-
     // Whether or not to wait for oplog visibility on oplog collection scans.
     bool shouldWaitForOplogVisibility = false;
 };
@@ -488,9 +485,6 @@ struct IndexScanNode : public QuerySolutionNode {
     IndexEntry index;
 
     int direction;
-
-    // maxScan option to .find() limits how many docs we look at.
-    int maxScan;
 
     // If there's a 'returnKey' projection we add key metadata.
     bool addKeyMetadata;

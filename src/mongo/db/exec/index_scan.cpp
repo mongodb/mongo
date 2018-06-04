@@ -172,9 +172,6 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         }
 
         ++_specificStats.keysExamined;
-        if (_params.maxScan && _specificStats.keysExamined >= _params.maxScan) {
-            kv = boost::none;
-        }
     }
 
     if (kv && _checker) {

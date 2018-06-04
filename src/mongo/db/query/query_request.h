@@ -262,14 +262,6 @@ public:
         _unwrappedReadPref = unwrappedReadPref.getOwned();
     }
 
-    int getMaxScan() const {
-        return _maxScan;
-    }
-
-    void setMaxScan(int maxScan) {
-        _maxScan = maxScan;
-    }
-
     int getMaxTimeMS() const {
         return _maxTimeMS;
     }
@@ -484,8 +476,6 @@ private:
     bool _explain = false;
 
     std::string _comment;
-
-    int _maxScan = 0;
 
     // A user-specified maxTimeMS limit, or a value of '0' if not specified.
     int _maxTimeMS = 0;

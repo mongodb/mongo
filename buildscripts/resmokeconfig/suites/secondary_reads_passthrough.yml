@@ -32,7 +32,6 @@ selector:
   - jstests/core/fts_spanish.js
   - jstests/core/geo_distinct.js
   - jstests/core/geo_s2ordering.js
-  - jstests/core/maxscan.js
   - jstests/core/nan.js
   - jstests/core/null2.js
   - jstests/core/not2.js
