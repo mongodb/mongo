@@ -1,0 +1,74 @@
+# Create certificate using:
+# openssl req -new -config client-all-the-oids.csr.in -keyout client-all-the-oids.key -out client-all-the-oids.csr
+# openssl rsa -in client-all-the-oids.key -out client-all-the-oids.rsa
+# openssl x509 -in client-all-the-oids.csr -out client-all-the-oids.pem -req -CA ca.pem -days 3650 -CAcreateserial
+# cat client-all-the-oids.rsa >> client-all-the-oids.pem
+# rm ca.srl client-all-the-oids.key client-all-the-oids.rsa client-all-the-oids.csr
+
+[ req ]
+default_bits=2048
+prompt=no
+encrypt_key=no
+default_md=sha1
+distinguished_name=dn
+
+[ dn ]
+# Collect all known OIDs using:
+# grep -E '^X509 ' "$OPENSSL/crypto/objects/objects.txt" | tr -d '\t' | \
+#   sed -e 's/^X509 *\([0-9]\+\) *\(: *\)\+\([[:alnum:]]\+\).*/\3=Datum-\1/g' \
+#       -e 's/C=Datum-6/C=US/g' -e 's/ST=Datum-8/ST=NY/g'
+CN=Datum-3
+SN=Datum-4
+serialNumber=Datum-5
+C=US
+L=Datum-7
+ST=NY
+street=Datum-9
+O=Datum-10
+OU=Datum-11
+title=Datum-12
+description=Datum-13
+searchGuide=Datum-14
+businessCategory=Datum-15
+postalAddress=Datum-16
+postalCode=Datum-17
+postOfficeBox=Datum-18
+physicalDeliveryOfficeName=Datum-19
+telephoneNumber=Datum-20
+telexNumber=Datum-21
+teletexTerminalIdentifier=Datum-22
+facsimileTelephoneNumber=Datum-23
+x121Address=Datum-24
+internationaliSDNNumber=Datum-25
+registeredAddress=Datum-26
+destinationIndicator=Datum-27
+preferredDeliveryMethod=Datum-28
+presentationAddress=Datum-29
+supportedApplicationContext=Datum-30
+member=Datum-31
+owner=Datum-32
+roleOccupant=Datum-33
+seeAlso=Datum-34
+userPassword=Datum-35
+userCertificate=Datum-36
+cACertificate=Datum-37
+authorityRevocationList=Datum-38
+certificateRevocationList=Datum-39
+crossCertificatePair=Datum-40
+name=Datum-41
+GN=Datum-42
+initials=Datum-43
+generationQualifier=Datum-44
+x500UniqueIdentifier=Datum-45
+dnQualifier=Datum-46
+enhancedSearchGuide=Datum-47
+protocolInformation=Datum-48
+distinguishedName=Datum-49
+uniqueMember=Datum-50
+houseIdentifier=Datum-51
+supportedAlgorithms=Datum-52
+deltaRevocationList=Datum-53
+dmdName=Datum-54
+pseudonym=Datum-65
+role=Datum-72
+
