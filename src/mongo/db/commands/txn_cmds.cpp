@@ -36,6 +36,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/util/fail_point_service.h"
@@ -79,6 +80,11 @@ public:
 
         // commitTransaction is retryable.
         if (session->transactionIsCommitted()) {
+            // We set the client last op to the last optime observed by the system to ensure that
+            // we wait for the specified write concern on an optime greater than or equal to the
+            // commit oplog entry.
+            auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+            replClient.setLastOpToSystemLastOpTime(opCtx);
             return true;
         }
 
