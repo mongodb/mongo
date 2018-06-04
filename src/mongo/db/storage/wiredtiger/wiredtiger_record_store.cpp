@@ -67,6 +67,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -1155,6 +1156,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 }
 
 void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp persistedTimestamp) {
+    Timer timer;
     while (auto stone = _oplogStones->peekOldestStoneIfNeeded()) {
         invariant(stone->lastRecord.isNormal());
 
@@ -1204,6 +1206,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp pers
 
     LOG(1) << "Finished truncating the oplog, it now contains approximately " << _numRecords.load()
            << " records totaling to " << _dataSize.load() << " bytes";
+    log() << "WiredTiger record store oplog truncation finished in: " << timer.millis() << "ms";
 }
 
 Status WiredTigerRecordStore::insertRecords(OperationContext* opCtx,

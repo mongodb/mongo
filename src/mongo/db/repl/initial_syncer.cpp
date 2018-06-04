@@ -67,6 +67,7 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
@@ -596,7 +597,9 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
 
     // 1.) Truncate the oplog.
     LOG(2) << "Truncating the existing oplog: " << _opts.localOplogNS;
+    Timer timer;
     auto status = _storage->truncateCollection(opCtx.get(), _opts.localOplogNS);
+    log() << "Initial syncer oplog truncation finished in: " << timer.millis() << "ms";
     if (!status.isOK()) {
         // 1a.) Create the oplog.
         LOG(2) << "Creating the oplog: " << _opts.localOplogNS;
