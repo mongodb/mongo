@@ -245,6 +245,7 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
        << "  foo                   foo database on local machine\n"
        << "  192.168.0.5/foo       foo database on 192.168.0.5 machine\n"
        << "  192.168.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999\n"
+       << "  mongodb://192.168.0.5:9999/foo  connection string URI can also be used\n"
        << options.helpString() << "\n"
        << "file names: a list of files to run. files have to end in .js and will exit after "
        << "unless --shell is specified";
