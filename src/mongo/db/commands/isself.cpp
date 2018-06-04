@@ -51,9 +51,12 @@ public:
     std::string help() const override {
         return "{ _isSelf : 1 } INTERNAL ONLY";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
+    bool requiresAuth() const override {
+        return false;
+    }
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {}
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,
