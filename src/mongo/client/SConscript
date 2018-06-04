@@ -4,16 +4,6 @@ Import('env')
 
 env = env.Clone()
 
-
-env.SConscript(
-    dirs=[
-        'embedded',
-    ],
-    exports=[
-        'env',
-    ],
-)
-	
 # Contains only the core ConnectionString functionality, *not* the ability to call connect()
 # and return a DBClientBase* back. For that you need to link against the 'clientdriver' library.
 env.Library(
