@@ -1,10 +1,4 @@
 (function() {
-    // TODO: Remove this for SERVER-35237 to be resolved.
-    if (jsTest.options().storageEngine === 'wiredTiger') {
-        jsTest.log('not running test on wiredTiger storage engine');
-        return;
-    }
-
     t = db.push2;
     t.drop();
 
