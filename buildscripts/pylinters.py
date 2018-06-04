@@ -76,13 +76,18 @@ def _lint_files(linters, config_dict, file_names):
     if not linter_instances:
         sys.exit(1)
 
+    failed_lint = False
+
     for linter in linter_instances:
         run_fix = lambda param1: lint_runner.run_lint(linter, param1)  # pylint: disable=cell-var-from-loop
         lint_clean = parallel.parallel_process([os.path.abspath(f) for f in file_names], run_fix)
 
         if not lint_clean:
-            print("ERROR: Code Style does not match coding style")
-            sys.exit(1)
+            failed_lint = True
+
+    if failed_lint:
+        print("ERROR: Code Style does not match coding style")
+        sys.exit(1)
 
 
 def lint_patch(linters, config_dict, file_name):
