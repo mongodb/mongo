@@ -90,6 +90,7 @@
     session.endSession();
 
     // readConcern 'snapshot' is allowed on a replica set secondary.
+    rst.awaitLastOpCommitted();
     session = rst.getSecondary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
     session.startTransaction({readConcern: {level: "snapshot"}});
