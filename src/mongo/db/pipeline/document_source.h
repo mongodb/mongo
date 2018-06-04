@@ -290,6 +290,13 @@ public:
             return transactionRequirement == TransactionRequirement::kAllowed;
         }
 
+        /**
+         * Returns true if this stage writes persistent data to disk.
+         */
+        bool writesPersistentData() const {
+            return diskRequirement == DiskUseRequirement::kWritesPersistentData;
+        }
+
         // Indicates whether this stage needs to be at a particular position in the pipeline.
         const PositionRequirement requiredPosition;
 

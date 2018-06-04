@@ -239,6 +239,21 @@ TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
         ErrorCodes::OptionNotSupportedOnView);
 }
 
+TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStagePersistentWrite) {
+    const NamespaceString viewName("db.view");
+    const NamespaceString viewOn("db.coll");
+
+    // $out cannot be used in a view definition pipeline.
+    auto invalidPipeline = BSON_ARRAY(BSON("$out"
+                                           << "someOtherCollection"));
+
+    ASSERT_THROWS_CODE(
+        viewCatalog.createView(opCtx.get(), viewName, viewOn, invalidPipeline, emptyCollation)
+            .ignore(),
+        AssertionException,
+        ErrorCodes::OptionNotSupportedOnView);
+}
+
 TEST_F(ViewCatalogFixture, CreateViewOnInvalidCollectionName) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.$coll");
