@@ -112,6 +112,7 @@ public:
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
+        result.appendNumber("connectionId", opCtx->getClient()->getConnectionId());
 
         // Mongos tries to keep exactly the same version range of the server for which
         // it is compiled.

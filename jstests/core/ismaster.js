@@ -8,6 +8,7 @@ assert(res.maxWriteBatchSize && isNumber(res.maxWriteBatchSize) && res.maxWriteB
        "maxWriteBatchSize possibly missing:" + tojson(res));
 assert(res.ismaster, "ismaster missing or false:" + tojson(res));
 assert(res.localTime, "localTime possibly missing:" + tojson(res));
+assert(res.connectionId, "connectionId missing or false" + tojson(res));
 
 if (!testingReplication) {
     var badFields = [];
