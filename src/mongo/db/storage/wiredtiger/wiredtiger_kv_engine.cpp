@@ -618,10 +618,15 @@ void WiredTigerKVEngine::cleanShutdown() {
     }
 
     // these must be the last things we do before _conn->close();
-    if (_journalFlusher)
+    if (_journalFlusher) {
+        log() << "Shutting down journal flusher thread";
         _journalFlusher->shutdown();
+        log() << "Finished shutting down journal flusher thread";
+    }
     if (_checkpointThread) {
+        log() << "Shutting down checkpoint thread";
         _checkpointThread->shutdown();
+        log() << "Finished shutting down checkpoint thread";
         LOG_FOR_RECOVERY(2) << "Shutdown timestamps. StableTimestamp: "
                             << _checkpointThread->getStableTimestamp()
                             << " Initial data timestamp: "
