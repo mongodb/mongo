@@ -70,7 +70,12 @@ ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocume
                                                               &ttlDeletedDocuments);
 
 MONGO_EXPORT_SERVER_PARAMETER(ttlMonitorEnabled, bool, true);
-MONGO_EXPORT_SERVER_PARAMETER(ttlMonitorSleepSecs, int, 60);  // used for testing
+MONGO_EXPORT_SERVER_PARAMETER(ttlMonitorSleepSecs, int, 60)
+    ->withValidator([](const int& newVal) {
+        if (newVal <= 0)
+            return Status(ErrorCodes::BadValue, "ttlMonitorSleepSecs must be strictly positive");
+        return Status::OK();
+    });  // used for testing
 
 class TTLMonitor : public BackgroundJob {
 public:
