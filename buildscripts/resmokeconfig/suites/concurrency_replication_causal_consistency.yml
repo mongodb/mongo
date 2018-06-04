@@ -52,9 +52,7 @@ executor:
   # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
   - class: CheckReplDBHash
   - class: ValidateCollections
-  # TODO SERVER-35197: Change it to CleanupConcurrencyWorkloads
-  - class: CleanEveryN
-    n: 20
+  - class: CleanupConcurrencyWorkloads
   fixture:
     class: ReplicaSetFixture
     mongod_options:
