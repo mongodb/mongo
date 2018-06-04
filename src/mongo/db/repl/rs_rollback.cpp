@@ -1334,7 +1334,15 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                 // RecordId loc = Helpers::findById(nsd, pattern);
                                 if (!loc.isNull()) {
                                     try {
-                                        collection->cappedTruncateAfter(opCtx, loc, true);
+                                        writeConflictRetry(opCtx,
+                                                           "cappedTruncateAfter",
+                                                           collection->ns().ns(),
+                                                           [&] {
+                                                               WriteUnitOfWork wunit(opCtx);
+                                                               collection->cappedTruncateAfter(
+                                                                   opCtx, loc, true);
+                                                               wunit.commit();
+                                                           });
                                     } catch (const DBException& e) {
                                         if (e.code() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
