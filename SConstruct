@@ -727,10 +727,6 @@ env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
     default=mongo_generators.default_buildinfo_environment_data())
 
-# Exposed to be able to cross compile Android/*nix from Windows without ending up with the .exe suffix.
-env_vars.Add('PROGSUFFIX',
-    help='Sets the suffix for built executable files')
-
 env_vars.Add('MONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
     converter=variable_distsrc_converter,
@@ -772,6 +768,10 @@ env_vars.Add('MSVC_VERSION',
 env_vars.Add('OBJCOPY',
     help='Sets the path to objcopy',
     default=WhereIs('objcopy'))
+
+# Exposed to be able to cross compile Android/*nix from Windows without ending up with the .exe suffix.
+env_vars.Add('PROGSUFFIX',
+    help='Sets the suffix for built executable files')
 
 env_vars.Add('RPATH',
     help='Set the RPATH for dynamic libraries and executables',
@@ -1049,13 +1049,14 @@ elif endian == "big":
 # NOTE: Remember to add a trailing comma to form any required one
 # element tuples, or your configure checks will fail in strange ways.
 processor_macros = {
-    'arm'     : { 'endian': 'little', 'defines': ('__arm__',) },
-    'aarch64' : { 'endian': 'little', 'defines': ('__arm64__', '__aarch64__')},
-    'i386'    : { 'endian': 'little', 'defines': ('__i386', '_M_IX86')},
-    'ppc64le' : { 'endian': 'little', 'defines': ('__powerpc64__',)},
-    's390x'   : { 'endian': 'big',    'defines': ('__s390x__',)},
-    'sparc'   : { 'endian': 'big',    'defines': ('__sparc',)},
-    'x86_64'  : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
+    'arm'        : { 'endian': 'little', 'defines': ('__arm__',) },
+    'aarch64'    : { 'endian': 'little', 'defines': ('__arm64__', '__aarch64__')},
+    'i386'       : { 'endian': 'little', 'defines': ('__i386', '_M_IX86')},
+    'ppc64le'    : { 'endian': 'little', 'defines': ('__powerpc64__',)},
+    's390x'      : { 'endian': 'big',    'defines': ('__s390x__',)},
+    'sparc'      : { 'endian': 'big',    'defines': ('__sparc',)},
+    'x86_64'     : { 'endian': 'little', 'defines': ('__x86_64', '_M_AMD64')},
+    'emscripten' : { 'endian': 'little', 'defines': ('__EMSCRIPTEN__', )},
 }
 
 def CheckForProcessor(context, which_arch):
@@ -1109,6 +1110,7 @@ os_macros = {
     "macOS": "defined(__APPLE__) && (TARGET_OS_OSX || (TARGET_OS_MAC && !TARGET_OS_IPHONE))",
     "linux": "defined(__linux__)",
     "android": "defined(__ANDROID__)",
+    "emscripten": "defined(__EMSCRIPTEN__)",
 }
 
 def CheckForOS(context, which_os):
@@ -1711,7 +1713,7 @@ if env.TargetOSIs('posix'):
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
     env.Append( CCFLAGS=["-fno-omit-frame-pointer",
                          "-fno-strict-aliasing",
-                         "-ggdb",
+                         "-ggdb" if not env.TargetOSIs('emscripten') else "-g",
                          "-pthread",
                          "-Wall",
                          "-Wsign-compare",

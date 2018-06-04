@@ -43,7 +43,8 @@
 #	undef  ultrix
 #       undef  win64 
 #       undef  darwin 
-#       undef  interix 
+#       undef  interix
+#       undef  emscripten
 
 #	define dos 1
 #	define OP_SYSTEM dos
@@ -62,6 +63,7 @@
 #       undef   win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define vms 2
 #	define OP_SYSTEM vms
@@ -80,6 +82,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define wnt 3
 #	define OP_SYSTEM wnt
@@ -98,6 +101,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define linux 8
 #	define OP_SYSTEM linux
@@ -117,6 +121,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define osf 4
 #	define OP_SYSTEM osf
@@ -135,6 +140,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define hp_ux 5
 #	define OP_SYSTEM hp_ux
@@ -153,6 +159,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define unicos 6
 #	define OP_SYSTEM unicos
@@ -171,6 +178,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #	define ultrix 7
 #	define OP_SYSTEM ultrix
@@ -188,6 +196,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #       define win64 9
 #       define OP_SYSTEM win64
@@ -205,6 +214,7 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #       define darwin 10
 #       define OP_SYSTEM darwin
@@ -221,9 +231,29 @@
 #       undef  win64
 #       undef  darwin 
 #       undef  interix 
+#       undef  emscripten
 
 #       define interix 11
 #       define OP_SYSTEM interix
+
+#elif defined(__EMSCRIPTEN__)
+
+#	undef  dos
+#	undef  vms
+#	undef  wnt
+#	undef  osf
+#	undef  hp_ux
+#	undef  linux
+#	undef  unicos
+#	undef  ultrix
+#       undef  win64
+#       undef  darwin 
+#       undef  interix 
+#       undef  emscripten
+
+#	define emscripten 12
+#	define OP_SYSTEM emscripten
+
 #else
 
 #	error Operating system must be specified.
@@ -235,7 +265,8 @@
 	OP_SYSTEM == linux || \
 	OP_SYSTEM == osf || \
 	OP_SYSTEM == ultrix || \
-	OP_SYSTEM == unicos \
+	OP_SYSTEM == unicos || \
+	OP_SYSTEM == emscripten \
 )
 
 #endif  /* OP_SYSTEM_H */

@@ -302,7 +302,7 @@ if env.TargetOSIs('freebsd') or env.TargetOSIs('openbsd'):
 # Set Architecture Defines
 processor = env['TARGET_ARCH']
 # Using 32 bit
-if processor == 'i386':
+if processor == 'i386' or processor == 'emscripten':
     cpp_defines['IA32'] = '1'
     cpp_defines['ia32'] = '1'
 elif processor == 'arm':

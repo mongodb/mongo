@@ -147,7 +147,8 @@ std::unique_ptr<SecureRandom> SecureRandom::create() {
     return stdx::make_unique<WinSecureRandom>();
 }
 
-#elif defined(__linux__) || defined(__sun) || defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__linux__) || defined(__sun) || defined(__APPLE__) || defined(__FreeBSD__) || \
+    defined(__EMSCRIPTEN__)
 
 class InputStreamSecureRandom : public SecureRandom {
 public:
