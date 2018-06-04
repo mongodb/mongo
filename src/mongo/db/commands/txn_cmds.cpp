@@ -39,7 +39,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
-#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace {
@@ -99,8 +98,6 @@ public:
 
 } commitTxn;
 
-MONGO_FAIL_POINT_DEFINE(pauseAfterTransactionPrepare);
-
 class CmdPrepareTxn : public BasicCommand {
 public:
     CmdPrepareTxn() : BasicCommand("prepareTransaction") {}
@@ -139,17 +136,7 @@ public:
                 "Transaction isn't in progress",
                 session->inMultiDocumentTransaction());
 
-        auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        invariant(opObserver);
-        opObserver->onTransactionPrepare(opCtx);
-
-        // For testing purposes, this command prepares and immediately aborts the transaction,
-        // Running commit after prepare is not allowed yet.
-        // Prepared units of work cannot be released by the session, so we immediately abort here.
-        opCtx->getWriteUnitOfWork()->prepare();
-        // This failpoint will cause readers of prepared documents to return prepare conflicts.
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(pauseAfterTransactionPrepare);
-        session->abortActiveTransaction(opCtx);
+        session->prepareTransaction(opCtx);
         return true;
     }
 };

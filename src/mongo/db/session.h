@@ -280,6 +280,11 @@ public:
     void commitTransaction(OperationContext* opCtx);
 
     /**
+     * Puts a transaction into a prepared state.
+     */
+    void prepareTransaction(OperationContext* opCtx);
+
+    /**
      * Aborts the transaction outside the transaction, releasing transaction resources.
      */
     void abortArbitraryTransaction();
