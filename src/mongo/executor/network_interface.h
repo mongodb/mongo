@@ -54,9 +54,6 @@ class NetworkInterface {
     MONGO_DISALLOW_COPYING(NetworkInterface);
 
 public:
-    // A flag to keep replication MessagingPorts open when all other sockets are disconnected.
-    static const unsigned int kMessagingPortKeepOpen = 1;
-
     using Response = RemoteCommandResponse;
     using RemoteCommandCompletionFn = stdx::function<void(const TaskExecutor::ResponseStatus&)>;
 
