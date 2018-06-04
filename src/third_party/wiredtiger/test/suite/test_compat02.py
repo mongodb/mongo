@@ -128,7 +128,8 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
         #
         msgunsup = "/unsupported major version/"
         msglog = "/this build requires a minimum version/"
-        msgcompat = "/required min cannot be larger/"
+        msgcompat = "/cannot be larger than compatibility release/"
+        msgsave = "/cannot be larger than saved release/"
         if (self.log_req >= self.future_logv):
             self.pr("EXPECT: " + msgunsup)
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -139,6 +140,12 @@ class test_compat02(wttest.WiredTigerTestCase, suite_subprocess):
             # setting we expect an error.
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open('.', restart_config), msgcompat)
+        elif (self.log_req > self.log_create and self.create_rel != 'none'):
+            self.pr("EXPECT: " + msgsave)
+            # If required minimum is larger than the setting we created the
+            # database with, we expect an error.
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.wiredtiger_open('.', restart_config), msgsave)
         elif (self.log_req > self.log_create):
             self.pr("EXPECT: " + msglog)
             # If required minimum is larger than the setting we created the
