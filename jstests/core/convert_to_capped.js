@@ -1,6 +1,13 @@
-// Test the convertToCapped cmd.
-//
-// @tags: [requires_non_retryable_commands]
+/**
+ * Test the convertToCapped cmd.
+ *
+ * @tags: [
+ *   requires_non_retryable_commands,
+ *
+ *   # capped collections is not available on embedded
+ *   incompatible_with_embedded,
+ * ]
+ */
 
 (function() {
     "use strict";
