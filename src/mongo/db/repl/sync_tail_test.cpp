@@ -53,6 +53,7 @@
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -1097,6 +1098,44 @@ TEST_F(SyncTailTest,
     auto iter = collectionReader.makeIterator();
     ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+namespace {
+
+class ReplicationCoordinatorSignalDrainCompleteThrows : public ReplicationCoordinatorMock {
+public:
+    ReplicationCoordinatorSignalDrainCompleteThrows(ServiceContext* service,
+                                                    const ReplSettings& settings)
+        : ReplicationCoordinatorMock(service, settings) {}
+    void signalDrainComplete(OperationContext*, long long) final {
+        uasserted(ErrorCodes::OperationFailed, "failed to signal drain complete");
+    }
+};
+
+}  // namespace
+
+DEATH_TEST_F(SyncTailTest,
+             OplogApplicationLogsExceptionFromSignalDrainCompleteBeforeAborting,
+             "Invariant failure _isDead") {
+    // Leave oplog buffer empty so that SyncTail calls
+    // ReplicationCoordinator::signalDrainComplete() during oplog application.
+    auto oplogBuffer = std::make_unique<OplogBufferBlockingQueue>();
+    BackgroundSync bgsync(nullptr,  // ReplicationCoordinatorExternalState. Not used.
+                          _replicationProcess,
+                          std::move(oplogBuffer));
+
+    auto applyOperationFn = [](MultiApplier::OperationPtrs*, SyncTail*) { return Status::OK(); };
+    SyncTail syncTail(&bgsync, applyOperationFn);
+
+    auto service = getServiceContext();
+    auto currentReplCoord = ReplicationCoordinator::get(_opCtx.get());
+    ReplicationCoordinatorSignalDrainCompleteThrows replCoord(service,
+                                                              currentReplCoord->getSettings());
+    ASSERT_OK(replCoord.setFollowerMode(MemberState::RS_PRIMARY));
+
+    // SyncTail::oplogApplication() creates its own OperationContext in the current thread context.
+    _opCtx = {};
+    syncTail.oplogApplication(&replCoord);
 }
 
 TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
