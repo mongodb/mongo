@@ -7330,6 +7330,153 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: ubuntu1804
+  display_name: SSL Ubuntu 18.04
+  run_on:
+  - ubuntu1804-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu1804
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: ubuntu1804
+    multiversion_edition: targeted
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: org
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags ssl"
+    build_mongoreplay: true
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+  - name: aggregation
+  - name: aggregation_auth
+  - name: auth
+  - name: dbtest
+  - name: disk_wiredtiger
+  - name: failpoints
+  - name: failpoints_auth
+  - name: free_monitoring
+  - name: gle_auth
+  - name: gle_auth_write_cmd
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_txns
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
+  - name: parallel
+  - name: parallel_compatibility
+  - name: concurrency
+  - name: concurrency_replication
+  - name: concurrency_replication_causal_consistency
+    distros:
+    - ubuntu1804-build
+  - name: concurrency_sharded_replication
+  - name: concurrency_sharded_replication_with_balancer
+  - name: concurrency_simultaneous
+  - name: replica_sets
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: slow1
+  - name: serial_run
+  - name: sharding_jscore_passthrough
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
+- name: enterprise-ubuntu1804-64
+  display_name: Enterprise Ubuntu 18.04
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu1804
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform: ubuntu1804
+    multiversion_edition: enterprise
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: ubuntu1804
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+  - name: audit
+  - name: dbtest
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: replica_sets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: watchdog_mmapv1
+  - name: watchdog_wiredtiger
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
 - name: ubuntu1604
   display_name: SSL Ubuntu 16.04
   run_on:
