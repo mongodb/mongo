@@ -731,9 +731,11 @@ std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(const std::strin
         }
         return {results.front(), resNss};
     }
-    uasserted(
-        40586,
-        str::stream() << "find command using UUID failed. Command: " << cmd << " Result: " << res);
+
+    Status status = getStatusFromCommandResult(res);
+    status.addContext(str::stream() << "find command using UUID failed. Command: " << cmd);
+    uassertStatusOK(status);
+    MONGO_UNREACHABLE;
 }
 
 namespace {
