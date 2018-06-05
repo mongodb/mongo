@@ -41,7 +41,7 @@
 
 load('jstests/libs/cycle_detection.js');  // for Graph
 
-// For withTxnAndAutoRetryOnWriteConflict.
+// For withTxnAndAutoRetry.
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 var $config = (function() {
@@ -99,18 +99,18 @@ var $config = (function() {
 
     const states = (function() {
 
-        function getAllDocuments(collection, numDocs) {
+        function getAllDocuments(session, collection, numDocs) {
             // We intentionally use a smaller batch size when fetching all of the documents in the
             // collection in order to stress the behavior of reading from the same snapshot over the
             // course of multiple network roundtrips.
             const batchSize = Math.max(2, Math.floor(numDocs / 5));
 
-            collection.getDB().getSession().startTransaction();
-            const documents =
-                collection.find().batchSize(batchSize).readConcern('snapshot').toArray();
-            collection.getDB().getSession().commitTransaction();
+            let documents;
+            withTxnAndAutoRetry(session, () => {
+                documents = collection.find().batchSize(batchSize).toArray();
 
-            assertWhenOwnColl.eq(numDocs, documents.length, () => tojson(documents));
+                assertWhenOwnColl.eq(numDocs, documents.length, () => tojson(documents));
+            });
             return documents;
         }
 
@@ -148,7 +148,7 @@ var $config = (function() {
                     }
                 };
 
-                withTxnAndAutoRetryOnWriteConflict(this.session, () => {
+                withTxnAndAutoRetry(this.session, () => {
                     for (let [i, docId] of docIds.entries()) {
                         const res = collection.runCommand('update', {
                             updates: [{q: {_id: docId}, u: updateMods}],
@@ -164,7 +164,7 @@ var $config = (function() {
 
             checkConsistency: function checkConsistency(db, collName) {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                const documents = getAllDocuments(collection, this.numDocs);
+                const documents = getAllDocuments(this.session, collection, this.numDocs);
                 checkTransactionCommitOrder(documents);
                 checkNumUpdatedByEachTransaction(documents);
             }

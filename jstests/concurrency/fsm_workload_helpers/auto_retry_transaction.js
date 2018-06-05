@@ -1,6 +1,6 @@
 'use strict';
 
-var {withTxnAndAutoRetryOnWriteConflict} = (function() {
+var {withTxnAndAutoRetry} = (function() {
 
     /**
      * Calls 'func' with the print() function overridden to be a no-op.
@@ -21,20 +21,21 @@ var {withTxnAndAutoRetryOnWriteConflict} = (function() {
 
     /**
      * Runs 'func' inside of a transaction started with 'txnOptions', and automatically retries
-     * until it either succeeds or the server returns a non-WriteConflict error response.
+     * until it either succeeds or the server returns a non-TransientTransactionError error
+     * response.
      *
      * The caller should take care to ensure 'func' doesn't modify any captured variables in a
      * speculative fashion where calling it multiple times would lead to unintended behavior. The
-     * transaction started by the withTxnAndAutoRetryOnWriteConflict() function is only known to
-     * have committed after the withTxnAndAutoRetryOnWriteConflict() function returns.
+     * transaction started by the withTxnAndAutoRetry() function is only known to have committed
+     * after the withTxnAndAutoRetry() function returns.
      */
-    function withTxnAndAutoRetryOnWriteConflict(
+    function withTxnAndAutoRetry(
         session, func, {txnOptions: txnOptions = {readConcern: {level: 'snapshot'}}} = {}) {
-        let hasWriteConflict;
+        let hasTransientError;
 
         do {
             session.startTransaction(txnOptions);
-            hasWriteConflict = false;
+            hasTransientError = false;
 
             try {
                 func();
@@ -50,14 +51,15 @@ var {withTxnAndAutoRetryOnWriteConflict} = (function() {
                 // such that it agrees no transaction is currently in progress on this session.
                 session.abortTransaction();
 
-                if (e.code !== ErrorCodes.WriteConflict) {
+                if (!e.hasOwnProperty('errorLabels') ||
+                    !e.errorLabels.includes('TransientTransactionError')) {
                     throw e;
                 }
 
-                hasWriteConflict = true;
+                hasTransientError = true;
             }
-        } while (hasWriteConflict);
+        } while (hasTransientError);
     }
 
-    return {withTxnAndAutoRetryOnWriteConflict};
+    return {withTxnAndAutoRetry};
 })();
