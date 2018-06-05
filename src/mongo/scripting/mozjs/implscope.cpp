@@ -195,8 +195,18 @@ void MozJSImplScope::unregisterOperation() {
 
 void MozJSImplScope::kill() {
     {
-        std::unique_lock<std::mutex> lk(_sleepMutex);
-        _pendingKill.store(true);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+        // If we are on the right thread, in the middle of an operation, and we have a registered
+        // opCtx, then we should check the opCtx for interrupts.
+        if (_mr._thread.get() == PR_GetCurrentThread() && _inOp > 0 && _opCtx) {
+            _killStatus = _opCtx->checkForInterruptNoAssert();
+        }
+
+        // If we didn't have a kill status, someone is killing us by hand here.
+        if (_killStatus.isOK()) {
+            _killStatus = Status(ErrorCodes::Interrupted, "JavaScript execution interrupted");
+        }
     }
     _sleepCondition.notify_all();
     JS_RequestInterruptCallback(_runtime);
@@ -207,7 +217,8 @@ void MozJSImplScope::interrupt() {
 }
 
 bool MozJSImplScope::isKillPending() const {
-    return _pendingKill.load();
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return !_killStatus.isOK();
 }
 
 OperationContext* MozJSImplScope::getOpContext() const {
@@ -231,20 +242,18 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
         JS_MaybeGC(cx);
     }
 
+    // Check our initial kill status (which might be fine).
+    auto status = [&scope]() -> Status {
+        stdx::lock_guard<stdx::mutex> lk(scope->_mutex);
+        return scope->_killStatus;
+    }();
+
     if (scope->_hasOutOfMemoryException) {
-        scope->_status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
-    } else if (scope->isKillPending()) {
-        scope->_status = Status(ErrorCodes::Interrupted, "JavaScript execution interrupted");
+        status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
     }
-    // If we are on the right thread, in the middle of an operation, and we have a registered opCtx,
-    // then we should check the opCtx for interrupts.
-    if ((scope->_mr._thread.get() == PR_GetCurrentThread()) && (scope->_inOp > 0) &&
-        scope->_opCtx) {
-        auto status = scope->_opCtx->checkForInterruptNoAssert();
-        if (!status.isOK()) {
-            scope->_status = status;
-        }
-    }
+
+    if (!status.isOK())
+        scope->setStatus(std::move(status));
 
     if (!scope->_status.isOK()) {
         scope->_engine->getDeadlineMonitor().stopDeadline(scope);
@@ -415,7 +424,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _global(_globalProto.getProto()),
       _funcs(),
       _internedStrings(_context),
-      _pendingKill(false),
+      _killStatus(Status::OK()),
       _opId(0),
       _opCtx(nullptr),
       _inOp(0),
@@ -793,12 +802,12 @@ void MozJSImplScope::gc() {
 }
 
 void MozJSImplScope::sleep(Milliseconds ms) {
-    std::unique_lock<std::mutex> lk(_sleepMutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     uassert(ErrorCodes::JSUncatchableError,
             "sleep was interrupted by kill",
             !_sleepCondition.wait_for(
-                lk, ms.toSystemDuration(), [this] { return _pendingKill.load(); }));
+                lk, ms.toSystemDuration(), [this] { return !_killStatus.isOK(); }));
 }
 
 void MozJSImplScope::localConnectForDbEval(OperationContext* opCtx, const char* dbName) {
@@ -858,7 +867,7 @@ void MozJSImplScope::externalSetup() {
 
 void MozJSImplScope::reset() {
     unregisterOperation();
-    _pendingKill.store(false);
+    _killStatus = Status::OK();
     _pendingGC.store(false);
     _requireOwnedObjects = false;
     advanceGeneration();
@@ -908,9 +917,12 @@ void MozJSImplScope::setStatus(Status status) {
 }
 
 bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool assertOnError) {
-    if (isKillPending()) {
-        success = false;
-        _status = Status(ErrorCodes::Interrupted, "JavaScript execution interrupted");
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_killStatus.isOK()) {
+            success = false;
+            setStatus(_killStatus);
+        }
     }
 
     if (success) {
