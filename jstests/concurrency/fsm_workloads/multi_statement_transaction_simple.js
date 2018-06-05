@@ -8,7 +8,7 @@
  * @tags: [uses_transactions]
  */
 
-// For withTxnAndAutoRetryOnWriteConflict.
+// For withTxnAndAutoRetry.
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
 var $config = (function() {
@@ -19,12 +19,13 @@ var $config = (function() {
 
     var states = (function() {
 
-        function getAllDocuments(collection, numDocs) {
-            collection.getDB().getSession().startTransaction();
-            const documents = collection.find().readConcern('snapshot').toArray();
-            collection.getDB().getSession().commitTransaction();
+        function getAllDocuments(session, collection, numDocs) {
+            let documents;
+            withTxnAndAutoRetry(session, () => {
+                documents = collection.find().toArray();
 
-            assertWhenOwnColl.eq(numDocs, documents.length, () => tojson(documents));
+                assertWhenOwnColl.eq(numDocs, documents.length, () => tojson(documents));
+            });
             return documents;
         }
 
@@ -34,7 +35,7 @@ var $config = (function() {
 
         function checkMoneyBalance(db, collName) {
             const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-            const documents = getAllDocuments(collection, this.numAccounts);
+            const documents = getAllDocuments(this.session, collection, this.numAccounts);
             assertWhenOwnColl.eq(this.numAccounts * this.initialValue,
                                  computeTotalOfAllBalances(documents),
                                  () => tojson(documents));
@@ -52,7 +53,7 @@ var $config = (function() {
             const transferAmount = Random.randInt(this.initialValue / 10) + 1;
 
             const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-            withTxnAndAutoRetryOnWriteConflict(this.session, () => {
+            withTxnAndAutoRetry(this.session, () => {
                 let res = collection.runCommand('update', {
                     updates: [{q: {_id: transferFrom}, u: {$inc: {balance: -transferAmount}}}],
                 });
