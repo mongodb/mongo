@@ -421,8 +421,8 @@ private:
     JS::HandleObject _global;
     std::vector<JS::PersistentRootedValue> _funcs;
     InternedStringTable _internedStrings;
-    std::atomic<bool> _pendingKill;
-    std::mutex _sleepMutex;
+    Status _killStatus;
+    mutable std::mutex _mutex;
     std::condition_variable _sleepCondition;
     std::string _error;
     unsigned int _opId;        // op id for this scope
