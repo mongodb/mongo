@@ -266,6 +266,10 @@ private:
 
     class OpQueueBatcher;
 
+    void _oplogApplication(OplogBuffer* oplogBuffer,
+                           ReplicationCoordinator* replCoord,
+                           OpQueueBatcher* batcher) noexcept;
+
     std::string _hostname;
 
     OplogApplier::Observer* const _observer;
