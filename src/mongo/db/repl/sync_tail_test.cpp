@@ -1109,7 +1109,7 @@ public:
 
 DEATH_TEST_F(SyncTailTest,
              OplogApplicationLogsExceptionFromSignalDrainCompleteBeforeAborting,
-             "Invariant failure _isDead") {
+             "failed to signal drain complete") {
     // Leave oplog buffer empty so that SyncTail calls
     // ReplicationCoordinator::signalDrainComplete() during oplog application.
     auto oplogBuffer = stdx::make_unique<OplogBufferBlockingQueue>();

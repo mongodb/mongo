@@ -230,6 +230,8 @@ protected:
 private:
     class OpQueueBatcher;
 
+    void _oplogApplication(ReplicationCoordinator* replCoord, OpQueueBatcher* batcher) noexcept;
+
     std::string _hostname;
 
     BackgroundSync* _networkQueue;
