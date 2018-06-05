@@ -55,13 +55,7 @@ function doSnapshotFind(sortByAscending, collName, data, findErrorCodes) {
     const cursor = parseCursor(res);
 
     if (!cursor) {
-        const abortCmd = {
-            abortTransaction: 1,
-            txnNumber: NumberLong(data.txnNumber),
-            autocommit: false
-        };
-        res = data.sessionDb.adminCommand(abortCmd);
-        assertWorkedOrFailed(abortCmd, res, [ErrorCodes.NoSuchTransaction]);
+        abortTransaction(data.sessionDb, data.txnNumber, [ErrorCodes.NoSuchTransaction]);
         data.cursorId = 0;
     } else {
         assert(cursor.hasOwnProperty("firstBatch"), tojson(res));
@@ -105,8 +99,8 @@ function doSnapshotGetMore(collName, data, getMoreErrorCodes, commitTransactionE
 /**
  * This function can be used to share session data across threads.
  */
-function insertSessionDoc(db, collName, data, session) {
-    const sessionDoc = {"_id": "sessionDoc" + data.tid, "id": session.getSessionId().id};
+function insertSessionDoc(db, collName, tid, sessionId) {
+    const sessionDoc = {"_id": "sessionDoc" + tid, "id": sessionId};
     const res = db[collName].insert(sessionDoc);
     assert.writeOK(res);
     assert.eq(1, res.nInserted);
@@ -114,13 +108,57 @@ function insertSessionDoc(db, collName, data, session) {
 
 /**
  * This function can be used in conjunction with insertSessionDoc to kill any active sessions on
- * teardown.
+ * teardown or iteration completion.
  */
-function killSessionsFromDocs(db, collName) {
-    const sessionDocCursor = db[collName].find({"_id": {$regex: "sessionDoc*"}});
-    assert(sessionDocCursor.hasNext());
-    while (sessionDocCursor.hasNext()) {
-        const sessionDoc = sessionDocCursor.next();
-        assert.commandWorked(db.runCommand({killSessions: [{id: sessionDoc.id}]}));
+function killSessionsFromDocs(db, collName, tid) {
+    // Cleanup up all sessions, unless 'tid' is supplied.
+    let docs = {$regex: /^sessionDoc/};
+    if (tid !== undefined) {
+        docs = "sessionDoc" + tid;
     }
+    let sessionIds = db[collName].find({"_id": docs}, {_id: 0, id: 1}).toArray();
+    assert.commandWorked(db.runCommand({killSessions: sessionIds}));
 }
+
+/**
+ * Abort the transaction on the session and return result.
+ */
+function abortTransaction(db, txnNumber, errorCodes) {
+    abortCmd = {abortTransaction: 1, txnNumber: NumberLong(txnNumber), autocommit: false};
+    res = db.adminCommand(abortCmd);
+    assertWorkedOrFailed(abortCmd, res, errorCodes);
+    return res;
+}
+
+/**
+ * This function operates on the last iteration of each thread to abort any active transactions.
+ */
+var {cleanupOnLastIteration} = (function() {
+    function cleanupOnLastIteration(data, func) {
+        const abortErrorCodes = [
+            ErrorCodes.NoSuchTransaction,
+            ErrorCodes.TransactionCommitted,
+            ErrorCodes.TransactionTooOld
+        ];
+        let lastIteration = ++data.iteration >= data.iterations;
+        try {
+            func();
+        } catch (e) {
+            lastIteration = true;
+            throw e;
+        } finally {
+            if (lastIteration) {
+                // Abort the latest transactions for this session as some may have been skipped due
+                // to incrementing data.txnNumber.
+                for (let i = data.txnNumber; i >= 0; i--) {
+                    let res = abortTransaction(data.sessionDb, i, abortErrorCodes);
+                    if (res.ok === 1) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return {cleanupOnLastIteration};
+})();

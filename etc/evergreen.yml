@@ -4728,6 +4728,14 @@ tasks:
       resmoke_args: --suites=concurrency_simultaneous --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: concurrency_simultaneous_replication
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_simultaneous_replication --storageEngine=wiredTiger
+
+- <<: *task_template
   name: rlp
   commands:
   - func: "do setup"
@@ -6882,6 +6890,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough
   - name: read_only
@@ -6942,6 +6951,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
+    distros:
+    - rhel62-large
 
 - &linux-64-debug-template
   name: linux-64-debug
@@ -6998,6 +7010,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
@@ -7344,6 +7357,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -7611,6 +7625,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -7693,6 +7708,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -7810,6 +7826,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -7872,6 +7889,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: ese
   - name: failpoints
@@ -8080,6 +8098,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -8255,6 +8274,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -8375,6 +8395,9 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: concurrency_simultaneous
+    distros:
+    - windows-64-vs2015-large
+  - name: concurrency_simultaneous_replication
     distros:
     - windows-64-vs2015-large
   - name: read_concern_linearizable_passthrough
@@ -8812,6 +8835,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: jsCore
   - name: jsCore_auth
   - name: jsCore_txns
@@ -8884,6 +8908,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
@@ -9042,6 +9067,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
@@ -9702,6 +9728,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: ese
@@ -10208,6 +10235,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: ese
@@ -10450,6 +10478,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -10548,6 +10577,9 @@ buildvariants:
   - name: concurrency_simultaneous
     distros:
     - rhel70
+  - name: concurrency_simultaneous_replication
+    distros:
+    - rhel70
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -10612,6 +10644,9 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
+    distros:
+    - rhel72-zseries-build
   - name: dbtest
   - name: ese
   - name: failpoints
@@ -10720,6 +10755,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: ese
   - name: failpoints
@@ -10826,6 +10862,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: ese
   - name: failpoints
@@ -11191,6 +11228,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: ese
   - name: failpoints
@@ -11324,6 +11362,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -11469,6 +11508,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -11619,6 +11659,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
@@ -11703,6 +11744,9 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
+    distros:
+    - rhel62-large
   - name: dbtest
   - name: failpoints
   - name: failpoints_auth
@@ -12006,6 +12050,9 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
+    distros:
+    - rhel62-large
   - name: dbtest
   - name: failpoints
   - name: failpoints_auth
@@ -12091,6 +12138,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: failpoints
   - name: failpoints_auth
@@ -12182,6 +12230,9 @@ buildvariants:
     distros:
     - rhel72-zseries-build
   - name: concurrency_simultaneous
+    distros:
+    - rhel72-zseries-build
+  - name: concurrency_simultaneous_replication
     distros:
     - rhel72-zseries-build
   - name: dbtest
@@ -12326,6 +12377,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: ese
@@ -12502,6 +12554,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns
   - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: ese
@@ -12645,6 +12698,7 @@ buildvariants:
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_replication
   - name: dbtest
   - name: disk_wiredtiger
   - name: ese
@@ -12737,4 +12791,3 @@ buildvariants:
   - name: fetch_test_lifecycle
     distros:
     - rhel62-small
-
