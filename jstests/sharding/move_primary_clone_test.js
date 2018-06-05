@@ -213,17 +213,6 @@
     var fooIndexes = [{key: {a: 1}, name: 'index1', expireAfterSeconds: 5000}];
     var barIndexes = [{key: {a: -1}, name: 'index2'}];
 
-    // Set FCV to 3.6
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-
-    movePrimaryWithFailpoint(true);
-    movePrimaryWithFailpoint(false);
-    movePrimaryNoFailpoint(true);
-    movePrimaryNoFailpoint(false);
-
-    // Set FCV to 4.0
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-
     movePrimaryWithFailpoint(true);
     movePrimaryWithFailpoint(false);
     movePrimaryNoFailpoint(true);

@@ -26,6 +26,7 @@ selector:
   - jstests/multiVersion/migration_between_mixed_FCV_mixed_version_mongods.js
   - jstests/multiVersion/rollback_latest_to_last_stable.js
   - jstests/multiVersion/set_feature_compatibility_version.js
+  - jstests/multiVersion/migration_between_mixed_version_mongods.js
 
   # TODO: SERVER-35171
   - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js

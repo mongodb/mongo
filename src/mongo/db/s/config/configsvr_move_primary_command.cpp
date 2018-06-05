@@ -143,7 +143,6 @@ public:
         }
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
-        auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         auto dbDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
@@ -181,208 +180,21 @@ public:
             return true;
         }
 
-        // FCV 4.0 logic exists inside the if statement.
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
-            const NamespaceString nss(dbname);
+        ShardMovePrimary shardMovePrimaryRequest;
+        shardMovePrimaryRequest.set_movePrimary(NamespaceString(dbname));
+        shardMovePrimaryRequest.setTo(toShard->getId().toString());
 
-            ShardMovePrimary shardMovePrimaryRequest;
-            shardMovePrimaryRequest.set_movePrimary(nss);
-            shardMovePrimaryRequest.setTo(toShard->getId().toString());
-
-            auto cmdResponse = uassertStatusOK(fromShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                "admin",
-                CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
-                    cmdObj, shardMovePrimaryRequest.toBSON())),
-                Shard::RetryPolicy::kIdempotent));
-
-            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
-
-            return true;
-        }
-
-        // The rest of this function will only be executed under FCV 3.6 (or downgrading).
-
-        log() << "Moving " << dbname << " primary from: " << fromShard->toString()
-              << " to: " << toShard->toString();
-
-        const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
-
-        // Record start in changelog
-        uassertStatusOK(catalogClient->logChange(
+        auto cmdResponse = uassertStatusOK(fromShard->runCommandWithFixedRetryAttempts(
             opCtx,
-            "movePrimary.start",
-            dbname,
-            _buildMoveLogEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls),
-            ShardingCatalogClient::kMajorityWriteConcern));
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            "admin",
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(cmdObj, shardMovePrimaryRequest.toBSON())),
+            Shard::RetryPolicy::kIdempotent));
 
-        ScopedDbConnection toconn(toShard->getConnString());
-        ON_BLOCK_EXIT([&toconn] { toconn.done(); });
-
-        // TODO ERH - we need a clone command which replays operations from clone start to now
-        //            can just use local.oplog.$main
-        BSONObj cloneRes;
-        bool hasWCError = false;
-
-        {
-            BSONArrayBuilder barr;
-            for (const auto& shardedColl : shardedColls) {
-                barr.append(shardedColl.ns());
-            }
-
-            const bool worked = toconn->runCommand(
-                dbname,
-                BSON("clone" << fromShard->getConnString().toString() << "collsToIgnore"
-                             << barr.arr()
-                             << bypassDocumentValidationCommandOption()
-                             << true
-                             << "writeConcern"
-                             << opCtx->getWriteConcern().toBSON()),
-                cloneRes);
-
-            if (!worked) {
-                log() << "clone failed" << redact(cloneRes);
-                uasserted(ErrorCodes::OperationFailed, str::stream() << "clone failed");
-            }
-
-            if (auto wcErrorElem = cloneRes["writeConcernError"]) {
-                appendWriteConcernErrorToCmdResponse(toShard->getId(), wcErrorElem, result);
-                hasWCError = true;
-            }
-        }
-
-        {
-            // Hold the Global IX lock across checking the FCV and writing the database entry.
-            // Because of the Global S lock barrier in setFCV, this ensures a concurrent setFCV
-            // will block before performing schema upgrade until we have written the entry.
-            Lock::GlobalLock lk(opCtx, MODE_IX);
-
-            // If we are upgrading to (or are fully on) FCV 4.0, then fail. If we do not fail, we
-            // will potentially change the primary shard of a database without changing its version.
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 ||
-                serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-                uasserted(ErrorCodes::ConflictingOperationInProgress,
-                          "committing movePrimary failed due to version mismatch");
-            }
-
-            // Update the database entry with the new primary shard.
-            uassertStatusOK(catalogClient->updateConfigDocument(
-                opCtx,
-                DatabaseType::ConfigNS,
-                BSON(DatabaseType::name(dbname)),
-                BSON("$set" << BSON(DatabaseType::primary(toShard->getId().toString()))),
-                false,
-                ShardingCatalogClient::kLocalWriteConcern));
-        }
-
-
-        // Ensure the next attempt to retrieve the database or any of its collections will do a full
-        // reload
-        catalogCache->purgeDatabase(dbname);
-
-        const auto oldPrimary = fromShard->getConnString().toString();
-
-        ScopedDbConnection fromconn(fromShard->getConnString());
-        ON_BLOCK_EXIT([&fromconn] { fromconn.done(); });
-
-        if (shardedColls.empty()) {
-            log() << "movePrimary dropping database on " << oldPrimary
-                  << ", no sharded collections in " << dbname;
-
-            try {
-                BSONObj dropDBInfo;
-                fromconn->dropDatabase(dbname.c_str(), opCtx->getWriteConcern(), &dropDBInfo);
-                if (!hasWCError) {
-                    if (auto wcErrorElem = dropDBInfo["writeConcernError"]) {
-                        appendWriteConcernErrorToCmdResponse(
-                            fromShard->getId(), wcErrorElem, result);
-                        hasWCError = true;
-                    }
-                }
-            } catch (DBException& e) {
-                e.addContext(str::stream() << "movePrimary could not drop the database " << dbname
-                                           << " on "
-                                           << oldPrimary);
-                throw;
-            }
-
-        } else if (cloneRes["clonedColls"].type() != Array) {
-            // Legacy behavior from old mongod with sharded collections, *do not* delete
-            // database, but inform user they can drop manually (or ignore).
-            warning() << "movePrimary legacy mongod behavior detected. "
-                      << "User must manually remove unsharded collections in database " << dbname
-                      << " on " << oldPrimary;
-        } else {
-            // Sharded collections exist on the old primary, so drop only the cloned (unsharded)
-            // collections.
-            BSONObjIterator it(cloneRes["clonedColls"].Obj());
-
-            while (it.more()) {
-                BSONElement el = it.next();
-                if (el.type() == String) {
-                    try {
-                        log() << "movePrimary dropping cloned collection " << el.String() << " on "
-                              << oldPrimary;
-                        BSONObj dropCollInfo;
-                        fromconn->dropCollection(
-                            el.String(), opCtx->getWriteConcern(), &dropCollInfo);
-                        if (!hasWCError) {
-                            if (auto wcErrorElem = dropCollInfo["writeConcernError"]) {
-                                appendWriteConcernErrorToCmdResponse(
-                                    fromShard->getId(), wcErrorElem, result);
-                                hasWCError = true;
-                            }
-                        }
-
-                    } catch (DBException& e) {
-                        e.addContext(str::stream()
-                                     << "movePrimary could not drop the cloned collection "
-                                     << el.String()
-                                     << " on "
-                                     << oldPrimary);
-                        throw;
-                    }
-                }
-            }
-        }
-
-        result << "primary" << toShard->toString();
-
-        // Record finish in changelog
-        uassertStatusOK(catalogClient->logChange(
-            opCtx,
-            "movePrimary",
-            dbname,
-            _buildMoveLogEntry(dbname, oldPrimary, toShard->toString(), shardedColls),
-            ShardingCatalogClient::kMajorityWriteConcern));
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
 
         return true;
-    }
-
-private:
-    static BSONObj _buildMoveLogEntry(const std::string& db,
-                                      const std::string& from,
-                                      const std::string& to,
-                                      const std::vector<NamespaceString>& shardedColls) {
-        BSONObjBuilder details;
-        details.append("database", db);
-        details.append("from", from);
-        details.append("to", to);
-
-        BSONArrayBuilder collB(details.subarrayStart("shardedCollections"));
-        for (const auto& shardedColl : shardedColls) {
-            collB.append(shardedColl.ns());
-        }
-        collB.done();
-
-        return details.obj();
     }
 
 } configsvrMovePrimaryCmd;

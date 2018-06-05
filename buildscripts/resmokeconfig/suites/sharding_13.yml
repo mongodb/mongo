@@ -37,8 +37,6 @@ selector:
   - jstests/sharding/create_database.js
   - jstests/sharding/shard_aware_on_add_shard.js
   - jstests/sharding/killop.js
-  - jstests/sharding/move_primary_with_test_flag.js
-  - jstests/sharding/move_primary_fcv_40.js
   - jstests/sharding/listshards.js
   - jstests/sharding/return_partial_shards_down.js
   - jstests/sharding/refresh_sessions.js

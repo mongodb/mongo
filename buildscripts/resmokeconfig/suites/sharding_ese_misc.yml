@@ -164,11 +164,9 @@ selector:
   - jstests/sharding/count1.js
   - jstests/sharding/shard4.js
   - jstests/sharding/count2.js
-  - jstests/sharding/movePrimary1.js
   - jstests/sharding/views.js
   - jstests/sharding/large_skip_one_shard.js
   - jstests/sharding/hash_shard_num_chunks.js
-  - jstests/sharding/move_primary_clone_test.js
   - jstests/sharding/features1.js
   - jstests/sharding/validate_collection.js
   - jstests/sharding/migration_move_chunk_after_receive.js
@@ -253,7 +251,6 @@ selector:
   - jstests/sharding/addshard1.js
   - jstests/sharding/sharding_balance2.js
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
-  - jstests/sharding/move_primary_basic.js
   - jstests/sharding/shard_keycount.js
   - jstests/sharding/time_zone_info_mongos.js
   - jstests/sharding/enable_sharding_basic.js
@@ -303,8 +300,6 @@ selector:
   - jstests/sharding/shard_collection_verify_initial_chunks.js
   - jstests/sharding/use_rsm_data_for_cs.js
   - jstests/sharding/change_stream_update_lookup_collation.js
-  - jstests/sharding/move_primary_with_test_flag.js
-  - jstests/sharding/move_primary_fcv_40.js
   - jstests/sharding/logical_time_api.js
   - jstests/sharding/operation_time_api.js
   - jstests/sharding/shard_aware_on_add_shard.js

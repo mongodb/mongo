@@ -98,7 +98,6 @@ selector:
   - jstests/sharding/migrateBig.js
   - jstests/sharding/mapReduce_inSharded_outSharded.js
   - jstests/sharding/change_stream_chunk_migration.js
-  - jstests/sharding/move_primary_clone_test.js
   - jstests/sharding/large_chunk.js
   - jstests/sharding/auth_slaveok_routing.js
   - jstests/sharding/balancer_window.js
@@ -188,7 +187,6 @@ selector:
   - jstests/sharding/pending_chunk.js
   - jstests/sharding/cleanup_orphaned_cmd_prereload.js
   - jstests/sharding/basic_merge.js
-  - jstests/sharding/move_primary_basic.js
   - jstests/sharding/migration_critical_section_concurrency.js
   - jstests/sharding/sort1.js
   - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
@@ -251,7 +249,6 @@ selector:
   - jstests/sharding/movechunk_with_default_paranoia.js
   - jstests/sharding/write_transactions_during_migration.js
   - jstests/sharding/movechunk_with_noMoveParanoia.js
-  - jstests/sharding/movePrimary1.js
   - jstests/sharding/shard_collection_verify_initial_chunks.js
   - jstests/sharding/geo_near_sort.js
   - jstests/sharding/noUpdateButN1inAnotherCollection.js
@@ -299,8 +296,6 @@ selector:
   - jstests/sharding/create_database.js
   - jstests/sharding/shard_aware_on_add_shard.js
   - jstests/sharding/killop.js
-  - jstests/sharding/move_primary_with_test_flag.js
-  - jstests/sharding/move_primary_fcv_40.js
   - jstests/sharding/listshards.js
   - jstests/sharding/return_partial_shards_down.js
   - jstests/sharding/refresh_sessions.js

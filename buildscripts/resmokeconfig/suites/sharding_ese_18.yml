@@ -36,8 +36,6 @@ selector:
   - jstests/sharding/shard_collection_verify_initial_chunks.js
   - jstests/sharding/use_rsm_data_for_cs.js
   - jstests/sharding/change_stream_update_lookup_collation.js
-  - jstests/sharding/move_primary_with_test_flag.js
-  - jstests/sharding/move_primary_fcv_40.js
   - jstests/sharding/logical_time_api.js
   - jstests/sharding/operation_time_api.js
   - jstests/sharding/shard_aware_on_add_shard.js

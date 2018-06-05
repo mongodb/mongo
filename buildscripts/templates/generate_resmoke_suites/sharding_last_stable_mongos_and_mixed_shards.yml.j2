@@ -45,8 +45,6 @@ selector:
   - jstests/sharding/safe_secondary_reads_drop_recreate.js
   - jstests/sharding/safe_secondary_reads_single_migration_suspend_range_deletion.js
   - jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
-  - jstests/sharding/move_primary_basic.js
-  - jstests/sharding/movePrimary1.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
   # Can be un-blacklisted once the version of 4.0 used for 'last-stable' includes SERVER-34338's
@@ -60,8 +58,6 @@ selector:
   - jstests/sharding/aggregations_in_session.js
   # New failpoint in v4.0 mongos.
   - jstests/sharding/crash_mongos_against_upgraded_cluster.js
-  # New failpoint in v4.0 mongod.
-  - jstests/sharding/move_primary_clone_test.js
   # New waitForClusterTime
   - jstests/sharding/auth_slaveok_routing.js
   # This test should not be run with a mixed cluster environment.

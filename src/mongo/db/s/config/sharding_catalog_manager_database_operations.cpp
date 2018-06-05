@@ -211,19 +211,6 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    // Hold the Global IX lock across checking the FCV and writing the database entry. Because of
-    // the Global S lock barrier in setFCV, this ensures a concurrent setFCV will block before
-    // performing schema downgrade until we have written the entry.
-    Lock::GlobalLock lk(opCtx, MODE_IX);
-
-    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
-
-    // If we're not in 4.0, then fail. We want to have assurance that the schema will accept a
-    // version field in config.databases.
-    uassert(ErrorCodes::ConflictingOperationInProgress,
-            "committing movePrimary failed due to version mismatch",
-            currentFCV == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
-
     // Must use local read concern because we will perform subsequent writes.
     auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,

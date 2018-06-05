@@ -182,7 +182,6 @@ selector:
   - jstests/sharding/hash_shard_num_chunks.js
   - jstests/sharding/views.js
   - jstests/sharding/exact_shard_key_target.js
-  - jstests/sharding/movePrimary1.js
   - jstests/sharding/session_info_in_oplog.js
   - jstests/sharding/validate_collection.js
   - jstests/sharding/sharded_limit_batchsize.js
@@ -191,7 +190,6 @@ selector:
   - jstests/sharding/features1.js
   - jstests/sharding/balancer_window.js
   - jstests/sharding/query_config.js
-  - jstests/sharding/move_primary_clone_test.js
   - jstests/sharding/resume_change_stream_from_stale_mongos.js
   - jstests/sharding/update_sharded.js
   - jstests/sharding/resume_change_stream_on_subset_of_shards.js
@@ -265,7 +263,6 @@ selector:
   - jstests/sharding/merge_chunks_compound_shard_key.js
   - jstests/sharding/remove1.js
   - jstests/sharding/shard_keycount.js
-  - jstests/sharding/move_primary_basic.js
   - jstests/sharding/SERVER-7379.js
   - jstests/sharding/idhack_sharded.js
   - jstests/sharding/shard7.js
@@ -297,10 +294,8 @@ selector:
   - jstests/sharding/explain_find_and_modify_sharded.js
   - jstests/sharding/split_stale_mongos.js
   - jstests/sharding/move_stale_mongos.js
-  - jstests/sharding/move_primary_with_test_flag.js
   - jstests/sharding/move_chunk_missing_idx.js
   - jstests/sharding/disable_autosplit.js
-  - jstests/sharding/move_primary_fcv_40.js
   - jstests/sharding/oplog_document_key.js
   - jstests/sharding/top_chunk_split.js
   - jstests/sharding/movechunk_commit_changelog_stats.js
