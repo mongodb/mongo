@@ -666,7 +666,9 @@ DBQuery.prototype.modifiers = function(document) {
 };
 
 DBQuery.prototype.close = function() {
-    this._cursor.close();
+    if (this._cursor) {
+        this._cursor.close();
+    }
 };
 
 DBQuery.prototype.isClosed = function() {
