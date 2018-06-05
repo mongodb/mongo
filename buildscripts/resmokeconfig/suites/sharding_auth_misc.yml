@@ -337,7 +337,6 @@ selector:
   - jstests/sharding/sessions_collection_auto_healing.js
   - jstests/sharding/rename_across_mongos.js
   - jstests/sharding/conn_pool_stats.js
-  - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js
   - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/listDatabases.js
@@ -357,7 +356,6 @@ selector:
   - jstests/sharding/hash_single_shard.js
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/server_status.js
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/read_does_not_create_namespaces.js
   - jstests/sharding/kill_op_overflow.js
   - jstests/sharding/forget_mr_temp_ns.js

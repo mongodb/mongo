@@ -30,7 +30,6 @@ selector:
   - jstests/sharding/balancer_shell_commands.js
   - jstests/sharding/remove_shard_from_zone.js
   - jstests/sharding/map_reduce_validation.js
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/arbiters_do_not_use_cluster_time.js
   - jstests/sharding/kill_op_overflow.js
   - jstests/sharding/hash_single_shard.js

@@ -40,7 +40,6 @@ selector:
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
   - jstests/sharding/autosplit.js
   - jstests/sharding/limit_push.js
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/shard_keycount.js
   - jstests/sharding/shard_key_immutable.js
   - jstests/sharding/sharding_system_namespaces.js

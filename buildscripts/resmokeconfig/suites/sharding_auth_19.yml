@@ -20,7 +20,6 @@ selector:
   roots:
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/server_status.js
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/read_does_not_create_namespaces.js
   - jstests/sharding/kill_op_overflow.js
   - jstests/sharding/forget_mr_temp_ns.js

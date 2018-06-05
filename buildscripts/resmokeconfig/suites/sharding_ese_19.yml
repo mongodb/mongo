@@ -46,7 +46,6 @@ selector:
   - jstests/sharding/drop_configdb.js
   - jstests/sharding/conn_pool_stats.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js
-  - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
   - jstests/sharding/query_sharded.js
 
 executor:

@@ -49,7 +49,6 @@ selector:
   - jstests/sharding/mongos_query_comment.js
   - jstests/sharding/rename_across_mongos.js
   - jstests/sharding/conn_pool_stats.js
-  - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
 
 executor:
   config:

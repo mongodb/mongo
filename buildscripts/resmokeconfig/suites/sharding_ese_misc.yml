@@ -342,7 +342,6 @@ selector:
   - jstests/sharding/drop_configdb.js
   - jstests/sharding/conn_pool_stats.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js
-  - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
   - jstests/sharding/query_sharded.js
   - jstests/sharding/update_zone_key_range.js
   - jstests/sharding/cleanup_orphaned_auth.js
@@ -358,7 +357,6 @@ selector:
   - jstests/sharding/balancer_shell_commands.js
   - jstests/sharding/remove_shard_from_zone.js
   - jstests/sharding/map_reduce_validation.js
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/arbiters_do_not_use_cluster_time.js
   - jstests/sharding/kill_op_overflow.js
   - jstests/sharding/hash_single_shard.js

@@ -9,9 +9,6 @@ selector:
   # running in fully downgraded version, the config server won't forward the
   # command to the shards - it'll just return success immediately. 
   - jstests/sharding/max_time_ms_sharded_new_commands.js
-  # Calls setFCV=4.0, which cannot be run on last-stable shards.
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
-  - jstests/sharding/shard_collection_cache_upgrade_downgrade.js
   #### Enable when 4.0 becomes last-stable.
   - jstests/sharding/change_stream_no_shards.js
   - jstests/sharding/create_database.js

@@ -30,7 +30,6 @@ selector:
   - jstests/sharding/add_shard_to_zone.js
   - jstests/sharding/remove_shard_from_zone.js
   - jstests/sharding/arbiters_do_not_use_cluster_time.js
-  - jstests/sharding/database_versioning_upgrade_downgrade.js
   - jstests/sharding/balancer_shell_commands.js
   - jstests/sharding/ssv_config_check.js
   - jstests/sharding/version2.js
