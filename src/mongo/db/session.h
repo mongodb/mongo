@@ -466,9 +466,6 @@ private:
     // Protects the member variables below.
     mutable stdx::mutex _mutex;
 
-    // Condition variable notified when we finish an attempt to commit the global WUOW.
-    stdx::condition_variable _commitcv;
-
     // Specifies whether the session information needs to be refreshed from storage
     bool _isValid{false};
 

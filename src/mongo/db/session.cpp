@@ -1072,7 +1072,6 @@ void Session::_commitTransaction(stdx::unique_lock<stdx::mutex> lk, OperationCon
         opCtx->setRecoveryUnit(opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         opCtx->lockState()->unsetMaxLockTimeout();
-        _commitcv.notify_all();
     });
     lk.unlock();
     opCtx->getWriteUnitOfWork()->commit();
