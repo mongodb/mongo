@@ -199,7 +199,6 @@
     const clusterOptions = {
         replication: {enabled: false},
         sharded: {enabled: false},
-        useExistingConnectionAsSeed: true,
     };
 
     const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
