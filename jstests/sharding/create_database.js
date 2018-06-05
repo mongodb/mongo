@@ -59,12 +59,6 @@
 
     var st = new ShardingTest({shards: 1});
 
-    //
-    // FCV 4.0
-    //
-
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-
     // A new database is given a databaseVersion.
     let dbEntry1 = assertDbVersionAssigned(st.s, dbName);
 
@@ -72,12 +66,6 @@
     let dbEntry2 = assertDbVersionAssigned(st.s, dbName);
     assert.neq(dbEntry1.version.uuid, dbEntry2.version.uuid);
 
-    //
-    // FCV 3.6
-    //
-
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-    assertDbVersionNotAssigned(st.s, dbName);
     st.stop();
 
 })();
