@@ -112,7 +112,7 @@ const std::initializer_list<ErrorCodes::Error> RemoteCommandRetryScheduler::kAll
     ErrorCodes::HostNotFound,
     ErrorCodes::NetworkTimeout,
     ErrorCodes::PrimarySteppedDown,
-    ErrorCodes::InterruptedDueToReplStateChange,
+    ErrorCodes::InterruptedDueToStepDown,
     ErrorCodes::BalancerInterrupted};
 
 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy>

@@ -40,7 +40,7 @@
         var result =
             master.getDB("test").runCommand({getLastError: 1, w: 2, wtimeout: 10 * 60 * 1000});
         if (result.errmsg === "not master" || result.code == ErrorCodes.NotMaster ||
-            result.code == ErrorCodes.InterruptedDueToReplStateChange) {
+            result.code == ErrorCodes.InterruptedDueToStepDown) {
             throw new Error("satisfy assert.throws()");
         }
         print("failed to throw exception; GLE returned: ");

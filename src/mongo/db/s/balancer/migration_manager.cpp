@@ -98,7 +98,7 @@ Status extractMigrationStatusFromCommandResponse(const BSONObj& commandResponse)
 bool isErrorDueToConfigStepdown(Status status, bool isStopping) {
     return ((status == ErrorCodes::CallbackCanceled && isStopping) ||
             status == ErrorCodes::BalancerInterrupted ||
-            status == ErrorCodes::InterruptedDueToReplStateChange);
+            status == ErrorCodes::InterruptedDueToStepDown);
 }
 
 }  // namespace

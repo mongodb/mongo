@@ -208,7 +208,7 @@ void Balancer::interruptBalancer() {
     // context of that thread is still alive, because we hold the balancer mutex.
     if (_threadOperationContext) {
         stdx::lock_guard<Client> scopedClientLock(*_threadOperationContext->getClient());
-        _threadOperationContext->markKilled(ErrorCodes::InterruptedDueToReplStateChange);
+        _threadOperationContext->markKilled(ErrorCodes::InterruptedDueToStepDown);
     }
 
     // Schedule a separate thread to shutdown the migration manager in order to avoid deadlock with

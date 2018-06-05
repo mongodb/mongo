@@ -1,6 +1,6 @@
 // Tests that an error encountered during PlanExecutor execution will be propagated back to the user
 // with the original error code. This is important for retryable errors like
-// 'InterruptedDueToReplStateChange',
+// 'InterruptedDueToStepDown',
 // and also to ensure that the error is not swallowed and the diagnostic info is not lost.
 (function() {
     "use strict";

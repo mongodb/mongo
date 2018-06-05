@@ -86,7 +86,7 @@ CollectionRangeDeleter::CollectionRangeDeleter() = default;
 
 CollectionRangeDeleter::~CollectionRangeDeleter() {
     // Notify anybody still sleeping on orphan ranges
-    clear({ErrorCodes::InterruptedDueToReplStateChange, "Collection sharding metadata discarded"});
+    clear({ErrorCodes::InterruptedDueToStepDown, "Collection sharding metadata discarded"});
 }
 
 boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(

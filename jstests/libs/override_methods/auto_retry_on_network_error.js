@@ -149,7 +149,7 @@
     // TODO SERVER-32208: Remove this function once it is no longer needed.
     function isRetryableExecutorCodeAndMessage(code, msg) {
         return code === ErrorCodes.OperationFailed && typeof msg !== "undefined" &&
-            msg.indexOf("InterruptedDueToReplStateChange") >= 0;
+            msg.indexOf("InterruptedDueToStepDown") >= 0;
     }
 
     function runWithRetriesOnNetworkErrors(mongo, cmdObj, clientFunction, clientFunctionArguments) {
@@ -304,7 +304,7 @@
 
                         // Thrown when an index build is interrupted during its collection scan.
                         if (cmdName === "createIndexes" &&
-                            res.codeName === "InterruptedDueToReplStateChange") {
+                            res.codeName === "InterruptedDueToStepDown") {
                             print("=-=-=-= Retrying because of interrupted collection scan: " +
                                   cmdName + ", retries remaining: " + numRetries);
                             continue;

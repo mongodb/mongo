@@ -270,7 +270,7 @@ error_code("BSONObjectTooLarge", 10334)
 error_code("DuplicateKey", 11000)
 error_code("InterruptedAtShutdown", 11600)
 error_code("Interrupted", 11601)
-error_code("InterruptedDueToReplStateChange", 11602)
+error_code("InterruptedDueToStepDown", 11602)
 error_code("OutOfDiskSpace", 14031 )
 error_code("KeyTooLong", 17280);
 error_code("BackgroundOperationInProgressForDatabase", 12586);
@@ -286,7 +286,7 @@ error_code("OBSOLETE_PrepareConfigsFailed", 13104);
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout", "SocketException"])
 error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
-                             "InterruptedDueToReplStateChange",
+                             "InterruptedDueToStepDown",
                              "ExceededTimeLimit",
                              "CursorKilled",
                              "LockTimeout"])
@@ -298,7 +298,7 @@ error_class("NotMasterError", [
     "NotMaster",
     "NotMasterNoSlaveOk",
     "NotMasterOrSecondary",
-    "InterruptedDueToReplStateChange",
+    "InterruptedDueToStepDown",
     "PrimarySteppedDown",
     ])
 error_class("StaleShardVersionError",

@@ -57,7 +57,7 @@
             writeConcern: {w: 'majority', wtimeout: 600000}
         });
         assert.writeErrorWithCode(
-            res, [ErrorCodes.PrimarySteppedDown, ErrorCodes.InterruptedDueToReplStateChange]);
+            res, [ErrorCodes.PrimarySteppedDown, ErrorCodes.InterruptedDueToStepDown]);
     };
 
     var joinMajorityWriter = startParallelShell(doMajorityWrite, nodes[0].port);

@@ -657,7 +657,7 @@ void ReplicationCoordinatorExternalStateImpl::closeConnections() {
 
 void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationContext* opCtx) {
     ServiceContext* environment = opCtx->getServiceContext();
-    environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToReplStateChange);
+    environment->killAllUserOperations(opCtx, ErrorCodes::InterruptedDueToStepDown);
 
     // Destroy all stashed transaction resources, in order to release locks.
     SessionKiller::Matcher matcherAllSessions(

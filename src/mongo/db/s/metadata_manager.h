@@ -184,7 +184,7 @@ private:
 
     /**
      * Cancels all scheduled deletions of orphan ranges, notifying listeners with status
-     * InterruptedDueToReplStateChange.
+     * InterruptedDueToStepDown.
      */
     void _clearAllCleanups(WithLock);
 
