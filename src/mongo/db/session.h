@@ -1,4 +1,4 @@
-/**
+/*
  *    Copyright (C) 2017 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -40,6 +40,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/txn_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -528,6 +529,9 @@ private:
     // This member is only applicable to operations running in a transaction. It is reset when a
     // transaction state resets.
     std::vector<MultikeyPathInfo> _multikeyPathInfo;
+
+    // Tracks per-transaction metrics.
+    TxnStats _txnStats;
 };
 
 }  // namespace mongo
