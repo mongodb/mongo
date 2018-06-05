@@ -56,6 +56,12 @@ var $config = (function() {
                           .toArray();
                 success = true;
             } catch (e) {
+                // We propagate TransientTransactionErrors to allow the state function to
+                // automatically be retried when TestData.runInsideTransaction=true
+                if (e.hasOwnProperty('errorLabels') &&
+                    e.errorLabels.includes('TransientTransactionError')) {
+                    throw e;
+                }
                 // Retry if the query is interrupted.
                 assertAlways.eq(e.code,
                                 ErrorCodes.QueryPlanKilled,
@@ -70,7 +76,7 @@ var $config = (function() {
 
     function getReadConcernLevel(supportsCommittedReads) {
         const readConcernLevels = ['local'];
-        if (!TestData.runningWithCausalConsistency) {
+        if (!TestData.runningWithCausalConsistency && !TestData.runInsideTransaction) {
             readConcernLevels.push('available');
         }
         if (supportsCommittedReads) {
@@ -85,7 +91,7 @@ var $config = (function() {
         // secondaries with a randomly chosen readConcern level.
         function readFromSecondaries(db, collName) {
             if (this.isWriterThread()) {
-                this.insertDocuments(db, this.collName, {w: 1});
+                this.insertDocuments(db, this.collName);
             } else {
                 this.readFromSecondaries(
                     db, this.collName, getReadConcernLevel(supportsCommittedReads(db)));

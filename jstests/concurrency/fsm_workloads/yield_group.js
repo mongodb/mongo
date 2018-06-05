@@ -16,6 +16,9 @@ var $config = (function() {
                 assert.commandWorked(db.runCommand(
                     {group: {ns: collName, key: {_id: 1}, $reduce: function() {}, initial: {}}}));
             } catch (ex) {
+                if (ex.code === ErrorCodes.OperationNotSupportedInTransaction) {
+                    throw ex;
+                }
                 assert.eq(ErrorCodes.CappedPositionLost, ex.code);
             }
         },

@@ -1,0 +1,61 @@
+test_kind: fsm_workload_test
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+  ##
+  # Disabled due to MongoDB restrictions and/or workload restrictions
+  ##
+  # These workloads use >100MB of data, which can overwhelm test hosts.
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
+  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+
+  # Creates a cursor in one state function and uses it in a different state function, which means
+  # that in this suite it attempts to use the same cursor in multiple transactions.
+  - jstests/concurrency/fsm_workloads/invalidated_cursors.js
+  - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
+  - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
+
+  # Relies on having one thread observe writes from the other threads, which won't become visible
+  # once a transaction in the thread is started because it'll keep reading from the same snapshot.
+  - jstests/concurrency/fsm_workloads/create_index_background.js
+  exclude_with_any_tags:
+  - requires_sharding
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      readMode: commands
+      global_vars:
+        TestData:
+          runInsideTransaction: true
+          runningWithSessions: true
+          traceExceptions: false
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  #
+  # TODO SERVER-26466: Add CheckReplOplogs hook to the concurrency suite.
+  - class: CheckReplDBHashInBackground
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 1
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+    num_nodes: 3
