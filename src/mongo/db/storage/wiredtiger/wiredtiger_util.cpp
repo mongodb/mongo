@@ -97,6 +97,9 @@ Status wtRCToStatus_slow(int retCode, const char* prefix) {
     if (retCode == EINVAL) {
         return Status(ErrorCodes::BadValue, s);
     }
+    if (retCode == EMFILE) {
+        return Status(ErrorCodes::TooManyFilesOpen, s);
+    }
 
     uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
 
