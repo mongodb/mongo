@@ -7,6 +7,3 @@ selector:
     exclude_tasks:
     # Exclude list of jstests file names.
     exclude_tests:
-    # SERVER-27653 - Blacklist concurrency test runners to avoid potential issues from attempting
-    # to run them in parallel with each other.
-    - jstests/concurrency/fsm_all*.js

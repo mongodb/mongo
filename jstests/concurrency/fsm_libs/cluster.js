@@ -48,7 +48,6 @@ var Cluster = function(options) {
             'sharded.stepdownOptions.configStepdown',
             'sharded.stepdownOptions.shardStepdown',
             'teardownFunctions',
-            'useExistingConnectionAsSeed',
         ];
 
         getObjectKeys(options).forEach(function(option) {
@@ -167,30 +166,12 @@ var Cluster = function(options) {
                'Expected teardownFunctions.config to be an array');
         assert(options.teardownFunctions.config.every(f => (typeof f === 'function')),
                'Expected teardownFunctions.config to be an array of functions');
-
-        options.useExistingConnectionAsSeed = options.useExistingConnectionAsSeed || false;
-        assert.eq('boolean', typeof options.useExistingConnectionAsSeed);
-    }
-
-    function makeReplSetTestConfig(numReplSetNodes, firstNodeOnlyVote) {
-        const REPL_SET_VOTING_LIMIT = 7;
-        // Workaround for SERVER-26893 to specify when numReplSetNodes > REPL_SET_VOTING_LIMIT.
-        var firstNodeNotVoting = firstNodeOnlyVote ? 1 : REPL_SET_VOTING_LIMIT;
-        var rstConfig = [];
-        for (var i = 0; i < numReplSetNodes; i++) {
-            rstConfig[i] = {};
-            if (i >= firstNodeNotVoting) {
-                rstConfig[i].rsConfig = {priority: 0, votes: 0};
-            }
-        }
-        return rstConfig;
     }
 
     var conn;
     var secondaryConns;
 
     var st;
-    var rawST;  // The raw ShardingTest object for test suites not using resmoke fixtures.
 
     var initialized = false;
     var clusterStartTime;
@@ -211,85 +192,24 @@ var Cluster = function(options) {
         }
 
         if (options.sharded.enabled) {
-            if (options.useExistingConnectionAsSeed) {
-                st = new FSMShardingTest(`mongodb://${db.getMongo().host}`);
-            } else {
-                // TODO: allow 'options' to specify the number of shards and mongos processes
-                var shardConfig = {
-                    shards: options.sharded.numShards,
-                    mongos: options.sharded.numMongos,
-                    verbose: verbosityLevel,
-                    other: {
-                        enableAutoSplit: options.sharded.enableAutoSplit,
-                        enableBalancer: options.sharded.enableBalancer,
-                    }
-                };
-
-                // TODO: allow 'options' to specify an 'rs' config
-                if (options.replication.enabled) {
-                    shardConfig.rs = {
-                        nodes: makeReplSetTestConfig(options.replication.numNodes,
-                                                     !this.shouldPerformContinuousStepdowns()),
-                        // Increase the oplog size (in MB) to prevent rollover
-                        // during write-heavy workloads
-                        oplogSize: 1024,
-                        // Set the electionTimeoutMillis to 1 day to prevent unintended elections
-                        settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000},
-                        verbose: verbosityLevel
-                    };
-                    shardConfig.rsOptions = {};
-                }
-
-                if (this.shouldPerformContinuousStepdowns()) {
-                    load('jstests/libs/override_methods/continuous_stepdown.js');
-                    ContinuousStepdown.configure(options.sharded.stepdownOptions);
-                }
-
-                rawST = new ShardingTest(shardConfig);
-                const hostStr = "mongodb://" + rawST._mongos.map(conn => conn.host).join(",");
-
-                st = new FSMShardingTest(hostStr);
-            }
+            st = new FSMShardingTest(`mongodb://${db.getMongo().host}`);
 
             conn = st.s(0);  // First mongos
 
-            this.teardown = function teardown(opts) {
+            this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
                 options.teardownFunctions.config.forEach(this.executeOnConfigNodes);
-
-                // Skip checking uuids in teardown if performing continuous stepdowns. The override
-                // uses cached connections and expects to run commands against primaries, which is
-                // not compatible with stepdowns.
-                if (this.shouldPerformContinuousStepdowns()) {
-                    TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-                }
-
-                if (!options.useExistingConnectionAsSeed) {
-                    rawST.stop(opts);
-                }
             };
 
-            if (this.shouldPerformContinuousStepdowns()) {
-                this.startContinuousFailover = function() {
-                    rawST.startContinuousFailover();
-                };
-
-                this.reestablishConnectionsAfterFailover = function() {
-                    // Call getPrimary() to re-establish the connections in FSMShardingTest
-                    // as it is not a transparent proxy for SharingTest/rawST.
-                    st._configsvr.getPrimary();
-                    for (let rst of st._shard_rsts) {
-                        rst.getPrimary();
-                    }
-                };
-
-                this.stopContinuousFailover = function() {
-                    rawST.stopContinuousFailover(
-                        {waitForPrimary: true, waitForMongosRetarget: true});
-                    this.reestablishConnectionsAfterFailover();
-                };
-            }
+            this.reestablishConnectionsAfterFailover = function() {
+                // Call getPrimary() to re-establish the connections in FSMShardingTest
+                // as it is not a transparent proxy for ShardingTest.
+                st._configsvr.getPrimary();
+                for (let rst of st._shard_rsts) {
+                    rst.getPrimary();
+                }
+            };
 
             // Save all mongos, mongod, and ReplSet connections (if any).
             var i;
@@ -312,35 +232,14 @@ var Cluster = function(options) {
             }
 
         } else if (options.replication.enabled) {
-            var replSetConfig = {
-                nodes: makeReplSetTestConfig(options.replication.numNodes,
-                                             !this.shouldPerformContinuousStepdowns()),
-                // Increase the oplog size (in MB) to prevent rollover during write-heavy workloads
-                oplogSize: 1024,
-                nodeOptions: {verbose: verbosityLevel},
-                // Set the electionTimeoutMillis to 1 day to prevent unintended elections
-                settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000}
-            };
-
-            if (!options.useExistingConnectionAsSeed) {
-                rst = new ReplSetTest(replSetConfig);
-                rst.startSet();
-
-                rst.initiate();
-                rst.awaitSecondaryNodes();
-            } else {
-                rst = new ReplSetTest(db.getMongo().host);
-            }
+            rst = new ReplSetTest(db.getMongo().host);
 
             conn = rst.getPrimary();
             secondaryConns = rst.getSecondaries();
             replSets = [rst];
 
-            this.teardown = function teardown(opts) {
+            this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-                if (!options.useExistingConnectionAsSeed) {
-                    rst.stopSet(undefined, undefined, opts);
-                }
             };
 
             this._addReplicaSetConns(rst);
