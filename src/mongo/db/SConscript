@@ -200,6 +200,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='curop_failpoint_helpers',
+    source=[
+        'curop_failpoint_helpers.cpp',
+    ],
+    LIBDEPS=[
+        'curop',
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+)
+
 env.CppUnitTest(
     target='operation_context_test',
     source=[
