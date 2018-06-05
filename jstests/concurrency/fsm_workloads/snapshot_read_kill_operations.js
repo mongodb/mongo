@@ -27,10 +27,11 @@ var $config = (function() {
         },
 
         snapshotGetMore: function snapshotGetMore(db, collName) {
-            doSnapshotGetMore(collName,
-                              this,
-                              [ErrorCodes.NoSuchTransaction, ErrorCodes.CursorNotFound],
-                              [ErrorCodes.NoSuchTransaction]);
+            doSnapshotGetMore(
+                collName,
+                this,
+                [ErrorCodes.NoSuchTransaction, ErrorCodes.CursorNotFound, ErrorCodes.Interrupted],
+                [ErrorCodes.NoSuchTransaction]);
         },
 
         incrementTxnNumber: function incrementTxnNumber(db, collName) {
