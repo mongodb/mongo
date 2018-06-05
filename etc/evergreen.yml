@@ -4885,6 +4885,14 @@ tasks:
       resmoke_args: --suites=concurrency_replication_causal_consistency --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: concurrency_replication_multi_stmt_txn
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_multi_stmt_txn --storageEngine=wiredTiger
+
+- <<: *task_template
   name: concurrency_replication_ubsan
   commands:
   - func: "do setup"
@@ -4899,6 +4907,14 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=concurrency_replication_causal_consistency_ubsan --storageEngine=wiredTiger
+
+- <<: *task_template
+  name: concurrency_replication_multi_stmt_txn_ubsan
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_multi_stmt_txn_ubsan --storageEngine=wiredTiger
 
 - <<: *task_template
   name: concurrency_sharded_replication
@@ -7292,6 +7308,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel62-large
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7349,6 +7366,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: concurrency_replication_causal_consistency
+    distros:
+    - rhel62-large
+  - name: concurrency_replication_multi_stmt_txn
     distros:
     - rhel62-large
   - name: concurrency_sharded_replication
@@ -7410,6 +7430,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -7669,6 +7690,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - ubuntu1404-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -7764,6 +7786,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - ubuntu1804-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8018,6 +8041,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - ubuntu1604-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8102,6 +8126,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8221,6 +8246,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8285,6 +8311,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8497,6 +8524,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - linux-64-amzn-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8676,6 +8704,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - amazon2-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -8781,6 +8810,9 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: concurrency_replication_causal_consistency
+    distros:
+    - windows-64-vs2015-large
+  - name: concurrency_replication_multi_stmt_txn
     distros:
     - windows-64-vs2015-large
   - name: concurrency_sharded_replication
@@ -9241,6 +9273,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - windows-64-vs2015-large
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -9471,6 +9504,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -10128,6 +10162,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel62-large
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -10675,6 +10710,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -10926,6 +10962,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel62-large
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11021,6 +11058,9 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel70
+  - name: concurrency_replication_multi_stmt_txn
+    distros:
+    - rhel70
   - name: concurrency_sharded_replication
     distros:
     - rhel70
@@ -11096,6 +11136,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11208,6 +11249,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11316,6 +11358,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11688,6 +11731,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11823,6 +11867,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - suse12-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -11972,6 +12017,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - debian81-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -12125,6 +12171,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - debian92-build
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous
@@ -12705,6 +12752,8 @@ buildvariants:
   - name: concurrency_replication_causal_consistency
     distros:
     - rhel72-zseries-build
+    distros:
+    - rhel72-zseries-build
   - name: concurrency_sharded_replication
     distros:
     - rhel72-zseries-build
@@ -12829,6 +12878,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -13009,6 +13059,7 @@ buildvariants:
   # TODO: SERVER-35964 revert the addition of UBSAN concurrency_replication suites.
   - name: concurrency_replication_ubsan
   - name: concurrency_replication_causal_consistency_ubsan
+  - name: concurrency_replication_multi_stmt_txn_ubsan
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_sharded_causal_consistency
@@ -13159,6 +13210,7 @@ buildvariants:
   - name: concurrency
   - name: concurrency_replication
   - name: concurrency_replication_causal_consistency
+  - name: concurrency_replication_multi_stmt_txn
   - name: concurrency_sharded_replication
   - name: concurrency_sharded_replication_with_balancer
   - name: concurrency_simultaneous

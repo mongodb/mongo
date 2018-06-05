@@ -33,7 +33,8 @@ var $config = (function() {
             const readErrorCodes = [
                 ErrorCodes.NoSuchTransaction,
                 ErrorCodes.SnapshotUnavailable,
-                ErrorCodes.LockTimeout
+                ErrorCodes.LockTimeout,
+                ErrorCodes.ConflictingOperationInProgress
             ];
             const commitTransactionErrorCodes = readErrorCodes;
             doSnapshotFind(sortByAscending, collName, this, readErrorCodes);
@@ -55,6 +56,12 @@ var $config = (function() {
                 try {
                     db[collName].update({_id: i}, {$inc: {value: 1}});
                 } catch (e) {
+                    // We propagate TransientTransactionErrors to allow the state function to
+                    // automatically be retried when TestData.runInsideTransaction=true
+                    if (e.hasOwnProperty('errorLabels') &&
+                        e.errorLabels.includes('TransientTransactionError')) {
+                        throw e;
+                    }
                     // dropIndex can cause queries to throw if these queries yield.
                     assertAlways.contains(e.code,
                                           [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
@@ -68,6 +75,12 @@ var $config = (function() {
                 try {
                     db[collName].findOne({_id: i});
                 } catch (e) {
+                    // We propagate TransientTransactionErrors to allow the state function to
+                    // automatically be retried when TestData.runInsideTransaction=true
+                    if (e.hasOwnProperty('errorLabels') &&
+                        e.errorLabels.includes('TransientTransactionError')) {
+                        throw e;
+                    }
                     // dropIndex can cause queries to throw if these queries yield.
                     assertAlways.contains(e.code,
                                           [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
@@ -81,6 +94,12 @@ var $config = (function() {
             try {
                 db[collName].deleteOne({_id: indexToDelete});
             } catch (e) {
+                // We propagate TransientTransactionErrors to allow the state function to
+                // automatically be retried when TestData.runInsideTransaction=true
+                if (e.hasOwnProperty('errorLabels') &&
+                    e.errorLabels.includes('TransientTransactionError')) {
+                    throw e;
+                }
                 // dropIndex can cause queries to throw if these queries yield.
                 assertAlways.contains(e.code,
                                       [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],

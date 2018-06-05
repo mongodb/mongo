@@ -247,7 +247,7 @@
             resmokeDbPathPrefix + '/concurrency_sharded_stepdown_stepping_down';
     }
 
-    if (Object.keys(sessionOptions).length > 0) {
+    if (Object.keys(sessionOptions).length > 0 || TestData.runningWithSessions) {
         executionOptions.sessionOptions = sessionOptions;
     }
 

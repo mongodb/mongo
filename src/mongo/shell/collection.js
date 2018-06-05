@@ -418,7 +418,7 @@ DBCollection.prototype.remove = function(t, justOne) {
                 result = ex;
             } else {
                 // Other exceptions thrown
-                throw Error(ex);
+                throw ex;
             }
         }
     } else {
@@ -534,7 +534,7 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
                 result = ex;
             } else {
                 // Other exceptions thrown
-                throw Error(ex);
+                throw ex;
             }
         }
     } else {
@@ -1539,7 +1539,7 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
     // Execute distinct command
     var res = this.runReadCommand(cmd);
     if (!res.ok) {
-        throw new Error("distinct failed: " + tojson(res));
+        throw _getErrorWithCode(res, "distinct failed: " + tojson(res));
     }
 
     return res.values;

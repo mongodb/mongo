@@ -667,7 +667,7 @@ assert = (function() {
         }
 
         if (errMsg) {
-            doassert(_buildAssertionMessage(msg, errMsg));
+            doassert(_buildAssertionMessage(msg, errMsg), res);
         }
 
         return res;
