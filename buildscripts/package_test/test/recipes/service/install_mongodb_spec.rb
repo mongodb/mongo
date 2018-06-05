@@ -15,7 +15,7 @@ describe command("#{service} mongod start") do
   its('exit_status') { should eq 0 }
 end
 
-# Inspec treats all amazon linux as upstart, we explicitly make it use 
+# Inspec treats all amazon linux as upstart, we explicitly make it use
 # systemd_service https://github.com/chef/inspec/issues/2639
 if (os[:name] == 'amazon' and os[:release] == '2.0')
   describe systemd_service('mongod') do
@@ -145,10 +145,18 @@ if deb
     it { should be_directory }
   end
 
-  describe user('mongodb') do
-    it { should exist }
-    its('groups') { should include 'mongodb' }
-    its('shell') { should eq '/bin/false' }
+  if os[:release] == '18.04'
+    describe user('mongodb') do
+      it { should exist }
+      its('groups') { should include 'mongodb' }
+      its('shell') { should eq '/usr/sbin/nologin' }
+    end
+  else
+    describe user('mongodb') do
+      it { should exist }
+      its('groups') { should include 'mongodb' }
+      its('shell') { should eq '/bin/false' }
+    end
   end
 end
 
