@@ -243,6 +243,10 @@ private:
 
     class OpQueueBatcher;
 
+    void _oplogApplication(OplogBuffer* oplogBuffer,
+                           ReplicationCoordinator* replCoord,
+                           OpQueueBatcher* batcher) noexcept;
+
     OplogApplier::Observer* const _observer;
     ReplicationConsistencyMarkers* const _consistencyMarkers;
     StorageInterface* const _storageInterface;
