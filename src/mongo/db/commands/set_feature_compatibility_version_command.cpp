@@ -184,16 +184,6 @@ public:
 
                 auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
                 for (const auto& db : allDbs) {
-                    const auto dbVersion = databaseVersion::makeNew();
-
-                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-                        opCtx,
-                        DatabaseType::ConfigNS,
-                        BSON(DatabaseType::name(db.getName())),
-                        BSON("$set" << BSON(DatabaseType::version(dbVersion.toBSON()))),
-                        false,
-                        ShardingCatalogClient::kLocalWriteConcern));
-
                     // Enumerate all collections
                     auto collections =
                         uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
@@ -269,20 +259,11 @@ public:
                                                   opCtx, repl::ReadConcernLevel::kLocalReadConcern))
                                   .value;
 
-                // The 'config' dataabase contains the sharded 'config.system.sessions' collection,
+                // The 'config' database contains the sharded 'config.system.sessions' collection,
                 // but does not have an entry in config.databases.
                 allDbs.emplace_back("config", ShardId("config"), true);
 
                 for (const auto& db : allDbs) {
-                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-                        opCtx,
-                        DatabaseType::ConfigNS,
-                        BSON(DatabaseType::name(db.getName())),
-                        BSON("$unset" << BSON("version"
-                                              << "")),
-                        false,
-                        ShardingCatalogClient::kLocalWriteConcern));
-
                     // Enumerate all collections
                     auto collections =
                         uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
