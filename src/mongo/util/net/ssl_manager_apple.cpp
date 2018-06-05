@@ -1438,15 +1438,6 @@ MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManagerApple(sslGlobalParams, isSSLServer);
-        const auto& config = theSSLManager->getSSLConfiguration();
-        log() << "Secure Transport Initialized";
-        if (!config.clientSubjectName.empty()) {
-            log() << "Client Certificate Name: " << config.clientSubjectName;
-        }
-        if (!config.serverSubjectName.empty()) {
-            log() << "Server Certificate Name: " << config.serverSubjectName;
-            log() << "Server Certificate Expiration: " << config.serverCertificateExpirationDate;
-        }
     }
     return Status::OK();
 }
