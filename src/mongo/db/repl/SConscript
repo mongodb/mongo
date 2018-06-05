@@ -332,6 +332,7 @@ env.CppUnitTest(
         'sync_tail_test.cpp',
     ],
     LIBDEPS=[
+        'oplog_buffer_blocking_queue',
         'oplog_interface_local',
         'replmocks',
         'sync_tail',

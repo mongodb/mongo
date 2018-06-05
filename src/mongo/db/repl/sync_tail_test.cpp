@@ -47,6 +47,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/md5.hpp"
@@ -1087,6 +1089,43 @@ TEST_F(SyncTailTest,
     auto iter = collectionReader.makeIterator();
     ASSERT_BSONOBJ_EQ(updatedDocument, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+namespace {
+
+class ReplicationCoordinatorSignalDrainCompleteThrows : public ReplicationCoordinatorMock {
+public:
+    explicit ReplicationCoordinatorSignalDrainCompleteThrows(const ReplSettings& settings)
+        : ReplicationCoordinatorMock(settings) {}
+    bool isInPrimaryOrSecondaryState() const final {
+        return true;
+    }
+    void signalDrainComplete(OperationContext*, long long) final {
+        uasserted(ErrorCodes::OperationFailed, "failed to signal drain complete");
+    }
+};
+
+}  // namespace
+
+DEATH_TEST_F(SyncTailTest,
+             OplogApplicationLogsExceptionFromSignalDrainCompleteBeforeAborting,
+             "Invariant failure _isDead") {
+    // Leave oplog buffer empty so that SyncTail calls
+    // ReplicationCoordinator::signalDrainComplete() during oplog application.
+    auto oplogBuffer = stdx::make_unique<OplogBufferBlockingQueue>();
+    BackgroundSync bgsync(nullptr,  // ReplicationCoordinatorExternalState. Not used.
+                          std::move(oplogBuffer));
+
+    auto applyOperationFn = [](MultiApplier::OperationPtrs*, SyncTail*) { return Status::OK(); };
+    SyncTail syncTail(&bgsync, applyOperationFn);
+
+    auto currentReplCoord = ReplicationCoordinator::get(_opCtx.get());
+    ReplicationCoordinatorSignalDrainCompleteThrows replCoord(currentReplCoord->getSettings());
+    ASSERT_TRUE(replCoord.setFollowerMode(MemberState::RS_PRIMARY));
+
+    // SyncTail::oplogApplication() creates its own OperationContext in the current thread context.
+    _opCtx = {};
+    syncTail.oplogApplication(&replCoord);
 }
 
 class IdempotencyTest : public SyncTailTest {
