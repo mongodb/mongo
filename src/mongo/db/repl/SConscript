@@ -715,6 +715,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         'idempotency_test_fixture',
+        'oplog_buffer_blocking_queue',
         'oplog_interface_local',
         'sync_tail_test_fixture',
     ],
