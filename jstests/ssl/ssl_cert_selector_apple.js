@@ -34,7 +34,8 @@ requireSSLProvider('apple', function() {
             sslMode: 'requireSSL',
             sslCertificateSelector: cert.selector,
             sslClusterCertificateSelector: cluster.selector,
-            waitForConnect: false
+            waitForConnect: false,
+            setParameter: {logLevel: '1'},
         };
         clearRawMongoProgramOutput();
         const mongod = MongoRunner.runMongod(opts);

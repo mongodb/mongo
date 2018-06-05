@@ -25,6 +25,9 @@
  *    then also delete it in the license file.
  */
 
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_manager.h"
@@ -33,12 +36,14 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
@@ -65,8 +70,8 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly>
     setDiffieHellmanParameterPEMFile(ServerParameterSet::getGlobal(),
                                      "opensslDiffieHellmanParameters",
                                      &sslGlobalParams.sslPEMTempDHParam);
-
 }  // namespace
+
 
 SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
     return peerInfoForSession(session.get());
@@ -145,6 +150,21 @@ std::string x509OidToShortName(const std::string& name) {
 }
 #endif
 }  // namespace
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager", "GlobalLogManager"))
+(InitializerContext*) {
+    if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
+        const auto& config = getSSLManager()->getSSLConfiguration();
+        if (!config.clientSubjectName.empty()) {
+            LOG(1) << "Client Certificate Name: " << config.clientSubjectName;
+        }
+        if (!config.serverSubjectName.empty()) {
+            LOG(1) << "Server Certificate Name: " << config.serverSubjectName;
+            LOG(1) << "Server Certificate Expiration: " << config.serverCertificateExpirationDate;
+        }
+    }
+    return Status::OK();
+}
 
 StatusWith<std::string> SSLX509Name::getOID(StringData oid) const {
     for (const auto& rdn : _entries) {
