@@ -3209,7 +3209,7 @@ void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* sta
 
 TEST_F(
     ReplCoordTest,
-    NodeReturnsCannotSatisfyWriteConcernWhenReconfiggingToAClusterThatCannotSatisfyTheWriteConcern) {
+    NodeReturnsUnsatisfiableWriteConcernWhenReconfiggingToAClusterThatCannotSatisfyTheWriteConcern) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
                             << "version"
@@ -3262,10 +3262,10 @@ TEST_F(
 
     // writeconcern feasability should be reevaluated and an error should be returned
     ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
-    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern, statusAndDur.status);
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern, statusAndDur.status);
     awaiter.reset();
     ReplicationCoordinator::StatusAndDuration statusAndDurJournaled = awaiterJournaled.getResult();
-    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern, statusAndDurJournaled.status);
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern, statusAndDurJournaled.status);
     awaiterJournaled.reset();
 }
 

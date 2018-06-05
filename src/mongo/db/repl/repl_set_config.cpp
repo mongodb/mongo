@@ -630,7 +630,7 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
         }
         // Even if all the nodes in the set had a given write it still would not satisfy this
         // write concern mode.
-        return Status(ErrorCodes::CannotSatisfyWriteConcern,
+        return Status(ErrorCodes::UnsatisfiableWriteConcern,
                       str::stream() << "Not enough nodes match write concern mode \""
                                     << writeConcern.wMode
                                     << "\"");
@@ -644,7 +644,7 @@ Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
                 }
             }
         }
-        return Status(ErrorCodes::CannotSatisfyWriteConcern, "Not enough data-bearing nodes");
+        return Status(ErrorCodes::UnsatisfiableWriteConcern, "Not enough data-bearing nodes");
     }
 }
 

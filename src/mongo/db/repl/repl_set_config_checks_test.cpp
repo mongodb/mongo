@@ -139,7 +139,7 @@ TEST(ValidateConfigForInitiate, WriteConcernMustBeSatisfiable) {
     presentOnceExternalState.addSelf(HostAndPort("h2"));
 
     ASSERT_EQUALS(
-        ErrorCodes::CannotSatisfyWriteConcern,
+        ErrorCodes::UnsatisfiableWriteConcern,
         validateConfigForInitiate(&presentOnceExternalState, config, getGlobalServiceContext())
             .getStatus());
 }
@@ -970,13 +970,13 @@ TEST(ValidateConfigForReconfig, NewConfigWriteConcernNotSatisifiable) {
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));
     ASSERT_EQUALS(
-        ErrorCodes::CannotSatisfyWriteConcern,
+        ErrorCodes::UnsatisfiableWriteConcern,
         validateConfigForReconfig(
             &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
             .getStatus());
     // Forced reconfigs also do not allow this.
     ASSERT_EQUALS(
-        ErrorCodes::CannotSatisfyWriteConcern,
+        ErrorCodes::UnsatisfiableWriteConcern,
         validateConfigForReconfig(
             &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
             .getStatus());

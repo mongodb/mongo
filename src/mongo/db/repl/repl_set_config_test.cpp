@@ -1525,7 +1525,7 @@ TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
 
     WriteConcernOptions invalidNumberWC;
     invalidNumberWC.wNumNodes = 6;
-    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidNumberWC));
 
     WriteConcernOptions majorityWC;
@@ -1543,12 +1543,12 @@ TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
 
     WriteConcernOptions invalidModeNotEnoughValuesWC;
     invalidModeNotEnoughValuesWC.wMode = "invalidNotEnoughValues";
-    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughValuesWC));
 
     WriteConcernOptions invalidModeNotEnoughNodesWC;
     invalidModeNotEnoughNodesWC.wMode = "invalidNotEnoughNodes";
-    ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+    ASSERT_EQUALS(ErrorCodes::UnsatisfiableWriteConcern,
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
 }
 
