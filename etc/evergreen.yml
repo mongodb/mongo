@@ -7337,29 +7337,6 @@ buildvariants:
   - name: slow1
   - name: tool
 
-- name: linux-64-lsm
-  stepback: false
-  display_name: Linux LSM
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --wiredTigerEngineConfig=mmap=false --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1,uses_transactions
-    scons_cache_scope: shared
-    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
-    tooltags: ""
-    build_mongoreplay: true
-  display_tasks:
-  - *unittests
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel62-large
-  - name: dbtest
-  - name: jsCore
-
 - name: ubuntu1404
   display_name: SSL Ubuntu 14.04
   run_on:
