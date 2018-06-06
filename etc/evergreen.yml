@@ -7484,6 +7484,117 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: enterprise-ubuntu1804-64-gcc-cxx17
+  display_name: ~ Enterprise Ubuntu 18.04 (System GCC 7.x C++17 DEBUG)
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      --ssl
+      -j$(grep -c ^processor /proc/cpuinfo)
+      CC=gcc-7
+      CXX=g++-7
+      --cxx-std=17
+      --disable-warnings-as-errors
+      --allocator=system
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+  - name: audit
+  - name: dbtest
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  # - name: aggregation_fuzzer
+  # - name: jstestfuzz
+  # - name: jstestfuzz_concurrent
+  # - name: jstestfuzz_concurrent_replication
+  # - name: jstestfuzz_concurrent_sharded
+  # - name: jstestfuzz_replication
+  # - name: jstestfuzz_sharded
+  # - name: replica_sets_auth
+  - name: sasl
+  # - name: sharding_auth
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: watchdog_mmapv1
+  - name: watchdog_wiredtiger
+
+- name: enterprise-ubuntu1804-64-clang-cxx17
+  display_name: ~ Enterprise Ubuntu 18.04 (System clang 6.0 C++17 libc++ DEBUG)
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: --excludeWithAnyTags=requires_mmapv1
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      --ssl
+      -j$(grep -c ^processor /proc/cpuinfo)
+      CC=clang-6.0
+      CXX=clang++-6.0
+      --libc++
+      --cxx-std=17
+      --disable-warnings-as-errors
+      --allocator=system
+      CPPDEFINES=_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR
+      CXXFLAGS="-Wno-register"
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go'
+    tooltags: "-tags 'ssl sasl'"
+    build_mongoreplay: true
+  display_tasks:
+  - *unittests
+  tasks:
+  - name: compile_all_run_unittests_TG
+    distros:
+    - ubuntu1804-build
+  - name: audit
+  - name: dbtest
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_txns
+  - name: causally_consistent_jscore_txns_passthrough
+  # - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  # - name: jstestfuzz_sharded
+  - name: replica_sets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: watchdog_mmapv1
+  - name: watchdog_wiredtiger
+
 - name: ubuntu1604
   display_name: SSL Ubuntu 16.04
   run_on:
