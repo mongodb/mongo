@@ -38,13 +38,13 @@ struct stream_core {
     // sufficient to hold the largest possible TLS record.
     enum { max_tls_record_size = 17 * 1024 };
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
     stream_core(SCHANNEL_CRED* context,
                 const std::string& remoteHostName,
                 asio::io_context& io_context)
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
     stream_core(SSL_CTX* context, const std::string& remoteHostName, asio::io_context& io_context)
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
     stream_core(apple::Context* context,
                 const std::string& remoteHostName,
                 asio::io_context& io_context)

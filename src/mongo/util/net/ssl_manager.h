@@ -45,7 +45,7 @@
 #include "mongo/util/time_support.h"
 
 // SChannel implementation
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #endif
@@ -62,13 +62,13 @@ const std::string getSSLVersion(const std::string& prefix, const std::string& su
 namespace mongo {
 struct SSLParams;
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 typedef SSL_CTX* SSLContextType;
 typedef SSL* SSLConnectionType;
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 typedef SCHANNEL_CRED* SSLContextType;
 typedef PCtxtHandle SSLConnectionType;
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
 typedef asio::ssl::apple::Context* SSLContextType;
 typedef SSLContextRef SSLConnectionType;
 #else

@@ -2970,12 +2970,12 @@ def doConfigure(myenv):
     if ssl_provider == 'native':
         if conf.env.TargetOSIs('windows'):
             ssl_provider = 'windows'
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_WINDOWS")
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_WINDOWS")
             conf.env.Append( MONGO_CRYPTO=["windows"] )
 
         elif conf.env.TargetOSIs('darwin', 'macOS'):
             ssl_provider = 'apple'
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_APPLE")
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_APPLE")
             conf.env.Append( MONGO_CRYPTO=["apple"] )
             conf.env.AppendUnique(FRAMEWORKS=[
                 'CoreFoundation',
@@ -2986,7 +2986,7 @@ def doConfigure(myenv):
         if has_option("ssl"):
             checkOpenSSL(conf)
             # Working OpenSSL available, use it.
-            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_OPENSSL")
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "MONGO_CONFIG_SSL_PROVIDER_OPENSSL")
 
             conf.env.Append( MONGO_CRYPTO=["openssl"] )
         else:

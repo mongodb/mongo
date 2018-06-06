@@ -28,7 +28,7 @@
 
 #pragma once
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <Security/Security.h>

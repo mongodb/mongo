@@ -17,7 +17,7 @@
 
 #include "asio/detail/config.hpp"
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
 #endif
 
