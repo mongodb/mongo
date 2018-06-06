@@ -96,7 +96,7 @@ public:
 #ifdef MONGO_CONFIG_SSL
 
 namespace {
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 // OpenSSL has a more complete library of OID to SN mappings.
 std::string x509OidToShortName(const std::string& name) {
     const auto nid = OBJ_txt2nid(name.c_str());

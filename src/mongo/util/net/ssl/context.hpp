@@ -26,15 +26,15 @@
  * then also delete it in the license file.
  */
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_WINDOWS
 
 #include "mongo/util/net/ssl/context_schannel.hpp"
 
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
 #include "mongo/util/net/ssl/context_openssl.hpp"
 
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+#elif MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_APPLE
 
 #include "mongo/util/net/ssl/context_apple.hpp"
 

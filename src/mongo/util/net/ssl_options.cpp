@@ -41,7 +41,7 @@
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include <openssl/ssl.h>
 #endif  // #ifdef MONGO_CONFIG_SSL
 
@@ -441,7 +441,7 @@ Status storeSSLServerOptions(const moe::Environment& params) {
         if (!status.isOK()) {
             return status;
         }
-#if (MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
+#if (MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
     (OPENSSL_VERSION_NUMBER >= 0x100000cf) /* 1.0.0l */
     } else {
         /* Disable TLS 1.0 by default on all platforms
@@ -583,7 +583,7 @@ Status storeSSLClientOptions(const moe::Environment& params) {
         if (!status.isOK()) {
             return status;
         }
-#if ((MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL) || \
+#if ((MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_OPENSSL) || \
      (OPENSSL_VERSION_NUMBER >= 0x100000cf)) /* 1.0.0l */
     } else {
         /* Similar to the server setting above, we auto-disable TLS 1.0

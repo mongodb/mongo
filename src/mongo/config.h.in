@@ -29,9 +29,9 @@
 #pragma once
 
 // List of possible SSL providers
-#define SSL_PROVIDER_OPENSSL 1
-#define SSL_PROVIDER_WINDOWS 2
-#define SSL_PROVIDER_APPLE 3
+#define MONGO_CONFIG_SSL_PROVIDER_OPENSSL 1
+#define MONGO_CONFIG_SSL_PROVIDER_WINDOWS 2
+#define MONGO_CONFIG_SSL_PROVIDER_APPLE 3
 
 // Define altivec vec_vbpermq output index
 @mongo_config_altivec_vec_vbpermq_output_index@
