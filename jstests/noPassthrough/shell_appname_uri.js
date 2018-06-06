@@ -26,13 +26,13 @@
     });
 
     tests.push(function testAppName() {
-        const db = new Mongo(uri + "?appname=TestAppName").getDB("test");
+        const db = new Mongo(uri + "?appName=TestAppName").getDB("test");
         assert.commandWorked(db.coll.insert({}));
         assertProfileOnlyContainsAppName(db, "TestAppName");
     });
 
     tests.push(function testMultiWordAppName() {
-        const db = new Mongo(uri + "?appname=Test%20App%20Name").getDB("test");
+        const db = new Mongo(uri + "?appName=Test%20App%20Name").getDB("test");
         assert.commandWorked(db.coll.insert({}));
         assertProfileOnlyContainsAppName(db, "Test App Name");
     });
@@ -43,11 +43,11 @@
         // these limits are not adhered to, which will result in handshake failure. Drivers MUST
         // validate these values and truncate driver provided values if necessary.
         const longAppName = "a".repeat(129);
-        assert.throws(() => new Mongo(uri + "?appname=" + longAppName));
+        assert.throws(() => new Mongo(uri + "?appName=" + longAppName));
 
         // But a 128 character appname should connect without issue.
         const notTooLongAppName = "a".repeat(128);
-        const db = new Mongo(uri + "?appname=" + notTooLongAppName).getDB("test");
+        const db = new Mongo(uri + "?appName=" + notTooLongAppName).getDB("test");
         assert.commandWorked(db.coll.insert({}));
         assertProfileOnlyContainsAppName(db, notTooLongAppName);
     });
@@ -55,11 +55,11 @@
     tests.push(function testLongAppNameWithMultiByteUTF8() {
         // Each epsilon character is two bytes in UTF-8.
         const longAppName = "\u0190".repeat(65);
-        assert.throws(() => new Mongo(uri + "?appname=" + longAppName));
+        assert.throws(() => new Mongo(uri + "?appName=" + longAppName));
 
         // But a 128 character appname should connect without issue.
         const notTooLongAppName = "\u0190".repeat(64);
-        const db = new Mongo(uri + "?appname=" + notTooLongAppName).getDB("test");
+        const db = new Mongo(uri + "?appName=" + notTooLongAppName).getDB("test");
         assert.commandWorked(db.coll.insert({}));
         assertProfileOnlyContainsAppName(db, notTooLongAppName);
     });
