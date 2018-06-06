@@ -109,7 +109,7 @@ public:
                                BSONObj* result) override;
 
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    const std::string dbname,
+                                    StringData dbname,
                                     PrivilegeFormat privilegeFormat,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
@@ -123,7 +123,7 @@ public:
 
     void invalidateUserByName(const UserName& user) override;
 
-    void invalidateUsersFromDB(const std::string& dbname) override;
+    void invalidateUsersFromDB(StringData dbname) override;
 
     Status initialize(OperationContext* opCtx) override;
 

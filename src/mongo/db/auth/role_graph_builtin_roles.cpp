@@ -36,33 +36,27 @@
 
 namespace mongo {
 
-const std::string RoleGraph::BUILTIN_ROLE_V0_READ = "read";
-const std::string RoleGraph::BUILTIN_ROLE_V0_READ_WRITE = "dbOwner";
-const std::string RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ = "readAnyDatabase";
-const std::string RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ_WRITE = "root";
-
 namespace {
-const std::string ADMIN_DBNAME = "admin";
-
-const std::string BUILTIN_ROLE_READ = "read";
-const std::string BUILTIN_ROLE_READ_WRITE = "readWrite";
-const std::string BUILTIN_ROLE_USER_ADMIN = "userAdmin";
-const std::string BUILTIN_ROLE_DB_ADMIN = "dbAdmin";
-const std::string BUILTIN_ROLE_CLUSTER_ADMIN = "clusterAdmin";
-const std::string BUILTIN_ROLE_READ_ANY_DB = "readAnyDatabase";
-const std::string BUILTIN_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase";
-const std::string BUILTIN_ROLE_USER_ADMIN_ANY_DB = "userAdminAnyDatabase";
-const std::string BUILTIN_ROLE_DB_ADMIN_ANY_DB = "dbAdminAnyDatabase";
-const std::string BUILTIN_ROLE_ROOT = "root";
-const std::string BUILTIN_ROLE_INTERNAL = "__system";
-const std::string BUILTIN_ROLE_DB_OWNER = "dbOwner";
-const std::string BUILTIN_ROLE_CLUSTER_MONITOR = "clusterMonitor";
-const std::string BUILTIN_ROLE_HOST_MANAGEMENT = "hostManager";
-const std::string BUILTIN_ROLE_CLUSTER_MANAGEMENT = "clusterManager";
-const std::string BUILTIN_ROLE_BACKUP = "backup";
-const std::string BUILTIN_ROLE_RESTORE = "restore";
-const std::string BUILTIN_ROLE_ENABLE_SHARDING = "enableSharding";
-const std::string BUILTIN_ROLE_QUERYABLE_BACKUP = "__queryableBackup";
+constexpr StringData ADMIN_DBNAME = "admin"_sd;
+constexpr StringData BUILTIN_ROLE_READ = "read"_sd;
+constexpr StringData BUILTIN_ROLE_READ_WRITE = "readWrite"_sd;
+constexpr StringData BUILTIN_ROLE_USER_ADMIN = "userAdmin"_sd;
+constexpr StringData BUILTIN_ROLE_DB_ADMIN = "dbAdmin"_sd;
+constexpr StringData BUILTIN_ROLE_CLUSTER_ADMIN = "clusterAdmin"_sd;
+constexpr StringData BUILTIN_ROLE_READ_ANY_DB = "readAnyDatabase"_sd;
+constexpr StringData BUILTIN_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase"_sd;
+constexpr StringData BUILTIN_ROLE_USER_ADMIN_ANY_DB = "userAdminAnyDatabase"_sd;
+constexpr StringData BUILTIN_ROLE_DB_ADMIN_ANY_DB = "dbAdminAnyDatabase"_sd;
+constexpr StringData BUILTIN_ROLE_ROOT = "root"_sd;
+constexpr StringData BUILTIN_ROLE_INTERNAL = "__system"_sd;
+constexpr StringData BUILTIN_ROLE_DB_OWNER = "dbOwner"_sd;
+constexpr StringData BUILTIN_ROLE_CLUSTER_MONITOR = "clusterMonitor"_sd;
+constexpr StringData BUILTIN_ROLE_HOST_MANAGEMENT = "hostManager"_sd;
+constexpr StringData BUILTIN_ROLE_CLUSTER_MANAGEMENT = "clusterManager"_sd;
+constexpr StringData BUILTIN_ROLE_BACKUP = "backup"_sd;
+constexpr StringData BUILTIN_ROLE_RESTORE = "restore"_sd;
+constexpr StringData BUILTIN_ROLE_ENABLE_SHARDING = "enableSharding"_sd;
+constexpr StringData BUILTIN_ROLE_QUERYABLE_BACKUP = "__queryableBackup"_sd;
 
 /// Actions that the "read" role may perform on a normal resources of a specific database, and
 /// that the "readAnyDatabase" role may perform on normal resources of any database.
@@ -785,7 +779,7 @@ bool RoleGraph::isBuiltinRole(const RoleName& role) {
     return false;
 }
 
-void RoleGraph::_createBuiltinRolesForDBIfNeeded(const std::string& dbname) {
+void RoleGraph::_createBuiltinRolesForDBIfNeeded(StringData dbname) {
     _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ, dbname));
     _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_READ_WRITE, dbname));
     _createBuiltinRoleIfNeeded(RoleName(BUILTIN_ROLE_USER_ADMIN, dbname));

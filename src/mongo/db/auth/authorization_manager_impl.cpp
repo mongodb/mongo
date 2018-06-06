@@ -404,7 +404,7 @@ Status AuthorizationManagerImpl::getRolesDescription(OperationContext* opCtx,
 
 Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
     OperationContext* opCtx,
-    const std::string dbname,
+    StringData dbname,
     PrivilegeFormat privileges,
     AuthenticationRestrictionsFormat restrictions,
     bool showBuiltinRoles,
@@ -555,7 +555,7 @@ void AuthorizationManagerImpl::invalidateUserByName(const UserName& userName) {
     user->invalidate();
 }
 
-void AuthorizationManagerImpl::invalidateUsersFromDB(const std::string& dbname) {
+void AuthorizationManagerImpl::invalidateUsersFromDB(StringData dbname) {
     CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
     _updateCacheGeneration_inlock();
     stdx::unordered_map<UserName, User*>::iterator it = _userCache.begin();

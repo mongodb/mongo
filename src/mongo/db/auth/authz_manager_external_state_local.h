@@ -72,7 +72,7 @@ public:
                                AuthenticationRestrictionsFormat,
                                BSONObj* result) override;
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    const std::string& dbname,
+                                    StringData dbname,
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,

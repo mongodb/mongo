@@ -89,7 +89,7 @@ public:
     }
 
     Status getRoleDescriptionsForDB(OperationContext*,
-                                    std::string,
+                                    const StringData,
                                     PrivilegeFormat,
                                     AuthenticationRestrictionsFormat,
                                     bool,
@@ -109,7 +109,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUsersFromDB(const std::string& dbname) override {
+    void invalidateUsersFromDB(const StringData dbname) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

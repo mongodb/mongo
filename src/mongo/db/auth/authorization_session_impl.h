@@ -95,7 +95,7 @@ public:
 
     std::string getAuthenticatedUserNamesToken() override;
 
-    void logoutDatabase(const std::string& dbname) override;
+    void logoutDatabase(StringData dbname) override;
 
     void grantInternalAuthorization() override;
 

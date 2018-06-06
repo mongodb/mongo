@@ -288,7 +288,7 @@ Status AuthzManagerExternalStateMongos::getRolesDescription(
 }
 Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
     OperationContext* opCtx,
-    const std::string& dbname,
+    StringData dbname,
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     bool showBuiltinRoles,
@@ -299,7 +299,7 @@ Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
 
     BSONObjBuilder builder;
     const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-        opCtx, dbname, rolesInfoCmd.obj(), &builder);
+        opCtx, dbname.toString(), rolesInfoCmd.obj(), &builder);
     BSONObj cmdResult = builder.obj();
     if (!ok) {
         return getStatusFromCommandResult(cmdResult);

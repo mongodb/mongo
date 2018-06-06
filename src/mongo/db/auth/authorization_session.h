@@ -169,7 +169,7 @@ public:
 
     // Removes any authenticated principals whose authorization credentials came from the given
     // database, and revokes any privileges that were granted via that principal.
-    virtual void logoutDatabase(const std::string& dbname) = 0;
+    virtual void logoutDatabase(StringData dbname) = 0;
 
     // Adds the internalSecurity user to the set of authenticated users.
     // Used to grant internal threads full access.

@@ -68,13 +68,14 @@ mongo::AuthInfo mongo::internalSecurity;
 
 namespace mongo {
 
-const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
-const std::string AuthorizationManager::USER_DB_FIELD_NAME = "db";
-const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";
-const std::string AuthorizationManager::ROLE_DB_FIELD_NAME = "db";
-const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
-const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
-const std::string AuthorizationManager::V1_USER_SOURCE_FIELD_NAME = "userSource";
+constexpr StringData AuthorizationManager::USER_NAME_FIELD_NAME;
+constexpr StringData AuthorizationManager::USER_DB_FIELD_NAME;
+constexpr StringData AuthorizationManager::ROLE_NAME_FIELD_NAME;
+constexpr StringData AuthorizationManager::ROLE_DB_FIELD_NAME;
+constexpr StringData AuthorizationManager::PASSWORD_FIELD_NAME;
+constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
+constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
+
 
 const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
 const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
@@ -92,7 +93,7 @@ const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::Authen
 const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id"
                                                                 << "authSchema");
 
-const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
+constexpr StringData AuthorizationManager::schemaVersionFieldName;
 
 const int AuthorizationManager::schemaVersion24;
 const int AuthorizationManager::schemaVersion26Upgrade;

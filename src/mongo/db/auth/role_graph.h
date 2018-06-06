@@ -72,12 +72,6 @@ public:
      */
     static bool addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges);
 
-    // Built-in roles for backwards compatibility with 2.2 and prior
-    static const std::string BUILTIN_ROLE_V0_READ;
-    static const std::string BUILTIN_ROLE_V0_READ_WRITE;
-    static const std::string BUILTIN_ROLE_V0_ADMIN_READ;
-    static const std::string BUILTIN_ROLE_V0_ADMIN_READ_WRITE;
-
     // Swaps the contents of this RoleGraph with those of "other"
     void swap(RoleGraph& other);
 
@@ -126,7 +120,7 @@ public:
      * Returns an iterator that can be used to get a full list of roles (in lexicographical
      * order) that are defined on the given database.
      */
-    RoleNameIterator getRolesForDatabase(const std::string& dbname);
+    RoleNameIterator getRolesForDatabase(StringData dbname);
 
     /**
      * Returns a vector of the privileges that the given role has been directly granted.
@@ -321,7 +315,7 @@ private:
      * Adds the built-in roles for the given database name to the role graph if they aren't
      * already present.
      */
-    void _createBuiltinRolesForDBIfNeeded(const std::string& dbname);
+    void _createBuiltinRolesForDBIfNeeded(StringData dbname);
 
     /**
      * Returns whether or not the given role exists strictly within the role graph.

@@ -149,7 +149,7 @@ public:
      * contain a "warnings" array, with std::string messages describing inconsistencies.
      */
     virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            const std::string& dbname,
+                                            StringData dbname,
                                             PrivilegeFormat showPrivileges,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,

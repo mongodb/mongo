@@ -94,13 +94,14 @@ public:
 
     static MONGO_DECLARE_SHIM(()->std::unique_ptr<AuthorizationManager>) create;
 
-    static const std::string USER_NAME_FIELD_NAME;
-    static const std::string USER_DB_FIELD_NAME;
-    static const std::string ROLE_NAME_FIELD_NAME;
-    static const std::string ROLE_DB_FIELD_NAME;
-    static const std::string PASSWORD_FIELD_NAME;
-    static const std::string V1_USER_NAME_FIELD_NAME;
-    static const std::string V1_USER_SOURCE_FIELD_NAME;
+    static constexpr StringData USER_NAME_FIELD_NAME = "user"_sd;
+    static constexpr StringData USER_DB_FIELD_NAME = "db"_sd;
+    static constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
+    static constexpr StringData ROLE_DB_FIELD_NAME = "db"_sd;
+    static constexpr StringData PASSWORD_FIELD_NAME = "pwd"_sd;
+    static constexpr StringData V1_USER_NAME_FIELD_NAME = "user"_sd;
+    static constexpr StringData V1_USER_SOURCE_FIELD_NAME = "userSource"_sd;
+
 
     static const NamespaceString adminCommandNamespace;
     static const NamespaceString rolesCollectionNamespace;
@@ -126,7 +127,7 @@ public:
      * Name of the field in the auth schema version document containing the current schema
      * version.
      */
-    static const std::string schemaVersionFieldName;
+    static constexpr StringData schemaVersionFieldName = "currentVersion"_sd;
 
     /**
      * Value used to represent that the schema version is not cached or invalid.
@@ -244,7 +245,7 @@ public:
      * Delegates method call to the underlying AuthzManagerExternalState.
      */
     virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            const std::string dbname,
+                                            StringData dbname,
                                             PrivilegeFormat privilegeFormat,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
@@ -278,7 +279,7 @@ public:
     /**
      * Invalidates all users who's source is "dbname" and removes them from the user cache.
      */
-    virtual void invalidateUsersFromDB(const std::string& dbname) = 0;
+    virtual void invalidateUsersFromDB(StringData dbname) = 0;
 
     /**
      * Initializes the authorization manager.  Depending on what version the authorization

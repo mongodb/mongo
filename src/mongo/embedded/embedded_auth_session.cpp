@@ -99,7 +99,7 @@ public:
         // Always okay to do something, on embedded.
     }
 
-    void logoutDatabase(const std::string&) override {
+    void logoutDatabase(const StringData) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

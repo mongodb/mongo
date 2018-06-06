@@ -68,7 +68,7 @@ MONGO_REGISTER_SHIM(AuthorizationSession::create)
 }
 
 namespace {
-const std::string ADMIN_DBNAME = "admin";
+constexpr StringData ADMIN_DBNAME = "admin"_sd;
 
 // Checks if this connection has the privileges necessary to create or modify the view 'viewNs'
 // to be a view on 'viewOnNs' with pipeline 'viewPipeline'. Call this function after verifying
@@ -199,7 +199,7 @@ User* AuthorizationSessionImpl::getSingleUser() {
     return lookupUser(userName);
 }
 
-void AuthorizationSessionImpl::logoutDatabase(const std::string& dbname) {
+void AuthorizationSessionImpl::logoutDatabase(StringData dbname) {
     User* removedUser = _authenticatedUsers.removeByDBName(dbname);
     if (removedUser) {
         getAuthorizationManager().releaseUser(removedUser);

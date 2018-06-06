@@ -438,7 +438,7 @@ Status AuthzManagerExternalStateLocal::_getRoleDescription_inlock(
 
 Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
     OperationContext* opCtx,
-    const std::string& dbname,
+    StringData dbname,
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     bool showBuiltinRoles,

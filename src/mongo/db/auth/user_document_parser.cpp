@@ -47,19 +47,19 @@
 namespace mongo {
 
 namespace {
-const std::string ADMIN_DBNAME = "admin";
+constexpr StringData ADMIN_DBNAME = "admin"_sd;
 
-const std::string ROLES_FIELD_NAME = "roles";
-const std::string PRIVILEGES_FIELD_NAME = "inheritedPrivileges";
-const std::string INHERITED_ROLES_FIELD_NAME = "inheritedRoles";
-const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
-const std::string READONLY_FIELD_NAME = "readOnly";
-const std::string CREDENTIALS_FIELD_NAME = "credentials";
-const std::string ROLE_NAME_FIELD_NAME = "role";
-const std::string ROLE_DB_FIELD_NAME = "db";
-const std::string SCRAMSHA1_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
-const std::string SCRAMSHA256_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-256";
-const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
+constexpr StringData ROLES_FIELD_NAME = "roles"_sd;
+constexpr StringData PRIVILEGES_FIELD_NAME = "inheritedPrivileges"_sd;
+constexpr StringData INHERITED_ROLES_FIELD_NAME = "inheritedRoles"_sd;
+constexpr StringData OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles"_sd;
+constexpr StringData READONLY_FIELD_NAME = "readOnly"_sd;
+constexpr StringData CREDENTIALS_FIELD_NAME = "credentials"_sd;
+constexpr StringData ROLE_NAME_FIELD_NAME = "role"_sd;
+constexpr StringData ROLE_DB_FIELD_NAME = "db"_sd;
+constexpr StringData SCRAMSHA1_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1"_sd;
+constexpr StringData SCRAMSHA256_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-256"_sd;
+constexpr StringData MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external"_sd;
 constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
 constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
     "inheritedAuthenticationRestrictions"_sd;
@@ -75,7 +75,7 @@ inline Status _badValue(const std::string& reason) {
 template <typename Credentials>
 bool parseSCRAMCredentials(const BSONElement& credentialsElement,
                            Credentials& scram,
-                           const std::string& fieldName) {
+                           StringData fieldName) {
     const auto scramElement = credentialsElement[fieldName];
     if (scramElement.eoo()) {
         return false;
