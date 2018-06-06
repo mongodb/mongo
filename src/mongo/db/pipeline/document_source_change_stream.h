@@ -196,9 +196,9 @@ public:
     static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
 
 private:
-    static constexpr StringData kRegexAllCollections = R"(\.(?!(\$|system\.)))"_sd;
-    static constexpr StringData kRegexAllDBs = "(?!(admin|config|local)).+"_sd;
-    static constexpr StringData kRegexCmdColl = R"(\.\$cmd$)"_sd;
+    static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
+    static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
+    static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
 
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is

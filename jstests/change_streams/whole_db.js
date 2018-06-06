@@ -43,6 +43,26 @@
     };
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: [expected]});
 
+    // Test that the change stream returns an inserted doc on a user-created collection whose name
+    // includes "system" but is not considered an internal collection.
+    const validSystemColls = ["system", "systems.views", "ssystem.views", "test.system"];
+    validSystemColls.forEach(collName => {
+        assert.writeOK(db.getCollection(collName).insert({_id: 0, a: 1}));
+        // Drop the collection so that it doesn't show up in the notifications after dropping the
+        // database.
+        assertDropCollection(db, collName);
+        expected = [
+            {
+              documentKey: {_id: 0},
+              fullDocument: {_id: 0, a: 1},
+              ns: {db: db.getName(), coll: collName},
+              operationType: "insert",
+            },
+            {operationType: "drop", ns: {db: db.getName(), coll: collName}}
+        ];
+        cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expected});
+    });
+
     // Dropping the database should generate collection drop entries followed by an invalidate. Note
     // that the order of collection drops is not guaranteed so only check the database name.
     assert.commandWorked(db.dropDatabase());

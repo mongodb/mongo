@@ -1133,6 +1133,41 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDo
         40645);
 }
 
+TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
+    // Renaming to a non-system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << systemColl.ns() << "to" << nss.ns()), testUuid());
+
+    // Note that the collection rename does *not* have the queued invalidated field.
+    Document expectedRename{
+        {DSChangeStream::kRenameTargetNssField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+    };
+    checkTransformation(rename, expectedRename);
+}
+
+TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
+    // Renaming to a system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+
+    // Note that the collection rename does *not* have the queued invalidated field.
+    Document expectedRename{
+        {DSChangeStream::kRenameTargetNssField,
+         D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
+    };
+    checkTransformation(rename, expectedRename);
+}
+
 //
 // Test class for change stream of a single database.
 //
@@ -1377,33 +1412,55 @@ TEST_F(ChangeStreamStageDBTest, TransformDropDatabase) {
     checkTransformation(dropDB, expectedInvalidateDropDatabase);
 }
 
-TEST_F(ChangeStreamStageDBTest, SystemCollectionsDrop) {
+TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
     NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, systemColl, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
     OplogEntry dropColl = createCommand(BSON("drop" << systemColl.coll()), testUuid());
-    // Note that the collection drop does *not* have the queued invalidated field.
-    Document expectedDrop{
-        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kDropCollectionOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
-    };
-    checkTransformation(dropColl, expectedDrop);
-}
+    checkTransformation(dropColl, boost::none);
 
-TEST_F(ChangeStreamStageDBTest, SystemCollectionsRename) {
-    NamespaceString systemColl(nss.db() + ".system.users");
-    NamespaceString renamedSystemColl(nss.db() + ".system.users_new");
-
+    // Rename from a 'system' collection to another 'system' collection should not include a
+    // notification.
+    NamespaceString renamedSystemColl(nss.db() + ".system.views");
     OplogEntry rename = createCommand(
         BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
+    checkTransformation(rename, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
+    // Renaming to a non-system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString renamedColl(nss.db() + ".non_system_coll");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << systemColl.ns() << "to" << renamedColl.ns()), testUuid());
+
     // Note that the collection rename does *not* have the queued invalidated field.
     Document expectedRename{
         {DSChangeStream::kRenameTargetNssField,
-         D{{"db", renamedSystemColl.db()}, {"coll", renamedSystemColl.coll()}}},
+         D{{"db", renamedColl.db()}, {"coll", renamedColl.coll()}}},
         {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
         {DSChangeStream::kNamespaceField, D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+    };
+    checkTransformation(rename, expectedRename);
+}
+
+TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
+    // Renaming to a system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+
+    // Note that the collection rename does *not* have the queued invalidated field.
+    Document expectedRename{
+        {DSChangeStream::kRenameTargetNssField,
+         D{{"db", systemColl.db()}, {"coll", systemColl.coll()}}},
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kRenameCollectionOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+        {DSChangeStream::kNamespaceField, D{{"db", nss.db()}, {"coll", nss.coll()}}},
     };
     checkTransformation(rename, expectedRename);
 }

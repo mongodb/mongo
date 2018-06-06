@@ -8,6 +8,7 @@
     load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
     const testDB = db.getSiblingDB(jsTestName());
+    testDB.dropDatabase();
     let cst = new ChangeStreamTest(testDB);
 
     // Write a document to the collection and test that the change stream returns it
@@ -168,16 +169,65 @@
             [{operationType: "drop", ns: {db: testDB.getName(), coll: coll.getName()}}],
     });
 
-    // Dropping a 'system' collection should also generate a 'drop' notification.
-    // Create a view to ensure that the 'system.views' collection exists.
+    // Operations on internal "system" collections should be filtered out and not included in the
+    // change stream.
+    aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
+    // Creating a view will generate an insert entry on the "system.views" collection.
     assert.commandWorked(
         testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
+    // Drop the "system.views" collection.
     assertDropCollection(testDB, "system.views");
+    // Verify that the change stream does not report the insertion into "system.views", and is
+    // not invalidated by dropping the system collection. Instead, it correctly reports the next
+    // write to the test collection.
+    assert.writeOK(coll.insert({_id: 0}));
+    change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "insert", tojson(change));
+    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
+
+    // Test that renaming a "system" collection *does* return a notification if the target of
+    // the rename is a non-system collection.
+    assert.commandWorked(
+        testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
+    assert.writeOK(testDB.system.views.renameCollection("non_system_collection"));
     cst.assertNextChangesEqual({
         cursor: aggCursor,
-        expectedChanges:
-            [{operationType: "drop", ns: {db: testDB.getName(), coll: "system.views"}}]
+        expectedChanges: [{
+            operationType: "rename",
+            ns: {db: testDB.getName(), coll: "system.views"},
+            to: {db: testDB.getName(), coll: "non_system_collection"}
+        }],
     });
+
+    // Test that renaming a "system" collection to a different "system" collection does not
+    // result in a notification in the change stream.
+    aggCursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: 1});
+    assert.commandWorked(
+        testDB.runCommand({create: "view1", viewOn: coll.getName(), pipeline: []}));
+    // Note that the target of the rename must be a valid "system" collection.
+    assert.writeOK(testDB.system.views.renameCollection("system.users"));
+    // Verify that the change stream filters out the rename above, instead returning the next insert
+    // to the test collection.
+    assert.writeOK(coll.insert({_id: 1}));
+    change = cst.getOneChange(aggCursor);
+    assert.eq(change.operationType, "insert", tojson(change));
+    assert.eq(change.ns, {db: testDB.getName(), coll: coll.getName()});
+
+    // Test that renaming a user collection to a "system" collection *is* returned in the change
+    // stream.
+    assert.writeOK(coll.renameCollection("system.views"));
+    cst.assertNextChangesEqual({
+        cursor: aggCursor,
+        expectedChanges: [{
+            operationType: "rename",
+            ns: {db: testDB.getName(), coll: coll.getName()},
+            to: {db: testDB.getName(), coll: "system.views"}
+        }],
+    });
+
+    // Drop the "system.views" collection to avoid view catalog errors in subsequent tests.
+    assertDropCollection(testDB, "system.views");
+    assertDropCollection(testDB, "non_system_collection");
 
     cst.cleanUp();
 }());
