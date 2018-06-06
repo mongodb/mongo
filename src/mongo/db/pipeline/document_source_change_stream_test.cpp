@@ -1086,6 +1086,32 @@ TEST_F(ChangeStreamStageTest, DocumentKeyShouldNotIncludeShardKeyIfResumeTokenDo
         40645);
 }
 
+TEST_F(ChangeStreamStageTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
+    // Renaming to a non-system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << systemColl.ns() << "to" << nss.ns()), testUuid());
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+    };
+    checkTransformation(rename, expectedInvalidate);
+}
+
+TEST_F(ChangeStreamStageTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
+    // Renaming to a system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+    };
+    checkTransformation(rename, expectedInvalidate);
+}
+
 //
 // Test class for change stream of a single database.
 //
@@ -1317,20 +1343,46 @@ TEST_F(ChangeStreamStageDBTest, TransformInvalidate) {
     checkTransformation(dropDB, expectedInvalidateDropDatabase);
 }
 
-TEST_F(ChangeStreamStageDBTest, SystemCollectionsDropOrRenameShouldInvalidate) {
+TEST_F(ChangeStreamStageDBTest, MatchFiltersOperationsOnSystemCollections) {
     NamespaceString systemColl(nss.db() + ".system.users");
-    NamespaceString renamedSystemColl(nss.db() + ".system.users_new");
+    OplogEntry insert = makeOplogEntry(OpTypeEnum::kInsert, systemColl, BSON("_id" << 1));
+    checkTransformation(insert, boost::none);
+
+    OplogEntry dropColl = createCommand(BSON("drop" << systemColl.coll()), testUuid());
+    checkTransformation(dropColl, boost::none);
+
+    // Rename from a 'system' collection to another 'system' collection should not include a
+    // notification.
+    NamespaceString renamedSystemColl(nss.db() + ".system.views");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
+    checkTransformation(rename, boost::none);
+}
+
+TEST_F(ChangeStreamStageDBTest, RenameFromSystemToUserCollectionShouldIncludeNotification) {
+    // Renaming to a non-system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    NamespaceString renamedColl(nss.db() + ".non_system_coll");
+    OplogEntry rename = createCommand(
+        BSON("renameCollection" << systemColl.ns() << "to" << renamedColl.ns()), testUuid());
     Document expectedInvalidate{
         {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
         {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
+    checkTransformation(rename, expectedInvalidate);
+}
 
-    OplogEntry dropColl = createCommand(BSON("drop" << systemColl.coll()), testUuid());
-    checkTransformation(dropColl, expectedInvalidate);
-
-    OplogEntry rename = createCommand(
-        BSON("renameCollection" << systemColl.ns() << "to" << renamedSystemColl.ns()), testUuid());
+TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNotification) {
+    // Renaming to a system collection will include a notification in the stream.
+    NamespaceString systemColl(nss.db() + ".system.users");
+    OplogEntry rename =
+        createCommand(BSON("renameCollection" << nss.ns() << "to" << systemColl.ns()), testUuid());
+    Document expectedInvalidate{
+        {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kInvalidateOpType},
+        {DSChangeStream::kClusterTimeField, kDefaultTs},
+    };
     checkTransformation(rename, expectedInvalidate);
 }
 

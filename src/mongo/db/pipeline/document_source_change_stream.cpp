@@ -285,11 +285,11 @@ std::string DocumentSourceChangeStream::getNsRegexForChangeStream(const Namespac
         case ChangeStreamType::kSingleDatabase:
             // Match all namespaces that start with db name, followed by ".", then NOT followed by
             // '$' or 'system.'
-            return "^" + nss.db() + kRegexAllCollections;
+            return "^" + nss.db() + "\\." + kRegexAllCollections;
         case ChangeStreamType::kAllChangesForCluster:
             // Match all namespaces that start with any db name other than admin, config, or local,
-            // followed by ".", then NOT followed by '$' or 'system.'
-            return "^" + kRegexAllDBs + kRegexAllCollections;
+            // followed by ".", then NOT followed by '$' or 'system.'.
+            return kRegexAllDBs + "\\." + kRegexAllCollections;
         default:
             MONGO_UNREACHABLE;
     }
@@ -320,18 +320,20 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
                 BSON("o.create" << nss.coll() << "o.collation" << BSON("$exists" << true)));
         }
     } else {
-        // For change streams on an entire database, the stream is invalidated if any collections in
-        // that database are dropped or renamed. For cluster-wide streams, drops or renames of any
-        // collection in any database (aside from the internal databases admin, config and local)
-        // will invalidate the stream.
-        invalidatingCommands.append(BSON("o.drop" << BSON("$exists" << true)));
-        invalidatingCommands.append(BSON("o.renameCollection" << BSON("$exists" << true)));
+        // For change streams on an entire database, the stream is invalidated if any non-system
+        // collections in that database are dropped or renamed. For cluster-wide streams, drops or
+        // renames of any non-system collection in any database (aside from the internal databases
+        // admin, config and local) will invalidate the stream.
+        invalidatingCommands.append(BSON("o.drop" << BSONRegEx("^" + kRegexAllCollections)));
+        // Note that 'o.renameCollection' contains the full NamespaceString.
+        invalidatingCommands.append(
+            BSON("o.renameCollection" << BSONRegEx(getNsRegexForChangeStream(nss))));
     }
 
     // For cluster-wide $changeStream, match the command namespace of any database other than admin,
     // config, or local. Otherwise, match only against the target db's command namespace.
     auto cmdNsFilter = (sourceType == ChangeStreamType::kAllChangesForCluster
-                            ? BSON("ns" << BSONRegEx("^" + kRegexAllDBs + kRegexCmdColl))
+                            ? BSON("ns" << BSONRegEx(kRegexAllDBs + "\\." + kRegexCmdColl))
                             : BSON("ns" << nss.getCommandNS().ns()));
 
     // 1.1) Commands that are on target db(s) and one of the above invalidating commands.
@@ -339,9 +341,7 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
         BSON("$and" << BSON_ARRAY(cmdNsFilter << BSON("$or" << invalidatingCommands.arr())));
 
     // 1.2) Supported commands that have arbitrary db namespaces in "ns" field.
-    auto renameDropTarget = (sourceType == ChangeStreamType::kAllChangesForCluster
-                                 ? BSON("o.to" << BSON("$exists" << true))
-                                 : BSON("o.to" << nss.ns()));
+    auto renameDropTarget = BSON("o.to" << BSONRegEx(getNsRegexForChangeStream(nss)));
 
     // All supported commands that are either (1.1) or (1.2).
     BSONObj commandMatch = BSON("op"
