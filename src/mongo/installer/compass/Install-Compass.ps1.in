@@ -31,13 +31,19 @@ $CompassExe = "$TemporaryDir" + "compass-install.exe"
 
 Remove-Item $CompassExe -ErrorAction:Ignore
 
-Write-Output "Downloading Compass from $CompassUrl"
-Invoke-WebRequest -Uri $CompassUrl -OutFile $CompassExe
+try {
+    Write-Output "Downloading Compass from $CompassUrl"
+    Invoke-WebRequest -Uri $CompassUrl -OutFile $CompassExe
 
-Write-Output "Installing Compass"
-& $CompassExe
+    Write-Output "Installing Compass"
+    & $CompassExe
+    Write-Output "Successfully installed Compass"
+} catch {
+    # Fail silently. With the way that we've hooked into the MSI
+    # currently we're not able to do any meaningful error reporting
+    # and not crash the installer.
+    Write-Output "Error installing Compass."
+}
 
 # Remove the binary we downloaded
 Remove-Item $CompassExe -ErrorAction:Ignore
-
-Write-Output "Successfully installed Compass"
