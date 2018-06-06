@@ -151,5 +151,9 @@ Status storeOptions(const moe::Environment& params) {
     return Status::OK();
 }
 
+void resetOptions() {
+    storageGlobalParams.reset();
+}
+
 }  // namespace embedded
 }  // namespace mongo
