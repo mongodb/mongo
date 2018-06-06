@@ -194,7 +194,7 @@
         BinaryKey="WixCA"
         DllEntry="WixQuietExec64"
         Execute="deferred"
-        Return="check"
+        Return="ignore"
         Impersonate="yes" />
 
     <InstallExecuteSequence>
