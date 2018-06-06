@@ -681,6 +681,7 @@ _SELECTOR_REGISTRY = {
     "parallel_fsm_workload_test": (_MultiJSTestSelectorConfig, _MultiJSTestSelector),
     "json_schema_test": (_JsonTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
+    "mql_model_haskell_test": (_JsonTestSelectorConfig, _Selector),
     "mql_model_mongod_test": (_JsonTestSelectorConfig, _Selector),
     "multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),
     "py_test": (_PyTestCaseSelectorConfig, _Selector),

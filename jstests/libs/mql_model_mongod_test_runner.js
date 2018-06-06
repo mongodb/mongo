@@ -8,7 +8,7 @@
     const mqlRootPath = jsTestOptions().mqlRootPath;
 
     if (jsonFilename === undefined) {
-        throw new Error('MQL MongoD model tests must be run through resmoke.py');
+        throw new Error('Undefined JSON file name: MQL Model tests must be run through resmoke.py');
     }
 
     // Populate collections with data fetched from the dataFile.

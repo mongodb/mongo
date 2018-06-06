@@ -1,0 +1,11 @@
+test_kind: mql_model_haskell_test
+
+selector:
+  roots:
+  - mql-model/test/**/*.json
+  exclude_files:
+  - mql-model/test/find/*.json
+  - mql-model/test/data/*.json
+
+executor:
+  config: {}
