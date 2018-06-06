@@ -1239,10 +1239,10 @@ TEST(MatchExpressionParserLeafTest, InvalidTypeCodeUnusedBetweenMinAndMaxFailsTo
 }
 
 TEST(MatchExpressionParserLeafTest, ValidTypeCodesParseSuccessfully) {
-    std::vector<BSONType> validTypes{
-        MinKey,    EOO,    NumberDouble, String,    Object,        Array,      BinData,
-        Undefined, jstOID, Bool,         Date,      jstNULL,       RegEx,      DBRef,
-        Code,      Symbol, CodeWScope,   NumberInt, bsonTimestamp, NumberLong, MaxKey};
+    std::vector<BSONType> validTypes{MinKey,     NumberDouble, String,        Object,     Array,
+                                     BinData,    Undefined,    jstOID,        Bool,       Date,
+                                     jstNULL,    RegEx,        DBRef,         Code,       Symbol,
+                                     CodeWScope, NumberInt,    bsonTimestamp, NumberLong, MaxKey};
 
     for (auto type : validTypes) {
         BSONObj predicate = BSON("a" << BSON("$type" << type));

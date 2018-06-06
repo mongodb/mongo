@@ -116,6 +116,26 @@ TEST(MatcherTypeSetTest, ParseFromElementFailsToParseUnknownBSONType) {
     ASSERT_NOT_OK(result.getStatus());
 }
 
+TEST(MatcherTypeSetTest, ParseFromElementFailsToParseEOOTypeCode) {
+    auto obj = BSON("" << 0);
+    auto result = MatcherTypeSet::parse(obj.firstElement(), kTypeAliasMap);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "Invalid numerical type code: 0. Instead use {$exists:false}.");
+}
+
+TEST(MatcherTypeSetTest, ParseFromElementFailsToParseEOOTypeName) {
+    auto obj = BSON(""
+                    << "missing");
+    auto result = MatcherTypeSet::parse(obj.firstElement(), kTypeAliasMap);
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(),
+              "'missing' is not a legal type name. "
+              "To query for non-existence of a field, use {$exists:false}.");
+}
+
 TEST(MatcherTypeSetTest, ParseFromElementCanParseRoundDoubleTypeCode) {
     auto obj = BSON("" << 2.0);
     auto result = MatcherTypeSet::parse(obj.firstElement(), kTypeAliasMap);

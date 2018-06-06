@@ -54,6 +54,15 @@ Status addAliasToTypeSet(StringData typeAlias,
 
     auto it = aliasMap.find(typeAlias.toString());
     if (it == aliasMap.end()) {
+        // The string "missing" can be returned from the $type agg expression, but is not valid for
+        // use in the $type match expression predicate. Return a special error message for this
+        // case.
+        if (typeAlias == StringData{typeName(BSONType::EOO)}) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "'missing' is not a legal type name. To query for "
+                                           "non-existence of a field, use {$exists:false}.");
+        }
+
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Unknown type name alias: " << typeAlias);
     }
@@ -83,6 +92,12 @@ Status parseSingleType(BSONElement elt,
     if (!valueAsInt.isOK()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid numerical type code: " << elt.number());
+    }
+
+    if (valueAsInt.getValue() == 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid numerical type code: " << elt.number()
+                                    << ". Instead use {$exists:false}.");
     }
 
     if (!isValidBSONType(valueAsInt.getValue())) {
