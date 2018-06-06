@@ -38,33 +38,40 @@ MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(EmbeddedOptions)(InitializerContext* cont
     return addOptions(&optionenvironment::startupOptions);
 }
 
-MONGO_INITIALIZER_GENERAL(EmbeddedOptions,
-                          ("BeginStartupOptionValidation", "AllFailPointsRegistered"),
-                          ("EndStartupOptionValidation"))
-(InitializerContext* context) {
-    // Run validation, but tell the Environment that we don't want it to be set as "valid",
-    // since we may be making it invalid in the canonicalization process.
-    Status ret = optionenvironment::startupOptionsParsed.validate(false);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = canonicalizeOptions(&optionenvironment::startupOptionsParsed);
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = optionenvironment::startupOptionsParsed.validate();
-    if (!ret.isOK()) {
-        return ret;
-    }
-    return Status::OK();
-}
+GlobalInitializerRegisterer embeddedOptionsInitializer(
+    "EmbeddedOptions",
+    {"BeginStartupOptionValidation", "AllFailPointsRegistered"},
+    {"EndStartupOptionValidation"},
+    [](InitializerContext* context) {
+        // Run validation, but tell the Environment that we don't want it to be set as "valid",
+        // since we may be making it invalid in the canonicalization process.
+        Status ret = optionenvironment::startupOptionsParsed.validate(false);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = canonicalizeOptions(&optionenvironment::startupOptionsParsed);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = optionenvironment::startupOptionsParsed.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+        return Status::OK();
+    },
+    [](DeinitializerContext* context) { return Status::OK(); });
 
-MONGO_INITIALIZER_GENERAL(EmbeddedOptions_Store,
-                          ("BeginStartupOptionStorage"),
-                          ("EndStartupOptionStorage"))
-(InitializerContext* context) {
-    return storeOptions(optionenvironment::startupOptionsParsed);
-}
+GlobalInitializerRegisterer embeddedOptionsStore("EmbeddedOptions_Store",
+                                                 {"BeginStartupOptionStorage"},
+                                                 {"EndStartupOptionStorage"},
+                                                 [](InitializerContext* context) {
+                                                     return storeOptions(
+                                                         optionenvironment::startupOptionsParsed);
+                                                 },
+                                                 [](DeinitializerContext* context) {
+                                                     resetOptions();
+                                                     return Status::OK();
+                                                 });
 
 }  // namespace embedded
 }  // namespace mongo

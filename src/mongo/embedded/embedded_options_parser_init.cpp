@@ -40,18 +40,26 @@
 namespace mongo {
 namespace optionenvironment {
 
-MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
-    // Embedded uses a YAML config passed in argv to reuse the existing interface, extract it from
-    // the first element otherwise use empty string.
-    std::string config = !context->args().empty() ? context->args()[0] : "";
+GlobalInitializerRegisterer startupOptionsInitializer(
+    "StartupOptions",
+    {"BeginStartupOptionParsing"},
+    {"EndStartupOptionParsing"},
+    [](InitializerContext* context) {
+        // Embedded uses a YAML config passed in argv to reuse the existing interface, extract it
+        // from the first element otherwise use empty string.
+        std::string config = !context->args().empty() ? context->args()[0] : "";
 
-    OptionsParser parser;
-    Status ret =
-        parser.runConfigFile(startupOptions, config, context->env(), &startupOptionsParsed);
-    uassertStatusOKWithContext(ret, "Options parsing failed.");
+        OptionsParser parser;
+        Status ret =
+            parser.runConfigFile(startupOptions, config, context->env(), &startupOptionsParsed);
+        uassertStatusOKWithContext(ret, "Options parsing failed.");
 
-    return Status::OK();
-}
+        return Status::OK();
+    },
+    [](DeinitializerContext* context) {
+        startupOptionsParsed = Environment();
+        return Status::OK();
+    });
 
 }  // namespace optionenvironment
 }  // namespace mongo

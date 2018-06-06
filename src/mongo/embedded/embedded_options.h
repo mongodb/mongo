@@ -46,5 +46,7 @@ Status addOptions(optionenvironment::OptionSection* options);
 Status canonicalizeOptions(optionenvironment::Environment* params);
 
 Status storeOptions(const optionenvironment::Environment& params);
+void resetOptions();
+
 }  // namespace embedded
 }  // namespace mongo
