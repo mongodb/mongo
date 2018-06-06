@@ -38,11 +38,13 @@
         // successfully. The cursor may be in a "zombie" state for some time before it is actually
         // killed, so we need the assert.soon.
         assert.soon(function() {
-            const killRes = db.runCommand({killCursors: collName, cursors: [cmdRes.cursor.id]});
-            assert.commandWorked(killRes);
-
-            return killRes.cursorsKilled.length === 0 && killRes.cursorsNotFound.length === 1 &&
-                killRes.cursorsNotFound[0].compare(cmdRes.cursor.id) === 0;
+            const matchingCursors = db.getSiblingDB("admin")
+                                        .aggregate([
+                                            {"$listLocalCursors": {}},
+                                            {"$match": {"id": cmdRes.cursor.id}},
+                                        ])
+                                        .toArray();
+            return matchingCursors.length === 0;
         });
     }
     let code = `const cmdRes = ${tojson(cmdRes)};`;
