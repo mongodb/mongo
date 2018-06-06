@@ -25,7 +25,7 @@ var workerThread = (function() {
     function main(workloads, args, run) {
         var myDB;
         var configs = {};
-        var connectionString = 'mongodb://' + args.host + '/?appname=tid:' + args.tid;
+        var connectionString = 'mongodb://' + args.host + '/?appName=tid:' + args.tid;
         if (typeof args.replSetName !== 'undefined') {
             connectionString += '&replicaSet=' + args.replSetName;
         }

@@ -429,11 +429,11 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
         invariant(!setName.empty());
     }
 
-    // If an appname option was specified, validate that is 128 bytes or less.
-    optIter = options.find("appname");
+    // If an appName option was specified, validate that is 128 bytes or less.
+    optIter = options.find("appName");
     if (optIter != end(options) && optIter->second.length() > 128) {
         uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "appname cannot exceed 128 characters: " << optIter->second);
+                  str::stream() << "appName cannot exceed 128 characters: " << optIter->second);
     }
 
     boost::optional<bool> retryWrites = boost::none;
@@ -462,7 +462,7 @@ StatusWith<MongoURI> MongoURI::parse(const std::string& url) try {
 }
 
 const boost::optional<std::string> MongoURI::getAppName() const {
-    const auto optIter = _options.find("appname");
+    const auto optIter = _options.find("appName");
     if (optIter != end(_options)) {
         return optIter->second;
     } else {
