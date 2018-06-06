@@ -326,7 +326,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
     // Use the cached index assignments to build solnRoot. Takes ownership of '_orExpression'.
     std::unique_ptr<QuerySolutionNode> solnRoot(QueryPlannerAccess::buildIndexedDataAccess(
-        *_query, _orExpression.release(), false, _plannerParams.indices, _plannerParams));
+        *_query, std::move(_orExpression), _plannerParams.indices, _plannerParams));
 
     if (!solnRoot) {
         mongoutils::str::stream ss;
