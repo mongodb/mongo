@@ -213,11 +213,6 @@ public:
     virtual void killAllUserOperations(OperationContext* opCtx) = 0;
 
     /**
-     * Kills all transaction owned client cursors. Used during stepdown.
-     */
-    virtual void killAllTransactionCursors(OperationContext* opCtx) = 0;
-
-    /**
      * Resets any active sharding metadata on this server and stops any sharding-related threads
      * (such as the balancer). It is called after stepDown to ensure that if the node becomes
      * primary again in the future it will recover its state from a clean slate.

@@ -1642,10 +1642,6 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 "specified that we should step down for"};
     }
 
-    // TODO SERVER-34395: Remove this method and kill cursors as part of killAllUserOperations call
-    // when the CursorManager no longer requires collection locks to kill cursors.
-    _externalState->killAllTransactionCursors(opCtx);
-
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto status = opCtx->checkForInterruptNoAssert();

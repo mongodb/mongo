@@ -662,14 +662,7 @@ void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationCon
     // Destroy all stashed transaction resources, in order to release locks.
     SessionKiller::Matcher matcherAllSessions(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    bool killCursors = false;
-    killSessionsLocalKillTransactions(opCtx, matcherAllSessions, killCursors);
-}
-
-void ReplicationCoordinatorExternalStateImpl::killAllTransactionCursors(OperationContext* opCtx) {
-    SessionKiller::Matcher matcherAllSessions(
-        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    killSessionsLocalKillTransactionCursors(opCtx, matcherAllSessions);
+    killSessionsLocalKillTransactions(opCtx, matcherAllSessions);
 }
 
 void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {

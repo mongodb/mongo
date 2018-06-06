@@ -101,14 +101,6 @@ public:
         OperationContext* opCtx, const SessionKiller::Matcher& matcher);
 
     /**
-     * Kills all cursors with matching logical session and transaction number. Returns the number of
-     * cursors successfully killed.
-     */
-    static size_t killAllCursorsForTransaction(OperationContext* opCtx,
-                                               LogicalSessionId lsid,
-                                               TxnNumber txnNumber);
-
-    /**
      * Returns true if the CursorManager has cursor references for the given session ID and
      * transaction number.
      */
@@ -197,14 +189,9 @@ public:
      * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager. Returns
      * ErrorCodes::OperationFailed if attempting to erase a pinned cursor.
      *
-     * If 'shouldAudit' is true, will perform audit logging. If 'lsid' or 'txnNumber' are provided
-     * we will confirm that the cursor is owned by the given session or transaction.
+     * If 'shouldAudit' is true, will perform audit logging.
      */
-    Status killCursor(OperationContext* opCtx,
-                      CursorId id,
-                      bool shouldAudit,
-                      boost::optional<LogicalSessionId> lsid = boost::none,
-                      boost::optional<TxnNumber> txnNumber = boost::none);
+    Status killCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
 
     /**
      * Returns an OK status if we're authorized to erase the cursor. Otherwise, returns

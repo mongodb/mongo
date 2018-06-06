@@ -51,19 +51,10 @@ void killSessionsLocalKillCursors(OperationContext* opCtx, const SessionKiller::
 }  // namespace
 
 void killSessionsLocalKillTransactions(OperationContext* opCtx,
-                                       const SessionKiller::Matcher& matcher,
-                                       bool shouldKillClientCursors) {
-    SessionCatalog::get(opCtx)->scanSessions(
-        opCtx, matcher, [shouldKillClientCursors](OperationContext* opCtx, Session* session) {
-            session->abortArbitraryTransaction(opCtx, shouldKillClientCursors);
-        });
-}
-
-void killSessionsLocalKillTransactionCursors(OperationContext* opCtx,
-                                             const SessionKiller::Matcher& matcher) {
+                                       const SessionKiller::Matcher& matcher) {
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcher, [](OperationContext* opCtx, Session* session) {
-            session->killTransactionCursors(opCtx);
+            session->abortArbitraryTransaction();
         });
 }
 
@@ -82,7 +73,7 @@ void killAllExpiredTransactions(OperationContext* opCtx) {
     SessionCatalog::get(opCtx)->scanSessions(
         opCtx, matcherAllSessions, [](OperationContext* opCtx, Session* session) {
             try {
-                session->abortArbitraryTransactionIfExpired(opCtx);
+                session->abortArbitraryTransactionIfExpired();
             } catch (const DBException& ex) {
                 Status status = ex.toStatus();
                 std::string errmsg = str::stream()

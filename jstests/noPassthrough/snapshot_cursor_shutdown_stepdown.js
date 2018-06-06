@@ -75,11 +75,8 @@
         stepdownFunc(rst);
         rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
-        // Perform a getMore using the previous transaction's open cursorId. We expect to receive
-        // CursorNotFound if the cursor was properly closed on step down.
-        assert.commandFailedWithCode(
-            sessionDB.runCommand({getMore: cursorId, collection: collName}),
-            ErrorCodes.CursorNotFound);
+        // Kill the cursor.
+        assert.commandWorked(sessionDB.runCommand({killCursors: collName, cursors: [cursorId]}));
         rst.stopSet();
     }
 

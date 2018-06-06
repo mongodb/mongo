@@ -96,7 +96,7 @@
         txnNumber: NumberLong(1),
         batchSize: 2
     }),
-                                 ErrorCodes.CursorNotFound);
+                                 50741);
 
     // The cursor can no longer be iterated because its transaction has ended.
     assert.commandFailedWithCode(sessionDB1.runCommand({
@@ -107,6 +107,10 @@
         batchSize: 2
     }),
                                  ErrorCodes.TransactionTooOld);
+
+    // Kill the cursor.
+    assert.commandWorked(
+        sessionDB1.runCommand({killCursors: sessionDB1.coll.getName(), cursors: [cursorID]}));
 
     // Establish a cursor outside of any transaction in session1.
     res = assert.commandWorked(sessionDB1.runCommand({find: collName, batchSize: 2}));
