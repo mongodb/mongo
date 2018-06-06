@@ -1,5 +1,8 @@
 /**
  * Helper functions for testing write conflicts between concurrent, multi-document transactions.
+ *
+ * @tags: [uses_transactions]
+ *
  */
 var WriteConflictHelpers = (function() {
 
