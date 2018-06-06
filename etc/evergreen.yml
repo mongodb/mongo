@@ -7406,7 +7406,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sharding
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
   - name: slow1
   - name: serial_run
   - name: sharding_jscore_passthrough
