@@ -26,46 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/retryable_writes_stats.h"
-
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transactions_stats_gen.h"
 
 namespace mongo {
-namespace {
-const auto retryableWritesStatsDecoration =
-    ServiceContext::declareDecoration<RetryableWritesStats>();
-}  // namespace
 
-RetryableWritesStats* RetryableWritesStats::get(ServiceContext* service) {
-    return &retryableWritesStatsDecoration(service);
-}
+/**
+ * Container for server-wide multi-document transaction statistics.
+ */
+class ServerTransactionsMetrics {
+    MONGO_DISALLOW_COPYING(ServerTransactionsMetrics);
 
-RetryableWritesStats* RetryableWritesStats::get(OperationContext* opCtx) {
-    return get(opCtx->getServiceContext());
-}
+public:
+    ServerTransactionsMetrics() = default;
 
-void RetryableWritesStats::incrementRetriedCommandsCount() {
-    _retriedCommandsCount.fetchAndAdd(1);
-}
+    static ServerTransactionsMetrics* get(ServiceContext* service);
+    static ServerTransactionsMetrics* get(OperationContext* opCtx);
 
-void RetryableWritesStats::incrementRetriedStatementsCount() {
-    _retriedStatementsCount.fetchAndAdd(1);
-}
+    /**
+     * Appends the accumulated stats to a transactions stats object.
+     */
+    void updateStats(TransactionsStats* stats);
 
-void RetryableWritesStats::incrementTransactionsCollectionWriteCount() {
-    _transactionsCollectionWriteCount.fetchAndAdd(1);
-}
-
-void RetryableWritesStats::updateStats(TransactionsStats* stats) {
-    stats->setRetriedCommandsCount(_retriedCommandsCount.load());
-    stats->setRetriedStatementsCount(_retriedStatementsCount.load());
-    stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.load());
-}
+private:
+};
 
 }  // namespace mongo

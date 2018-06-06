@@ -624,6 +624,7 @@ env.Library(
     source=[
         'catalog_raii.cpp',
         'retryable_writes_stats.cpp',
+        'server_transactions_metrics.cpp',
         'session.cpp',
         'session_catalog.cpp',
         'transaction_history_iterator.cpp',

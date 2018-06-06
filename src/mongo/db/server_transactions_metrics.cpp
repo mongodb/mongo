@@ -28,44 +28,56 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/retryable_writes_stats.h"
+#include "mongo/db/server_transactions_metrics.h"
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transactions_stats_gen.h"
 
 namespace mongo {
 namespace {
-const auto retryableWritesStatsDecoration =
-    ServiceContext::declareDecoration<RetryableWritesStats>();
+const auto ServerTransactionsMetricsDecoration =
+    ServiceContext::declareDecoration<ServerTransactionsMetrics>();
 }  // namespace
 
-RetryableWritesStats* RetryableWritesStats::get(ServiceContext* service) {
-    return &retryableWritesStatsDecoration(service);
+ServerTransactionsMetrics* ServerTransactionsMetrics::get(ServiceContext* service) {
+    return &ServerTransactionsMetricsDecoration(service);
 }
 
-RetryableWritesStats* RetryableWritesStats::get(OperationContext* opCtx) {
+ServerTransactionsMetrics* ServerTransactionsMetrics::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-void RetryableWritesStats::incrementRetriedCommandsCount() {
-    _retriedCommandsCount.fetchAndAdd(1);
+void ServerTransactionsMetrics::updateStats(TransactionsStats* stats) {
+    // This is a dummy function until we start tracking global transactions metrics.
 }
 
-void RetryableWritesStats::incrementRetriedStatementsCount() {
-    _retriedStatementsCount.fetchAndAdd(1);
-}
+class TransactionsSSS : public ServerStatusSection {
+public:
+    TransactionsSSS() : ServerStatusSection("transactions") {}
 
-void RetryableWritesStats::incrementTransactionsCollectionWriteCount() {
-    _transactionsCollectionWriteCount.fetchAndAdd(1);
-}
+    virtual ~TransactionsSSS() {}
 
-void RetryableWritesStats::updateStats(TransactionsStats* stats) {
-    stats->setRetriedCommandsCount(_retriedCommandsCount.load());
-    stats->setRetriedStatementsCount(_retriedStatementsCount.load());
-    stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.load());
-}
+    virtual bool includeByDefault() const {
+        return true;
+    }
+
+    virtual BSONObj generateSection(OperationContext* opCtx,
+                                    const BSONElement& configElement) const {
+        TransactionsStats stats;
+
+        // Retryable writes and multi-document transactions metrics are both included in the same
+        // serverStatus section because both utilize similar internal machinery for tracking their
+        // lifecycle within a session. Both are assigned transaction numbers, and so both are often
+        // referred to as “transactions”.
+        RetryableWritesStats::get(opCtx)->updateStats(&stats);
+        ServerTransactionsMetrics::get(opCtx)->updateStats(&stats);
+        return stats.toBSON();
+    }
+
+} transactionsSSS;
 
 }  // namespace mongo
