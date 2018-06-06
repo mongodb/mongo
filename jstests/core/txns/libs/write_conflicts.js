@@ -127,7 +127,8 @@ var WriteConflictHelpers = (function() {
     }
 
     return {
-        writeConflictTest: writeConflictTest, T1StartsFirstAndWins: T1StartsFirstAndWins,
-            T2StartsSecondAndWins: T2StartsSecondAndWins
-    }
+        writeConflictTest: writeConflictTest,
+        T1StartsFirstAndWins: T1StartsFirstAndWins,
+        T2StartsSecondAndWins: T2StartsSecondAndWins
+    };
 })();
