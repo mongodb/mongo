@@ -58,8 +58,16 @@ jsTest.log("Downgrading replica set..");
 rst.upgradeSet({binVersion: oldVersion, storageEngine: storageEngine});
 jsTest.log("Downgrade complete.");
 
+// We save a reference to the old primary so that we can call reconnect() on it before
+// joinFindInsert() would attempt to send the node an update operation that signals the parallel
+// shell running the background operations to stop.
+var oldPrimary = primary;
 primary = rst.getPrimary();
 printjson(rst.status());
 
+// Since the primary from before the upgrade took place was restarted as part of the
+// upgrade/downgrade process, we explicitly reconnect to it so that sending it an update operation
+// silently fails with an unchecked NotMaster error rather than a network error.
+reconnect(oldPrimary.getDB("admin"));
 joinFindInsert();
 rst.stopSet();

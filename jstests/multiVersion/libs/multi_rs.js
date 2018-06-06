@@ -25,7 +25,6 @@ ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
         var node = nodesToUpgrade[i];
         if (node == primary) {
             node = this.stepdown(node);
-            this.waitForState(node, ReplSetTest.State.SECONDARY);
             primary = this.getPrimary();
         }
 
@@ -84,7 +83,10 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
         print('Caught exception after stepDown cmd: ' + tojson(ex));
     }
 
-    return this.reconnect(node);
+    // Wait for the state to be secondary to avoid the race of closing new connections on stepdown.
+    this.waitForState(node, ReplSetTest.State.SECONDARY);
+
+    return node;
 };
 
 ReplSetTest.prototype.reconnect = function(node) {
