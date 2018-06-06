@@ -46,12 +46,9 @@ ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationCon
 }
 
 ServiceContext::UniqueOperationContext QueryTestServiceContext::makeOperationContext(
-    LogicalSessionId lsid, boost::optional<TxnNumber> txnNumber) {
+    LogicalSessionId lsid) {
     auto opCtx = makeOperationContext();
     opCtx->setLogicalSessionId(lsid);
-    if (txnNumber) {
-        opCtx->setTxnNumber(*txnNumber);
-    }
     return opCtx;
 }
 

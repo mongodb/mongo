@@ -201,8 +201,6 @@ void ReplicationCoordinatorExternalStateMock::closeConnections() {
 
 void ReplicationCoordinatorExternalStateMock::killAllUserOperations(OperationContext* opCtx) {}
 
-void ReplicationCoordinatorExternalStateMock::killAllTransactionCursors(OperationContext* opCtx) {}
-
 void ReplicationCoordinatorExternalStateMock::shardingOnStepDownHook() {}
 
 void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}

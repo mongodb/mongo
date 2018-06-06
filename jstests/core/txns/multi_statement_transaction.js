@@ -155,36 +155,5 @@
     assert.eq(null, testColl.findOne({_id: "doc-2"}));
     assert.eq(null, testColl.findOne({_id: "doc-3"}));
 
-    // Open a client cursor under a new transaction.
-    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
-
-    assert.commandWorked(
-        testColl.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}}));
-
-    session.startTransaction();
-
-    let res = sessionDb.runCommand({
-        find: collName,
-        batchSize: 0,
-    });
-    assert.commandWorked(res);
-    assert(res.hasOwnProperty("cursor"));
-    assert(res.cursor.hasOwnProperty("firstBatch"));
-    assert.eq(0, res.cursor.firstBatch.length);
-    assert(res.cursor.hasOwnProperty("id"));
-    const cursorId = res.cursor.id;
-    assert.neq(0, cursorId);
-
-    // Commit the transaction.
-    session.commitTransaction();
-
-    // Perform a getMore using the previous transaction's open cursorId. We expect to receive
-    // CursorNotFound if the cursor was properly closed on commit.
-    assert.commandFailedWithCode(testDB.runCommand({
-        getMore: cursorId,
-        collection: collName,
-    }),
-                                 ErrorCodes.CursorNotFound);
-
     session.endSession();
 }());

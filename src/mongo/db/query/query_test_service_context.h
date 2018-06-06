@@ -45,8 +45,7 @@ public:
 
     ServiceContext::UniqueOperationContext makeOperationContext();
 
-    ServiceContext::UniqueOperationContext makeOperationContext(
-        LogicalSessionId lsid, boost::optional<TxnNumber> txnNumber);
+    ServiceContext::UniqueOperationContext makeOperationContext(LogicalSessionId lsid);
 
     Client* getClient() const;
 

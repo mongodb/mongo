@@ -403,10 +403,6 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     globalExclusiveLock.waitForLockUntil(Date_t::max());
     invariant(globalExclusiveLock.isLocked());
 
-    // TODO SERVER-34395: Remove this method and kill cursors as part of killAllUserOperations call
-    // when the CursorManager no longer requires collection locks to kill cursors.
-    _externalState->killAllTransactionCursors(opCtx.get());
-
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     _topCoord->finishUnconditionalStepDown();

@@ -59,13 +59,8 @@
 
 namespace mongo {
 
-MONGO_INITIALIZER(RegisterCursorKillFunction)
+MONGO_INITIALIZER(RegisterCursorExistsFunction)
 (InitializerContext* const) {
-    Session::registerCursorKillFunction(
-        [](OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
-            return CursorManager::killAllCursorsForTransaction(opCtx, lsid, txnNumber);
-        });
-
     Session::registerCursorExistsFunction([](LogicalSessionId lsid, TxnNumber txnNumber) {
         return CursorManager::hasTransactionCursorReference(lsid, txnNumber);
     });
@@ -133,10 +128,6 @@ public:
                                           CursorId cursorId);
 
     size_t numOpenCursorsForTransaction(LogicalSessionId lsid, TxnNumber txnNumber);
-
-    size_t killAllCursorsForTransaction(OperationContext* opCtx,
-                                        LogicalSessionId lsid,
-                                        TxnNumber txnNumber);
 
 private:
     // '_mutex' must not be held when acquiring a CursorManager mutex to avoid deadlock.
@@ -211,40 +202,6 @@ size_t GlobalCursorIdCache::numOpenCursorsForTransaction(LogicalSessionId lsid,
         return 0;
     }
     return _lsidToTxnCursorMap[lsid][txnNumber].size();
-}
-
-size_t GlobalCursorIdCache::killAllCursorsForTransaction(OperationContext* opCtx,
-                                                         LogicalSessionId lsid,
-                                                         TxnNumber txnNumber) {
-    size_t killCount = 0;
-    CursorIdToNssMap cursorToNssMap;
-    {
-        // Copy the cursorId/NamespaceString map to a local structure to avoid obtaining the
-        // CursorManager mutex while holding the GlobalCursorIdCache mutex.
-        stdx::lock_guard<SimpleMutex> lk(_mutex);
-        for (auto&& cursorIdAndNss : _lsidToTxnCursorMap[lsid][txnNumber]) {
-            cursorToNssMap.insert(cursorIdAndNss);
-        }
-    }
-
-    for (auto&& cursorIdAndNss : cursorToNssMap) {
-        const auto cursorId = cursorIdAndNss.first;
-        const auto nss = cursorIdAndNss.second;
-
-        auto status = CursorManager::withCursorManager(
-            opCtx, cursorId, nss, [opCtx, cursorId, lsid, txnNumber](CursorManager* manager) {
-                const auto shouldAudit = false;
-                return manager->killCursor(opCtx, cursorId, shouldAudit, lsid, txnNumber);
-            });
-
-        if (status.isOK()) {
-            ++killCount;
-        }
-
-        invariant(status.isOK() || status.code() == ErrorCodes::CursorNotFound);
-    }
-
-    return killCount;
 }
 
 uint32_t GlobalCursorIdCache::registerCursorManager(const NamespaceString& nss) {
@@ -475,12 +432,6 @@ void CursorManager::removeTransactionCursorReference(const ClientCursor* cursor)
 
 std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {
     return globalCursorIdCache->timeoutCursors(opCtx, now);
-}
-
-size_t CursorManager::killAllCursorsForTransaction(OperationContext* opCtx,
-                                                   LogicalSessionId lsid,
-                                                   TxnNumber txnNumber) {
-    return globalCursorIdCache->killAllCursorsForTransaction(opCtx, lsid, txnNumber);
 }
 
 bool CursorManager::hasTransactionCursorReference(LogicalSessionId lsid, TxnNumber txnNumber) {
@@ -881,11 +832,7 @@ void CursorManager::deregisterAndDestroyCursor(
     cursor->dispose(opCtx);
 }
 
-Status CursorManager::killCursor(OperationContext* opCtx,
-                                 CursorId id,
-                                 bool shouldAudit,
-                                 boost::optional<LogicalSessionId> lsid,
-                                 boost::optional<TxnNumber> txnNumber) {
+Status CursorManager::killCursor(OperationContext* opCtx, CursorId id, bool shouldAudit) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
@@ -896,17 +843,6 @@ Status CursorManager::killCursor(OperationContext* opCtx,
         return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
     }
     auto cursor = it->second;
-
-    if (lsid && lsid != cursor->getSessionId()) {
-        return {
-            ErrorCodes::CursorNotFound,
-            str::stream() << "killCursor LogicalSessionId must match that of cursor when provided"};
-    }
-
-    if (txnNumber && txnNumber != cursor->getTxnNumber()) {
-        return {ErrorCodes::CursorNotFound,
-                str::stream() << "killCursor TxnNumber must match that of cursor when provided"};
-    }
 
     if (cursor->_operationUsingCursor) {
         // Rather than removing the cursor directly, kill the operation that's currently using the

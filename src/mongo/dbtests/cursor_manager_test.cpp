@@ -541,7 +541,7 @@ TEST_F(CursorManagerTestCustomOpCtx, LogicalSessionIdOnOperationCtxTest) {
     // Cursors created on an op ctx with a session id have a session id.
     {
         auto lsid = makeLogicalSessionIdForTest();
-        auto opCtx2 = _queryServiceContext->makeOperationContext(lsid, boost::none);
+        auto opCtx2 = _queryServiceContext->makeOperationContext(lsid);
         auto pinned2 = makeCursor(opCtx2.get());
 
         ASSERT_EQUALS(pinned2.getCursor()->getSessionId(), lsid);
@@ -569,7 +569,7 @@ TEST_F(CursorManagerTestCustomOpCtx, CursorsWithoutSessions) {
 TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
     // Add a cursor with a session to the cursor manager.
     auto lsid = makeLogicalSessionIdForTest();
-    auto opCtx = _queryServiceContext->makeOperationContext(lsid, boost::none);
+    auto opCtx = _queryServiceContext->makeOperationContext(lsid);
     auto pinned = makeCursor(opCtx.get());
 
     // Retrieve all sessions active in manager - set should contain just lsid.
@@ -595,145 +595,13 @@ TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
     ASSERT(useCursorManager()->getCursorsForSession(lsid).empty());
 }
 
-TEST_F(CursorManagerTestCustomOpCtx, KillCursorRespectsSessionId) {
-    // Add a cursor with a session to the cursor manager.
-    auto lsid = makeLogicalSessionIdForTest();
-    auto opCtx = _queryServiceContext->makeOperationContext(lsid, boost::none);
-    auto pinned = makeCursor(opCtx.get());
-    auto cursorId = pinned.getCursor()->cursorid();
-
-    // Killing the cursor with incorrect LogicalSessionId fails.
-    pinned.release();
-    auto wrongLsid = makeLogicalSessionIdForTest();
-    auto status =
-        useCursorManager()->killCursor(opCtx.get(), cursorId, false, wrongLsid, boost::none);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::CursorNotFound);
-
-    // Killing the cursor with the correct LogicalSessionId works.
-    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId, false, lsid, boost::none));
-}
-
-TEST_F(CursorManagerTestCustomOpCtx,
-       KillCursorWithSessionDoesNotKillCursorCreatedOutsideOfSession) {
-    // Add a cursor with a session to the cursor manager.
-    auto opCtx = _queryServiceContext->makeOperationContext();
-    auto pinned = makeCursor(opCtx.get());
-    auto cursorId = pinned.getCursor()->cursorid();
-
-    // Killing the cursor with the correct cursorId but with an unrelated LogicalSessionId fails.
-    auto lsid = makeLogicalSessionIdForTest();
-    auto status = useCursorManager()->killCursor(opCtx.get(), cursorId, false, lsid, boost::none);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::CursorNotFound);
-}
-
-TEST_F(CursorManagerTestCustomOpCtx, KillCursorRespectsTxnNumber) {
-    // Add a cursor with a session to the cursor manager.
-    auto lsid = makeLogicalSessionIdForTest();
-    const TxnNumber txnNumber = 0;
-    auto opCtx = _queryServiceContext->makeOperationContext(lsid, txnNumber);
-    auto pinned = makeCursor(opCtx.get());
-    auto cursorId = pinned.getCursor()->cursorid();
-
-    // Killing the cursor with incorrect TxnNumber fails.
-    pinned.release();
-    const TxnNumber wrongTxnNumber = 1;
-    auto status =
-        useCursorManager()->killCursor(opCtx.get(), cursorId, false, lsid, wrongTxnNumber);
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::CursorNotFound);
-
-    // Kill the cursor with the correct TxnNumber works.
-    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId, false, lsid, txnNumber));
-}
-
-TEST_F(CursorManagerTestCustomOpCtx,
-       KillAllCursorsForTransactionRemovesCorrectEntryFromTransactionMap) {
-    CursorManager* cursorManager = CursorManager::getGlobalCursorManager();
-
-    // Create 3 sets of cursors, each with a unique LogicalSessionId/TxnNumber pair, but each
-    // sharing either LogicalSessionId or TxnNumber with another set.
-    auto lsid1 = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber1 = 0;
-    {
-        auto opCtx = _queryServiceContext->makeOperationContext(lsid1, txnNumber1);
-        auto pinned = cursorManager->registerCursor(opCtx.get(),
-                                                    {makeFakePlanExecutor(),
-                                                     NamespaceString{"test.collection"},
-                                                     {},
-                                                     repl::ReadConcernLevel::kLocalReadConcern,
-                                                     BSONObj()});
-        pinned.release();
-    }
-
-    auto lsid2 = lsid1;
-    TxnNumber txnNumber2 = 1;
-    {
-        auto opCtx = _queryServiceContext->makeOperationContext(lsid2, txnNumber2);
-        auto pinned = cursorManager->registerCursor(opCtx.get(),
-                                                    {makeFakePlanExecutor(),
-                                                     NamespaceString{"test.collection"},
-                                                     {},
-                                                     repl::ReadConcernLevel::kLocalReadConcern,
-                                                     BSONObj()});
-        pinned.release();
-    }
-
-    auto lsid3 = makeLogicalSessionIdForTest();
-    TxnNumber txnNumber3 = txnNumber1;
-    {
-        auto opCtx = _queryServiceContext->makeOperationContext(lsid3, txnNumber3);
-        // Create 2 cursors for the third set to confirm multiple cursor deregistration.
-        auto pinned = cursorManager->registerCursor(opCtx.get(),
-                                                    {makeFakePlanExecutor(),
-                                                     NamespaceString{"test.collection"},
-                                                     {},
-                                                     repl::ReadConcernLevel::kLocalReadConcern,
-                                                     BSONObj()});
-        pinned.release();
-        pinned = cursorManager->registerCursor(opCtx.get(),
-                                               {makeFakePlanExecutor(),
-                                                NamespaceString{"test.collection"},
-                                                {},
-                                                repl::ReadConcernLevel::kLocalReadConcern,
-                                                BSONObj()});
-        pinned.release();
-    }
-
-    auto opCtx = _queryServiceContext->makeOperationContext();
-
-    // Transaction reference exists for all 3 sets.
-    ASSERT_TRUE(cursorManager->hasTransactionCursorReference(lsid1, txnNumber1));
-    ASSERT_TRUE(cursorManager->hasTransactionCursorReference(lsid2, txnNumber2));
-    ASSERT_TRUE(cursorManager->hasTransactionCursorReference(lsid3, txnNumber3));
-
-    // Transaction reference does not exist for LogicalSessionId/TxnNumber that has no cursors.
-    ASSERT_FALSE(cursorManager->hasTransactionCursorReference(makeLogicalSessionIdForTest(), 99));
-
-    // Kill cursors for set 1.
-    ASSERT_EQ(1ul, cursorManager->killAllCursorsForTransaction(opCtx.get(), lsid1, txnNumber1));
-    ASSERT_FALSE(cursorManager->hasTransactionCursorReference(lsid1, txnNumber1));
-    ASSERT_TRUE(cursorManager->hasTransactionCursorReference(lsid2, txnNumber2));
-    ASSERT_TRUE(cursorManager->hasTransactionCursorReference(lsid3, txnNumber3));
-
-    // Kill cursors for set 2.
-    ASSERT_EQ(1ul, cursorManager->killAllCursorsForTransaction(opCtx.get(), lsid2, txnNumber2));
-    ASSERT_FALSE(cursorManager->hasTransactionCursorReference(lsid2, txnNumber2));
-    ASSERT_TRUE(cursorManager->hasTransactionCursorReference(lsid3, txnNumber3));
-
-    // Kill cursors for set 3.
-    ASSERT_EQ(2ul, cursorManager->killAllCursorsForTransaction(opCtx.get(), lsid3, txnNumber3));
-    ASSERT_FALSE(cursorManager->hasTransactionCursorReference(lsid3, txnNumber3));
-}
-
 /**
  * Test a manager with multiple cursors running inside of the same session.
  */
 TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
     // Add two cursors on the same session to the cursor manager.
     auto lsid = makeLogicalSessionIdForTest();
-    auto opCtx = _queryServiceContext->makeOperationContext(lsid, boost::none);
+    auto opCtx = _queryServiceContext->makeOperationContext(lsid);
     auto pinned = makeCursor(opCtx.get());
     auto pinned2 = makeCursor(opCtx.get());
 
@@ -780,13 +648,13 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsMultipleSessions) {
 
     // Cursor with session 1.
     {
-        auto opCtx1 = _queryServiceContext->makeOperationContext(lsid1, boost::none);
+        auto opCtx1 = _queryServiceContext->makeOperationContext(lsid1);
         cursor1 = makeCursor(opCtx1.get()).getCursor()->cursorid();
     }
 
     // Cursor with session 2.
     {
-        auto opCtx2 = _queryServiceContext->makeOperationContext(lsid2, boost::none);
+        auto opCtx2 = _queryServiceContext->makeOperationContext(lsid2);
         cursor2 = makeCursor(opCtx2.get()).getCursor()->cursorid();
     }
 
