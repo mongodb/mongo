@@ -139,3 +139,7 @@ structs:
                 optional: true
                 description: "The optime of another oplog entry that contains the document
                               after an update was applied."
+            prepare:
+                type: bool
+                optional: true
+                description: "Specifies that this operation should be put into a 'prepare' state"

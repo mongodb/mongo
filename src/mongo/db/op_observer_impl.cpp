@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/shard_server_op_observer.h"
@@ -73,7 +74,8 @@ repl::OpTime logOperation(OperationContext* opCtx,
                           Date_t wallClockTime,
                           const OperationSessionInfo& sessionInfo,
                           StmtId stmtId,
-                          const repl::OplogLink& oplogLink) {
+                          const repl::OplogLink& oplogLink,
+                          bool prepare) {
     auto& times = OpObserver::Times::get(opCtx).reservedOpTimes;
     auto opTime = repl::logOp(opCtx,
                               opstr,
@@ -85,7 +87,9 @@ repl::OpTime logOperation(OperationContext* opCtx,
                               wallClockTime,
                               sessionInfo,
                               stmtId,
-                              oplogLink);
+                              oplogLink,
+                              prepare);
+
     times.push_back(opTime);
     return opTime;
 }
@@ -193,7 +197,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                              opTimes.wallClockTime,
                                              sessionInfo,
                                              args.stmtId,
-                                             {});
+                                             {},
+                                             false /* prepare */);
 
         opTimes.prePostImageOpTime = noteUpdateOpTime;
 
@@ -214,7 +219,8 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
                                        opTimes.wallClockTime,
                                        sessionInfo,
                                        args.stmtId,
-                                       oplogLink);
+                                       oplogLink,
+                                       false /* prepare */);
 
     return opTimes;
 }
@@ -252,7 +258,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                       opTimes.wallClockTime,
                                       sessionInfo,
                                       stmtId,
-                                      {});
+                                      {},
+                                      false /* prepare */);
         opTimes.prePostImageOpTime = noteOplog;
         oplogLink.preImageOpTime = noteOplog;
     }
@@ -268,7 +275,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                                        opTimes.wallClockTime,
                                        sessionInfo,
                                        stmtId,
-                                       oplogLink);
+                                       oplogLink,
+                                       false /* prepare */);
     return opTimes;
 }
 
@@ -280,7 +288,8 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                              const BSONObj& applyOpCmd,
                              const OperationSessionInfo& sessionInfo,
                              StmtId stmtId,
-                             const repl::OplogLink& oplogLink) {
+                             const repl::OplogLink& oplogLink,
+                             bool prepare) {
     OpTimeBundle times;
     times.wallClockTime = getWallClockTimeForOpLog(opCtx);
     times.writeOpTime = logOperation(opCtx,
@@ -293,7 +302,8 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
                                      times.wallClockTime,
                                      sessionInfo,
                                      stmtId,
-                                     oplogLink);
+                                     oplogLink,
+                                     prepare);
     return times;
 }
 
@@ -325,7 +335,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     false /* prepare */);
     } else {
         logOperation(opCtx,
                      "i",
@@ -337,7 +348,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     false /* prepare */);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -561,7 +573,8 @@ void OpObserverImpl::onInternalOpMessage(OperationContext* opCtx,
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 false /* prepare */);
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
@@ -604,7 +617,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     false /* prepare */);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -650,7 +664,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     false /* prepare */);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -687,7 +702,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 false /* prepare */);
 
     uassert(
         50714, "dropping the admin database is not allowed.", dbName != NamespaceString::kAdminDb);
@@ -720,7 +736,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     false /* prepare */);
     }
 
     uassert(50715,
@@ -760,7 +777,8 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 false /* prepare */);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
@@ -795,7 +813,8 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                  getWallClockTimeForOpLog(opCtx),
                  {},
                  kUninitializedStmtId,
-                 {});
+                 {},
+                 false /* prepare */);
 
     return {};
 }
@@ -848,7 +867,10 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
     const NamespaceString cmdNss{dbName, "$cmd"};
-    replLogApplyOps(opCtx, cmdNss, applyOpCmd, {}, kUninitializedStmtId, {});
+
+    // Only transactional 'applyOps' commands can be prepared.
+    constexpr bool prepare = false;
+    replLogApplyOps(opCtx, cmdNss, applyOpCmd, {}, kUninitializedStmtId, {}, prepare);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
@@ -872,30 +894,27 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                      getWallClockTimeForOpLog(opCtx),
                      {},
                      kUninitializedStmtId,
-                     {});
+                     {},
+                     false /* prepare */);
     }
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
-void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
-    invariant(opCtx->getTxnNumber());
-    Session* const session = OperationContextSession::get(opCtx);
-    invariant(session);
-    auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
+namespace {
 
-    // It is possible that the transaction resulted in no changes.  In that case, we should
-    // not write an empty applyOps entry.
-    if (stmts.empty())
-        return;
-
+OpTimeBundle logApplyOpsForTransaction(OperationContext* opCtx,
+                                       Session* const session,
+                                       std::vector<repl::ReplOperation> stmts,
+                                       bool prepare) {
     BSONObjBuilder applyOpsBuilder;
     BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
     for (auto& stmt : stmts) {
         opsArray.append(stmt.toBSON());
     }
     opsArray.done();
+
     const NamespaceString cmdNss{"admin", "$cmd"};
 
     OperationSessionInfo sessionInfo;
@@ -909,10 +928,12 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
 
     try {
         auto applyOpCmd = applyOpsBuilder.done();
-        auto times = replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink);
+        auto times =
+            replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink, prepare);
 
         onWriteOpCompleted(
             opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
+        return times;
     } catch (const AssertionException& e) {
         // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
         uassert(ErrorCodes::TransactionTooLarge,
@@ -920,15 +941,52 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
                 e.code() != ErrorCodes::BSONObjectTooLarge);
         throw;
     }
+    MONGO_UNREACHABLE;
+}
+
+}  //  namespace
+
+void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
+    invariant(opCtx->getTxnNumber());
+    Session* const session = OperationContextSession::get(opCtx);
+    invariant(session);
+    invariant(session->inMultiDocumentTransaction());
+    auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
+
+    // It is possible that the transaction resulted in no changes.  In that case, we should
+    // not write an empty applyOps entry.
+    if (stmts.empty())
+        return;
+
+    const auto commitOpTime =
+        logApplyOpsForTransaction(opCtx, session, stmts, false /* prepare */).writeOpTime;
+    invariant(!commitOpTime.isNull());
 }
 
 void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
     Session* const session = OperationContextSession::get(opCtx);
+    invariant(session);
     invariant(session->inMultiDocumentTransaction());
+    auto stmts = session->endTransactionAndRetrieveOperations(opCtx);
 
-    auto opTime = repl::getNextOpTimeNoPersistForTesting(opCtx).opTime;
-    opCtx->recoveryUnit()->setPrepareTimestamp(opTime.getTimestamp());
+    // It is possible that the transaction resulted in no changes.  In that case, we should
+    // not write an empty applyOps entry.
+    if (stmts.empty())
+        return;
+
+    // We write the oplog entry in a side transaction so that we do not commit the now-prepared
+    // transaction. We then return to the main transaction and set its 'prepareTimestamp'.
+    repl::OpTime prepareOpTime;
+    {
+        Session::SideTransactionBlock sideTxn(opCtx);
+        WriteUnitOfWork wuow(opCtx);
+        prepareOpTime =
+            logApplyOpsForTransaction(opCtx, session, stmts, true /* prepare */).writeOpTime;
+        wuow.commit();
+    }
+    invariant(!prepareOpTime.isNull());
+    opCtx->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {

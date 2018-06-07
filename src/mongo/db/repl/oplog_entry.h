@@ -115,6 +115,11 @@ public:
     bool isCrudOpType() const;
 
     /**
+     * Returns if the operation should be prepared. Must be called on an 'applyOps' entry.
+     */
+    bool shouldPrepare() const;
+
+    /**
      * Returns the _id of the document being modified. Must be called on CRUD ops.
      */
     BSONElement getIdElement() const;

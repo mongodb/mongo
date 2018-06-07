@@ -477,7 +477,8 @@ private:
                                                   wallClockTime,
                                                   {},
                                                   kUninitializedStmtId,
-                                                  {});
+                                                  {},
+                                                  false /* prepare */);
                 uow.commit();
                 return result;
             });

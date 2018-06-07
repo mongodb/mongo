@@ -252,7 +252,8 @@
 
     jsTestLog("Check that prepareTransaction accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
-        find: collName,
+        insert: collName,
+        documents: [{_id: "doc2"}],
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
         stmtId: NumberInt(0),

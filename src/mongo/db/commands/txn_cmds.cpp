@@ -101,7 +101,6 @@ public:
 
 MONGO_FAIL_POINT_DEFINE(pauseAfterTransactionPrepare);
 
-// TODO: This is a stub for testing storage prepare functionality.
 class CmdPrepareTxn : public BasicCommand {
 public:
     CmdPrepareTxn() : BasicCommand("prepareTransaction") {}
@@ -119,7 +118,7 @@ public:
     }
 
     std::string help() const override {
-        return "Preprares a transaction. THIS IS A STUB FOR TESTING.";
+        return "Prepares a transaction. This is only expected to be called by mongos.";
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,

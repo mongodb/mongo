@@ -257,6 +257,11 @@ bool OplogEntry::isCrudOpType() const {
     return isCrudOpType(getOpType());
 }
 
+bool OplogEntry::shouldPrepare() const {
+    invariant(getCommandType() == OplogEntry::CommandType::kApplyOps);
+    return getPrepare() && *getPrepare();
+}
+
 BSONElement OplogEntry::getIdElement() const {
     invariant(isCrudOpType());
     if (getOpType() == OpTypeEnum::kUpdate) {

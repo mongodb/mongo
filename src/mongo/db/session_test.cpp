@@ -126,7 +126,8 @@ protected:
                            Date_t::now(),
                            osi,
                            stmtId,
-                           link);
+                           link,
+                           false /* prepare */);
     }
 
     void bumpTxnNumberFromDifferentOpCtx(Session* session, TxnNumber newTxnNum) {
@@ -526,7 +527,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   wallClockTime,
                                   osi,
                                   1,
-                                  {});
+                                  {},
+                                  false /* prepare */);
         session.onWriteOpCompletedOnPrimary(opCtx(), txnNum, {1}, opTime, wallClockTime);
         wuow.commit();
 
@@ -552,7 +554,8 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
                                   wallClockTime,
                                   osi,
                                   kIncompleteHistoryStmtId,
-                                  link);
+                                  link,
+                                  false /* prepare */);
 
         session.onWriteOpCompletedOnPrimary(
             opCtx(), txnNum, {kIncompleteHistoryStmtId}, opTime, wallClockTime);

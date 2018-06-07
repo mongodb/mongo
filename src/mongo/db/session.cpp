@@ -722,6 +722,23 @@ void Session::TxnResources::release(OperationContext* opCtx) {
     readConcernArgs = _readConcernArgs;
 }
 
+Session::SideTransactionBlock::SideTransactionBlock(OperationContext* opCtx) : _opCtx(opCtx) {
+    if (_opCtx->getWriteUnitOfWork()) {
+        // This must be done under the client lock, since we are modifying '_opCtx'.
+        stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
+        _txnResources = Session::TxnResources(_opCtx);
+    }
+}
+
+Session::SideTransactionBlock::~SideTransactionBlock() {
+    if (_txnResources) {
+        // Restore the transaction state onto '_opCtx'. This must be done under the
+        // client lock, since we are modifying '_opCtx'.
+        stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
+        _txnResources->release(_opCtx);
+    }
+}
+
 void Session::stashTransactionResources(OperationContext* opCtx) {
     if (opCtx->getClient()->isInDirectClient()) {
         return;

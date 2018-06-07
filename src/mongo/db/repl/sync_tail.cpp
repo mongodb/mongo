@@ -572,6 +572,10 @@ void fillWriterVectors(OperationContext* opCtx,
         // Extract applyOps operations and fill writers with extracted operations using this
         // function.
         if (op.isCommand() && op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+            if (op.shouldPrepare()) {
+                // TODO (SERVER-35307) mark operations as needing prepare.
+                continue;
+            }
             try {
                 derivedOps->emplace_back(ApplyOps::extractOperations(op));
                 fillWriterVectors(

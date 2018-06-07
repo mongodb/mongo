@@ -330,7 +330,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             Date_t wallTime,
                             const OperationSessionInfo& sessionInfo,
                             StmtId statementId,
-                            const OplogLink& oplogLink) {
+                            const OplogLink& oplogLink,
+                            bool prepare) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -353,6 +354,11 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     b.appendDate("wall", wallTime);
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
+
+    if (prepare) {
+        b.appendBool(OplogEntryBase::kPrepareFieldName, true);
+    }
+
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
 }
 }  // end anon namespace
@@ -427,7 +433,8 @@ OpTime logOp(OperationContext* opCtx,
              Date_t wallClockTime,
              const OperationSessionInfo& sessionInfo,
              StmtId statementId,
-             const OplogLink& oplogLink) {
+             const OplogLink& oplogLink,
+             bool prepare) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // For commands, the test below is on the command ns and therefore does not check for
     // specific namespaces such as system.profile. This is the caller's responsibility.
@@ -460,7 +467,8 @@ OpTime logOp(OperationContext* opCtx,
                                wallClockTime,
                                sessionInfo,
                                statementId,
-                               oplogLink);
+                               oplogLink,
+                               prepare);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.opTime.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot.opTime);
@@ -515,6 +523,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         if (insertStatementOplogSlot.opTime.isNull()) {
             _getNextOpTimes(opCtx, oplog, 1, &insertStatementOplogSlot);
         }
+        // Only 'applyOps' oplog entries can be prepared.
+        constexpr bool prepare = false;
         writers.emplace_back(_logOpWriter(opCtx,
                                           "i",
                                           nss,
@@ -527,7 +537,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           wallClockTime,
                                           sessionInfo,
                                           begin[i].stmtId,
-                                          oplogLink));
+                                          oplogLink,
+                                          prepare));
         oplogLink.prevOpTime = insertStatementOplogSlot.opTime;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot.opTime);

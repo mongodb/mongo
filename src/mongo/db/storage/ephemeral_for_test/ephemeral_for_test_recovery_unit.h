@@ -76,6 +76,8 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) {}
 
+    virtual void setPrepareTimestamp(Timestamp) {}
+
 private:
     typedef std::shared_ptr<Change> ChangePtr;
     typedef std::vector<ChangePtr> Changes;

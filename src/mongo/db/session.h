@@ -107,6 +107,25 @@ public:
         WriteUnitOfWork::RecoveryUnitState _ruState;
     };
 
+    /**
+     *  An RAII object that stashes `TxnResouces` from the `opCtx` onto the stack. At destruction
+     *  it unstashes the `TxnResources` back onto the `opCtx`.
+     */
+    class SideTransactionBlock {
+    public:
+        SideTransactionBlock(OperationContext* opCtx);
+        ~SideTransactionBlock();
+
+        // Rule of 5: because we have a class-defined destructor, we need to explictly specify
+        // the move operator and move assignment operator.
+        SideTransactionBlock(SideTransactionBlock&&) = default;
+        SideTransactionBlock& operator=(SideTransactionBlock&&) = default;
+
+    private:
+        boost::optional<Session::TxnResources> _txnResources;
+        OperationContext* _opCtx;
+    };
+
     using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
     using CursorKillFunction =
         std::function<size_t(OperationContext*, LogicalSessionId, TxnNumber)>;
@@ -305,7 +324,8 @@ public:
 
     /**
      * Returns whether we are in a multi-document transaction, which means we have an active
-     * transaction which has autoCommit:false and has not been committed or aborted.
+     * transaction which has autoCommit:false and has not been committed or aborted. It is possible
+     * that the current transaction is stashed onto the stack via a `SideTransactionBlock`.
      */
     bool inMultiDocumentTransaction() const {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
