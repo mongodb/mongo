@@ -666,15 +666,6 @@ Status buildCredentials(BSONObjBuilder* builder, const auth::CreateOrUpdateUserA
     }
 
     if (buildSCRAMSHA256) {
-        // FCV check is deferred till this point so that the suitability checks can be performed
-        // regardless.
-        const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
-        if (fcv < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-            buildSCRAMSHA256 = false;
-        }
-    }
-
-    if (buildSCRAMSHA256) {
         if (!args.digestPassword) {
             return {ErrorCodes::BadValue, "Use of SCRAM-SHA-256 requires undigested passwords"};
         }

@@ -73,23 +73,6 @@
     admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
     assert(admin.auth('admin', 'pass'));
 
-    // Test FCV 3.6 mode first.
-    assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.6"}));
-
-    // By default, only create SHA-1 in 3.6 FCV mode.
-    test.createUser({user: 'sha1default', pwd: 'pass', roles: jsTest.basicUserRoles});
-    checkUser('sha1default', 'pass', true, false);
-
-    // SCRAM-SHA-256 not available.
-    assert.throws(function() {
-        test.createUser({
-            user: 'sha256failure',
-            pwd: 'pass',
-            roles: jsTest.basicUserRoles,
-            mechanisms: ['SCRAM-SHA-256']
-        });
-    });
-
     // Unknown mechanism.
     assert.throws(function() {
         test.createUser({
@@ -99,9 +82,6 @@
             mechanisms: ['SCRAM-SHA-1', 'SCRAM-SHA-LA-LA'],
         });
     });
-
-    // Now do general testing with SCRAM-SHA-256 enabled.
-    assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "4.0"}));
 
     // By default, users are created with both SCRAM variants.
     test.createUser({user: 'user', pwd: 'pass', roles: jsTest.basicUserRoles});
@@ -212,7 +192,7 @@
     allSCRAMSHA1UsersInfo.users.forEach(function(userObj) {
         foundUsers.push(userObj.user);
     });
-    assert.eq(["sha1default", "sha1user", "sha1user2", "\u2168"], foundUsers);
+    assert.eq(["sha1user", "sha1user2", "\u2168"], foundUsers);
 
     // Demonstrate that usersInfo can find SCRAM-SHA-256 users
     const allSCRAMSHA256UsersInfo = assert.commandWorked(

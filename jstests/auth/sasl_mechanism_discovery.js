@@ -22,18 +22,6 @@
         assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "bogus"}),
                                      ErrorCodes.BadValue);
 
-        // Create a legacy user.
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-        assert.commandWorked(db.runCommand({createUser: "legacyUser", pwd: "pwd", roles: []}));
-        checkMechs("admin.legacyUser", ["SCRAM-SHA-1"]);
-
-        // Enable SCRAM-SHA-256.
-        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-
-        // Legacy users continue expressing SCRAM-SHA-1
-        checkMechs("admin.legacyUser", ["SCRAM-SHA-1"]);
-
-        // Make users.
         assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: []}));
         assert.commandWorked(externalDB.runCommand({createUser: "user", roles: []}));
 
