@@ -138,10 +138,6 @@ void ScatterGatherRunner::RunnerImpl::processResponse(
     std::swap(*iter, _callbacks.back());
     _callbacks.pop_back();
 
-    if (cbData.response.status == ErrorCodes::CallbackCanceled) {
-        return;
-    }
-
     _algorithm->processResponse(cbData.request, cbData.response);
     if (_algorithm->hasReceivedSufficientResponses()) {
         _signalSufficientResponsesReceived();
