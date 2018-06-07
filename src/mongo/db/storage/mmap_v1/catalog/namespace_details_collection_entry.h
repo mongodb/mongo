@@ -102,8 +102,6 @@ public:
 
     void updateFlags(OperationContext* opCtx, int newValue) final;
 
-    void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;
-
     bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid);
 
     void updateValidator(OperationContext* opCtx,

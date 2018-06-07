@@ -194,8 +194,6 @@ public:
         virtual const NamespaceString& ns() const = 0;
         virtual OptionalCollectionUUID uuid() const = 0;
 
-        virtual void refreshUUID(OperationContext* opCtx) = 0;
-
         virtual const IndexCatalog* getIndexCatalog() const = 0;
         virtual IndexCatalog* getIndexCatalog() = 0;
 
@@ -383,10 +381,6 @@ public:
 
     inline OptionalCollectionUUID uuid() const {
         return this->_impl().uuid();
-    }
-
-    inline void refreshUUID(OperationContext* opCtx) {
-        return this->_impl().refreshUUID(opCtx);
     }
 
     inline const IndexCatalog* getIndexCatalog() const {

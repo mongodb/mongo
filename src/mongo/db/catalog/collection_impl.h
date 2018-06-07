@@ -84,8 +84,6 @@ public:
         return _uuid;
     }
 
-    void refreshUUID(OperationContext* opCtx) final;
-
     const IndexCatalog* getIndexCatalog() const final {
         return &_indexCatalog;
     }

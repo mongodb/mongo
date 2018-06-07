@@ -87,8 +87,6 @@ public:
 
     void updateCappedSize(OperationContext*, long long int) final;
 
-    void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) final;
-
     bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) final;
 
     RecordStore* getRecordStore() {

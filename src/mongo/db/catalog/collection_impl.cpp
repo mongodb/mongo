@@ -195,15 +195,6 @@ CollectionImpl::~CollectionImpl() {
     _magic = 0;
 }
 
-void CollectionImpl::refreshUUID(OperationContext* opCtx) {
-    auto options = getCatalogEntry()->getCollectionOptions(opCtx);
-    // refreshUUID may be called from outside a WriteUnitOfWork. In such cases, there is no
-    // change to any on disk data, so no rollback handler is needed.
-    if (opCtx->lockState()->inAWriteUnitOfWork())
-        opCtx->recoveryUnit()->onRollback([ this, oldUUID = _uuid ] { this->_uuid = oldUUID; });
-    _uuid = options.uuid;
-}
-
 bool CollectionImpl::requiresIdIndex() const {
     if (_ns.isVirtualized() || _ns.isOplog()) {
         // No indexes on virtual collections or the oplog.

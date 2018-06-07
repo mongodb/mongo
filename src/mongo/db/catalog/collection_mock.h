@@ -85,11 +85,6 @@ public:
     const CollectionInfoCache* infoCache() const {
         std::abort();
     }
-
-    void refreshUUID(OperationContext* opCtx) {
-        std::abort();
-    }
-
     const IndexCatalog* getIndexCatalog() const {
         std::abort();
     }

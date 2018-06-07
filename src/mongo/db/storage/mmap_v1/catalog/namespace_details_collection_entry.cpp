@@ -428,27 +428,6 @@ void NamespaceDetailsCollectionCatalogEntry::updateFlags(OperationContext* opCtx
     _updateSystemNamespaces(opCtx, BSON("$set" << BSON("options.flags" << newValue)));
 }
 
-void NamespaceDetailsCollectionCatalogEntry::addUUID(OperationContext* opCtx,
-                                                     CollectionUUID uuid,
-                                                     Collection* coll) {
-    // Add a UUID to CollectionOptions if a UUID does not yet exist.
-    if (ns().coll() == "system.namespaces") {
-        return;
-    }
-    RecordData namespaceData;
-    invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
-
-    auto namespacesBson = namespaceData.releaseToBson();
-
-    if (namespacesBson["options"].isABSONObj() && !namespacesBson["options"].Obj()["uuid"].eoo()) {
-        fassert(40565, UUID::parse(namespacesBson["options"].Obj()["uuid"]).getValue() == uuid);
-    } else {
-        _updateSystemNamespaces(opCtx, BSON("$set" << BSON("options.uuid" << uuid)));
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
-        catalog.onCreateCollection(opCtx, coll, uuid);
-    }
-}
-
 bool NamespaceDetailsCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
                                                                    OptionalCollectionUUID uuid) {
     if (ns().coll() == "system.namespaces") {

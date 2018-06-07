@@ -136,7 +136,6 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
 Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                                      const std::vector<std::string>& dbNames) {
     bool isMmapV1 = opCtx->getServiceContext()->getStorageEngine()->isMmapV1();
-    std::vector<NamespaceString> nonReplicatedCollNSSsWithoutUUIDs;
     for (const auto& dbName : dbNames) {
         Database* db = DatabaseHolder::getDatabaseHolder().openDb(opCtx, dbName);
         invariant(db);
@@ -175,31 +174,12 @@ Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
                 continue;
             }
 
+            // We expect all collections to have UUIDs in MongoDB 4.2
             if (!coll->uuid()) {
-                if (!coll->ns().isReplicated()) {
-                    nonReplicatedCollNSSsWithoutUUIDs.push_back(coll->ns());
-                    continue;
-                }
-
-                // We expect all collections to have UUIDs starting in FCV 3.6, so if we are missing
-                // a UUID then the user never upgraded to FCV 3.6 and this startup attempt is
-                // illegal.
                 return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
             }
         }
     }
-
-    // Non-replicated collections are very easy to fix since they don't require a replication or
-    // sharding solution. So, regardless of what the cause might have been, we go ahead and add
-    // UUIDs to them to ensure UUID dependent code works.
-    //
-    // Note: v3.6 arbiters do not have UUIDs, so this code is necessary to add them on upgrade to
-    // v4.0.
-    for (const auto& collNSS : nonReplicatedCollNSSsWithoutUUIDs) {
-        uassertStatusOK(
-            collModForUUIDUpgrade(opCtx, collNSS, BSON("collMod" << collNSS.coll()), UUID::gen()));
-    }
-
     return Status::OK();
 }
 

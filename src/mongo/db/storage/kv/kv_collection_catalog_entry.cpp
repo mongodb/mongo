@@ -239,20 +239,6 @@ void KVCollectionCatalogEntry::updateIndexMetadata(OperationContext* opCtx,
     const string ident = _catalog->getIndexIdent(opCtx, ns().ns(), desc->indexName());
     _engine->alterIdentMetadata(opCtx, ident, desc);
 }
-void KVCollectionCatalogEntry::addUUID(OperationContext* opCtx,
-                                       CollectionUUID uuid,
-                                       Collection* coll) {
-    // Add a UUID to CollectionOptions if a UUID does not yet exist.
-    MetaData md = _getMetaData(opCtx);
-    if (!md.options.uuid) {
-        md.options.uuid = uuid;
-        _catalog->putMetaData(opCtx, ns().toString(), md);
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
-        catalog.onCreateCollection(opCtx, coll, uuid);
-    } else {
-        fassert(40564, md.options.uuid.get() == uuid);
-    }
-}
 
 bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
                                                      OptionalCollectionUUID uuid) {
