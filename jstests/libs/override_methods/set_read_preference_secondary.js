@@ -125,6 +125,12 @@
             shouldForceReadPreference = false;
         }
 
+        if (TestData.doNotOverrideReadPreference) {
+            // Use this TestData flag to allow certain runCommands to be exempted from
+            // setting secondary read preference.
+            shouldForceReadPreference = false;
+        }
+
         if (shouldForceReadPreference) {
             if (commandObj === commandObjUnwrapped) {
                 // We wrap the command object using a "query" field rather than a "$query" field to
