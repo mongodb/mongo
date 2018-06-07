@@ -979,6 +979,61 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
     ASSERT_OK(waitForQuorumCheck());
 }
 
+TEST_F(CheckQuorumForReconfig, QuorumCheckProcessesCallbackCanceledResponse) {
+    // In this test, "we" are host "h3".  Only "h1" and "h2" can vote.
+    // We are checking that even if a callback was canceled, it will count as a response towards
+    // the quorum. Since we make h2 respond negatively, the test requires that it processes the
+    // cancelled callback in order to complete.
+
+    const ReplSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "rs0"
+                                << "version"
+                                << 2
+                                << "protocolVersion"
+                                << 1
+                                << "members"
+                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                         << "h1:1")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1"))));
+    const int myConfigIndex = 2;
+    const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+    startQuorumCheck(rsConfig, myConfigIndex);
+    const Date_t startDate = getNet()->now();
+    const int numCommandsExpected = rsConfig.getNumMembers() - 1;
+    stdx::unordered_set<HostAndPort> seenHosts;
+    getNet()->enterNetwork();
+    for (int i = 0; i < numCommandsExpected; ++i) {
+        const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        const RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS("admin", request.dbname);
+        ASSERT_BSONOBJ_EQ(hbRequest, request.cmdObj);
+        ASSERT(seenHosts.insert(request.target).second) << "Already saw "
+                                                        << request.target.toString();
+        if (request.target == HostAndPort("h1", 1)) {
+            getNet()->scheduleResponse(
+                noi,
+                startDate + Milliseconds(10),
+                (RemoteCommandResponse(ErrorCodes::CallbackCanceled, "Testing canceled callback")));
+        } else {
+            getNet()->scheduleResponse(
+                noi,
+                startDate + Milliseconds(10),
+                (RemoteCommandResponse(BSON("ok" << 0), BSONObj(), Milliseconds(8))));
+        }
+    }
+    getNet()->runUntil(startDate + Milliseconds(10));
+    getNet()->exitNetwork();
+
+    Status status = waitForQuorumCheck();
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
+    ASSERT_REASON_CONTAINS(status, "not enough voting nodes responded");
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
