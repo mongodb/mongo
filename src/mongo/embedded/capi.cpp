@@ -96,7 +96,7 @@ mongo_embedded_v1_status translateException() try { throw; } catch (const Mobile
 } catch (...) {
     return {MONGO_EMBEDDED_V1_ERROR_UNKNOWN,
             mongo::ErrorCodes::InternalError,
-            "Unknown error encountered in performing requested libmongodbcapi operation"};
+            "Unknown error encountered in performing requested mongo_embedded_v1 operation"};
 }
 
 std::nullptr_t handleException(mongo_embedded_v1_status& status) noexcept {
@@ -225,7 +225,7 @@ private:
 public:
     explicit ReentrancyGuard() {
         uassert(ErrorCodes::ReentrancyNotAllowed,
-                str::stream() << "Reentry into libmongodbcapi is not allowed",
+                str::stream() << "Reentry into mongo_embedded_v1 library is not allowed",
                 !inLibrary);
         inLibrary = true;
     }
