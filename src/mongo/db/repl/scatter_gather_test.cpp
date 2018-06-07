@@ -374,6 +374,49 @@ TEST_F(ScatterGatherTest, DoNotProcessMoreThanSufficientResponses) {
     net->exitNetwork();
 }
 
+// Confirm that scatter-gather runner passes CallbackCanceled error to the algorithm
+// and that the algorithm processes the response correctly.
+TEST_F(ScatterGatherTest, AlgorithmProcessesCallbackCanceledResponse) {
+    auto sga = std::make_shared<ScatterGatherTestAlgorithm>();
+    ScatterGatherRunner* sgr = new ScatterGatherRunner(sga, &getExecutor());
+    bool ranCompletion = false;
+    StatusWith<executor::TaskExecutor::EventHandle> status = sgr->start();
+    ASSERT_OK(getExecutor()
+                  .onEvent(status.getValue(), getOnCompletionTestFunction(&ranCompletion))
+                  .getStatus());
+    ASSERT_OK(status.getStatus());
+    ASSERT_FALSE(ranCompletion);
+
+    NetworkInterfaceMock* net = getNet();
+    net->enterNetwork();
+    NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+    net->scheduleResponse(noi,
+                          net->now() + Seconds(2),
+                          (RemoteCommandResponse(BSON("ok" << 1), BSONObj(), Milliseconds(10))));
+    ASSERT_FALSE(ranCompletion);
+
+    noi = net->getNextReadyRequest();
+    net->scheduleResponse(
+        noi,
+        net->now() + Seconds(2),
+        (RemoteCommandResponse(ErrorCodes::CallbackCanceled, "Testing canceled callback")));
+    ASSERT_FALSE(ranCompletion);
+
+    // We don't schedule a response from one node to make sure the response with the
+    // CallbackCanceled error is needed to get the sufficient number of responses.
+    noi = net->getNextReadyRequest();
+    ASSERT_FALSE(ranCompletion);
+
+    net->runUntil(net->now() + Seconds(2));
+    ASSERT_TRUE(ranCompletion);
+
+    net->runReadyNetworkOperations();
+    // The response with the CallbackCanceled error should count as a response to the algorithm.
+    ASSERT_EQUALS(2, sga->getResponseCount());
+
+    net->exitNetwork();
+}
+
 // Confirm that starting with sufficient responses received will immediate complete.
 TEST_F(ScatterGatherTest, DoNotCreateCallbacksIfHasSufficientResponsesReturnsTrueImmediately) {
     auto sga = std::make_shared<ScatterGatherTestAlgorithm>();

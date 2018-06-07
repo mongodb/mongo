@@ -197,9 +197,7 @@ TEST_F(FreshnessCheckerTest, ShuttingDown) {
     joinExecutorThread();
     waitOnChecker();
 
-    // This seems less than ideal, but if we are shutting down, the next phase of election
-    // cannot proceed anyway.
-    ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::None);
+    ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::QuorumUnreachable);
 }
 
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
