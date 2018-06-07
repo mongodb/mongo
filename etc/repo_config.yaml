@@ -74,6 +74,14 @@ repos:
       - yum/redhat/6/mongodb-org
       - yum/redhat/6Server/mongodb-org
 
+  - name: rhel67
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/redhat/6/mongodb-org
+      - yum/redhat/6Server/mongodb-org
+
   - name: rhel70
     type: rpm
     edition: org
